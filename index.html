@@ -136,12 +136,33 @@
     flex:1;
   }
 
-  /* 주간교육활동 페이지 */
-  .weekly-page-inner{
-    padding:16px;max-width:800px;margin:0 auto;width:100%;
+  /* 주간교육활동 페이지 - iframe 방식 */
+  .weekly-top-bar{
+    flex-shrink:0;padding:10px 14px;
+    background:var(--paper);border-bottom:1px solid var(--rule);
+    min-height:44px;display:flex;align-items:center;
   }
+  .weekly-iframe-wrap{
+    flex:1;min-height:0;position:relative;
+  }
+  #weeklyIframe{
+    width:100%;height:100%;border:none;display:block;
+  }
+  .weekly-iframe-fallback{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:16px;
+    background:var(--paper);
+    font-size:14px;color:var(--ink-soft);
+  }
+  .weekly-open-btn{
+    padding:12px 24px;border-radius:8px;
+    background:var(--mon);color:#fff;font-weight:700;
+    font-family:'Noto Sans KR';font-size:14px;
+    text-decoration:none;
+  }
+  .weekly-open-btn:hover{opacity:.85;}
   .weekly-page-loading{
-    padding:40px;text-align:center;font-size:13px;color:var(--ink-soft);
+    font-size:13px;color:var(--ink-soft);
   }
   .weekly-dept{
     background:var(--paper);border-radius:8px;margin-bottom:10px;overflow:hidden;
@@ -841,9 +862,16 @@
 
       <!-- 주간교육활동 페이지 -->
       <div class="page-view" id="weeklyPage">
-        <div class="weekly-page-inner">
+        <div class="weekly-top-bar">
           <div class="weekly-page-loading" id="weeklyPageLoading">주간교육활동을 불러오는 중...</div>
-          <div class="weekly-page-content" id="weeklyPageContent"></div>
+          <div class="weekly-week-bar" id="weeklyWeekBar" style="display:none;"></div>
+        </div>
+        <div class="weekly-iframe-wrap">
+          <iframe id="weeklyIframe" title="주간 교육활동" src=""></iframe>
+          <div class="weekly-iframe-fallback" id="weeklyIframeFallback" style="display:none;">
+            <p>iframe이 차단되었습니다.</p>
+            <a id="weeklyDirectLink" href="https://sites.google.com/yeungnam.hs.kr/202633" target="_blank" class="weekly-open-btn">새 탭에서 열기 ↗</a>
+          </div>
         </div>
       </div>
 
@@ -2019,21 +2047,11 @@ document.addEventListener('visibilitychange', async () => {
 });
 
 // ---- 메인 네비게이션: 시간표 ↔ 주간교육활동 ----
-const SITES_BASE = 'https://sites.google.com/yeungnam.hs.kr/202633';
-const APPS_SCRIPT_PROXY = 'https://script.google.com/macros/s/AKfycbxNLX5U2hdeuE6vHeKvyfkpnshwvpcDCIV-MdgdwNphHVpqfGUrhkS4jGi35HRSOgGS9w/exec';
-const PROXIES = [
-  url => `${APPS_SCRIPT_PROXY}?url=${encodeURIComponent(url)}`,
-  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-];
-
 const mainNav       = document.getElementById('mainNav');
 const hamburgerBtn  = document.getElementById('hamburgerBtn');
 const navOverlay    = document.getElementById('navOverlay');
 const timetablePage = document.getElementById('timetablePage');
 const weeklyPage    = document.getElementById('weeklyPage');
-const weeklyPageLoading = document.getElementById('weeklyPageLoading');
-const weeklyPageContent = document.getElementById('weeklyPageContent');
 
 // 햄버거 (모바일)
 hamburgerBtn.addEventListener('click', () => {
@@ -2070,223 +2088,98 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
   });
 });
 
-// ---- 주간교육활동 페이지 ----
+// ---- 주간교육활동 (iframe 방식) ----
+const SITES_BASE = 'https://sites.google.com/yeungnam.hs.kr/202633';
+const APPS_SCRIPT_PROXY = 'https://script.google.com/macros/s/AKfycby4NGUHpHzPXXdmdBbgCAMcx5Fjrya2_tmOGygrD0aEUIJlwZoGlCaDJtFfvGC-9DEzGQ/exec';
+
+const weeklyPageEl    = document.getElementById('weeklyPage');
+const weeklyPageLoading = document.getElementById('weeklyPageLoading');
+const weeklyWeekBar   = document.getElementById('weeklyWeekBar');
+const weeklyIframe    = document.getElementById('weeklyIframe');
+const weeklyFallback  = document.getElementById('weeklyIframeFallback');
+const weeklyDirectLink= document.getElementById('weeklyDirectLink');
+
 let weeklyInitialized = false;
-let weeklyNavLinks    = [];
-
-async function fetchWithFallback(url) {
-  const errors = [];
-  for(const proxy of PROXIES){
-    try{
-      const proxyUrl = proxy(url);
-      const res = await fetch(proxyUrl, {signal: AbortSignal.timeout(10000)});
-      if(!res.ok){ errors.push(`${proxyUrl.slice(0,40)}: HTTP ${res.status}`); continue; }
-      const text = await res.text();
-      // Google Sites JS shell은 본문 내용이 거의 없음 → 1000자 이상이어야 유효
-      if(text && text.length > 1000) return text;
-      errors.push(`${proxyUrl.slice(0,40)}: 응답이 너무 짧음 (${text.length}자)`);
-    }catch(e){
-      errors.push(`${proxy(url).slice(0,40)}: ${e.message}`);
-    }
-  }
-  throw new Error('모든 프록시 실패:\n' + errors.join('\n'));
-}
-
-function parseSitesHtml(html){
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  const navLinks = [];
-
-  // ── 앱스 스크립트 응답 형식: ===NAV=== / ===CONTENT=== ──
-  if(html.includes('===NAV===') && html.includes('===CONTENT===')){
-    const navPart     = html.split('===NAV===')[1].split('===CONTENT===')[0];
-    const contentHtml = html.split('===CONTENT===')[1] || '';
-
-    navPart.trim().split('\n').forEach(line => {
-      const url = line.trim();
-      if(!url || !url.includes('/202633/')) return;
-      const slug = decodeURIComponent(url.split('/202633/').pop().replace(/-/g,' '));
-      const m = slug.match(/(\d{4})년\s*(\d+)월\s*(\d+)일\s*([월화수목금토일])/);
-      const text = m ? `${m[2]}월 ${m[3]}일(${m[4]})` : slug;
-      navLinks.push({text, href: url});
-    });
-
-    return {navLinks, contentHtml, sections: []};
-  }
-
-  // ── 폴백: DOM 방식 ──
-  const seen = new Set();
-  doc.querySelectorAll('a').forEach(a => {
-    const raw  = a.getAttribute('href') || '';
-    const text = a.textContent.trim();
-    if(!text || seen.has(raw)) return;
-    if(!raw.includes('/202633/') && !(a.href||'').includes('/202633/')) return;
-    seen.add(raw);
-    const href = raw.startsWith('http') ? raw : 'https://sites.google.com' + raw;
-    navLinks.push({text, href});
-  });
-  return {navLinks, contentHtml: '', sections: parseTextToSections(doc.body.textContent||'')};
-}
-
-function sanitizeContentHtml(html){
-  // script, on* 이벤트, javascript: 링크 제거
-  return html
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
-    .replace(/\son\w+="[^"]*"/g, '')
-    .replace(/javascript:/gi, '#');
-}
-
-function parseTextToSections(rawText){
-  const lines = rawText.split(/\r?\n/)
-    .map(l => l.trim())
-    .filter(l => l.length > 1);
-
-  const SKIP = ['Skip to main', 'Skip to navigation', 'Report abuse',
-    'Page details', 'Page updated', 'Search this site', 'Embedded Files',
-    '이 사이트 검색', 'Report a problem', 'Google Sites'];
-
-  const DEPT_SUFFIX  = ['부','실','팀'];
-  const DEPT_KEYWORD = ['교감','교장','행정','사감'];
-
-  function isDeptLine(l){
-    if(l.length > 20 || l.length < 2) return false;
-    if(DEPT_KEYWORD.some(k => l.includes(k))) return true;
-    return DEPT_SUFFIX.some(s => l.endsWith(s));
-  }
-  function isItemLine(l){
-    return /^(0\d|1\d|2\d)_/.test(l) || /^♥/.test(l);
-  }
-
-  const sections = [];
-  let dept = null, item = null;
-
-  for(const line of lines){
-    if(SKIP.some(s => line.startsWith(s))) continue;
-    if(line.startsWith('http') && line.length > 60) continue;
-    if(/^[a-zA-Z0-9_\-\.]+$/.test(line) && line.length > 10) continue; // JS 심볼 스킵
-
-    if(isDeptLine(line)){
-      dept = {title: line, items: []};
-      sections.push(dept);
-      item = null;
-    } else if(isItemLine(line)){
-      if(!dept){dept={title:'공지',items:[]};sections.push(dept);}
-      item = {title: line, lines: []};
-      dept.items.push(item);
-    } else if(line.length >= 2){
-      if(!item){
-        if(!dept){dept={title:'공지',items:[]};sections.push(dept);}
-        item = {title:'',lines:[]};
-        dept.items.push(item);
-      }
-      item.lines.push(line);
-    }
-  }
-  return sections.filter(s => s.items.length > 0);
-}
+let currentWeekUrl    = SITES_BASE;
 
 async function initWeeklyPage(){
   weeklyInitialized = true;
-  weeklyPageLoading.textContent = '주간교육활동을 불러오는 중...';
+  weeklyPageLoading.textContent = '주간교육활동 목록을 불러오는 중...';
   weeklyPageLoading.style.display = '';
-  weeklyPageContent.innerHTML = '';
-  try{
-    const html  = await fetchWithFallback(SITES_BASE);
-    const data  = parseSitesHtml(html);
-    weeklyNavLinks = data.navLinks;
-    renderWeeklyPage(data.navLinks, data.contentHtml, data.sections);
-    weeklyPageLoading.style.display = 'none';
-  }catch(e){
-    weeklyPageLoading.textContent = '불러오기 실패:\n' + e.message;
-  }
-}
+  weeklyWeekBar.style.display = 'none';
 
-async function loadWeekByUrl(url){
-  weeklyPageLoading.textContent = '불러오는 중...';
-  weeklyPageLoading.style.display = '';
-  weeklyPageContent.querySelector('.weekly-html-content')?.remove();
-  weeklyPageContent.querySelector('.weekly-dept-list')?.remove();
+  // 1) 먼저 iframe에 현재 주차 페이지 로드
+  loadInIframe(SITES_BASE);
+
+  // 2) Apps Script에서 주차 목록 가져오기
   try{
-    const html  = await fetchWithFallback(url);
-    const data  = parseSitesHtml(html);
-    if(data.contentHtml){
-      renderHtmlContent(data.contentHtml);
+    const res  = await fetch(APPS_SCRIPT_PROXY + '?url=' + encodeURIComponent(SITES_BASE),
+                             {signal: AbortSignal.timeout(10000)});
+    const text = await res.text();
+    const urls = text.trim().split('\n')
+      .map(u => u.trim())
+      .filter(u => u.includes('/202633/'));
+
+    if(urls.length > 0){
+      renderWeekChips(urls);
+      weeklyPageLoading.style.display = 'none';
+      weeklyWeekBar.style.display = '';
     } else {
-      renderDeptList(data.sections);
+      weeklyPageLoading.textContent = '목록을 가져오지 못했어요.';
     }
-    weeklyPageLoading.style.display = 'none';
   }catch(e){
-    weeklyPageLoading.textContent = '불러오기 실패: ' + e.message;
+    weeklyPageLoading.textContent = '목록 로딩 실패: ' + e.message;
   }
 }
 
-function renderWeeklyPage(navLinks, contentHtml, sections){
-  const bar = document.createElement('div');
-  bar.className = 'weekly-week-bar';
-  navLinks.slice(0, 18).forEach((link, i) => {
+function renderWeekChips(urls){
+  weeklyWeekBar.innerHTML = '';
+  urls.slice(0, 20).forEach((url, i) => {
+    const slug = decodeURIComponent(url.split('/202633/').pop()).replace(/-/g,' ');
+    const m = slug.match(/(\d{4})년\s*(\d+)월\s*(\d+)일\s*([월화수목금토일])/);
+    const text = m ? `${m[2]}월 ${m[3]}일(${m[4]})` : slug;
+
     const chip = document.createElement('button');
     chip.className = 'weekly-week-chip' + (i === 0 ? ' active' : '');
-    chip.textContent = link.text;
+    chip.textContent = text;
     chip.addEventListener('click', () => {
-      bar.querySelectorAll('.weekly-week-chip').forEach(c=>c.classList.remove('active'));
+      weeklyWeekBar.querySelectorAll('.weekly-week-chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
-      loadWeekByUrl(link.href);
+      loadInIframe(url);
     });
-    bar.appendChild(chip);
+    weeklyWeekBar.appendChild(chip);
   });
-  weeklyPageContent.innerHTML = '';
-  weeklyPageContent.appendChild(bar);
-  if(contentHtml){
-    renderHtmlContent(contentHtml);
-  } else {
-    renderDeptList(sections);
-  }
 }
 
-function renderHtmlContent(html){
-  const existing = weeklyPageContent.querySelector('.weekly-html-content');
-  if(existing) existing.remove();
-  const div = document.createElement('div');
-  div.className = 'weekly-html-content';
-  div.innerHTML = sanitizeContentHtml(html);
-  weeklyPageContent.appendChild(div);
+function loadInIframe(url){
+  currentWeekUrl = url;
+  weeklyDirectLink.href = url;
+  weeklyIframe.src = url;
+  weeklyFallback.style.display = 'none';
+  weeklyIframe.style.display = 'block';
+
+  // iframe이 로드된 후 비어있으면 (X-Frame-Options 차단) fallback 표시
+  weeklyIframe.onload = function(){
+    try{
+      // 크로스오리진이면 접근 자체가 불가능 → catch에서 처리
+      const doc = weeklyIframe.contentDocument || weeklyIframe.contentWindow.document;
+      if(!doc || !doc.body || doc.body.innerHTML.trim() === ''){
+        showFallback();
+      }
+    }catch(e){
+      // 크로스오리진 오류 → 사실은 정상 로드된 것 (X-Frame-Options가 없는 경우)
+      // 아무것도 안 해도 됨
+    }
+  };
 }
 
-function renderDeptList(sections){
-  const existing = weeklyPageContent.querySelector('.weekly-dept-list');
-  if(existing) existing.remove();
-
-  const list = document.createElement('div');
-  list.className = 'weekly-dept-list';
-
-  if(!sections.length){
-    list.innerHTML = '<div class="weekly-page-loading">내용을 파싱하지 못했습니다. 직접 사이트를 확인해주세요.</div>';
-    weeklyPageContent.appendChild(list);
-    return;
-  }
-
-  list.innerHTML = sections.map(dept => `
-    <div class="weekly-dept">
-      <div class="weekly-dept-header" onclick="this.nextElementSibling.classList.toggle('closed')">
-        <span>${dept.title}</span><span style="font-size:11px;opacity:.6">▾</span>
-      </div>
-      <div class="weekly-dept-body">
-        ${dept.items.map(item => `
-          <div class="weekly-item">
-            ${item.title ? `<div class="weekly-item-title">${item.title}</div>` : ''}
-            <div class="weekly-item-body">${item.lines.join('\n')}</div>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `).join('');
-  weeklyPageContent.appendChild(list);
+function showFallback(){
+  weeklyIframe.style.display = 'none';
+  weeklyFallback.style.display = 'flex';
 }
 
 
-</script>
-</body>
-</html>
+
 </script>
 </body>
 </html>
