@@ -43,26 +43,32 @@
 
   /* 상단 헤더 */
   .app-header{
-    flex-shrink:0;display:flex;align-items:center;gap:10px;
-    height:50px;padding:0 14px;
-    background:var(--bg-base);
+    flex-shrink:0;display:flex;align-items:flex-end;gap:14px;
+    height:160px;padding:0 22px 18px;
+    background:var(--paper);
     border-bottom:1px solid rgba(255,255,255,0.07);
-    box-shadow:0 2px 12px -4px rgba(0,0,0,0.4);
+    box-shadow:0 4px 20px -6px rgba(0,0,0,0.5);
     z-index:100;position:relative;
+    background-image:
+      radial-gradient(circle at 20% 50%, rgba(255,255,255,0.04), transparent 50%),
+      radial-gradient(circle at 80% 30%, rgba(255,255,255,0.03), transparent 45%);
   }
   .app-header-title{
-    font-family:'Noto Serif KR';font-weight:900;font-size:15px;
+    font-family:'Noto Serif KR';font-weight:900;font-size:24px;
     color:var(--ink);flex:1;
+    text-shadow:0 2px 8px rgba(0,0,0,0.3);
+    letter-spacing:-0.02em;
   }
   .hamburger-btn{
-    flex-shrink:0;width:36px;height:36px;
+    flex-shrink:0;width:40px;height:40px;
     background:transparent;border:none;cursor:pointer;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
-    padding:4px;border-radius:6px;
+    padding:4px;border-radius:8px;
+    align-self:flex-start;margin-top:14px;
   }
   .hamburger-btn:hover{background:var(--paper-soft);}
   .hamburger-btn span{
-    display:block;width:18px;height:2px;
+    display:block;width:20px;height:2px;
     background:var(--ink);border-radius:2px;
     transition:transform .2s ease, opacity .2s ease;
   }
@@ -71,8 +77,9 @@
   .hamburger-btn.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg);}
   .app-logout-btn{
     border:1px solid var(--rule);background:var(--paper-soft);
-    font-family:'Noto Sans KR';font-size:11px;font-weight:700;color:var(--ink-soft);
-    padding:5px 10px;border-radius:6px;cursor:pointer;flex-shrink:0;
+    font-family:'Noto Sans KR';font-size:11.5px;font-weight:700;color:var(--ink-soft);
+    padding:6px 12px;border-radius:6px;cursor:pointer;flex-shrink:0;
+    align-self:flex-start;margin-top:14px;
   }
   .app-logout-btn:hover{background:var(--rule);}
 
@@ -81,23 +88,23 @@
 
   /* 메인 네비게이션 사이드바 */
   .main-nav{
-    flex-shrink:0;width:180px;
+    flex-shrink:0;width:240px;
     background:var(--paper);
     overflow-y:auto;
     border-right:1px solid var(--rule);
-    padding:8px;
+    padding:12px;
     transition:transform .25s ease;
   }
   .main-nav-item{
-    display:flex;align-items:center;gap:8px;
-    padding:11px 12px;border-radius:8px;cursor:pointer;
-    font-family:'Noto Sans KR';font-size:13px;font-weight:600;
+    display:flex;align-items:center;gap:10px;
+    padding:14px 16px;border-radius:10px;cursor:pointer;
+    font-family:'Noto Sans KR';font-size:14.5px;font-weight:700;
     color:var(--ink-soft);
     transition:background .12s ease, color .12s ease;
   }
   .main-nav-item:hover{background:var(--paper-soft);color:var(--ink);}
   .main-nav-item.active{background:var(--mon);color:#fff;}
-  .main-nav-icon{font-size:14px;}
+  .main-nav-icon{font-size:17px;}
 
   /* 모바일: 사이드바는 기본적으로 숨김 */
   .nav-overlay{
@@ -108,7 +115,7 @@
 
   @media (max-width:699px){
     .main-nav{
-      position:fixed;left:0;top:50px;bottom:0;z-index:200;
+      position:fixed;left:0;top:160px;bottom:0;z-index:200;
       transform:translateX(-100%);
       box-shadow:4px 0 20px -4px rgba(0,0,0,0.5);
     }
@@ -1993,6 +2000,7 @@ const SITES_BASE = 'https://sites.google.com/yeungnam.hs.kr/202633';
 const PROXIES = [
   url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
   url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
 ];
 
 const mainNav       = document.getElementById('mainNav');
@@ -2043,16 +2051,21 @@ let weeklyInitialized = false;
 let weeklyNavLinks    = [];
 
 async function fetchWithFallback(url) {
+  const errors = [];
   for(const proxy of PROXIES){
     try{
-      const res = await fetch(proxy(url), {signal: AbortSignal.timeout(8000)});
-      if(res.ok){
-        const text = await res.text();
-        if(text && text.length > 500) return text;
-      }
-    }catch(e){}
+      const proxyUrl = proxy(url);
+      const res = await fetch(proxyUrl, {signal: AbortSignal.timeout(10000)});
+      if(!res.ok){ errors.push(`${proxyUrl.slice(0,40)}: HTTP ${res.status}`); continue; }
+      const text = await res.text();
+      // Google Sites JS shell은 본문 내용이 거의 없음 → 1000자 이상이어야 유효
+      if(text && text.length > 1000) return text;
+      errors.push(`${proxyUrl.slice(0,40)}: 응답이 너무 짧음 (${text.length}자)`);
+    }catch(e){
+      errors.push(`${proxy(url).slice(0,40)}: ${e.message}`);
+    }
   }
-  throw new Error('모든 프록시에서 불러오기 실패');
+  throw new Error('모든 프록시 실패:\n' + errors.join('\n'));
 }
 
 function parseSitesHtml(html){
