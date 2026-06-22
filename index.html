@@ -148,45 +148,51 @@
 
   /* 주간교육활동 페이지 */
   .weekly-top-bar{
-    flex-shrink:0;padding:10px 14px;
-    background:var(--paper);border-bottom:1px solid var(--rule);
-    min-height:44px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;
+    flex-shrink:0;padding:8px 12px 0;
+    background:transparent;
+    display:flex;align-items:center;flex-wrap:wrap;gap:8px;
   }
-  .weekly-top-bar:empty{display:none;}
   .weekly-body{
-    flex:1;overflow-y:auto;padding:16px;
-    display:flex;flex-direction:column;gap:12px;
+    flex:1;overflow-y:auto;padding:0 12px 12px;
+    display:flex;flex-direction:column;gap:0;
     background:var(--bg-base);
   }
-  .weekly-open-wrap{text-align:right;}
-  .weekly-open-btn{
-    display:inline-block;padding:7px 16px;border-radius:8px;
-    background:var(--paper);border:1.5px solid var(--rule);
-    color:var(--ink-soft);font-family:'Noto Sans KR';font-size:12.5px;font-weight:700;
-    text-decoration:none;
-  }
-  .weekly-open-btn:hover{background:var(--paper-soft);color:var(--ink);}
-  .weekly-page-loading{font-size:13px;color:var(--ink-soft);}
+  .weekly-page-loading{font-size:13px;color:var(--ink-soft);padding:8px 0;}
+  /* 본문 카드 */
   .weekly-html-content{
+    position:relative;margin-top:6px;
     background:var(--paper);border-radius:8px;padding:24px 28px;
     box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
     font-size:15px;line-height:2;color:var(--ink-soft);
   }
-  .weekly-html-content h1,.weekly-html-content h2,.weekly-html-content h3,
-  .weekly-html-content h4{
-    font-family:'Noto Serif KR';color:var(--ink);margin:22px 0 10px;
-    font-weight:700;padding-bottom:8px;border-bottom:1px solid var(--rule);
+  /* h1(페이지 제목): 강제로 어두운 색으로 */
+  .weekly-html-content h1{
+    color:var(--ink) !important;font-size:20px;
+    font-family:'Noto Serif KR';font-weight:700;
+    margin:0 0 16px;padding:0 0 8px;padding-right:160px;
+    border-bottom:1px solid var(--rule);
   }
-  .weekly-html-content h1{font-size:20px;}
-  .weekly-html-content h2{font-size:18px;}
-  .weekly-html-content h3{font-size:16px;}
-  .weekly-html-content h4{font-size:15px;border-bottom:none;}
+  .weekly-html-content h2{
+    font-family:'Noto Serif KR';color:var(--ink);margin:22px 0 10px;
+    font-weight:700;font-size:18px;padding-bottom:8px;border-bottom:1px solid var(--rule);
+  }
+  .weekly-html-content h3{font-family:'Noto Serif KR';color:var(--ink);font-size:16px;font-weight:700;margin:18px 0 8px;}
+  .weekly-html-content h4{font-family:'Noto Serif KR';color:var(--ink);font-size:15px;font-weight:700;margin:14px 0 6px;}
   .weekly-html-content p,.weekly-html-content div{margin:5px 0;}
   .weekly-html-content a{color:var(--wed);}
   .weekly-html-content a:hover{text-decoration:underline;}
   .weekly-html-content strong,.weekly-html-content b{color:var(--ink);font-weight:700;}
   .weekly-html-content ul,.weekly-html-content ol{padding-left:20px;margin:6px 0;}
   .weekly-html-content li{margin:4px 0;}
+  /* 새 탭 버튼: 본문 카드 우상단 고정 */
+  .weekly-float-btn{
+    position:absolute;top:20px;right:20px;
+    padding:6px 13px;border-radius:7px;
+    background:var(--paper-soft);border:1.5px solid var(--rule);
+    color:var(--ink-soft);font-family:'Noto Sans KR';font-size:12px;font-weight:700;
+    text-decoration:none;white-space:nowrap;
+  }
+  .weekly-float-btn:hover{background:var(--rule);color:var(--ink);}
   .weekly-dept{
     background:var(--paper);border-radius:8px;margin-bottom:10px;overflow:hidden;
     box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
@@ -885,14 +891,10 @@
 
       <!-- 주간교육활동 페이지 -->
       <div class="page-view" id="weeklyPage">
-        <div class="weekly-top-bar">
-          <div class="weekly-page-loading" id="weeklyPageLoading">주간교육활동을 불러오는 중...</div>
-          <div class="weekly-week-bar" id="weeklyWeekBar" style="display:none;"></div>
-        </div>
         <div class="weekly-body" id="weeklyBody">
-          <div class="weekly-open-wrap">
-            <a id="weeklyOpenLink" href="https://sites.google.com/yeungnam.hs.kr/202633"
-               target="_blank" class="weekly-open-btn">↗ 새 탭에서 원본 열기</a>
+          <div class="weekly-top-bar" id="weeklyTopBar">
+            <div class="weekly-page-loading" id="weeklyPageLoading">주간교육활동을 불러오는 중...</div>
+            <div class="weekly-week-bar" id="weeklyWeekBar" style="display:none;"></div>
           </div>
           <div class="weekly-page-content" id="weeklyPageContent"></div>
         </div>
@@ -2160,8 +2162,8 @@ const APPS_SCRIPT_PROXY = 'https://script.google.com/macros/s/AKfycbxVT4Z20BvZ9D
 const weeklyPageLoading  = document.getElementById('weeklyPageLoading');
 const weeklyWeekBar      = document.getElementById('weeklyWeekBar');
 const weeklyPageContent  = document.getElementById('weeklyPageContent');
-const weeklyOpenLink     = document.getElementById('weeklyOpenLink');
 
+let weeklyCurrentUrl = SITES_BASE;
 let weeklyInitialized = false;
 
 async function fetchViaProxy(url) {
@@ -2228,7 +2230,7 @@ function renderWeekChips(navLinks, activeHref){
     chip.addEventListener('click', async () => {
       weeklyWeekBar.querySelectorAll('.weekly-week-chip').forEach(c=>c.classList.remove('active'));
       chip.classList.add('active');
-      weeklyOpenLink.href = link.href;
+      weeklyCurrentUrl = link.href;
       weeklyPageContent.innerHTML = '<div class="weekly-page-loading" style="padding:24px;">불러오는 중...</div>';
       try{
         const raw  = await fetchViaProxy(link.href);
@@ -2244,7 +2246,13 @@ function renderWeekChips(navLinks, activeHref){
 
 function renderContent(html){
   if(!html){
-    weeklyPageContent.innerHTML = '<div class="weekly-page-loading" style="padding:24px;">내용을 파싱하지 못했습니다.<br>위의 새 탭 버튼을 이용해주세요.</div>';
+    weeklyPageContent.innerHTML = '<div class="weekly-page-loading" style="padding:24px;">내용을 파싱하지 못했습니다.<br>새 탭 버튼을 이용해주세요.</div>';
+    // 파싱 실패 시에도 버튼 표시
+    const fallbackBtn = document.createElement('a');
+    fallbackBtn.href = weeklyCurrentUrl; fallbackBtn.target = '_blank';
+    fallbackBtn.className = 'weekly-float-btn'; fallbackBtn.style.cssText = 'position:static;display:inline-block;margin:12px 0;';
+    fallbackBtn.textContent = '↗ 새 탭에서 원본 열기';
+    weeklyPageContent.appendChild(fallbackBtn);
     return;
   }
   const safe = html
@@ -2255,6 +2263,14 @@ function renderContent(html){
   const div = document.createElement('div');
   div.className = 'weekly-html-content';
   div.innerHTML = safe;
+
+  // 새 탭 버튼을 카드 우상단에 고정
+  const btn = document.createElement('a');
+  btn.href = weeklyCurrentUrl; btn.target = '_blank';
+  btn.className = 'weekly-float-btn';
+  btn.textContent = '↗ 새 탭에서 원본';
+  div.appendChild(btn);
+
   weeklyPageContent.innerHTML = '';
   weeklyPageContent.appendChild(div);
 }
