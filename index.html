@@ -49,6 +49,7 @@
     background:var(--paper);
     border-bottom:1px solid var(--rule);
     z-index:100;position:relative;overflow:hidden;
+    transition:height 0.25s ease;
     background-image:
       radial-gradient(circle at 20% 50%, rgba(255,255,255,0.04), transparent 50%),
       radial-gradient(circle at 80% 30%, rgba(255,255,255,0.03), transparent 45%);
@@ -2134,7 +2135,55 @@ function updateNavMode() {
 
 // 초기 실행 + 리사이즈 감지
 updateNavMode();
-window.addEventListener('resize', updateNavMode);
+window.addEventListener('resize', () => { updateNavMode(); updateMobileNavTop(); });
+
+// ---- 스크롤에 따라 헤더 높이 축소 ----
+const appHeaderEl = document.querySelector('.app-header');
+const HEADER_MIN  = 48;   // 최소 높이 (px)
+const SHRINK_OVER = 120;  // 이 스크롤 거리 동안 최소로 줄어듦
+let headerNaturalH = 0;
+
+function measureNaturalH() {
+  // inline style 없는 상태의 자연 높이 측정
+  const prev = appHeaderEl.style.height;
+  appHeaderEl.style.height = '';
+  headerNaturalH = appHeaderEl.offsetHeight;
+  appHeaderEl.style.height = prev;
+}
+
+function applyHeaderShrink(scrollTop) {
+  if(!headerNaturalH) measureNaturalH();
+  if(scrollTop <= 0){
+    appHeaderEl.style.height = '';
+    return;
+  }
+  const ratio  = Math.min(1, scrollTop / SHRINK_OVER);
+  const target = headerNaturalH - ratio * (headerNaturalH - HEADER_MIN);
+  appHeaderEl.style.height = Math.max(HEADER_MIN, Math.round(target)) + 'px';
+}
+
+// 페이지 전환 시 헤더 초기화
+function resetHeaderShrink() {
+  appHeaderEl.style.height = '';
+  headerNaturalH = 0;
+}
+
+// 각 스크롤 컨테이너에 이벤트 연결
+function attachScrollShrink(el) {
+  if(!el) return;
+  el.addEventListener('scroll', () => applyHeaderShrink(el.scrollTop), {passive: true});
+}
+
+attachScrollShrink(document.getElementById('timetablePage'));
+attachScrollShrink(document.getElementById('weeklyBody'));
+
+// 페이지 전환 시 스크롤 위치 초기화 & 헤더 복원
+document.querySelectorAll('.main-nav-item').forEach(item => {
+  item.addEventListener('click', resetHeaderShrink, {capture: true});
+});
+
+// 리사이즈 시 자연 높이 재측정
+window.addEventListener('resize', () => { headerNaturalH = 0; }, {passive: true});
 
 // 페이지 전환
 document.querySelectorAll('.main-nav-item').forEach(item => {
