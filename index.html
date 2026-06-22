@@ -2072,77 +2072,97 @@ async function fetchWithFallback(url) {
 function parseSitesHtml(html){
   const doc = new DOMParser().parseFromString(html, 'text/html');
 
-  // 주차 링크 추출
+  // ── 주차 링크 추출 ──
   const navLinks = [];
   const seen = new Set();
   doc.querySelectorAll('a').forEach(a => {
-    const href = (a.getAttribute('href') || '');
-    const full = a.href || '';
+    const raw  = a.getAttribute('href') || '';
     const text = a.textContent.trim();
-    if(
-      text && (full.includes('yeungnam.hs.kr/202633/') || href.includes('/202633/')) &&
-      !seen.has(full)
-    ){
-      seen.add(full);
-      navLinks.push({text, href: full || href});
-    }
+    if(!text || seen.has(raw)) return;
+    const isWeekLink = raw.includes('/202633/') || (a.href||'').includes('/202633/');
+    if(!isWeekLink) return;
+    seen.add(raw);
+    const href = raw.startsWith('http') ? raw
+      : raw.startsWith('/') ? 'https://sites.google.com' + raw
+      : raw;
+    navLinks.push({text, href});
   });
 
-  // 본문 텍스트 기반 섹션 파싱
-  // Google Sites의 서버사이드 렌더링 텍스트 추출
-  const sections = [];
-  let currentDept = null;
-  let currentItem = null;
+  // ── 본문 전체 텍스트를 줄 단위로 파싱 ──
+  // Google Sites는 <div>/<span> 기반이라 textContent로 전체 추출 후 패턴 분석
+  const rawText = doc.body.textContent || '';
+  const lines = rawText.split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(l => l.length > 0);
 
-  // 텍스트 노드를 줄 단위로 분석
-  const bodyText = doc.body.innerText || doc.body.textContent || '';
-  const lines = bodyText.split('\n').map(l => l.trim()).filter(Boolean);
+  // 건너뛸 UI 문자열
+  const SKIP = ['Skip to main', 'Skip to navigation', 'Report abuse',
+    'Page details', 'Page updated', 'Search this site',
+    'Embedded Files', '← Back', '이 사이트 검색'];
+
+  const sections = [];
+  let dept = null;
+  let item = null;
+
+  // 알려진 부서/담당 목록 (접미사로 판단)
+  const DEPT_SUFFIX = ['부','실','팀'];
+  const DEPT_KEYWORD= ['교감','교장','행정','사감'];
+
+  function isDeptLine(l) {
+    if(l.length > 20 || l.length < 2) return false;
+    if(DEPT_KEYWORD.some(k => l.includes(k))) return true;
+    return DEPT_SUFFIX.some(s => l.endsWith(s));
+  }
+
+  // 항목 줄: 두 자리 숫자_로 시작하거나 ♥로 시작
+  function isItemLine(l) {
+    return /^(0\d|1\d|2\d)_/.test(l) || /^♥/.test(l);
+  }
 
   for(const line of lines){
-    if(line.startsWith('Skip to') || line.includes('Report abuse') || 
-       line.includes('Page updated') || line.includes('Search this site')) continue;
+    if(SKIP.some(s => line.startsWith(s))) continue;
+    if(line.startsWith('http') && line.length > 60) continue; // 긴 URL 스킵
 
-    // h2 수준: 부서명 (짧고 링크 앵커 없음)
-    const isDept = line.length < 25 && !line.startsWith('◾') && !line.startsWith('#') &&
-                   !line.match(/^\d/) && !line.startsWith('http') &&
-                   (line.endsWith('부') || line.endsWith('실') || line.endsWith('님') ||
-                    line.includes('교감') || line.includes('행정'));
-
-    // h3 수준: 항목명 (번호로 시작)
-    const isItem = /^(0\d|1\d)_/.test(line) || /^♥/.test(line);
-
-    if(isDept && line.length > 2){
-      currentDept = {title: line, items: []};
-      sections.push(currentDept);
-      currentItem = null;
-    } else if(isItem){
-      if(!currentDept){currentDept={title:'안내',items:[]};sections.push(currentDept);}
-      currentItem = {title: line, lines: []};
-      currentDept.items.push(currentItem);
-    } else if(line.length > 2){
-      if(!currentItem){
-        if(!currentDept){currentDept={title:'공지',items:[]};sections.push(currentDept);}
-        currentItem = {title: '', lines: []};
-        currentDept.items.push(currentItem);
+    if(isDeptLine(line)){
+      dept = {title: line, items: []};
+      sections.push(dept);
+      item = null;
+    } else if(isItemLine(line)){
+      if(!dept){ dept={title:'공지',items:[]}; sections.push(dept); }
+      item = {title: line, lines: []};
+      dept.items.push(item);
+    } else if(line.length >= 2){
+      if(!item){
+        if(!dept){ dept={title:'공지',items:[]}; sections.push(dept); }
+        item = {title:'', lines:[]};
+        dept.items.push(item);
       }
-      currentItem.lines.push(line);
+      item.lines.push(line);
     }
   }
-  return {navLinks, sections: sections.filter(s=>s.items.length)};
+
+  return { navLinks, sections: sections.filter(s => s.items.length > 0) };
 }
 
 async function initWeeklyPage(){
   weeklyInitialized = true;
+  weeklyPageLoading.textContent = '주간교육활동을 불러오는 중...';
   weeklyPageLoading.style.display = '';
   weeklyPageContent.innerHTML = '';
   try{
     const html  = await fetchWithFallback(SITES_BASE);
     const data  = parseSitesHtml(html);
     weeklyNavLinks = data.navLinks;
-    renderWeeklyPage(data.navLinks, data.sections);
-    weeklyPageLoading.style.display = 'none';
+    if(data.sections.length === 0){
+      // 파싱은 됐지만 섹션을 못 찾은 경우 - 원문 텍스트 일부를 보여줌
+      weeklyPageLoading.textContent = `HTML 가져오기 성공 (${html.length}자), 섹션 파싱 실패 (navLinks: ${data.navLinks.length}개). 내용 구조를 분석 중입니다.`;
+      renderWeeklyPage(data.navLinks, []);
+    } else {
+      renderWeeklyPage(data.navLinks, data.sections);
+      weeklyPageLoading.style.display = 'none';
+    }
   }catch(e){
-    weeklyPageLoading.textContent = '불러오기 실패: ' + e.message + '\n(인터넷 연결 확인 후 새로고침해주세요)';
+    weeklyPageLoading.textContent = '불러오기 실패:\n' + e.message;
   }
 }
 
