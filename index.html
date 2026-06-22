@@ -169,27 +169,27 @@
   }
   .weekly-item-body a{color:var(--wed);}
   .weekly-html-content{
-    background:var(--paper);border-radius:8px;padding:20px 24px;
+    background:var(--paper);border-radius:8px;padding:24px 28px;
     box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
-    font-size:13px;line-height:1.85;color:var(--ink-soft);
+    font-size:15px;line-height:2;color:var(--ink-soft);
   }
   .weekly-html-content h1,.weekly-html-content h2,.weekly-html-content h3,
   .weekly-html-content h4{
-    font-family:'Noto Serif KR';color:var(--ink);margin:18px 0 8px;
-    font-weight:700;padding-bottom:6px;border-bottom:1px solid var(--rule);
+    font-family:'Noto Serif KR';color:var(--ink);margin:24px 0 10px;
+    font-weight:700;padding-bottom:8px;border-bottom:1px solid var(--rule);
   }
-  .weekly-html-content h1{font-size:17px;}
-  .weekly-html-content h2{font-size:15px;}
-  .weekly-html-content h3{font-size:13.5px;}
-  .weekly-html-content h4{font-size:13px;border-bottom:none;}
-  .weekly-html-content p{margin:4px 0;}
+  .weekly-html-content h1{font-size:20px;}
+  .weekly-html-content h2{font-size:18px;}
+  .weekly-html-content h3{font-size:16px;}
+  .weekly-html-content h4{font-size:15px;border-bottom:none;}
+  .weekly-html-content p{margin:6px 0;}
   .weekly-html-content a{color:var(--wed);word-break:break-all;}
   .weekly-html-content a:hover{text-decoration:underline;}
   .weekly-html-content strong,.weekly-html-content b{color:var(--ink);font-weight:700;}
-  .weekly-html-content ul,.weekly-html-content ol{padding-left:18px;margin:4px 0;}
-  .weekly-html-content li{margin:3px 0;}
-  .weekly-html-content div{margin:2px 0;}
-  .weekly-html-content br{line-height:1.2;}
+  .weekly-html-content ul,.weekly-html-content ol{padding-left:20px;margin:6px 0;}
+  .weekly-html-content li{margin:4px 0;}
+  .weekly-html-content div{margin:3px 0;}
+  .weekly-html-content br{line-height:1.5;}
 
   .weekly-week-bar{
     display:flex;align-items:center;gap:8px;
@@ -2020,7 +2020,7 @@ document.addEventListener('visibilitychange', async () => {
 
 // ---- 메인 네비게이션: 시간표 ↔ 주간교육활동 ----
 const SITES_BASE = 'https://sites.google.com/yeungnam.hs.kr/202633';
-const APPS_SCRIPT_PROXY = 'https://script.google.com/macros/s/AKfycbxauHbz7YryvYWDaskOdm1d2ZyFn16uyLh7H82SW0KQL05Ua4M4RaVdhy180rMM_002pg/exec';
+const APPS_SCRIPT_PROXY = 'https://script.google.com/macros/s/AKfycbxNLX5U2hdeuE6vHeKvyfkpnshwvpcDCIV-MdgdwNphHVpqfGUrhkS4jGi35HRSOgGS9w/exec';
 const PROXIES = [
   url => `${APPS_SCRIPT_PROXY}?url=${encodeURIComponent(url)}`,
   url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
