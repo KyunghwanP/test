@@ -143,34 +143,45 @@
     flex:1;
   }
 
-  /* 주간교육활동 페이지 - iframe 방식 */
+  /* 주간교육활동 페이지 */
   .weekly-top-bar{
     flex-shrink:0;padding:10px 14px;
     background:var(--paper);border-bottom:1px solid var(--rule);
-    min-height:44px;display:flex;align-items:center;
+    min-height:44px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;
   }
-  .weekly-iframe-wrap{
-    flex:1;min-height:0;position:relative;
+  .weekly-body{
+    flex:1;overflow-y:auto;padding:16px;
+    display:flex;flex-direction:column;gap:12px;
   }
-  #weeklyIframe{
-    width:100%;height:100%;border:none;display:block;
-  }
-  .weekly-iframe-fallback{
-    position:absolute;inset:0;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:16px;
-    background:var(--paper);
-    font-size:14px;color:var(--ink-soft);
-  }
+  .weekly-open-wrap{text-align:right;}
   .weekly-open-btn{
-    padding:12px 24px;border-radius:8px;
-    background:var(--mon);color:#fff;font-weight:700;
-    font-family:'Noto Sans KR';font-size:14px;
+    display:inline-block;padding:7px 16px;border-radius:8px;
+    background:var(--paper);border:1.5px solid var(--rule);
+    color:var(--ink-soft);font-family:'Noto Sans KR';font-size:12.5px;font-weight:700;
     text-decoration:none;
   }
-  .weekly-open-btn:hover{opacity:.85;}
-  .weekly-page-loading{
-    font-size:13px;color:var(--ink-soft);
+  .weekly-open-btn:hover{background:var(--paper-soft);color:var(--ink);}
+  .weekly-page-loading{font-size:13px;color:var(--ink-soft);}
+  .weekly-html-content{
+    background:var(--paper);border-radius:8px;padding:24px 28px;
+    box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
+    font-size:15px;line-height:2;color:var(--ink-soft);
   }
+  .weekly-html-content h1,.weekly-html-content h2,.weekly-html-content h3,
+  .weekly-html-content h4{
+    font-family:'Noto Serif KR';color:var(--ink);margin:22px 0 10px;
+    font-weight:700;padding-bottom:8px;border-bottom:1px solid var(--rule);
+  }
+  .weekly-html-content h1{font-size:20px;}
+  .weekly-html-content h2{font-size:18px;}
+  .weekly-html-content h3{font-size:16px;}
+  .weekly-html-content h4{font-size:15px;border-bottom:none;}
+  .weekly-html-content p,.weekly-html-content div{margin:5px 0;}
+  .weekly-html-content a{color:var(--wed);}
+  .weekly-html-content a:hover{text-decoration:underline;}
+  .weekly-html-content strong,.weekly-html-content b{color:var(--ink);font-weight:700;}
+  .weekly-html-content ul,.weekly-html-content ol{padding-left:20px;margin:6px 0;}
+  .weekly-html-content li{margin:4px 0;}
   .weekly-dept{
     background:var(--paper);border-radius:8px;margin-bottom:10px;overflow:hidden;
     box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
@@ -873,12 +884,12 @@
           <div class="weekly-page-loading" id="weeklyPageLoading">주간교육활동을 불러오는 중...</div>
           <div class="weekly-week-bar" id="weeklyWeekBar" style="display:none;"></div>
         </div>
-        <div class="weekly-iframe-wrap">
-          <iframe id="weeklyIframe" title="주간 교육활동" src=""></iframe>
-          <div class="weekly-iframe-fallback" id="weeklyIframeFallback" style="display:none;">
-            <p>iframe이 차단되었습니다.</p>
-            <a id="weeklyDirectLink" href="https://sites.google.com/yeungnam.hs.kr/202633" target="_blank" class="weekly-open-btn">새 탭에서 열기 ↗</a>
+        <div class="weekly-body" id="weeklyBody">
+          <div class="weekly-open-wrap">
+            <a id="weeklyOpenLink" href="https://sites.google.com/yeungnam.hs.kr/202633"
+               target="_blank" class="weekly-open-btn">↗ 새 탭에서 원본 열기</a>
           </div>
+          <div class="weekly-page-content" id="weeklyPageContent"></div>
         </div>
       </div>
 
@@ -2127,94 +2138,110 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
   });
 });
 
-// ---- 주간교육활동 (iframe 방식) ----
+// ---- 주간교육활동 (HTML 파싱 + 새탭 버튼 방식) ----
 const SITES_BASE = 'https://sites.google.com/yeungnam.hs.kr/202633';
-const APPS_SCRIPT_PROXY = 'https://script.google.com/macros/s/AKfycby4NGUHpHzPXXdmdBbgCAMcx5Fjrya2_tmOGygrD0aEUIJlwZoGlCaDJtFfvGC-9DEzGQ/exec';
+const APPS_SCRIPT_PROXY = 'https://script.google.com/macros/s/AKfycbxVT4Z20BvZ9DUwLH79h3_5LhJCazcPOJ3lAWNi1Z_WkwjvOXsomWrs242wpiPUokmbXA/exec';
 
-const weeklyPageEl    = document.getElementById('weeklyPage');
-const weeklyPageLoading = document.getElementById('weeklyPageLoading');
-const weeklyWeekBar   = document.getElementById('weeklyWeekBar');
-const weeklyIframe    = document.getElementById('weeklyIframe');
-const weeklyFallback  = document.getElementById('weeklyIframeFallback');
-const weeklyDirectLink= document.getElementById('weeklyDirectLink');
+const weeklyPageLoading  = document.getElementById('weeklyPageLoading');
+const weeklyWeekBar      = document.getElementById('weeklyWeekBar');
+const weeklyPageContent  = document.getElementById('weeklyPageContent');
+const weeklyOpenLink     = document.getElementById('weeklyOpenLink');
 
 let weeklyInitialized = false;
-let currentWeekUrl    = SITES_BASE;
+
+async function fetchViaProxy(url) {
+  const res = await fetch(APPS_SCRIPT_PROXY + '?url=' + encodeURIComponent(url),
+    {signal: AbortSignal.timeout(15000)});
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  if(text.length < 200) throw new Error('응답이 너무 짧음');
+  return text;
+}
 
 async function initWeeklyPage(){
   weeklyInitialized = true;
-  weeklyPageLoading.textContent = '주간교육활동 목록을 불러오는 중...';
+  weeklyPageLoading.textContent = '주간교육활동을 불러오는 중...';
   weeklyPageLoading.style.display = '';
   weeklyWeekBar.style.display = 'none';
+  weeklyPageContent.innerHTML = '';
 
-  // 1) 먼저 iframe에 현재 주차 페이지 로드
-  loadInIframe(SITES_BASE);
-
-  // 2) Apps Script에서 주차 목록 가져오기
   try{
-    const res  = await fetch(APPS_SCRIPT_PROXY + '?url=' + encodeURIComponent(SITES_BASE),
-                             {signal: AbortSignal.timeout(10000)});
-    const text = await res.text();
-    const urls = text.trim().split('\n')
-      .map(u => u.trim())
-      .filter(u => u.includes('/202633/'));
+    const raw  = await fetchViaProxy(SITES_BASE);
+    const data = parseSitesResponse(raw);
 
-    if(urls.length > 0){
-      renderWeekChips(urls);
-      weeklyPageLoading.style.display = 'none';
+    if(data.navLinks.length > 0){
+      renderWeekChips(data.navLinks, data.navLinks[0].href);
       weeklyWeekBar.style.display = '';
-    } else {
-      weeklyPageLoading.textContent = '목록을 가져오지 못했어요.';
     }
+    weeklyPageLoading.style.display = 'none';
+    renderContent(data.contentHtml);
   }catch(e){
-    weeklyPageLoading.textContent = '목록 로딩 실패: ' + e.message;
+    weeklyPageLoading.textContent = '불러오기 실패: ' + e.message;
   }
 }
 
-function renderWeekChips(urls){
-  weeklyWeekBar.innerHTML = '';
-  urls.slice(0, 20).forEach((url, i) => {
-    const slug = decodeURIComponent(url.split('/202633/').pop()).replace(/-/g,' ');
-    const m = slug.match(/(\d{4})년\s*(\d+)월\s*(\d+)일\s*([월화수목금토일])/);
-    const text = m ? `${m[2]}월 ${m[3]}일(${m[4]})` : slug;
+function parseSitesResponse(raw){
+  const navLinks = [];
+  let contentHtml = '';
 
+  if(raw.includes('===NAV===') && raw.includes('===CONTENT===')){
+    const navPart = raw.split('===NAV===')[1].split('===CONTENT===')[0];
+    contentHtml   = raw.split('===CONTENT===')[1] || '';
+    navPart.trim().split('\n').forEach(line => {
+      const url = line.trim();
+      if(!url.includes('/202633/')) return;
+      const slug = decodeURIComponent(url.split('/202633/').pop()).replace(/-/g,' ');
+      const m = slug.match(/(\d{4})년\s*(\d+)월\s*(\d+)일\s*([월화수목금토일])/);
+      navLinks.push({text: m ? `${m[2]}월 ${m[3]}일(${m[4]})` : slug, href: url});
+    });
+  } else {
+    raw.trim().split('\n').filter(u => u.includes('/202633/')).forEach(url => {
+      const slug = decodeURIComponent(url.trim().split('/202633/').pop()).replace(/-/g,' ');
+      const m = slug.match(/(\d{4})년\s*(\d+)월\s*(\d+)일\s*([월화수목금토일])/);
+      navLinks.push({text: m ? `${m[2]}월 ${m[3]}일(${m[4]})` : slug, href: url.trim()});
+    });
+  }
+  return {navLinks, contentHtml};
+}
+
+function renderWeekChips(navLinks, activeHref){
+  weeklyWeekBar.innerHTML = '';
+  navLinks.slice(0,20).forEach(link => {
     const chip = document.createElement('button');
-    chip.className = 'weekly-week-chip' + (i === 0 ? ' active' : '');
-    chip.textContent = text;
-    chip.addEventListener('click', () => {
-      weeklyWeekBar.querySelectorAll('.weekly-week-chip').forEach(c => c.classList.remove('active'));
+    chip.className = 'weekly-week-chip' + (link.href === activeHref ? ' active':'');
+    chip.textContent = link.text;
+    chip.addEventListener('click', async () => {
+      weeklyWeekBar.querySelectorAll('.weekly-week-chip').forEach(c=>c.classList.remove('active'));
       chip.classList.add('active');
-      loadInIframe(url);
+      weeklyOpenLink.href = link.href;
+      weeklyPageContent.innerHTML = '<div class="weekly-page-loading" style="padding:24px;">불러오는 중...</div>';
+      try{
+        const raw  = await fetchViaProxy(link.href);
+        const data = parseSitesResponse(raw);
+        renderContent(data.contentHtml || raw);
+      }catch(e){
+        weeklyPageContent.innerHTML = `<div class="weekly-page-loading">불러오기 실패: ${e.message}</div>`;
+      }
     });
     weeklyWeekBar.appendChild(chip);
   });
 }
 
-function loadInIframe(url){
-  currentWeekUrl = url;
-  weeklyDirectLink.href = url;
-  weeklyIframe.src = url;
-  weeklyFallback.style.display = 'none';
-  weeklyIframe.style.display = 'block';
-
-  // iframe이 로드된 후 비어있으면 (X-Frame-Options 차단) fallback 표시
-  weeklyIframe.onload = function(){
-    try{
-      // 크로스오리진이면 접근 자체가 불가능 → catch에서 처리
-      const doc = weeklyIframe.contentDocument || weeklyIframe.contentWindow.document;
-      if(!doc || !doc.body || doc.body.innerHTML.trim() === ''){
-        showFallback();
-      }
-    }catch(e){
-      // 크로스오리진 오류 → 사실은 정상 로드된 것 (X-Frame-Options가 없는 경우)
-      // 아무것도 안 해도 됨
-    }
-  };
-}
-
-function showFallback(){
-  weeklyIframe.style.display = 'none';
-  weeklyFallback.style.display = 'flex';
+function renderContent(html){
+  if(!html){
+    weeklyPageContent.innerHTML = '<div class="weekly-page-loading" style="padding:24px;">내용을 파싱하지 못했습니다.<br>위의 새 탭 버튼을 이용해주세요.</div>';
+    return;
+  }
+  const safe = html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'')
+    .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi,'')
+    .replace(/\son\w+="[^"]*"/g,'')
+    .replace(/javascript:/gi,'#');
+  const div = document.createElement('div');
+  div.className = 'weekly-html-content';
+  div.innerHTML = safe;
+  weeklyPageContent.innerHTML = '';
+  weeklyPageContent.appendChild(div);
 }
 
 
