@@ -87,6 +87,7 @@
   .app-body{flex:1;display:flex;overflow:hidden;position:relative;}
 
   /* 메인 네비게이션 사이드바 */
+  /* 메인 네비게이션: 기본적으로 고정(overlay) 방식 → JS가 .desktop 클래스 추가 시 인라인으로 전환 */
   .main-nav{
     flex-shrink:0;width:240px;
     background:var(--paper);
@@ -94,7 +95,20 @@
     border-right:1px solid var(--rule);
     padding:12px;
     transition:transform .25s ease;
+    /* 기본: 오버레이(고정) 모드 */
+    position:fixed;left:0;top:160px;bottom:0;z-index:200;
+    transform:translateX(-100%);
+    box-shadow:4px 0 20px -4px rgba(0,0,0,0.5);
   }
+  .main-nav.open{transform:translateX(0);}
+
+  /* JS가 충분한 여백을 감지하면 .desktop 클래스 추가 → 인라인 배치 */
+  .main-nav.desktop{
+    position:static;transform:none;
+    box-shadow:none;
+  }
+  /* 데스크톱 모드에서는 햄버거 버튼 숨김 */
+  .app-shell.desktop-nav .hamburger-btn{display:none;}
   .main-nav-item{
     display:flex;align-items:center;gap:10px;
     padding:14px 16px;border-radius:10px;cursor:pointer;
@@ -106,21 +120,14 @@
   .main-nav-item.active{background:var(--mon);color:#fff;}
   .main-nav-icon{font-size:17px;}
 
-  /* 모바일: 사이드바는 기본적으로 숨김 */
+  /* 모바일: 오버레이 배경 */
   .nav-overlay{
     display:none;position:fixed;inset:0;
     background:rgba(0,0,0,0.45);z-index:199;
   }
   .nav-overlay.open{display:block;}
-
-  @media (max-width:699px){
-    .main-nav{
-      position:fixed;left:0;top:160px;bottom:0;z-index:200;
-      transform:translateX(-100%);
-      box-shadow:4px 0 20px -4px rgba(0,0,0,0.5);
-    }
-    .main-nav.open{transform:translateX(0);}
-  }
+  /* 데스크톱 모드에서는 오버레이 불필요 */
+  .app-shell.desktop-nav .nav-overlay{display:none !important;}
 
   /* 콘텐츠 영역 */
   .app-content{flex:1;overflow:hidden;display:flex;flex-direction:column;}
@@ -2053,7 +2060,7 @@ const navOverlay    = document.getElementById('navOverlay');
 const timetablePage = document.getElementById('timetablePage');
 const weeklyPage    = document.getElementById('weeklyPage');
 
-// 햄버거 (모바일)
+// 햄버거 (모바일/좁은화면)
 hamburgerBtn.addEventListener('click', () => {
   const open = mainNav.classList.toggle('open');
   hamburgerBtn.classList.toggle('open', open);
@@ -2064,6 +2071,38 @@ navOverlay.addEventListener('click', () => {
   hamburgerBtn.classList.remove('open');
   navOverlay.classList.remove('open');
 });
+
+// ── 메인 사이드바 반응형: 여백 기반 자동 전환 ──
+// 시간표 내부 사이드바(300px)가 이미 등장한 상태에서
+// .wrap 좌우 합 여백이 50px 이상 될 때 메인 사이드바를 인라인으로 펼침
+const MAIN_NAV_WIDTH = 240;    // .main-nav width
+const WRAP_MAX_WIDTH = 920;    // #timetablePage .wrap max-width
+const MARGIN_THRESHOLD = 50;  // 좌우 합 여백 기준 (px)
+
+function updateNavMode() {
+  // 메인 사이드바를 보였을 때 앱 콘텐츠 너비 = 윈도우 - 사이드바
+  const appContentWidthWithNav = window.innerWidth - MAIN_NAV_WIDTH;
+  // 그 상태에서 .wrap 좌우 합 여백
+  const marginsWithNav = Math.max(0, appContentWidthWithNav - WRAP_MAX_WIDTH);
+
+  const appShell = document.getElementById('appShell');
+  if(marginsWithNav >= MARGIN_THRESHOLD){
+    // 여백 충분 → 메인 사이드바 인라인으로 고정 표시
+    mainNav.classList.add('desktop');
+    mainNav.classList.remove('open');
+    hamburgerBtn.classList.remove('open');
+    navOverlay.classList.remove('open');
+    appShell.classList.add('desktop-nav');
+  } else {
+    // 여백 부족 → 오버레이(햄버거) 방식으로 복귀
+    mainNav.classList.remove('desktop');
+    appShell.classList.remove('desktop-nav');
+  }
+}
+
+// 초기 실행 + 리사이즈 감지
+updateNavMode();
+window.addEventListener('resize', updateNavMode);
 
 // 페이지 전환
 document.querySelectorAll('.main-nav-item').forEach(item => {
