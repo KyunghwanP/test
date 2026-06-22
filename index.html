@@ -44,27 +44,29 @@
   /* 상단 헤더 */
   .app-header{
     flex-shrink:0;display:flex;align-items:flex-end;gap:14px;
-    height:160px;padding:0 22px 18px;
+    height:clamp(58px, 15vh, 160px);
+    padding:0 22px clamp(10px, 1.6vh, 18px);
     background:var(--paper);
     border-bottom:1px solid rgba(255,255,255,0.07);
     box-shadow:0 4px 20px -6px rgba(0,0,0,0.5);
-    z-index:100;position:relative;
+    z-index:100;position:relative;overflow:hidden;
     background-image:
       radial-gradient(circle at 20% 50%, rgba(255,255,255,0.04), transparent 50%),
       radial-gradient(circle at 80% 30%, rgba(255,255,255,0.03), transparent 45%);
   }
   .app-header-title{
-    font-family:'Noto Serif KR';font-weight:900;font-size:24px;
+    font-family:'Noto Serif KR';font-weight:900;
+    font-size:clamp(14px, 2.2vh, 24px);
     color:var(--ink);flex:1;
     text-shadow:0 2px 8px rgba(0,0,0,0.3);
     letter-spacing:-0.02em;
   }
   .hamburger-btn{
-    flex-shrink:0;width:40px;height:40px;
+    flex-shrink:0;width:36px;height:36px;
     background:transparent;border:none;cursor:pointer;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
     padding:4px;border-radius:8px;
-    align-self:flex-start;margin-top:14px;
+    align-self:center;
   }
   .hamburger-btn:hover{background:var(--paper-soft);}
   .hamburger-btn span{
@@ -79,12 +81,12 @@
     border:1px solid var(--rule);background:var(--paper-soft);
     font-family:'Noto Sans KR';font-size:11.5px;font-weight:700;color:var(--ink-soft);
     padding:6px 12px;border-radius:6px;cursor:pointer;flex-shrink:0;
-    align-self:flex-start;margin-top:14px;
+    align-self:center;
   }
   .app-logout-btn:hover{background:var(--rule);}
 
   /* 앱 바디 */
-  .app-body{flex:1;display:flex;overflow:hidden;position:relative;}
+  .app-body{flex:1;display:flex;overflow:hidden;position:relative;background:var(--bg-base);}
 
   /* 메인 네비게이션 사이드바 */
   /* 메인 네비게이션: 기본적으로 고정(overlay) 방식 → JS가 .desktop 클래스 추가 시 인라인으로 전환 */
@@ -129,6 +131,8 @@
   /* 데스크톱 모드에서는 오버레이 불필요 */
   .app-shell.desktop-nav .nav-overlay{display:none !important;}
 
+  /* 모바일 사이드바: top은 JS에서 동적으로 설정 */
+
   /* 콘텐츠 영역 */
   .app-content{flex:1;overflow:hidden;display:flex;flex-direction:column;}
 
@@ -149,9 +153,11 @@
     background:var(--paper);border-bottom:1px solid var(--rule);
     min-height:44px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;
   }
+  .weekly-top-bar:empty{display:none;}
   .weekly-body{
     flex:1;overflow-y:auto;padding:16px;
     display:flex;flex-direction:column;gap:12px;
+    background:var(--bg-base);
   }
   .weekly-open-wrap{text-align:right;}
   .weekly-open-btn{
@@ -2072,7 +2078,17 @@ const timetablePage = document.getElementById('timetablePage');
 const weeklyPage    = document.getElementById('weeklyPage');
 
 // 햄버거 (모바일/좁은화면)
+function updateMobileNavTop(){
+  const h = document.querySelector('.app-header').getBoundingClientRect().height;
+  if(!mainNav.classList.contains('desktop')){
+    mainNav.style.top = h + 'px';
+  }
+}
+updateMobileNavTop();
+window.addEventListener('resize', updateMobileNavTop);
+
 hamburgerBtn.addEventListener('click', () => {
+  updateMobileNavTop();
   const open = mainNav.classList.toggle('open');
   hamburgerBtn.classList.toggle('open', open);
   navOverlay.classList.toggle('open', open);
