@@ -153,14 +153,7 @@
     background:transparent;
     display:flex;align-items:center;flex-wrap:wrap;gap:8px;
   }
-  .weekly-topbar-btn{
-    margin-left:auto;
-    padding:5px 12px;border-radius:7px;
-    background:var(--paper-soft);border:1.5px solid var(--rule);
-    color:var(--ink-soft);font-family:'Noto Sans KR';font-size:12px;font-weight:700;
-    text-decoration:none;white-space:nowrap;flex-shrink:0;
-  }
-  .weekly-topbar-btn:hover{background:var(--rule);color:var(--ink);}
+
   .weekly-body{
     flex:1;overflow-y:auto;padding:0 12px 12px;
     display:flex;flex-direction:column;gap:0;
@@ -174,22 +167,22 @@
     box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
     font-size:15px;line-height:2;color:var(--ink-soft);
   }
-  /* h1(페이지 제목): 카드 상단에 어두운 타이틀바 */
+  /* h1(페이지 제목): 카드 상단 어두운 타이틀바 + 밝은 글자 */
   .weekly-html-content h1,
   .weekly-forced-title{
-    color:var(--ink) !important;
-    background:var(--bg-base) !important;
-    font-size:17px;
-    font-family:'Noto Serif KR';font-weight:700;
+    color:#FBF6EC !important;
+    background:#1F3D33 !important;
+    font-size:16px !important;
+    font-family:'Noto Serif KR' !important;font-weight:700 !important;
+    display:block !important;
     margin:-24px -28px 20px !important;
-    padding:18px 160px 18px 28px !important;
+    padding:16px 28px !important;
     border-radius:8px 8px 0 0;
-    border-bottom:1px solid rgba(255,255,255,0.08) !important;
+    border-bottom:1px solid rgba(255,255,255,0.12) !important;
   }
-  /* 제목 내부 모든 자식 요소도 색상 강제 */
   .weekly-html-content h1 *,
   .weekly-forced-title *{
-    color:var(--ink) !important;
+    color:#FBF6EC !important;
     background:transparent !important;
   }
   .weekly-html-content h2{
@@ -204,15 +197,19 @@
   .weekly-html-content strong,.weekly-html-content b{color:var(--ink);font-weight:700;}
   .weekly-html-content ul,.weekly-html-content ol{padding-left:20px;margin:6px 0;}
   .weekly-html-content li{margin:4px 0;}
-  /* 새 탭 버튼: 본문 카드 우상단 (어두운 h1 배경 위) */
-  .weekly-float-btn{
-    position:absolute;top:14px;right:20px;
-    padding:6px 13px;border-radius:7px;
-    background:rgba(255,255,255,0.12);border:1.5px solid rgba(255,255,255,0.2);
-    color:var(--ink);font-family:'Noto Sans KR';font-size:12px;font-weight:700;
-    text-decoration:none;white-space:nowrap;
+  /* 새 탭 버튼: 내용 위 독립 버튼 */
+  .weekly-btn-row{
+    display:flex;justify-content:flex-end;padding:6px 0 4px;
   }
-  .weekly-float-btn:hover{background:rgba(255,255,255,0.22);}
+  .weekly-open-main-btn{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:8px 18px;border-radius:8px;
+    background:var(--paper);border:1.5px solid var(--rule);
+    color:var(--ink-soft);font-family:'Noto Sans KR';font-size:13px;font-weight:700;
+    text-decoration:none;
+    box-shadow:0 2px 8px -4px rgba(0,0,0,0.25);
+  }
+  .weekly-open-main-btn:hover{background:var(--paper-soft);color:var(--ink);}
   .weekly-dept{
     background:var(--paper);border-radius:8px;margin-bottom:10px;overflow:hidden;
     box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
@@ -915,8 +912,13 @@
           <div class="weekly-top-bar" id="weeklyTopBar">
             <div class="weekly-page-loading" id="weeklyPageLoading">주간교육활동을 불러오는 중...</div>
             <div class="weekly-week-bar" id="weeklyWeekBar" style="display:none;"></div>
-            <a id="weeklyOpenLink" href="https://sites.google.com/yeungnam.hs.kr/202633"
-               target="_blank" class="weekly-topbar-btn">↗ 원본 새 탭</a>
+          </div>
+          <div class="weekly-body" id="weeklyBody">
+            <div class="weekly-btn-row">
+              <a id="weeklyOpenLink" href="https://sites.google.com/yeungnam.hs.kr/202633"
+                 target="_blank" class="weekly-open-main-btn">↗ 새 탭에서 원본 열기</a>
+            </div>
+            <div class="weekly-page-content" id="weeklyPageContent"></div>
           </div>
           <div class="weekly-page-content" id="weeklyPageContent"></div>
         </div>
@@ -2344,8 +2346,10 @@ function renderContent(html){
 
   if(titleEl){
     titleEl.classList.add('weekly-forced-title');
-    titleEl.querySelectorAll('*').forEach(el => { el.style.color = ''; });
-    titleEl.style.color = '';
+    // 자식 요소들의 inline color 제거 후 밝은 색으로 강제
+    titleEl.querySelectorAll('*').forEach(el => { el.style.color = '#FBF6EC'; });
+    titleEl.style.color = '#FBF6EC';
+    titleEl.style.background = '#1F3D33';
   }
 
   weeklyPageContent.innerHTML = '';
