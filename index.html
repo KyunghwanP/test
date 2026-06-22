@@ -168,6 +168,29 @@
     white-space:pre-wrap;word-break:break-word;
   }
   .weekly-item-body a{color:var(--wed);}
+  .weekly-html-content{
+    background:var(--paper);border-radius:8px;padding:20px 24px;
+    box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
+    font-size:13px;line-height:1.85;color:var(--ink-soft);
+  }
+  .weekly-html-content h1,.weekly-html-content h2,.weekly-html-content h3,
+  .weekly-html-content h4{
+    font-family:'Noto Serif KR';color:var(--ink);margin:18px 0 8px;
+    font-weight:700;padding-bottom:6px;border-bottom:1px solid var(--rule);
+  }
+  .weekly-html-content h1{font-size:17px;}
+  .weekly-html-content h2{font-size:15px;}
+  .weekly-html-content h3{font-size:13.5px;}
+  .weekly-html-content h4{font-size:13px;border-bottom:none;}
+  .weekly-html-content p{margin:4px 0;}
+  .weekly-html-content a{color:var(--wed);word-break:break-all;}
+  .weekly-html-content a:hover{text-decoration:underline;}
+  .weekly-html-content strong,.weekly-html-content b{color:var(--ink);font-weight:700;}
+  .weekly-html-content ul,.weekly-html-content ol{padding-left:18px;margin:4px 0;}
+  .weekly-html-content li{margin:3px 0;}
+  .weekly-html-content div{margin:2px 0;}
+  .weekly-html-content br{line-height:1.2;}
+
   .weekly-week-bar{
     display:flex;align-items:center;gap:8px;
     margin-bottom:14px;flex-wrap:wrap;
@@ -2073,28 +2096,24 @@ function parseSitesHtml(html){
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const navLinks = [];
 
-  // ── 새 앱스 스크립트 응답 형식: ===NAV=== / ===CONTENT=== ──
+  // ── 앱스 스크립트 응답 형식: ===NAV=== / ===CONTENT=== ──
   if(html.includes('===NAV===') && html.includes('===CONTENT===')){
     const navPart     = html.split('===NAV===')[1].split('===CONTENT===')[0];
-    const contentPart = html.split('===CONTENT===')[1] || '';
+    const contentHtml = html.split('===CONTENT===')[1] || '';
 
-    // navLinks 추출
     navPart.trim().split('\n').forEach(line => {
       const url = line.trim();
       if(!url || !url.includes('/202633/')) return;
-      // URL에서 날짜 텍스트 추출: .../2026년-6월-22일월 → 6월 22일(월)
-      const slug = decodeURIComponent(url.split('/').pop());
-      const m = slug.match(/(\d+)년-(\d+)월-(\d+)일([월화수목금토일])/);
+      const slug = decodeURIComponent(url.split('/202633/').pop().replace(/-/g,' '));
+      const m = slug.match(/(\d{4})년\s*(\d+)월\s*(\d+)일\s*([월화수목금토일])/);
       const text = m ? `${m[2]}월 ${m[3]}일(${m[4]})` : slug;
       navLinks.push({text, href: url});
     });
 
-    // 콘텐츠 파싱
-    const sections = parseTextToSections(contentPart);
-    return {navLinks, sections};
+    return {navLinks, contentHtml, sections: []};
   }
 
-  // ── 폴백: 기존 DOM 방식 ──
+  // ── 폴백: DOM 방식 ──
   const seen = new Set();
   doc.querySelectorAll('a').forEach(a => {
     const raw  = a.getAttribute('href') || '';
@@ -2105,8 +2124,16 @@ function parseSitesHtml(html){
     const href = raw.startsWith('http') ? raw : 'https://sites.google.com' + raw;
     navLinks.push({text, href});
   });
-  const rawText = doc.body.textContent || '';
-  return {navLinks, sections: parseTextToSections(rawText)};
+  return {navLinks, contentHtml: '', sections: parseTextToSections(doc.body.textContent||'')};
+}
+
+function sanitizeContentHtml(html){
+  // script, on* 이벤트, javascript: 링크 제거
+  return html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+    .replace(/\son\w+="[^"]*"/g, '')
+    .replace(/javascript:/gi, '#');
 }
 
 function parseTextToSections(rawText){
@@ -2167,40 +2194,39 @@ async function initWeeklyPage(){
     const html  = await fetchWithFallback(SITES_BASE);
     const data  = parseSitesHtml(html);
     weeklyNavLinks = data.navLinks;
-    if(data.sections.length === 0){
-      // 파싱은 됐지만 섹션을 못 찾은 경우 - 원문 텍스트 일부를 보여줌
-      weeklyPageLoading.textContent = `HTML 가져오기 성공 (${html.length}자), 섹션 파싱 실패 (navLinks: ${data.navLinks.length}개). 내용 구조를 분석 중입니다.`;
-      renderWeeklyPage(data.navLinks, []);
-    } else {
-      renderWeeklyPage(data.navLinks, data.sections);
-      weeklyPageLoading.style.display = 'none';
-    }
+    renderWeeklyPage(data.navLinks, data.contentHtml, data.sections);
+    weeklyPageLoading.style.display = 'none';
   }catch(e){
     weeklyPageLoading.textContent = '불러오기 실패:\n' + e.message;
   }
 }
 
 async function loadWeekByUrl(url){
+  weeklyPageLoading.textContent = '불러오는 중...';
   weeklyPageLoading.style.display = '';
+  weeklyPageContent.querySelector('.weekly-html-content')?.remove();
   weeklyPageContent.querySelector('.weekly-dept-list')?.remove();
   try{
     const html  = await fetchWithFallback(url);
     const data  = parseSitesHtml(html);
-    renderDeptList(data.sections);
+    if(data.contentHtml){
+      renderHtmlContent(data.contentHtml);
+    } else {
+      renderDeptList(data.sections);
+    }
     weeklyPageLoading.style.display = 'none';
   }catch(e){
     weeklyPageLoading.textContent = '불러오기 실패: ' + e.message;
   }
 }
 
-function renderWeeklyPage(navLinks, sections){
-  // 주차 선택 칩
+function renderWeeklyPage(navLinks, contentHtml, sections){
   const bar = document.createElement('div');
   bar.className = 'weekly-week-bar';
-  navLinks.slice(0, 10).forEach((link, i) => {
+  navLinks.slice(0, 18).forEach((link, i) => {
     const chip = document.createElement('button');
     chip.className = 'weekly-week-chip' + (i === 0 ? ' active' : '');
-    chip.textContent = link.text.replace(/^20\d{2}년\s*/, '');
+    chip.textContent = link.text;
     chip.addEventListener('click', () => {
       bar.querySelectorAll('.weekly-week-chip').forEach(c=>c.classList.remove('active'));
       chip.classList.add('active');
@@ -2210,7 +2236,20 @@ function renderWeeklyPage(navLinks, sections){
   });
   weeklyPageContent.innerHTML = '';
   weeklyPageContent.appendChild(bar);
-  renderDeptList(sections);
+  if(contentHtml){
+    renderHtmlContent(contentHtml);
+  } else {
+    renderDeptList(sections);
+  }
+}
+
+function renderHtmlContent(html){
+  const existing = weeklyPageContent.querySelector('.weekly-html-content');
+  if(existing) existing.remove();
+  const div = document.createElement('div');
+  div.className = 'weekly-html-content';
+  div.innerHTML = sanitizeContentHtml(html);
+  weeklyPageContent.appendChild(div);
 }
 
 function renderDeptList(sections){
