@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>영남고 시간표 업로드 도구</title>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(reg => reg.unregister());
+  });
+}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Malgun Gothic',sans-serif;background:#f0f4f3;color:#222;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .card{background:#fff;border-radius:12px;box-shadow:0 20px 50px -15px rgba(0,0,0,0.3);max-width:560px;width:100%;padding:36px 32px;}
+  h1{font-size:18px;font-weight:900;color:#2F5D62;margin-bottom:6px;}
+  .subtitle{font-size:12.5px;color:#666;margin-bottom:28px;line-height:1.6;}
+  .step{display:flex;align-items:flex-start;gap:14px;margin-bottom:20px;}
+  .step-num{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:#2F5D62;color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;}
+  .step-body{flex:1;}
+  .step-label{font-size:13px;font-weight:700;margin-bottom:6px;}
+  button{font-family:'Malgun Gothic',sans-serif;font-size:13px;font-weight:700;padding:10px 20px;border-radius:8px;border:1.5px solid #ccc;background:#f5f5f5;cursor:pointer;}
+  button:hover:not(:disabled){background:#e5e5e5;}
+  button:disabled{opacity:.45;cursor:default;}
+  .btn-primary{background:#2F5D62;color:#fff;border-color:#2F5D62;}
+  .btn-primary:hover:not(:disabled){background:#254d52;}
+  .file-label{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1.5px dashed #aaa;border-radius:8px;cursor:pointer;font-size:13px;color:#555;background:#fafafa;}
+  .file-label:hover{border-color:#2F5D62;color:#2F5D62;}
+  #fileInput{display:none;}
+  #fileName{font-size:11.5px;color:#888;margin-top:6px;}
+  #status{margin-top:24px;padding:14px 16px;border-radius:8px;font-size:12.5px;line-height:1.8;white-space:pre-wrap;display:none;}
+  #status.ok{background:#e6f7e6;color:#1a6b1a;display:block;}
+  #status.err{background:#fdeaea;color:#a02626;display:block;}
+  #status.info{background:#e8f4f8;color:#1a4a6b;display:block;}
+  hr{border:none;border-top:1px solid #eee;margin:16px 0;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>영남고 시간표 업로드 도구</h1>
+  <p class="subtitle">엑셀 템플릿(시간표_입력템플릿_완성본.xlsx)을 채워서 올리면<br>앱 데이터가 바로 갱신됩니다.</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <div class="step-label">학교 계정으로 로그인</div>
+      <button id="loginBtn" class="btn-primary">Google로 로그인</button>
+      <button id="logoutBtn" style="display:none;margin-left:8px;">로그아웃</button>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <div class="step-label">엑셀 파일 선택</div>
+      <label class="file-label" for="fileInput">📂 파일 선택…</label>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" disabled>
+      <div id="fileName">파일을 선택해주세요</div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <div class="step-label">Firestore에 업로드</div>
+      <button id="uploadBtn" class="btn-primary" disabled>데이터 업로드</button>
+    </div>
+  </div>
+
+  <div id="status"></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
+  authDomain: "ynhs-7b5ba.firebaseapp.com",
+  projectId: "ynhs-7b5ba",
+  storageBucket: "ynhs-7b5ba.firebasestorage.app",
+  messagingSenderId: "1031618043470",
+  appId: "1:1031618043470:web:edb5b8d1f98db029916d1f"
+};
+const ALLOWED_DOMAIN = '@yeungnam.hs.kr';
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const loginBtn   = document.getElementById('loginBtn');
+const logoutBtn  = document.getElementById('logoutBtn');
+const fileInput  = document.getElementById('fileInput');
+const fileNameEl = document.getElementById('fileName');
+const uploadBtn  = document.getElementById('uploadBtn');
+const statusEl   = document.getElementById('status');
+
+let parsedData  = null;
+let currentUser = null;
+
+function setStatus(msg, type) {
+  statusEl.textContent = msg;
+  statusEl.className = type || 'info';
+  statusEl.style.display = msg ? 'block' : 'none';
+}
+
+loginBtn.addEventListener('click', async () => {
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ hd: 'yeungnam.hs.kr' });
+    await signInWithPopup(auth, provider);
+  } catch(e) {
+    setStatus('로그인 실패: ' + e.message, 'err');
+  }
+});
+
+logoutBtn.addEventListener('click', () => signOut(auth));
+
+onAuthStateChanged(auth, user => {
+  if (user && user.email && user.email.endsWith(ALLOWED_DOMAIN)) {
+    currentUser = user;
+    loginBtn.style.display  = 'none';
+    logoutBtn.style.display = '';
+    logoutBtn.textContent   = user.email + ' (로그아웃)';
+    fileInput.disabled      = false;
+    setStatus('로그인됨: ' + user.email, 'info');
+    if (parsedData) uploadBtn.disabled = false;
+  } else {
+    currentUser = null;
+    loginBtn.style.display  = '';
+    logoutBtn.style.display = 'none';
+    fileInput.disabled      = true;
+    uploadBtn.disabled      = true;
+    if (user) {
+      setStatus('학교 계정(' + ALLOWED_DOMAIN + ')으로만 가능합니다.', 'err');
+      signOut(auth);
+    } else {
+      setStatus('');
+    }
+  }
+});
+
+fileInput.addEventListener('change', async () => {
+  const file = fileInput.files[0];
+  if (!file) { parsedData = null; return; }
+  fileNameEl.textContent = file.name;
+  setStatus('파일 분석 중...', 'info');
+  try {
+    parsedData = await parseExcel(file);
+    const s = parsedData;
+    setStatus(
+      '파일 분석 완료\n' +
+      '  교사: ' + s.teachers.length + '명\n' +
+      '  내선번호: ' + Object.keys(s.extMap).length + '건\n' +
+      '  시정표: ' + s.bellSchedule.length + '개 교시\n' +
+      '  묶음선택과목: ' + s.electiveBlocks.length + '개 묶음\n\n' +
+      '이상 없으면 「데이터 업로드」 버튼을 눌러주세요.', 'ok');
+    if (currentUser) uploadBtn.disabled = false;
+  } catch(e) {
+    parsedData = null;
+    uploadBtn.disabled = true;
+    setStatus('파일 분석 실패:\n' + e.message, 'err');
+  }
+});
+
+async function parseExcel(file) {
+  const buf  = await file.arrayBuffer();
+  const wb   = XLSX.read(buf, {type:'array'});
+  const DAYS = ['월','화','수','목','금'];
+  const PERIODS = [1,2,3,4,5,6,7];
+  const sheetNames = wb.SheetNames;
+
+  const name1 = sheetNames.find(n => n.includes('전체시간표'));
+  const ws1 = name1 ? wb.Sheets[name1] : null;
+  if (!ws1) throw new Error('「전체시간표」 시트가 없습니다.');
+  const rows1 = XLSX.utils.sheet_to_json(ws1, {header:1, range:1});
+  const teachers = [];
+  for (let ri = 1; ri < rows1.length; ri++) {
+    const row  = rows1[ri];
+    const name = (row[1] || '').toString().trim();
+    if (!name) continue;
+    const schedule = {};
+    DAYS.forEach((d, di) => {
+      schedule[d] = PERIODS.map((p, pi) => {
+        const cell = (row[2 + di * 7 + pi] || '').toString().trim();
+        if (!cell) return null;
+        const slash = cell.indexOf('/');
+        return slash === -1
+          ? {period: p, subject: cell, class: null}
+          : {period: p, subject: cell.slice(0, slash), class: cell.slice(slash + 1)};
+      }).filter(Boolean);
+    });
+    teachers.push({
+      no: String(ri),
+      name,
+      schedule,
+      total_hours: (row[37] || '').toString().trim() || null,
+      homeroom:    (row[38] || '').toString().trim() || null,
+      remarks:     (row[39] || '').toString().trim() || null,
+    });
+  }
+  if (teachers.length < 10) throw new Error('교사 수가 너무 적습니다 (' + teachers.length + '명). 전체시간표 탭을 확인해주세요.');
+
+  const name2 = sheetNames.find(n => n.includes('내선번호'));
+  const ws2 = name2 ? wb.Sheets[name2] : null;
+  if (!ws2) throw new Error('「내선번호」 시트가 없습니다.');
+  const rows2 = XLSX.utils.sheet_to_json(ws2, {header:1, range:1});
+  const extMap = {};
+  for (let ri = 1; ri < rows2.length; ri++) {
+    const name = (rows2[ri][0] || '').toString().trim();
+    const ext  = (rows2[ri][1] || '').toString().trim();
+    if (name && ext) extMap[name] = ext;
+  }
+
+  const name3 = sheetNames.find(n => n.includes('시정표'));
+  const ws3 = name3 ? wb.Sheets[name3] : null;
+  if (!ws3) throw new Error('「시정표」 시트가 없습니다.');
+  const rows3 = XLSX.utils.sheet_to_json(ws3, {header:1, range:1});
+  const bellSchedule = [];
+  for (let ri = 1; ri < rows3.length; ri++) {
+    const pRaw  = (rows3[ri][0] || '').toString().trim();
+    const start = (rows3[ri][1] || '').toString().trim();
+    const end   = (rows3[ri][2] || '').toString().trim();
+    if (!pRaw || !start || !end) continue;
+    const period = pRaw === 'lunch' ? 'lunch' : parseInt(pRaw, 10);
+    if (pRaw !== 'lunch' && isNaN(period)) continue;
+    bellSchedule.push({period, start, end});
+  }
+  if (bellSchedule.length < 7) throw new Error('시정표가 부족합니다 (' + bellSchedule.length + '개). 시정표 탭을 확인해주세요.');
+
+  const name4 = sheetNames.find(n => n.includes('묶음선택과목'));
+  const ws4 = name4 ? wb.Sheets[name4] : null;
+  if (!ws4) throw new Error('「묶음선택과목」 시트가 없습니다.');
+  const rows4 = XLSX.utils.sheet_to_json(ws4, {header:1, range:1});
+  const blockMap = {};
+  for (let ri = 1; ri < rows4.length; ri++) {
+    const bn     = (rows4[ri][0] || '').toString().trim();
+    const tname  = (rows4[ri][1] || '').toString().trim();
+    const day    = (rows4[ri][2] || '').toString().trim();
+    const period = parseInt((rows4[ri][3] || '').toString().trim(), 10);
+    if (!bn || !tname || !day || isNaN(period)) continue;
+    if (!blockMap[bn]) blockMap[bn] = {teachers: new Set(), slots: new Set()};
+    blockMap[bn].teachers.add(tname);
+    blockMap[bn].slots.add(day + '|' + period);
+  }
+  // slots을 객체 형태로 변환 (Firestore는 중첩 배열 미지원)
+  const electiveBlocks = Object.values(blockMap).map(b => ({
+    teachers: [...b.teachers],
+    slots: [...b.slots].map(s => {
+      const [d, p] = s.split('|');
+      return {day: d, period: parseInt(p, 10)};
+    })
+  }));
+
+  return {teachers, extMap, bellSchedule, electiveBlocks};
+}
+
+uploadBtn.addEventListener('click', async () => {
+  if (!parsedData || !currentUser) { setStatus('먼저 로그인하고 파일을 선택해주세요.', 'err'); return; }
+  uploadBtn.disabled = true;
+  setStatus('Firestore에 업로드 중...', 'info');
+  try {
+    await setDoc(doc(db, 'appdata', 'main'), {...parsedData, updatedAt: new Date().toISOString()});
+    setStatus(
+      '✅ 업로드 완료!\n\n' +
+      '  교사: ' + parsedData.teachers.length + '명\n' +
+      '  내선번호: ' + Object.keys(parsedData.extMap).length + '건\n' +
+      '  시정표: ' + parsedData.bellSchedule.length + '개 교시\n' +
+      '  묶음선택과목: ' + parsedData.electiveBlocks.length + '개 묶음\n\n' +
+      '앱을 새로고침하면 새 데이터가 즉시 반영됩니다.', 'ok');
+    uploadBtn.disabled = false;
+  } catch(e) {
+    console.error('upload error:', e);
+    setStatus('❌ 업로드 실패:\n' + e.code + '\n' + e.message, 'err');
+    uploadBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
