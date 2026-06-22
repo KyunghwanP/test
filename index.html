@@ -2071,77 +2071,91 @@ async function fetchWithFallback(url) {
 
 function parseSitesHtml(html){
   const doc = new DOMParser().parseFromString(html, 'text/html');
-
-  // ── 주차 링크 추출 ──
   const navLinks = [];
+
+  // ── 새 앱스 스크립트 응답 형식: ===NAV=== / ===CONTENT=== ──
+  if(html.includes('===NAV===') && html.includes('===CONTENT===')){
+    const navPart     = html.split('===NAV===')[1].split('===CONTENT===')[0];
+    const contentPart = html.split('===CONTENT===')[1] || '';
+
+    // navLinks 추출
+    navPart.trim().split('\n').forEach(line => {
+      const url = line.trim();
+      if(!url || !url.includes('/202633/')) return;
+      // URL에서 날짜 텍스트 추출: .../2026년-6월-22일월 → 6월 22일(월)
+      const slug = decodeURIComponent(url.split('/').pop());
+      const m = slug.match(/(\d+)년-(\d+)월-(\d+)일([월화수목금토일])/);
+      const text = m ? `${m[2]}월 ${m[3]}일(${m[4]})` : slug;
+      navLinks.push({text, href: url});
+    });
+
+    // 콘텐츠 파싱
+    const sections = parseTextToSections(contentPart);
+    return {navLinks, sections};
+  }
+
+  // ── 폴백: 기존 DOM 방식 ──
   const seen = new Set();
   doc.querySelectorAll('a').forEach(a => {
     const raw  = a.getAttribute('href') || '';
     const text = a.textContent.trim();
     if(!text || seen.has(raw)) return;
-    const isWeekLink = raw.includes('/202633/') || (a.href||'').includes('/202633/');
-    if(!isWeekLink) return;
+    if(!raw.includes('/202633/') && !(a.href||'').includes('/202633/')) return;
     seen.add(raw);
-    const href = raw.startsWith('http') ? raw
-      : raw.startsWith('/') ? 'https://sites.google.com' + raw
-      : raw;
+    const href = raw.startsWith('http') ? raw : 'https://sites.google.com' + raw;
     navLinks.push({text, href});
   });
-
-  // ── 본문 전체 텍스트를 줄 단위로 파싱 ──
-  // Google Sites는 <div>/<span> 기반이라 textContent로 전체 추출 후 패턴 분석
   const rawText = doc.body.textContent || '';
+  return {navLinks, sections: parseTextToSections(rawText)};
+}
+
+function parseTextToSections(rawText){
   const lines = rawText.split(/\r?\n/)
     .map(l => l.trim())
-    .filter(l => l.length > 0);
+    .filter(l => l.length > 1);
 
-  // 건너뛸 UI 문자열
   const SKIP = ['Skip to main', 'Skip to navigation', 'Report abuse',
-    'Page details', 'Page updated', 'Search this site',
-    'Embedded Files', '← Back', '이 사이트 검색'];
+    'Page details', 'Page updated', 'Search this site', 'Embedded Files',
+    '이 사이트 검색', 'Report a problem', 'Google Sites'];
 
-  const sections = [];
-  let dept = null;
-  let item = null;
+  const DEPT_SUFFIX  = ['부','실','팀'];
+  const DEPT_KEYWORD = ['교감','교장','행정','사감'];
 
-  // 알려진 부서/담당 목록 (접미사로 판단)
-  const DEPT_SUFFIX = ['부','실','팀'];
-  const DEPT_KEYWORD= ['교감','교장','행정','사감'];
-
-  function isDeptLine(l) {
+  function isDeptLine(l){
     if(l.length > 20 || l.length < 2) return false;
     if(DEPT_KEYWORD.some(k => l.includes(k))) return true;
     return DEPT_SUFFIX.some(s => l.endsWith(s));
   }
-
-  // 항목 줄: 두 자리 숫자_로 시작하거나 ♥로 시작
-  function isItemLine(l) {
+  function isItemLine(l){
     return /^(0\d|1\d|2\d)_/.test(l) || /^♥/.test(l);
   }
 
+  const sections = [];
+  let dept = null, item = null;
+
   for(const line of lines){
     if(SKIP.some(s => line.startsWith(s))) continue;
-    if(line.startsWith('http') && line.length > 60) continue; // 긴 URL 스킵
+    if(line.startsWith('http') && line.length > 60) continue;
+    if(/^[a-zA-Z0-9_\-\.]+$/.test(line) && line.length > 10) continue; // JS 심볼 스킵
 
     if(isDeptLine(line)){
       dept = {title: line, items: []};
       sections.push(dept);
       item = null;
     } else if(isItemLine(line)){
-      if(!dept){ dept={title:'공지',items:[]}; sections.push(dept); }
+      if(!dept){dept={title:'공지',items:[]};sections.push(dept);}
       item = {title: line, lines: []};
       dept.items.push(item);
     } else if(line.length >= 2){
       if(!item){
-        if(!dept){ dept={title:'공지',items:[]}; sections.push(dept); }
-        item = {title:'', lines:[]};
+        if(!dept){dept={title:'공지',items:[]};sections.push(dept);}
+        item = {title:'',lines:[]};
         dept.items.push(item);
       }
       item.lines.push(line);
     }
   }
-
-  return { navLinks, sections: sections.filter(s => s.items.length > 0) };
+  return sections.filter(s => s.items.length > 0);
 }
 
 async function initWeeklyPage(){
