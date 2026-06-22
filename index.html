@@ -165,12 +165,16 @@
     box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
     font-size:15px;line-height:2;color:var(--ink-soft);
   }
-  /* h1(페이지 제목): 강제로 어두운 색으로 */
+  /* h1(페이지 제목): 카드 상단에 어두운 타이틀바 */
   .weekly-html-content h1{
-    color:var(--ink) !important;font-size:20px;
+    color:var(--ink) !important;
+    background:var(--bg-base);
+    font-size:17px;
     font-family:'Noto Serif KR';font-weight:700;
-    margin:0 0 16px;padding:0 0 8px;padding-right:160px;
-    border-bottom:1px solid var(--rule);
+    margin:-24px -28px 20px !important;
+    padding:18px 160px 18px 28px !important;
+    border-radius:8px 8px 0 0;
+    border-bottom:1px solid rgba(255,255,255,0.08);
   }
   .weekly-html-content h2{
     font-family:'Noto Serif KR';color:var(--ink);margin:22px 0 10px;
@@ -184,15 +188,15 @@
   .weekly-html-content strong,.weekly-html-content b{color:var(--ink);font-weight:700;}
   .weekly-html-content ul,.weekly-html-content ol{padding-left:20px;margin:6px 0;}
   .weekly-html-content li{margin:4px 0;}
-  /* 새 탭 버튼: 본문 카드 우상단 고정 */
+  /* 새 탭 버튼: 본문 카드 우상단 (어두운 h1 배경 위) */
   .weekly-float-btn{
-    position:absolute;top:20px;right:20px;
+    position:absolute;top:14px;right:20px;
     padding:6px 13px;border-radius:7px;
-    background:var(--paper-soft);border:1.5px solid var(--rule);
-    color:var(--ink-soft);font-family:'Noto Sans KR';font-size:12px;font-weight:700;
+    background:rgba(255,255,255,0.12);border:1.5px solid rgba(255,255,255,0.2);
+    color:var(--ink);font-family:'Noto Sans KR';font-size:12px;font-weight:700;
     text-decoration:none;white-space:nowrap;
   }
-  .weekly-float-btn:hover{background:var(--rule);color:var(--ink);}
+  .weekly-float-btn:hover{background:rgba(255,255,255,0.22);}
   .weekly-dept{
     background:var(--paper);border-radius:8px;margin-bottom:10px;overflow:hidden;
     box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
