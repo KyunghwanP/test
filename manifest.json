@@ -2,26 +2,26 @@
   "name": "영남고등학교",
   "short_name": "영남고",
   "description": "영남고등학교 - 시간표, 주간교육활동, 식단표, 비상연락망",
-  "start_url": "/",
+  "start_url": "/test/",
   "display": "standalone",
   "background_color": "#1F3D33",
   "theme_color": "#1F3D33",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "/test/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-512.png",
+      "src": "/test/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-180.png",
+      "src": "/test/icon-180.png",
       "sizes": "180x180",
       "type": "image/png",
       "purpose": "any"
