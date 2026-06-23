@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>영남고 현황판 ver1.11</title>
+<title>영남고 현황판 ver1.12</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -820,55 +820,96 @@
      식단표 페이지
   ══════════════════════════════════════════ */
   .meal-body{
-    flex:1;overflow-y:auto;padding:12px;
-    background:var(--bg-base);display:flex;flex-direction:column;gap:12px;
+    flex:1;overflow-y:auto;padding:10px 12px 16px;
+    background:var(--bg-base);display:flex;flex-direction:column;gap:10px;
   }
   .meal-top-bar{
-    display:flex;align-items:center;justify-content:center;gap:16px;
-    padding:4px 0 8px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;gap:14px;
+    padding:2px 0 6px;flex-shrink:0;
   }
   .meal-nav-btn{
     background:var(--paper);border:1.5px solid var(--rule);
-    color:var(--ink);font-size:20px;font-weight:700;
-    width:36px;height:36px;border-radius:8px;cursor:pointer;
+    color:var(--ink);font-size:22px;font-weight:700;
+    width:40px;height:40px;border-radius:10px;cursor:pointer;
     display:flex;align-items:center;justify-content:center;
+    -webkit-tap-highlight-color:transparent;
   }
   .meal-nav-btn:hover{background:var(--paper-soft);}
+  .meal-nav-btn:active{background:var(--rule);}
   .meal-week-label{
     font-family:'Noto Serif KR';font-weight:700;font-size:15px;color:var(--paper);
+    min-width:100px;text-align:center;
   }
+  /* 데스크톱: 5열 그리드 */
   .meal-grid{
     display:grid;
-    grid-template-columns:repeat(5, 1fr);
-    gap:8px;
+    grid-template-columns:repeat(5,1fr);
+    gap:10px;
+    align-items:start;
   }
-  @media(max-width:600px){
-    .meal-grid{grid-template-columns:1fr;}
+  /* 모바일: 가로 스크롤 카드 슬라이더 */
+  @media(max-width:700px){
+    .meal-grid{
+      display:flex;
+      flex-direction:row;
+      overflow-x:auto;
+      gap:10px;
+      padding-bottom:6px;
+      scrollbar-width:none;
+      scroll-snap-type:x mandatory;
+      -webkit-overflow-scrolling:touch;
+    }
+    .meal-grid::-webkit-scrollbar{display:none;}
+    .meal-card{
+      min-width:72vw;max-width:80vw;
+      scroll-snap-align:start;
+      flex-shrink:0;
+    }
   }
   .meal-card{
-    background:var(--paper);border-radius:10px;
-    padding:14px 16px;
-    box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
+    background:var(--paper);border-radius:12px;
+    padding:0;
+    box-shadow:0 4px 16px -8px rgba(0,0,0,0.35);
+    overflow:hidden;
+  }
+  .meal-card.today-card{
+    box-shadow:0 0 0 2.5px var(--wed), 0 4px 16px -8px rgba(0,0,0,0.35);
   }
   .meal-card-day{
-    font-family:'Noto Serif KR';font-weight:700;font-size:13px;
+    font-family:'Noto Serif KR';font-weight:700;font-size:14px;
     color:#fff;background:var(--mon);
-    margin:-14px -16px 12px;padding:8px 16px;
-    border-radius:10px 10px 0 0;
+    padding:10px 16px;
+    display:flex;align-items:baseline;gap:6px;
   }
   .meal-card-day.today{background:var(--wed);}
-  .meal-card-day.weekend{background:var(--ink-soft);}
-  .meal-card-date{font-size:11px;opacity:0.75;margin-left:6px;font-family:'IBM Plex Mono';}
+  .meal-card-date{font-size:11.5px;opacity:0.8;font-family:'IBM Plex Mono';font-weight:500;}
+  .meal-card-body{padding:12px 16px 14px;}
+  /* 중식/석식 구분 블록 */
+  .meal-type-block{
+    margin-bottom:12px;
+  }
+  .meal-type-block:last-child{margin-bottom:0;}
+  .meal-type-label{
+    font-size:10.5px;font-weight:700;font-family:'IBM Plex Mono';
+    color:#fff;background:var(--tue);
+    display:inline-block;padding:2px 8px;border-radius:10px;
+    margin-bottom:6px;letter-spacing:0.04em;
+  }
+  .meal-type-label.supper{background:var(--thu);}
+  .meal-type-divider{
+    border:none;border-top:1.5px solid var(--rule);
+    margin:10px 0;
+  }
   .meal-item{
-    font-size:12.5px;line-height:1.8;color:var(--ink-soft);
-    border-bottom:1px dashed var(--rule);padding:3px 0;
+    font-size:14.5px;line-height:1.9;color:var(--ink-soft);
+    border-bottom:1px dashed var(--rule);padding:2px 0;
   }
   .meal-item:last-child{border-bottom:none;}
-  .meal-empty{font-size:13px;color:var(--ink-soft);text-align:center;padding:20px 0;}
-  .meal-loading{font-size:13px;color:var(--ink-soft);padding:20px;text-align:center;}
+  .meal-empty{font-size:14px;color:var(--ink-soft);text-align:center;padding:24px 0;}
+  .meal-loading{font-size:14px;color:var(--ink-soft);padding:24px;text-align:center;}
   .meal-kcal{
-    font-family:'IBM Plex Mono';font-size:11px;color:var(--ink-soft);
-    margin-top:8px;text-align:right;
+    font-family:'IBM Plex Mono';font-size:11.5px;color:var(--ink-soft);
+    margin-top:6px;text-align:right;opacity:0.75;
   }
 </style>
 </head>
@@ -890,7 +931,7 @@
     <button class="hamburger-btn" id="hamburgerBtn" aria-label="메뉴">
       <span></span><span></span><span></span>
     </button>
-    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.11</span></div>
+    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.12</span></div>
     <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
   </header>
 
@@ -2722,44 +2763,66 @@ function renderMealGrid(dates, byDate) {
   dates.forEach((d, i) => {
     const dateStr = formatDate(d);
     const meals = byDate[dateStr] || {};
-    const card = document.createElement('div');
-    card.className = 'meal-card';
+    const mealTypes = Object.keys(meals).sort();
+    const today = isToday(d);
 
+    const card = document.createElement('div');
+    card.className = 'meal-card' + (today ? ' today-card' : '');
+
+    // 요일 헤더
     const dayHeader = document.createElement('div');
-    dayHeader.className = 'meal-card-day' + (isToday(d) ? ' today' : '');
+    dayHeader.className = 'meal-card-day' + (today ? ' today' : '');
     dayHeader.innerHTML = `${DAYS_KO[i]}요일 <span class="meal-card-date">${formatDateLabel(d)}</span>`;
     card.appendChild(dayHeader);
 
-    const mealTypes = Object.keys(meals).sort();
+    // 본문 영역
+    const body = document.createElement('div');
+    body.className = 'meal-card-body';
+
     if(!mealTypes.length){
       const empty = document.createElement('div');
       empty.className = 'meal-empty';
       empty.textContent = '급식 없음';
-      card.appendChild(empty);
+      body.appendChild(empty);
     } else {
-      mealTypes.forEach(type => {
+      mealTypes.forEach((type, ti) => {
         const { menu, kcal } = meals[type];
-        // 중식/석식 구분 라벨 (2개 이상일 때만 표시)
-        if(mealTypes.length > 1){
-          const label = document.createElement('div');
-          label.style.cssText = 'font-size:11px;font-weight:700;color:var(--ink-soft);margin:8px 0 4px;font-family:"IBM Plex Mono";';
-          label.textContent = `─ ${MEAL_LABEL[type]||type} ─`;
-          card.appendChild(label);
-        }
+        const block = document.createElement('div');
+        block.className = 'meal-type-block';
+
+        // 중식/석식 라벨 (항상 표시)
+        const label = document.createElement('span');
+        label.className = 'meal-type-label' + (type === '3' ? ' supper' : '');
+        label.textContent = MEAL_LABEL[type] || type;
+        block.appendChild(label);
+
+        // 메뉴 아이템
         menu.forEach(item => {
           const div = document.createElement('div');
           div.className = 'meal-item';
           div.textContent = item;
-          card.appendChild(div);
+          block.appendChild(div);
         });
+
+        // 칼로리
         if(kcal){
           const kcalEl = document.createElement('div');
           kcalEl.className = 'meal-kcal';
           kcalEl.textContent = kcal;
-          card.appendChild(kcalEl);
+          block.appendChild(kcalEl);
         }
+
+        // 중식/석식 사이 구분선
+        if(ti < mealTypes.length - 1){
+          const hr = document.createElement('hr');
+          hr.className = 'meal-type-divider';
+          block.appendChild(hr);
+        }
+
+        body.appendChild(block);
       });
     }
+    card.appendChild(body);
     grid.appendChild(card);
   });
 }
@@ -2781,6 +2844,11 @@ async function loadMealWeek() {
   try {
     const byDate = await fetchMeals(start, end);
     renderMealGrid(dates, byDate);
+    // 모바일: 오늘 카드로 자동 스크롤
+    setTimeout(() => {
+      const todayCard = document.querySelector('.meal-card.today-card');
+      if(todayCard) todayCard.scrollIntoView({behavior:'smooth', block:'nearest', inline:'start'});
+    }, 100);
   } catch(e) {
     grid.innerHTML = `<div class="meal-loading">불러오기 실패: ${e.message}</div>`;
   }
