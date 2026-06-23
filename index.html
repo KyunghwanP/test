@@ -2250,25 +2250,16 @@ async function initWeeklyPage(){
   weeklyWeekBar.style.display = 'none';
   weeklyPageContent.innerHTML = '';
   try{
-    // Firestore에서 먼저 읽기 (GitHub Actions가 저장한 데이터)
-    const [indexSnap, contentSnap] = await Promise.all([
-      getDoc(doc(fbDb, 'weeklyData', 'index')),
-      getDoc(doc(fbDb, 'weeklyData', 'current'))
-    ]);
-    if(indexSnap.exists() && contentSnap.exists()){
+    // Firestore에서 주차 목록만 읽어 칩 렌더링
+    const indexSnap = await getDoc(doc(fbDb, 'weeklyData', 'index'));
+    if(indexSnap.exists()){
       const { weeks } = indexSnap.data();
-      const fsData = contentSnap.data();
       if(weeks && weeks.length > 0){
         renderWeekChipsFromFirestore(weeks);
         weeklyWeekBar.style.display = '';
       }
-      weeklyPageLoading.style.display = 'none';
-      if(fsData.html) renderWeeklyHtml(fsData.title, fsData.html);
-      else renderSections(fsData.title, fsData.sections);
-      return;
     }
-    // Firestore에 데이터 없으면 Apps Script 폴백
-    weeklyPageLoading.textContent = '직접 불러오는 중...';
+    // 현재 주차 내용은 항상 Apps Script로 실시간 fetch
     await loadViaAppsScript();
   }catch(e){
     weeklyPageLoading.textContent = '불러오기 실패: ' + e.message;
@@ -2307,18 +2298,11 @@ function renderWeekChipsFromFirestore(weeks){
       weeklyCurrentUrl = week.href;
       weeklyOpenLink.href = week.href;
       weeklyPageContent.innerHTML = '<div class="weekly-page-loading" style="padding:24px;">불러오는 중...</div>';
-      const slug = 'week-' + (week.href.split('/202633/').pop()||'').replace(/\//g,'');
       try{
-        const snap = await getDoc(doc(fbDb, 'weeklyData', slug));
-        if(snap.exists()){
-          const sd = snap.data();
-          if(sd.html) renderWeeklyHtml(sd.title, sd.html);
-          else renderSections(sd.title, sd.sections);
-        } else {
-          const raw = await fetchViaProxy(week.href);
-          const data = parseSitesResponse(raw, []);
-          renderContent(data.contentHtml);
-        }
+        // 항상 Apps Script 프록시로 실시간 fetch
+        const raw = await fetchViaProxy(week.href);
+        const data = parseSitesResponse(raw, []);
+        renderContent(data.contentHtml);
       }catch(e){
         weeklyPageContent.innerHTML = `<div class="weekly-page-loading">실패: ${e.message}</div>`;
       }
