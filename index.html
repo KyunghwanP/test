@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>영남고 시간표 조회 프로그램</title>
+<title>영남고 현황판 ver1.04</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -823,7 +823,7 @@
     <button class="hamburger-btn" id="hamburgerBtn" aria-label="메뉴">
       <span></span><span></span><span></span>
     </button>
-    <div class="app-header-title">영남고 현황판</div>
+    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.04</span></div>
     <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
   </header>
 
@@ -2486,6 +2486,20 @@ function renderContent(html){
     const anchor = svg.closest('a');
     if(anchor) anchor.remove();
     else svg.remove();
+  });
+
+  // 구글 사이트 하단 불필요 텍스트 제거
+  const SKIP_TEXTS = [
+    'Report abuse', 'Page details', 'Page updated',
+    'Skip to main content', 'Skip to navigation', 'Search this site',
+    '불건전 게시물 신고', '페이지 세부정보', '페이지 업데이트 시간', 'Embedded Files',
+  ];
+  div.querySelectorAll('*').forEach(el => {
+    if(el.children.length > 0) return;
+    const t = el.textContent.trim();
+    if(SKIP_TEXTS.some(s => t === s || t.startsWith(s))) {
+      (el.closest('div, p, li, span') || el).remove();
+    }
   });
 
   // 제목 요소 찾기: h1 → role="heading" → 첫 번째 자식 순으로 시도
