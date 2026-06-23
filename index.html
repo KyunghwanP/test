@@ -803,6 +803,21 @@
   }
   .exit-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
+  .btn-short{display:none;}
+  .btn-long{display:inline;}
+  @media (max-width:600px){
+    .btn-short{display:inline;}
+    .btn-long{display:none;}
+
+    .controls{flex-wrap:nowrap;gap:6px;margin-top:12px;}
+    .tabs{flex-shrink:0;padding:3px;}
+    .tab-btn{padding:6px 8px;font-size:12px;}
+    .search-box{min-width:0;flex:1;}
+    .search-box input{padding:7px 10px;font-size:13px;}
+    .class-select-box{min-width:0;flex:1;}
+    .class-select-box select{padding:7px 8px;font-size:13px;}
+  }
+
   @media (max-height: 760px){
     #timetablePage .wrap{padding-top:10px;padding-bottom:10px;}
     .masthead{padding-top:10px;padding-bottom:8px;}
@@ -1133,7 +1148,7 @@
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>비상연락망
       </div>
-    <div class="nav-version">ver1.22</div>
+    <div class="nav-version">ver1.27</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -1155,8 +1170,8 @@
 
     <div class="controls">
       <div class="tabs">
-        <button class="tab-btn active" data-mode="teacher">교사별 보기</button>
-        <button class="tab-btn" data-mode="class">학급별 보기</button>
+        <button class="tab-btn active" data-mode="teacher"><span class="btn-long">교사별 보기</span><span class="btn-short">교사별</span></button>
+        <button class="tab-btn" data-mode="class"><span class="btn-long">학급별 보기</span><span class="btn-short">학급별</span></button>
       </div>
       <div class="search-box" id="teacherSearchBox">
         <input id="searchInput" type="text" autocomplete="off" placeholder="교사 이름을 입력하세요">
@@ -2565,6 +2580,8 @@ function updateWeeklyTopOffset() {
   const h = topBar.getBoundingClientRect().height;
   document.querySelector('.weekly-html-content')?.style.setProperty('--weekly-top-offset', h + 'px');
 }
+
+
 
 // ---- 모바일 탭바 클릭
 document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(tab => {
