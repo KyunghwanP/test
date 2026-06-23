@@ -356,10 +356,12 @@
   }
   .winsize-btn:hover{background:var(--rule);color:var(--ink);}
   .school{
-    font-size:13px;
+    font-size:clamp(18px,3vw,26px);
     letter-spacing:0.04em;
     color:var(--ink-soft);
-    font-weight:500;
+    font-weight:700;
+    font-family:'Noto Serif KR',serif;
+    margin:4px 0 12px;
   }
   h1{
     font-family:'Noto Serif KR', serif;
@@ -1130,7 +1132,7 @@
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>비상연락망
       </div>
-    <div class="nav-version">ver1.19</div>
+    <div class="nav-version">ver1.20</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -1148,7 +1150,6 @@
       <button class="winsize-btn" data-size="max" title="전체화면">전체</button>
     </div>
     <div class="school">영남고등학교 · 2026학년도 1학기</div>
-    <h1>시간표 조회 프로그램</h1>
     <div class="rule"></div>
 
     <div class="controls">
