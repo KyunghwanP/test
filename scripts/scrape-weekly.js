@@ -149,7 +149,8 @@ async function extractContent(page) {
         currentItem = { title: text, lines: [] };
         currentSection.items.push(currentItem);
       } else if (text.length >= 2) {
-        if (!currentSection) return; // 제목 전 내용 스킵
+        // ✅ 수정: return → continue (조기 종료 버그 수정)
+        if (!currentSection) continue;
         if (!currentItem) {
           currentItem = { title: '', lines: [] };
           currentSection.items.push(currentItem);
