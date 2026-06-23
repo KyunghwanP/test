@@ -2257,13 +2257,14 @@ async function initWeeklyPage(){
     ]);
     if(indexSnap.exists() && contentSnap.exists()){
       const { weeks } = indexSnap.data();
-      const { title, sections } = contentSnap.data();
+      const fsData = contentSnap.data();
       if(weeks && weeks.length > 0){
         renderWeekChipsFromFirestore(weeks);
         weeklyWeekBar.style.display = '';
       }
       weeklyPageLoading.style.display = 'none';
-      renderSections(title, sections);
+      if(fsData.html) renderWeeklyHtml(fsData.title, fsData.html);
+      else renderSections(fsData.title, fsData.sections);
       return;
     }
     // Firestore에 데이터 없으면 Apps Script 폴백
@@ -2310,8 +2311,9 @@ function renderWeekChipsFromFirestore(weeks){
       try{
         const snap = await getDoc(doc(fbDb, 'weeklyData', slug));
         if(snap.exists()){
-          const { title, sections } = snap.data();
-          renderSections(title, sections);
+          const sd = snap.data();
+          if(sd.html) renderWeeklyHtml(sd.title, sd.html);
+          else renderSections(sd.title, sd.sections);
         } else {
           const raw = await fetchViaProxy(week.href);
           const data = parseSitesResponse(raw, []);
@@ -2323,6 +2325,35 @@ function renderWeekChipsFromFirestore(weeks){
     });
     weeklyWeekBar.appendChild(chip);
   });
+}
+
+function renderWeeklyHtml(title, html){
+  const wrap = document.createElement('div');
+  wrap.className = 'weekly-html-content';
+
+  // 제목 바
+  const titleBar = document.createElement('div');
+  titleBar.className = 'weekly-forced-title';
+  titleBar.style.cssText = 'display:flex;align-items:center;background:#1F3D33;color:#FBF6EC;';
+  const titleSpan = document.createElement('span');
+  titleSpan.style.flex = '1';
+  titleSpan.style.color = '#FBF6EC';
+  titleSpan.textContent = title || '주간 교육활동 및 업무 안내';
+  const btn = document.createElement('a');
+  btn.href = weeklyCurrentUrl; btn.target = '_blank';
+  btn.className = 'weekly-title-btn';
+  btn.textContent = '원본보기';
+  titleBar.appendChild(titleSpan);
+  titleBar.appendChild(btn);
+  wrap.appendChild(titleBar);
+
+  // 본문 HTML 삽입
+  const body = document.createElement('div');
+  body.innerHTML = html;
+  wrap.appendChild(body);
+
+  weeklyPageContent.innerHTML = '';
+  weeklyPageContent.appendChild(wrap);
 }
 
 function renderSections(title, sections){
