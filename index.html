@@ -2256,15 +2256,20 @@ async function initWeeklyPage(){
   try{
     const raw = await fetchViaProxy(SITES_BASE);
 
-    // 절대 URL + 상대 URL 두 패턴 모두 검색
-    const absPattern = /https:\/\/sites\.google\.com\/yeungnam\.hs\.kr\/202633\/[A-Za-z0-9%\-_.~]+/g;
-    const relPattern = /\/yeungnam\.hs\.kr\/202633\/[A-Za-z0-9%\-_.~]+/g;
+    // /202633/ 이후를 공백·따옴표·꺾쇠가 아닌 모든 문자로 매칭 (한글 포함)
+    const absPattern = /https:\/\/sites\.google\.com\/yeungnam\.hs\.kr\/202633\/[^\s"'<>\n\r]+/g;
+    const relPattern = /\/yeungnam\.hs\.kr\/202633\/[^\s"'<>\n\r]+/g;
+    // /202633/ 이후 슬러그만 잡는 광범위 패턴
+    const slugPattern = /\/202633\/([^\s"'<>\n\r#?]+)/g;
 
     const absUrls = [...(raw.matchAll(absPattern)||[])].map(m => m[0]);
     const relUrls = [...(raw.matchAll(relPattern)||[])].map(m =>
       'https://sites.google.com' + m[0]);
+    const slugUrls = [...(raw.matchAll(slugPattern)||[])].map(m =>
+      'https://sites.google.com/yeungnam.hs.kr/202633/' + m[1]);
 
-    const allUrls = [...new Set([...absUrls, ...relUrls])];
+    const allUrls = [...new Set([...absUrls, ...relUrls, ...slugUrls])]
+      .filter(u => u.includes('/202633/') && u.split('/202633/')[1].length > 2);
 
     const data = parseSitesResponse(raw, allUrls);
 
@@ -2306,12 +2311,18 @@ function parseSitesResponse(raw, fallbackUrls = []){
     contentHtml = raw;
   }
 
-  // navLinks가 비어있으면 정규식으로 직접 추출한 URL 사용
+  // navLinks가 비어있으면 직접 추출한 URL 사용
   if(navLinks.length === 0 && fallbackUrls.length > 0){
+    const seen = new Set(navLinks.map(n=>n.href));
     fallbackUrls.forEach(url => {
-      const slug = decodeURIComponent(url.split('/202633/').pop()).replace(/-/g,' ');
-      const m = slug.match(/(\d{4})년\s*(\d+)월\s*(\d+)일\s*([월화수목금토일])/);
-      navLinks.push({text: m ? `${m[2]}월 ${m[3]}일(${m[4]})` : slug, href: url});
+      if(seen.has(url)) return;
+      seen.add(url);
+      const slug = url.split('/202633/').pop() || '';
+      let decoded = slug;
+      try{ decoded = decodeURIComponent(slug); }catch(e){}
+      decoded = decoded.replace(/-/g,' ');
+      const m = decoded.match(/(\d{4})년\s*(\d+)월\s*(\d+)일\s*([월화수목금토일])/);
+      if(m) navLinks.push({text:`${m[2]}월 ${m[3]}일(${m[4]})`, href: url});
     });
   }
 
