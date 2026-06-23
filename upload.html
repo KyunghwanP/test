@@ -249,10 +249,11 @@ if ('serviceWorker' in navigator) {
       <div class="format-box">
         <b>엑셀 형식 안내</b> — 1행은 헤더, 2행부터 데이터<br>
         <code>A: 이름</code> &nbsp;
-        <code>B: 부서</code> &nbsp;
-        <code>C: 휴대폰</code> &nbsp;
-        <code>D: 내선번호</code> &nbsp;
-        <code>E: 직위(선택)</code>
+        <code>B: 담당부서</code> &nbsp;
+        <code>C: 담당과목</code> &nbsp;
+        <code>D: 휴대폰</code> &nbsp;
+        <code>E: 내선번호</code> &nbsp;
+        <code>F: 직위(선택)</code>
       </div>
 
       <div class="dropzone" id="ctDropzone">
@@ -265,7 +266,7 @@ if ('serviceWorker' in navigator) {
         <div class="stat-chips" id="ctStats"></div>
         <div class="preview-wrap">
           <table class="preview-table">
-            <thead><tr><th>이름</th><th>부서</th><th>휴대폰</th><th>내선</th><th>직위</th></tr></thead>
+            <thead><tr><th>이름</th><th>부서</th><th>담당과목</th><th>휴대폰</th><th>내선</th><th>직위</th></tr></thead>
             <tbody id="ctPreviewBody"></tbody>
           </table>
         </div>
@@ -544,11 +545,12 @@ async function processContactFile(file) {
     ctParsedData = rows.slice(1)
       .filter(r => r[0] && String(r[0]).trim())
       .map(r => ({
-        name:  String(r[0]||'').trim(),
-        dept:  String(r[1]||'').trim(),
-        phone: String(r[2]||'').trim(),
-        ext:   String(r[3]||'').trim(),
-        role:  String(r[4]||'').trim(),
+        name:    String(r[0]||'').trim(),
+        dept:    String(r[1]||'').trim(),
+        subject: String(r[2]||'').trim(),
+        phone:   String(r[3]||'').trim(),
+        ext:     String(r[4]||'').trim(),
+        role:    String(r[5]||'').trim(),
       }));
 
     if (!ctParsedData.length) {
@@ -573,6 +575,7 @@ function renderContactPreview(contacts) {
     <tr>
       <td class="name">${c.name}</td>
       <td>${c.dept}</td>
+      <td>${c.subject||''}</td>
       <td class="phone">${c.phone}</td>
       <td class="ext">${c.ext}</td>
       <td>${c.role}</td>
@@ -638,6 +641,7 @@ async function loadDbContacts() {
       <div class="db-item">
         <span class="name">${s.name}</span>
         <span class="dept">${s.dept||'-'}</span>
+        <span class="phone">${s.subject||'-'}</span>
         <span class="phone">${s.phone||'-'}</span>
         <span class="ext">${s.ext ? '내선 '+s.ext : ''}</span>
       </div>
@@ -654,7 +658,7 @@ document.getElementById('downloadCsvBtn').addEventListener('click', () => {
   const staff = window._dbStaff;
   if (!staff?.length) { alert('데이터가 없습니다.'); return; }
   const ws = XLSX.utils.json_to_sheet(staff.map(s => ({
-    이름: s.name, 부서: s.dept, 휴대폰: s.phone, 내선: s.ext, 직위: s.role
+    이름: s.name, 담당부서: s.dept, 담당과목: s.subject, 휴대폰: s.phone, 내선번호: s.ext, 직위: s.role
   })));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '비상연락망');
