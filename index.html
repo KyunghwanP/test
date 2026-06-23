@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>영남고 현황판 ver1.05</title>
+<title>영남고 현황판 ver1.06</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -149,9 +149,9 @@
 
   /* 주간교육활동 페이지 */
   .weekly-top-bar{
-    flex-shrink:0;padding:8px 12px 0;
+    flex-shrink:0;padding:6px 12px 0;
     background:transparent;
-    display:flex;align-items:center;flex-wrap:wrap;gap:8px;
+    display:flex;flex-direction:column;align-items:stretch;gap:0;
   }
 
   .weekly-body{
@@ -258,8 +258,11 @@
 
   .weekly-week-bar{
     display:flex;align-items:center;gap:8px;
-    margin-bottom:14px;flex-wrap:wrap;
+    margin-bottom:8px;flex-wrap:nowrap;
+    overflow-x:auto;-webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
   }
+  .weekly-week-bar::-webkit-scrollbar{display:none;}
   .weekly-week-chip{
     padding:5px 12px;border-radius:20px;cursor:pointer;
     font-size:12px;font-weight:700;font-family:'Noto Sans KR';
@@ -823,7 +826,7 @@
     <button class="hamburger-btn" id="hamburgerBtn" aria-label="메뉴">
       <span></span><span></span><span></span>
     </button>
-    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.05</span></div>
+    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.06</span></div>
     <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
   </header>
 
@@ -2281,7 +2284,7 @@ async function loadViaAppsScript(){
     renderWeekChips(data.navLinks, data.navLinks[0].href);
     weeklyWeekBar.style.display = '';
   } else {
-    weeklyPageLoading.textContent = `주차 목록 없음 (응답 ${raw.length}자, URL ${allUrls.length}개)`;
+    weeklyPageLoading.style.display = 'none';
   }
   renderContent(data.contentHtml);
 }
