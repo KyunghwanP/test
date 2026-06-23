@@ -96,21 +96,81 @@ async function main() {
   }
 }
 
-// ── 페이지에서 내용 추출 ──────────────────────────────────
+// ── 허용할 인라인 스타일 속성 (배경색 제외, 텍스트 관련만) ──────────
+const ALLOWED_STYLE_PROPS = new Set([
+  'color', 'font-weight', 'font-style', 'text-decoration',
+  'font-size', 'font-family', 'letter-spacing', 'text-align'
+]);
+
+// ── 페이지에서 내용 추출 (HTML 보존 방식) ─────────────────────────
 async function extractContent(page) {
   return await page.evaluate(() => {
-    // 제목 추출
+    const ALLOWED_STYLE_PROPS = new Set([
+      'color', 'font-weight', 'font-style', 'text-decoration',
+      'font-size', 'font-family', 'letter-spacing', 'text-align'
+    ]);
+
+    // 노드의 스타일에서 허용된 속성만 추출해 인라인 style 문자열로 반환
+    function extractAllowedStyle(el) {
+      const cs = window.getComputedStyle(el);
+      const parts = [];
+      ALLOWED_STYLE_PROPS.forEach(prop => {
+        const val = cs.getPropertyValue(prop);
+        if (!val || val === 'normal' || val === 'none' || val === 'auto') return;
+        // 기본 검정색(rgb(0,0,0), #000 등)은 굳이 넣지 않음
+        if (prop === 'color' && (val === 'rgb(0, 0, 0)' || val === '#000000')) return;
+        parts.push(`${prop}:${val}`);
+      });
+      return parts.join(';');
+    }
+
+    // 엘리먼트를 안전한 HTML 문자열로 직렬화
+    // 허용 태그만 유지하고, href는 절대 URL로 고정, 스타일은 필터링
+    function sanitizeNode(node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        return node.textContent
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) return '';
+
+      const tag = node.tagName.toLowerCase();
+      const ALLOWED_TAGS = new Set(['a','b','strong','i','em','u','s','br','span','p','ul','ol','li','div']);
+      const BLOCK_TAGS   = new Set(['p','ul','ol','li','div','br']);
+
+      // 허용되지 않은 태그 → 자식만 재귀 처리
+      if (!ALLOWED_TAGS.has(tag)) {
+        return Array.from(node.childNodes).map(sanitizeNode).join('');
+      }
+
+      const style = extractAllowedStyle(node);
+      let attrs = style ? ` style="${style}"` : '';
+
+      if (tag === 'a') {
+        const href = node.href || '';  // 이미 절대 URL
+        if (href && (href.startsWith('http') || href.startsWith('mailto'))) {
+          attrs += ` href="${href.replace(/"/g,'&quot;')}" target="_blank" rel="noopener"`;
+        } else {
+          // 유효하지 않은 링크는 span으로 강등
+          const inner = Array.from(node.childNodes).map(sanitizeNode).join('');
+          return `<span${attrs}>${inner}</span>`;
+        }
+      }
+
+      if (tag === 'br') return '<br>';
+
+      const inner = Array.from(node.childNodes).map(sanitizeNode).join('');
+      if (!inner.trim()) return '';  // 빈 블록 제거
+
+      return `<${tag}${attrs}>${inner}</${tag}>`;
+    }
+
+    // ── 제목 추출 ──
     const titleEl = document.querySelector('h1, [role="heading"][aria-level="1"]');
     const title = titleEl ? titleEl.textContent.trim() : '';
 
-    // 섹션별(부서별) 내용 추출
-    const sections = [];
-    let currentSection = null;
-    let currentItem = null;
-
+    // ── 섹션 구분 헬퍼 ──
     const DEPT_SUFFIXES = ['부', '실', '팀'];
     const DEPT_KEYWORDS = ['교감', '교장', '행정', '사감'];
-
     function isDept(text) {
       if (text.length > 20 || text.length < 2) return false;
       if (DEPT_KEYWORDS.some(k => text.includes(k))) return true;
@@ -120,42 +180,47 @@ async function extractContent(page) {
       return /^(0\d|1\d|2\d)_/.test(text) || /^♥/.test(text);
     }
 
-    // 모든 텍스트 노드를 순서대로 순회
-    const walker = document.createTreeWalker(
-      document.body,
-      NodeFilter.SHOW_ELEMENT
-    );
-
     const SKIP = ['Skip to', 'Report abuse', 'Page details', '이 사이트 검색', 'Google Sites'];
+
+    // ── DOM 순회 (리프 노드 기준) ──
+    const sections = [];
+    let currentSection = null;
+    let currentItem = null;
+
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
     let node;
     while ((node = walker.nextNode())) {
       const tag = node.tagName?.toLowerCase();
-      if (['script', 'style', 'nav', 'header', 'footer'].includes(tag)) continue;
+      if (['script','style','nav','header','footer'].includes(tag)) continue;
       const text = node.textContent.trim();
       if (!text || text.length < 2) continue;
       if (SKIP.some(s => text.startsWith(s))) continue;
-      // 자식이 있는 경우 자식에서 처리
-      if (node.children.length > 0) continue;
+      if (node.children.length > 0) continue;  // 리프만 처리
 
-      const isH2 = tag === 'h2' || (node.getAttribute?.('aria-level') === '2');
-      const isH3 = tag === 'h3' || (node.getAttribute?.('aria-level') === '3');
+      const isH2 = tag === 'h2' || node.getAttribute?.('aria-level') === '2';
+      const isH3 = tag === 'h3' || node.getAttribute?.('aria-level') === '3';
 
       if (isH2 || isDept(text)) {
-        currentSection = { title: text, items: [] };
+        currentSection = { title: text, titleHtml: sanitizeNode(node), items: [] };
         sections.push(currentSection);
         currentItem = null;
       } else if (isH3 || isItem(text)) {
-        if (!currentSection) { currentSection = { title: '공지', items: [] }; sections.push(currentSection); }
-        currentItem = { title: text, lines: [] };
+        if (!currentSection) { currentSection = { title: '공지', titleHtml: '공지', items: [] }; sections.push(currentSection); }
+        currentItem = { title: text, titleHtml: sanitizeNode(node), lines: [] };
         currentSection.items.push(currentItem);
       } else if (text.length >= 2) {
-        // ✅ 수정: return → continue (조기 종료 버그 수정)
         if (!currentSection) continue;
         if (!currentItem) {
-          currentItem = { title: '', lines: [] };
+          currentItem = { title: '', titleHtml: '', lines: [] };
           currentSection.items.push(currentItem);
         }
-        currentItem.lines.push(text);
+        // 링크가 있는 노드는 부모까지 올라가서 HTML 보존
+        const parentA = node.closest('a');
+        if (parentA) {
+          currentItem.lines.push(sanitizeNode(parentA));
+        } else {
+          currentItem.lines.push(sanitizeNode(node));
+        }
       }
     }
 
