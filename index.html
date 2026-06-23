@@ -2257,8 +2257,14 @@ async function initWeeklyPage(){
     const raw  = await fetchViaProxy(SITES_BASE);
 
     // 응답에서 NAV 링크 직접 추출 (형식에 관계없이)
-    const allUrls = [...raw.matchAll(/https:\/\/sites\.google\.com\/yeungnam\.hs\.kr\/202633\/[^\s"'<>]+/g)]
-      .map(m => m[0]);
+    // 상대 경로와 절대 경로를 모두 탐지하는 정규식으로 변경
+    const regex = /(?:https:\/\/sites\.google\.com)?\/yeungnam\.hs\.kr\/202633\/[^\s"'<>?#]+/g;
+    const allUrls = [...raw.matchAll(regex)]
+      .map(m => {
+        const url = m[0];
+        // 상대 경로일 경우 도메인을 결합하여 절대 경로로 정규화
+        return url.startsWith('http') ? url : 'https://sites.google.com' + url;
+      });
     const uniqueUrls = [...new Set(allUrls)];
 
     const data = parseSitesResponse(raw, uniqueUrls);
