@@ -2332,6 +2332,8 @@ function renderSections(title, sections){
   }
   const div = document.createElement('div');
   div.className = 'weekly-html-content';
+
+  // 제목 바
   const titleBar = document.createElement('div');
   titleBar.className = 'weekly-forced-title';
   titleBar.style.cssText = 'display:flex;align-items:center;background:#1F3D33;color:#FBF6EC;';
@@ -2346,15 +2348,31 @@ function renderSections(title, sections){
   titleBar.appendChild(titleSpan);
   titleBar.appendChild(btn);
   div.appendChild(titleBar);
+
   sections.forEach(section => {
     const h2 = document.createElement('h2');
-    h2.textContent = section.title;
+    // titleHtml이 있으면 HTML로, 없으면 텍스트로
+    if(section.titleHtml) h2.innerHTML = section.titleHtml;
+    else h2.textContent = section.title;
     div.appendChild(h2);
+
     section.items.forEach(item => {
-      if(item.title){const h3=document.createElement('h3');h3.textContent=item.title;div.appendChild(h3);}
-      (item.lines||[]).forEach(line => {const p=document.createElement('p');p.textContent=line;div.appendChild(p);});
+      if(item.title){
+        const h3 = document.createElement('h3');
+        if(item.titleHtml) h3.innerHTML = item.titleHtml;
+        else h3.textContent = item.title;
+        div.appendChild(h3);
+      }
+      (item.lines||[]).forEach(line => {
+        const p = document.createElement('p');
+        // HTML 태그가 포함된 경우 innerHTML로, 아니면 textContent로
+        if(/<[a-z][\s\S]*>/i.test(line)) p.innerHTML = line;
+        else p.textContent = line;
+        div.appendChild(p);
+      });
     });
   });
+
   weeklyPageContent.innerHTML = '';
   weeklyPageContent.appendChild(div);
 }
