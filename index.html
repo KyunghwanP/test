@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>영남고 현황판 ver1.12</title>
+<title>영남고 현황판 ver1.13</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -911,6 +911,68 @@
     font-family:'IBM Plex Mono';font-size:11.5px;color:var(--ink-soft);
     margin-top:6px;text-align:right;opacity:0.75;
   }
+
+  /* ══════════════════════════════════════════
+     비상연락망 페이지
+  ══════════════════════════════════════════ */
+  .contacts-body{
+    flex:1;overflow-y:auto;padding:10px 12px 16px;
+    background:var(--bg-base);display:flex;flex-direction:column;gap:8px;
+  }
+  .contacts-search-bar{
+    flex-shrink:0;padding:2px 0 4px;
+  }
+  .contacts-search-bar input{
+    width:100%;font-family:'Noto Sans KR';font-size:14px;
+    padding:10px 14px;border:1.5px solid var(--rule);border-radius:10px;
+    background:var(--paper);color:var(--ink);outline:none;
+  }
+  .contacts-search-bar input:focus{border-color:var(--mon);}
+  .contacts-list{
+    display:flex;flex-direction:column;gap:6px;
+  }
+  .contacts-dept-label{
+    font-family:'Noto Serif KR';font-weight:700;font-size:12px;
+    color:var(--paper);opacity:0.6;
+    padding:10px 4px 4px;letter-spacing:0.04em;
+  }
+  .contacts-dept-label:first-child{padding-top:4px;}
+  .contact-card{
+    background:var(--paper);border-radius:10px;
+    padding:12px 16px;
+    box-shadow:0 2px 8px -4px rgba(0,0,0,0.25);
+    display:flex;align-items:center;gap:12px;
+  }
+  .contact-avatar{
+    flex-shrink:0;width:38px;height:38px;border-radius:50%;
+    background:var(--mon);color:#fff;
+    font-family:'Noto Serif KR';font-weight:700;font-size:15px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .contact-info{flex:1;min-width:0;}
+  .contact-name{
+    font-family:'Noto Serif KR';font-weight:700;font-size:14px;color:var(--ink);
+  }
+  .contact-dept{font-size:11.5px;color:var(--ink-soft);margin-top:1px;}
+  .contact-actions{display:flex;gap:8px;flex-shrink:0;}
+  .contact-btn{
+    font-family:'IBM Plex Mono';font-size:11.5px;font-weight:600;
+    padding:5px 10px;border-radius:7px;border:1.5px solid var(--rule);
+    background:var(--paper-soft);color:var(--ink-soft);
+    cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:4px;
+    white-space:nowrap;
+  }
+  .contact-btn:hover{background:var(--rule);color:var(--ink);}
+  .contact-btn.phone{border-color:var(--wed);color:var(--wed);background:rgba(47,93,98,0.07);}
+  .contact-btn.phone:hover{background:rgba(47,93,98,0.15);}
+  .contacts-empty{
+    color:var(--paper);opacity:0.5;font-size:14px;
+    text-align:center;padding:40px 0;
+  }
+  .contacts-loading{
+    color:var(--paper);opacity:0.5;font-size:13px;
+    text-align:center;padding:30px 0;
+  }
 </style>
 </head>
 <body>
@@ -931,7 +993,7 @@
     <button class="hamburger-btn" id="hamburgerBtn" aria-label="메뉴">
       <span></span><span></span><span></span>
     </button>
-    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.12</span></div>
+    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.13</span></div>
     <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
   </header>
 
@@ -951,6 +1013,9 @@
       </div>
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
+      </div>
+      <div class="main-nav-item" data-page="contacts">
+        <span class="main-nav-icon">📞</span>비상연락망
       </div>
     </nav>
 
@@ -1040,6 +1105,18 @@
           </div>
           <div class="meal-grid" id="mealGrid">
             <div class="meal-loading">식단을 불러오는 중...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 비상연락망 페이지 -->
+      <div class="page-view" id="contactsPage">
+        <div class="contacts-body">
+          <div class="contacts-search-bar">
+            <input type="text" id="contactsSearch" placeholder="이름 또는 부서 검색..." autocomplete="off">
+          </div>
+          <div class="contacts-list" id="contactsList">
+            <div class="contacts-loading">불러오는 중...</div>
           </div>
         </div>
       </div>
@@ -2222,6 +2299,7 @@ const navOverlay    = document.getElementById('navOverlay');
 const timetablePage = document.getElementById('timetablePage');
 const weeklyPage    = document.getElementById('weeklyPage');
 const mealPage      = document.getElementById('mealPage');
+const contactsPage  = document.getElementById('contactsPage');
 
 // 햄버거 (모바일/좁은화면)
 function updateMobileNavTop(){
@@ -2341,16 +2419,25 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       timetablePage.classList.add('active');
       weeklyPage.classList.remove('active');
       mealPage.classList.remove('active');
+      contactsPage.classList.remove('active');
     } else if(page === 'weekly'){
       timetablePage.classList.remove('active');
       weeklyPage.classList.add('active');
       mealPage.classList.remove('active');
+      contactsPage.classList.remove('active');
       if(!weeklyInitialized) initWeeklyPage();
     } else if(page === 'meal'){
       timetablePage.classList.remove('active');
       weeklyPage.classList.remove('active');
       mealPage.classList.add('active');
+      contactsPage.classList.remove('active');
       if(!mealInitialized) initMealPage();
+    } else if(page === 'contacts'){
+      timetablePage.classList.remove('active');
+      weeklyPage.classList.remove('active');
+      mealPage.classList.remove('active');
+      contactsPage.classList.add('active');
+      if(!contactsInitialized) initContactsPage();
     }
   });
 });
@@ -2864,6 +2951,89 @@ function initMealPage() {
     mealWeekOffset++; loadMealWeek();
   });
 }
+
+
+// ---- 비상연락망 ----
+let contactsInitialized = false;
+let allContacts = [];
+
+async function initContactsPage() {
+  contactsInitialized = true;
+  const list = document.getElementById('contactsList');
+  list.innerHTML = '<div class="contacts-loading">불러오는 중...</div>';
+  try {
+    const snap = await getDoc(doc(fbDb, 'contacts', 'main'));
+    if (!snap.exists() || !snap.data().staff?.length) {
+      list.innerHTML = '<div class="contacts-empty">등록된 비상연락망이 없습니다.<br>관리자에게 문의하세요.</div>';
+      return;
+    }
+    allContacts = snap.data().staff || [];
+    renderContacts(allContacts);
+  } catch(e) {
+    list.innerHTML = `<div class="contacts-empty">불러오기 실패: ${e.message}</div>`;
+  }
+}
+
+// 아바타 색상 - 부서별로 다른 색
+const AVATAR_COLORS = ['#8C2F39','#2F5D62','#B08D57','#3B5170','#6B7A3A','#5D4037','#546E7A'];
+function avatarColor(dept) {
+  let hash = 0;
+  for (const c of (dept||'')) hash = (hash * 31 + c.charCodeAt(0)) & 0xFFFFFF;
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function renderContacts(contacts) {
+  const list = document.getElementById('contactsList');
+  if (!contacts.length) {
+    list.innerHTML = '<div class="contacts-empty">검색 결과가 없습니다.</div>';
+    return;
+  }
+
+  // 부서별 그룹핑
+  const grouped = {};
+  contacts.forEach(c => {
+    const dept = c.dept || '기타';
+    if (!grouped[dept]) grouped[dept] = [];
+    grouped[dept].push(c);
+  });
+
+  let html = '';
+  Object.entries(grouped).forEach(([dept, members]) => {
+    html += `<div class="contacts-dept-label">— ${dept} —</div>`;
+    members.forEach(c => {
+      const color = avatarColor(c.dept);
+      const initial = c.name ? c.name[0] : '?';
+      const phoneBtn = c.phone
+        ? `<a class="contact-btn phone" href="tel:${c.phone.replace(/-/g,'')}">📞 ${c.phone}</a>`
+        : '';
+      const extBtn = c.ext
+        ? `<span class="contact-btn">내선 ${c.ext}</span>`
+        : '';
+      html += `
+        <div class="contact-card">
+          <div class="contact-avatar" style="background:${color}">${initial}</div>
+          <div class="contact-info">
+            <div class="contact-name">${c.name}${c.role ? ' <span style="font-size:11px;font-weight:400;color:var(--ink-soft);">'+c.role+'</span>' : ''}</div>
+            <div class="contact-dept">${c.dept||''}</div>
+          </div>
+          <div class="contact-actions">${phoneBtn}${extBtn}</div>
+        </div>`;
+    });
+  });
+  list.innerHTML = html;
+}
+
+// 검색
+document.getElementById('contactsSearch').addEventListener('input', function() {
+  const q = this.value.trim().toLowerCase();
+  if (!q) { renderContacts(allContacts); return; }
+  const filtered = allContacts.filter(c =>
+    (c.name||'').toLowerCase().includes(q) ||
+    (c.dept||'').toLowerCase().includes(q) ||
+    (c.role||'').toLowerCase().includes(q)
+  );
+  renderContacts(filtered);
+});
 
 
 </script>
