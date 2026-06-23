@@ -2,7 +2,7 @@ name: 주간교육활동 자동 스크래핑
 
 on:
   schedule:
-    - cron: '0 23 * * 0'
+    - cron: '0 23 * * *'
   workflow_dispatch:
 
 jobs:
