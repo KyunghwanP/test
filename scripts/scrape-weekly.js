@@ -105,11 +105,16 @@ async function extractContent(page, sourceUrl) {
     const title = titleEl ? titleEl.textContent.trim() : '';
 
     // ── 본문 컨테이너 탐색 ──
-    // 구글 사이트는 [role="main"] 안에 실제 콘텐츠가 있음
-    const main = document.querySelector('[role="main"]')
-              || document.querySelector('main')
-              || document.querySelector('article')
-              || document.body;
+    // 구글 사이트는 JS 렌더링 후 본문이 여러 div에 나뉘어 들어감
+    // 텍스트가 가장 많은 div를 본문으로 간주 (네비/헤더/푸터 제외)
+    let main = null;
+    let maxLen = 0;
+    document.querySelectorAll('div, section, article, main').forEach(el => {
+      if (el.closest('nav, header, footer, [role="navigation"]')) return;
+      const len = el.textContent.trim().length;
+      if (len > maxLen) { maxLen = len; main = el; }
+    });
+    if (!main || maxLen < 100) main = document.body;
 
     // ── 불필요한 요소 제거 (원본 DOM 건드리지 않도록 clone) ──
     const clone = main.cloneNode(true);
