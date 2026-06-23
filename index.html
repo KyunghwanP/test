@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>영남고등학교 ver1.16</title>
+<title>영남고등학교</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="/test/icon-180.png">
@@ -96,6 +96,7 @@
     overflow-y:auto;
     border-right:1px solid var(--rule);
     padding:12px;
+    display:flex;flex-direction:column;
     transition:transform .25s ease;
     /* 기본: 오버레이(고정) 모드 */
     position:fixed;left:0;top:160px;bottom:0;z-index:200;
@@ -132,6 +133,41 @@
   .app-shell.desktop-nav .nav-overlay{display:none !important;}
 
   /* 모바일 사이드바: top은 JS에서 동적으로 설정 */
+
+  /* 모바일 탭바 */
+  .mobile-tab-bar{
+    display:none;
+    flex-direction:row;
+    background:var(--paper);
+    border-bottom:1px solid var(--rule);
+    overflow-x:auto;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+  }
+  .mobile-tab-bar::-webkit-scrollbar{display:none;}
+  .mobile-tab-bar .tab-item{
+    flex:0 0 auto;
+    display:flex;flex-direction:column;align-items:center;
+    padding:6px 16px;cursor:pointer;
+    font-family:'Noto Sans KR';font-size:10px;font-weight:700;
+    color:var(--ink-soft);gap:2px;border-bottom:2.5px solid transparent;
+    white-space:nowrap;
+  }
+  .mobile-tab-bar .tab-item.active{color:var(--mon);border-bottom-color:var(--mon);}
+  .mobile-tab-bar .tab-item-icon{font-size:18px;}
+
+  /* 사이드바가 overlay 모드일 때 탭바 표시 */
+  .app-shell:not(.desktop-nav) .mobile-tab-bar{display:flex;}
+  /* 데스크톱 모드에서는 탭바 숨김 */
+  .app-shell.desktop-nav .mobile-tab-bar{display:none;}
+
+  /* 버전 표시 */
+  .nav-version{
+    margin-top:auto;padding:12px 16px 4px;
+    font-family:'IBM Plex Mono';font-size:10px;
+    color:var(--ink-soft);opacity:0.45;
+    text-align:center;
+  }
 
   /* 콘텐츠 영역 */
   .app-content{flex:1;overflow:hidden;display:flex;flex-direction:column;}
@@ -1053,9 +1089,25 @@
     <button class="hamburger-btn" id="hamburgerBtn" aria-label="메뉴">
       <span></span><span></span><span></span>
     </button>
-    <div class="app-header-title"><img src="icon-180.png" style="height:38px;vertical-align:middle;margin-right:10px;">영남고등학교 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.16</span></div>
+    <div class="app-header-title"><img src="icon-180.png" style="height:38px;vertical-align:middle;margin-right:10px;">영남고등학교</div>
     <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
   </header>
+
+  <!-- 모바일 탭바 (사이드바가 접힌 상태에서 표시) -->
+  <div class="mobile-tab-bar" id="mobileTabBar">
+    <div class="tab-item active" data-page="timetable">
+      <span class="tab-item-icon">📅</span>시간표
+    </div>
+    <div class="tab-item" data-page="weekly">
+      <span class="tab-item-icon">📋</span>주간교육활동
+    </div>
+    <div class="tab-item" data-page="meal">
+      <span class="tab-item-icon">🍱</span>식단표
+    </div>
+    <div class="tab-item" data-page="contacts">
+      <span class="tab-item-icon">📞</span>비상연락망
+    </div>
+  </div>
 
   <!-- 앱 바디 -->
   <div class="app-body">
@@ -1077,6 +1129,7 @@
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>비상연락망
       </div>
+    <div class="nav-version">ver1.17</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -2499,6 +2552,29 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       contactsPage.classList.add('active');
       if(!contactsInitialized) initContactsPage();
     }
+  });
+});
+
+// ---- 모바일 탭바 클릭
+document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const page = tab.dataset.page;
+    // 사이드바 nav-item도 동기화
+    mainNav.querySelectorAll('.main-nav-item').forEach(i => {
+      i.classList.toggle('active', i.dataset.page === page);
+    });
+    document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(t => {
+      t.classList.toggle('active', t.dataset.page === page);
+    });
+    // 페이지 전환
+    timetablePage.classList.remove('active');
+    weeklyPage.classList.remove('active');
+    mealPage.classList.remove('active');
+    contactsPage.classList.remove('active');
+    if(page === 'timetable')      { timetablePage.classList.add('active'); }
+    else if(page === 'weekly')    { weeklyPage.classList.add('active'); if(!weeklyInitialized) initWeeklyPage(); }
+    else if(page === 'meal')      { mealPage.classList.add('active'); if(!mealInitialized) initMealPage(); }
+    else if(page === 'contacts')  { contactsPage.classList.add('active'); if(!contactsInitialized) initContactsPage(); }
   });
 });
 
