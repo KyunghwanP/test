@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>영남고 현황판 ver1.04</title>
+<title>영남고 현황판 ver1.05</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -823,7 +823,7 @@
     <button class="hamburger-btn" id="hamburgerBtn" aria-label="메뉴">
       <span></span><span></span><span></span>
     </button>
-    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.04</span></div>
+    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.05</span></div>
     <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
   </header>
 
@@ -2486,6 +2486,11 @@ function renderContent(html){
     const anchor = svg.closest('a');
     if(anchor) anchor.remove();
     else svg.remove();
+  });
+
+  // <small> 태그 사이 줄바꿈 추가
+  div.querySelectorAll('small').forEach(small => {
+    small.insertAdjacentHTML('afterend', '<br>');
   });
 
   // 구글 사이트 하단 불필요 텍스트 제거
