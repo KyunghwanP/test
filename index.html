@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>영남고 현황판 ver1.14</title>
+<title>영남고 현황판 ver1.15</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -1024,6 +1024,15 @@
     -webkit-tap-highlight-color:transparent;
   }
   .cd-phone-btn:hover{background:#254d52;}
+  .cd-phone-btn.sms{background:var(--tue);}
+  .cd-phone-btn.sms:hover{background:#8a6d3b;}
+  .cd-phone-btn.ext{background:var(--thu);}
+  .cd-phone-btn.ext:hover{background:#2e3f58;}
+  .cd-action-btns{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .contact-btn.sms{border-color:var(--tue);color:var(--tue);background:rgba(176,141,87,0.07);}
+  .contact-btn.sms:hover{background:rgba(176,141,87,0.18);}
+  .contact-btn.ext{border-color:var(--thu);color:var(--thu);background:rgba(59,81,112,0.07);}
+  .contact-btn.ext:hover{background:rgba(59,81,112,0.18);}
 </style>
 </head>
 <body>
@@ -1044,7 +1053,7 @@
     <button class="hamburger-btn" id="hamburgerBtn" aria-label="메뉴">
       <span></span><span></span><span></span>
     </button>
-    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.14</span></div>
+    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.15</span></div>
     <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
   </header>
 
@@ -3043,11 +3052,16 @@ function renderContacts(contacts) {
   let html = contacts.map((c, idx) => {
     const color = avatarColor(c.dept);
     const initial = c.name ? c.name[0] : '?';
-    const phoneBtn = c.phone
-      ? `<a class="contact-btn phone" href="tel:${c.phone.replace(/-/g,'')}" title="전화걸기">📞</a>`
+    // 휴대폰: 전화 + 문자 아이콘
+    const phoneNum = c.phone ? c.phone.replace(/-/g,'') : '';
+    const phoneBtn = phoneNum
+      ? `<a class="contact-btn phone" href="tel:${phoneNum}" title="전화걸기">📞</a>
+         <a class="contact-btn sms" href="sms:${phoneNum}" title="문자보내기">💬</a>`
       : '';
+    // 내선: 053-235-#### 형태로 변환해서 클릭 시 전화 연결
+    const extNum = c.ext ? '053235' + String(c.ext).replace(/-/g,'').slice(-4) : '';
     const extBtn = c.ext
-      ? `<span class="contact-btn" title="내선 ${c.ext}">☎ ${c.ext}</span>`
+      ? `<a class="contact-btn ext" href="tel:${extNum}" title="내선 ${c.ext}">☎</a>`
       : '';
     return `
       <div class="contact-card">
@@ -3077,17 +3091,32 @@ function showContactDetail(c) {
     ['담당 부서', c.dept],
     ['담당 과목', c.subject],
     ['직위',     c.role],
-    ['내선번호', c.ext],
   ].filter(r => r[1]).map(([label, val]) => `
     <div class="cd-row">
       <span class="cd-label">${label}</span>
       <span class="cd-value">${val}</span>
     </div>`).join('');
 
-  const phoneRow = c.phone ? `
+  const phoneNum = c.phone ? c.phone.replace(/-/g,'') : '';
+  const extNum   = c.ext   ? '053235' + String(c.ext).replace(/-/g,'').slice(-4) : '';
+  const extFormatted = c.ext ? '053-235-' + String(c.ext).slice(-4) : '';
+
+  const phoneRow = phoneNum ? `
     <div class="cd-row">
       <span class="cd-label">휴대폰</span>
-      <a class="cd-phone-btn" href="tel:${c.phone.replace(/-/g,'')}">📞 전화 연결</a>
+      <div class="cd-action-btns">
+        <a class="cd-phone-btn" href="tel:${phoneNum}">📞 전화</a>
+        <a class="cd-phone-btn sms" href="sms:${phoneNum}">💬 문자</a>
+      </div>
+    </div>` : '';
+
+  const extRow = extNum ? `
+    <div class="cd-row">
+      <span class="cd-label">내선전화</span>
+      <div class="cd-action-btns">
+        <span class="cd-value">${extFormatted}</span>
+        <a class="cd-phone-btn ext" href="tel:${extNum}">☎ 연결</a>
+      </div>
     </div>` : '';
 
   const overlay = document.createElement('div');
@@ -3105,6 +3134,7 @@ function showContactDetail(c) {
       <div class="cd-body">
         ${rows}
         ${phoneRow}
+        ${extRow}
       </div>
     </div>`;
 
