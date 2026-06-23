@@ -914,7 +914,7 @@
           <div class="weekly-body" id="weeklyBody">
             <div class="weekly-btn-row">
               <a id="weeklyOpenLink" href="https://sites.google.com/yeungnam.hs.kr/202633"
-                 target="_blank" class="weekly-open-main-btn">↗ 새 탭에서 원본 열기</a>
+                 target="_blank" class="weekly-open-main-btn">↗ 원본보기</a>
             </div>
             <div class="weekly-page-content" id="weeklyPageContent"></div>
           </div>
@@ -2252,36 +2252,31 @@ async function initWeeklyPage(){
   weeklyPageLoading.style.display = '';
   weeklyWeekBar.style.display = 'none';
   weeklyPageContent.innerHTML = '';
-try {
+
+  try{
     const raw = await fetchViaProxy(SITES_BASE);
 
-    // 1. 구글 사이트 내부 이스케이프 문자 정규화
-    const normalizedRaw = raw.replace(/\\u002F/g, '/').replace(/\\\//g, '/');
+    // 절대 URL + 상대 URL 두 패턴 모두 검색
+    const absPattern = /https:\/\/sites\.google\.com\/yeungnam\.hs\.kr\/202633\/[A-Za-z0-9%\-_.~]+/g;
+    const relPattern = /\/yeungnam\.hs\.kr\/202633\/[A-Za-z0-9%\-_.~]+/g;
 
-    // 2. 경로 접두사 전면 무시: '202633/' 문자열을 기준으로 하위 슬러그만 강제 추출
-    const regex = /202633\/([^\s"'<>?#\\]+)/g;
-    
-    const allUrls = [...normalizedRaw.matchAll(regex)].map(m => {
-      // 추출된 슬러그(m[1])를 기반으로 절대 경로 표준화 조립
-      return 'https://sites.google.com/yeungnam.hs.kr/202633/' + m[1];
-    });
-      
-    const uniqueUrls = [...new Set(allUrls)];
+    const absUrls = [...(raw.matchAll(absPattern)||[])].map(m => m[0]);
+    const relUrls = [...(raw.matchAll(relPattern)||[])].map(m =>
+      'https://sites.google.com' + m[0]);
 
-    // 3. 파싱 함수에 정규화된 데이터 및 조립된 URL 배열 전달
-    const data = parseSitesResponse(normalizedRaw, uniqueUrls);
+    const allUrls = [...new Set([...absUrls, ...relUrls])];
 
-    weeklyPageLoading.textContent = `주차 ${data.navLinks.length}개 로드됨`;
-    setTimeout(() => { weeklyPageLoading.style.display = 'none'; }, 1500);
+    const data = parseSitesResponse(raw, allUrls);
 
     if(data.navLinks.length > 0){
+      weeklyPageLoading.style.display = 'none';
       renderWeekChips(data.navLinks, data.navLinks[0].href);
       weeklyWeekBar.style.display = '';
     } else {
-      weeklyPageLoading.textContent = '주차 목록 없음 (슬러그 추출 실패)';
+      weeklyPageLoading.textContent = `주차 목록 없음 (응답 ${raw.length}자, URL 발견 ${allUrls.length}개)`;
     }
     renderContent(data.contentHtml);
-  } catch(e) {
+  }catch(e){
     weeklyPageLoading.textContent = '불러오기 실패: ' + e.message;
   }
 }
@@ -2353,7 +2348,7 @@ function renderContent(html){
     const fallbackBtn = document.createElement('a');
     fallbackBtn.href = weeklyCurrentUrl; fallbackBtn.target = '_blank';
     fallbackBtn.className = 'weekly-float-btn'; fallbackBtn.style.cssText = 'position:static;display:inline-block;margin:12px 0;';
-    fallbackBtn.textContent = '↗ 새 탭에서 원본 열기';
+    fallbackBtn.textContent = '↗ 원본보기';
     weeklyPageContent.appendChild(fallbackBtn);
     return;
   }
@@ -2387,11 +2382,11 @@ function renderContent(html){
     textSpan.innerHTML = titleEl.innerHTML;
     titleEl.innerHTML = '';
     titleEl.appendChild(textSpan);
-    // "새 탭에서 원본 열기" 버튼 추가
+    // "원본보기" 버튼 추가
     const btn = document.createElement('a');
     btn.href = weeklyCurrentUrl; btn.target = '_blank';
     btn.className = 'weekly-title-btn';
-    btn.textContent = '↗ 새 탭에서 원본 열기';
+    btn.textContent = '↗ 원본보기';
     titleEl.appendChild(btn);
   }
 
