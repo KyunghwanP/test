@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>영남고 현황판 ver1.06</title>
+<title>영남고 현황판 ver1.07</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -264,9 +264,10 @@
   }
   .weekly-week-bar::-webkit-scrollbar{display:none;}
   .weekly-week-chip{
-    padding:5px 12px;border-radius:20px;cursor:pointer;
-    font-size:12px;font-weight:700;font-family:'Noto Sans KR';
+    padding:4px 10px;border-radius:20px;cursor:pointer;
+    font-size:11px;font-weight:700;font-family:'IBM Plex Mono';
     border:1.5px solid var(--rule);color:var(--ink-soft);background:var(--paper);
+    white-space:nowrap;flex-shrink:0;
   }
   .weekly-week-chip.active{background:var(--mon);border-color:var(--mon);color:#fff;}
   .weekly-week-chip:hover:not(.active){background:var(--paper-soft);}
@@ -826,7 +827,7 @@
     <button class="hamburger-btn" id="hamburgerBtn" aria-label="메뉴">
       <span></span><span></span><span></span>
     </button>
-    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.06</span></div>
+    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.07</span></div>
     <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
   </header>
 
@@ -2289,12 +2290,23 @@ async function loadViaAppsScript(){
   renderContent(data.contentHtml);
 }
 
+// "2026년 6월 1일(월)" → "26.06.01.(월)" 형식으로 변환
+function formatWeekChipText(text) {
+  const m = text.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일\s*([\(（][월화수목금토일][\)）])/);
+  if(!m) return text;
+  const yy = m[1].slice(2);
+  const mm = m[2].padStart(2,'0');
+  const dd = m[3].padStart(2,'0');
+  const day = m[4].replace('（','(').replace('）',')');
+  return `${yy}.${mm}.${dd}.${day}`;
+}
+
 function renderWeekChipsFromFirestore(weeks){
   weeklyWeekBar.innerHTML = '';
   weeks.slice(0,20).forEach((week, i) => {
     const chip = document.createElement('button');
     chip.className = 'weekly-week-chip' + (i === 0 ? ' active' : '');
-    chip.textContent = week.text;
+    chip.textContent = formatWeekChipText(week.text);
     chip.addEventListener('click', async () => {
       weeklyWeekBar.querySelectorAll('.weekly-week-chip').forEach(c=>c.classList.remove('active'));
       chip.classList.add('active');
@@ -2443,7 +2455,7 @@ function renderWeekChips(navLinks, activeHref){
   navLinks.slice(0,20).forEach(link => {
     const chip = document.createElement('button');
     chip.className = 'weekly-week-chip' + (link.href === activeHref ? ' active':'');
-    chip.textContent = link.text;
+    chip.textContent = formatWeekChipText(link.text);
     chip.addEventListener('click', async () => {
       weeklyWeekBar.querySelectorAll('.weekly-week-chip').forEach(c=>c.classList.remove('active'));
       chip.classList.add('active');
