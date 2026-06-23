@@ -2255,22 +2255,20 @@ async function initWeeklyPage(){
 try {
     const raw = await fetchViaProxy(SITES_BASE);
 
-    // 1. 구글 사이트 내 특수문자(\u002F, \/) 정규화 처리
+    // 1. 구글 사이트 내부 이스케이프 문자 정규화
     const normalizedRaw = raw.replace(/\\u002F/g, '/').replace(/\\\//g, '/');
 
-    // 2. 상대 경로 및 절대 경로 통합 추출 정규식 정의
-    const regex = /(?:https:\/\/sites\.google\.com)?\/yeungnam\.hs\.kr\/202633\/[^\s"'<>?#\\]+/g;
+    // 2. 경로 접두사 전면 무시: '202633/' 문자열을 기준으로 하위 슬러그만 강제 추출
+    const regex = /202633\/([^\s"'<>?#\\]+)/g;
     
-    const allUrls = [...normalizedRaw.matchAll(regex)]
-      .map(m => {
-        const url = m[0];
-        // 상대 경로인 경우 기본 도메인 결합
-        return url.startsWith('http') ? url : 'https://sites.google.com' + url;
-      });
+    const allUrls = [...normalizedRaw.matchAll(regex)].map(m => {
+      // 추출된 슬러그(m[1])를 기반으로 절대 경로 표준화 조립
+      return 'https://sites.google.com/yeungnam.hs.kr/202633/' + m[1];
+    });
       
     const uniqueUrls = [...new Set(allUrls)];
 
-    // 3. 파싱 함수에 정규화된 데이터 전달
+    // 3. 파싱 함수에 정규화된 데이터 및 조립된 URL 배열 전달
     const data = parseSitesResponse(normalizedRaw, uniqueUrls);
 
     weeklyPageLoading.textContent = `주차 ${data.navLinks.length}개 로드됨`;
@@ -2280,11 +2278,10 @@ try {
       renderWeekChips(data.navLinks, data.navLinks[0].href);
       weeklyWeekBar.style.display = '';
     } else {
-      weeklyPageLoading.textContent = '주차 목록 없음 (데이터 추출 실패)';
+      weeklyPageLoading.textContent = '주차 목록 없음 (슬러그 추출 실패)';
     }
     renderContent(data.contentHtml);
-  }
-  catch(e){
+  } catch(e) {
     weeklyPageLoading.textContent = '불러오기 실패: ' + e.message;
   }
 }
