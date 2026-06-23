@@ -19,14 +19,14 @@ async function main() {
   const page = await browser.newPage();
 
   try {
-    // 1) 메인 페이지 로드 (JS 실행 포함)
+    // 1) 메인 페이지 로드
     console.log('📡 구글 사이트 접속 중...');
     await page.goto(SITES_BASE, { waitUntil: 'networkidle', timeout: 30000 });
-    await page.waitForTimeout(2000); // JS 렌더링 여유 시간
+    await page.waitForTimeout(2000);
 
     // 2) 주차 네비게이션 링크 추출
     console.log('🗂  주차 목록 추출 중...');
-    const weekLinks = await page.evaluate((base) => {
+    const weekLinks = await page.evaluate(() => {
       const links = [];
       const seen = new Set();
       document.querySelectorAll('a[href]').forEach(a => {
@@ -38,13 +38,12 @@ async function main() {
         links.push({ text, href });
       });
       return links;
-    }, SITES_BASE);
-
+    });
     console.log(`  → 주차 ${weekLinks.length}개 발견`);
 
     // 3) 현재 주차 내용 추출
     console.log('📄 현재 주차 내용 추출 중...');
-    const contentData = await extractContent(page);
+    const contentData = await extractContent(page, SITES_BASE);
 
     // 4) Firestore에 저장
     console.log('☁️  Firestore 저장 중...');
@@ -58,15 +57,14 @@ async function main() {
     console.log('  → 주차 목록 저장 완료');
 
     // 현재 주차 내용 저장
-    const slug = 'current';
-    await db.collection('weeklyData').doc(slug).set({
+    await db.collection('weeklyData').doc('current').set({
       ...contentData,
       sourceUrl: SITES_BASE,
       fetchedAt: now
     });
     console.log('  → 현재 주차 내용 저장 완료');
 
-    // 5) 최근 2개 주차 내용도 저장 (링크가 있을 경우)
+    // 5) 최근 2개 주차 내용 저장
     for (let i = 0; i < Math.min(2, weekLinks.length); i++) {
       const link = weekLinks[i];
       const weekSlug = link.href.split('/202633/').pop().replace(/\//g, '');
@@ -76,7 +74,7 @@ async function main() {
       try {
         await page.goto(link.href, { waitUntil: 'networkidle', timeout: 20000 });
         await page.waitForTimeout(1500);
-        const weekContent = await extractContent(page);
+        const weekContent = await extractContent(page, link.href);
         await db.collection('weeklyData').doc('week-' + weekSlug).set({
           ...weekContent,
           weekText: link.text,
@@ -96,146 +94,107 @@ async function main() {
   }
 }
 
-// ── 페이지에서 내용 추출 (HTML 보존 방식) ─────────────────────────
-async function extractContent(page) {
-  return await page.evaluate(() => {
-    // 노드 및 조상을 타고 올라가며 인라인 스타일을 직접 읽어 합산
-    // (구글 사이트는 getComputedStyle이 아닌 인라인 style 속성에 서식이 들어있음)
-    function extractAllowedStyle(el) {
-      const PROPS = [
-        ['color',          'color'],
-        ['fontWeight',     'font-weight'],
-        ['fontStyle',      'font-style'],
-        ['textDecoration', 'text-decoration'],
-        ['fontSize',       'font-size'],
-        ['fontFamily',     'font-family'],
-        ['letterSpacing',  'letter-spacing'],
-        ['textAlign',      'text-align'],
-      ];
-      const seen = new Set();
-      const parts = [];
-      let cur = el;
-      while (cur && cur !== document.body) {
-        const s = cur.style;
-        for (const [jsKey, cssKey] of PROPS) {
-          if (seen.has(cssKey)) continue;
-          const val = s[jsKey];
-          if (!val || val === 'normal' || val === 'none' || val === 'auto') continue;
-          // 기본 검정색은 생략
-          if (cssKey === 'color' && (val === 'rgb(0, 0, 0)' || val === '#000000' || val === '#000')) continue;
-          seen.add(cssKey);
-          parts.push(`${cssKey}:${val}`);
-        }
-        cur = cur.parentElement;
-      }
-      return parts.join(';');
-    }
-
-    // 엘리먼트를 안전한 HTML 문자열로 직렬화
-    // 허용 태그만 유지하고, href는 절대 URL로 고정, 스타일은 필터링
-    function sanitizeNode(node) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        return node.textContent
-          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      }
-      if (node.nodeType !== Node.ELEMENT_NODE) return '';
-
-      const tag = node.tagName.toLowerCase();
-      const ALLOWED_TAGS = new Set(['a','b','strong','i','em','u','s','br','span','p','ul','ol','li','div']);
-      const BLOCK_TAGS   = new Set(['p','ul','ol','li','div','br']);
-
-      // 허용되지 않은 태그 → 자식만 재귀 처리
-      if (!ALLOWED_TAGS.has(tag)) {
-        return Array.from(node.childNodes).map(sanitizeNode).join('');
-      }
-
-      const style = extractAllowedStyle(node);
-      let attrs = style ? ` style="${style}"` : '';
-
-      if (tag === 'a') {
-        const href = node.href || '';  // 이미 절대 URL
-        if (href && (href.startsWith('http') || href.startsWith('mailto'))) {
-          attrs += ` href="${href.replace(/"/g,'&quot;')}" target="_blank" rel="noopener"`;
-        } else {
-          // 유효하지 않은 링크는 span으로 강등
-          const inner = Array.from(node.childNodes).map(sanitizeNode).join('');
-          return `<span${attrs}>${inner}</span>`;
-        }
-      }
-
-      if (tag === 'br') return '<br>';
-
-      const inner = Array.from(node.childNodes).map(sanitizeNode).join('');
-      if (!inner.trim()) return '';  // 빈 블록 제거
-
-      return `<${tag}${attrs}>${inner}</${tag}>`;
-    }
+// ── 페이지 본문 HTML 통째로 추출 후 정제 ────────────────────────────
+// 구글 사이트의 렌더링된 DOM에서 본문 컨테이너를 통째로 가져오고,
+// 구글 전용 클래스/속성/불필요한 태그만 제거해 저장합니다.
+async function extractContent(page, sourceUrl) {
+  return await page.evaluate((srcUrl) => {
 
     // ── 제목 추출 ──
     const titleEl = document.querySelector('h1, [role="heading"][aria-level="1"]');
     const title = titleEl ? titleEl.textContent.trim() : '';
 
-    // ── 섹션 구분 헬퍼 ──
-    const DEPT_SUFFIXES = ['부', '실', '팀'];
-    const DEPT_KEYWORDS = ['교감', '교장', '행정', '사감'];
-    function isDept(text) {
-      if (text.length > 20 || text.length < 2) return false;
-      if (DEPT_KEYWORDS.some(k => text.includes(k))) return true;
-      return DEPT_SUFFIXES.some(s => text.endsWith(s));
-    }
-    function isItem(text) {
-      return /^(0\d|1\d|2\d)_/.test(text) || /^♥/.test(text);
-    }
+    // ── 본문 컨테이너 탐색 ──
+    // 구글 사이트는 [role="main"] 안에 실제 콘텐츠가 있음
+    const main = document.querySelector('[role="main"]')
+              || document.querySelector('main')
+              || document.querySelector('article')
+              || document.body;
 
-    const SKIP = ['Skip to', 'Report abuse', 'Page details', '이 사이트 검색', 'Google Sites'];
+    // ── 불필요한 요소 제거 (원본 DOM 건드리지 않도록 clone) ──
+    const clone = main.cloneNode(true);
 
-    // ── DOM 순회 (리프 노드 기준) ──
-    const sections = [];
-    let currentSection = null;
-    let currentItem = null;
+    // 제거할 요소들: 네비게이션, 헤더, 검색, 앵커 전용 링크, 신고 버튼 등
+    const REMOVE_SELECTORS = [
+      'nav', 'header', 'footer',
+      'script', 'style', 'noscript',
+      '[role="navigation"]',
+      '[role="search"]',
+      '[aria-label="Site actions"]',
+      // 구글 사이트 앵커 링크 (#h.xxx 형태) - 아이콘만 있는 링크
+      'a[href^="#"]',
+    ];
+    REMOVE_SELECTORS.forEach(sel => {
+      clone.querySelectorAll(sel).forEach(el => el.remove());
+    });
 
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
-    let node;
-    while ((node = walker.nextNode())) {
-      const tag = node.tagName?.toLowerCase();
-      if (['script','style','nav','header','footer'].includes(tag)) continue;
-      const text = node.textContent.trim();
-      if (!text || text.length < 2) continue;
-      if (SKIP.some(s => text.startsWith(s))) continue;
-      if (node.children.length > 0) continue;  // 리프만 처리
-
-      const isH2 = tag === 'h2' || node.getAttribute?.('aria-level') === '2';
-      const isH3 = tag === 'h3' || node.getAttribute?.('aria-level') === '3';
-
-      if (isH2 || isDept(text)) {
-        currentSection = { title: text, titleHtml: sanitizeNode(node), items: [] };
-        sections.push(currentSection);
-        currentItem = null;
-      } else if (isH3 || isItem(text)) {
-        if (!currentSection) { currentSection = { title: '공지', titleHtml: '공지', items: [] }; sections.push(currentSection); }
-        currentItem = { title: text, titleHtml: sanitizeNode(node), lines: [] };
-        currentSection.items.push(currentItem);
-      } else if (text.length >= 2) {
-        if (!currentSection) continue;
-        if (!currentItem) {
-          currentItem = { title: '', titleHtml: '', lines: [] };
-          currentSection.items.push(currentItem);
-        }
-        // 링크가 있는 노드는 부모까지 올라가서 HTML 보존
-        const parentA = node.closest('a');
-        if (parentA) {
-          currentItem.lines.push(sanitizeNode(parentA));
-        } else {
-          currentItem.lines.push(sanitizeNode(node));
+    // "Report abuse", "Page details", "Skip to" 텍스트만 있는 요소 제거
+    const SKIP_TEXTS = ['Report abuse', 'Page details', 'Page updated', 'Skip to main content', 'Skip to navigation', 'Search this site'];
+    clone.querySelectorAll('*').forEach(el => {
+      if (el.children.length === 0) {
+        const t = el.textContent.trim();
+        if (SKIP_TEXTS.some(s => t === s || t.startsWith(s))) {
+          el.closest('div, p, span, li') ? el.closest('div, p, span, li').remove() : el.remove();
         }
       }
+    });
+
+    // ── 속성 정제: 허용 속성만 남기고 나머지 제거 ──
+    // href, target, rel, style만 허용. class/id/data-* 등 구글 전용 속성 제거
+    function cleanAttrs(el) {
+      const ALLOWED_ATTRS = new Set(['href', 'target', 'rel', 'style', 'src', 'alt']);
+      Array.from(el.attributes).forEach(attr => {
+        if (!ALLOWED_ATTRS.has(attr.name)) el.removeAttribute(attr.name);
+      });
+
+      // style에서 배경색, 레이아웃 관련 속성 제거, 텍스트 서식만 남김
+      if (el.style) {
+        const REMOVE_STYLE_PROPS = [
+          'background', 'background-color', 'background-image',
+          'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
+          'padding', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right',
+          'width', 'height', 'max-width', 'min-width',
+          'display', 'position', 'top', 'left', 'right', 'bottom',
+          'float', 'clear', 'overflow', 'z-index',
+          'border', 'border-radius', 'box-shadow',
+          'line-height', 'list-style',
+        ];
+        REMOVE_STYLE_PROPS.forEach(prop => el.style.removeProperty(prop));
+      }
+
+      // 링크: 외부 URL만 허용, 구글 내부 앵커/추적 링크는 텍스트로 강등
+      if (el.tagName === 'A') {
+        const href = el.getAttribute('href') || '';
+        if (!href || href.startsWith('#') || href.includes('google.com/url?')) {
+          // 앵커 or 추적 링크 → span으로 교체
+          const span = document.createElement('span');
+          span.innerHTML = el.innerHTML;
+          el.replaceWith(span);
+          return; // replaceWith 후엔 el이 DOM에서 사라지므로 children 처리 불필요
+        }
+        el.setAttribute('target', '_blank');
+        el.setAttribute('rel', 'noopener');
+      }
+
+      // 재귀적으로 자식도 처리
+      Array.from(el.children).forEach(cleanAttrs);
+    }
+    cleanAttrs(clone);
+
+    // ── 빈 블록 요소 제거 (여러 번 반복해서 중첩 빈 div도 제거) ──
+    for (let pass = 0; pass < 3; pass++) {
+      clone.querySelectorAll('div, p, span, li').forEach(el => {
+        if (!el.textContent.trim() && !el.querySelector('img, br')) el.remove();
+      });
     }
 
+    // ── 최종 HTML 반환 ──
     return {
       title,
-      sections: sections.filter(s => s.items.length > 0)
+      html: clone.innerHTML,
     };
-  });
+
+  }, sourceUrl);
 }
 
 main().catch(err => {
