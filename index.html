@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>영남고 현황판 ver1.15</title>
+<title>영남고등학교 ver1.16</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -165,7 +165,7 @@
     position:relative;margin-top:6px;
     background:var(--paper);border-radius:8px;padding:24px 28px;
     box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
-    font-size:15px;line-height:2;color:var(--ink-soft);
+    font-size:17px;line-height:2;color:var(--ink-soft);
     overflow:visible;
   }
   /* h1(페이지 제목): 카드 상단 어두운 타이틀바, flex로 제목+버튼 나란히 */
@@ -197,7 +197,7 @@
   .weekly-title-btn:hover{background:rgba(251,246,236,0.28);}
   .weekly-html-content h2{
     font-family:'Noto Serif KR';color:var(--ink);margin:22px 0 10px;
-    font-weight:700;font-size:18px;padding-bottom:8px;border-bottom:1px solid var(--rule);
+    font-weight:700;font-size:20px;padding-bottom:8px;border-bottom:1px solid var(--rule);
     position:sticky;top:0;
     background:var(--paper);
     z-index:10;
@@ -206,8 +206,8 @@
     padding-left:28px;padding-right:28px;
     box-shadow:0 4px 8px -4px rgba(0,0,0,0.08);
   }
-  .weekly-html-content h3{font-family:'Noto Serif KR';color:var(--ink);font-size:16px;font-weight:700;margin:18px 0 8px;}
-  .weekly-html-content h4{font-family:'Noto Serif KR';color:var(--ink);font-size:15px;font-weight:700;margin:14px 0 6px;}
+  .weekly-html-content h3{font-family:'Noto Serif KR';color:var(--ink);font-size:18px;font-weight:700;margin:18px 0 8px;}
+  .weekly-html-content h4{font-family:'Noto Serif KR';color:var(--ink);font-size:17px;font-weight:700;margin:14px 0 6px;}
   .weekly-html-content p,.weekly-html-content div{margin:5px 0;}
   .weekly-html-content a{color:var(--wed);}
   .weekly-html-content a:hover{text-decoration:underline;}
@@ -237,7 +237,7 @@
     margin-bottom:5px;padding-bottom:4px;border-bottom:1px dashed var(--rule);
   }
   .weekly-item-body{
-    font-size:12px;line-height:1.85;color:var(--ink-soft);
+    font-size:14px;line-height:1.85;color:var(--ink-soft);
     white-space:pre-wrap;word-break:break-word;
   }
   .weekly-item-body a{color:var(--wed);}
@@ -1053,7 +1053,7 @@
     <button class="hamburger-btn" id="hamburgerBtn" aria-label="메뉴">
       <span></span><span></span><span></span>
     </button>
-    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.15</span></div>
+    <div class="app-header-title"><img src="icon-180.png" style="height:26px;vertical-align:middle;margin-right:8px;border-radius:4px;">영남고등학교 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.16</span></div>
     <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
   </header>
 
@@ -2779,8 +2779,9 @@ function renderContent(html){
     else svg.remove();
   });
 
-  // <small> 태그 사이 줄바꿈 추가
+  // <small> 태그 줄바꿈 + 글자색 검정
   div.querySelectorAll('small').forEach(small => {
+    small.style.color = '#000';
     small.insertAdjacentHTML('afterend', '<br>');
   });
 
