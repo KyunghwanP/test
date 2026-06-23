@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>영남고 현황판 ver1.08</title>
+<title>영남고 현황판 ver1.09</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -815,6 +815,61 @@
     .gt-cell.today, .gt-lunch-cell.today{background:#fff !important;}
     .gt-cell.now{background:#fff !important;border-color:#777 !important;box-shadow:none !important;}
   }
+
+  /* ══════════════════════════════════════════
+     식단표 페이지
+  ══════════════════════════════════════════ */
+  .meal-body{
+    flex:1;overflow-y:auto;padding:12px;
+    background:var(--bg-base);display:flex;flex-direction:column;gap:12px;
+  }
+  .meal-top-bar{
+    display:flex;align-items:center;justify-content:center;gap:16px;
+    padding:4px 0 8px;flex-shrink:0;
+  }
+  .meal-nav-btn{
+    background:var(--paper);border:1.5px solid var(--rule);
+    color:var(--ink);font-size:20px;font-weight:700;
+    width:36px;height:36px;border-radius:8px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .meal-nav-btn:hover{background:var(--paper-soft);}
+  .meal-week-label{
+    font-family:'Noto Serif KR';font-weight:700;font-size:15px;color:var(--paper);
+  }
+  .meal-grid{
+    display:grid;
+    grid-template-columns:repeat(5, 1fr);
+    gap:8px;
+  }
+  @media(max-width:600px){
+    .meal-grid{grid-template-columns:1fr;}
+  }
+  .meal-card{
+    background:var(--paper);border-radius:10px;
+    padding:14px 16px;
+    box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
+  }
+  .meal-card-day{
+    font-family:'Noto Serif KR';font-weight:700;font-size:13px;
+    color:#fff;background:var(--mon);
+    margin:-14px -16px 12px;padding:8px 16px;
+    border-radius:10px 10px 0 0;
+  }
+  .meal-card-day.today{background:var(--wed);}
+  .meal-card-day.weekend{background:var(--ink-soft);}
+  .meal-card-date{font-size:11px;opacity:0.75;margin-left:6px;font-family:'IBM Plex Mono';}
+  .meal-item{
+    font-size:12.5px;line-height:1.8;color:var(--ink-soft);
+    border-bottom:1px dashed var(--rule);padding:3px 0;
+  }
+  .meal-item:last-child{border-bottom:none;}
+  .meal-empty{font-size:13px;color:var(--ink-soft);text-align:center;padding:20px 0;}
+  .meal-loading{font-size:13px;color:var(--ink-soft);padding:20px;text-align:center;}
+  .meal-kcal{
+    font-family:'IBM Plex Mono';font-size:11px;color:var(--ink-soft);
+    margin-top:8px;text-align:right;
+  }
 </style>
 </head>
 <body>
@@ -835,7 +890,7 @@
     <button class="hamburger-btn" id="hamburgerBtn" aria-label="메뉴">
       <span></span><span></span><span></span>
     </button>
-    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.08</span></div>
+    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.09</span></div>
     <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
   </header>
 
@@ -852,6 +907,9 @@
       </div>
       <div class="main-nav-item" data-page="weekly">
         <span class="main-nav-icon">📋</span>주간교육활동
+      </div>
+      <div class="main-nav-item" data-page="meal">
+        <span class="main-nav-icon">🍱</span>식단표
       </div>
     </nav>
 
@@ -928,6 +986,20 @@
                target="_blank" class="weekly-open-main-btn">↗ 원본보기</a>
           </div>
           <div class="weekly-page-content" id="weeklyPageContent"></div>
+        </div>
+      </div>
+
+      <!-- 식단표 페이지 -->
+      <div class="page-view" id="mealPage">
+        <div class="meal-body" id="mealBody">
+          <div class="meal-top-bar">
+            <button class="meal-nav-btn" id="mealPrevBtn">‹</button>
+            <span class="meal-week-label" id="mealWeekLabel"></span>
+            <button class="meal-nav-btn" id="mealNextBtn">›</button>
+          </div>
+          <div class="meal-grid" id="mealGrid">
+            <div class="meal-loading">식단을 불러오는 중...</div>
+          </div>
         </div>
       </div>
 
@@ -2108,6 +2180,7 @@ const hamburgerBtn  = document.getElementById('hamburgerBtn');
 const navOverlay    = document.getElementById('navOverlay');
 const timetablePage = document.getElementById('timetablePage');
 const weeklyPage    = document.getElementById('weeklyPage');
+const mealPage      = document.getElementById('mealPage');
 
 // 햄버거 (모바일/좁은화면)
 function updateMobileNavTop(){
@@ -2226,10 +2299,17 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
     if(page === 'timetable'){
       timetablePage.classList.add('active');
       weeklyPage.classList.remove('active');
-    } else {
+      mealPage.classList.remove('active');
+    } else if(page === 'weekly'){
       timetablePage.classList.remove('active');
       weeklyPage.classList.add('active');
+      mealPage.classList.remove('active');
       if(!weeklyInitialized) initWeeklyPage();
+    } else if(page === 'meal'){
+      timetablePage.classList.remove('active');
+      weeklyPage.classList.remove('active');
+      mealPage.classList.add('active');
+      if(!mealInitialized) initMealPage();
     }
   });
 });
@@ -2563,6 +2643,150 @@ function renderContent(html){
   weeklyPageContent.appendChild(div);
 }
 
+
+
+// ---- 식단표 (나이스 급식 API) ----
+const NEIS_KEY  = 'faa26ac84d27403e8ecd28aaf407f500';
+const ATPT_CODE = 'D10';
+const SCHUL_CODE= 'D100000331';
+const DAYS_KO   = ['월','화','수','목','금'];
+
+let mealInitialized = false;
+let mealWeekOffset  = 0; // 0=이번주, -1=지난주, +1=다음주
+
+function getMealWeekDates(offset) {
+  const now = new Date();
+  const day = now.getDay(); // 0=일, 1=월 ... 6=토
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
+  const dates = [];
+  for(let i = 0; i < 5; i++){
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    dates.push(d);
+  }
+  return dates;
+}
+
+function formatDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}${m}${day}`;
+}
+
+function formatDateLabel(d) {
+  const m = d.getMonth()+1;
+  const day = d.getDate();
+  return `${m}/${day}`;
+}
+
+function isToday(d) {
+  const now = new Date();
+  return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && d.getDate()===now.getDate();
+}
+
+async function fetchMeals(startDate, endDate) {
+  const url = `https://open.neis.go.kr/hub/mealServiceDietInfo`
+    + `?KEY=${NEIS_KEY}&Type=json&pIndex=1&pSize=100`
+    + `&ATPT_OFCDC_SC_CODE=${ATPT_CODE}&SD_SCHUL_CODE=${SCHUL_CODE}`
+    + `&MLSV_FROM_YMD=${startDate}&MLSV_TO_YMD=${endDate}`;
+
+  const res = await fetch(url);
+  const json = await res.json();
+
+  // 에러 응답 처리
+  if(json.RESULT) return {};
+  const rows = json.mealServiceDietInfo?.[1]?.row || [];
+
+  // 날짜별로 정리
+  const byDate = {};
+  rows.forEach(r => {
+    const date = r.MLSV_YMD;
+    if(!byDate[date]) byDate[date] = { menu: [], kcal: '' };
+    // 메뉴: 줄바꿈 분리, 알레르기 번호 제거
+    const items = r.DDISH_NM
+      .split('<br/>')
+      .map(s => s.replace(/\d+(\.\d+)*/g, '').replace(/[()]/g,'').trim())
+      .filter(Boolean);
+    byDate[date].menu.push(...items);
+    byDate[date].kcal = r.CAL_INFO || '';
+  });
+  return byDate;
+}
+
+function renderMealGrid(dates, byDate) {
+  const grid = document.getElementById('mealGrid');
+  grid.innerHTML = '';
+  const todayStr = formatDate(new Date());
+
+  dates.forEach((d, i) => {
+    const dateStr = formatDate(d);
+    const meal = byDate[dateStr];
+    const card = document.createElement('div');
+    card.className = 'meal-card';
+
+    const dayHeader = document.createElement('div');
+    const isWeekend = false; // 월~금만 표시
+    dayHeader.className = 'meal-card-day' + (isToday(d) ? ' today' : '');
+    dayHeader.innerHTML = `${DAYS_KO[i]}요일 <span class="meal-card-date">${formatDateLabel(d)}</span>`;
+    card.appendChild(dayHeader);
+
+    if(!meal || !meal.menu.length){
+      const empty = document.createElement('div');
+      empty.className = 'meal-empty';
+      empty.textContent = '급식 없음';
+      card.appendChild(empty);
+    } else {
+      meal.menu.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'meal-item';
+        div.textContent = item;
+        card.appendChild(div);
+      });
+      if(meal.kcal){
+        const kcal = document.createElement('div');
+        kcal.className = 'meal-kcal';
+        kcal.textContent = meal.kcal;
+        card.appendChild(kcal);
+      }
+    }
+    grid.appendChild(card);
+  });
+}
+
+async function loadMealWeek() {
+  const grid = document.getElementById('mealGrid');
+  const label = document.getElementById('mealWeekLabel');
+  grid.innerHTML = '<div class="meal-loading">불러오는 중...</div>';
+
+  const dates = getMealWeekDates(mealWeekOffset);
+  const start = formatDate(dates[0]);
+  const end   = formatDate(dates[4]);
+
+  // 주 라벨
+  const m1 = dates[0].getMonth()+1, d1 = dates[0].getDate();
+  const m2 = dates[4].getMonth()+1, d2 = dates[4].getDate();
+  label.textContent = `${m1}/${d1} ~ ${m2}/${d2}`;
+
+  try {
+    const byDate = await fetchMeals(start, end);
+    renderMealGrid(dates, byDate);
+  } catch(e) {
+    grid.innerHTML = `<div class="meal-loading">불러오기 실패: ${e.message}</div>`;
+  }
+}
+
+function initMealPage() {
+  mealInitialized = true;
+  loadMealWeek();
+  document.getElementById('mealPrevBtn').addEventListener('click', () => {
+    mealWeekOffset--; loadMealWeek();
+  });
+  document.getElementById('mealNextBtn').addEventListener('click', () => {
+    mealWeekOffset++; loadMealWeek();
+  });
+}
 
 
 </script>
