@@ -2252,22 +2252,26 @@ async function initWeeklyPage(){
   weeklyPageLoading.style.display = '';
   weeklyWeekBar.style.display = 'none';
   weeklyPageContent.innerHTML = '';
+try {
+    const raw = await fetchViaProxy(SITES_BASE);
 
-  try{
-    const raw  = await fetchViaProxy(SITES_BASE);
+    // 1. 구글 사이트 내 특수문자(\u002F, \/) 정규화 처리
+    const normalizedRaw = raw.replace(/\\u002F/g, '/').replace(/\\\//g, '/');
 
-    // 응답에서 NAV 링크 직접 추출 (형식에 관계없이)
-    // 상대 경로와 절대 경로를 모두 탐지하는 정규식으로 변경
-    const regex = /(?:https:\/\/sites\.google\.com)?\/yeungnam\.hs\.kr\/202633\/[^\s"'<>?#]+/g;
-    const allUrls = [...raw.matchAll(regex)]
+    // 2. 상대 경로 및 절대 경로 통합 추출 정규식 정의
+    const regex = /(?:https:\/\/sites\.google\.com)?\/yeungnam\.hs\.kr\/202633\/[^\s"'<>?#\\]+/g;
+    
+    const allUrls = [...normalizedRaw.matchAll(regex)]
       .map(m => {
         const url = m[0];
-        // 상대 경로일 경우 도메인을 결합하여 절대 경로로 정규화
+        // 상대 경로인 경우 기본 도메인 결합
         return url.startsWith('http') ? url : 'https://sites.google.com' + url;
       });
+      
     const uniqueUrls = [...new Set(allUrls)];
 
-    const data = parseSitesResponse(raw, uniqueUrls);
+    // 3. 파싱 함수에 정규화된 데이터 전달
+    const data = parseSitesResponse(normalizedRaw, uniqueUrls);
 
     weeklyPageLoading.textContent = `주차 ${data.navLinks.length}개 로드됨`;
     setTimeout(() => { weeklyPageLoading.style.display = 'none'; }, 1500);
@@ -2276,10 +2280,11 @@ async function initWeeklyPage(){
       renderWeekChips(data.navLinks, data.navLinks[0].href);
       weeklyWeekBar.style.display = '';
     } else {
-      weeklyPageLoading.textContent = '주차 목록 없음 (URL 패턴 불일치)';
+      weeklyPageLoading.textContent = '주차 목록 없음 (데이터 추출 실패)';
     }
     renderContent(data.contentHtml);
-  }catch(e){
+  }
+  catch(e){
     weeklyPageLoading.textContent = '불러오기 실패: ' + e.message;
   }
 }
