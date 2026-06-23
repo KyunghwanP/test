@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>영남고 현황판 ver1.10</title>
+<title>영남고 현황판 ver1.11</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -890,7 +890,7 @@
     <button class="hamburger-btn" id="hamburgerBtn" aria-label="메뉴">
       <span></span><span></span><span></span>
     </button>
-    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.10</span></div>
+    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.11</span></div>
     <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
   </header>
 
@@ -2695,61 +2695,70 @@ async function fetchMeals(startDate, endDate) {
   const res = await fetch(url);
   const json = await res.json();
 
-  // 에러 응답 처리
   if(json.RESULT) return {};
   const rows = json.mealServiceDietInfo?.[1]?.row || [];
 
-  // 날짜별로 정리
+  // 날짜 + 식사구분(2=중식, 3=석식)별로 정리
   const byDate = {};
   rows.forEach(r => {
     const date = r.MLSV_YMD;
-    if(!byDate[date]) byDate[date] = { menu: [], kcal: '' };
-    // 메뉴: 줄바꿈 분리, 알레르기 번호 제거
+    const type = r.MMEAL_SC_CODE; // 1=조식, 2=중식, 3=석식
+    if(!byDate[date]) byDate[date] = {};
     const items = r.DDISH_NM
       .split('<br/>')
       .map(s => s.replace(/\d+(\.\d+)*/g, '').replace(/[()]/g,'').trim())
       .filter(Boolean);
-    byDate[date].menu.push(...items);
-    byDate[date].kcal = r.CAL_INFO || '';
+    byDate[date][type] = { menu: items, kcal: r.CAL_INFO || '' };
   });
   return byDate;
 }
 
+const MEAL_LABEL = { '1':'조식', '2':'중식', '3':'석식' };
+
 function renderMealGrid(dates, byDate) {
   const grid = document.getElementById('mealGrid');
   grid.innerHTML = '';
-  const todayStr = formatDate(new Date());
 
   dates.forEach((d, i) => {
     const dateStr = formatDate(d);
-    const meal = byDate[dateStr];
+    const meals = byDate[dateStr] || {};
     const card = document.createElement('div');
     card.className = 'meal-card';
 
     const dayHeader = document.createElement('div');
-    const isWeekend = false; // 월~금만 표시
     dayHeader.className = 'meal-card-day' + (isToday(d) ? ' today' : '');
     dayHeader.innerHTML = `${DAYS_KO[i]}요일 <span class="meal-card-date">${formatDateLabel(d)}</span>`;
     card.appendChild(dayHeader);
 
-    if(!meal || !meal.menu.length){
+    const mealTypes = Object.keys(meals).sort();
+    if(!mealTypes.length){
       const empty = document.createElement('div');
       empty.className = 'meal-empty';
       empty.textContent = '급식 없음';
       card.appendChild(empty);
     } else {
-      meal.menu.forEach(item => {
-        const div = document.createElement('div');
-        div.className = 'meal-item';
-        div.textContent = item;
-        card.appendChild(div);
+      mealTypes.forEach(type => {
+        const { menu, kcal } = meals[type];
+        // 중식/석식 구분 라벨 (2개 이상일 때만 표시)
+        if(mealTypes.length > 1){
+          const label = document.createElement('div');
+          label.style.cssText = 'font-size:11px;font-weight:700;color:var(--ink-soft);margin:8px 0 4px;font-family:"IBM Plex Mono";';
+          label.textContent = `─ ${MEAL_LABEL[type]||type} ─`;
+          card.appendChild(label);
+        }
+        menu.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'meal-item';
+          div.textContent = item;
+          card.appendChild(div);
+        });
+        if(kcal){
+          const kcalEl = document.createElement('div');
+          kcalEl.className = 'meal-kcal';
+          kcalEl.textContent = kcal;
+          card.appendChild(kcalEl);
+        }
       });
-      if(meal.kcal){
-        const kcal = document.createElement('div');
-        kcal.className = 'meal-kcal';
-        kcal.textContent = meal.kcal;
-        card.appendChild(kcal);
-      }
     }
     grid.appendChild(card);
   });
