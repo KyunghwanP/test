@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>영남고 현황판 ver1.13</title>
+<title>영남고 현황판 ver1.14</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -973,6 +973,57 @@
     color:var(--paper);opacity:0.5;font-size:13px;
     text-align:center;padding:30px 0;
   }
+
+  /* 비상연락망 상세 팝업 */
+  .cd-overlay{
+    position:fixed;inset:0;background:rgba(20,24,18,0.55);
+    display:flex;align-items:center;justify-content:center;
+    padding:20px;z-index:400;
+    opacity:0;transition:opacity 0.18s ease;
+  }
+  .cd-overlay.open{opacity:1;}
+  .cd-box{
+    background:var(--paper);border-radius:14px;
+    max-width:360px;width:100%;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,0.5);
+    overflow:hidden;
+    transform:scale(0.95);transition:transform 0.18s ease;
+  }
+  .cd-overlay.open .cd-box{transform:scale(1);}
+  .cd-header{
+    display:flex;align-items:center;gap:14px;
+    padding:18px 20px;color:#fff;position:relative;
+  }
+  .cd-avatar{
+    width:44px;height:44px;border-radius:50%;
+    background:rgba(255,255,255,0.25);
+    font-family:'Noto Serif KR';font-weight:700;font-size:20px;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .cd-name{font-family:'Noto Serif KR';font-weight:700;font-size:18px;}
+  .cd-dept{font-size:12px;opacity:0.8;margin-top:2px;}
+  .cd-close{
+    position:absolute;top:12px;right:14px;
+    background:rgba(255,255,255,0.2);border:none;color:#fff;
+    font-size:18px;width:28px;height:28px;border-radius:50%;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+  .cd-close:hover{background:rgba(255,255,255,0.35);}
+  .cd-body{padding:16px 20px 20px;display:flex;flex-direction:column;gap:10px;}
+  .cd-row{display:flex;align-items:center;gap:12px;}
+  .cd-label{
+    font-size:12px;color:var(--ink-soft);font-weight:600;
+    min-width:72px;flex-shrink:0;
+  }
+  .cd-value{font-size:14px;color:var(--ink);font-weight:500;}
+  .cd-phone-btn{
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--wed);color:#fff;
+    font-family:'Noto Sans KR';font-weight:700;font-size:13px;
+    padding:9px 18px;border-radius:8px;text-decoration:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .cd-phone-btn:hover{background:#254d52;}
 </style>
 </head>
 <body>
@@ -993,7 +1044,7 @@
     <button class="hamburger-btn" id="hamburgerBtn" aria-label="메뉴">
       <span></span><span></span><span></span>
     </button>
-    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.13</span></div>
+    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.14</span></div>
     <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
   </header>
 
@@ -2988,39 +3039,84 @@ function renderContacts(contacts) {
     list.innerHTML = '<div class="contacts-empty">검색 결과가 없습니다.</div>';
     return;
   }
+  // 파일 순서 그대로, 부서 그룹 없이 나열
+  let html = contacts.map((c, idx) => {
+    const color = avatarColor(c.dept);
+    const initial = c.name ? c.name[0] : '?';
+    const phoneBtn = c.phone
+      ? `<a class="contact-btn phone" href="tel:${c.phone.replace(/-/g,'')}" title="전화걸기">📞</a>`
+      : '';
+    const extBtn = c.ext
+      ? `<span class="contact-btn" title="내선 ${c.ext}">☎ ${c.ext}</span>`
+      : '';
+    return `
+      <div class="contact-card">
+        <div class="contact-avatar" style="background:${color}" data-idx="${idx}">${initial}</div>
+        <div class="contact-info" data-idx="${idx}" style="cursor:pointer;">
+          <div class="contact-name">${c.name}${c.role ? ' <span style="font-size:11px;font-weight:400;color:var(--ink-soft);">'+c.role+'</span>' : ''}</div>
+          <div class="contact-dept">${c.dept||''}${c.subject ? ' · '+c.subject : ''}</div>
+        </div>
+        <div class="contact-actions">${phoneBtn}${extBtn}</div>
+      </div>`;
+  }).join('');
+  list.innerHTML = html;
 
-  // 부서별 그룹핑
-  const grouped = {};
-  contacts.forEach(c => {
-    const dept = c.dept || '기타';
-    if (!grouped[dept]) grouped[dept] = [];
-    grouped[dept].push(c);
-  });
-
-  let html = '';
-  Object.entries(grouped).forEach(([dept, members]) => {
-    html += `<div class="contacts-dept-label">— ${dept} —</div>`;
-    members.forEach(c => {
-      const color = avatarColor(c.dept);
-      const initial = c.name ? c.name[0] : '?';
-      const phoneBtn = c.phone
-        ? `<a class="contact-btn phone" href="tel:${c.phone.replace(/-/g,'')}">📞 ${c.phone}</a>`
-        : '';
-      const extBtn = c.ext
-        ? `<span class="contact-btn">내선 ${c.ext}</span>`
-        : '';
-      html += `
-        <div class="contact-card">
-          <div class="contact-avatar" style="background:${color}">${initial}</div>
-          <div class="contact-info">
-            <div class="contact-name">${c.name}${c.role ? ' <span style="font-size:11px;font-weight:400;color:var(--ink-soft);">'+c.role+'</span>' : ''}</div>
-            <div class="contact-dept">${c.dept||''}</div>
-          </div>
-          <div class="contact-actions">${phoneBtn}${extBtn}</div>
-        </div>`;
+  // 이름/아바타 클릭 → 상세 팝업
+  list.querySelectorAll('[data-idx]').forEach(el => {
+    el.addEventListener('click', () => {
+      const c = contacts[parseInt(el.dataset.idx)];
+      showContactDetail(c);
     });
   });
-  list.innerHTML = html;
+}
+
+// 상세 팝업
+function showContactDetail(c) {
+  const color = avatarColor(c.dept);
+  const rows = [
+    ['담당 부서', c.dept],
+    ['담당 과목', c.subject],
+    ['직위',     c.role],
+    ['내선번호', c.ext],
+  ].filter(r => r[1]).map(([label, val]) => `
+    <div class="cd-row">
+      <span class="cd-label">${label}</span>
+      <span class="cd-value">${val}</span>
+    </div>`).join('');
+
+  const phoneRow = c.phone ? `
+    <div class="cd-row">
+      <span class="cd-label">휴대폰</span>
+      <a class="cd-phone-btn" href="tel:${c.phone.replace(/-/g,'')}">📞 전화 연결</a>
+    </div>` : '';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'cd-overlay';
+  overlay.innerHTML = `
+    <div class="cd-box">
+      <div class="cd-header" style="background:${color}">
+        <div class="cd-avatar">${c.name[0]}</div>
+        <div>
+          <div class="cd-name">${c.name}</div>
+          <div class="cd-dept">${c.dept||''}</div>
+        </div>
+        <button class="cd-close">×</button>
+      </div>
+      <div class="cd-body">
+        ${rows}
+        ${phoneRow}
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('open'));
+
+  const close = () => {
+    overlay.classList.remove('open');
+    setTimeout(() => overlay.remove(), 200);
+  };
+  overlay.querySelector('.cd-close').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if(e.target === overlay) close(); });
 }
 
 // 검색
@@ -3030,6 +3126,7 @@ document.getElementById('contactsSearch').addEventListener('input', function() {
   const filtered = allContacts.filter(c =>
     (c.name||'').toLowerCase().includes(q) ||
     (c.dept||'').toLowerCase().includes(q) ||
+    (c.subject||'').toLowerCase().includes(q) ||
     (c.role||'').toLowerCase().includes(q)
   );
   renderContacts(filtered);
