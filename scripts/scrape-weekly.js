@@ -96,31 +96,38 @@ async function main() {
   }
 }
 
-// ── 허용할 인라인 스타일 속성 (배경색 제외, 텍스트 관련만) ──────────
-const ALLOWED_STYLE_PROPS = new Set([
-  'color', 'font-weight', 'font-style', 'text-decoration',
-  'font-size', 'font-family', 'letter-spacing', 'text-align'
-]);
-
 // ── 페이지에서 내용 추출 (HTML 보존 방식) ─────────────────────────
 async function extractContent(page) {
   return await page.evaluate(() => {
-    const ALLOWED_STYLE_PROPS = new Set([
-      'color', 'font-weight', 'font-style', 'text-decoration',
-      'font-size', 'font-family', 'letter-spacing', 'text-align'
-    ]);
-
-    // 노드의 스타일에서 허용된 속성만 추출해 인라인 style 문자열로 반환
+    // 노드 및 조상을 타고 올라가며 인라인 스타일을 직접 읽어 합산
+    // (구글 사이트는 getComputedStyle이 아닌 인라인 style 속성에 서식이 들어있음)
     function extractAllowedStyle(el) {
-      const cs = window.getComputedStyle(el);
+      const PROPS = [
+        ['color',          'color'],
+        ['fontWeight',     'font-weight'],
+        ['fontStyle',      'font-style'],
+        ['textDecoration', 'text-decoration'],
+        ['fontSize',       'font-size'],
+        ['fontFamily',     'font-family'],
+        ['letterSpacing',  'letter-spacing'],
+        ['textAlign',      'text-align'],
+      ];
+      const seen = new Set();
       const parts = [];
-      ALLOWED_STYLE_PROPS.forEach(prop => {
-        const val = cs.getPropertyValue(prop);
-        if (!val || val === 'normal' || val === 'none' || val === 'auto') return;
-        // 기본 검정색(rgb(0,0,0), #000 등)은 굳이 넣지 않음
-        if (prop === 'color' && (val === 'rgb(0, 0, 0)' || val === '#000000')) return;
-        parts.push(`${prop}:${val}`);
-      });
+      let cur = el;
+      while (cur && cur !== document.body) {
+        const s = cur.style;
+        for (const [jsKey, cssKey] of PROPS) {
+          if (seen.has(cssKey)) continue;
+          const val = s[jsKey];
+          if (!val || val === 'normal' || val === 'none' || val === 'auto') continue;
+          // 기본 검정색은 생략
+          if (cssKey === 'color' && (val === 'rgb(0, 0, 0)' || val === '#000000' || val === '#000')) continue;
+          seen.add(cssKey);
+          parts.push(`${cssKey}:${val}`);
+        }
+        cur = cur.parentElement;
+      }
       return parts.join(';');
     }
 
