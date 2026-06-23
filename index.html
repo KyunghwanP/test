@@ -2478,16 +2478,14 @@ function renderContent(html){
   div.className = 'weekly-html-content';
   div.innerHTML = safe;
 
-  // 구글 사이트 앵커 아이콘 SVG 제거 (⇄ 링크 아이콘)
-  // path가 "M3.9 12c0-1.71"로 시작하는 SVG 전체 제거
+  // 구글 사이트 앵커 링크 아이콘 제거
+  // 1) #h. 형태의 앵커 링크 전체 제거
+  div.querySelectorAll('a[href^="#"]').forEach(a => a.remove());
+  // 2) SVG 아이콘 제거 (링크 아이콘 path 패턴)
   div.querySelectorAll('svg').forEach(svg => {
-    const path = svg.querySelector('path');
-    if(path && path.getAttribute('d') && path.getAttribute('d').startsWith('M3.9 12')) {
-      // svg를 감싸는 a 태그(앵커 링크)까지 제거
-      const anchor = svg.closest('a');
-      if(anchor) anchor.remove();
-      else svg.remove();
-    }
+    const anchor = svg.closest('a');
+    if(anchor) anchor.remove();
+    else svg.remove();
   });
 
   // 제목 요소 찾기: h1 → role="heading" → 첫 번째 자식 순으로 시도
