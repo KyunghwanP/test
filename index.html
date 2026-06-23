@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>영남고 현황판 ver1.07</title>
+<title>영남고 현황판 ver1.08</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -166,6 +166,7 @@
     background:var(--paper);border-radius:8px;padding:24px 28px;
     box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
     font-size:15px;line-height:2;color:var(--ink-soft);
+    overflow:visible;
   }
   /* h1(페이지 제목): 카드 상단 어두운 타이틀바, flex로 제목+버튼 나란히 */
   .weekly-html-content h1,
@@ -197,6 +198,13 @@
   .weekly-html-content h2{
     font-family:'Noto Serif KR';color:var(--ink);margin:22px 0 10px;
     font-weight:700;font-size:18px;padding-bottom:8px;border-bottom:1px solid var(--rule);
+    position:sticky;top:0;
+    background:var(--paper);
+    z-index:10;
+    padding-top:8px;
+    margin-left:-28px;margin-right:-28px;
+    padding-left:28px;padding-right:28px;
+    box-shadow:0 4px 8px -4px rgba(0,0,0,0.08);
   }
   .weekly-html-content h3{font-family:'Noto Serif KR';color:var(--ink);font-size:16px;font-weight:700;margin:18px 0 8px;}
   .weekly-html-content h4{font-family:'Noto Serif KR';color:var(--ink);font-size:15px;font-weight:700;margin:14px 0 6px;}
@@ -827,7 +835,7 @@
     <button class="hamburger-btn" id="hamburgerBtn" aria-label="메뉴">
       <span></span><span></span><span></span>
     </button>
-    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.07</span></div>
+    <div class="app-header-title">영남고 현황판 <span style="font-size:0.6em;opacity:0.6;font-family:'IBM Plex Mono';font-weight:500;">ver1.08</span></div>
     <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
   </header>
 
