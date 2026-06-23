@@ -1,0 +1,13 @@
+{
+  "name": "ynhs-scraper",
+  "version": "1.0.0",
+  "description": "영남고 주간교육활동 스크래퍼",
+  "main": "scrape-weekly.js",
+  "scripts": {
+    "scrape": "node scrape-weekly.js"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.44.0",
+    "firebase-admin": "^12.0.0"
+  }
+}
