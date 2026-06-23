@@ -235,7 +235,7 @@
   .weekly-html-content h2{
     font-family:'Noto Serif KR';color:var(--ink);margin:22px 0 10px;
     font-weight:700;font-size:20px;padding-bottom:8px;border-bottom:1px solid var(--rule);
-    position:sticky;top:0;
+    position:sticky;top:var(--weekly-top-offset, 0px);
     background:var(--paper);
     z-index:10;
     padding-top:8px;
@@ -1130,7 +1130,7 @@
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>비상연락망
       </div>
-    <div class="nav-version">ver1.17</div>
+    <div class="nav-version">ver1.19</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -2556,6 +2556,14 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
   });
 });
 
+// ---- 주차칩 바 높이를 h2 sticky offset에 반영
+function updateWeeklyTopOffset() {
+  const topBar = document.getElementById('weeklyTopBar');
+  if (!topBar) return;
+  const h = topBar.getBoundingClientRect().height;
+  document.querySelector('.weekly-html-content')?.style.setProperty('--weekly-top-offset', h + 'px');
+}
+
 // ---- 모바일 탭바 클릭
 document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -2706,6 +2714,7 @@ function renderWeeklyHtml(title, html){
 
   weeklyPageContent.innerHTML = '';
   weeklyPageContent.appendChild(wrap);
+  setTimeout(updateWeeklyTopOffset, 50);
 }
 
 function renderSections(title, sections){
@@ -2758,6 +2767,7 @@ function renderSections(title, sections){
 
   weeklyPageContent.innerHTML = '';
   weeklyPageContent.appendChild(div);
+  setTimeout(updateWeeklyTopOffset, 50);
 }
 
 function parseSitesResponse(raw, fallbackUrls = []){
