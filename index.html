@@ -896,23 +896,26 @@
     min-width:100px;text-align:center;
   }
   /* 데스크톱: 5열 그리드 */
+  /* 항상 가로 스크롤 방식 */
   .meal-grid{
-    display:grid;
-    grid-template-columns:repeat(5,1fr);
+    display:flex;
+    flex-direction:row;
+    overflow-x:auto;
     gap:10px;
-    align-items:start;
+    padding-bottom:6px;
+    scrollbar-width:thin;
+    scroll-snap-type:x mandatory;
+    -webkit-overflow-scrolling:touch;
   }
-  /* 모바일: 가로 스크롤 카드 슬라이더 */
+  .meal-card{
+    min-width:200px;max-width:220px;
+    scroll-snap-align:start;
+    flex-shrink:0;
+  }
+  /* 모바일: 카드 더 넓게 */
   @media(max-width:850px){
     .meal-grid{
-      display:flex;
-      flex-direction:row;
-      overflow-x:auto;
-      gap:10px;
-      padding-bottom:6px;
       scrollbar-width:none;
-      scroll-snap-type:x mandatory;
-      -webkit-overflow-scrolling:touch;
     }
     .meal-grid::-webkit-scrollbar{display:none;}
     .meal-card{
@@ -1148,7 +1151,7 @@
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>비상연락망
       </div>
-    <div class="nav-version">ver1.34</div>
+    <div class="nav-version">ver1.35</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
