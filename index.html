@@ -1096,7 +1096,7 @@
 </head>
 <body>
 
-<div class="auth-gate" id="authGate">
+<div class="auth-gate open" id="authGate">
   <div class="auth-box">
     <h2><img src="icon-180.png" style="height:44px;vertical-align:middle;">영남고등학교</h2>
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
@@ -1152,7 +1152,7 @@
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>비상연락망
       </div>
-    <div class="nav-version">ver1.39</div>
+    <div class="nav-version">ver1.40</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -1286,7 +1286,12 @@ const ALLOWED_EMAIL_DOMAIN = '@yeungnam.hs.kr';
 const fbApp = initializeApp(firebaseConfig);
 
 // iOS redirect 로그인 결과 처리
-getRedirectResult(getAuth(fbApp)).catch(() => {});
+getRedirectResult(getAuth(fbApp)).then(result => {
+  // redirect 결과가 있으면 onAuthStateChanged가 자동으로 처리함
+  // 별도 처리 불필요
+}).catch(e => {
+  console.warn('redirect result error:', e);
+});
 const fbAuth = getAuth(fbApp);
 const fbDb = getFirestore(fbApp);
 const TEACHERS = [];
