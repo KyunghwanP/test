@@ -1104,7 +1104,8 @@
     <h2><img src="icon-180.png" style="height:44px;vertical-align:middle;">영남고등학교</h2>
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
-    <div id="authStatus"></div>
+    <div id="authStatus" style="margin-top:12px;"></div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.45</div>
   </div>
 </div>
 
@@ -1155,7 +1156,7 @@
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>비상연락망
       </div>
-    <div class="nav-version">ver1.44</div>
+    <div class="nav-version">ver1.45</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -2657,9 +2658,4 @@ async function fetchViaProxy(url) {
 
 async function initWeeklyPage(){
   weeklyInitialized = true;
-  weeklyPageLoading.textContent = '주간교육활동을 불러오는 중...';
-  weeklyPageLoading.style.display = '';
-  weeklyWeekBar.style.display = 'none';
-  weeklyPageContent.innerHTML = '';
-  try{
-    // Firestore
+  weeklyPageLoading.textContent = '주간교육활동을 불
