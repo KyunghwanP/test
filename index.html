@@ -1151,7 +1151,7 @@
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>비상연락망
       </div>
-    <div class="nav-version">ver1.35</div>
+    <div class="nav-version">ver1.36</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -1268,7 +1268,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -1283,6 +1283,9 @@ const firebaseConfig = {
 const ALLOWED_EMAIL_DOMAIN = '@yeungnam.hs.kr';
 
 const fbApp = initializeApp(firebaseConfig);
+
+// iOS redirect 로그인 결과 처리
+getRedirectResult(getAuth(fbApp)).catch(() => {});
 const fbAuth = getAuth(fbApp);
 const fbDb = getFirestore(fbApp);
 const TEACHERS = [];
@@ -2347,7 +2350,13 @@ googleLoginBtn.addEventListener('click', async () => {
   try{
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ hd: 'yeungnam.hs.kr' });
-    await signInWithPopup(fbAuth, provider);
+    // iOS Safari는 팝업 차단 → redirect 방식 사용
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (isIOS) {
+      await signInWithRedirect(fbAuth, provider);
+    } else {
+      await signInWithPopup(fbAuth, provider);
+    }
     // 이후 흐름은 onAuthStateChanged에서 처리됨
   }catch(e){
     setAuthStatus('로그인 실패: ' + e.message, true);
