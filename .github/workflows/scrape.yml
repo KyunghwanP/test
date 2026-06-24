@@ -2,36 +2,37 @@ name: 주간교육활동 자동 스크래핑
 
 on:
   schedule:
-    # 매주 일요일 23:00 UTC = 월요일 08:00 KST
-    - cron: '0 23 * * 0'
+    # 매일 KST 06:00 ~ 08:00 사이 10분 간격 (UTC 21:00 ~ 23:00)
+    - cron: '0 21 * * *'   # KST 06:00
+    - cron: '10 21 * * *'  # KST 06:10
+    - cron: '20 21 * * *'  # KST 06:20
+    - cron: '30 21 * * *'  # KST 06:30
+    - cron: '40 21 * * *'  # KST 06:40
+    - cron: '50 21 * * *'  # KST 06:50
+    - cron: '0 22 * * *'   # KST 07:00
+    - cron: '10 22 * * *'  # KST 07:10
+    - cron: '20 22 * * *'  # KST 07:20
+    - cron: '30 22 * * *'  # KST 07:30
+    - cron: '40 22 * * *'  # KST 07:40
+    - cron: '50 22 * * *'  # KST 07:50
+    - cron: '0 23 * * *'   # KST 08:00
+    - cron: '10 23 * * *'  # KST 08:10
+    - cron: '20 23 * * *'  # KST 08:20
   workflow_dispatch:  # 수동 실행 버튼
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-
     steps:
-      - name: 코드 체크아웃
-        uses: actions/checkout@v4
-
-      - name: Node.js 설정
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
+          node-version: '22'
       - name: 의존성 설치
-        run: |
-          cd scripts
-          npm install
-
-      - name: Playwright 브라우저 설치
-        run: |
-          cd scripts
-          npx playwright install chromium --with-deps
-
+        run: cd scripts && npm install
+      - name: Playwright 설치
+        run: cd scripts && npx playwright install chromium --with-deps
       - name: 스크래핑 실행
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-        run: |
-          cd scripts
-          node scrape-weekly.js
+        run: cd scripts && node scrape-weekly.js
