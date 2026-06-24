@@ -1095,6 +1095,51 @@
   .contact-btn.sms:hover{background:rgba(176,141,87,0.18);}
   .contact-btn.ext{border-color:var(--thu);color:var(--thu);background:rgba(59,81,112,0.07);}
   .contact-btn.ext:hover{background:rgba(59,81,112,0.18);}
+
+  /* ══════════════════════════════════════════
+     학생 비상연락망
+  ══════════════════════════════════════════ */
+  .students-filter-bar{
+    flex-shrink:0;padding:8px 0 4px;display:flex;flex-direction:column;gap:8px;
+  }
+  .students-tab-row{display:flex;gap:6px;background:var(--paper-soft);padding:4px;border-radius:8px;width:fit-content;}
+  .students-tab{
+    font-family:'Noto Sans KR';font-weight:700;font-size:13px;
+    border:none;background:transparent;padding:7px 16px;border-radius:6px;
+    cursor:pointer;color:var(--ink-soft);
+  }
+  .students-tab.active{background:var(--paper);color:var(--mon);box-shadow:0 1px 3px rgba(0,0,0,0.15);}
+  .students-select-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .students-select-row select{
+    font-family:'Noto Sans KR';font-size:14px;
+    padding:8px 12px;border:1.5px solid var(--rule);border-radius:8px;
+    background:var(--paper);color:var(--ink);outline:none;cursor:pointer;
+  }
+  .students-select-row select:focus{border-color:var(--mon);}
+  .students-search-input{
+    width:100%;font-family:'Noto Sans KR';font-size:14px;
+    padding:10px 14px;border:1.5px solid var(--rule);border-radius:10px;
+    background:var(--paper);color:var(--ink);outline:none;
+  }
+  .students-search-input:focus{border-color:var(--mon);}
+  .students-list{display:flex;flex-direction:column;gap:6px;}
+  .student-card{
+    background:var(--paper);border-radius:10px;
+    padding:12px 16px;
+    box-shadow:0 2px 8px -4px rgba(0,0,0,0.25);
+    display:flex;align-items:center;gap:12px;
+  }
+  .student-num{
+    flex-shrink:0;width:42px;height:42px;border-radius:10px;
+    background:var(--paper-soft);border:1.5px solid var(--rule);
+    font-family:'IBM Plex Mono';font-weight:700;font-size:12px;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--ink-soft);text-align:center;line-height:1.3;
+  }
+  .student-info{flex:1;min-width:0;}
+  .student-name{font-family:'Noto Serif KR';font-weight:700;font-size:14px;color:var(--ink);}
+  .student-meta{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .student-actions{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;}
 </style>
 </head>
 <body>
@@ -1105,7 +1150,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.47</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.48</div>
   </div>
 </div>
 
@@ -1134,6 +1179,9 @@
     <div class="tab-item" data-page="contacts">
       <span class="tab-item-icon">📞</span>비상연락망
     </div>
+    <div class="tab-item" data-page="students">
+      <span class="tab-item-icon">🎒</span>학생연락망
+    </div>
   </div>
 
   <!-- 앱 바디 -->
@@ -1156,7 +1204,10 @@
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>비상연락망
       </div>
-    <div class="nav-version">ver1.47</div>
+      <div class="main-nav-item" data-page="students">
+        <span class="main-nav-icon">🎒</span>학생연락망
+      </div>
+    <div class="nav-version">ver1.48</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -1255,6 +1306,34 @@
             <input type="text" id="contactsSearch" placeholder="이름 또는 부서 검색..." autocomplete="off">
           </div>
           <div class="contacts-list" id="contactsList">
+            <div class="contacts-loading">불러오는 중...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 학생 비상연락망 페이지 -->
+      <div class="page-view" id="studentsPage">
+        <div class="contacts-body">
+          <!-- 필터 바 -->
+          <div class="students-filter-bar">
+            <div class="students-tab-row" id="studentsTabRow">
+              <button class="students-tab active" data-filter="class">학반별</button>
+              <button class="students-tab" data-filter="club">동아리별</button>
+            </div>
+            <div class="students-select-row" id="studentsSelectRow">
+              <!-- 학반별 -->
+              <div id="studentsClassFilter">
+                <select id="studentsGradeSelect"><option value="">학년</option></select>
+                <select id="studentsRoomSelect"><option value="">반</option></select>
+              </div>
+              <!-- 동아리별 -->
+              <div id="studentsClubFilter" style="display:none;">
+                <select id="studentsClubSelect"><option value="">동아리 선택</option></select>
+              </div>
+            </div>
+            <input type="text" id="studentsSearch" placeholder="이름 또는 번호 검색..." autocomplete="off" class="students-search-input">
+          </div>
+          <div class="students-list" id="studentsList">
             <div class="contacts-loading">불러오는 중...</div>
           </div>
         </div>
@@ -2450,6 +2529,7 @@ const timetablePage = document.getElementById('timetablePage');
 const weeklyPage    = document.getElementById('weeklyPage');
 const mealPage      = document.getElementById('mealPage');
 const contactsPage  = document.getElementById('contactsPage');
+const studentsPage  = document.getElementById('studentsPage');
 
 // 햄버거 (모바일/좁은화면)
 function updateMobileNavTop(){
@@ -2570,24 +2650,35 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       weeklyPage.classList.remove('active');
       mealPage.classList.remove('active');
       contactsPage.classList.remove('active');
+      studentsPage.classList.remove('active');
     } else if(page === 'weekly'){
       timetablePage.classList.remove('active');
       weeklyPage.classList.add('active');
       mealPage.classList.remove('active');
       contactsPage.classList.remove('active');
+      studentsPage.classList.remove('active');
       if(!weeklyInitialized) initWeeklyPage();
     } else if(page === 'meal'){
       timetablePage.classList.remove('active');
       weeklyPage.classList.remove('active');
       mealPage.classList.add('active');
       contactsPage.classList.remove('active');
+      studentsPage.classList.remove('active');
       if(!mealInitialized) initMealPage();
     } else if(page === 'contacts'){
       timetablePage.classList.remove('active');
       weeklyPage.classList.remove('active');
       mealPage.classList.remove('active');
       contactsPage.classList.add('active');
+      studentsPage.classList.remove('active');
       if(!contactsInitialized) initContactsPage();
+    } else if(page === 'students'){
+      timetablePage.classList.remove('active');
+      weeklyPage.classList.remove('active');
+      mealPage.classList.remove('active');
+      contactsPage.classList.remove('active');
+      studentsPage.classList.add('active');
+      if(!studentsInitialized) initStudentsPage();
     }
   });
 });
@@ -2629,6 +2720,7 @@ document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(tab => {
     else if(page === 'weekly')    { weeklyPage.classList.add('active'); if(!weeklyInitialized) initWeeklyPage(); }
     else if(page === 'meal')      { mealPage.classList.add('active'); if(!mealInitialized) initMealPage(); }
     else if(page === 'contacts')  { contactsPage.classList.add('active'); if(!contactsInitialized) initContactsPage(); }
+    else if(page === 'students')  { studentsPage.classList.add('active'); if(!studentsInitialized) initStudentsPage(); }
   });
 });
 
@@ -3342,6 +3434,190 @@ document.getElementById('contactsSearch').addEventListener('input', function() {
   );
   renderContacts(filtered);
 });
+
+
+// ---- 학생 비상연락망 ----
+let studentsInitialized = false;
+let allStudents = [];
+let studentsFilterMode = 'class'; // class | club
+
+async function initStudentsPage() {
+  studentsInitialized = true;
+  const list = document.getElementById('studentsList');
+  list.innerHTML = '<div class="contacts-loading">불러오는 중...</div>';
+  try {
+    const snap = await getDoc(doc(fbDb, 'students', 'main'));
+    if (!snap.exists() || !snap.data().students?.length) {
+      list.innerHTML = '<div class="contacts-empty">등록된 학생 연락망이 없습니다.</div>';
+      return;
+    }
+    allStudents = snap.data().students || [];
+    buildStudentsFilters();
+    renderStudents();
+  } catch(e) {
+    list.innerHTML = `<div class="contacts-empty">불러오기 실패: ${e.message}</div>`;
+  }
+}
+
+function buildStudentsFilters() {
+  // 학반 필터
+  const grades = [...new Set(allStudents.map(s => String(s.grade)).filter(Boolean))].sort();
+  const gradeSelect = document.getElementById('studentsGradeSelect');
+  gradeSelect.innerHTML = '<option value="">학년</option>';
+  grades.forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = g; opt.textContent = g + '학년';
+    gradeSelect.appendChild(opt);
+  });
+
+  gradeSelect.addEventListener('change', () => {
+    const roomSelect = document.getElementById('studentsRoomSelect');
+    const grade = gradeSelect.value;
+    const rooms = grade
+      ? [...new Set(allStudents.filter(s => String(s.grade) === grade).map(s => String(s.room)).filter(Boolean))].sort((a,b) => parseInt(a)-parseInt(b))
+      : [];
+    roomSelect.innerHTML = '<option value="">반</option>';
+    rooms.forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r; opt.textContent = r + '반';
+      roomSelect.appendChild(opt);
+    });
+    renderStudents();
+  });
+  document.getElementById('studentsRoomSelect').addEventListener('change', renderStudents);
+
+  // 동아리 필터
+  const clubs = [...new Set(allStudents.map(s => s.club).filter(Boolean))].sort();
+  const clubSelect = document.getElementById('studentsClubSelect');
+  clubSelect.innerHTML = '<option value="">동아리 선택</option>';
+  clubs.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    clubSelect.appendChild(opt);
+  });
+  clubSelect.addEventListener('change', renderStudents);
+}
+
+function renderStudents() {
+  const list = document.getElementById('studentsList');
+  const q = document.getElementById('studentsSearch').value.trim().toLowerCase();
+  const grade = document.getElementById('studentsGradeSelect').value;
+  const room  = document.getElementById('studentsRoomSelect').value;
+  const club  = document.getElementById('studentsClubSelect').value;
+
+  let filtered = allStudents;
+
+  if(studentsFilterMode === 'class') {
+    if(grade) filtered = filtered.filter(s => String(s.grade) === grade);
+    if(room)  filtered = filtered.filter(s => String(s.room)  === room);
+  } else {
+    if(club) filtered = filtered.filter(s => s.club === club);
+  }
+
+  if(q) {
+    filtered = filtered.filter(s =>
+      (s.name||'').toLowerCase().includes(q) ||
+      String(s.num||'').includes(q)
+    );
+  }
+
+  // 학번 순 정렬
+  filtered.sort((a,b) => {
+    const ag = parseInt(a.grade)||0, bg = parseInt(b.grade)||0;
+    const ar = parseInt(a.room)||0,  br = parseInt(b.room)||0;
+    const an = parseInt(a.num)||0,   bn = parseInt(b.num)||0;
+    return ag-bg || ar-br || an-bn;
+  });
+
+  if(!filtered.length) {
+    list.innerHTML = '<div class="contacts-empty">검색 결과가 없습니다.</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map((s, idx) => {
+    const phoneBtn = s.phone
+      ? `<a class="contact-btn phone" href="tel:${s.phone.replace(/-/g,'')}" title="학생에게 전화">📞</a>
+         <a class="contact-btn sms" href="sms:${s.phone.replace(/-/g,'')}" title="문자">💬</a>`
+      : '';
+    return `
+      <div class="student-card" data-idx="${idx}" style="cursor:pointer;">
+        <div class="student-num">${s.grade||''}-${s.room||''}<br>${String(s.num||'').padStart(2,'0')}</div>
+        <div class="student-info">
+          <div class="student-name">${s.name||''}</div>
+          <div class="student-meta">${s.club ? '🎯 '+s.club : ''}</div>
+        </div>
+        <div class="student-actions">${phoneBtn}</div>
+      </div>`;
+  }).join('');
+
+  // 카드 클릭 → 상세 팝업
+  list.querySelectorAll('.student-card').forEach(card => {
+    card.addEventListener('click', e => {
+      if(e.target.closest('a')) return; // 전화/문자 버튼 클릭은 팝업 안 띄움
+      const s = filtered[parseInt(card.dataset.idx)];
+      showStudentDetail(s);
+    });
+  });
+}
+
+function showStudentDetail(s) {
+  const rows = [
+    ['학번', `${s.grade||''}-${s.room||''}-${String(s.num||'').padStart(2,'0')}`],
+    ['동아리', s.club],
+  ].filter(r => r[1]).map(([label, val]) => `
+    <div class="cd-row">
+      <span class="cd-label">${label}</span>
+      <span class="cd-value">${val}</span>
+    </div>`).join('');
+
+  const makePhoneRow = (label, phone) => phone ? `
+    <div class="cd-row">
+      <span class="cd-label">${label}</span>
+      <div class="cd-action-btns">
+        <a class="cd-phone-btn" href="tel:${phone.replace(/-/g,'')}">📞 전화</a>
+        <a class="cd-phone-btn sms" href="sms:${phone.replace(/-/g,'')}">💬 문자</a>
+      </div>
+    </div>` : '';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'cd-overlay';
+  overlay.innerHTML = `
+    <div class="cd-box">
+      <div class="cd-header" style="background:var(--wed);">
+        <div class="cd-avatar">${(s.name||'?')[0]}</div>
+        <div>
+          <div class="cd-name">${s.name||''}</div>
+          <div class="cd-dept">${s.grade||''}학년 ${s.room||''}반 ${String(s.num||'').padStart(2,'0')}번</div>
+        </div>
+        <button class="cd-close">×</button>
+      </div>
+      <div class="cd-body">
+        ${rows}
+        ${makePhoneRow('학생', s.phone)}
+        ${makePhoneRow('부', s.fatherPhone)}
+        ${makePhoneRow('모', s.motherPhone)}
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  const close = () => { overlay.classList.remove('open'); setTimeout(() => overlay.remove(), 200); };
+  overlay.querySelector('.cd-close').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if(e.target === overlay) close(); });
+}
+
+// 탭 전환 (학반별/동아리별)
+document.getElementById('studentsTabRow').addEventListener('click', e => {
+  const btn = e.target.closest('.students-tab');
+  if(!btn) return;
+  studentsFilterMode = btn.dataset.filter;
+  document.querySelectorAll('.students-tab').forEach(b => b.classList.toggle('active', b === btn));
+  document.getElementById('studentsClassFilter').style.display = studentsFilterMode === 'class' ? '' : 'none';
+  document.getElementById('studentsClubFilter').style.display  = studentsFilterMode === 'club'  ? '' : 'none';
+  renderStudents();
+});
+
+document.getElementById('studentsSearch').addEventListener('input', renderStudents);
 
 
 </script>
