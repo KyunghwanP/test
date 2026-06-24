@@ -205,6 +205,7 @@ if ('serviceWorker' in navigator) {
 <div class="tab-nav">
   <button class="tab-nav-btn active" data-tab="timetable">📅 시간표 업로드</button>
   <button class="tab-nav-btn" data-tab="contacts">📞 비상연락망 업로드</button>
+  <button class="tab-nav-btn" data-tab="students">🎒 학생연락망 업로드</button>
 </div>
 
 <div class="container">
@@ -236,6 +237,44 @@ if ('serviceWorker' in navigator) {
       </div>
 
       <div class="status" id="ttStatus"></div>
+    </div>
+  </div>
+
+  <!-- ══ 학생연락망 탭 ══ -->
+  <div class="tab-panel" id="tab-students">
+    <div class="section">
+      <div class="section-title">🎒 학생 비상연락망 업로드</div>
+      <div class="section-desc">엑셀(.xlsx)을 올리면 Firestore의 <code>students/main</code>에 저장됩니다. 기존 데이터는 덮어씁니다.</div>
+      <div class="format-box">
+        <b>엑셀 형식 안내</b> — 1행은 헤더, 2행부터 데이터<br>
+        <code>A: 학년</code> &nbsp;
+        <code>B: 반</code> &nbsp;
+        <code>C: 번호</code> &nbsp;
+        <code>D: 이름</code> &nbsp;
+        <code>E: 학생연락처</code> &nbsp;
+        <code>F: 부연락처</code> &nbsp;
+        <code>G: 모연락처</code> &nbsp;
+        <code>H: 동아리(선택)</code>
+      </div>
+      <div class="dropzone" id="stDropzone">
+        <div class="dropzone-icon">📂</div>
+        <div class="dropzone-text"><b>파일을 드래그하거나 클릭</b><br>xlsx 지원</div>
+        <input type="file" id="stFileInput" accept=".xlsx" style="display:none;">
+      </div>
+      <div id="stPreviewWrap" style="display:none;">
+        <div class="stat-chips" id="stStats"></div>
+        <div class="preview-wrap">
+          <table class="preview-table">
+            <thead><tr><th>학년</th><th>반</th><th>번호</th><th>이름</th><th>학생</th><th>부</th><th>모</th><th>동아리</th></tr></thead>
+            <tbody id="stPreviewBody"></tbody>
+          </table>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="stUploadBtn">☁️ Firestore에 저장</button>
+          <button class="btn btn-secondary" id="stClearBtn">취소</button>
+        </div>
+      </div>
+      <div class="status" id="stStatus"></div>
     </div>
   </div>
 
@@ -663,6 +702,106 @@ document.getElementById('downloadCsvBtn').addEventListener('click', () => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '비상연락망');
   XLSX.writeFile(wb, `영남고_비상연락망_${new Date().toLocaleDateString('ko-KR').replace(/\.\s/g,'-')}.xlsx`);
+});
+
+// ════════════════════════════════════
+// ── 학생 비상연락망 업로드 ──
+// ════════════════════════════════════
+const stDropzone  = document.getElementById('stDropzone');
+const stFileInput = document.getElementById('stFileInput');
+let stParsedData  = [];
+
+stDropzone.addEventListener('click', () => stFileInput.click());
+stDropzone.addEventListener('dragover', e => { e.preventDefault(); stDropzone.classList.add('drag-over'); });
+stDropzone.addEventListener('dragleave', () => stDropzone.classList.remove('drag-over'));
+stDropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  stDropzone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) processStudentFile(e.dataTransfer.files[0]);
+});
+stFileInput.addEventListener('change', () => {
+  if (stFileInput.files[0]) processStudentFile(stFileInput.files[0]);
+});
+
+async function processStudentFile(file) {
+  setStatus('stStatus', '📂 파일 읽는 중...', 'loading');
+  try {
+    const data = await file.arrayBuffer();
+    const wb   = XLSX.read(data, {type:'array'});
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+    stParsedData = rows.slice(1)
+      .filter(r => r[3] && String(r[3]).trim())
+      .map(r => ({
+        grade:       String(r[0]||'').trim(),
+        room:        String(r[1]||'').trim(),
+        num:         String(r[2]||'').trim(),
+        name:        String(r[3]||'').trim(),
+        phone:       String(r[4]||'').trim(),
+        fatherPhone: String(r[5]||'').trim(),
+        motherPhone: String(r[6]||'').trim(),
+        club:        String(r[7]||'').trim(),
+      }));
+
+    if (!stParsedData.length) {
+      setStatus('stStatus', '데이터가 없습니다. 파일 형식을 확인해주세요.', 'err');
+      return;
+    }
+
+    // 미리보기
+    const grades = [...new Set(stParsedData.map(s => s.grade).filter(Boolean))];
+    document.getElementById('stStats').innerHTML = `
+      <div class="stat-chip">총 <b>${stParsedData.length}</b>명</div>
+      <div class="stat-chip">학년 <b>${grades.join(', ')}</b></div>
+    `;
+    const tbody = document.getElementById('stPreviewBody');
+    tbody.innerHTML = stParsedData.slice(0, 50).map(s => `
+      <tr>
+        <td>${s.grade}</td><td>${s.room}</td><td>${s.num}</td>
+        <td class="name">${s.name}</td>
+        <td class="phone">${s.phone}</td>
+        <td>${s.fatherPhone}</td>
+        <td>${s.motherPhone}</td>
+        <td>${s.club}</td>
+      </tr>`).join('');
+    if(stParsedData.length > 50) {
+      tbody.innerHTML += `<tr><td colspan="8" style="text-align:center;color:var(--ink-soft);padding:10px;">... 외 ${stParsedData.length-50}명</td></tr>`;
+    }
+    document.getElementById('stPreviewWrap').style.display = '';
+    clearStatus('stStatus');
+  } catch(e) {
+    setStatus('stStatus', '파일 읽기 실패: ' + e.message, 'err');
+  }
+}
+
+document.getElementById('stUploadBtn').addEventListener('click', async () => {
+  if (!stParsedData.length) return;
+  const btn = document.getElementById('stUploadBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>저장 중...';
+  setStatus('stStatus', '☁️ Firestore에 저장하는 중...', 'loading');
+  try {
+    await setDoc(doc(db, 'students', 'main'), {
+      students: stParsedData,
+      updatedAt: new Date().toISOString(),
+      updatedBy: auth.currentUser?.email || '',
+      count: stParsedData.length,
+    });
+    setStatus('stStatus', `✅ ${stParsedData.length}명 저장 완료!`, 'ok');
+  } catch(e) {
+    setStatus('stStatus', '저장 실패: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '☁️ Firestore에 저장';
+  }
+});
+
+document.getElementById('stClearBtn').addEventListener('click', () => {
+  stParsedData = [];
+  document.getElementById('stPreviewWrap').style.display = 'none';
+  stFileInput.value = '';
+  clearStatus('stStatus');
 });
 </script>
 </body>
