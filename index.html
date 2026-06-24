@@ -1152,7 +1152,7 @@
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>비상연락망
       </div>
-    <div class="nav-version">ver1.37</div>
+    <div class="nav-version">ver1.38</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -1270,7 +1270,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
@@ -2663,7 +2663,19 @@ async function initWeeklyPage(){
         weeklyWeekBar.style.display = '';
       }
     }
-    // 현재 주차 내용은 항상 Apps Script로 실시간 fetch
+    // 현재 주차: Firestore 캐시 확인
+    const mainCacheSnap = await getDoc(doc(fbDb, 'weeklyData', 'cache-current'));
+    const ONE_HOUR = 60 * 60 * 1000;
+    if(mainCacheSnap.exists()){
+      const cached = mainCacheSnap.data();
+      const age = Date.now() - new Date(cached.fetchedAt).getTime();
+      if(age < ONE_HOUR && cached.html){
+        weeklyPageLoading.style.display = 'none';
+        renderContent(cached.html);
+        return;
+      }
+    }
+    // 캐시 없거나 만료 → Apps Script fetch
     await loadViaAppsScript();
   }catch(e){
     weeklyPageLoading.textContent = '불러오기 실패: ' + e.message;
@@ -2688,6 +2700,11 @@ async function loadViaAppsScript(){
     weeklyPageLoading.style.display = 'none';
   }
   renderContent(data.contentHtml);
+  // Firestore에 현재 주차 캐시 저장
+  setDoc(doc(fbDb, 'weeklyData', 'cache-current'), {
+    html: data.contentHtml,
+    fetchedAt: new Date().toISOString(),
+  }).catch(()=>{});
 }
 
 // "2026년 6월 1일(월)" → "26.06.01.(월)" 형식으로 변환
@@ -2714,10 +2731,34 @@ function renderWeekChipsFromFirestore(weeks){
       weeklyOpenLink.href = week.href;
       weeklyPageContent.innerHTML = '<div class="weekly-page-loading" style="padding:24px;">불러오는 중...</div>';
       try{
-        // 항상 Apps Script 프록시로 실시간 fetch
+        // Firestore 캐시 확인 (1시간 이내면 캐시 사용)
+        const cacheSlug = 'cache-' + encodeURIComponent(week.href).replace(/%/g,'_').slice(-40);
+        const cacheSnap = await getDoc(doc(fbDb, 'weeklyData', cacheSlug));
+        const ONE_HOUR = 60 * 60 * 1000;
+        const now = Date.now();
+
+        if(cacheSnap.exists()){
+          const cached = cacheSnap.data();
+          const age = now - new Date(cached.fetchedAt).getTime();
+          if(age < ONE_HOUR && cached.html){
+            // 캐시 유효 → 바로 렌더링
+            renderContent(cached.html);
+            return;
+          }
+        }
+
+        // 캐시 없거나 만료 → Apps Script fetch
         const raw = await fetchViaProxy(week.href);
         const data = parseSitesResponse(raw, []);
         renderContent(data.contentHtml);
+
+        // Firestore에 캐시 저장 (비동기, 실패해도 무시)
+        setDoc(doc(fbDb, 'weeklyData', cacheSlug), {
+          html: data.contentHtml,
+          sourceUrl: week.href,
+          fetchedAt: new Date().toISOString(),
+        }).catch(()=>{});
+
       }catch(e){
         weeklyPageContent.innerHTML = `<div class="weekly-page-loading">실패: ${e.message}</div>`;
       }
