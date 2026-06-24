@@ -1148,7 +1148,7 @@
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>비상연락망
       </div>
-    <div class="nav-version">ver1.33</div>
+    <div class="nav-version">ver1.34</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -3126,6 +3126,13 @@ function initMealPage() {
   });
 }
 
+
+// ---- 식단표 마우스 휠 → 가로 스크롤 변환 ----
+document.getElementById('mealGrid').addEventListener('wheel', function(e) {
+  if (e.deltaY === 0) return;
+  e.preventDefault();
+  this.scrollLeft += e.deltaY * 2;
+}, { passive: false });
 
 // ---- 비상연락망 ----
 let contactsInitialized = false;
