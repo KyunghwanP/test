@@ -758,7 +758,7 @@
   }
   .subject-chip.active{background:var(--mon);border-color:var(--mon);color:#fff;}
 
-  @media (min-width:700px){
+  @media (min-width:850px){
     .layout{display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:stretch;}
     .main{display:flex;flex-direction:column;}
     .card{flex:1;margin-top:0;}
@@ -785,7 +785,7 @@
   }
 
   /* ---------- phone: tighter page padding ---------- */
-  @media (max-width:699px){
+  @media (max-width:849px){
     .masthead, .card{padding-left:16px;padding-right:16px;}
     .info-name{font-size:min(var(--info-name-font), 18px);}
   }
@@ -818,7 +818,7 @@
     .class-select-box select{padding:7px 8px;font-size:13px;}
   }
 
-  @media (max-height: 760px){
+  @media (max-height: 360px){
     #timetablePage .wrap{padding-top:10px;padding-bottom:10px;}
     .masthead{padding-top:10px;padding-bottom:8px;}
     .masthead .school{display:none;}
@@ -903,7 +903,7 @@
     align-items:start;
   }
   /* 모바일: 가로 스크롤 카드 슬라이더 */
-  @media(max-width:700px){
+  @media(max-width:850px){
     .meal-grid{
       display:flex;
       flex-direction:row;
@@ -1148,7 +1148,7 @@
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>비상연락망
       </div>
-    <div class="nav-version">ver1.27</div>
+    <div class="nav-version">ver1.30</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -2582,6 +2582,13 @@ function updateWeeklyTopOffset() {
 }
 
 
+
+// ---- Neutralino 앱 종료 처리
+if (typeof Neutralino !== 'undefined') {
+  Neutralino.events.on('windowClose', () => {
+    Neutralino.app.exit();
+  });
+}
 
 // ---- 모바일 탭바 클릭
 document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(tab => {
