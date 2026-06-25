@@ -18,7 +18,7 @@
 
   :root{
     --bg-base:#F1F5F9;
-    --bg-base-soft:#1E293B;
+    --bg-base-soft:#F8FAFC;
     --paper:#FFFFFF;
     --paper-soft:#F8FAFC;
     --ink:#0F172A;
@@ -48,15 +48,15 @@
     flex-shrink:0;display:flex;align-items:center;gap:14px;
     height:clamp(48px, 10vh, 160px);
     padding:0 22px;
-    background:var(--bg-base-soft);
-    border-bottom:1px solid rgba(255,255,255,0.08);
+    background:var(--paper);
+    border-bottom:1px solid var(--rule);
     z-index:100;position:relative;overflow:hidden;
     transition:height 0.25s ease;
   }
   .app-header-title{
     font-family:'Pretendard','Noto Sans KR';font-weight:900;
     font-size:clamp(15px, 3vh, 24px);
-    color:#F1F5F9;flex:1;
+    color:var(--ink);flex:1;
     letter-spacing:-0.02em;
   }
   .hamburger-btn{
@@ -69,15 +69,15 @@
   .hamburger-btn:hover{background:var(--paper-soft);}
   .hamburger-btn span{
     display:block;width:20px;height:2px;
-    background:#F1F5F9;border-radius:2px;
+    background:var(--ink);border-radius:2px;
     transition:transform .2s ease, opacity .2s ease;
   }
   .hamburger-btn.open span:nth-child(1){transform:translateY(7px) rotate(45deg);}
   .hamburger-btn.open span:nth-child(2){opacity:0;}
   .hamburger-btn.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg);}
   .app-logout-btn{
-    border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);
-    font-family:'Pretendard','Noto Sans KR';font-size:11.5px;font-weight:700;color:#94A3B8;
+    border:1px solid var(--rule);background:var(--paper-soft);
+    font-family:'Pretendard','Noto Sans KR';font-size:11.5px;font-weight:700;color:var(--ink-soft);
     padding:6px 12px;border-radius:6px;cursor:pointer;flex-shrink:0;
     align-self:center;
   }
@@ -90,9 +90,9 @@
   /* 메인 네비게이션: 기본적으로 고정(overlay) 방식 → JS가 .desktop 클래스 추가 시 인라인으로 전환 */
   .main-nav{
     flex-shrink:0;width:220px;
-    background:var(--bg-base-soft);
+    background:var(--paper);
     overflow-y:auto;
-    border-right:1px solid rgba(255,255,255,0.06);
+    border-right:1px solid var(--rule);
     padding:12px;
     display:flex;flex-direction:column;
     transition:transform .25s ease;
@@ -114,10 +114,10 @@
     display:flex;align-items:center;gap:10px;
     padding:14px 16px;border-radius:10px;cursor:pointer;
     font-family:'Noto Sans KR';font-size:14.5px;font-weight:700;
-    color:#64748B;
+    color:var(--ink-soft);
     transition:background .12s ease, color .12s ease;
   }
-  .main-nav-item:hover{background:rgba(255,255,255,0.06);color:#E2E8F0;}
+  .main-nav-item:hover{background:var(--paper-soft);color:var(--ink);}
   .main-nav-item.active{background:var(--mon);color:#fff;border-radius:8px;}
   .main-nav-icon{font-size:17px;}
 
@@ -136,8 +136,8 @@
   .mobile-tab-bar{
     display:none;
     flex-direction:row;
-    background:var(--bg-base-soft);
-    border-bottom:1px solid rgba(255,255,255,0.06);
+    background:var(--paper);
+    border-bottom:1px solid var(--rule);
     overflow-x:auto;
     scrollbar-width:none;
     -webkit-overflow-scrolling:touch;
@@ -148,7 +148,7 @@
     display:flex;flex-direction:column;align-items:center;
     padding:6px 16px;cursor:pointer;
     font-family:'Noto Sans KR';font-size:10px;font-weight:700;
-    color:#475569;gap:2px;border-bottom:2.5px solid transparent;
+    color:var(--ink-soft);gap:2px;border-bottom:2.5px solid transparent;
     white-space:nowrap;
   }
   .mobile-tab-bar .tab-item.active{color:var(--mon);border-bottom-color:var(--mon);}
@@ -163,7 +163,7 @@
   .nav-version{
     margin-top:auto;padding:12px 16px 4px;
     font-family:'IBM Plex Mono';font-size:10px;
-    color:#334155;opacity:0.8;
+    color:var(--ink-soft);opacity:0.45;
     text-align:center;
   }
 
@@ -599,7 +599,7 @@
 
   .auth-gate{
     display:none;position:fixed;inset:0;z-index:500;
-    background:#F1F5F9;
+    background:var(--bg-base);
     align-items:center;justify-content:center;
   }
   .auth-gate.open{display:flex;}
@@ -1476,7 +1476,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.73</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.74</div>
   </div>
 </div>
 
@@ -1545,7 +1545,7 @@
       <div class="main-nav-item" data-page="schedule">
         <span class="main-nav-icon">📆</span>학사일정
       </div>
-    <div class="nav-version">ver1.73</div>
+    <div class="nav-version">ver1.74</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
