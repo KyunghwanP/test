@@ -1140,6 +1140,44 @@
   .student-name{font-family:'Noto Serif KR';font-weight:700;font-size:14px;color:var(--ink);}
   .student-meta{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
   .student-actions{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;}
+
+  /* 학생 연락망 그룹 방식 */
+  .sg-section-label{
+    font-family:'Noto Serif KR';font-weight:700;font-size:12px;
+    color:var(--paper);opacity:0.55;padding:12px 4px 6px;letter-spacing:0.05em;
+  }
+  .sg-section-label:first-child{padding-top:4px;}
+  .sg-group-card{
+    background:var(--paper);border-radius:10px;
+    padding:14px 16px;display:flex;align-items:center;gap:10px;
+    box-shadow:0 2px 8px -4px rgba(0,0,0,0.25);cursor:pointer;
+    transition:background .12s;
+  }
+  .sg-group-card:hover{background:var(--paper-soft);}
+  .sg-group-left{display:flex;flex-direction:column;flex:1;}
+  .sg-group-name{font-family:'Noto Serif KR';font-weight:700;font-size:15px;color:var(--ink);}
+  .sg-group-sub{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .sg-group-count{font-family:'IBM Plex Mono';font-size:12px;color:var(--ink-soft);margin-left:auto;}
+  .sg-arrow{font-size:20px;color:var(--rule);margin-left:8px;}
+  .sg-back-row{
+    display:flex;align-items:center;gap:10px;
+    padding:4px 0 8px;flex-shrink:0;
+  }
+  .sg-back-btn{
+    font-family:'Noto Sans KR';font-weight:700;font-size:13px;
+    border:1.5px solid var(--rule);background:var(--paper);color:var(--ink-soft);
+    padding:6px 12px;border-radius:8px;cursor:pointer;
+  }
+  .sg-back-btn:hover{background:var(--paper-soft);}
+  .sg-current-label{font-family:'Noto Serif KR';font-weight:700;font-size:14px;color:var(--paper);}
+  .sg-homeroom-card{
+    background:var(--mon);border-radius:10px;
+    padding:10px 16px;display:flex;align-items:center;gap:10px;
+    margin-bottom:4px;
+  }
+  .sg-homeroom-label{font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);font-family:'IBM Plex Mono';}
+  .sg-homeroom-name{font-family:'Noto Serif KR';font-weight:700;font-size:14px;color:#fff;flex:1;}
+  .sg-homeroom-ext{font-family:'IBM Plex Mono';font-size:12px;color:rgba(255,255,255,0.8);}
 </style>
 </head>
 <body>
@@ -1150,7 +1188,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.49</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.50</div>
   </div>
 </div>
 
@@ -1177,7 +1215,7 @@
       <span class="tab-item-icon">🍱</span>식단표
     </div>
     <div class="tab-item" data-page="contacts">
-      <span class="tab-item-icon">📞</span>비상연락망
+      <span class="tab-item-icon">📞</span>교원연락망
     </div>
     <div class="tab-item" data-page="students">
       <span class="tab-item-icon">🎒</span>학생연락망
@@ -1202,12 +1240,12 @@
         <span class="main-nav-icon">🍱</span>식단표
       </div>
       <div class="main-nav-item" data-page="contacts">
-        <span class="main-nav-icon">📞</span>비상연락망
+        <span class="main-nav-icon">📞</span>교원연락망
       </div>
       <div class="main-nav-item" data-page="students">
         <span class="main-nav-icon">🎒</span>학생연락망
       </div>
-    <div class="nav-version">ver1.49</div>
+    <div class="nav-version">ver1.50</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -1313,26 +1351,10 @@
 
       <!-- 학생 비상연락망 페이지 -->
       <div class="page-view" id="studentsPage">
-        <div class="contacts-body">
-          <!-- 필터 바 -->
-          <div class="students-filter-bar">
-            <div class="students-tab-row" id="studentsTabRow">
-              <button class="students-tab active" data-filter="class">학반별</button>
-              <button class="students-tab" data-filter="club">동아리별</button>
-            </div>
-            <div class="students-select-row" id="studentsSelectRow">
-              <!-- 학반별 -->
-              <div id="studentsClassFilter">
-                <select id="studentsGradeSelect"><option value="">학년</option></select>
-                <select id="studentsRoomSelect"><option value="">반</option></select>
-              </div>
-              <!-- 동아리별 -->
-              <div id="studentsClubFilter" style="display:none;">
-                <select id="studentsClubSelect"><option value="">동아리 선택</option></select>
-              </div>
-            </div>
-            <input type="text" id="studentsSearch" placeholder="이름 또는 번호 검색..." autocomplete="off" class="students-search-input">
-          </div>
+        <div class="contacts-body" id="studentsBody">
+          <!-- 검색바 -->
+          <input type="text" id="studentsSearch" placeholder="이름 또는 번호 검색..." autocomplete="off" class="students-search-input" style="flex-shrink:0;">
+          <!-- 그룹 목록 또는 학생 목록 -->
           <div class="students-list" id="studentsList">
             <div class="contacts-loading">불러오는 중...</div>
           </div>
@@ -3439,7 +3461,8 @@ document.getElementById('contactsSearch').addEventListener('input', function() {
 // ---- 학생 비상연락망 ----
 let studentsInitialized = false;
 let allStudents = [];
-let studentsFilterMode = 'class'; // class | club
+let studentsViewMode = 'group';   // group | class | club | search
+let studentsCurrentGroup = null;  // { type:'class'|'club', key, label }
 
 async function initStudentsPage() {
   studentsInitialized = true;
@@ -3452,173 +3475,188 @@ async function initStudentsPage() {
       return;
     }
     allStudents = snap.data().students || [];
-    buildStudentsFilters();
-    renderStudents();
+    renderStudentsGroupList();
   } catch(e) {
     list.innerHTML = `<div class="contacts-empty">불러오기 실패: ${e.message}</div>`;
   }
 }
 
-function buildStudentsFilters() {
-  // 학반 필터
-  const grades = [...new Set(allStudents.map(s => String(s.grade)).filter(Boolean))].sort();
-  const gradeSelect = document.getElementById('studentsGradeSelect');
-  gradeSelect.innerHTML = '<option value="">학년</option>';
-  grades.forEach(g => {
-    const opt = document.createElement('option');
-    opt.value = g; opt.textContent = g + '학년';
-    gradeSelect.appendChild(opt);
-  });
+// ── 그룹 목록 (동아리 → 학반 순) ──
+function renderStudentsGroupList() {
+  studentsViewMode = 'group';
+  studentsCurrentGroup = null;
+  const list = document.getElementById('studentsList');
 
-  gradeSelect.addEventListener('change', () => {
-    const roomSelect = document.getElementById('studentsRoomSelect');
-    const grade = gradeSelect.value;
-    const rooms = grade
-      ? [...new Set(allStudents.filter(s => String(s.grade) === grade).map(s => String(s.room)).filter(Boolean))].sort((a,b) => parseInt(a)-parseInt(b))
-      : [];
-    roomSelect.innerHTML = '<option value="">반</option>';
-    rooms.forEach(r => {
-      const opt = document.createElement('option');
-      opt.value = r; opt.textContent = r + '반';
-      roomSelect.appendChild(opt);
-    });
-    renderStudents();
-  });
-  document.getElementById('studentsRoomSelect').addEventListener('change', renderStudents);
-
-  // 동아리 필터
+  // 동아리 그룹
   const clubs = [...new Set(allStudents.map(s => s.club).filter(Boolean))].sort();
-  const clubSelect = document.getElementById('studentsClubSelect');
-  clubSelect.innerHTML = '<option value="">동아리 선택</option>';
-  clubs.forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c; opt.textContent = c;
-    clubSelect.appendChild(opt);
+  // 학반 그룹
+  const classKeys = [...new Set(allStudents.map(s => s.grade && s.room ? `${s.grade}-${s.room}` : null).filter(Boolean))]
+    .sort((a,b) => {
+      const [ag,ar] = a.split('-').map(Number);
+      const [bg,br] = b.split('-').map(Number);
+      return ag-bg || ar-br;
+    });
+
+  let html = '';
+
+  // 동아리 섹션
+  if(clubs.length) {
+    html += `<div class="sg-section-label">🎯 동아리</div>`;
+    html += clubs.map(club => {
+      const cnt = allStudents.filter(s => s.club === club).length;
+      return `<div class="sg-group-card" data-type="club" data-key="${club}">
+        <span class="sg-group-name">${club}</span>
+        <span class="sg-group-count">${cnt}명</span>
+        <span class="sg-arrow">›</span>
+      </div>`;
+    }).join('');
+  }
+
+  // 학반 섹션
+  html += `<div class="sg-section-label">🏫 학반별</div>`;
+  html += classKeys.map(key => {
+    const [grade, room] = key.split('-');
+    const cnt = allStudents.filter(s => String(s.grade)===grade && String(s.room)===room).length;
+    // 담임 찾기 (교직원 연락망에서)
+    const homeroom = allContacts.find(c => c.dept && c.dept.includes(key) || false);
+    return `<div class="sg-group-card" data-type="class" data-key="${key}">
+      <div class="sg-group-left">
+        <span class="sg-group-name">${grade}학년 ${room}반</span>
+        <span class="sg-group-sub">${cnt}명</span>
+      </div>
+      <span class="sg-arrow">›</span>
+    </div>`;
+  }).join('');
+
+  list.innerHTML = html;
+
+  list.querySelectorAll('.sg-group-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const type = card.dataset.type;
+      const key  = card.dataset.key;
+      if(type === 'class') {
+        const [grade, room] = key.split('-');
+        renderStudentsInGroup({type:'class', key, label:`${grade}학년 ${room}반`});
+      } else {
+        renderStudentsInGroup({type:'club', key, label:key});
+      }
+    });
   });
-  clubSelect.addEventListener('change', renderStudents);
 }
 
-function renderStudents() {
+// ── 그룹 내 학생 목록 ──
+function renderStudentsInGroup(group) {
+  studentsViewMode = 'list';
+  studentsCurrentGroup = group;
   const list = document.getElementById('studentsList');
-  const q = document.getElementById('studentsSearch').value.trim().toLowerCase();
-  const grade = document.getElementById('studentsGradeSelect').value;
-  const room  = document.getElementById('studentsRoomSelect').value;
-  const club  = document.getElementById('studentsClubSelect').value;
 
   let filtered = allStudents;
-
-  if(studentsFilterMode === 'class') {
-    if(grade) filtered = filtered.filter(s => String(s.grade) === grade);
-    if(room)  filtered = filtered.filter(s => String(s.room)  === room);
+  if(group.type === 'class') {
+    const [grade, room] = group.key.split('-');
+    filtered = filtered.filter(s => String(s.grade)===grade && String(s.room)===room);
+    filtered.sort((a,b) => (parseInt(a.num)||0)-(parseInt(b.num)||0));
   } else {
-    if(club) filtered = filtered.filter(s => s.club === club);
+    filtered = filtered.filter(s => s.club === group.key);
+    filtered.sort((a,b) => {
+      const ag=parseInt(a.grade)||0, bg=parseInt(b.grade)||0;
+      const ar=parseInt(a.room)||0,  br=parseInt(b.room)||0;
+      return ag-bg || ar-br || (parseInt(a.num)||0)-(parseInt(b.num)||0);
+    });
   }
 
-  if(q) {
-    filtered = filtered.filter(s =>
-      (s.name||'').toLowerCase().includes(q) ||
-      String(s.num||'').includes(q)
-    );
+  // 담임 정보 (학반별일 때)
+  let homeroomHtml = '';
+  if(group.type === 'class') {
+    const [grade, room] = group.key.split('-');
+    const homeroom = allContacts.find(c => c.homeroom === group.key || c.dept === group.key);
+    // 시간표 데이터에서 담임 찾기
+    const homeroomTeacher = TEACHERS.find(t => t.homeroom === group.key);
+    if(homeroomTeacher) {
+      homeroomHtml = `<div class="sg-homeroom-card">
+        <span class="sg-homeroom-label">담임</span>
+        <span class="sg-homeroom-name">${homeroomTeacher.name} 선생님</span>
+        ${EXT_MAP[homeroomTeacher.name] ? `<span class="sg-homeroom-ext">☎ ${EXT_MAP[homeroomTeacher.name]}</span>` : ''}
+      </div>`;
+    }
   }
 
-  // 학번 순 정렬
-  filtered.sort((a,b) => {
-    const ag = parseInt(a.grade)||0, bg = parseInt(b.grade)||0;
-    const ar = parseInt(a.room)||0,  br = parseInt(b.room)||0;
-    const an = parseInt(a.num)||0,   bn = parseInt(b.num)||0;
-    return ag-bg || ar-br || an-bn;
-  });
-
-  if(!filtered.length) {
-    list.innerHTML = '<div class="contacts-empty">검색 결과가 없습니다.</div>';
-    return;
-  }
-
-  list.innerHTML = filtered.map((s, idx) => {
-    const phoneBtn = s.phone
-      ? `<a class="contact-btn phone" href="tel:${s.phone.replace(/-/g,'')}" title="학생에게 전화">📞</a>
-         <a class="contact-btn sms" href="sms:${s.phone.replace(/-/g,'')}" title="문자">💬</a>`
-      : '';
-    return `
-      <div class="student-card" data-idx="${idx}" style="cursor:pointer;">
-        <div class="student-num">${s.grade||''}-${s.room||''}<br>${String(s.num||'').padStart(2,'0')}</div>
+  list.innerHTML = `
+    <div class="sg-back-row">
+      <button class="sg-back-btn" id="sgBackBtn">← 목록으로</button>
+      <span class="sg-current-label">${group.label} · ${filtered.length}명</span>
+    </div>
+    ${homeroomHtml}
+    ${filtered.map((s, idx) => {
+      const phoneBtn = s.phone
+        ? `<a class="contact-btn phone" href="tel:${s.phone.replace(/-/g,'')}" title="전화">📞</a>
+           <a class="contact-btn sms"   href="sms:${s.phone.replace(/-/g,'')}"  title="문자">💬</a>`
+        : '';
+      const classLabel = group.type === 'club' ? `${s.grade||''}-${s.room||''}-${String(s.num||'').padStart(2,'0')}` : String(s.num||'').padStart(2,'0')+'번';
+      return `<div class="student-card" data-idx="${idx}" style="cursor:pointer;">
+        <div class="student-num">${group.type==='club' ? (s.grade+'-'+s.room) : String(s.num||'').padStart(2,'0')}<br>${group.type==='club' ? String(s.num||'').padStart(2,'0')+'번' : ''}</div>
         <div class="student-info">
           <div class="student-name">${s.name||''}</div>
-          <div class="student-meta">${s.club ? '🎯 '+s.club : ''}</div>
+          <div class="student-meta">${group.type==='club' ? '' : (s.club ? '🎯 '+s.club : '')}</div>
         </div>
         <div class="student-actions">${phoneBtn}</div>
       </div>`;
-  }).join('');
+    }).join('')}`;
 
-  // 카드 클릭 → 상세 팝업
+  document.getElementById('sgBackBtn').addEventListener('click', () => {
+    renderStudentsGroupList();
+  });
+
   list.querySelectorAll('.student-card').forEach(card => {
     card.addEventListener('click', e => {
-      if(e.target.closest('a')) return; // 전화/문자 버튼 클릭은 팝업 안 띄움
+      if(e.target.closest('a')) return;
       const s = filtered[parseInt(card.dataset.idx)];
       showStudentDetail(s);
     });
   });
 }
 
-function showStudentDetail(s) {
-  const rows = [
-    ['학번', `${s.grade||''}-${s.room||''}-${String(s.num||'').padStart(2,'0')}`],
-    ['생년월일', s.birth],
-    ['동아리', s.club],
-  ].filter(r => r[1]).map(([label, val]) => `
-    <div class="cd-row">
-      <span class="cd-label">${label}</span>
-      <span class="cd-value">${val}</span>
-    </div>`).join('');
+// ── 검색 ──
+document.getElementById('studentsSearch').addEventListener('input', function() {
+  const q = this.value.trim().toLowerCase();
+  if(!q) {
+    if(studentsCurrentGroup) renderStudentsInGroup(studentsCurrentGroup);
+    else renderStudentsGroupList();
+    return;
+  }
+  const filtered = allStudents.filter(s =>
+    (s.name||'').toLowerCase().includes(q) ||
+    String(s.num||'').includes(q) ||
+    (s.grade && s.room ? `${s.grade}-${s.room}` : '').includes(q)
+  ).sort((a,b) => {
+    const ag=parseInt(a.grade)||0, bg=parseInt(b.grade)||0;
+    const ar=parseInt(a.room)||0,  br=parseInt(b.room)||0;
+    return ag-bg || ar-br || (parseInt(a.num)||0)-(parseInt(b.num)||0);
+  });
 
-  const makePhoneRow = (label, phone) => phone ? `
-    <div class="cd-row">
-      <span class="cd-label">${label}</span>
-      <div class="cd-action-btns">
-        <a class="cd-phone-btn" href="tel:${phone.replace(/-/g,'')}">📞 전화</a>
-        <a class="cd-phone-btn sms" href="sms:${phone.replace(/-/g,'')}">💬 문자</a>
+  const list = document.getElementById('studentsList');
+  if(!filtered.length) { list.innerHTML = '<div class="contacts-empty">검색 결과 없음</div>'; return; }
+  list.innerHTML = filtered.map((s, idx) => {
+    const phoneBtn = s.phone
+      ? `<a class="contact-btn phone" href="tel:${s.phone.replace(/-/g,'')}" title="전화">📞</a>
+         <a class="contact-btn sms"   href="sms:${s.phone.replace(/-/g,'')}"  title="문자">💬</a>`
+      : '';
+    return `<div class="student-card" data-idx="${idx}" style="cursor:pointer;">
+      <div class="student-num">${s.grade||''}-${s.room||''}<br>${String(s.num||'').padStart(2,'0')}</div>
+      <div class="student-info">
+        <div class="student-name">${s.name||''}</div>
+        <div class="student-meta">${s.club ? '🎯 '+s.club : ''}</div>
       </div>
-    </div>` : '';
-
-  const overlay = document.createElement('div');
-  overlay.className = 'cd-overlay';
-  overlay.innerHTML = `
-    <div class="cd-box">
-      <div class="cd-header" style="background:var(--wed);">
-        <div class="cd-avatar">${(s.name||'?')[0]}</div>
-        <div>
-          <div class="cd-name">${s.name||''}</div>
-          <div class="cd-dept">${s.grade||''}학년 ${s.room||''}반 ${String(s.num||'').padStart(2,'0')}번</div>
-        </div>
-        <button class="cd-close">×</button>
-      </div>
-      <div class="cd-body">
-        ${rows}
-        ${makePhoneRow('학생', s.phone)}
-        ${makePhoneRow('부', s.fatherPhone)}
-        ${makePhoneRow('모', s.motherPhone)}
-      </div>
+      <div class="student-actions">${phoneBtn}</div>
     </div>`;
+  }).join('');
 
-  document.body.appendChild(overlay);
-  requestAnimationFrame(() => overlay.classList.add('open'));
-  const close = () => { overlay.classList.remove('open'); setTimeout(() => overlay.remove(), 200); };
-  overlay.querySelector('.cd-close').addEventListener('click', close);
-  overlay.addEventListener('click', e => { if(e.target === overlay) close(); });
-}
-
-// 탭 전환 (학반별/동아리별)
-document.getElementById('studentsTabRow').addEventListener('click', e => {
-  const btn = e.target.closest('.students-tab');
-  if(!btn) return;
-  studentsFilterMode = btn.dataset.filter;
-  document.querySelectorAll('.students-tab').forEach(b => b.classList.toggle('active', b === btn));
-  document.getElementById('studentsClassFilter').style.display = studentsFilterMode === 'class' ? '' : 'none';
-  document.getElementById('studentsClubFilter').style.display  = studentsFilterMode === 'club'  ? '' : 'none';
-  renderStudents();
+  list.querySelectorAll('.student-card').forEach(card => {
+    card.addEventListener('click', e => {
+      if(e.target.closest('a')) return;
+      showStudentDetail(filtered[parseInt(card.dataset.idx)]);
+    });
+  });
 });
-
-document.getElementById('studentsSearch').addEventListener('input', renderStudents);
 
 
 </script>
