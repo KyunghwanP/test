@@ -1478,7 +1478,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.79</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.80</div>
   </div>
 </div>
 
@@ -1547,7 +1547,7 @@
       <div class="main-nav-item" data-page="schedule">
         <span class="main-nav-icon">📆</span>학사일정
       </div>
-    <div class="nav-version">ver1.79</div>
+    <div class="nav-version">ver1.80</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -3810,7 +3810,7 @@ function renderContacts(contacts) {
         <div class="contact-info" data-idx="${idx}" style="cursor:pointer;">
           <div class="contact-name">${c.name}${c.role ? ' <span style="font-size:11px;font-weight:400;color:var(--ink-soft);">'+c.role+'</span>' : ''}</div>
           <div class="contact-dept">${c.dept||''}${c.subject ? ' · '+c.subject : ''}</div>
-          ${c.phone ? `<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;font-family:'IBM Plex Mono';">${c.phone}</div>` : ''}
+
         </div>
         <div class="contact-actions">${phoneBtn}${extBtn}</div>
       </div>`;
@@ -4043,18 +4043,12 @@ function renderStudentsInGroup(group) {
     </div>
     ${homeroomHtml}
     ${filtered.map((s, idx) => {
-      const phoneBtn = s.phone
-        ? `<a class="contact-btn phone" href="tel:${s.phone.replace(/-/g,'')}" title="전화">📞</a>
-           <a class="contact-btn sms"   href="sms:${s.phone.replace(/-/g,'')}"  title="문자">💬</a>`
-        : '';
-      const classLabel = group.type === 'club' ? `${s.grade||''}-${s.room||''}-${String(s.num||'').padStart(2,'0')}` : String(s.num||'').padStart(2,'0')+'번';
       return `<div class="student-card" data-idx="${idx}" style="cursor:pointer;">
         <div class="student-num">${group.type==='club' ? (s.grade+'-'+s.room) : String(s.num||'').padStart(2,'0')}<br>${group.type==='club' ? String(s.num||'').padStart(2,'0')+'번' : ''}</div>
         <div class="student-info">
           <div class="student-name">${s.name||''}</div>
           <div class="student-meta">${group.type==='club' ? '' : (s.club ? '🎯 '+s.club : '')}</div>
         </div>
-        <div class="student-actions">${phoneBtn}</div>
       </div>`;
     }).join('')}`;
 
@@ -4073,9 +4067,16 @@ function renderStudentsInGroup(group) {
 
 // ── 학생 상세 팝업 ──
 function showStudentDetail(s) {
+  // 학번: 10801 형식
+  const studentId = `${s.grade||''}${s.room||''}${String(s.num||'').replace(/^0+/,'')}`.padStart(5,'0');
+  // 생년월일: yyyy.mm.dd 형식
+  const birthFormatted = s.birth ? s.birth.replace(/-/g, '.') : '';
+  // 번호 앞 0 제거
+  const numDisplay = parseInt(s.num||'0');
+
   const rows = [
-    ['학번', `${s.grade||''}-${s.room||''}-${String(s.num||'').padStart(2,'0')}`],
-    ['생년월일', s.birth],
+    ['학번', studentId],
+    ['생년월일', birthFormatted],
     ['동아리', s.club],
   ].filter(r => r[1]).map(([label, val]) => `
     <div class="cd-row">
@@ -4100,7 +4101,7 @@ function showStudentDetail(s) {
         <div class="cd-avatar">${(s.name||'?')[0]}</div>
         <div>
           <div class="cd-name">${s.name||''}</div>
-          <div class="cd-dept">${s.grade||''}학년 ${s.room||''}반 ${String(s.num||'').padStart(2,'0')}번</div>
+          <div class="cd-dept">${s.grade||''}학년 ${s.room||''}반 ${numDisplay}번</div>
         </div>
         <button class="cd-close">×</button>
       </div>
@@ -4140,17 +4141,12 @@ document.getElementById('studentsSearch').addEventListener('input', function() {
   const list = document.getElementById('studentsList');
   if(!filtered.length) { list.innerHTML = '<div class="contacts-empty">검색 결과 없음</div>'; return; }
   list.innerHTML = filtered.map((s, idx) => {
-    const phoneBtn = s.phone
-      ? `<a class="contact-btn phone" href="tel:${s.phone.replace(/-/g,'')}" title="전화">📞</a>
-         <a class="contact-btn sms"   href="sms:${s.phone.replace(/-/g,'')}"  title="문자">💬</a>`
-      : '';
     return `<div class="student-card" data-idx="${idx}" style="cursor:pointer;">
       <div class="student-num">${s.grade||''}-${s.room||''}<br>${String(s.num||'').padStart(2,'0')}</div>
       <div class="student-info">
         <div class="student-name">${s.name||''}</div>
         <div class="student-meta">${s.club ? '🎯 '+s.club : ''}</div>
       </div>
-      <div class="student-actions">${phoneBtn}</div>
     </div>`;
   }).join('');
 
