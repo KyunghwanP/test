@@ -4329,10 +4329,10 @@ async function initHomePage() {
       const isNow = nowMin >= toMinutes(b.start)-5 && nowMin <= toMinutes(b.end)+5;
       const cls = ['home-tt-cell', isNow?'now':'', !found?'empty':''].filter(Boolean).join(' ');
       return `<div class="${cls}">
-        <div class="home-tt-period">${b.period}교시</div>
-        ${found
-          ? `<div class="home-tt-subject">${found.subject}</div><div class="home-tt-class">${found.class||''}</div>`
-          : '<div class="home-tt-empty">·</div>'}
+        <div class="home-tt-period-bar">${b.period}교시</div>
+        <div class="home-tt-body">${found
+          ? `<div class="home-tt-subject">${found.subject}</div><div class="home-tt-class">${found.class||'　'}</div>`
+          : '<div class="home-tt-empty">·</div>'}</div>
       </div>`;
     }).join('');
     document.getElementById('homeMyTt').innerHTML = ttHtml || '<div class="home-tt-no-class">오늘 수업이 없습니다</div>';
