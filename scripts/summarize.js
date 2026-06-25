@@ -43,12 +43,23 @@ async function summarizeWeekly() {
 
   // 4) Gemini 요약 (503 등 일시 오류 시 최대 5회 재시도)
   console.log('🤖 Gemini 요약 중...');
-  const prompt = `다음은 영남고등학교 이번 주 주간교육활동 내용입니다. 담당 교사가 한눈에 파악할 수 있도록 핵심 일정과 업무를 3~5줄로 간결하게 요약해주세요. 날짜와 대상 학년을 포함하고, 불필요한 반복이나 형식적인 말은 빼고 핵심만 써주세요.\n\n${text}`;
+  const prompt = `다음은 영남고등학교 이번 주 주간교육활동 내용입니다.
+담당 교사가 한눈에 파악할 수 있도록 핵심 일정과 업무를 5~8줄로 요약하세요.
+
+규칙:
+- 요약한 내용만 출력하세요. 인사말, "요약입니다", "다음과 같습니다" 같은 말 절대 금지
+- 날짜와 대상 학년을 반드시 포함
+- 중요한 행사, 시험, 제출 마감, 학년별 주요 일정 위주로
+- 줄바꿈으로 항목 구분
+- 불필요한 반복 금지
+
+주간교육활동 내용:
+${text}`;
 
   const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
   const GEMINI_BODY = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 400, temperature: 0.3 }
+    generationConfig: { maxOutputTokens: 2000, temperature: 0.3, responseMimeType: "text/plain" }
   });
 
   let data;
