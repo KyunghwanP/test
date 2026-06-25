@@ -1248,7 +1248,7 @@
   }
   .sc-cal-cell{
     background:var(--paper);
-    min-height:52px;padding:4px 5px;
+    min-height:72px;padding:4px 5px;
     display:flex;flex-direction:column;gap:2px;
   }
   .sc-cal-cell.other-month{background:var(--paper-soft);}
@@ -1267,8 +1267,9 @@
   .sc-cal-cell.sunday .sc-cal-date{color:#C0392B;}
   .sc-cal-cell.saturday .sc-cal-date{color:#2980B9;}
   .sc-cal-event-dot{
-    font-size:9px;line-height:1.3;color:var(--mon);font-weight:700;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    font-size:9px;line-height:1.4;color:var(--mon);font-weight:600;
+    word-break:keep-all;overflow:hidden;
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
   }
 
   /* 리스트 */
@@ -1315,7 +1316,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.52</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.53</div>
   </div>
 </div>
 
@@ -1378,7 +1379,7 @@
       <div class="main-nav-item" data-page="schedule">
         <span class="main-nav-icon">📆</span>학사일정
       </div>
-    <div class="nav-version">ver1.52</div>
+    <div class="nav-version">ver1.53</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -1506,8 +1507,6 @@
           <div class="schedule-month-bar" id="scheduleMonthBar"></div>
           <!-- 캘린더 -->
           <div class="schedule-calendar" id="scheduleCalendar"></div>
-          <!-- 일정 리스트 -->
-          <div class="schedule-list" id="scheduleList"></div>
         </div>
       </div>
 
@@ -3934,47 +3933,41 @@ function renderSchedule(monthKey) {
   calHtml += '</div>';
   cal.innerHTML = calHtml;
 
-  // 캘린더 날짜 클릭 → 리스트 해당 날짜로 스크롤
+  // 캘린더 날짜 클릭 → 팝업으로 일정 상세 보기
   cal.querySelectorAll('.sc-cal-cell.has-event').forEach(cell => {
     cell.addEventListener('click', () => {
       const d = parseInt(cell.dataset.date);
-      const target = document.getElementById(`sl-date-${d}`);
-      if(target) target.scrollIntoView({behavior:'smooth', block:'center'});
+      const ev = eventMap[d];
+      if(!ev) return;
+      const date = new Date(year, month-1, d);
+      const dow = ['일','월','화','수','목','금','토'][date.getDay()];
+      const overlay = document.createElement('div');
+      overlay.className = 'cd-overlay';
+      overlay.innerHTML = `
+        <div class="cd-box">
+          <div class="cd-header" style="background:var(--mon);">
+            <div class="cd-avatar">${d}</div>
+            <div>
+              <div class="cd-name">${year}년 ${month}월 ${d}일</div>
+              <div class="cd-dept">${dow}요일</div>
+            </div>
+            <button class="cd-close">×</button>
+          </div>
+          <div class="cd-body">
+            <div style="font-size:15px;color:var(--ink);line-height:1.7;">${ev.content}</div>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      requestAnimationFrame(() => overlay.classList.add('open'));
+      const close = () => { overlay.classList.remove('open'); setTimeout(() => overlay.remove(), 200); };
+      overlay.querySelector('.cd-close').addEventListener('click', close);
+      overlay.addEventListener('click', e => { if(e.target===overlay) close(); });
     });
   });
 
-  // ── 리스트 렌더링 ──
-  const list = document.getElementById('scheduleList');
+  // 이벤트 없으면 안내
   if(!events.length) {
-    list.innerHTML = '<div class="schedule-empty">이 달에 등록된 일정이 없습니다.</div>';
-    return;
-  }
-
-  const dayNames = ['일','월','화','수','목','금','토'];
-  list.innerHTML = events.map(e => {
-    const date = new Date(year, month-1, e.date);
-    const dow = date.getDay();
-    const isToday2 = isThisMonth && today.getDate()===e.date;
-    const isSun = dow===0, isSat = dow===6;
-    const cls = ['sl-item', isToday2?'today':'', isSun||isSat?'holiday':''].filter(Boolean).join(' ');
-    const dayCls = isSun?'sun':isSat?'sat':'';
-    return `<div class="${cls}" id="sl-date-${e.date}">
-      <div class="sl-date">
-        <div class="sl-date-num">${e.date}</div>
-        <div class="sl-date-day ${dayCls}">${e.day||dayNames[dow]}요일</div>
-      </div>
-      <div class="sl-content">
-        <div class="sl-event">${e.content}</div>
-      </div>
-    </div>`;
-  }).join('');
-
-  // 오늘 날짜로 자동 스크롤
-  if(isThisMonth) {
-    setTimeout(() => {
-      const todayItem = document.querySelector('.sl-item.today');
-      if(todayItem) todayItem.scrollIntoView({behavior:'smooth', block:'center'});
-    }, 100);
+    cal.innerHTML += '<div class="schedule-empty" style="padding:20px;text-align:center;">이 달에 등록된 일정이 없습니다.</div>';
   }
 }
 
