@@ -1400,6 +1400,11 @@
 
   /* 반반 레이아웃 */
   .home-row{display:flex;gap:10px;}
+  .home-tt-row{display:flex;flex-direction:column;gap:10px;}
+  @media(min-width:850px){
+    .home-tt-row{flex-direction:row;align-items:flex-start;}
+    .home-tt-row .home-section{flex:1;min-width:0;}
+  }
   .home-half{flex:1;min-width:0;}
 
   /* 학사일정 미니 */
@@ -1528,22 +1533,25 @@
         <div class="home-body" id="homeBody">
           <div class="home-loading" id="homeLoading">불러오는 중...</div>
 
-          <!-- 내 시간표 섹션 -->
-          <div class="home-section" id="homeMyTimetable" style="display:none;">
-            <div class="home-section-header" data-goto="timetable-me">
-              <span class="home-section-title">📅 오늘 내 시간표</span>
-              <span class="home-section-arrow">›</span>
+          <!-- 내 시간표 + 학급 시간표 (넓은 화면에서 가로 배치) -->
+          <div class="home-tt-row" id="homeTtRow">
+            <!-- 내 시간표 섹션 -->
+            <div class="home-section" id="homeMyTimetable" style="display:none;">
+              <div class="home-section-header" data-goto="timetable-me">
+                <span class="home-section-title">📅 오늘 내 시간표</span>
+                <span class="home-section-arrow">›</span>
+              </div>
+              <div class="home-my-tt" id="homeMyTt"></div>
             </div>
-            <div class="home-my-tt" id="homeMyTt"></div>
-          </div>
 
-          <!-- 담임 학급 시간표 섹션 -->
-          <div class="home-section" id="homeClassTimetable" style="display:none;">
-            <div class="home-section-header" data-goto="timetable-class">
-              <span class="home-section-title">🏫 <span id="homeClassName"></span> 시간표</span>
-              <span class="home-section-arrow">›</span>
+            <!-- 담임 학급 시간표 섹션 -->
+            <div class="home-section" id="homeClassTimetable" style="display:none;">
+              <div class="home-section-header" data-goto="timetable-class">
+                <span class="home-section-title">🏫 <span id="homeClassName"></span> 시간표</span>
+                <span class="home-section-arrow">›</span>
+              </div>
+              <div class="home-my-tt" id="homeClassTt"></div>
             </div>
-            <div class="home-my-tt" id="homeClassTt"></div>
           </div>
 
           <!-- 학사일정 + 식단 한줄 -->
