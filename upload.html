@@ -251,10 +251,11 @@ if ('serviceWorker' in navigator) {
         <code>B: 반</code> &nbsp;
         <code>C: 번호</code> &nbsp;
         <code>D: 이름</code> &nbsp;
-        <code>E: 학생연락처</code> &nbsp;
-        <code>F: 부연락처</code> &nbsp;
-        <code>G: 모연락처</code> &nbsp;
-        <code>H: 동아리(선택)</code>
+        <code>E: 생년월일</code> &nbsp;
+        <code>F: 학생연락처</code> &nbsp;
+        <code>G: 부연락처</code> &nbsp;
+        <code>H: 모연락처</code> &nbsp;
+        <code>I: 동아리(선택)</code>
       </div>
       <div class="dropzone" id="stDropzone">
         <div class="dropzone-icon">📂</div>
@@ -265,7 +266,7 @@ if ('serviceWorker' in navigator) {
         <div class="stat-chips" id="stStats"></div>
         <div class="preview-wrap">
           <table class="preview-table">
-            <thead><tr><th>학년</th><th>반</th><th>번호</th><th>이름</th><th>학생</th><th>부</th><th>모</th><th>동아리</th></tr></thead>
+            <thead><tr><th>학년</th><th>반</th><th>번호</th><th>이름</th><th>생년월일</th><th>학생</th><th>부</th><th>모</th><th>동아리</th></tr></thead>
             <tbody id="stPreviewBody"></tbody>
           </table>
         </div>
@@ -738,10 +739,11 @@ async function processStudentFile(file) {
         room:        String(r[1]||'').trim(),
         num:         String(r[2]||'').trim(),
         name:        String(r[3]||'').trim(),
-        phone:       String(r[4]||'').trim(),
-        fatherPhone: String(r[5]||'').trim(),
-        motherPhone: String(r[6]||'').trim(),
-        club:        String(r[7]||'').trim(),
+        birth:       String(r[4]||'').trim(),
+        phone:       String(r[5]||'').trim(),
+        fatherPhone: String(r[6]||'').trim(),
+        motherPhone: String(r[7]||'').trim(),
+        club:        String(r[8]||'').trim(),
       }));
 
     if (!stParsedData.length) {
@@ -760,6 +762,7 @@ async function processStudentFile(file) {
       <tr>
         <td>${s.grade}</td><td>${s.room}</td><td>${s.num}</td>
         <td class="name">${s.name}</td>
+        <td>${s.birth}</td>
         <td class="phone">${s.phone}</td>
         <td>${s.fatherPhone}</td>
         <td>${s.motherPhone}</td>
