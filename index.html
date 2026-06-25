@@ -1316,6 +1316,12 @@
     text-align:center;padding:30px 0;
   }
   .schedule-list{display:flex;flex-direction:column;gap:4px;}
+  .schedule-main-row{display:flex;flex-direction:column;gap:10px;}
+  @media(min-width:900px){
+    .schedule-main-row{flex-direction:row;align-items:flex-start;gap:16px;}
+    .schedule-main-row .schedule-calendar{flex-shrink:0;width:420px;}
+    .schedule-main-row .schedule-list{flex:1;min-width:0;max-height:70vh;overflow-y:auto;}
+  }
   .sl-item{
     background:var(--paper);border-radius:8px;
     padding:8px 12px;display:flex;align-items:center;gap:10px;
@@ -1473,7 +1479,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.69</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.71</div>
   </div>
 </div>
 
@@ -1542,7 +1548,7 @@
       <div class="main-nav-item" data-page="schedule">
         <span class="main-nav-icon">📆</span>학사일정
       </div>
-    <div class="nav-version">ver1.69</div>
+    <div class="nav-version">ver1.71</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -1553,52 +1559,53 @@
         <div class="home-body" id="homeBody">
           <div class="home-loading" id="homeLoading">불러오는 중...</div>
 
-          <!-- 내 시간표 + 학급 시간표 (넓은 화면에서 가로 배치) -->
-          <div class="home-tt-row" id="homeTtRow">
-            <!-- 내 시간표 섹션 -->
-            <div class="home-section" id="homeMyTimetable" style="display:none;">
-              <div class="home-section-header" data-goto="timetable-me">
-                <span class="home-section-title">📅 오늘 내 시간표</span>
-                <span class="home-section-arrow">›</span>
+          <!-- 전체 래퍼 시작 -->
+          <div class="home-main-row" id="homeMainRow">
+            <!-- 왼쪽: 시간표 -->
+            <div class="home-left-col">
+              <div class="home-tt-row" id="homeTtRow">
+                <div class="home-section" id="homeMyTimetable" style="display:none;">
+                  <div class="home-section-header" data-goto="timetable-me">
+                    <span class="home-section-title">📅 오늘 내 시간표</span>
+                    <span class="home-section-arrow">›</span>
+                  </div>
+                  <div class="home-my-tt" id="homeMyTt"></div>
+                </div>
+                <div class="home-section" id="homeClassTimetable" style="display:none;">
+                  <div class="home-section-header" data-goto="timetable-class">
+                    <span class="home-section-title">🏫 <span id="homeClassName"></span> 시간표</span>
+                    <span class="home-section-arrow">›</span>
+                  </div>
+                  <div class="home-my-tt" id="homeClassTt"></div>
+                </div>
               </div>
-              <div class="home-my-tt" id="homeMyTt"></div>
             </div>
-
-            <!-- 담임 학급 시간표 섹션 -->
-            <div class="home-section" id="homeClassTimetable" style="display:none;">
-              <div class="home-section-header" data-goto="timetable-class">
-                <span class="home-section-title">🏫 <span id="homeClassName"></span> 시간표</span>
-                <span class="home-section-arrow">›</span>
+            <!-- 오른쪽: 학사일정 + 급식 + 날씨 -->
+            <div class="home-right-col">
+              <div class="home-section" id="homeScheduleSection" data-goto="schedule">
+                <div class="home-section-header">
+                  <span class="home-section-title">📆 이번달 학사일정</span>
+                  <span class="home-section-arrow">›</span>
+                </div>
+                <div class="home-schedule-list" id="homeScheduleList" style="max-height:200px;overflow-y:auto;"></div>
               </div>
-              <div class="home-my-tt" id="homeClassTt"></div>
-            </div>
-          </div>
-
-          <!-- 학사일정 + 식단 한줄 -->
-          <div class="home-row">
-            <div class="home-section home-half" id="homeScheduleSection" data-goto="schedule">
-              <div class="home-section-header">
-                <span class="home-section-title">📆 학사일정</span>
-                <span class="home-section-arrow">›</span>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <div class="home-section" id="homeMealSection" data-goto="meal" style="flex:1;min-width:160px;">
+                  <div class="home-section-header">
+                    <span class="home-section-title">🍱 오늘 급식</span>
+                    <span class="home-section-arrow">›</span>
+                  </div>
+                  <div class="home-meal-list" id="homeMealList"></div>
+                </div>
+                <div class="home-section" id="homeWeatherSection" style="flex:1;min-width:160px;">
+                  <div class="home-section-header">
+                    <span class="home-section-title">🌤 날씨</span>
+                  </div>
+                  <div class="home-weather" id="homeWeather">불러오는 중...</div>
+                </div>
               </div>
-              <div class="home-schedule-list" id="homeScheduleList"></div>
             </div>
-            <div class="home-section home-half" id="homeMealSection" data-goto="meal">
-              <div class="home-section-header">
-                <span class="home-section-title">🍱 오늘 급식</span>
-                <span class="home-section-arrow">›</span>
-              </div>
-              <div class="home-meal-list" id="homeMealList"></div>
-            </div>
-          </div>
-
-          <!-- 날씨 -->
-          <div class="home-section" id="homeWeatherSection">
-            <div class="home-section-header">
-              <span class="home-section-title">🌤 날씨</span>
-            </div>
-            <div class="home-weather" id="homeWeather">불러오는 중...</div>
-          </div>
+          </div><!-- home-main-row 끝 -->
 
         </div>
       </div>
@@ -1723,10 +1730,11 @@
         <div class="schedule-body">
           <!-- 월 선택 바 -->
           <div class="schedule-month-bar" id="scheduleMonthBar"></div>
-          <!-- 캘린더 -->
-          <div class="schedule-calendar" id="scheduleCalendar"></div>
-          <!-- 일정 리스트 -->
-          <div class="schedule-list" id="scheduleList"></div>
+          <!-- 캘린더 + 리스트 가로 배치 -->
+          <div class="schedule-main-row">
+            <div class="schedule-calendar" id="scheduleCalendar"></div>
+            <div class="schedule-list" id="scheduleList"></div>
+          </div>
         </div>
       </div>
 
@@ -4191,7 +4199,7 @@ async function initSchedulePage() {
 
 function renderMonthBar() {
   const bar = document.getElementById('scheduleMonthBar');
-  const keys = Object.keys(scheduleData).sort();
+  const keys = Object.keys(scheduleData).sort().reverse();
   bar.innerHTML = keys.map(key => {
     const [y, m] = key.split('-');
     const label = `${y.slice(2)}년 ${parseInt(m)}월`;
