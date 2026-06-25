@@ -1203,6 +1203,108 @@
   .sg-homeroom-label{font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);font-family:'IBM Plex Mono';}
   .sg-homeroom-name{font-family:'Noto Serif KR';font-weight:700;font-size:14px;color:#fff;flex:1;}
   .sg-homeroom-ext{font-family:'IBM Plex Mono';font-size:12px;color:rgba(255,255,255,0.8);}
+
+  /* ══════════════════════════════════════════
+     학사일정 페이지
+  ══════════════════════════════════════════ */
+  .schedule-body{
+    flex:1;overflow-y:auto;padding:8px 10px 16px;
+    background:var(--bg-base);display:flex;flex-direction:column;gap:10px;
+  }
+  /* 월 선택 바 */
+  .schedule-month-bar{
+    display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;
+    scrollbar-width:none;padding:2px 0 4px;flex-shrink:0;
+  }
+  .schedule-month-bar::-webkit-scrollbar{display:none;}
+  .schedule-month-chip{
+    flex-shrink:0;padding:5px 14px;border-radius:20px;cursor:pointer;
+    font-size:12px;font-weight:700;font-family:'IBM Plex Mono';
+    border:1.5px solid var(--rule);color:var(--ink-soft);background:var(--paper);
+    white-space:nowrap;
+  }
+  .schedule-month-chip.active{background:var(--mon);border-color:var(--mon);color:#fff;}
+  .schedule-month-chip:hover:not(.active){background:var(--paper-soft);}
+
+  /* 캘린더 */
+  .schedule-calendar{
+    background:var(--paper);border-radius:12px;
+    box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
+    overflow:hidden;
+  }
+  .sc-cal-header{
+    display:grid;grid-template-columns:repeat(7,1fr);
+    background:var(--mon);
+  }
+  .sc-cal-header span{
+    font-family:'Noto Sans KR';font-weight:700;font-size:11px;
+    color:#fff;text-align:center;padding:8px 4px;
+  }
+  .sc-cal-header span:first-child{color:#ffaaaa;}
+  .sc-cal-header span:last-child{color:#aaddff;}
+  .sc-cal-grid{
+    display:grid;grid-template-columns:repeat(7,1fr);
+    gap:1px;background:var(--rule);
+  }
+  .sc-cal-cell{
+    background:var(--paper);
+    min-height:52px;padding:4px 5px;
+    display:flex;flex-direction:column;gap:2px;
+  }
+  .sc-cal-cell.other-month{background:var(--paper-soft);}
+  .sc-cal-cell.today{background:#FFF8E1;}
+  .sc-cal-cell.has-event{cursor:pointer;}
+  .sc-cal-cell.has-event:hover{background:var(--paper-soft);}
+  .sc-cal-date{
+    font-family:'IBM Plex Mono';font-size:11px;font-weight:600;
+    color:var(--ink-soft);line-height:1;
+  }
+  .sc-cal-cell.today .sc-cal-date{
+    background:var(--mon);color:#fff;
+    width:20px;height:20px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:10px;
+  }
+  .sc-cal-cell.sunday .sc-cal-date{color:#C0392B;}
+  .sc-cal-cell.saturday .sc-cal-date{color:#2980B9;}
+  .sc-cal-event-dot{
+    font-size:9px;line-height:1.3;color:var(--mon);font-weight:700;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+
+  /* 리스트 */
+  .schedule-list{
+    display:flex;flex-direction:column;gap:6px;
+  }
+  .sl-item{
+    background:var(--paper);border-radius:10px;
+    padding:12px 16px;
+    box-shadow:0 2px 8px -4px rgba(0,0,0,0.2);
+    display:flex;align-items:flex-start;gap:14px;
+    border-left:4px solid var(--mon);
+  }
+  .sl-item.holiday{border-left-color:var(--wed);}
+  .sl-item.today{background:#FFF8E1;border-left-color:#E8A93A;}
+  .sl-date{
+    flex-shrink:0;text-align:center;min-width:42px;
+  }
+  .sl-date-num{
+    font-family:'IBM Plex Mono';font-weight:700;font-size:22px;
+    color:var(--ink);line-height:1;
+  }
+  .sl-date-day{
+    font-size:11px;color:var(--ink-soft);font-weight:700;
+    margin-top:2px;
+  }
+  .sl-date-day.sun{color:#C0392B;}
+  .sl-date-day.sat{color:#2980B9;}
+  .sl-content{flex:1;min-width:0;}
+  .sl-event{
+    font-size:14px;color:var(--ink);line-height:1.6;
+  }
+  .schedule-empty{
+    color:var(--paper);opacity:0.5;font-size:13px;
+    text-align:center;padding:30px 0;
+  }
 </style>
 </head>
 <body>
@@ -1213,7 +1315,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.51</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.52</div>
   </div>
 </div>
 
@@ -1245,6 +1347,9 @@
     <div class="tab-item" data-page="students">
       <span class="tab-item-icon">🎒</span>학생연락망
     </div>
+    <div class="tab-item" data-page="schedule">
+      <span class="tab-item-icon">📆</span>학사일정
+    </div>
   </div>
 
   <!-- 앱 바디 -->
@@ -1270,7 +1375,10 @@
       <div class="main-nav-item" data-page="students">
         <span class="main-nav-icon">🎒</span>학생연락망
       </div>
-    <div class="nav-version">ver1.51</div>
+      <div class="main-nav-item" data-page="schedule">
+        <span class="main-nav-icon">📆</span>학사일정
+      </div>
+    <div class="nav-version">ver1.52</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -1388,6 +1496,18 @@
           <div class="students-list" id="studentsList">
             <div class="contacts-loading">불러오는 중...</div>
           </div>
+        </div>
+      </div>
+
+      <!-- 학사일정 페이지 -->
+      <div class="page-view" id="schedulePage">
+        <div class="schedule-body">
+          <!-- 월 선택 바 -->
+          <div class="schedule-month-bar" id="scheduleMonthBar"></div>
+          <!-- 캘린더 -->
+          <div class="schedule-calendar" id="scheduleCalendar"></div>
+          <!-- 일정 리스트 -->
+          <div class="schedule-list" id="scheduleList"></div>
         </div>
       </div>
 
@@ -2582,6 +2702,7 @@ const weeklyPage    = document.getElementById('weeklyPage');
 const mealPage      = document.getElementById('mealPage');
 const contactsPage  = document.getElementById('contactsPage');
 const studentsPage  = document.getElementById('studentsPage');
+const schedulePage  = document.getElementById('schedulePage');
 
 // 햄버거 (모바일/좁은화면)
 function updateMobileNavTop(){
@@ -2703,12 +2824,14 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       mealPage.classList.remove('active');
       contactsPage.classList.remove('active');
       studentsPage.classList.remove('active');
+      schedulePage.classList.remove('active');
     } else if(page === 'weekly'){
       timetablePage.classList.remove('active');
       weeklyPage.classList.add('active');
       mealPage.classList.remove('active');
       contactsPage.classList.remove('active');
       studentsPage.classList.remove('active');
+      schedulePage.classList.remove('active');
       if(!weeklyInitialized) initWeeklyPage();
     } else if(page === 'meal'){
       timetablePage.classList.remove('active');
@@ -2716,6 +2839,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       mealPage.classList.add('active');
       contactsPage.classList.remove('active');
       studentsPage.classList.remove('active');
+      schedulePage.classList.remove('active');
       if(!mealInitialized) initMealPage();
     } else if(page === 'contacts'){
       timetablePage.classList.remove('active');
@@ -2723,6 +2847,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       mealPage.classList.remove('active');
       contactsPage.classList.add('active');
       studentsPage.classList.remove('active');
+      schedulePage.classList.remove('active');
       if(!contactsInitialized) initContactsPage();
     } else if(page === 'students'){
       timetablePage.classList.remove('active');
@@ -2730,7 +2855,16 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       mealPage.classList.remove('active');
       contactsPage.classList.remove('active');
       studentsPage.classList.add('active');
+      schedulePage.classList.remove('active');
       if(!studentsInitialized) initStudentsPage();
+    } else if(page === 'schedule'){
+      timetablePage.classList.remove('active');
+      weeklyPage.classList.remove('active');
+      mealPage.classList.remove('active');
+      contactsPage.classList.remove('active');
+      studentsPage.classList.remove('active');
+      schedulePage.classList.add('active');
+      if(!scheduleInitialized) initSchedulePage();
     }
   });
 });
@@ -2773,6 +2907,7 @@ document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(tab => {
     else if(page === 'meal')      { mealPage.classList.add('active'); if(!mealInitialized) initMealPage(); }
     else if(page === 'contacts')  { contactsPage.classList.add('active'); if(!contactsInitialized) initContactsPage(); }
     else if(page === 'students')  { studentsPage.classList.add('active'); if(!studentsInitialized) initStudentsPage(); }
+    else if(page === 'schedule')  { schedulePage.classList.add('active'); if(!scheduleInitialized) initSchedulePage(); }
   });
 });
 
@@ -3696,6 +3831,152 @@ document.getElementById('studentsSearch').addEventListener('input', function() {
   });
 });
 
+
+// ---- 학사일정 ----
+let scheduleInitialized = false;
+let scheduleData = {};       // { '2026-07': [{date,day,content}], ... }
+let scheduleCurrentMonth = null;
+
+async function initSchedulePage() {
+  scheduleInitialized = true;
+  try {
+    const snap = await getDoc(doc(fbDb, 'schedule', 'main'));
+    if (!snap.exists()) {
+      document.getElementById('scheduleList').innerHTML = '<div class="schedule-empty">학사일정 데이터가 없습니다.</div>';
+      return;
+    }
+    scheduleData = snap.data().data || {};
+
+    // 현재 월 또는 가장 가까운 월 선택
+    const now = new Date();
+    const curKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const keys = Object.keys(scheduleData).sort();
+    scheduleCurrentMonth = keys.includes(curKey) ? curKey : (keys[0] || null);
+
+    renderMonthBar();
+    if(scheduleCurrentMonth) renderSchedule(scheduleCurrentMonth);
+  } catch(e) {
+    document.getElementById('scheduleList').innerHTML = `<div class="schedule-empty">불러오기 실패: ${e.message}</div>`;
+  }
+}
+
+function renderMonthBar() {
+  const bar = document.getElementById('scheduleMonthBar');
+  const keys = Object.keys(scheduleData).sort();
+  bar.innerHTML = keys.map(key => {
+    const [y, m] = key.split('-');
+    const label = `${y.slice(2)}년 ${parseInt(m)}월`;
+    const active = key === scheduleCurrentMonth ? ' active' : '';
+    return `<div class="schedule-month-chip${active}" data-key="${key}">${label}</div>`;
+  }).join('');
+
+  bar.querySelectorAll('.schedule-month-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      scheduleCurrentMonth = chip.dataset.key;
+      bar.querySelectorAll('.schedule-month-chip').forEach(c => c.classList.toggle('active', c === chip));
+      renderSchedule(scheduleCurrentMonth);
+    });
+  });
+
+  // 현재 월 칩으로 스크롤
+  setTimeout(() => {
+    const active = bar.querySelector('.active');
+    if(active) active.scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'});
+  }, 100);
+}
+
+function renderSchedule(monthKey) {
+  const [year, month] = monthKey.split('-').map(Number);
+  const events = scheduleData[monthKey] || [];
+
+  // 이벤트를 날짜 맵으로 변환
+  const eventMap = {};
+  events.forEach(e => { eventMap[e.date] = e; });
+
+  // ── 캘린더 렌더링 ──
+  const cal = document.getElementById('scheduleCalendar');
+  const days = ['일','월','화','수','목','금','토'];
+  const firstDay = new Date(year, month-1, 1).getDay();
+  const lastDate = new Date(year, month, 0).getDate();
+  const prevLastDate = new Date(year, month-1, 0).getDate();
+  const today = new Date();
+  const isThisMonth = today.getFullYear()===year && today.getMonth()===month-1;
+
+  let calHtml = `<div class="sc-cal-header">${days.map(d=>`<span>${d}</span>`).join('')}</div><div class="sc-cal-grid">`;
+
+  // 이전 달 빈칸
+  for(let i=0; i<firstDay; i++) {
+    const d = prevLastDate - firstDay + i + 1;
+    calHtml += `<div class="sc-cal-cell other-month"><span class="sc-cal-date">${d}</span></div>`;
+  }
+
+  // 이번 달
+  for(let d=1; d<=lastDate; d++) {
+    const dow = (firstDay + d - 1) % 7;
+    const isToday = isThisMonth && today.getDate()===d;
+    const ev = eventMap[d];
+    const cls = ['sc-cal-cell', isToday?'today':'', dow===0?'sunday':dow===6?'saturday':'', ev?'has-event':''].filter(Boolean).join(' ');
+    const dateEl = isToday
+      ? `<div class="sc-cal-date">${d}</div>`
+      : `<span class="sc-cal-date">${d}</span>`;
+    const evEl = ev ? `<div class="sc-cal-event-dot">● ${ev.content.slice(0,8)}</div>` : '';
+    calHtml += `<div class="${cls}" data-date="${d}">${dateEl}${evEl}</div>`;
+  }
+
+  // 다음 달 빈칸
+  const remaining = 7 - ((firstDay + lastDate) % 7);
+  if(remaining < 7) {
+    for(let i=1; i<=remaining; i++) {
+      calHtml += `<div class="sc-cal-cell other-month"><span class="sc-cal-date">${i}</span></div>`;
+    }
+  }
+
+  calHtml += '</div>';
+  cal.innerHTML = calHtml;
+
+  // 캘린더 날짜 클릭 → 리스트 해당 날짜로 스크롤
+  cal.querySelectorAll('.sc-cal-cell.has-event').forEach(cell => {
+    cell.addEventListener('click', () => {
+      const d = parseInt(cell.dataset.date);
+      const target = document.getElementById(`sl-date-${d}`);
+      if(target) target.scrollIntoView({behavior:'smooth', block:'center'});
+    });
+  });
+
+  // ── 리스트 렌더링 ──
+  const list = document.getElementById('scheduleList');
+  if(!events.length) {
+    list.innerHTML = '<div class="schedule-empty">이 달에 등록된 일정이 없습니다.</div>';
+    return;
+  }
+
+  const dayNames = ['일','월','화','수','목','금','토'];
+  list.innerHTML = events.map(e => {
+    const date = new Date(year, month-1, e.date);
+    const dow = date.getDay();
+    const isToday2 = isThisMonth && today.getDate()===e.date;
+    const isSun = dow===0, isSat = dow===6;
+    const cls = ['sl-item', isToday2?'today':'', isSun||isSat?'holiday':''].filter(Boolean).join(' ');
+    const dayCls = isSun?'sun':isSat?'sat':'';
+    return `<div class="${cls}" id="sl-date-${e.date}">
+      <div class="sl-date">
+        <div class="sl-date-num">${e.date}</div>
+        <div class="sl-date-day ${dayCls}">${e.day||dayNames[dow]}요일</div>
+      </div>
+      <div class="sl-content">
+        <div class="sl-event">${e.content}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // 오늘 날짜로 자동 스크롤
+  if(isThisMonth) {
+    setTimeout(() => {
+      const todayItem = document.querySelector('.sl-item.today');
+      if(todayItem) todayItem.scrollIntoView({behavior:'smooth', block:'center'});
+    }, 100);
+  }
+}
 
 </script>
 </body>
