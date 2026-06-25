@@ -1364,6 +1364,14 @@
     gap:4px;padding:10px 12px;
     min-height:90px;flex-shrink:0;
   }
+  /* 내 시간표와 학급 시간표 동일한 그리드 */
+  #homeClassTt{
+    display:grid !important;
+    grid-template-columns:repeat(7, 1fr);
+    gap:4px;padding:10px 12px;
+    min-height:90px;flex-shrink:0;
+    overflow-x:unset;
+  }
   .home-my-tt::-webkit-scrollbar{display:none;}
   .home-tt-cell{
     min-width:0;
@@ -1376,18 +1384,18 @@
   .home-tt-cell.now .home-tt-period-bar{background:#E8A93A;}
   .home-tt-cell.empty{opacity:0.35;}
   .home-tt-period-bar{
-    background:var(--wed);padding:4px 4px;
-    font-family:'IBM Plex Mono';font-size:11px;color:#fff;font-weight:700;
+    background:var(--wed);padding:5px 4px;
+    font-family:'IBM Plex Mono';font-size:clamp(9px,1.8vw,12px);color:#fff;font-weight:700;
   }
   .home-tt-cell.now .home-tt-period-bar{background:#E8A93A;}
   .home-tt-body{
     padding:6px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;
     flex:1;justify-content:center;
   }
-  .home-tt-subject{font-size:clamp(9px,2vw,13px);font-weight:700;color:var(--ink);line-height:1.3;word-break:keep-all;}
-  .home-tt-class{font-size:clamp(8px,1.5vw,10px);color:var(--ink-soft);font-family:'IBM Plex Mono';}
-  .home-tt-empty{font-size:clamp(14px,2.5vw,20px);color:var(--rule);}
-  .home-tt-period-bar{font-size:clamp(9px,1.8vw,11px);}
+  .home-tt-subject{font-size:clamp(10px,2.2vw,14px);font-weight:700;color:var(--ink);line-height:1.3;word-break:keep-all;}
+  .home-tt-class{font-size:clamp(9px,1.6vw,11px);color:var(--ink-soft);font-family:'IBM Plex Mono';}
+  .home-tt-empty{font-size:clamp(16px,2.5vw,22px);color:var(--rule);}
+
   .home-tt-no-class{font-size:12px;color:var(--ink-soft);padding:16px;text-align:center;}
 
   /* 반반 레이아웃 */
