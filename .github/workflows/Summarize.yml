@@ -1,0 +1,22 @@
+name: 주간교육활동 AI 요약
+
+on:
+  schedule:
+    - cron: '0 23 * * *'  # 매일 KST 08:00 (UTC 23:00) 1회
+  workflow_dispatch:
+
+jobs:
+  summarize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 의존성 설치
+        run: cd scripts && npm install
+      - name: AI 요약 실행
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: cd scripts && node summarize.js
