@@ -3222,6 +3222,7 @@ const contactsPage  = document.getElementById('contactsPage');
 const studentsPage  = document.getElementById('studentsPage');
 const schedulePage  = document.getElementById('schedulePage');
 const homePage      = document.getElementById('homePage');
+const pointsPage    = document.getElementById('pointsPage');
 
 // 햄버거 (모바일/좁은화면)
 function updateMobileNavTop(){
@@ -3345,6 +3346,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       contactsPage.classList.remove('active');
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
+      pointsPage.classList.remove('active');
       if(!homeInitialized) initHomePage();
     } else if(page === 'timetable'){
       homePage.classList.remove('active');
@@ -3354,6 +3356,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       contactsPage.classList.remove('active');
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
+      pointsPage.classList.remove('active');
       // 시간표 탭 클릭 시 본인 시간표 자동 로드
       const _user = fbAuth.currentUser;
       const _name = (_user?.displayName||'').trim().replace(/\s*(선생님|교사|쌤)/,'');
@@ -3367,6 +3370,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       contactsPage.classList.remove('active');
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
+      pointsPage.classList.remove('active');
       if(!weeklyInitialized) initWeeklyPage();
     } else if(page === 'meal'){
       homePage.classList.remove('active');
@@ -3376,6 +3380,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       contactsPage.classList.remove('active');
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
+      pointsPage.classList.remove('active');
       if(!mealInitialized) initMealPage();
     } else if(page === 'contacts'){
       homePage.classList.remove('active');
@@ -3385,6 +3390,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       contactsPage.classList.add('active');
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
+      pointsPage.classList.remove('active');
       if(!contactsInitialized) initContactsPage();
     } else if(page === 'students'){
       homePage.classList.remove('active');
@@ -3394,6 +3400,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       contactsPage.classList.remove('active');
       studentsPage.classList.add('active');
       schedulePage.classList.remove('active');
+      pointsPage.classList.remove('active');
       if(!studentsInitialized) initStudentsPage();
     } else if(page === 'schedule'){
       homePage.classList.remove('active');
@@ -3403,7 +3410,18 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       contactsPage.classList.remove('active');
       studentsPage.classList.remove('active');
       schedulePage.classList.add('active');
+      pointsPage.classList.remove('active');
       if(!scheduleInitialized) initSchedulePage();
+    } else if(page === 'points'){
+      homePage.classList.remove('active');
+      timetablePage.classList.remove('active');
+      weeklyPage.classList.remove('active');
+      mealPage.classList.remove('active');
+      contactsPage.classList.remove('active');
+      studentsPage.classList.remove('active');
+      schedulePage.classList.remove('active');
+      pointsPage.classList.add('active');
+      initPointsPage();
     }
   });
 });
@@ -3450,6 +3468,7 @@ document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(tab => {
     studentsPage.classList.remove('active');
     schedulePage.classList.remove('active');
     homePage.classList.remove('active');
+    pointsPage.classList.remove('active');
     if(page === 'home')         { homePage.classList.add('active'); if(!homeInitialized) initHomePage(); }
     else if(page === 'timetable') { timetablePage.classList.add('active'); }
     else if(page === 'weekly')    { weeklyPage.classList.add('active'); if(!weeklyInitialized) initWeeklyPage(); }
@@ -3457,6 +3476,7 @@ document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(tab => {
     else if(page === 'contacts')  { contactsPage.classList.add('active'); if(!contactsInitialized) initContactsPage(); }
     else if(page === 'students')  { studentsPage.classList.add('active'); if(!studentsInitialized) initStudentsPage(); }
     else if(page === 'schedule')  { schedulePage.classList.add('active'); if(!scheduleInitialized) initSchedulePage(); }
+    else if(page === 'points')    { pointsPage.classList.add('active'); initPointsPage(); }
   });
 });
 
