@@ -4340,7 +4340,12 @@ async function initHomePage() {
     // 섹션 클릭 → 내 시간표로
     document.querySelector('[data-goto="timetable-me"]').addEventListener('click', () => {
       navigateTo('timetable');
-      setTimeout(() => { if(myTeacher) select(myTeacher); }, 100);
+      setTimeout(() => {
+        // 교사별 모드로 전환
+        const teacherTabBtn = document.querySelector('.tab-btn[data-mode="teacher"]');
+        if(teacherTabBtn) teacherTabBtn.click();
+        setTimeout(() => { if(myTeacher) select(myTeacher); }, 100);
+      }, 100);
     });
 
     // ── 담임 학급 시간표 ──
