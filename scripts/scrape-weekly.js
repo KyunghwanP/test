@@ -67,7 +67,9 @@ async function fetchSchedule() {
           }
           // 내용: 날짜와 요일이 확인된 후 첫 번째 긴 텍스트
           else if (date && day && !content && cell.length >= 2 && !/^[①②③ㆍ\d]/.test(cell)) {
-            content = cell;
+            // 사람 이름(2~4글자 한글 이름) 제외
+            const isName = /^[가-힣]{2,4}$/.test(cell);
+            if (!isName) content = cell;
           }
         }
 
