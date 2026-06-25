@@ -1364,17 +1364,26 @@
   }
   .home-my-tt::-webkit-scrollbar{display:none;}
   .home-tt-cell{
-    flex-shrink:0;min-width:52px;
+    flex-shrink:0;min-width:64px;
     background:var(--paper-soft);border-radius:8px;
-    padding:6px 4px;text-align:center;
+    overflow:hidden;text-align:center;
     border:1.5px solid var(--rule);
+    display:flex;flex-direction:column;
   }
-  .home-tt-cell.now{background:#FFF8E1;border-color:#E8A93A;}
-  .home-tt-cell.empty{opacity:0.4;}
-  .home-tt-period{font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);font-weight:600;}
-  .home-tt-subject{font-size:11px;font-weight:700;color:var(--ink);margin-top:3px;line-height:1.3;word-break:keep-all;}
-  .home-tt-class{font-size:9px;color:var(--ink-soft);margin-top:1px;font-family:'IBM Plex Mono';}
-  .home-tt-empty{font-size:18px;color:var(--rule);margin-top:4px;}
+  .home-tt-cell.now{border-color:#E8A93A;}
+  .home-tt-cell.now .home-tt-period-bar{background:#E8A93A;}
+  .home-tt-cell.empty{opacity:0.35;}
+  .home-tt-period-bar{
+    background:var(--mon);padding:4px 4px;
+    font-family:'IBM Plex Mono';font-size:11px;color:#fff;font-weight:700;
+  }
+  .home-tt-body{
+    padding:6px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;
+    flex:1;justify-content:center;
+  }
+  .home-tt-subject{font-size:13px;font-weight:700;color:var(--ink);line-height:1.3;word-break:keep-all;}
+  .home-tt-class{font-size:10px;color:var(--ink-soft);font-family:'IBM Plex Mono';}
+  .home-tt-empty{font-size:20px;color:var(--rule);}
   .home-tt-no-class{font-size:12px;color:var(--ink-soft);padding:16px;text-align:center;}
 
   /* 반반 레이아웃 */
@@ -1398,6 +1407,9 @@
   .home-meal-item{font-size:11.5px;color:var(--ink);line-height:1.6;border-bottom:1px dashed var(--rule);padding:1px 0;}
   .home-meal-item:last-child{border-bottom:none;}
   .home-meal-empty{font-size:11px;color:var(--ink-soft);padding:8px 12px;}
+  .home-meal-type-label{font-size:10px;font-weight:700;font-family:'IBM Plex Mono';color:#fff;background:var(--tue);border-radius:10px;padding:2px 8px;display:inline-block;margin:4px 0 2px;}
+  .home-schedule-item.today .home-schedule-date{color:#E8A93A;font-weight:900;}
+  .home-schedule-item.today .home-schedule-content{font-weight:700;color:var(--ink);}
 
   /* 날씨 */
   .home-weather{
@@ -4324,17 +4336,37 @@ async function initHomePage() {
         const isNow = nowMin >= toMinutes(b.start)-5 && nowMin <= toMinutes(b.end)+5;
         const cls = ['home-tt-cell', isNow?'now':'', !found?'empty':''].filter(Boolean).join(' ');
         return `<div class="${cls}">
-          <div class="home-tt-period">${b.period}교시</div>
-          ${found
+          <div class="home-tt-period-bar">${b.period}교시</div>
+          <div class="home-tt-body">${found
             ? `<div class="home-tt-subject">${found.subject}</div><div class="home-tt-class">${found.teacher||''}</div>`
-            : '<div class="home-tt-empty">·</div>'}
+            : '<div class="home-tt-empty">·</div>'}</div>
         </div>`;
       }).join('');
       document.getElementById('homeClassTt').innerHTML = classHtml;
 
       document.querySelector('[data-goto="timetable-class"]').addEventListener('click', () => {
         navigateTo('timetable');
-        setTimeout(() => { select(myTeacher.homeroom); }, 100);
+        // 학급별 보기로 전환 후 해당 학급 선택
+        setTimeout(() => {
+          const classTabBtn = document.querySelector('.tab-btn[data-mode="class"]');
+          if(classTabBtn) classTabBtn.click();
+          setTimeout(() => {
+            const homeroom = myTeacher.homeroom;
+            const [grade, room] = homeroom.split('-');
+            const gradeEl = document.getElementById('gradeSelect');
+            const roomEl  = document.getElementById('roomSelect');
+            if(gradeEl && grade) {
+              gradeEl.value = grade;
+              gradeEl.dispatchEvent(new Event('change'));
+              setTimeout(() => {
+                if(roomEl && room) {
+                  roomEl.value = homeroom;
+                  roomEl.dispatchEvent(new Event('change'));
+                }
+              }, 100);
+            }
+          }, 100);
+        }, 100);
       });
     }
   }
@@ -4344,13 +4376,13 @@ async function initHomePage() {
     const snap = await getDoc(doc(fbDb, 'schedule', 'main'));
     const schedData = snap.exists() ? (snap.data().data || {}) : {};
     const monthKey = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
-    const events = (schedData[monthKey] || []).filter(e => e.date >= today.getDate()).slice(0, 4);
+    const events = (schedData[monthKey] || []);
     const schedHtml = events.length
-      ? events.map(e => `<div class="home-schedule-item">
+      ? events.map(e => `<div class="home-schedule-item${e.date === today.getDate() ? ' today' : ''}">
           <span class="home-schedule-date">${e.date}일</span>
           <span class="home-schedule-content">${e.content}</span>
         </div>`).join('')
-      : '<div class="home-schedule-empty">이번 달 남은 일정 없음</div>';
+      : '<div class="home-schedule-empty">이번 달 학사일정 없음</div>';
     document.getElementById('homeScheduleList').innerHTML = schedHtml;
   } catch(e) {
     document.getElementById('homeScheduleList').innerHTML = '<div class="home-schedule-empty">불러오기 실패</div>';
@@ -4360,16 +4392,24 @@ async function initHomePage() {
   // ── 오늘 급식 ──
   try {
     const dateStr = today.getFullYear() + String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0');
-    const url = `https://open.neis.go.kr/hub/mealServiceDietInfo?KEY=faa26ac84d27403e8ecd28aaf407f500&Type=json&ATPT_OFCDC_SC_CODE=D10&SD_SCHUL_CODE=7240095&MLSV_YMD=${dateStr}&MMEAL_SC_CODE=2`;
-    const res = await fetch(url);
-    const data = await res.json();
-    const rows = data?.mealServiceDietInfo?.[1]?.row;
-    if(rows?.length) {
-      const items = rows[0].DDISH_NM.split('<br/>').map(m => m.trim()).filter(Boolean).slice(0, 6);
-      document.getElementById('homeMealList').innerHTML = items.map(m => `<div class="home-meal-item">${m}</div>`).join('');
-    } else {
-      document.getElementById('homeMealList').innerHTML = '<div class="home-meal-empty">오늘 급식 정보 없음</div>';
+    const mealBase = `https://open.neis.go.kr/hub/mealServiceDietInfo?KEY=faa26ac84d27403e8ecd28aaf407f500&Type=json&ATPT_OFCDC_SC_CODE=D10&SD_SCHUL_CODE=7240095&MLSV_YMD=${dateStr}`;
+    const [lunchRes, dinnerRes] = await Promise.all([
+      fetch(mealBase + '&MMEAL_SC_CODE=2'),
+      fetch(mealBase + '&MMEAL_SC_CODE=3')
+    ]);
+    const [lunchData, dinnerData] = await Promise.all([lunchRes.json(), dinnerRes.json()]);
+    const lunchRows = lunchData?.mealServiceDietInfo?.[1]?.row;
+    const dinnerRows = dinnerData?.mealServiceDietInfo?.[1]?.row;
+    let mealHtml = '';
+    if(lunchRows?.length) {
+      const items = lunchRows[0].DDISH_NM.split('<br/>').map(m => m.trim()).filter(Boolean).slice(0, 6);
+      mealHtml += `<div class="home-meal-type-label">중식</div>` + items.map(m => `<div class="home-meal-item">${m}</div>`).join('');
     }
+    if(dinnerRows?.length) {
+      const items = dinnerRows[0].DDISH_NM.split('<br/>').map(m => m.trim()).filter(Boolean).slice(0, 6);
+      mealHtml += `<div class="home-meal-type-label" style="margin-top:6px;">석식</div>` + items.map(m => `<div class="home-meal-item">${m}</div>`).join('');
+    }
+    document.getElementById('homeMealList').innerHTML = mealHtml || '<div class="home-meal-empty">오늘 급식 정보 없음</div>';
   } catch(e) {
     document.getElementById('homeMealList').innerHTML = '<div class="home-meal-empty">불러오기 실패</div>';
   }
