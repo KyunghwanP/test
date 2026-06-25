@@ -162,6 +162,134 @@
   /* 데스크톱 모드에서는 탭바 숨김 */
   .app-shell.desktop-nav .mobile-tab-bar{display:none;}
 
+  /* ══════════════════════════════════════════
+     상벌점 입력 페이지
+  ══════════════════════════════════════════ */
+  .points-body{
+    flex:1;overflow-y:auto;padding:16px;
+    background:var(--bg-base);
+    display:flex;flex-direction:column;align-items:center;
+  }
+  .points-card{
+    width:100%;max-width:560px;
+    background:var(--paper);border-radius:12px;
+    box-shadow:0 4px 20px -8px rgba(0,0,0,0.2);
+    padding:24px 24px 28px;
+    display:flex;flex-direction:column;gap:0;
+  }
+  .points-card-title{
+    font-family:'Pretendard','Noto Sans KR';font-weight:900;font-size:17px;
+    color:var(--ink);margin-bottom:20px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .points-type-row{
+    display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;
+  }
+  .points-type-btn{
+    padding:12px 0;border-radius:10px;border:2px solid var(--rule);
+    background:var(--paper-soft);cursor:pointer;
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:15px;
+    color:var(--ink-soft);transition:all .15s ease;
+    display:flex;align-items:center;justify-content:center;gap:6px;
+  }
+  .points-type-btn:hover{border-color:var(--mon);color:var(--mon);}
+  .points-type-btn.selected-merit{border-color:#10B981;background:#ECFDF5;color:#065F46;}
+  .points-type-btn.selected-demerit{border-color:#EF4444;background:#FEF2F2;color:#991B1B;}
+
+  .points-field{margin-bottom:14px;}
+  .points-label{
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:12px;
+    color:var(--ink-soft);margin-bottom:5px;letter-spacing:0.04em;
+    text-transform:uppercase;
+  }
+  .points-input, .points-select, .points-textarea{
+    width:100%;
+    font-family:'Pretendard','Noto Sans KR';font-size:15px;
+    padding:11px 14px;
+    border:1.5px solid var(--rule);border-radius:8px;
+    background:var(--paper);color:var(--ink);
+    outline:none;transition:border-color .15s;
+    appearance:none;-webkit-appearance:none;
+  }
+  .points-input:focus, .points-select:focus, .points-textarea:focus{border-color:var(--mon);}
+  .points-textarea{resize:vertical;min-height:80px;line-height:1.6;}
+  .points-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .points-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+  .points-score-row{display:flex;align-items:center;gap:10px;}
+  .points-score-row .points-input{width:100px;flex-shrink:0;text-align:center;font-weight:700;}
+  .points-score-presets{display:flex;gap:6px;flex-wrap:wrap;}
+  .points-score-chip{
+    padding:6px 12px;border-radius:20px;
+    border:1.5px solid var(--rule);background:var(--paper-soft);
+    font-family:'IBM Plex Mono';font-size:12px;font-weight:700;color:var(--ink-soft);
+    cursor:pointer;transition:all .12s;
+  }
+  .points-score-chip:hover{background:var(--rule);color:var(--ink);}
+  .points-score-chip.active{background:var(--mon);border-color:var(--mon);color:#fff;}
+
+  .points-teacher-info{
+    display:flex;align-items:center;gap:8px;padding:10px 14px;
+    background:var(--paper-soft);border-radius:8px;border:1.5px solid var(--rule);
+    font-family:'Pretendard','Noto Sans KR';font-size:14px;color:var(--ink-soft);
+  }
+  .points-teacher-name{font-weight:700;color:var(--ink);}
+
+  .points-submit-btn{
+    margin-top:20px;width:100%;
+    padding:14px;border-radius:10px;border:none;
+    background:var(--mon);color:#fff;
+    font-family:'Pretendard','Noto Sans KR';font-weight:900;font-size:16px;
+    cursor:pointer;transition:background .15s, transform .1s;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .points-submit-btn:hover{background:#2563EB;}
+  .points-submit-btn:active{transform:scale(0.98);}
+  .points-submit-btn:disabled{background:var(--ink-soft);cursor:not-allowed;transform:none;}
+
+  .points-toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
+    background:var(--ink);color:#fff;
+    font-family:'Pretendard','Noto Sans KR';font-size:14px;font-weight:700;
+    padding:12px 24px;border-radius:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.25);
+    transition:transform .3s ease, opacity .3s ease;
+    opacity:0;z-index:9999;white-space:nowrap;
+  }
+  .points-toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+  .points-toast.success{background:#10B981;}
+  .points-toast.error{background:#EF4444;}
+
+  .points-history{
+    width:100%;max-width:560px;margin-top:16px;
+    background:var(--paper);border-radius:12px;
+    box-shadow:0 4px 20px -8px rgba(0,0,0,0.2);
+    overflow:hidden;
+  }
+  .points-history-title{
+    padding:14px 20px;border-bottom:1px solid var(--rule);
+    font-family:'Pretendard','Noto Sans KR';font-weight:900;font-size:14px;color:var(--ink);
+    display:flex;align-items:center;gap:6px;
+  }
+  .points-history-list{max-height:300px;overflow-y:auto;}
+  .points-history-item{
+    padding:12px 20px;border-bottom:1px solid var(--rule);
+    display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;
+  }
+  .points-history-item:last-child{border-bottom:none;}
+  .points-history-badge{
+    padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;
+  }
+  .points-history-badge.merit{background:#ECFDF5;color:#065F46;}
+  .points-history-badge.demerit{background:#FEF2F2;color:#991B1B;}
+  .points-history-info{font-size:13px;color:var(--ink);line-height:1.5;}
+  .points-history-info .ph-name{font-weight:700;}
+  .points-history-info .ph-detail{color:var(--ink-soft);font-size:12px;}
+  .points-history-score{font-family:'IBM Plex Mono';font-weight:700;font-size:14px;}
+  .points-history-score.merit{color:#10B981;}
+  .points-history-score.demerit{color:#EF4444;}
+  .points-history-empty{padding:24px;text-align:center;color:var(--ink-soft);font-size:13px;}
+
   /* 버전 표시 */
   .nav-version{
     margin-top:auto;padding:12px 16px 4px;
@@ -1512,23 +1640,23 @@
     <div class="tab-item active" data-page="home">
       <span class="tab-item-icon">🏠</span>현황판
     </div>
-    <div class="tab-item" data-page="timetable">
-      <span class="tab-item-icon">📅</span>시간표
-    </div>
     <div class="tab-item" data-page="weekly">
       <span class="tab-item-icon">📋</span>주간교육활동
     </div>
-    <div class="tab-item" data-page="meal">
-      <span class="tab-item-icon">🍱</span>식단표
+    <div class="tab-item" data-page="schedule">
+      <span class="tab-item-icon">📆</span>학사일정
+    </div>
+    <div class="tab-item" data-page="timetable">
+      <span class="tab-item-icon">📅</span>시간표
+    </div>
+    <div class="tab-item" data-page="points">
+      <span class="tab-item-icon">📝</span>상벌점
     </div>
     <div class="tab-item" data-page="contacts">
       <span class="tab-item-icon">📞</span>교원연락망
     </div>
     <div class="tab-item" data-page="students">
       <span class="tab-item-icon">🎒</span>학생연락망
-    </div>
-    <div class="tab-item" data-page="schedule">
-      <span class="tab-item-icon">📆</span>학사일정
     </div>
   </div>
 
@@ -1543,23 +1671,23 @@
       <div class="main-nav-item active" data-page="home">
         <span class="main-nav-icon">🏠</span>현황판
       </div>
-      <div class="main-nav-item" data-page="timetable">
-        <span class="main-nav-icon">📅</span>시간표
-      </div>
       <div class="main-nav-item" data-page="weekly">
         <span class="main-nav-icon">📋</span>주간교육활동
       </div>
-      <div class="main-nav-item" data-page="meal">
-        <span class="main-nav-icon">🍱</span>식단표
+      <div class="main-nav-item" data-page="schedule">
+        <span class="main-nav-icon">📆</span>학사일정
+      </div>
+      <div class="main-nav-item" data-page="timetable">
+        <span class="main-nav-icon">📅</span>시간표
+      </div>
+      <div class="main-nav-item" data-page="points">
+        <span class="main-nav-icon">📝</span>상벌점 입력
       </div>
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>교원연락망
       </div>
       <div class="main-nav-item" data-page="students">
         <span class="main-nav-icon">🎒</span>학생연락망
-      </div>
-      <div class="main-nav-item" data-page="schedule">
-        <span class="main-nav-icon">📆</span>학사일정
       </div>
     <div class="nav-version">ver2.05</div>
     </nav>
@@ -1776,6 +1904,104 @@
           <div class="schedule-main-row">
             <div class="schedule-calendar" id="scheduleCalendar"></div>
             <div class="schedule-list" id="scheduleList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 상벌점 입력 페이지 -->
+      <div class="page-view" id="pointsPage">
+        <div class="points-body">
+          <!-- 입력 카드 -->
+          <div class="points-card">
+            <div class="points-card-title">📝 상벌점 입력</div>
+
+            <!-- 유형 선택 -->
+            <div class="points-field">
+              <div class="points-label">유형</div>
+              <div class="points-type-row">
+                <button class="points-type-btn" id="ptsMeritBtn" onclick="selectPointType('상점')">
+                  ⭐ 상점
+                </button>
+                <button class="points-type-btn" id="ptsDemeritBtn" onclick="selectPointType('벌점')">
+                  ⚠️ 벌점
+                </button>
+              </div>
+            </div>
+
+            <!-- 학생 정보: 학년/반/번호/이름 -->
+            <div class="points-field">
+              <div class="points-label">학생 정보</div>
+              <div class="points-row3" style="margin-bottom:8px;">
+                <div>
+                  <select class="points-select" id="ptsGrade">
+                    <option value="">학년</option>
+                    <option value="1">1학년</option>
+                    <option value="2">2학년</option>
+                    <option value="3">3학년</option>
+                  </select>
+                </div>
+                <div>
+                  <select class="points-select" id="ptsClass">
+                    <option value="">반</option>
+                  </select>
+                </div>
+                <div>
+                  <input class="points-input" id="ptsNumber" type="number" min="1" max="40" placeholder="번호">
+                </div>
+              </div>
+              <input class="points-input" id="ptsName" type="text" placeholder="학생 이름" autocomplete="off">
+            </div>
+
+            <!-- 상세 내용 -->
+            <div class="points-field">
+              <div class="points-label">상세활동내용</div>
+              <textarea class="points-textarea" id="ptsDetail" placeholder="구체적인 사유를 입력하세요"></textarea>
+            </div>
+
+            <!-- 일자 -->
+            <div class="points-field">
+              <div class="points-label">일자</div>
+              <input class="points-input" id="ptsDate" type="date">
+            </div>
+
+            <!-- 점수 -->
+            <div class="points-field">
+              <div class="points-label">점수</div>
+              <div class="points-score-row">
+                <input class="points-input" id="ptsScore" type="number" min="1" max="20" value="1" placeholder="점">
+                <div class="points-score-presets">
+                  <button class="points-score-chip" onclick="setScore(1)">1점</button>
+                  <button class="points-score-chip" onclick="setScore(2)">2점</button>
+                  <button class="points-score-chip" onclick="setScore(3)">3점</button>
+                  <button class="points-score-chip" onclick="setScore(5)">5점</button>
+                  <button class="points-score-chip" onclick="setScore(10)">10점</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 입력 선생님 (자동) -->
+            <div class="points-field">
+              <div class="points-label">입력 선생님</div>
+              <div class="points-teacher-info">
+                <span>👤</span>
+                <span class="points-teacher-name" id="ptsTeacherName">—</span>
+                <span style="font-size:12px;">(자동 입력)</span>
+              </div>
+            </div>
+
+            <!-- 제출 버튼 -->
+            <button class="points-submit-btn" id="ptsSubmitBtn" onclick="submitPoints()">
+              <span id="ptsSubmitIcon">✓</span>
+              <span id="ptsSubmitText">구글 시트에 저장</span>
+            </button>
+          </div>
+
+          <!-- 이번 세션 입력 내역 -->
+          <div class="points-history" id="ptsHistoryBox">
+            <div class="points-history-title">📋 이번 세션 입력 내역</div>
+            <div class="points-history-list" id="ptsHistoryList">
+              <div class="points-history-empty">아직 입력한 내역이 없습니다.</div>
+            </div>
           </div>
         </div>
       </div>
@@ -4609,7 +4835,7 @@ function navigateTo(page) {
   // 탭 전환
   document.querySelectorAll('.main-nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
   document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(t => t.classList.toggle('active', t.dataset.page === page));
-  ['home','timetable','weekly','meal','contacts','students','schedule'].forEach(p => {
+  ['home','timetable','weekly','meal','contacts','students','schedule','points'].forEach(p => {
     const el = document.getElementById(p + 'Page');
     if(el) el.classList.toggle('active', p === page);
   });
@@ -4618,6 +4844,171 @@ function navigateTo(page) {
   if(page === 'contacts' && !contactsInitialized) initContactsPage();
   if(page === 'students' && !studentsInitialized) initStudentsPage();
   if(page === 'schedule' && !scheduleInitialized) initSchedulePage();
+  if(page === 'points') initPointsPage();
+}
+
+// ══════════════════════════════════════════
+// 상벌점 입력 기능
+// ══════════════════════════════════════════
+const POINTS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxVT4Z20BvZ9DUwLH79h3_5LhJCazcPOJ3lAWNi1Z_WkwjvOXsomWrs242wpiPUokmbXA/exec';
+let ptsType = null; // '상점' | '벌점'
+const ptsSessionHistory = [];
+
+function initPointsPage() {
+  // 오늘 날짜 기본값
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const dateEl = document.getElementById('ptsDate');
+  if (dateEl && !dateEl.value) dateEl.value = `${yyyy}-${mm}-${dd}`;
+
+  // 로그인 선생님 이름 표시
+  const user = fbAuth.currentUser;
+  if (user) {
+    const displayName = user.displayName || user.email.split('@')[0];
+    const nameEl = document.getElementById('ptsTeacherName');
+    if (nameEl) nameEl.textContent = displayName;
+  }
+
+  // 반 셀렉트 초기화 (1~10반)
+  updateClassOptions();
+
+  // 학년 변경 시 반 목록 갱신
+  const gradeEl = document.getElementById('ptsGrade');
+  if (gradeEl && !gradeEl._ptsListened) {
+    gradeEl.addEventListener('change', updateClassOptions);
+    gradeEl._ptsListened = true;
+  }
+}
+
+function updateClassOptions() {
+  const classEl = document.getElementById('ptsClass');
+  if (!classEl) return;
+  const cur = classEl.value;
+  classEl.innerHTML = '<option value="">반</option>';
+  for (let i = 1; i <= 10; i++) {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = `${i}반`;
+    classEl.appendChild(opt);
+  }
+  if (cur) classEl.value = cur;
+}
+
+function selectPointType(type) {
+  ptsType = type;
+  const meritBtn   = document.getElementById('ptsMeritBtn');
+  const demeritBtn = document.getElementById('ptsDemeritBtn');
+  meritBtn.className   = 'points-type-btn' + (type === '상점' ? ' selected-merit'   : '');
+  demeritBtn.className = 'points-type-btn' + (type === '벌점' ? ' selected-demerit' : '');
+}
+
+function setScore(n) {
+  const el = document.getElementById('ptsScore');
+  if (el) el.value = n;
+  // 프리셋 칩 활성 표시
+  document.querySelectorAll('.points-score-chip').forEach(c => {
+    c.classList.toggle('active', c.textContent.trim() === n + '점');
+  });
+}
+
+function showPointsToast(msg, type = 'success') {
+  let toast = document.getElementById('ptsToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'ptsToast';
+    toast.className = 'points-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.className = `points-toast ${type}`;
+  requestAnimationFrame(() => {
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  });
+}
+
+function addToSessionHistory(data) {
+  ptsSessionHistory.unshift(data);
+  const list = document.getElementById('ptsHistoryList');
+  if (!list) return;
+  if (ptsSessionHistory.length === 1) list.innerHTML = '';
+  const item = document.createElement('div');
+  item.className = 'points-history-item';
+  const cls = data.type === '상점' ? 'merit' : 'demerit';
+  item.innerHTML = `
+    <span class="points-history-badge ${cls}">${data.type}</span>
+    <div class="points-history-info">
+      <span class="ph-name">${data.grade}학년 ${data.classNum}반 ${data.studentNum}번 ${data.name}</span>
+      <div class="ph-detail">${data.detail} · ${data.date}</div>
+    </div>
+    <span class="points-history-score ${cls}">${data.type === '상점' ? '+' : '-'}${data.score}점</span>
+  `;
+  list.prepend(item);
+}
+
+async function submitPoints() {
+  // 유효성 검사
+  if (!ptsType) { showPointsToast('유형(상점/벌점)을 선택하세요', 'error'); return; }
+  const grade      = document.getElementById('ptsGrade').value;
+  const classNum   = document.getElementById('ptsClass').value;
+  const studentNum = document.getElementById('ptsNumber').value;
+  const name       = document.getElementById('ptsName').value.trim();
+  const detail     = document.getElementById('ptsDetail').value.trim();
+  const date       = document.getElementById('ptsDate').value;
+  const score      = document.getElementById('ptsScore').value;
+
+  if (!grade)      { showPointsToast('학년을 선택하세요', 'error'); return; }
+  if (!classNum)   { showPointsToast('반을 선택하세요', 'error'); return; }
+  if (!studentNum) { showPointsToast('번호를 입력하세요', 'error'); return; }
+  if (!name)       { showPointsToast('학생 이름을 입력하세요', 'error'); return; }
+  if (!detail)     { showPointsToast('상세활동내용을 입력하세요', 'error'); return; }
+  if (!date)       { showPointsToast('일자를 선택하세요', 'error'); return; }
+  if (!score || Number(score) < 1) { showPointsToast('점수를 입력하세요', 'error'); return; }
+
+  const user = fbAuth.currentUser;
+  const teacher = user ? (user.displayName || user.email.split('@')[0]) : '알 수 없음';
+
+  const payload = { type: ptsType, grade, classNum, studentNum, name, detail, date, score: Number(score), teacher };
+
+  // 버튼 비활성화
+  const btn = document.getElementById('ptsSubmitBtn');
+  const btnText = document.getElementById('ptsSubmitText');
+  const btnIcon = document.getElementById('ptsSubmitIcon');
+  btn.disabled = true;
+  btnText.textContent = '저장 중...';
+  btnIcon.textContent = '⏳';
+
+  try {
+    const res = await fetch(POINTS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' }, // Apps Script CORS 우회
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (json.success) {
+      showPointsToast(`✓ 저장 완료! (순번 ${json.seq})`, 'success');
+      addToSessionHistory(payload);
+      // 입력 필드 초기화 (유형·학년·반·선생님 유지)
+      document.getElementById('ptsNumber').value = '';
+      document.getElementById('ptsName').value = '';
+      document.getElementById('ptsDetail').value = '';
+      document.getElementById('ptsScore').value = '1';
+      document.querySelectorAll('.points-score-chip').forEach(c => c.classList.remove('active'));
+      // 오늘 날짜 재세팅
+      const t = new Date();
+      document.getElementById('ptsDate').value = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+    } else {
+      showPointsToast('저장 실패: ' + (json.error || '알 수 없는 오류'), 'error');
+    }
+  } catch (e) {
+    showPointsToast('네트워크 오류: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btnText.textContent = '구글 시트에 저장';
+    btnIcon.textContent = '✓';
+  }
 }
 
 </script>
