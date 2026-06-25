@@ -29,10 +29,17 @@ async function summarizeWeekly() {
     { signal: AbortSignal.timeout(20000) });
   if (!res.ok) throw new Error('프록시 fetch 실패: ' + res.status);
   const html = await res.text();
+
+  // 디버그: HTML 내용 확인
+  console.log(`  → HTML 길이: ${html.length}자`);
+  console.log(`  → HTML 앞 500자:\n${html.slice(0, 500)}`);
+
   if (html.length < 100) throw new Error('HTML 너무 짧음');
 
   // 3) HTML 태그 제거 후 텍스트 추출
   const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 4000);
+  console.log(`  → 추출 텍스트 길이: ${text.length}자`);
+  console.log(`  → 텍스트 앞 300자:\n${text.slice(0, 300)}`);
 
   // 4) Gemini 요약 (503 등 일시 오류 시 최대 5회 재시도)
   console.log('🤖 Gemini 요약 중...');
@@ -60,7 +67,7 @@ async function summarizeWeekly() {
     console.warn(`  ⚠️  Gemini ${code} (시도 ${attempt}/5)`);
     if (!retryable || attempt === 5) throw new Error('Gemini 응답 없음: ' + JSON.stringify(data));
 
-    const wait = attempt * 10; // 10초, 20초, 30초, 40초
+    const wait = attempt * 10;
     console.log(`  ⏳ ${wait}초 후 재시도...`);
     await new Promise(r => setTimeout(r, wait * 1000));
   }
