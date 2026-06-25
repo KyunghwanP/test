@@ -4306,14 +4306,6 @@ async function initHomePage() {
   let displayName = (user?.displayName || '').trim().replace(/\s*(선생님|교사|쌤)/, '');
   let myTeacher = TEACHERS.find(t => t.name === displayName);
 
-  // ── 임시: 이현재 선생님을 1-1 담임으로 처리 ──
-  if(myTeacher && !myTeacher.homeroom) {
-    myTeacher = {...myTeacher, homeroom: '1-1'};
-  }
-  if(!myTeacher && user?.email?.includes('iter86')) {
-    myTeacher = TEACHERS.find(t => t.name === '이현재');
-    if(myTeacher) myTeacher = {...myTeacher, homeroom: '1-1'};
-  }
   const today = new Date();
   const days = ['일','월','화','수','목','금','토'];
   const todayDay = days[today.getDay()];
