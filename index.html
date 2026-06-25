@@ -1620,7 +1620,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.05</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.10</div>
   </div>
 </div>
 
@@ -1689,7 +1689,7 @@
       <div class="main-nav-item" data-page="students">
         <span class="main-nav-icon">🎒</span>학생연락망
       </div>
-    <div class="nav-version">ver2.05</div>
+    <div class="nav-version">ver2.10</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -5010,6 +5010,11 @@ async function submitPoints() {
     btnIcon.textContent = '✓';
   }
 }
+
+// onclick="" 인라인 핸들러는 module 스코프 접근 불가 → window에 명시 등록
+window.selectPointType = selectPointType;
+window.setScore = setScore;
+window.submitPoints = submitPoints;
 
 </script>
 </body>
