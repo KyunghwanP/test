@@ -1478,7 +1478,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.82</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.84</div>
   </div>
 </div>
 
@@ -1547,7 +1547,7 @@
       <div class="main-nav-item" data-page="schedule">
         <span class="main-nav-icon">📆</span>학사일정
       </div>
-    <div class="nav-version">ver1.82</div>
+    <div class="nav-version">ver1.84</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -3776,7 +3776,7 @@ async function initContactsPage() {
 }
 
 // 아바타 색상 - 부서별로 다른 색
-const AVATAR_COLORS = ['#8C2F39','#2F5D62','#B08D57','#3B5170','#6B7A3A','#5D4037','#546E7A'];
+const AVATAR_COLORS = ['#3B82F6','#8B5CF6','#10B981','#F59E0B','#EF4444','#06B6D4','#EC4899'];
 function avatarColor(dept) {
   let hash = 0;
   for (const c of (dept||'')) hash = (hash * 31 + c.charCodeAt(0)) & 0xFFFFFF;
@@ -3846,12 +3846,10 @@ function showContactDetail(c) {
   const phoneRow = phoneNum ? `
     <div class="cd-row">
       <span class="cd-label">휴대폰</span>
-      <div class="cd-action-btns" style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span style="font-size:15px;font-weight:700;color:var(--ink);font-family:'IBM Plex Mono';">${c.phone}</span>
-        <div style="display:flex;gap:6px;">
-          <a class="cd-phone-btn" href="tel:${phoneNum}">📞 전화</a>
-          <a class="cd-phone-btn sms" href="sms:${phoneNum}">💬 문자</a>
-        </div>
+        <a class="contact-btn phone" href="tel:${phoneNum}">📞</a>
+        <a class="contact-btn sms" href="sms:${phoneNum}">💬</a>
       </div>
     </div>` : '';
 
@@ -4090,12 +4088,10 @@ function showStudentDetail(s) {
   const makePhoneRow = (label, phone) => phone ? `
     <div class="cd-row">
       <span class="cd-label">${label}</span>
-      <div class="cd-action-btns" style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span style="font-size:15px;font-weight:700;color:var(--ink);font-family:'IBM Plex Mono';">${phone}</span>
-        <div style="display:flex;gap:6px;">
-          <a class="cd-phone-btn" href="tel:${phone.replace(/-/g,'')}">📞 전화</a>
-          <a class="cd-phone-btn sms" href="sms:${phone.replace(/-/g,'')}">💬 문자</a>
-        </div>
+        <a class="contact-btn phone" href="tel:${phone.replace(/-/g,'')}">📞</a>
+        <a class="contact-btn sms" href="sms:${phone.replace(/-/g,'')}">💬</a>
       </div>
     </div>` : '';
 
