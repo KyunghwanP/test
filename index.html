@@ -247,7 +247,7 @@
   .pts-add-student-btn:disabled{border-color:var(--rule);color:var(--ink-soft);cursor:not-allowed;}
 
   .pts-student-row{
-    display:grid;grid-template-columns:1fr 1fr 60px 1fr 28px;
+    display:grid;grid-template-columns:1fr 1fr 1fr 1fr 28px;
     gap:6px;align-items:center;
     background:var(--paper-soft);border-radius:8px;
     padding:10px 10px;margin-bottom:6px;
@@ -255,6 +255,22 @@
     position:relative;
   }
   .pts-student-row:first-child .pts-remove-btn{visibility:hidden;}
+  .pts-detail-row{
+    display:grid;grid-template-columns:1fr auto;
+    gap:6px;align-items:center;
+    background:var(--bg-base);border-radius:8px;
+    padding:8px 10px;margin-bottom:6px;
+    border:1.5px solid var(--rule);
+  }
+  .pts-detail-row .points-select{font-size:13px;}
+  .pts-sync-btn{
+    flex-shrink:0;padding:0 10px;height:36px;border-radius:6px;
+    border:1.5px solid var(--tue);background:transparent;
+    color:var(--tue);font-size:11px;font-weight:700;
+    font-family:'Pretendard','Noto Sans KR';
+    cursor:pointer;white-space:nowrap;transition:all .12s;
+  }
+  .pts-sync-btn:hover{background:var(--tue);color:#fff;}
   .pts-name-found{
     border-color:#10B981 !important;background:#ECFDF5 !important;
     font-weight:700;color:#065F46 !important;
@@ -270,10 +286,10 @@
   }
   .pts-remove-btn:hover{background:#FEF2F2;color:#EF4444;}
   .pts-row-label{
-    grid-column:1/-1;
     font-family:'IBM Plex Mono';font-size:10px;font-weight:700;
     color:var(--ink-soft);opacity:0.6;margin-bottom:2px;
-    display:grid;grid-template-columns:1fr 1fr 60px 1fr 28px;gap:6px;
+    display:grid;grid-template-columns:1fr 1fr 1fr 1fr 28px;gap:6px;
+    padding:0 10px;
   }
 
   .points-score-row{display:flex;align-items:center;gap:10px;}
@@ -1680,7 +1696,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.13</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.14</div>
   </div>
 </div>
 
@@ -1749,7 +1765,7 @@
       <div class="main-nav-item" data-page="students">
         <span class="main-nav-icon">🎒</span>학생연락망
       </div>
-    <div class="nav-version">ver2.13</div>
+    <div class="nav-version">ver2.14</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -1986,8 +2002,11 @@
             <!-- 학생 목록 (최대 5명) -->
             <div class="pts-students-section">
               <div class="pts-students-header">
-                <div class="points-label" style="margin-bottom:0;">학생 정보</div>
-                <button class="pts-add-student-btn" id="ptsAddStudentBtn" onclick="addStudentRow()">+ 학생 추가</button>
+                <div class="points-label" style="margin-bottom:0;">학생 정보 및 사유</div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <button class="pts-sync-btn" onclick="syncAllDetails()">↕ 사유 전체 동일 적용</button>
+                  <button class="pts-add-student-btn" id="ptsAddStudentBtn" onclick="addStudentRow()">+ 학생 추가</button>
+                </div>
               </div>
               <!-- 열 레이블 -->
               <div class="pts-row-label">
@@ -1998,17 +2017,17 @@
               </div>
             </div>
 
-            <!-- 사유 -->
-            <div class="points-field">
-              <div class="points-label">상세활동내용 (사유)</div>
+            <!-- 공통 사유 (전체 동일 적용용) -->
+            <div class="points-field" id="ptsCommonDetailField" style="display:none;">
+              <div class="points-label">공통 사유 <span style="font-weight:400;font-size:11px;color:var(--ink-soft);">(아래에서 선택 후 ↕ 전체 동일 적용 클릭)</span></div>
               <div class="points-detail-wrap">
                 <div class="points-detail-select-row">
-                  <select class="points-select" id="ptsDetailSelect" onchange="onDetailSelect()">
+                  <select class="points-select" id="ptsCommonDetailSelect">
                     <option value="">— 규정에서 선택 —</option>
                   </select>
-                  <button class="points-custom-toggle" id="ptsCustomToggle" onclick="toggleCustomDetail()">직접입력</button>
+                  <button class="points-custom-toggle" id="ptsCommonCustomToggle" onclick="toggleCommonCustom()">직접입력</button>
                 </div>
-                <textarea class="points-textarea points-custom-input" id="ptsCustomDetail" placeholder="직접 사유를 입력하세요..."></textarea>
+                <textarea class="points-textarea points-custom-input" id="ptsCommonCustomDetail" placeholder="직접 사유를 입력하세요..."></textarea>
               </div>
             </div>
 
@@ -4921,7 +4940,7 @@ function navigateTo(page) {
 }
 
 // ══════════════════════════════════════════
-// 상벌점 입력 기능 (ver2.13)
+// 상벌점 입력 기능 (ver2.14)
 // ══════════════════════════════════════════
 const POINTS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxVT4Z20BvZ9DUwLH79h3_5LhJCazcPOJ3lAWNi1Z_WkwjvOXsomWrs242wpiPUokmbXA/exec';
 let ptsType = null;
@@ -4988,9 +5007,9 @@ const PTS_RULES = {
   ],
 };
 
-// ── 드롭다운 항목 채우기 ──
 function populateDetailSelect(type) {
-  const sel = document.getElementById('ptsDetailSelect');
+  // 공통 사유 드롭박스 (ptsCommonDetailSelect) 채우기
+  const sel = document.getElementById('ptsCommonDetailSelect');
   if (!sel) return;
   sel.innerHTML = '<option value="">— 규정에서 선택 —</option>';
   const rules = type === '상점' ? PTS_RULES.상점
@@ -4999,6 +5018,7 @@ function populateDetailSelect(type) {
   let lastCat = '';
   rules.forEach((r, i) => {
     if (r.cat !== lastCat) {
+      if (lastCat) sel.appendChild(document.createElement('optgroup'));
       const og = document.createElement('optgroup');
       og.label = '── ' + r.cat;
       sel.appendChild(og);
@@ -5009,27 +5029,8 @@ function populateDetailSelect(type) {
     const scoreStr = r.score > 0 ? `+${r.score}점` : `${r.score}점`;
     opt.textContent = `${r.label} (${scoreStr})`;
     opt.dataset.score = r.score;
-    sel.appendChild(opt);
+    sel.lastElementChild.appendChild(opt);
   });
-}
-
-function onDetailSelect() {
-  const sel = document.getElementById('ptsDetailSelect');
-  const opt = sel.options[sel.selectedIndex];
-  if (opt && opt.dataset.score !== undefined) {
-    const absScore = Math.abs(Number(opt.dataset.score));
-    if (absScore > 0) setScore(absScore);
-  }
-}
-
-function toggleCustomDetail() {
-  ptsCustomMode = !ptsCustomMode;
-  const toggle = document.getElementById('ptsCustomToggle');
-  const input  = document.getElementById('ptsCustomDetail');
-  const sel    = document.getElementById('ptsDetailSelect');
-  toggle.classList.toggle('active', ptsCustomMode);
-  input.classList.toggle('show', ptsCustomMode);
-  sel.style.opacity = ptsCustomMode ? '0.4' : '1';
 }
 
 // ── 학생 행 관리 ──
@@ -5041,39 +5042,120 @@ function renderStudentRows() {
   if (!container) return;
   container.innerHTML = '';
   ptsStudentRows.forEach((s, idx) => {
+    const wrap = document.createElement('div');
+    wrap.dataset.idx = idx;
+
+    // 학생 정보 행
     const row = document.createElement('div');
     row.className = 'pts-student-row';
-    row.dataset.idx = idx;
     row.innerHTML = `
-      <select class="points-select" data-field="grade" onchange="onStudentFieldChange(${idx},'grade',this.value)">
+      <select class="points-select" onchange="onStudentFieldChange(${idx},'grade',this.value)">
         <option value="">학년</option>
         <option value="1" ${s.grade==='1'?'selected':''}>1학년</option>
         <option value="2" ${s.grade==='2'?'selected':''}>2학년</option>
         <option value="3" ${s.grade==='3'?'selected':''}>3학년</option>
       </select>
-      <select class="points-select" data-field="room" onchange="onStudentFieldChange(${idx},'room',this.value)">
+      <select class="points-select" onchange="onStudentFieldChange(${idx},'room',this.value)">
         <option value="">반</option>
         ${Array.from({length:10},(_,i)=>`<option value="${i+1}" ${s.room===String(i+1)?'selected':''}>${i+1}반</option>`).join('')}
       </select>
-      <input class="points-input" type="number" min="1" max="40" placeholder="번호"
-        value="${s.num}"
-        oninput="onStudentNumInput(${idx},this.value)"
-        style="text-align:center;">
-      <input class="points-input" type="text" placeholder="이름" value="${s.name}"
-        oninput="onStudentNameInput(${idx},this.value)"
-        data-name-idx="${idx}" readonly style="background:var(--paper-soft);">
-      <button class="pts-remove-btn" onclick="removeStudentRow(${idx})" ${idx===0&&ptsStudentRows.length===1?'style="visibility:hidden;"':''}>×</button>
+      <input class="points-input pts-num-input" type="number" min="1" max="40" placeholder="번호"
+        value="${s.num}" oninput="onStudentNumInput(${idx},this.value)" style="text-align:center;">
+      <input class="points-input pts-name-input ${s.name ? 'pts-name-found' : (s.num ? 'pts-name-notfound' : '')}"
+        type="text" placeholder="이름(자동)" value="${s.name}" readonly
+        id="ptsNameEl_${idx}">
+      <button class="pts-remove-btn" onclick="removeStudentRow(${idx})"
+        ${ptsStudentRows.length===1?'style="visibility:hidden;"':''}>×</button>
     `;
-    container.appendChild(row);
-    // 이름 자동완성 상태 반영
-    const nameEl = row.querySelector(`[data-name-idx="${idx}"]`);
-    if (s.name) {
-      nameEl.classList.add('pts-name-found');
+
+    // 사유 행
+    const detailRow = document.createElement('div');
+    detailRow.className = 'pts-detail-row';
+    const detailRules = buildDetailOptions();
+    detailRow.innerHTML = `
+      <select class="points-select" id="ptsDetailSel_${idx}" onchange="onStudentDetailSelect(${idx},this)">
+        <option value="">— 사유 선택 —</option>
+        ${detailRules}
+      </select>
+      <button class="points-custom-toggle ${s.customMode?'active':''}" onclick="toggleStudentCustom(${idx})">직접입력</button>
+    `;
+    if (s.customMode) {
+      const ta = document.createElement('textarea');
+      ta.className = 'points-textarea points-custom-input show';
+      ta.placeholder = '직접 사유 입력...';
+      ta.value = s.customDetail || '';
+      ta.oninput = () => { ptsStudentRows[idx].customDetail = ta.value; };
+      detailRow.appendChild(ta);
     }
+    // 드롭박스 선택값 복원
+    if (!s.customMode && s.detailIdx !== undefined) {
+      const sel = detailRow.querySelector(`#ptsDetailSel_${idx}`);
+      if (sel) sel.value = s.detailIdx;
+    }
+
+    wrap.appendChild(row);
+    wrap.appendChild(detailRow);
+    container.appendChild(wrap);
   });
-  // 추가 버튼 상태
+
   const addBtn = document.getElementById('ptsAddStudentBtn');
   if (addBtn) addBtn.disabled = ptsStudentRows.length >= PTS_MAX_STUDENTS;
+}
+
+function buildDetailOptions() {
+  const rules = ptsType === '상점' ? PTS_RULES.상점
+              : ptsType === '벌점' ? [...PTS_RULES.벌점, ...PTS_RULES.벌점감점]
+              : [];
+  let html = '';
+  let lastCat = '';
+  rules.forEach((r, i) => {
+    if (r.cat !== lastCat) {
+      if (lastCat) html += '</optgroup>';
+      html += `<optgroup label="── ${r.cat}">`;
+      lastCat = r.cat;
+    }
+    const scoreStr = r.score > 0 ? `+${r.score}점` : `${r.score}점`;
+    html += `<option value="${i}" data-score="${r.score}">${r.label} (${scoreStr})</option>`;
+  });
+  if (lastCat) html += '</optgroup>';
+  return html;
+}
+
+function onStudentDetailSelect(idx, sel) {
+  const opt = sel.options[sel.selectedIndex];
+  ptsStudentRows[idx].detailIdx = sel.value;
+  ptsStudentRows[idx].detail = opt?.text?.replace(/\s*\([+-]?\d+(\.\d+)?점\)$/, '').trim() || '';
+  if (opt?.dataset?.score) {
+    const abs = Math.abs(Number(opt.dataset.score));
+    if (abs > 0) setScore(abs);
+  }
+}
+
+function toggleStudentCustom(idx) {
+  ptsStudentRows[idx].customMode = !ptsStudentRows[idx].customMode;
+  renderStudentRows();
+}
+
+// 첫 번째 학생 사유를 나머지 전체에 동일 적용
+function syncAllDetails() {
+  if (ptsStudentRows.length < 2) { showPointsToast('학생이 2명 이상일 때 사용하세요', 'error'); return; }
+  const src = ptsStudentRows[0];
+  for (let i = 1; i < ptsStudentRows.length; i++) {
+    ptsStudentRows[i].customMode  = src.customMode;
+    ptsStudentRows[i].customDetail = src.customDetail;
+    ptsStudentRows[i].detailIdx   = src.detailIdx;
+    ptsStudentRows[i].detail      = src.detail;
+  }
+  renderStudentRows();
+  showPointsToast('첫 번째 학생 사유를 전체에 적용했습니다', 'success');
+}
+
+// 공통 사유 토글 (기존 호환용 — 현재 UI에선 미사용, 안전하게 유지)
+let ptsCommonCustomMode = false;
+function toggleCommonCustom() {
+  ptsCommonCustomMode = !ptsCommonCustomMode;
+  document.getElementById('ptsCommonCustomToggle')?.classList.toggle('active', ptsCommonCustomMode);
+  document.getElementById('ptsCommonCustomDetail')?.classList.toggle('show', ptsCommonCustomMode);
 }
 
 function onStudentFieldChange(idx, field, value) {
@@ -5099,22 +5181,16 @@ function autoFillName(idx) {
     String(st.room)  === String(s.room)  &&
     String(st.num)   === String(s.num)
   );
-  const container = document.getElementById('ptsStudentRows');
-  if (!container) return;
-  const rows = container.querySelectorAll('.pts-student-row');
-  const nameEl = rows[idx]?.querySelector(`[data-name-idx="${idx}"]`);
+  const nameEl = document.getElementById(`ptsNameEl_${idx}`);
   if (!nameEl) return;
   if (found) {
     ptsStudentRows[idx].name = found.name;
     nameEl.value = found.name;
-    nameEl.classList.add('pts-name-found');
-    nameEl.classList.remove('pts-name-notfound');
-    nameEl.style.background = '';
-  } else if (s.num) {
+    nameEl.className = 'points-input pts-name-input pts-name-found';
+  } else {
     ptsStudentRows[idx].name = '';
     nameEl.value = '';
-    nameEl.classList.remove('pts-name-found');
-    nameEl.classList.add('pts-name-notfound');
+    nameEl.className = 'points-input pts-name-input pts-name-notfound';
   }
 }
 
@@ -5157,6 +5233,9 @@ function selectPointType(type) {
   ptsType = type;
   document.getElementById('ptsMeritBtn').className   = 'points-type-btn' + (type==='상점' ? ' selected-merit' : '');
   document.getElementById('ptsDemeritBtn').className = 'points-type-btn' + (type==='벌점' ? ' selected-demerit' : '');
+  // 유형 바뀌면 학생별 사유 초기화 후 재렌더
+  ptsStudentRows.forEach(s => { s.detailIdx=undefined; s.detail=''; s.customMode=false; s.customDetail=''; });
+  renderStudentRows();
   populateDetailSelect(type);
 }
 
@@ -5208,27 +5287,26 @@ function addToSessionHistory(entries, detail, date, score) {
 async function submitPoints() {
   if (!ptsType) { showPointsToast('유형(상점/벌점)을 선택하세요', 'error'); return; }
 
-  // 사유 결정
-  let detail = '';
-  if (ptsCustomMode) {
-    detail = document.getElementById('ptsCustomDetail').value.trim();
-  } else {
-    const sel = document.getElementById('ptsDetailSelect');
-    const opt = sel.options[sel.selectedIndex];
-    if (opt && opt.value !== '') detail = opt.textContent.replace(/\s*\([+-]?\d+(\.\d+)?점\)$/, '').trim();
-  }
-  if (!detail) { showPointsToast('상세활동내용(사유)을 선택하거나 입력하세요', 'error'); return; }
-
   const date  = document.getElementById('ptsDate').value;
   const score = Number(document.getElementById('ptsScore').value);
   if (!date)      { showPointsToast('일자를 선택하세요', 'error'); return; }
   if (!score || score < 1) { showPointsToast('점수를 입력하세요', 'error'); return; }
 
-  // 학생 유효성 검사
+  // 학생 유효성 검사 + 사유 수집
   const validStudents = ptsStudentRows.filter(s => s.grade && s.room && s.num && s.name);
   if (validStudents.length === 0) { showPointsToast('학생 정보를 하나 이상 입력하세요', 'error'); return; }
   const incomplete = ptsStudentRows.find(s => (s.grade||s.room||s.num||s.name) && !(s.grade&&s.room&&s.num&&s.name));
   if (incomplete) { showPointsToast('입력 중인 학생 정보를 완성하거나 삭제하세요', 'error'); return; }
+
+  // 각 학생별 사유 결정
+  for (const s of validStudents) {
+    if (s.customMode) {
+      s._detail = (s.customDetail || '').trim();
+    } else {
+      s._detail = s.detail || '';
+    }
+    if (!s._detail) { showPointsToast(`${s.name}의 사유를 입력하세요`, 'error'); return; }
+  }
 
   const user = fbAuth.currentUser;
   const teacher = user ? (user.displayName || user.email.split('@')[0]) : '알 수 없음';
@@ -5250,7 +5328,7 @@ async function submitPoints() {
       classNum: s.room,
       studentNum: s.num,
       name: s.name,
-      detail,
+      detail: s._detail,
       date,
       score,
       teacher,
@@ -5280,8 +5358,8 @@ async function submitPoints() {
 
   if (successCount > 0) {
     showPointsToast(`✓ ${successCount}명 저장 완료!`, 'success');
-    addToSessionHistory(savedEntries, detail, date, score);
-    // 초기화 (사유·날짜·점수·유형 유지, 학생 행만 리셋)
+    addToSessionHistory(savedEntries, '(학생별 사유)', date, score);
+    // 초기화
     ptsStudentRows = [{ grade: '', room: '', num:'', name:'' }];
     renderStudentRows();
     document.getElementById('ptsScore').value = '1';
@@ -5290,16 +5368,18 @@ async function submitPoints() {
 }
 
 // window 등록 (module 스코프 → 인라인 onclick 접근용)
-window.selectPointType   = selectPointType;
-window.setScore          = setScore;
-window.submitPoints      = submitPoints;
-window.addStudentRow     = addStudentRow;
-window.removeStudentRow  = removeStudentRow;
+window.selectPointType      = selectPointType;
+window.setScore             = setScore;
+window.submitPoints         = submitPoints;
+window.addStudentRow        = addStudentRow;
+window.removeStudentRow     = removeStudentRow;
 window.onStudentFieldChange = onStudentFieldChange;
 window.onStudentNumInput    = onStudentNumInput;
 window.onStudentNameInput   = onStudentNameInput;
-window.onDetailSelect       = onDetailSelect;
-window.toggleCustomDetail   = toggleCustomDetail;
+window.onStudentDetailSelect = onStudentDetailSelect;
+window.toggleStudentCustom  = toggleStudentCustom;
+window.syncAllDetails       = syncAllDetails;
+window.toggleCommonCustom   = toggleCommonCustom;
 
 </script>
 </body>
