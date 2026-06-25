@@ -1453,7 +1453,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.66</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.67</div>
   </div>
 </div>
 
@@ -1522,7 +1522,7 @@
       <div class="main-nav-item" data-page="schedule">
         <span class="main-nav-icon">📆</span>학사일정
       </div>
-    <div class="nav-version">ver1.66</div>
+    <div class="nav-version">ver1.67</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -3069,7 +3069,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       const _user = fbAuth.currentUser;
       const _name = (_user?.displayName||'').trim().replace(/\s*(선생님|교사|쌤)/,'');
       const _teacher = TEACHERS.find(t => t.name === _name);
-      if(_teacher && !selectedKey) select(_teacher);
+      if(_teacher) select(_teacher);
     } else if(page === 'weekly'){
       homePage.classList.remove('active');
       timetablePage.classList.remove('active');
