@@ -724,6 +724,25 @@ stFileInput.addEventListener('change', () => {
   if (stFileInput.files[0]) processStudentFile(stFileInput.files[0]);
 });
 
+// 엑셀 날짜 숫자 → YYYY-MM-DD 변환
+function excelDateToStr(val) {
+  if (!val) return '';
+  const str = String(val).trim();
+  // 이미 날짜 형식이면 그대로
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  if (/^\d{4}\.\d{2}\.\d{2}$/.test(str)) return str.replace(/\./g, '-');
+  // 엑셀 시리얼 숫자 변환 (1900년 기준)
+  const num = parseInt(str);
+  if (!isNaN(num) && num > 1000) {
+    const date = new Date((num - 25569) * 86400 * 1000);
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth()+1).padStart(2,'0');
+    const d = String(date.getUTCDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+  return str;
+}
+
 async function processStudentFile(file) {
   setStatus('stStatus', '📂 파일 읽는 중...', 'loading');
   try {
@@ -739,7 +758,7 @@ async function processStudentFile(file) {
         room:        String(r[1]||'').trim(),
         num:         String(r[2]||'').trim(),
         name:        String(r[3]||'').trim(),
-        birth:       String(r[4]||'').trim(),
+        birth:       excelDateToStr(r[4]),
         phone:       String(r[5]||'').trim(),
         fatherPhone: String(r[6]||'').trim(),
         motherPhone: String(r[7]||'').trim(),
