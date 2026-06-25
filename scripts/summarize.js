@@ -38,7 +38,7 @@ async function summarizeWeekly() {
   console.log('🤖 Gemini 요약 중...');
   const prompt = `다음은 영남고등학교 이번 주 주간교육활동 내용입니다. 담당 교사가 한눈에 파악할 수 있도록 핵심 일정과 업무를 3~5줄로 간결하게 요약해주세요. 날짜와 대상 학년을 포함하고, 불필요한 반복이나 형식적인 말은 빼고 핵심만 써주세요.\n\n${text}`;
 
-  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
+  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
   const GEMINI_BODY = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: { maxOutputTokens: 400, temperature: 0.3 }
