@@ -49,38 +49,58 @@ async function fetchSchedule() {
       const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
       if (!month) continue;
 
-      const events = [];
-      for (const row of rows) {
-        // 날짜(숫자), 요일, 내용 파싱
-        // 시트마다 형식이 다를 수 있으니 숫자로 된 날짜 열을 찾음
-        let date = null, day = '', content = '';
+      // 현재 파싱 중인 월 (헤더 감지 시 변경될 수 있음)
+      let curMonth = month;
+      const eventsByMonth = {}; // { month: [events] }
 
-        for (let ci = 0; ci < row.length; ci++) {
-          const cell = String(row[ci] || '').trim();
-          // 날짜: 1~31 사이 숫자
-          if (!date && /^\d{1,2}$/.test(cell) && parseInt(cell) >= 1 && parseInt(cell) <= 31) {
-            date = parseInt(cell);
-          }
-          // 요일
-          else if (!day && /^[월화수목금토일]$/.test(cell)) {
-            day = cell;
-          }
-          // 내용: 날짜와 요일이 확인된 후 첫 번째 긴 텍스트
-          else if (date && day && !content && cell.length >= 2 && !/^[①②③ㆍ\d]/.test(cell)) {
-            // 사람 이름(2~4글자 한글 이름) 제외
-            const isName = /^[가-힣]{2,4}$/.test(cell);
-            if (!isName) content = cell;
-          }
+      for (const row of rows) {
+        const cellD = String(row[3] || '').trim();
+
+        // D열에 'X월 교육활동 내용' 헤더가 나오면 파싱 월 변경
+        const headerMatch = cellD.match(/^(\d+)월\s*교육활동/);
+        if (headerMatch) {
+          curMonth = parseInt(headerMatch[1]);
+          continue;
         }
 
-        if (date && content) {
-          events.push({ date, day, content });
+        // B열(1): 날짜
+        const cellB = String(row[1] || '').trim();
+        let date = null;
+        if (/^\d{1,2}$/.test(cellB) && parseInt(cellB) >= 1 && parseInt(cellB) <= 31) {
+          date = parseInt(cellB);
+        }
+        // C열(2): 요일
+        const cellC = String(row[2] || '').trim();
+        const day = /^[월화수목금토일]$/.test(cellC) ? cellC : '';
+
+        // D열(3): 교육활동 내용 (이름 패턴 제외)
+        let evContent = '';
+        if (cellD.length >= 2 && !/^[①②③ㆍ]/.test(cellD) && !/^[가-힣]{2,4}$/.test(cellD)) {
+          evContent = cellD;
+        }
+
+        if (date && evContent) {
+          const lastDay = new Date(year, curMonth, 0).getDate();
+          if (date <= lastDay) {
+            const key = curMonth;
+            if (!eventsByMonth[key]) eventsByMonth[key] = [];
+            eventsByMonth[key].push({ date, day, content: evContent });
+          }
         }
       }
 
-      if (events.length > 0) {
-        result[`${year}-${String(month).padStart(2,'0')}`] = events;
-        console.log(`  → ${sheetName}: ${events.length}개 일정`);
+      // 각 월별로 result에 저장
+      for (const [m, evs] of Object.entries(eventsByMonth)) {
+        if (evs.length > 0) {
+          const key = `${year}-${String(m).padStart(2,'0')}`;
+          if (!result[key]) result[key] = [];
+          // 중복 제거 후 병합
+          const existing = new Set(result[key].map(e => e.date + '-' + e.content));
+          evs.forEach(e => {
+            if (!existing.has(e.date + '-' + e.content)) result[key].push(e);
+          });
+          console.log(`  → ${sheetName} → ${key}: ${evs.length}개 일정`);
+        }
       }
     } catch(e) {
       console.warn(`  ⚠️  ${sheetName} 읽기 실패:`, e.message);
