@@ -1344,6 +1344,7 @@
     background:var(--paper);border-radius:12px;
     box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
     overflow:hidden;
+    flex-shrink:0;
   }
   .home-section-header{
     display:flex;align-items:center;justify-content:space-between;
@@ -1361,6 +1362,7 @@
     display:flex;gap:6px;padding:10px 12px;
     overflow-x:auto;scrollbar-width:none;
     -webkit-overflow-scrolling:touch;
+    min-height:90px;flex-shrink:0;
   }
   .home-my-tt::-webkit-scrollbar{display:none;}
   .home-tt-cell{
@@ -1377,6 +1379,9 @@
     background:var(--mon);padding:4px 4px;
     font-family:'IBM Plex Mono';font-size:11px;color:#fff;font-weight:700;
   }
+  #homeClassTt .home-tt-period-bar{background:var(--wed);}
+  #homeClassTt .home-tt-cell.now{border-color:#E8A93A;}
+  #homeClassTt .home-tt-cell.now .home-tt-period-bar{background:#E8A93A;}
   .home-tt-body{
     padding:6px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;
     flex:1;justify-content:center;
@@ -1436,7 +1441,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.65</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.66</div>
   </div>
 </div>
 
@@ -1453,10 +1458,10 @@
 
   <!-- 모바일 탭바 (사이드바가 접힌 상태에서 표시) -->
   <div class="mobile-tab-bar" id="mobileTabBar">
-    <div class="tab-item" data-page="home">
+    <div class="tab-item active" data-page="home">
       <span class="tab-item-icon">🏠</span>현황판
     </div>
-    <div class="tab-item active" data-page="timetable">
+    <div class="tab-item" data-page="timetable">
       <span class="tab-item-icon">📅</span>시간표
     </div>
     <div class="tab-item" data-page="weekly">
@@ -1484,10 +1489,10 @@
 
     <!-- 메인 내비게이션 사이드바 -->
     <nav class="main-nav" id="mainNav">
-      <div class="main-nav-item" data-page="home">
+      <div class="main-nav-item active" data-page="home">
         <span class="main-nav-icon">🏠</span>현황판
       </div>
-      <div class="main-nav-item active" data-page="timetable">
+      <div class="main-nav-item" data-page="timetable">
         <span class="main-nav-icon">📅</span>시간표
       </div>
       <div class="main-nav-item" data-page="weekly">
@@ -1505,14 +1510,14 @@
       <div class="main-nav-item" data-page="schedule">
         <span class="main-nav-icon">📆</span>학사일정
       </div>
-    <div class="nav-version">ver1.65</div>
+    <div class="nav-version">ver1.66</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
     <div class="app-content">
 
       <!-- 홈 현황판 페이지 -->
-      <div class="page-view" id="homePage">
+      <div class="page-view active" id="homePage">
         <div class="home-body" id="homeBody">
           <div class="home-loading" id="homeLoading">불러오는 중...</div>
 
@@ -1564,7 +1569,7 @@
       </div>
 
       <!-- 시간표 페이지 -->
-      <div class="page-view active" id="timetablePage">
+      <div class="page-view" id="timetablePage">
         <div class="wrap">
 
   <div class="masthead">
@@ -2772,9 +2777,10 @@ function initAppUI(){
   refreshGradeDropdown();
   renderSubjectSelectors();
   refreshLists();
-  // 마지막으로 보던 화면 복원, 없으면 본인 시간표 자동 로드
-  const restored = restoreLastView();
-  if(!restored) autoLoadMyTimetable();
+  // 홈 현황판 초기화
+  initHomePage();
+  // 마지막으로 보던 화면 복원 (시간표 데이터 미리 준비)
+  restoreLastView();
 }
 
 function autoLoadMyTimetable(){
@@ -3044,6 +3050,11 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       contactsPage.classList.remove('active');
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
+      // 시간표 탭 클릭 시 본인 시간표 자동 로드
+      const _user = fbAuth.currentUser;
+      const _name = (_user?.displayName||'').trim().replace(/\s*(선생님|교사|쌤)/,'');
+      const _teacher = TEACHERS.find(t => t.name === _name);
+      if(_teacher && !selectedKey) select(_teacher);
     } else if(page === 'weekly'){
       homePage.classList.remove('active');
       timetablePage.classList.remove('active');
