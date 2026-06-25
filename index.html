@@ -515,8 +515,8 @@
   }
 
   .gt-corner{
-    background:var(--paper);
-    border:1px dashed var(--rule);
+    background:var(--paper-soft);
+    border:1px solid var(--rule);
     border-radius:8px;
     display:flex;align-items:center;
     padding:4px clamp(2px,2cqw,10px);
@@ -552,12 +552,14 @@
     display:flex;align-items:center;justify-content:center;
     font-family:'IBM Plex Mono';font-weight:700;font-size:var(--gt-font-pnum);color:var(--ink-soft);
     min-height:var(--gt-row-h);
+    border:1px solid var(--rule);
   }
   .gt-lunch-label{
     background:var(--paper-soft);border-radius:8px;
     display:flex;align-items:center;justify-content:center;
     font-family:'Noto Sans KR';font-style:italic;font-weight:600;font-size:var(--gt-font-lunch);color:var(--ink-soft);
     min-height:var(--gt-lunch-h);
+    border:none;
   }
 
   .gt-cell{
@@ -565,7 +567,7 @@
     min-height:var(--gt-row-h);
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     padding:4px 2px;text-align:center;
-    border:1.5px solid transparent;
+    border:1px solid var(--rule);
   }
   .gt-cell.today{background:var(--today-tint);}
   .gt-cell.now{
@@ -573,7 +575,7 @@
     border-color:#E8A93A;
     box-shadow:0 0 0 3px rgba(232,169,58,0.18);
   }
-  .gt-lunch-cell{background:#fff;border-radius:8px;min-height:var(--gt-lunch-h);}
+  .gt-lunch-cell{background:#fff;border-radius:8px;min-height:var(--gt-lunch-h);border:none;}
   .gt-lunch-cell.today{background:var(--today-tint);}
   .gt-lunch-cell.now{background:#FFF8E3;border:1.5px solid #E8A93A;}
 
@@ -1016,10 +1018,10 @@
   .contact-dept{font-size:11.5px;color:var(--ink-soft);margin-top:1px;}
   .contact-actions{display:flex;gap:8px;flex-shrink:0;}
   .contact-btn{
-    font-family:'IBM Plex Mono';font-size:11.5px;font-weight:600;
-    padding:5px 10px;border-radius:7px;border:1.5px solid var(--rule);
+    font-family:'IBM Plex Mono';font-size:14px;font-weight:600;
+    padding:4px 7px;border-radius:7px;border:1.5px solid var(--rule);
     background:var(--paper-soft);color:var(--ink-soft);
-    cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:4px;
+    cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:2px;
     white-space:nowrap;
   }
   .contact-btn:hover{background:var(--rule);color:var(--ink);}
@@ -1476,7 +1478,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.75</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.77</div>
   </div>
 </div>
 
@@ -1545,7 +1547,7 @@
       <div class="main-nav-item" data-page="schedule">
         <span class="main-nav-icon">📆</span>학사일정
       </div>
-    <div class="nav-version">ver1.75</div>
+    <div class="nav-version">ver1.77</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -3808,6 +3810,7 @@ function renderContacts(contacts) {
         <div class="contact-info" data-idx="${idx}" style="cursor:pointer;">
           <div class="contact-name">${c.name}${c.role ? ' <span style="font-size:11px;font-weight:400;color:var(--ink-soft);">'+c.role+'</span>' : ''}</div>
           <div class="contact-dept">${c.dept||''}${c.subject ? ' · '+c.subject : ''}</div>
+          ${c.phone ? `<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;font-family:'IBM Plex Mono';">${c.phone}</div>` : ''}
         </div>
         <div class="contact-actions">${phoneBtn}${extBtn}</div>
       </div>`;
