@@ -978,8 +978,9 @@
      비상연락망 페이지
   ══════════════════════════════════════════ */
   .contacts-body{
-    flex:1;overflow-y:auto;padding:10px 12px 16px;
+    flex:1;overflow-y:auto;padding:10px 12px 80px;
     background:var(--bg-base);display:flex;flex-direction:column;gap:8px;
+    -webkit-overflow-scrolling:touch;
   }
   .contacts-search-bar{
     flex-shrink:0;padding:2px 0 4px;
@@ -1122,7 +1123,7 @@
     background:var(--paper);color:var(--ink);outline:none;
   }
   .students-search-input:focus{border-color:var(--mon);}
-  .students-list{display:flex;flex-direction:column;gap:6px;}
+  .students-list{display:flex;flex-direction:column;gap:6px;padding-bottom:20px;}
   .student-card{
     background:var(--paper);border-radius:10px;
     padding:12px 16px;
@@ -1256,19 +1257,19 @@
   .sc-cal-cell.has-event{cursor:pointer;}
   .sc-cal-cell.has-event:hover{background:var(--paper-soft);}
   .sc-cal-date{
-    font-family:'IBM Plex Mono';font-size:11px;font-weight:600;
+    font-family:'IBM Plex Mono';font-size:10px;font-weight:600;
     color:var(--ink-soft);line-height:1;
   }
   .sc-cal-cell.today .sc-cal-date{
     background:var(--mon);color:#fff;
-    width:20px;height:20px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;font-size:10px;
+    width:18px;height:18px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:9px;
   }
   .sc-cal-cell.sunday .sc-cal-date{color:#C0392B;}
   .sc-cal-cell.saturday .sc-cal-date{color:#2980B9;}
   .sc-cal-event-dot{
-    font-size:9px;line-height:1.4;color:var(--mon);font-weight:600;
-    word-break:keep-all;overflow:hidden;
+    font-size:8px;line-height:1.3;color:var(--mon);font-weight:600;
+    word-break:break-all;overflow:hidden;
     display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
   }
 
@@ -1331,7 +1332,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.55</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver1.58</div>
   </div>
 </div>
 
@@ -1394,7 +1395,7 @@
       <div class="main-nav-item" data-page="schedule">
         <span class="main-nav-icon">📆</span>학사일정
       </div>
-    <div class="nav-version">ver1.55</div>
+    <div class="nav-version">ver1.58</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -2128,9 +2129,9 @@ function applyRestoredView(data){
 function restoreLastView(){
   if(typeof Neutralino !== 'undefined'){
     Neutralino.storage.getData(LAST_VIEW_KEY)
-      .then(raw=> applyRestoredView(JSON.parse(raw)))
-      .catch(()=>{}); // 저장된 값이 없으면 그냥 기본 화면 유지
-    return;
+      .then(raw=> { if(!applyRestoredView(JSON.parse(raw))) autoLoadMyTimetable(); })
+      .catch(()=>{ autoLoadMyTimetable(); });
+    return true; // Neutralino는 비동기라 true 반환 (autoLoad는 콜백에서 처리)
   }
   try{
     const raw = localStorage.getItem(LAST_VIEW_KEY);
@@ -2598,7 +2599,25 @@ function initAppUI(){
   refreshGradeDropdown();
   renderSubjectSelectors();
   refreshLists();
-  restoreLastView();
+  // 마지막으로 보던 화면 복원, 없으면 본인 시간표 자동 로드
+  const restored = restoreLastView();
+  if(!restored) autoLoadMyTimetable();
+}
+
+function autoLoadMyTimetable(){
+  const user = fbAuth.currentUser;
+  if(!user || !TEACHERS.length) return;
+  // 구글 계정 표시 이름에서 이름 추출 (예: "김경규" 또는 "김경규 선생님")
+  const displayName = (user.displayName || '').trim().replace(/\s*(선생님|교사|쌤)/, '');
+  if(!displayName) return;
+  const teacher = TEACHERS.find(t => t.name === displayName);
+  if(teacher) {
+    mode = 'teacher';
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.mode==='teacher'));
+    teacherSearchBox.style.display = '';
+    classSelectBox.style.display = 'none';
+    select(teacher);
+  }
 }
 
 // PWA: http/https로 서빙될 때만 서비스워커 등록 (file://, Electron 환경에서는 그냥 건너뜀)
