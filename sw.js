@@ -1,7 +1,6 @@
-const CACHE_NAME = 'ynhs-v2';
+const CACHE_NAME = 'ynhs-v199';
 
 self.addEventListener('install', e => {
-  // 기본 캐시 없이 바로 활성화
   self.skipWaiting();
 });
 
