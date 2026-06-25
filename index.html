@@ -13,32 +13,33 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="영남고등학교">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700;900&family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+  @import url('https://cdn.jsdelivr.net/npm/pretendard@latest/dist/web/static/pretendard.css');
 
   :root{
-    --bg-base:#1F3D33;
-    --bg-base-soft:#274A3E;
-    --paper:#FBF6EC;
-    --paper-soft:#F2ECDD;
-    --ink:#232A22;
-    --ink-soft:#6B7468;
-    --rule:#D9D0BB;
+    --bg-base:#0F172A;
+    --bg-base-soft:#1E293B;
+    --paper:#FFFFFF;
+    --paper-soft:#F8FAFC;
+    --ink:#0F172A;
+    --ink-soft:#64748B;
+    --rule:#E2E8F0;
 
-    --mon:#8C2F39;
-    --tue:#B08D57;
-    --wed:#2F5D62;
-    --thu:#3B5170;
-    --fri:#6B7A3A;
+    --mon:#3B82F6;
+    --tue:#8B5CF6;
+    --wed:#10B981;
+    --thu:#F59E0B;
+    --fri:#EF4444;
 
-    --gold:#B08D57;
-    --today-tint:#F3E6C5;
+    --gold:#F59E0B;
+    --today-tint:#EFF6FF;
   }
 
   /* ══════════════════════════════════════════
      앱 셸 레이아웃
   ══════════════════════════════════════════ */
   html, body{height:100%;overflow:hidden;margin:0;padding:0;}
-  body{background:var(--bg-base);font-family:'Noto Sans KR',sans-serif;color:var(--ink);}
+  body{background:var(--bg-base);font-family:'Pretendard','Noto Sans KR',sans-serif;color:var(--ink);}
 
   .app-shell{display:flex;flex-direction:column;height:100vh;overflow:hidden;}
 
@@ -47,19 +48,15 @@
     flex-shrink:0;display:flex;align-items:center;gap:14px;
     height:clamp(48px, 10vh, 160px);
     padding:0 22px;
-    background:var(--paper);
-    border-bottom:1px solid var(--rule);
+    background:var(--bg-base-soft);
+    border-bottom:1px solid rgba(255,255,255,0.08);
     z-index:100;position:relative;overflow:hidden;
     transition:height 0.25s ease;
-    background-image:
-      radial-gradient(circle at 20% 50%, rgba(255,255,255,0.04), transparent 50%),
-      radial-gradient(circle at 80% 30%, rgba(255,255,255,0.03), transparent 45%);
   }
   .app-header-title{
-    font-family:'Noto Serif KR';font-weight:900;
+    font-family:'Pretendard','Noto Sans KR';font-weight:900;
     font-size:clamp(15px, 3vh, 24px);
-    color:var(--ink);flex:1;
-    text-shadow:0 2px 8px rgba(0,0,0,0.3);
+    color:#F1F5F9;flex:1;
     letter-spacing:-0.02em;
   }
   .hamburger-btn{
@@ -72,15 +69,15 @@
   .hamburger-btn:hover{background:var(--paper-soft);}
   .hamburger-btn span{
     display:block;width:20px;height:2px;
-    background:var(--ink);border-radius:2px;
+    background:#F1F5F9;border-radius:2px;
     transition:transform .2s ease, opacity .2s ease;
   }
   .hamburger-btn.open span:nth-child(1){transform:translateY(7px) rotate(45deg);}
   .hamburger-btn.open span:nth-child(2){opacity:0;}
   .hamburger-btn.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg);}
   .app-logout-btn{
-    border:1px solid var(--rule);background:var(--paper-soft);
-    font-family:'Noto Sans KR';font-size:11.5px;font-weight:700;color:var(--ink-soft);
+    border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);
+    font-family:'Pretendard','Noto Sans KR';font-size:11.5px;font-weight:700;color:#94A3B8;
     padding:6px 12px;border-radius:6px;cursor:pointer;flex-shrink:0;
     align-self:center;
   }
@@ -92,10 +89,10 @@
   /* 메인 네비게이션 사이드바 */
   /* 메인 네비게이션: 기본적으로 고정(overlay) 방식 → JS가 .desktop 클래스 추가 시 인라인으로 전환 */
   .main-nav{
-    flex-shrink:0;width:240px;
-    background:var(--paper);
+    flex-shrink:0;width:220px;
+    background:var(--bg-base-soft);
     overflow-y:auto;
-    border-right:1px solid var(--rule);
+    border-right:1px solid rgba(255,255,255,0.06);
     padding:12px;
     display:flex;flex-direction:column;
     transition:transform .25s ease;
@@ -117,11 +114,11 @@
     display:flex;align-items:center;gap:10px;
     padding:14px 16px;border-radius:10px;cursor:pointer;
     font-family:'Noto Sans KR';font-size:14.5px;font-weight:700;
-    color:var(--ink-soft);
+    color:#64748B;
     transition:background .12s ease, color .12s ease;
   }
-  .main-nav-item:hover{background:var(--paper-soft);color:var(--ink);}
-  .main-nav-item.active{background:var(--mon);color:#fff;}
+  .main-nav-item:hover{background:rgba(255,255,255,0.06);color:#E2E8F0;}
+  .main-nav-item.active{background:var(--mon);color:#fff;border-radius:8px;}
   .main-nav-icon{font-size:17px;}
 
   /* 모바일: 오버레이 배경 */
@@ -139,8 +136,8 @@
   .mobile-tab-bar{
     display:none;
     flex-direction:row;
-    background:var(--paper);
-    border-bottom:1px solid var(--rule);
+    background:var(--bg-base-soft);
+    border-bottom:1px solid rgba(255,255,255,0.06);
     overflow-x:auto;
     scrollbar-width:none;
     -webkit-overflow-scrolling:touch;
@@ -151,7 +148,7 @@
     display:flex;flex-direction:column;align-items:center;
     padding:6px 16px;cursor:pointer;
     font-family:'Noto Sans KR';font-size:10px;font-weight:700;
-    color:var(--ink-soft);gap:2px;border-bottom:2.5px solid transparent;
+    color:#475569;gap:2px;border-bottom:2.5px solid transparent;
     white-space:nowrap;
   }
   .mobile-tab-bar .tab-item.active{color:var(--mon);border-bottom-color:var(--mon);}
@@ -166,7 +163,7 @@
   .nav-version{
     margin-top:auto;padding:12px 16px 4px;
     font-family:'IBM Plex Mono';font-size:10px;
-    color:var(--ink-soft);opacity:0.45;
+    color:#334155;opacity:0.8;
     text-align:center;
   }
 
@@ -215,7 +212,7 @@
     color:#FBF6EC !important;
     background:#1F3D33 !important;
     font-size:16px !important;
-    font-family:'Noto Serif KR' !important;font-weight:700 !important;
+    font-family:'Pretendard','Noto Sans KR' !important;font-weight:700 !important;
     display:flex !important;align-items:center !important;gap:12px !important;
     margin:-24px -28px 20px !important;
     padding:12px 14px !important;
@@ -265,7 +262,7 @@
   .weekly-dept-header{
     display:flex;align-items:center;justify-content:space-between;
     padding:12px 16px;cursor:pointer;
-    font-family:'Noto Serif KR';font-weight:700;font-size:13.5px;color:var(--ink);
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:13.5px;color:var(--ink);
     background:var(--paper-soft);
     border-bottom:1px solid var(--rule);
   }
@@ -290,7 +287,7 @@
   }
   .weekly-html-content h1,.weekly-html-content h2,.weekly-html-content h3,
   .weekly-html-content h4{
-    font-family:'Noto Serif KR';color:var(--ink);margin:24px 0 10px;
+    font-family:'Pretendard','Noto Sans KR';color:var(--ink);margin:24px 0 10px;
     font-weight:700;padding-bottom:8px;border-bottom:1px solid var(--rule);
   }
   .weekly-html-content h1{font-size:20px;}
@@ -336,7 +333,7 @@
     background:var(--paper);
     border-radius:4px;
     padding:26px 30px 22px;
-    box-shadow:0 18px 40px -18px rgba(0,0,0,0.55);
+    box-shadow:0 1px 3px rgba(0,0,0,0.08),0 4px 16px rgba(0,0,0,0.04);
   }
   .masthead::before, .masthead::after{
     content:"";
@@ -365,11 +362,11 @@
     letter-spacing:0.04em;
     color:var(--ink-soft);
     font-weight:700;
-    font-family:'Noto Serif KR',serif;
+    font-family:'Pretendard','Noto Sans KR',serif;
     margin:4px 0 12px;
   }
   h1{
-    font-family:'Noto Serif KR', serif;
+    font-family:'Pretendard','Noto Sans KR', serif;
     font-weight:900;
     font-size:clamp(24px,4vw,32px);
     margin:4px 0 12px;
@@ -460,7 +457,7 @@
     margin-bottom:var(--info-row-margin-bottom);
   }
   .info-name{
-    font-family:'Noto Serif KR';font-weight:900;font-size:var(--info-name-font);
+    font-family:'Pretendard','Noto Sans KR';font-weight:900;font-size:var(--info-name-font);
   }
   .chip{
     font-family:'IBM Plex Mono';font-size:var(--chip-font);font-weight:600;
@@ -523,13 +520,13 @@
     border-radius:8px;
     display:flex;align-items:center;
     padding:4px clamp(2px,2cqw,10px);
-    font-family:'Noto Serif KR';font-weight:700;font-size:var(--gt-font-corner);color:var(--ink);
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:var(--gt-font-corner);color:var(--ink);
     line-height:1.2;white-space:normal;word-break:keep-all;
     min-height:var(--gt-head-h);
   }
   .gt-head{
     border-radius:8px;
-    color:#fff;font-family:'Noto Serif KR';font-weight:700;font-size:var(--gt-font-head);
+    color:#fff;font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:var(--gt-font-head);
     display:flex;align-items:center;justify-content:center;
     min-height:var(--gt-head-h);position:relative;
   }
@@ -602,7 +599,7 @@
 
   .auth-gate{
     display:none;position:fixed;inset:0;z-index:500;
-    background:var(--bg-base);
+    background:#0F172A;
     align-items:center;justify-content:center;
   }
   .auth-gate.open{display:flex;}
@@ -612,7 +609,7 @@
     padding:36px 30px;text-align:center;
     box-shadow:0 30px 60px -20px rgba(0,0,0,0.5);
   }
-  .auth-box h2{font-family:'Noto Serif KR';font-weight:900;font-size:20px;margin:0 0 8px;color:var(--ink);display:flex;align-items:center;justify-content:center;gap:10px;}
+  .auth-box h2{font-family:'Pretendard','Noto Sans KR';font-weight:900;font-size:20px;margin:0 0 8px;color:var(--ink);display:flex;align-items:center;justify-content:center;gap:10px;}
   .auth-box p{font-family:'Noto Sans KR';font-size:13.5px;color:var(--ink-soft);margin:0 0 22px;line-height:1.6;}
   .google-login-btn{
     display:inline-flex;align-items:center;gap:10px;
@@ -663,7 +660,7 @@
   }
   .popup-tab-btn.active{background:var(--mon);border-color:var(--mon);color:#fff;}
   .dept-divider{height:1px;background:var(--rule);margin:8px 4px;}
-  .modal-title{font-family:'Noto Serif KR';font-weight:700;font-size:17px;color:var(--ink);margin-bottom:4px;}
+  .modal-title{font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:17px;color:var(--ink);margin-bottom:4px;}
   .modal-sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:14px;line-height:1.5;}
   .swap-list{display:flex;flex-direction:column;gap:8px;}
   .swap-cand{
@@ -693,7 +690,7 @@
   .swap-preview-grids{display:flex;flex-direction:column;gap:18px;}
   .preview-col{width:100%;}
   .preview-col-single{max-width:600px;margin:0 auto;}
-  .preview-col-title{font-family:'Noto Serif KR';font-weight:700;font-size:17px;margin-bottom:8px;color:var(--ink);}
+  .preview-col-title{font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:17px;margin-bottom:8px;color:var(--ink);}
   .preview-ext{font-family:'IBM Plex Mono';font-size:13px;font-weight:700;color:var(--wed);margin-left:4px;}
   .gt-cell.preview-out{background:#FBEDE9;border-color:#C9544A;}
   .gt-cell.preview-in{background:#EAF5E8;border-color:#4C9A52;box-shadow:0 0 0 2px rgba(76,154,82,0.18);}
@@ -726,7 +723,7 @@
   .main{min-width:0;}
 
   .sidebar-title{
-    font-family:'Noto Serif KR';font-weight:700;font-size:12.5px;
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:12.5px;
     color:var(--ink-soft);padding:6px 10px 10px;
   }
   .list-item{
@@ -896,7 +893,7 @@
   .meal-nav-btn:hover{background:var(--paper-soft);}
   .meal-nav-btn:active{background:var(--rule);}
   .meal-week-label{
-    font-family:'Noto Serif KR';font-weight:700;font-size:15px;color:var(--paper);
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:15px;color:var(--paper);
     min-width:100px;text-align:center;
   }
   /* 데스크톱: 5열 그리드 */
@@ -938,7 +935,7 @@
     box-shadow:0 0 0 2.5px var(--wed), 0 4px 16px -8px rgba(0,0,0,0.35);
   }
   .meal-card-day{
-    font-family:'Noto Serif KR';font-weight:700;font-size:14px;
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;
     color:#fff;background:var(--mon);
     padding:10px 16px;
     display:flex;align-items:baseline;gap:6px;
@@ -995,7 +992,7 @@
     display:flex;flex-direction:column;gap:6px;
   }
   .contacts-dept-label{
-    font-family:'Noto Serif KR';font-weight:700;font-size:12px;
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:12px;
     color:var(--paper);opacity:0.6;
     padding:10px 4px 4px;letter-spacing:0.04em;
   }
@@ -1009,12 +1006,12 @@
   .contact-avatar{
     flex-shrink:0;width:38px;height:38px;border-radius:50%;
     background:var(--mon);color:#fff;
-    font-family:'Noto Serif KR';font-weight:700;font-size:15px;
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:15px;
     display:flex;align-items:center;justify-content:center;
   }
   .contact-info{flex:1;min-width:0;}
   .contact-name{
-    font-family:'Noto Serif KR';font-weight:700;font-size:14px;color:var(--ink);
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;color:var(--ink);
   }
   .contact-dept{font-size:11.5px;color:var(--ink-soft);margin-top:1px;}
   .contact-actions{display:flex;gap:8px;flex-shrink:0;}
@@ -1060,10 +1057,10 @@
   .cd-avatar{
     width:44px;height:44px;border-radius:50%;
     background:rgba(255,255,255,0.25);
-    font-family:'Noto Serif KR';font-weight:700;font-size:20px;
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:20px;
     display:flex;align-items:center;justify-content:center;flex-shrink:0;
   }
-  .cd-name{font-family:'Noto Serif KR';font-weight:700;font-size:18px;}
+  .cd-name{font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:18px;}
   .cd-dept{font-size:12px;opacity:0.8;margin-top:2px;}
   .cd-close{
     position:absolute;top:12px;right:14px;
@@ -1138,7 +1135,7 @@
     color:var(--ink-soft);text-align:center;line-height:1.3;
   }
   .student-info{flex:1;min-width:0;}
-  .student-name{font-family:'Noto Serif KR';font-weight:700;font-size:14px;color:var(--ink);}
+  .student-name{font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;color:var(--ink);}
   .student-meta{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
   .student-actions{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;}
 
@@ -1164,7 +1161,7 @@
   @media(max-width:640px){ .sg-group-grid{grid-template-columns:repeat(3,1fr);} }
   @media(max-width:480px){ .sg-group-grid{grid-template-columns:repeat(2,1fr);} }
   .sg-section-label{
-    font-family:'Noto Serif KR';font-weight:700;font-size:12px;
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:12px;
     color:var(--paper);opacity:0.55;padding:12px 4px 6px;letter-spacing:0.05em;
   }
   .sg-section-label:first-child{padding-top:4px;}
@@ -1196,14 +1193,14 @@
     padding:6px 12px;border-radius:8px;cursor:pointer;
   }
   .sg-back-btn:hover{background:var(--paper-soft);}
-  .sg-current-label{font-family:'Noto Serif KR';font-weight:700;font-size:14px;color:var(--paper);}
+  .sg-current-label{font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;color:var(--paper);}
   .sg-homeroom-card{
     background:var(--mon);border-radius:10px;
     padding:10px 16px;display:flex;align-items:center;gap:10px;
     margin-bottom:4px;
   }
   .sg-homeroom-label{font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);font-family:'IBM Plex Mono';}
-  .sg-homeroom-name{font-family:'Noto Serif KR';font-weight:700;font-size:14px;color:#fff;flex:1;}
+  .sg-homeroom-name{font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;color:#fff;flex:1;}
   .sg-homeroom-ext{font-family:'IBM Plex Mono';font-size:12px;color:rgba(255,255,255,0.8);}
 
   /* ══════════════════════════════════════════
@@ -1365,7 +1362,7 @@
   }
   .home-section-header:hover{background:var(--paper-soft);}
   .home-section-title{
-    font-family:'Noto Serif KR';font-weight:700;font-size:14px;color:var(--ink);
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;color:var(--ink);
   }
   .home-section-arrow{font-size:18px;color:var(--rule);}
 
@@ -1768,10 +1765,7 @@ const ALLOWED_EMAIL_DOMAIN = '@yeungnam.hs.kr';
 
 const fbApp = initializeApp(firebaseConfig);
 
-// iOS redirect 로그인 결과 처리 (에러 완전 무시)
-try {
-  getRedirectResult(getAuth(fbApp)).catch(()=>{});
-} catch(e) {}
+// redirect 방식 미사용
 const fbAuth = getAuth(fbApp);
 const fbDb = getFirestore(fbApp);
 const TEACHERS = [];
@@ -2867,12 +2861,8 @@ googleLoginBtn.addEventListener('click', async () => {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ hd: 'yeungnam.hs.kr' });
     // iOS Safari는 팝업 차단 → redirect 방식 사용
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    if (isIOS) {
-      await signInWithRedirect(fbAuth, provider);
-    } else {
-      await signInWithPopup(fbAuth, provider);
-    }
+    // 모든 기기에서 팝업 방식 사용 (iOS 포함)
+    await signInWithPopup(fbAuth, provider);
     // 이후 흐름은 onAuthStateChanged에서 처리됨
   }catch(e){
     setAuthStatus('로그인 실패: ' + e.message, true);
