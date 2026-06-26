@@ -372,7 +372,205 @@
   .points-history-score.demerit{color:#EF4444;}
   .points-history-empty{padding:24px;text-align:center;color:var(--ink-soft);font-size:16px;}
 
-  /* ── 상벌점 모바일 반응형 ── */
+  /* ══════════════════════════════════════════
+     업무 캘린더
+  ══════════════════════════════════════════ */
+  .mytask-body{
+    flex:1;overflow-y:auto;padding:16px;
+    background:var(--bg-base);
+    display:flex;flex-direction:column;align-items:center;
+  }
+  .mytask-wrap{ width:100%;max-width:780px; }
+
+  /* 상단 컨트롤 */
+  .mytask-header{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:16px;flex-wrap:wrap;gap:8px;
+  }
+  .mytask-nav{display:flex;align-items:center;gap:8px;}
+  .mytask-nav-btn{
+    width:32px;height:32px;border-radius:8px;border:1.5px solid var(--rule);
+    background:var(--paper);cursor:pointer;font-size:16px;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--ink-soft);transition:all .12s;
+  }
+  .mytask-nav-btn:hover{background:var(--mon);color:#fff;border-color:var(--mon);}
+  .mytask-month-title{
+    font-family:'Pretendard','Noto Sans KR';font-weight:900;font-size:20px;color:var(--ink);
+    min-width:120px;text-align:center;
+  }
+  .mytask-add-btn{
+    padding:8px 16px;border-radius:8px;border:none;
+    background:var(--mon);color:#fff;
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;
+    cursor:pointer;transition:background .12s;
+  }
+  .mytask-add-btn:hover{background:#2563EB;}
+
+  /* 필터 */
+  .mytask-filters{
+    display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;
+  }
+  .mytask-filter-btn{
+    padding:5px 14px;border-radius:20px;border:1.5px solid var(--rule);
+    background:var(--paper);color:var(--ink-soft);
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:13px;
+    cursor:pointer;transition:all .12s;
+  }
+  .mytask-filter-btn.active{background:var(--mon);border-color:var(--mon);color:#fff;}
+  .mytask-filter-btn.f-todo.active{background:#6366F1;border-color:#6366F1;}
+  .mytask-filter-btn.f-doing.active{background:#F59E0B;border-color:#F59E0B;}
+  .mytask-filter-btn.f-done.active{background:#10B981;border-color:#10B981;}
+
+  /* 캘린더 그리드 */
+  .mytask-cal{
+    background:var(--paper);border-radius:12px;
+    box-shadow:0 4px 20px -8px rgba(0,0,0,0.2);
+    overflow:hidden;margin-bottom:16px;
+  }
+  .mytask-cal-head{
+    display:grid;grid-template-columns:repeat(7,1fr);
+    background:var(--paper-soft);border-bottom:1px solid var(--rule);
+  }
+  .mytask-cal-head-cell{
+    padding:8px 0;text-align:center;
+    font-family:'IBM Plex Mono';font-size:11px;font-weight:700;color:var(--ink-soft);
+  }
+  .mytask-cal-head-cell:first-child{color:#EF4444;}
+  .mytask-cal-head-cell:last-child{color:#3B82F6;}
+  .mytask-cal-grid{
+    display:grid;grid-template-columns:repeat(7,1fr);
+  }
+  .mytask-cal-cell{
+    min-height:80px;padding:4px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);
+    cursor:pointer;transition:background .1s;
+  }
+  .mytask-cal-cell:nth-child(7n){border-right:none;}
+  .mytask-cal-cell:hover{background:var(--paper-soft);}
+  .mytask-cal-cell.other-month{opacity:0.35;}
+  .mytask-cal-cell.today .mytask-cal-date{
+    background:var(--mon);color:#fff;border-radius:50%;
+    width:24px;height:24px;display:flex;align-items:center;justify-content:center;
+  }
+  .mytask-cal-date{
+    font-family:'IBM Plex Mono';font-size:12px;font-weight:700;
+    color:var(--ink-soft);margin-bottom:2px;
+    width:24px;height:24px;display:flex;align-items:center;justify-content:center;
+  }
+  .mytask-cal-cell:nth-child(7n+1) .mytask-cal-date{color:#EF4444;}
+  .mytask-cal-cell:nth-child(7n) .mytask-cal-date{color:#3B82F6;}
+  .mytask-cal-chip{
+    font-size:11px;font-family:'Pretendard','Noto Sans KR';font-weight:700;
+    padding:2px 5px;border-radius:4px;margin-bottom:2px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    cursor:pointer;
+  }
+  .mytask-cal-chip.todo{background:#EEF2FF;color:#4F46E5;}
+  .mytask-cal-chip.doing{background:#FEF3C7;color:#D97706;}
+  .mytask-cal-chip.done{background:#D1FAE5;color:#065F46;text-decoration:line-through;}
+  .mytask-cal-more{font-size:10px;color:var(--ink-soft);padding:0 4px;}
+
+  /* 일정 목록 */
+  .mytask-list{ display:flex;flex-direction:column;gap:8px; }
+  .mytask-item{
+    background:var(--paper);border-radius:10px;padding:14px 16px;
+    border-left:4px solid var(--rule);
+    box-shadow:0 2px 8px -4px rgba(0,0,0,0.15);
+    cursor:pointer;transition:box-shadow .12s;
+    display:flex;align-items:center;gap:12px;
+  }
+  .mytask-item:hover{box-shadow:0 4px 16px -4px rgba(0,0,0,0.2);}
+  .mytask-item.todo{border-left-color:#6366F1;}
+  .mytask-item.doing{border-left-color:#F59E0B;}
+  .mytask-item.done{border-left-color:#10B981;}
+  .mytask-item-status{
+    width:8px;height:8px;border-radius:50%;flex-shrink:0;
+  }
+  .mytask-item-status.todo{background:#6366F1;}
+  .mytask-item-status.doing{background:#F59E0B;}
+  .mytask-item-status.done{background:#10B981;}
+  .mytask-item-info{flex:1;min-width:0;}
+  .mytask-item-title{
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:15px;
+    color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .mytask-item.done .mytask-item-title{text-decoration:line-through;color:var(--ink-soft);}
+  .mytask-item-date{
+    font-family:'IBM Plex Mono';font-size:12px;color:var(--ink-soft);margin-top:2px;
+  }
+  .mytask-item-badge{
+    padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;flex-shrink:0;
+  }
+  .mytask-item-badge.todo{background:#EEF2FF;color:#4F46E5;}
+  .mytask-item-badge.doing{background:#FEF3C7;color:#D97706;}
+  .mytask-item-badge.done{background:#D1FAE5;color:#065F46;}
+
+  /* 일정 추가/수정 모달 */
+  .mytask-modal{
+    display:none;position:fixed;inset:0;z-index:9100;
+    background:rgba(0,0,0,0.4);
+    align-items:center;justify-content:center;padding:16px;
+  }
+  .mytask-modal.show{display:flex;}
+  .mytask-modal-box{
+    background:var(--paper);border-radius:14px;
+    width:100%;max-width:440px;
+    box-shadow:0 8px 40px rgba(0,0,0,0.3);
+    overflow:hidden;
+  }
+  .mytask-modal-head{
+    padding:16px 20px;border-bottom:1px solid var(--rule);
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .mytask-modal-title{
+    font-family:'Pretendard','Noto Sans KR';font-weight:900;font-size:17px;color:var(--ink);
+  }
+  .mytask-modal-close{
+    width:32px;height:32px;border-radius:8px;border:none;
+    background:var(--paper-soft);cursor:pointer;font-size:18px;
+    display:flex;align-items:center;justify-content:center;color:var(--ink-soft);
+  }
+  .mytask-modal-body{padding:20px;display:flex;flex-direction:column;gap:14px;}
+  .mytask-modal-field label{
+    display:block;font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:12px;
+    color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;
+  }
+  .mytask-modal-field input,
+  .mytask-modal-field textarea,
+  .mytask-modal-field select{
+    width:100%;padding:10px 12px;border:1.5px solid var(--rule);border-radius:8px;
+    font-family:'Pretendard','Noto Sans KR';font-size:15px;
+    background:var(--paper);color:var(--ink);outline:none;
+    transition:border-color .15s;appearance:none;
+  }
+  .mytask-modal-field input:focus,
+  .mytask-modal-field textarea:focus,
+  .mytask-modal-field select:focus{border-color:var(--mon);}
+  .mytask-modal-field textarea{resize:vertical;min-height:80px;}
+  .mytask-modal-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .mytask-modal-footer{
+    padding:14px 20px;border-top:1px solid var(--rule);
+    display:flex;gap:8px;justify-content:flex-end;
+  }
+  .mytask-btn-cancel{
+    padding:9px 18px;border-radius:8px;border:1.5px solid var(--rule);
+    background:var(--paper);color:var(--ink-soft);
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;cursor:pointer;
+  }
+  .mytask-btn-save{
+    padding:9px 18px;border-radius:8px;border:none;
+    background:var(--mon);color:#fff;
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;cursor:pointer;
+  }
+  .mytask-btn-delete{
+    padding:9px 18px;border-radius:8px;border:none;
+    background:#EF4444;color:#fff;
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;cursor:pointer;
+    margin-right:auto;
+  }
+  .mytask-empty{
+    padding:40px;text-align:center;color:var(--ink-soft);font-size:15px;
+  }
   @media (max-width: 520px) {
     .points-body{ padding:8px; }
     .points-card{ padding:14px 12px 18px; border-radius:10px; }
@@ -1942,7 +2140,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.41</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.42</div>
   </div>
 </div>
 
@@ -2017,7 +2215,10 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver2.41</div>
+      <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
+        <span class="main-nav-icon">📌</span>업무캘린더
+      </div>
+    <div class="nav-version">ver2.43</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -2372,9 +2573,94 @@
         </div>
       </div>
 
+      <!-- 업무 캘린더 페이지 -->
+      <div class="page-view" id="mytaskPage">
+        <div class="mytask-body">
+          <div class="mytask-wrap">
+            <!-- 헤더 -->
+            <div class="mytask-header">
+              <div class="mytask-nav">
+                <button class="mytask-nav-btn" onclick="mytaskChangeMonth(-1)">‹</button>
+                <div class="mytask-month-title" id="mytaskMonthTitle"></div>
+                <button class="mytask-nav-btn" onclick="mytaskChangeMonth(1)">›</button>
+              </div>
+              <button class="mytask-add-btn" onclick="openMytaskModal()">+ 일정 추가</button>
+            </div>
+
+            <!-- 필터 -->
+            <div class="mytask-filters">
+              <button class="mytask-filter-btn active" data-filter="all" onclick="setMytaskFilter('all')">전체</button>
+              <button class="mytask-filter-btn f-todo" data-filter="todo" onclick="setMytaskFilter('todo')">🔵 시작전</button>
+              <button class="mytask-filter-btn f-doing" data-filter="doing" onclick="setMytaskFilter('doing')">🟡 진행중</button>
+              <button class="mytask-filter-btn f-done" data-filter="done" onclick="setMytaskFilter('done')">🟢 완료</button>
+            </div>
+
+            <!-- 캘린더 -->
+            <div class="mytask-cal">
+              <div class="mytask-cal-head">
+                <div class="mytask-cal-head-cell">일</div>
+                <div class="mytask-cal-head-cell">월</div>
+                <div class="mytask-cal-head-cell">화</div>
+                <div class="mytask-cal-head-cell">수</div>
+                <div class="mytask-cal-head-cell">목</div>
+                <div class="mytask-cal-head-cell">금</div>
+                <div class="mytask-cal-head-cell">토</div>
+              </div>
+              <div class="mytask-cal-grid" id="mytaskCalGrid"></div>
+            </div>
+
+            <!-- 일정 목록 -->
+            <div class="mytask-list" id="mytaskList"></div>
+          </div>
+        </div>
+      </div>
+
     </div><!-- .app-content 끝 -->
   </div><!-- .app-body 끝 -->
 </div><!-- .app-shell 끝 -->
+
+<!-- 업무 캘린더 추가/수정 모달 -->
+<div class="mytask-modal" id="mytaskModal" onclick="closeMytaskModalOverlay(event)">
+  <div class="mytask-modal-box">
+    <div class="mytask-modal-head">
+      <div class="mytask-modal-title" id="mytaskModalTitle">일정 추가</div>
+      <button class="mytask-modal-close" onclick="closeMytaskModal()">×</button>
+    </div>
+    <div class="mytask-modal-body">
+      <div class="mytask-modal-field">
+        <label>제목</label>
+        <input type="text" id="mytaskTitle" placeholder="업무 제목 입력...">
+      </div>
+      <div class="mytask-modal-field">
+        <label>메모</label>
+        <textarea id="mytaskMemo" placeholder="상세 내용 (선택)"></textarea>
+      </div>
+      <div class="mytask-modal-dates">
+        <div class="mytask-modal-field">
+          <label>시작일</label>
+          <input type="date" id="mytaskStartDate">
+        </div>
+        <div class="mytask-modal-field">
+          <label>마감일</label>
+          <input type="date" id="mytaskEndDate">
+        </div>
+      </div>
+      <div class="mytask-modal-field">
+        <label>상태</label>
+        <select id="mytaskStatus">
+          <option value="todo">🔵 시작전</option>
+          <option value="doing">🟡 진행중</option>
+          <option value="done">🟢 완료</option>
+        </select>
+      </div>
+    </div>
+    <div class="mytask-modal-footer">
+      <button class="mytask-btn-delete" id="mytaskDeleteBtn" onclick="deleteMytask()" style="display:none;">삭제</button>
+      <button class="mytask-btn-cancel" onclick="closeMytaskModal()">취소</button>
+      <button class="mytask-btn-save" onclick="saveMytask()">저장</button>
+    </div>
+  </div>
+</div>
 
 <!-- 상벌점 상세 팝업 -->
 <div class="pts-detail-modal" id="ptsDetailModal" onclick="closePtsDetail(event)">
@@ -2414,7 +2700,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc, getDocs, deleteDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
@@ -3519,15 +3805,31 @@ function setAuthStatus(msg, isError){
   authStatus.style.color = isError ? '#c0392b' : '';
 }
 
+// 사파리 감지
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+// redirect 결과 처리 (사파리에서 redirect 후 돌아왔을 때)
+getRedirectResult(fbAuth).then(result => {
+  if (result?.user) {
+    // redirect 로그인 성공 - onAuthStateChanged에서 처리됨
+  }
+}).catch(e => {
+  if (e.code !== 'auth/no-current-user') {
+    setAuthStatus('로그인 실패: ' + e.message, true);
+  }
+});
+
 googleLoginBtn.addEventListener('click', async () => {
   setAuthStatus('로그인 창을 여는 중...');
   try{
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ hd: 'yeungnam.hs.kr' });
-    // iOS Safari는 팝업 차단 → redirect 방식 사용
-    // 모든 기기에서 팝업 방식 사용 (iOS 포함)
-    await signInWithPopup(fbAuth, provider);
-    // 이후 흐름은 onAuthStateChanged에서 처리됨
+    if (isSafari) {
+      // 사파리는 팝업 차단 → redirect 방식
+      await signInWithRedirect(fbAuth, provider);
+    } else {
+      await signInWithPopup(fbAuth, provider);
+    }
   }catch(e){
     setAuthStatus('로그인 실패: ' + e.message, true);
   }
@@ -3588,6 +3890,11 @@ onAuthStateChanged(fbAuth, async (user) => {
     authGate.classList.remove('open');
     logoutBtn.style.display = '';
     appInitialized = true;
+    // 관리자만 업무캘린더 탭 표시
+    if (user.email === ADMIN_EMAIL) {
+      const navMyTask = document.getElementById('navMyTask');
+      if (navMyTask) navMyTask.style.display = '';
+    }
   }catch(e){
     setAuthStatus('데이터를 불러오지 못했습니다: ' + e.message + ' (인터넷 연결을 확인하고 새로고침해주세요)', true);
   }
@@ -3617,6 +3924,7 @@ const studentsPage  = document.getElementById('studentsPage');
 const schedulePage  = document.getElementById('schedulePage');
 const homePage      = document.getElementById('homePage');
 const pointsPage    = document.getElementById('pointsPage');
+const mytaskPage    = document.getElementById('mytaskPage');
 
 // 햄버거 (모바일/좁은화면)
 function updateMobileNavTop(){
@@ -3815,7 +4123,19 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.add('active');
+      if(mytaskPage) mytaskPage.classList.remove('active');
       initPointsPage();
+    } else if(page === 'mytask'){
+      homePage.classList.remove('active');
+      timetablePage.classList.remove('active');
+      weeklyPage.classList.remove('active');
+      mealPage.classList.remove('active');
+      contactsPage.classList.remove('active');
+      studentsPage.classList.remove('active');
+      schedulePage.classList.remove('active');
+      pointsPage.classList.remove('active');
+      mytaskPage.classList.add('active');
+      initMytaskPage();
     }
   });
 });
@@ -3863,8 +4183,10 @@ document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(tab => {
     schedulePage.classList.remove('active');
     homePage.classList.remove('active');
     pointsPage.classList.remove('active');
+    if(mytaskPage) mytaskPage.classList.remove('active');
     if(page === 'home')         { homePage.classList.add('active'); if(!homeInitialized) initHomePage(); }
     else if(page === 'timetable') { timetablePage.classList.add('active'); }
+    else if(page === 'mytask')    { mytaskPage.classList.add('active'); initMytaskPage(); }
     else if(page === 'weekly')    { weeklyPage.classList.add('active'); if(!weeklyInitialized) initWeeklyPage(); }
     else if(page === 'meal')      { mealPage.classList.add('active'); if(!mealInitialized) initMealPage(); }
     else if(page === 'contacts')  { contactsPage.classList.add('active'); if(!contactsInitialized) initContactsPage(); }
@@ -5262,7 +5584,7 @@ function navigateTo(page) {
 }
 
 // ══════════════════════════════════════════
-// 상벌점 조회·입력 기능 (ver2.41)
+// 상벌점 조회·입력 기능 (ver2.42)
 // ══════════════════════════════════════════
 const POINTS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
 let ptsType = null;
@@ -6102,6 +6424,212 @@ function closePtsDetailBtn() {
 window.showPtsDetail     = showPtsDetail;
 window.closePtsDetail    = closePtsDetail;
 window.closePtsDetailBtn = closePtsDetailBtn;
+// ══════════════════════════════════════════
+// 업무 캘린더
+// ══════════════════════════════════════════
+const ADMIN_EMAIL   = 'pkh910518@yeungnam.hs.kr';
+let mytaskYear      = new Date().getFullYear();
+let mytaskMonth     = new Date().getMonth();
+let mytaskFilter    = 'all';
+let mytaskTasks     = [];
+let mytaskEditId    = null;
+let mytaskInitialized = false;
+
+function initMytaskPage() {
+  if (!mytaskInitialized) {
+    loadMytasks();
+    mytaskInitialized = true;
+  }
+  renderMytaskCalendar();
+  renderMytaskList();
+}
+
+async function loadMytasks() {
+  const user = fbAuth.currentUser;
+  if (!user) return;
+  try {
+    const col = collection(fbDb, 'tasks', user.uid, 'items');
+    const snap = await getDocs(col);
+    mytaskTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderMytaskCalendar();
+    renderMytaskList();
+  } catch(e) { console.error('캘린더 로딩 실패:', e); }
+}
+
+function mytaskChangeMonth(dir) {
+  mytaskMonth += dir;
+  if (mytaskMonth > 11) { mytaskMonth = 0; mytaskYear++; }
+  if (mytaskMonth < 0)  { mytaskMonth = 11; mytaskYear--; }
+  renderMytaskCalendar();
+  renderMytaskList();
+}
+
+function setMytaskFilter(filter) {
+  mytaskFilter = filter;
+  document.querySelectorAll('.mytask-filter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.filter === filter);
+  });
+  renderMytaskCalendar();
+  renderMytaskList();
+}
+
+function getFilteredTasks() {
+  if (mytaskFilter === 'all') return mytaskTasks;
+  return mytaskTasks.filter(t => t.status === mytaskFilter);
+}
+
+function renderMytaskCalendar() {
+  const title = document.getElementById('mytaskMonthTitle');
+  if (title) title.textContent = `${mytaskYear}년 ${mytaskMonth + 1}월`;
+
+  const grid = document.getElementById('mytaskCalGrid');
+  if (!grid) return;
+
+  const firstDay = new Date(mytaskYear, mytaskMonth, 1).getDay();
+  const lastDate = new Date(mytaskYear, mytaskMonth + 1, 0).getDate();
+  const today    = new Date();
+  const filtered = getFilteredTasks();
+
+  let html = '';
+  let dayCount = 1;
+  const totalCells = Math.ceil((firstDay + lastDate) / 7) * 7;
+
+  for (let i = 0; i < totalCells; i++) {
+    const isOther = i < firstDay || dayCount > lastDate;
+    const date    = isOther ? null : dayCount;
+    const isToday = date && mytaskYear === today.getFullYear() &&
+                    mytaskMonth === today.getMonth() && date === today.getDate();
+    const dateStr = date ? `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}-${String(date).padStart(2,'0')}` : '';
+
+    // 해당 날짜 일정
+    const dayTasks = filtered.filter(t => t.startDate <= dateStr && t.endDate >= dateStr);
+
+    html += `<div class="mytask-cal-cell ${isOther?'other-month':''} ${isToday?'today':''}" onclick="${date?`mytaskCellClick('${dateStr}')`:''}">
+      <div class="mytask-cal-date">${date || ''}</div>
+      ${dayTasks.slice(0,2).map(t => `<div class="mytask-cal-chip ${t.status}" onclick="event.stopPropagation();openMytaskModal('${t.id}')">${t.title}</div>`).join('')}
+      ${dayTasks.length > 2 ? `<div class="mytask-cal-more">+${dayTasks.length-2}개</div>` : ''}
+    </div>`;
+    if (!isOther) dayCount++;
+  }
+  grid.innerHTML = html;
+}
+
+function mytaskCellClick(dateStr) {
+  openMytaskModal(null, dateStr);
+}
+
+function renderMytaskList() {
+  const list = document.getElementById('mytaskList');
+  if (!list) return;
+  const filtered = getFilteredTasks()
+    .filter(t => {
+      const ym = `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}`;
+      return t.startDate?.startsWith(ym) || t.endDate?.startsWith(ym) ||
+             (t.startDate <= ym+'-31' && t.endDate >= ym+'-01');
+    })
+    .sort((a,b) => a.startDate?.localeCompare(b.startDate));
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="mytask-empty">이번 달 일정이 없습니다.</div>';
+    return;
+  }
+  const statusLabel = { todo:'시작전', doing:'진행중', done:'완료' };
+  list.innerHTML = filtered.map(t => `
+    <div class="mytask-item ${t.status}" onclick="openMytaskModal('${t.id}')">
+      <div class="mytask-item-status ${t.status}"></div>
+      <div class="mytask-item-info">
+        <div class="mytask-item-title">${t.title}</div>
+        <div class="mytask-item-date">${t.startDate} ~ ${t.endDate}</div>
+      </div>
+      <span class="mytask-item-badge ${t.status}">${statusLabel[t.status]}</span>
+    </div>
+  `).join('');
+}
+
+function openMytaskModal(id=null, dateStr=null) {
+  mytaskEditId = id;
+  const modal  = document.getElementById('mytaskModal');
+  const delBtn = document.getElementById('mytaskDeleteBtn');
+  document.getElementById('mytaskModalTitle').textContent = id ? '일정 수정' : '일정 추가';
+  delBtn.style.display = id ? 'block' : 'none';
+
+  if (id) {
+    const t = mytaskTasks.find(t => t.id === id);
+    if (t) {
+      document.getElementById('mytaskTitle').value     = t.title || '';
+      document.getElementById('mytaskMemo').value      = t.memo  || '';
+      document.getElementById('mytaskStartDate').value = t.startDate || '';
+      document.getElementById('mytaskEndDate').value   = t.endDate   || '';
+      document.getElementById('mytaskStatus').value    = t.status    || 'todo';
+    }
+  } else {
+    document.getElementById('mytaskTitle').value     = '';
+    document.getElementById('mytaskMemo').value      = '';
+    document.getElementById('mytaskStartDate').value = dateStr || '';
+    document.getElementById('mytaskEndDate').value   = dateStr || '';
+    document.getElementById('mytaskStatus').value    = 'todo';
+  }
+  modal.classList.add('show');
+  document.getElementById('mytaskTitle').focus();
+}
+
+function closeMytaskModal() {
+  document.getElementById('mytaskModal').classList.remove('show');
+  mytaskEditId = null;
+}
+function closeMytaskModalOverlay(e) {
+  if (e.target === document.getElementById('mytaskModal')) closeMytaskModal();
+}
+
+async function saveMytask() {
+  const user = fbAuth.currentUser;
+  if (!user) return;
+  const title     = document.getElementById('mytaskTitle').value.trim();
+  const memo      = document.getElementById('mytaskMemo').value.trim();
+  const startDate = document.getElementById('mytaskStartDate').value;
+  const endDate   = document.getElementById('mytaskEndDate').value;
+  const status    = document.getElementById('mytaskStatus').value;
+  if (!title)     { alert('제목을 입력하세요'); return; }
+  if (!startDate) { alert('시작일을 입력하세요'); return; }
+  if (!endDate)   { alert('마감일을 입력하세요'); return; }
+
+  const data = { title, memo, startDate, endDate, status, updatedAt: new Date().toISOString() };
+  try {
+    if (mytaskEditId) {
+      await setDoc(doc(fbDb, 'tasks', user.uid, 'items', mytaskEditId), data);
+      const idx = mytaskTasks.findIndex(t => t.id === mytaskEditId);
+      if (idx >= 0) mytaskTasks[idx] = { id: mytaskEditId, ...data };
+    } else {
+      const ref = await addDoc(collection(fbDb, 'tasks', user.uid, 'items'), data);
+      mytaskTasks.push({ id: ref.id, ...data });
+    }
+    closeMytaskModal();
+    renderMytaskCalendar();
+    renderMytaskList();
+  } catch(e) { alert('저장 실패: ' + e.message); }
+}
+
+async function deleteMytask() {
+  if (!mytaskEditId) return;
+  if (!confirm('이 일정을 삭제할까요?')) return;
+  const user = fbAuth.currentUser;
+  try {
+    await deleteDoc(doc(fbDb, 'tasks', user.uid, 'items', mytaskEditId));
+    mytaskTasks = mytaskTasks.filter(t => t.id !== mytaskEditId);
+    closeMytaskModal();
+    renderMytaskCalendar();
+    renderMytaskList();
+  } catch(e) { alert('삭제 실패: ' + e.message); }
+}
+
+window.mytaskChangeMonth       = mytaskChangeMonth;
+window.setMytaskFilter         = setMytaskFilter;
+window.openMytaskModal         = openMytaskModal;
+window.closeMytaskModal        = closeMytaskModal;
+window.closeMytaskModalOverlay = closeMytaskModalOverlay;
+window.saveMytask              = saveMytask;
+window.deleteMytask            = deleteMytask;
+window.mytaskCellClick         = mytaskCellClick;
 
 </script>
 </body>
