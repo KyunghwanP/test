@@ -254,7 +254,6 @@
     border:1.5px solid var(--rule);
     position:relative;
   }
-  .pts-student-row:first-child .pts-remove-btn{visibility:hidden;}
   .pts-detail-row{
     display:grid;grid-template-columns:1fr auto;
     gap:6px;align-items:center;
@@ -401,13 +400,17 @@
     /* 삭제/리셋은 grid에서 숨기고 절대위치로 */
     .pts-student-row > *:nth-child(6),
     .pts-student-row > *:nth-child(7){ display:none; }
-    .pts-remove-btn, .pts-reset-btn{
+    .pts-remove-btn{
       display:flex !important;
-      position:absolute;top:4px;
+      position:absolute;top:4px;right:4px;
       width:24px;height:24px;font-size:14px;
     }
-    .pts-remove-btn{ right:4px; }
-    .pts-reset-btn{ right:32px; }
+    .pts-reset-btn{
+      display:flex !important;
+      position:absolute;top:4px;right:32px;
+      width:24px;height:24px;font-size:14px;
+    }
+
 
     /* 열 레이블도 동일하게 */
     .pts-row-label{
@@ -1793,7 +1796,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.31</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.32</div>
   </div>
 </div>
 
@@ -1868,7 +1871,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver2.31</div>
+    <div class="nav-version">ver2.32</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -5028,7 +5031,7 @@ function navigateTo(page) {
 }
 
 // ══════════════════════════════════════════
-// 상벌점 입력 기능 (ver2.31)
+// 상벌점 입력 기능 (ver2.32)
 // ══════════════════════════════════════════
 const POINTS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
 let ptsType = null;
