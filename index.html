@@ -568,9 +568,44 @@
     font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;cursor:pointer;
     margin-right:auto;
   }
-  .mytask-empty{
-    padding:40px;text-align:center;color:var(--ink-soft);font-size:15px;
+  .mytask-status-btn{
+    flex:1;padding:8px 0;border-radius:8px;border:1.5px solid var(--rule);
+    background:var(--paper);font-family:'Pretendard','Noto Sans KR';
+    font-weight:700;font-size:13px;cursor:pointer;transition:all .12s;
+    color:var(--ink-soft);
   }
+  .mytask-status-btn.active.todo{background:#EEF2FF;border-color:#6366F1;color:#4F46E5;}
+  .mytask-status-btn.active.doing{background:#FEF3C7;border-color:#F59E0B;color:#D97706;}
+  .mytask-status-btn.active.done{background:#D1FAE5;border-color:#10B981;color:#065F46;}
+  .mytask-share-chip{
+    display:flex;align-items:center;gap:4px;
+    padding:3px 8px;border-radius:20px;
+    background:var(--mon);color:#fff;
+    font-size:12px;font-family:'Pretendard','Noto Sans KR';font-weight:700;
+  }
+  .mytask-share-chip button{
+    background:none;border:none;color:#fff;cursor:pointer;
+    font-size:14px;padding:0;line-height:1;
+  }
+  .mytask-link-chip{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:6px 10px;border-radius:8px;
+    background:var(--paper-soft);border:1px solid var(--rule);
+    font-size:13px;font-family:'Pretendard','Noto Sans KR';
+  }
+  .mytask-link-chip button{
+    background:none;border:none;color:var(--ink-soft);cursor:pointer;font-size:14px;
+  }
+  .mytask-comment-item{
+    padding:8px 10px;border-radius:8px;background:var(--paper-soft);
+    font-size:13px;
+  }
+  .mytask-comment-author{
+    font-weight:700;font-size:11px;color:var(--mon);margin-bottom:3px;
+    font-family:'IBM Plex Mono';
+  }
+  .mytask-comment-text{color:var(--ink);line-height:1.5;}
+  .mytask-comment-time{font-size:10px;color:var(--ink-soft);margin-top:2px;}
   @media (max-width: 520px) {
     .points-body{ padding:8px; }
     .points-card{ padding:14px 12px 18px; border-radius:10px; }
@@ -2218,7 +2253,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver2.44</div>
+    <div class="nav-version">ver2.45</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -2621,43 +2656,78 @@
 
 <!-- 업무 캘린더 추가/수정 모달 -->
 <div class="mytask-modal" id="mytaskModal" onclick="closeMytaskModalOverlay(event)">
-  <div class="mytask-modal-box">
+  <div class="mytask-modal-box" style="max-width:520px;max-height:90vh;display:flex;flex-direction:column;">
     <div class="mytask-modal-head">
       <div class="mytask-modal-title" id="mytaskModalTitle">일정 추가</div>
       <button class="mytask-modal-close" onclick="closeMytaskModal()">×</button>
     </div>
-    <div class="mytask-modal-body">
-      <div class="mytask-modal-field">
-        <label>제목</label>
-        <input type="text" id="mytaskTitle" placeholder="업무 제목 입력...">
-      </div>
-      <div class="mytask-modal-field">
-        <label>메모</label>
-        <textarea id="mytaskMemo" placeholder="상세 내용 (선택)"></textarea>
-      </div>
-      <div class="mytask-modal-dates">
+    <div class="mytask-modal-body" style="overflow-y:auto;flex:1;">
+
+      <!-- 본인만 편집 가능한 영역 -->
+      <div id="mytaskOwnerSection">
         <div class="mytask-modal-field">
-          <label>시작일</label>
-          <input type="date" id="mytaskStartDate">
+          <label>제목</label>
+          <input type="text" id="mytaskTitle" placeholder="업무 제목 입력...">
         </div>
         <div class="mytask-modal-field">
-          <label>마감일</label>
-          <input type="date" id="mytaskEndDate">
+          <label>메모</label>
+          <textarea id="mytaskMemo" placeholder="상세 내용 (선택)"></textarea>
+        </div>
+        <div class="mytask-modal-dates">
+          <div class="mytask-modal-field">
+            <label>시작일</label>
+            <input type="date" id="mytaskStartDate">
+          </div>
+          <div class="mytask-modal-field">
+            <label>마감일</label>
+            <input type="date" id="mytaskEndDate">
+          </div>
+        </div>
+
+        <!-- 담당자 공유 -->
+        <div class="mytask-modal-field">
+          <label>공유 담당자</label>
+          <div id="mytaskSharedList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;min-height:24px;"></div>
+          <select id="mytaskShareSelect" onchange="addMytaskShare(this.value)">
+            <option value="">+ 선생님 추가...</option>
+          </select>
+        </div>
+
+        <!-- 연계 일정 -->
+        <div class="mytask-modal-field">
+          <label>연계 일정</label>
+          <div id="mytaskLinkedList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px;"></div>
+          <select id="mytaskLinkSelect" onchange="addMytaskLink(this.value)">
+            <option value="">+ 내 일정 연결...</option>
+          </select>
         </div>
       </div>
+
+      <!-- 상태 (본인+공유자 모두 가능) -->
       <div class="mytask-modal-field">
         <label>상태</label>
-        <select id="mytaskStatus">
-          <option value="todo">🔵 시작전</option>
-          <option value="doing">🟡 진행중</option>
-          <option value="done">🟢 완료</option>
-        </select>
+        <div style="display:flex;gap:8px;">
+          <button class="mytask-status-btn todo" data-status="todo" onclick="setMytaskStatusBtn('todo')">🔵 시작전</button>
+          <button class="mytask-status-btn doing" data-status="doing" onclick="setMytaskStatusBtn('doing')">🟡 진행중</button>
+          <button class="mytask-status-btn done" data-status="done" onclick="setMytaskStatusBtn('done')">🟢 완료</button>
+        </div>
       </div>
+
+      <!-- 댓글 -->
+      <div class="mytask-modal-field" id="mytaskCommentSection" style="display:none;">
+        <label>댓글</label>
+        <div id="mytaskCommentList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;max-height:150px;overflow-y:auto;"></div>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="mytaskCommentInput" placeholder="댓글 입력..." style="flex:1;padding:8px 12px;border:1.5px solid var(--rule);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink);">
+          <button onclick="addMytaskComment()" style="padding:8px 14px;border-radius:8px;border:none;background:var(--mon);color:#fff;font-weight:700;cursor:pointer;">등록</button>
+        </div>
+      </div>
+
     </div>
     <div class="mytask-modal-footer">
       <button class="mytask-btn-delete" id="mytaskDeleteBtn" onclick="deleteMytask()" style="display:none;">삭제</button>
       <button class="mytask-btn-cancel" onclick="closeMytaskModal()">취소</button>
-      <button class="mytask-btn-save" onclick="saveMytask()">저장</button>
+      <button class="mytask-btn-save" id="mytaskSaveBtn" onclick="saveMytask()">저장</button>
     </div>
   </div>
 </div>
@@ -6427,12 +6497,17 @@ window.closePtsDetailBtn = closePtsDetailBtn;
 // ══════════════════════════════════════════
 // 업무 캘린더
 // ══════════════════════════════════════════
-const ADMIN_EMAIL   = 'pkh910518@yeungnam.hs.kr';
+const MYTASK_ADMIN  = 'pkh910518@yeungnam.hs.kr';
 let mytaskYear      = new Date().getFullYear();
 let mytaskMonth     = new Date().getMonth();
 let mytaskFilter    = 'all';
-let mytaskTasks     = [];
+let mytaskTasks     = [];      // 내 일정
+let mytaskShared    = [];      // 공유받은 일정
 let mytaskEditId    = null;
+let mytaskEditOwner = null;    // 일정 소유자 uid
+let mytaskCurrentStatus = 'todo';
+let mytaskCurrentShared = [];
+let mytaskCurrentLinked = [];
 let mytaskInitialized = false;
 
 function initMytaskPage() {
@@ -6448,9 +6523,9 @@ async function loadMytasks() {
   const user = fbAuth.currentUser;
   if (!user) return;
   try {
-    const col = collection(fbDb, 'tasks', user.uid, 'items');
-    const snap = await getDocs(col);
-    mytaskTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // 내 일정
+    const snap = await getDocs(collection(fbDb, 'tasks', user.uid, 'items'));
+    mytaskTasks = snap.docs.map(d => ({ id: d.id, ownerUid: user.uid, ...d.data() }));
     renderMytaskCalendar();
     renderMytaskList();
   } catch(e) { console.error('캘린더 로딩 실패:', e); }
@@ -6473,40 +6548,34 @@ function setMytaskFilter(filter) {
   renderMytaskList();
 }
 
-function getFilteredTasks() {
-  if (mytaskFilter === 'all') return mytaskTasks;
-  return mytaskTasks.filter(t => t.status === mytaskFilter);
+function getAllTasks() {
+  const all = [...mytaskTasks, ...mytaskShared];
+  if (mytaskFilter === 'all') return all;
+  return all.filter(t => t.status === mytaskFilter);
 }
 
 function renderMytaskCalendar() {
   const title = document.getElementById('mytaskMonthTitle');
   if (title) title.textContent = `${mytaskYear}년 ${mytaskMonth + 1}월`;
-
   const grid = document.getElementById('mytaskCalGrid');
   if (!grid) return;
-
   const firstDay = new Date(mytaskYear, mytaskMonth, 1).getDay();
   const lastDate = new Date(mytaskYear, mytaskMonth + 1, 0).getDate();
   const today    = new Date();
-  const filtered = getFilteredTasks();
-
+  const filtered = getAllTasks();
   let html = '';
   let dayCount = 1;
   const totalCells = Math.ceil((firstDay + lastDate) / 7) * 7;
-
   for (let i = 0; i < totalCells; i++) {
     const isOther = i < firstDay || dayCount > lastDate;
     const date    = isOther ? null : dayCount;
     const isToday = date && mytaskYear === today.getFullYear() &&
                     mytaskMonth === today.getMonth() && date === today.getDate();
     const dateStr = date ? `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}-${String(date).padStart(2,'0')}` : '';
-
-    // 해당 날짜 일정
     const dayTasks = filtered.filter(t => t.startDate <= dateStr && t.endDate >= dateStr);
-
     html += `<div class="mytask-cal-cell ${isOther?'other-month':''} ${isToday?'today':''}" onclick="${date?`mytaskCellClick('${dateStr}')`:''}">
       <div class="mytask-cal-date">${date || ''}</div>
-      ${dayTasks.slice(0,2).map(t => `<div class="mytask-cal-chip ${t.status}" onclick="event.stopPropagation();openMytaskModal('${t.id}')">${t.title}</div>`).join('')}
+      ${dayTasks.slice(0,2).map(t => `<div class="mytask-cal-chip ${t.status}" onclick="event.stopPropagation();openMytaskModal('${t.id}','${t.ownerUid||''}')">${t.title}</div>`).join('')}
       ${dayTasks.length > 2 ? `<div class="mytask-cal-more">+${dayTasks.length-2}개</div>` : ''}
     </div>`;
     if (!isOther) dayCount++;
@@ -6514,31 +6583,26 @@ function renderMytaskCalendar() {
   grid.innerHTML = html;
 }
 
-function mytaskCellClick(dateStr) {
-  openMytaskModal(null, dateStr);
-}
+function mytaskCellClick(dateStr) { openMytaskModal(null, null, dateStr); }
 
 function renderMytaskList() {
   const list = document.getElementById('mytaskList');
   if (!list) return;
-  const filtered = getFilteredTasks()
-    .filter(t => {
-      const ym = `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}`;
-      return t.startDate?.startsWith(ym) || t.endDate?.startsWith(ym) ||
-             (t.startDate <= ym+'-31' && t.endDate >= ym+'-01');
-    })
+  const ym = `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}`;
+  const filtered = getAllTasks()
+    .filter(t => t.startDate?.slice(0,7) === ym || t.endDate?.slice(0,7) === ym ||
+                 (t.startDate <= ym+'-31' && t.endDate >= ym+'-01'))
     .sort((a,b) => a.startDate?.localeCompare(b.startDate));
-
   if (filtered.length === 0) {
     list.innerHTML = '<div class="mytask-empty">이번 달 일정이 없습니다.</div>';
     return;
   }
   const statusLabel = { todo:'시작전', doing:'진행중', done:'완료' };
   list.innerHTML = filtered.map(t => `
-    <div class="mytask-item ${t.status}" onclick="openMytaskModal('${t.id}')">
+    <div class="mytask-item ${t.status}" onclick="openMytaskModal('${t.id}','${t.ownerUid||''}')">
       <div class="mytask-item-status ${t.status}"></div>
       <div class="mytask-item-info">
-        <div class="mytask-item-title">${t.title}</div>
+        <div class="mytask-item-title">${t.title}${t.ownerUid !== fbAuth.currentUser?.uid ? ' <span style="font-size:11px;color:var(--ink-soft);">[공유]</span>':''}</div>
         <div class="mytask-item-date">${t.startDate} ~ ${t.endDate}</div>
       </div>
       <span class="mytask-item-badge ${t.status}">${statusLabel[t.status]}</span>
@@ -6546,62 +6610,204 @@ function renderMytaskList() {
   `).join('');
 }
 
-function openMytaskModal(id=null, dateStr=null) {
-  mytaskEditId = id;
-  const modal  = document.getElementById('mytaskModal');
-  const delBtn = document.getElementById('mytaskDeleteBtn');
-  document.getElementById('mytaskModalTitle').textContent = id ? '일정 수정' : '일정 추가';
-  delBtn.style.display = id ? 'block' : 'none';
+function setMytaskStatusBtn(status) {
+  mytaskCurrentStatus = status;
+  document.querySelectorAll('.mytask-status-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.status === status);
+  });
+}
+
+function addMytaskShare(email) {
+  if (!email) return;
+  if (mytaskCurrentShared.includes(email)) return;
+  mytaskCurrentShared.push(email);
+  renderMytaskSharedList();
+  document.getElementById('mytaskShareSelect').value = '';
+}
+
+function removeMytaskShare(email) {
+  mytaskCurrentShared = mytaskCurrentShared.filter(e => e !== email);
+  renderMytaskSharedList();
+}
+
+function renderMytaskSharedList() {
+  const el = document.getElementById('mytaskSharedList');
+  el.innerHTML = mytaskCurrentShared.map(e => {
+    const name = TEACHERS.find(t => t.email === e)?.name || e;
+    return `<div class="mytask-share-chip">${name}<button onclick="removeMytaskShare('${e}')">×</button></div>`;
+  }).join('');
+}
+
+function addMytaskLink(val) {
+  if (!val) return;
+  const t = mytaskTasks.find(t => t.id === val);
+  if (!t || mytaskCurrentLinked.find(l => l.id === val)) return;
+  mytaskCurrentLinked.push({ id: t.id, title: t.title });
+  renderMytaskLinkedList();
+  document.getElementById('mytaskLinkSelect').value = '';
+}
+
+function removeMytaskLink(id) {
+  mytaskCurrentLinked = mytaskCurrentLinked.filter(l => l.id !== id);
+  renderMytaskLinkedList();
+}
+
+function renderMytaskLinkedList() {
+  const el = document.getElementById('mytaskLinkedList');
+  el.innerHTML = mytaskCurrentLinked.map(l =>
+    `<div class="mytask-link-chip"><span>📎 ${l.title}</span><button onclick="removeMytaskLink('${l.id}')">×</button></div>`
+  ).join('');
+}
+
+async function addMytaskComment() {
+  const user  = fbAuth.currentUser;
+  const input = document.getElementById('mytaskCommentInput');
+  const text  = input.value.trim();
+  if (!text || !mytaskEditId) return;
+  const comment = {
+    email: user.email,
+    name: TEACHERS.find(t => t.email === user.email)?.name || user.email,
+    text,
+    createdAt: new Date().toISOString()
+  };
+  try {
+    const ownerUid = mytaskEditOwner || user.uid;
+    const ref = doc(fbDb, 'tasks', ownerUid, 'items', mytaskEditId);
+    const snap = await getDoc(ref);
+    const existing = snap.data()?.comments || [];
+    await setDoc(ref, { comments: [...existing, comment] }, { merge: true });
+    // 로컬 업데이트
+    const t = mytaskTasks.find(t => t.id === mytaskEditId);
+    if (t) { t.comments = [...existing, comment]; }
+    input.value = '';
+    renderMytaskComments([...existing, comment]);
+  } catch(e) { alert('댓글 저장 실패: ' + e.message); }
+}
+
+function renderMytaskComments(comments) {
+  const el = document.getElementById('mytaskCommentList');
+  if (!comments || comments.length === 0) {
+    el.innerHTML = '<div style="color:var(--ink-soft);font-size:13px;">댓글이 없습니다.</div>';
+    return;
+  }
+  el.innerHTML = comments.map(c => `
+    <div class="mytask-comment-item">
+      <div class="mytask-comment-author">${c.name || c.email}</div>
+      <div class="mytask-comment-text">${c.text}</div>
+      <div class="mytask-comment-time">${new Date(c.createdAt).toLocaleString('ko-KR')}</div>
+    </div>
+  `).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
+  const user     = fbAuth.currentUser;
+  mytaskEditId   = id;
+  mytaskEditOwner = ownerUid || user.uid;
+  const isOwner  = !ownerUid || ownerUid === user.uid;
+  const modal    = document.getElementById('mytaskModal');
+  const delBtn   = document.getElementById('mytaskDeleteBtn');
+  const saveBtn  = document.getElementById('mytaskSaveBtn');
+  const ownerSec = document.getElementById('mytaskOwnerSection');
+  const commentSec = document.getElementById('mytaskCommentSection');
+
+  document.getElementById('mytaskModalTitle').textContent = id ? '일정 상세' : '일정 추가';
+  delBtn.style.display  = (id && isOwner) ? 'block' : 'none';
+  ownerSec.style.display = isOwner ? 'block' : 'none';
+  commentSec.style.display = id ? 'block' : 'none';
+  saveBtn.textContent   = isOwner ? '저장' : '상태 저장';
+
+  mytaskCurrentShared = [];
+  mytaskCurrentLinked = [];
+  mytaskCurrentStatus = 'todo';
+
+  // 연계 일정 드롭다운 채우기
+  const linkSel = document.getElementById('mytaskLinkSelect');
+  linkSel.innerHTML = '<option value="">+ 내 일정 연결...</option>' +
+    mytaskTasks.filter(t => t.id !== id).map(t => `<option value="${t.id}">${t.title}</option>`).join('');
+
+  // 공유 선생님 드롭다운 채우기
+  const shareSel = document.getElementById('mytaskShareSelect');
+  shareSel.innerHTML = '<option value="">+ 선생님 추가...</option>' +
+    TEACHERS.filter(t => t.email && t.email !== user.email)
+      .map(t => `<option value="${t.email}">${t.name}</option>`).join('');
 
   if (id) {
-    const t = mytaskTasks.find(t => t.id === id);
+    const t = mytaskTasks.find(t => t.id === id) || mytaskShared.find(t => t.id === id);
     if (t) {
       document.getElementById('mytaskTitle').value     = t.title || '';
       document.getElementById('mytaskMemo').value      = t.memo  || '';
       document.getElementById('mytaskStartDate').value = t.startDate || '';
       document.getElementById('mytaskEndDate').value   = t.endDate   || '';
-      document.getElementById('mytaskStatus').value    = t.status    || 'todo';
+      mytaskCurrentStatus  = t.status || 'todo';
+      mytaskCurrentShared  = [...(t.sharedWith || [])];
+      mytaskCurrentLinked  = [...(t.linkedTasks || [])];
+      renderMytaskSharedList();
+      renderMytaskLinkedList();
+      renderMytaskComments(t.comments || []);
     }
   } else {
     document.getElementById('mytaskTitle').value     = '';
     document.getElementById('mytaskMemo').value      = '';
     document.getElementById('mytaskStartDate').value = dateStr || '';
     document.getElementById('mytaskEndDate').value   = dateStr || '';
-    document.getElementById('mytaskStatus').value    = 'todo';
   }
+  setMytaskStatusBtn(mytaskCurrentStatus);
   modal.classList.add('show');
-  document.getElementById('mytaskTitle').focus();
+  if (isOwner) document.getElementById('mytaskTitle').focus();
 }
 
 function closeMytaskModal() {
   document.getElementById('mytaskModal').classList.remove('show');
-  mytaskEditId = null;
+  mytaskEditId = null; mytaskEditOwner = null;
 }
 function closeMytaskModalOverlay(e) {
   if (e.target === document.getElementById('mytaskModal')) closeMytaskModal();
 }
 
 async function saveMytask() {
-  const user = fbAuth.currentUser;
-  if (!user) return;
+  const user    = fbAuth.currentUser;
+  const isOwner = !mytaskEditOwner || mytaskEditOwner === user.uid;
+
+  if (!isOwner) {
+    // 공유받은 사람: 상태만 저장
+    try {
+      await setDoc(doc(fbDb, 'tasks', mytaskEditOwner, 'items', mytaskEditId),
+        { status: mytaskCurrentStatus }, { merge: true });
+      const t = mytaskShared.find(t => t.id === mytaskEditId);
+      if (t) t.status = mytaskCurrentStatus;
+      closeMytaskModal();
+      renderMytaskCalendar();
+      renderMytaskList();
+    } catch(e) { alert('저장 실패: ' + e.message); }
+    return;
+  }
+
   const title     = document.getElementById('mytaskTitle').value.trim();
   const memo      = document.getElementById('mytaskMemo').value.trim();
   const startDate = document.getElementById('mytaskStartDate').value;
   const endDate   = document.getElementById('mytaskEndDate').value;
-  const status    = document.getElementById('mytaskStatus').value;
   if (!title)     { alert('제목을 입력하세요'); return; }
   if (!startDate) { alert('시작일을 입력하세요'); return; }
   if (!endDate)   { alert('마감일을 입력하세요'); return; }
 
-  const data = { title, memo, startDate, endDate, status, updatedAt: new Date().toISOString() };
+  const existing = mytaskEditId ? (mytaskTasks.find(t => t.id === mytaskEditId) || {}) : {};
+  const data = {
+    title, memo, startDate, endDate,
+    status: mytaskCurrentStatus,
+    sharedWith: mytaskCurrentShared,
+    linkedTasks: mytaskCurrentLinked,
+    comments: existing.comments || [],
+    updatedAt: new Date().toISOString()
+  };
   try {
     if (mytaskEditId) {
       await setDoc(doc(fbDb, 'tasks', user.uid, 'items', mytaskEditId), data);
       const idx = mytaskTasks.findIndex(t => t.id === mytaskEditId);
-      if (idx >= 0) mytaskTasks[idx] = { id: mytaskEditId, ...data };
+      if (idx >= 0) mytaskTasks[idx] = { id: mytaskEditId, ownerUid: user.uid, ...data };
     } else {
       const ref = await addDoc(collection(fbDb, 'tasks', user.uid, 'items'), data);
-      mytaskTasks.push({ id: ref.id, ...data });
+      mytaskTasks.push({ id: ref.id, ownerUid: user.uid, ...data });
     }
     closeMytaskModal();
     renderMytaskCalendar();
@@ -6630,6 +6836,12 @@ window.closeMytaskModalOverlay = closeMytaskModalOverlay;
 window.saveMytask              = saveMytask;
 window.deleteMytask            = deleteMytask;
 window.mytaskCellClick         = mytaskCellClick;
+window.setMytaskStatusBtn      = setMytaskStatusBtn;
+window.addMytaskShare          = addMytaskShare;
+window.removeMytaskShare       = removeMytaskShare;
+window.addMytaskLink           = addMytaskLink;
+window.removeMytaskLink        = removeMytaskLink;
+window.addMytaskComment        = addMytaskComment;
 
 </script>
 </body>
