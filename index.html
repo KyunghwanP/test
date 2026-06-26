@@ -377,36 +377,47 @@
     .pts-detail-row .points-select{ font-size:13px; }
     .pts-custom-toggle{ font-size:12px; padding:0 8px; }
 
-    /* 학생 행: 2줄로 분리 */
+    /* 학생 행: 3열×2행으로 */
     .pts-student-row{
       grid-template-columns:1fr 1fr 1fr;
       grid-template-rows:auto auto;
+      gap:5px;
     }
-    .pts-student-row > select:nth-child(1){ grid-column:1; } /* 학년 */
-    .pts-student-row > select:nth-child(2){ grid-column:2; } /* 반 */
-    .pts-student-row > input:nth-child(3) { grid-column:3; } /* 번호 */
-    .pts-student-row > input:nth-child(4) { grid-column:1/3; grid-row:2; } /* 이름 */
-    .pts-student-row > input:nth-child(5) { grid-column:3;   grid-row:2; } /* 점수 */
-    .pts-student-row > button             { grid-column:3;   grid-row:1; justify-self:end; } /* 삭제 */
+    /* 1행: 학년/반/번호 */
+    .pts-student-row > *:nth-child(1){ grid-column:1; grid-row:1; }
+    .pts-student-row > *:nth-child(2){ grid-column:2; grid-row:1; }
+    .pts-student-row > *:nth-child(3){ grid-column:3; grid-row:1; }
+    /* 2행: 이름(2칸)/점수/삭제 */
+    .pts-student-row > *:nth-child(4){ grid-column:1/3; grid-row:2; }
+    .pts-student-row > *:nth-child(5){ grid-column:3; grid-row:2; }
+    .pts-student-row > *:nth-child(6){ display:none; }
 
+    /* 열 레이블도 동일하게 */
     .pts-row-label{
       grid-template-columns:1fr 1fr 1fr;
       grid-template-rows:auto auto;
+      gap:5px;
     }
-    .pts-row-label > span:nth-child(1){ grid-column:1; }
-    .pts-row-label > span:nth-child(2){ grid-column:2; }
-    .pts-row-label > span:nth-child(3){ grid-column:3; }
-    .pts-row-label > span:nth-child(4){ grid-column:1/3; grid-row:2; }
-    .pts-row-label > span:nth-child(5){ grid-column:3;   grid-row:2; }
-    .pts-row-label > span:nth-child(6){ display:none; }
+    .pts-row-label > *:nth-child(1){ grid-column:1; grid-row:1; }
+    .pts-row-label > *:nth-child(2){ grid-column:2; grid-row:1; }
+    .pts-row-label > *:nth-child(3){ grid-column:3; grid-row:1; }
+    .pts-row-label > *:nth-child(4){ grid-column:1/3; grid-row:2; }
+    .pts-row-label > *:nth-child(5){ grid-column:3; grid-row:2; }
+    .pts-row-label > *:nth-child(6){ display:none; }
+
+    /* 삭제 버튼은 학년 위에 겹치게 우상단 절대위치로 */
+    .pts-student-row{ position:relative; }
+    .pts-remove-btn{
+      position:absolute;top:4px;right:4px;
+      width:22px;height:22px;font-size:14px;
+    }
 
     .pts-students-header{ flex-wrap:wrap; gap:6px; }
     .pts-students-header > div { width:100%; }
     .pts-students-header > div:last-child{ display:flex; gap:6px; width:100%; }
     .pts-sync-btn{ flex:1; font-size:12px; height:32px; }
-    .pts-add-student-btn{ flex:1; font-size:12px; }
+    .pts-add-student-btn{ flex:1; font-size:13px; }
 
-    .pts-add-student-btn{ font-size:13px; }
     .points-submit-btn{ font-size:15px; padding:12px; }
     .points-teacher-info{ font-size:13px; }
     .points-history-title{ font-size:14px; }
@@ -416,6 +427,30 @@
     .points-history-badge{ font-size:12px; }
     .points-toast{ font-size:13px; padding:10px 16px; white-space:normal; text-align:center; max-width:90vw; }
   }
+
+  .pts-name-wrap{ position:relative; min-width:0; }
+  .pts-suggestions{
+    display:none;
+    position:absolute;top:100%;left:0;right:0;z-index:999;
+    background:var(--paper);border:1.5px solid var(--mon);
+    border-radius:8px;box-shadow:0 8px 24px -4px rgba(0,0,0,0.2);
+    max-height:200px;overflow-y:auto;
+  }
+  .pts-suggestions.show{ display:block; }
+  .pts-suggestion-item{
+    padding:10px 14px;cursor:pointer;
+    font-family:'Pretendard','Noto Sans KR';font-size:14px;color:var(--ink);
+    border-bottom:1px solid var(--rule);
+    display:flex;align-items:center;gap:8px;
+  }
+  .pts-suggestion-item:last-child{ border-bottom:none; }
+  .pts-suggestion-item:hover{ background:var(--paper-soft); }
+  .pts-suggestion-tag{
+    font-family:'IBM Plex Mono';font-size:11px;font-weight:700;
+    background:var(--mon);color:#fff;
+    padding:2px 6px;border-radius:4px;white-space:nowrap;flex-shrink:0;
+  }
+  .pts-suggestion-name{ font-weight:700; }
 
   /* 버전 표시 */
   .nav-version{
@@ -1747,7 +1782,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.24</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.27</div>
   </div>
 </div>
 
@@ -1822,7 +1857,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver2.24</div>
+    <div class="nav-version">ver2.27</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -4982,7 +5017,7 @@ function navigateTo(page) {
 }
 
 // ══════════════════════════════════════════
-// 상벌점 입력 기능 (ver2.24)
+// 상벌점 입력 기능 (ver2.27)
 // ══════════════════════════════════════════
 const POINTS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
 let ptsType = null;
@@ -5122,17 +5157,24 @@ function renderStudentRows() {
         <option value="">반</option>
         ${getRoomOptions(s.grade, s.room)}
       </select>
-      <input class="points-input pts-num-input" type="number" min="1" max="40" placeholder="번호"
-        value="${s.num}" oninput="onStudentNumInput(${idx},this.value)" style="text-align:center;">
-      <input class="points-input pts-name-input ${s.name ? 'pts-name-found' : ''}"
-        type="text" placeholder="이름" value="${s.name}"
-        oninput="onStudentNameInput(${idx},this.value)"
-        id="ptsNameEl_${idx}"
-        style="min-width:0;">
-      <input class="points-input" type="number" min="1" max="20" placeholder="점수"
-        value="${s.score||''}"
-        oninput="onStudentScoreInput(${idx},this.value)"
-        style="text-align:center;">
+      <select class="points-select" onchange="onStudentNumInput(${idx},this.value)" style="text-align:center;">
+        <option value="">번호</option>
+        ${Array.from({length:40},(_,i)=>`<option value="${i+1}" ${s.num===String(i+1)?'selected':''}>${i+1}번</option>`).join('')}
+      </select>
+      <div class="pts-name-wrap" style="position:relative;min-width:0;">
+        <input class="points-input pts-name-input ${s.name ? 'pts-name-found' : ''}"
+          type="text" placeholder="이름 검색" value="${s.name}"
+          oninput="onStudentNameInput(${idx},this.value)"
+          onblur="hideSuggestions(${idx})"
+          autocomplete="off"
+          id="ptsNameEl_${idx}"
+          style="min-width:0;width:100%;">
+        <div class="pts-suggestions" id="ptsSug_${idx}"></div>
+      </div>
+      <select class="points-select" onchange="onStudentScoreInput(${idx},this.value)" style="text-align:center;">
+        <option value="">점수</option>
+        ${[1,2,3,5,10].map(n=>`<option value="${n}" ${s.score===String(n)?'selected':''}>${n}점</option>`).join('')}
+      </select>
       <button class="pts-remove-btn" onclick="removeStudentRow(${idx})"
         ${ptsStudentRows.length===1?'style="visibility:hidden;"':''}>×</button>
     `;
@@ -5146,12 +5188,13 @@ function renderStudentRows() {
         <option value="">— 사유 선택 —</option>
         ${detailRules}
       </select>
-      <button class="points-custom-toggle ${s.customMode?'active':''}" onclick="toggleStudentCustom(${idx})">직접입력</button>
+      <button class="points-custom-toggle ${s.customMode?'active':''}" onclick="toggleStudentCustom(${idx})">${s.customMode?'직접입력 접기':'+ 직접입력 추가'}</button>
     `;
+    // 직접입력 textarea (customMode일 때 표시)
     if (s.customMode) {
       const ta = document.createElement('textarea');
       ta.className = 'points-textarea points-custom-input show';
-      ta.placeholder = '직접 사유 입력...';
+      ta.placeholder = '드롭다운 사유에 추가로 입력할 내용...';
       ta.value = s.customDetail || '';
       ta.oninput = () => { ptsStudentRows[idx].customDetail = ta.value; };
       detailRow.appendChild(ta);
@@ -5241,6 +5284,59 @@ function onStudentNumInput(idx, value) {
 
 function onStudentNameInput(idx, value) {
   ptsStudentRows[idx].name = value;
+  const nameEl = document.getElementById(`ptsNameEl_${idx}`);
+  const sugEl  = document.getElementById(`ptsSug_${idx}`);
+  if (!sugEl) return;
+
+  const query = value.trim();
+  if (query.length < 1) { sugEl.classList.remove('show'); sugEl.innerHTML = ''; return; }
+
+  // 이름으로 학생 검색
+  const s = ptsStudentRows[idx];
+  let matches = allStudents.filter(st => st.name.includes(query));
+
+  // 학년/반/번호가 이미 입력된 경우 해당 조건으로 필터
+  if (s.grade) matches = matches.filter(st => String(st.grade) === String(s.grade));
+  if (s.room)  matches = matches.filter(st => String(st.room)  === String(s.room));
+  if (s.num)   matches = matches.filter(st => String(st.num)   === String(s.num));
+
+  if (matches.length === 0) { sugEl.classList.remove('show'); sugEl.innerHTML = ''; return; }
+
+  // 정확히 1명이고 이름이 완전 일치하면 자동 채우기
+  if (matches.length === 1 && matches[0].name === query) {
+    applyStudent(idx, matches[0]);
+    sugEl.classList.remove('show');
+    return;
+  }
+
+  // 목록 표시
+  sugEl.innerHTML = matches.slice(0, 10).map((st, i) =>
+    `<div class="pts-suggestion-item" onmousedown="applyStudent(${idx}, {grade:'${st.grade}',room:'${st.room}',num:'${st.num}',name:'${st.name}'})">
+      <span class="pts-suggestion-tag">${st.grade}학년 ${st.room}반 ${st.num}번</span>
+      <span class="pts-suggestion-name">${st.name}</span>
+    </div>`
+  ).join('');
+  sugEl.classList.add('show');
+}
+
+function applyStudent(idx, st) {
+  ptsStudentRows[idx].grade = String(st.grade);
+  ptsStudentRows[idx].room  = String(st.room);
+  ptsStudentRows[idx].num   = String(st.num);
+  ptsStudentRows[idx].name  = st.name;
+  // 자동완성 후 행 재렌더
+  renderStudentRows();
+  // 이름 초록색 표시
+  const nameEl = document.getElementById(`ptsNameEl_${idx}`);
+  if (nameEl) nameEl.className = 'points-input pts-name-input pts-name-found';
+}
+
+function hideSuggestions(idx) {
+  // blur 시 약간 딜레이 (mousedown 이벤트 먼저 처리되도록)
+  setTimeout(() => {
+    const sugEl = document.getElementById(`ptsSug_${idx}`);
+    if (sugEl) { sugEl.classList.remove('show'); }
+  }, 200);
 }
 
 function onStudentScoreInput(idx, value) {
@@ -5381,14 +5477,16 @@ async function submitPoints() {
 
   // 각 학생별 사유 + 점수 결정
   for (const s of validStudents) {
-    if (s.customMode) {
-      s._detail = (s.customDetail || '').trim();
-    } else {
-      s._detail = s.detail || '';
-    }
+    // 드롭다운 + 직접입력 둘 다 합쳐서 저장
+    const parts = [];
+    if (s.detail) parts.push(s.detail);
+    if (s.customDetail && s.customDetail.trim()) parts.push(s.customDetail.trim());
+    s._detail = parts.join(' / ');
     if (!s._detail) { showPointsToast(`${s.name}의 사유를 입력하세요`, 'error'); return; }
     s._score = Number(s.score);
     if (!s._score || s._score < 1) { showPointsToast(`${s.name}의 점수를 입력하세요`, 'error'); return; }
+    // 벌점이면 음수로 저장
+    if (ptsType === '벌점') s._score = -Math.abs(s._score);
   }
 
   const user = fbAuth.currentUser;
@@ -5462,6 +5560,8 @@ window.onStudentFieldChange = onStudentFieldChange;
 window.onStudentNumInput    = onStudentNumInput;
 window.onStudentNameInput   = onStudentNameInput;
 window.onStudentScoreInput  = onStudentScoreInput;
+window.applyStudent         = applyStudent;
+window.hideSuggestions      = hideSuggestions;
 window.onStudentDetailSelect = onStudentDetailSelect;
 window.toggleStudentCustom  = toggleStudentCustom;
 window.syncAllDetails       = syncAllDetails;
