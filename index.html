@@ -163,7 +163,7 @@
   .app-shell.desktop-nav .mobile-tab-bar{display:none;}
 
   /* ══════════════════════════════════════════
-     상벌점 입력 페이지
+     상벌점 조회·입력 페이지
   ══════════════════════════════════════════ */
   .points-body{
     flex:1;overflow-y:auto;padding:16px;
@@ -466,20 +466,22 @@
   }
   .pts-suggestion-name{ font-weight:700; }
 
-  /* 상벌점 입력/조회 탭 */
+  /* 상벌점 조회·입력/조회 탭 */
   .pts-mode-tabs{
-    display:flex;gap:0;margin-bottom:16px;
-    background:var(--paper-soft);border-radius:10px;padding:4px;
+    display:grid;grid-template-columns:1fr 1fr;
+    border-bottom:2px solid var(--rule);
+    margin-bottom:0;
+    background:var(--paper);
   }
   .pts-mode-btn{
-    flex:1;padding:10px 0;border-radius:8px;border:none;
+    padding:14px 0;border:none;border-bottom:3px solid transparent;
     background:transparent;cursor:pointer;
     font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:16px;
     color:var(--ink-soft);transition:all .15s;
+    margin-bottom:-2px;
   }
   .pts-mode-btn.active{
-    background:var(--paper);color:var(--mon);
-    box-shadow:0 1px 4px rgba(0,0,0,0.15);
+    color:var(--mon);border-bottom-color:var(--mon);
   }
 
   /* 조회 화면 */
@@ -553,6 +555,62 @@
     font-size:12px;font-weight:700;color:var(--ink-soft);
     font-family:'IBM Plex Mono';
   }
+
+  .pts-detail-modal{
+    display:none;position:fixed;inset:0;z-index:9000;
+    background:rgba(0,0,0,0.4);
+    align-items:center;justify-content:center;
+    padding:16px;
+  }
+  .pts-detail-modal.show{ display:flex; }
+  .pts-detail-box{
+    background:var(--paper);border-radius:14px;
+    width:100%;max-width:480px;max-height:80vh;
+    display:flex;flex-direction:column;
+    box-shadow:0 8px 40px rgba(0,0,0,0.3);
+    overflow:hidden;
+  }
+  .pts-detail-head{
+    padding:16px 20px;border-bottom:1px solid var(--rule);
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .pts-detail-head-name{
+    font-family:'Pretendard','Noto Sans KR';font-weight:900;font-size:18px;
+    color:var(--ink);
+  }
+  .pts-detail-head-info{
+    font-size:13px;color:var(--ink-soft);margin-top:2px;
+    font-family:'IBM Plex Mono';
+  }
+  .pts-detail-close{
+    width:32px;height:32px;border-radius:8px;border:none;
+    background:var(--paper-soft);cursor:pointer;font-size:18px;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--ink-soft);
+  }
+  .pts-detail-scores{
+    display:grid;grid-template-columns:1fr 1fr 1fr;
+    gap:1px;background:var(--rule);border-bottom:1px solid var(--rule);
+  }
+  .pts-detail-score-item{
+    padding:12px;text-align:center;background:var(--paper);
+  }
+  .pts-detail-score-label{font-size:11px;color:var(--ink-soft);margin-bottom:4px;}
+  .pts-detail-score-val{font-family:'IBM Plex Mono';font-weight:700;font-size:20px;}
+  .pts-detail-score-val.plus{color:#10B981;}
+  .pts-detail-score-val.minus{color:#EF4444;}
+  .pts-detail-records{overflow-y:auto;flex:1;padding:12px 20px;}
+  .pts-detail-record-item{
+    padding:10px 0;border-bottom:1px solid var(--rule);
+    display:flex;gap:10px;align-items:flex-start;
+  }
+  .pts-detail-record-item:last-child{border-bottom:none;}
+  .pts-detail-record-date{
+    font-family:'IBM Plex Mono';font-size:12px;color:var(--ink-soft);
+    white-space:nowrap;flex-shrink:0;padding-top:2px;
+  }
+  .pts-detail-record-text{font-size:14px;color:var(--ink);line-height:1.5;}
+  .pts-detail-empty{padding:24px;text-align:center;color:var(--ink-soft);font-size:14px;}
 
   /* 버전 표시 */
   .nav-version{
@@ -1884,7 +1942,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.35</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.39</div>
   </div>
 </div>
 
@@ -1914,7 +1972,7 @@
       <span class="tab-item-icon">📅</span>시간표
     </div>
     <div class="tab-item" data-page="points">
-      <span class="tab-item-icon">📝</span>상벌점
+      <span class="tab-item-icon">📝</span>상벌점 조회·입력
     </div>
     <div class="tab-item" data-page="contacts">
       <span class="tab-item-icon">📞</span>교원연락망
@@ -1948,7 +2006,7 @@
         <span class="main-nav-icon">📅</span>시간표
       </div>
       <div class="main-nav-item" data-page="points">
-        <span class="main-nav-icon">📝</span>상벌점 입력
+        <span class="main-nav-icon">📝</span>상벌점 조회·입력
       </div>
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>교원연락망
@@ -1959,7 +2017,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver2.35</div>
+    <div class="nav-version">ver2.39</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -2178,21 +2236,21 @@
         </div>
       </div>
 
-      <!-- 상벌점 입력 페이지 -->
+      <!-- 상벌점 조회·입력 페이지 -->
       <div class="page-view" id="pointsPage">
         <!-- 입력/조회 탭 버튼 -->
-        <div style="padding:12px 16px 0;background:var(--bg-base);">
+        <div style="background:var(--paper);">
           <div class="pts-mode-tabs">
-            <button class="pts-mode-btn active" id="ptsModeInput" onclick="switchPointsMode('input')">✏️ 입력</button>
-            <button class="pts-mode-btn" id="ptsModeView" onclick="switchPointsMode('view')">📊 조회</button>
+            <button class="pts-mode-btn active" id="ptsModeView" onclick="switchPointsMode('view')">📊 조회</button>
+            <button class="pts-mode-btn" id="ptsModeInput" onclick="switchPointsMode('input')">✏️ 입력</button>
           </div>
         </div>
 
         <!-- 입력 화면 -->
-        <div id="ptsInputSection" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+        <div id="ptsInputSection" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
           <div class="points-body">
           <div class="points-card">
-            <div class="points-card-title">📝 상벌점 입력</div>
+            <div class="points-card-title">📝 상벌점 조회·입력</div>
 
             <!-- 유형 -->
             <div class="points-field">
@@ -2268,7 +2326,7 @@
         </div><!-- ptsInputSection 끝 -->
 
         <!-- 조회 화면 -->
-        <div id="ptsViewSection" style="display:none;flex:1;overflow:hidden;flex-direction:column;">
+        <div id="ptsViewSection" style="display:flex;flex:1;overflow:hidden;flex-direction:column;">
           <div class="pts-view-body">
             <div class="pts-view-wrap">
               <!-- 업데이트 시각 -->
@@ -2288,12 +2346,22 @@
               </div>
 
               <!-- 반 그룹 카드 -->
-              <div class="pts-group-grid" id="ptsGroupGrid"></div>
+              <div id="ptsGroupSection">
+                <div class="pts-group-grid" id="ptsGroupGrid"></div>
+              </div>
 
               <!-- 학생 목록 -->
               <div id="ptsStudentListWrap" style="display:none;">
+                <!-- 뒤로가기 -->
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                  <button onclick="backToPtsGroups()" style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--rule);background:var(--paper);cursor:pointer;font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;color:var(--ink-soft);">← 목록으로</button>
+                  <span id="ptsCurrentRoom" style="font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:16px;color:var(--ink);"></span>
+                </div>
                 <div class="pts-list-header">
-                  <span>번호</span><span>이름</span><span style="text-align:center;">합계</span><span style="text-align:center;">상점</span><span style="text-align:center;">벌점</span>
+                  <span>번호</span><span>이름</span>
+                  <span style="text-align:center;cursor:pointer;" onclick="sortPtsBy('total')" id="ptsSort_total">합계 ↕</span>
+                  <span style="text-align:center;cursor:pointer;" onclick="sortPtsBy('merit')" id="ptsSort_merit">상점 ↕</span>
+                  <span style="text-align:center;cursor:pointer;" onclick="sortPtsBy('demerit')" id="ptsSort_demerit">벌점 ↕</span>
                 </div>
                 <div class="pts-student-list" id="ptsStudentList"></div>
               </div>
@@ -2307,6 +2375,34 @@
     </div><!-- .app-content 끝 -->
   </div><!-- .app-body 끝 -->
 </div><!-- .app-shell 끝 -->
+
+<!-- 상벌점 상세 팝업 -->
+<div class="pts-detail-modal" id="ptsDetailModal" onclick="closePtsDetail(event)">
+  <div class="pts-detail-box">
+    <div class="pts-detail-head">
+      <div>
+        <div class="pts-detail-head-name" id="ptsDetailName"></div>
+        <div class="pts-detail-head-info" id="ptsDetailInfo"></div>
+      </div>
+      <button class="pts-detail-close" onclick="closePtsDetailBtn()">×</button>
+    </div>
+    <div class="pts-detail-scores">
+      <div class="pts-detail-score-item">
+        <div class="pts-detail-score-label">합계</div>
+        <div class="pts-detail-score-val" id="ptsDetailTotal"></div>
+      </div>
+      <div class="pts-detail-score-item">
+        <div class="pts-detail-score-label">상점</div>
+        <div class="pts-detail-score-val plus" id="ptsDetailMerit"></div>
+      </div>
+      <div class="pts-detail-score-item">
+        <div class="pts-detail-score-label">벌점</div>
+        <div class="pts-detail-score-val minus" id="ptsDetailDemerit"></div>
+      </div>
+    </div>
+    <div class="pts-detail-records" id="ptsDetailRecords"></div>
+  </div>
+</div>
 
 <div class="modal-overlay" id="swapModal">
   <div class="modal-box">
@@ -5166,7 +5262,7 @@ function navigateTo(page) {
 }
 
 // ══════════════════════════════════════════
-// 상벌점 입력 기능 (ver2.35)
+// 상벌점 조회·입력 기능 (ver2.39)
 // ══════════════════════════════════════════
 const POINTS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
 let ptsType = null;
@@ -5622,7 +5718,8 @@ async function initPointsPage() {
     ptsStudentRows = [{ grade:'', room:'', num:'', name:'' }];
     renderStudentRows();
   }
-  populateDetailSelect(ptsType || '');
+  // 조회 데이터 자동 로드
+  if (!ptsViewLoaded) loadPtsViewData();
 }
 
 function selectPointType(type) {
@@ -5805,8 +5902,8 @@ function switchPointsMode(mode) {
   } else {
     inputSec.style.display = 'none';
     viewSec.style.display  = 'flex';
-    inputBtn.classList.remove('active');
     viewBtn.classList.add('active');
+    inputBtn.classList.remove('active');
     if (!ptsViewLoaded) loadPtsViewData();
   }
 }
@@ -5853,8 +5950,12 @@ function renderPtsGroups() {
     ? ptsViewData
     : ptsViewData.filter(s => String(s.grade) === ptsViewGrade);
 
-  // 반 목록 추출
-  const rooms = [...new Set(filtered.map(s => `${s.grade}-${s.room}`))].sort();
+  // 반 목록 추출 - 숫자 기준 정렬
+  const rooms = [...new Set(filtered.map(s => `${s.grade}-${s.room}`))].sort((a, b) => {
+    const [ag, ar] = a.split('-').map(Number);
+    const [bg, br] = b.split('-').map(Number);
+    return ag !== bg ? ag - bg : ar - br;
+  });
   grid.innerHTML = rooms.map(key => {
     const [g, r] = key.split('-');
     const cnt = filtered.filter(s => String(s.grade)===g && String(s.room)===r).length;
@@ -5869,15 +5970,56 @@ function renderPtsGroups() {
   }
 }
 
+let ptsSortKey  = null;
+let ptsSortDesc = true;
+let ptsCurrentStudents = [];
+
 function selectPtsRoom(key) {
   ptsViewRoom = key;
   renderPtsGroups();
   const [g, r] = key.split('-');
+  // 그룹 카드 숨기기
+  document.getElementById('ptsGroupSection').style.display = 'none';
+  document.getElementById('ptsCurrentRoom').textContent = `${g}학년 ${r}반`;
   const students = ptsViewData
     .filter(s => String(s.grade)===g && String(s.room)===r)
     .sort((a,b) => a.num - b.num);
+  ptsCurrentStudents = students;
+  ptsSortKey = null;
   renderPtsStudentList(students);
 }
+
+function backToPtsGroups() {
+  document.getElementById('ptsGroupSection').style.display = 'block';
+  document.getElementById('ptsStudentListWrap').style.display = 'none';
+  ptsViewRoom = null;
+  ptsSortKey  = null;
+  renderPtsGroups();
+}
+
+function sortPtsBy(key) {
+  if (ptsSortKey === key) {
+    ptsSortDesc = !ptsSortDesc;
+  } else {
+    ptsSortKey  = key;
+    ptsSortDesc = true;
+  }
+  // 헤더 표시 업데이트
+  ['total','merit','demerit'].forEach(k => {
+    const el = document.getElementById(`ptsSort_${k}`);
+    if (!el) return;
+    const labels = { total:'합계', merit:'상점', demerit:'벌점' };
+    el.textContent = labels[k] + (k === ptsSortKey ? (ptsSortDesc ? ' ↓' : ' ↑') : ' ↕');
+  });
+  const sorted = [...ptsCurrentStudents].sort((a,b) => {
+    const av = a[key] || 0, bv = b[key] || 0;
+    return ptsSortDesc ? bv - av : av - bv;
+  });
+  renderPtsStudentList(sorted);
+}
+
+window.backToPtsGroups = backToPtsGroups;
+window.sortPtsBy       = sortPtsBy;
 
 function filterPtsStudents() {
   const q = document.getElementById('ptsViewSearch').value.trim();
@@ -5885,13 +6027,16 @@ function filterPtsStudents() {
     if (ptsViewRoom) {
       const [g, r] = ptsViewRoom.split('-');
       const students = ptsViewData.filter(s => String(s.grade)===g && String(s.room)===r).sort((a,b)=>a.num-b.num);
+      ptsCurrentStudents = students;
       renderPtsStudentList(students);
     }
     return;
   }
   const filtered = ptsViewData.filter(s => s.name?.includes(q));
+  ptsCurrentStudents = filtered;
   renderPtsStudentList(filtered);
   document.getElementById('ptsStudentListWrap').style.display = 'block';
+  document.getElementById('ptsGroupSection').style.display = 'none';
 }
 
 function renderPtsStudentList(students) {
@@ -5904,9 +6049,9 @@ function renderPtsStudentList(students) {
   }
   document.getElementById('ptsViewEmpty').style.display = 'none';
   wrap.style.display = 'block';
-  list.innerHTML = students.map(s => {
+  list.innerHTML = students.map((s, i) => {
     const totalCls = s.total > 0 ? 'plus' : s.total < 0 ? 'minus' : '';
-    return `<div class="pts-student-item">
+    return `<div class="pts-student-item" onclick="showPtsDetail(${i}, '${encodeURIComponent(JSON.stringify(s))}')">
       <span class="pts-snum">${String(s.num).padStart(2,'0')}</span>
       <span class="pts-sname">${s.name}</span>
       <span class="pts-stotal ${totalCls}">${s.total > 0 ? '+':''}${s.total}</span>
@@ -5920,6 +6065,39 @@ window.switchPointsMode = switchPointsMode;
 window.selectPtsGrade   = selectPtsGrade;
 window.selectPtsRoom    = selectPtsRoom;
 window.filterPtsStudents = filterPtsStudents;
+function showPtsDetail(idx, encoded) {
+  const s = JSON.parse(decodeURIComponent(encoded));
+  document.getElementById('ptsDetailName').textContent = s.name;
+  document.getElementById('ptsDetailInfo').textContent = `${s.grade}학년 ${s.room}반 ${String(s.num).padStart(2,'0')}번`;
+  const totalEl = document.getElementById('ptsDetailTotal');
+  totalEl.textContent = (s.total > 0 ? '+' : '') + s.total;
+  totalEl.className = 'pts-detail-score-val ' + (s.total > 0 ? 'plus' : s.total < 0 ? 'minus' : '');
+  document.getElementById('ptsDetailMerit').textContent = '+' + (s.merit || 0);
+  document.getElementById('ptsDetailDemerit').textContent = s.demerit || 0;
+
+  const recordsEl = document.getElementById('ptsDetailRecords');
+  if (!s.records || s.records.length === 0) {
+    recordsEl.innerHTML = '<div class="pts-detail-empty">상세 내역이 없습니다.</div>';
+  } else {
+    recordsEl.innerHTML = s.records.map(r => `
+      <div class="pts-detail-record-item">
+        <span class="pts-detail-record-date">${r.date}</span>
+        <span class="pts-detail-record-text">${r.detail}</span>
+      </div>
+    `).join('');
+  }
+  document.getElementById('ptsDetailModal').classList.add('show');
+}
+
+function closePtsDetail(e) {
+  if (e.target === document.getElementById('ptsDetailModal')) closePtsDetailBtn();
+}
+function closePtsDetailBtn() {
+  document.getElementById('ptsDetailModal').classList.remove('show');
+}
+window.showPtsDetail     = showPtsDetail;
+window.closePtsDetail    = closePtsDetail;
+window.closePtsDetailBtn = closePtsDetailBtn;
 
 </script>
 </body>
