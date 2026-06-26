@@ -2253,7 +2253,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver2.45</div>
+    <div class="nav-version">ver2.48</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -2688,9 +2688,15 @@
         <div class="mytask-modal-field">
           <label>공유 담당자</label>
           <div id="mytaskSharedList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;min-height:24px;"></div>
-          <select id="mytaskShareSelect" onchange="addMytaskShare(this.value)">
-            <option value="">+ 선생님 추가...</option>
-          </select>
+          <div style="position:relative;">
+            <input type="text" id="mytaskShareInput" placeholder="선생님 이름 검색..."
+              oninput="searchMytaskShare(this.value)"
+              onblur="hideMytaskShareSug()"
+              onkeydown="mytaskShareKeydown(event)"
+              autocomplete="off"
+              style="width:100%;padding:10px 12px;border:1.5px solid var(--rule);border-radius:8px;font-size:15px;background:var(--paper);color:var(--ink);">
+            <div id="mytaskShareSug" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:9999;background:var(--paper);border:1.5px solid var(--mon);border-radius:8px;box-shadow:0 8px 24px -4px rgba(0,0,0,0.2);max-height:180px;overflow-y:auto;"></div>
+          </div>
         </div>
 
         <!-- 연계 일정 -->
@@ -6617,12 +6623,56 @@ function setMytaskStatusBtn(status) {
   });
 }
 
+function searchMytaskShare(val) {
+  const sug  = document.getElementById('mytaskShareSug');
+  const user = fbAuth.currentUser;
+  const q    = val.trim();
+  if (!q) { sug.style.display = 'none'; return; }
+  const matches = TEACHERS.filter(t =>
+    t.name?.includes(q) &&
+    t.email && t.email !== user?.email &&
+    !mytaskCurrentShared.includes(t.email)
+  ).slice(0, 8);
+  if (matches.length === 0) { sug.style.display = 'none'; return; }
+  sug.innerHTML = matches.map(t =>
+    `<div style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--rule);"
+      onmousedown="selectMytaskShare('${t.email}','${t.name}')"
+      onmouseover="this.style.background='var(--paper-soft)'"
+      onmouseout="this.style.background=''">
+      ${t.name} <span style="font-size:12px;color:var(--ink-soft);">${t.subject||''}</span>
+    </div>`
+  ).join('');
+  sug.style.display = 'block';
+}
+
+function selectMytaskShare(email, name) {
+  if (!mytaskCurrentShared.includes(email)) {
+    mytaskCurrentShared.push(email);
+    renderMytaskSharedList();
+  }
+  document.getElementById('mytaskShareInput').value = '';
+  document.getElementById('mytaskShareSug').style.display = 'none';
+}
+
+function mytaskShareKeydown(e) {
+  if (e.key === 'Backspace' && e.target.value === '' && mytaskCurrentShared.length > 0) {
+    mytaskCurrentShared.pop();
+    renderMytaskSharedList();
+  }
+}
+window.mytaskShareKeydown = mytaskShareKeydown;
+
+function hideMytaskShareSug() {
+  setTimeout(() => {
+    const sug = document.getElementById('mytaskShareSug');
+    if (sug) sug.style.display = 'none';
+  }, 200);
+}
+
 function addMytaskShare(email) {
-  if (!email) return;
-  if (mytaskCurrentShared.includes(email)) return;
+  if (!email || mytaskCurrentShared.includes(email)) return;
   mytaskCurrentShared.push(email);
   renderMytaskSharedList();
-  document.getElementById('mytaskShareSelect').value = '';
 }
 
 function removeMytaskShare(email) {
@@ -6726,11 +6776,9 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
   linkSel.innerHTML = '<option value="">+ 내 일정 연결...</option>' +
     mytaskTasks.filter(t => t.id !== id).map(t => `<option value="${t.id}">${t.title}</option>`).join('');
 
-  // 공유 선생님 드롭다운 채우기
-  const shareSel = document.getElementById('mytaskShareSelect');
-  shareSel.innerHTML = '<option value="">+ 선생님 추가...</option>' +
-    TEACHERS.filter(t => t.email && t.email !== user.email)
-      .map(t => `<option value="${t.email}">${t.name}</option>`).join('');
+  // 공유 입력창 초기화
+  const shareInput = document.getElementById('mytaskShareInput');
+  if (shareInput) shareInput.value = '';
 
   if (id) {
     const t = mytaskTasks.find(t => t.id === id) || mytaskShared.find(t => t.id === id);
@@ -6838,6 +6886,9 @@ window.deleteMytask            = deleteMytask;
 window.mytaskCellClick         = mytaskCellClick;
 window.setMytaskStatusBtn      = setMytaskStatusBtn;
 window.addMytaskShare          = addMytaskShare;
+window.searchMytaskShare       = searchMytaskShare;
+window.selectMytaskShare       = selectMytaskShare;
+window.hideMytaskShareSug      = hideMytaskShareSug;
 window.removeMytaskShare       = removeMytaskShare;
 window.addMytaskLink           = addMytaskLink;
 window.removeMytaskLink        = removeMytaskLink;
