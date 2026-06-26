@@ -1747,7 +1747,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.23</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.24</div>
   </div>
 </div>
 
@@ -1785,6 +1785,9 @@
     <div class="tab-item" data-page="students">
       <span class="tab-item-icon">🎒</span>학생연락망
     </div>
+    <div class="tab-item" data-page="meal">
+      <span class="tab-item-icon">🍱</span>식단표
+    </div>
   </div>
 
   <!-- 앱 바디 -->
@@ -1816,7 +1819,10 @@
       <div class="main-nav-item" data-page="students">
         <span class="main-nav-icon">🎒</span>학생연락망
       </div>
-    <div class="nav-version">ver2.23</div>
+      <div class="main-nav-item" data-page="meal">
+        <span class="main-nav-icon">🍱</span>식단표
+      </div>
+    <div class="nav-version">ver2.24</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -4976,7 +4982,7 @@ function navigateTo(page) {
 }
 
 // ══════════════════════════════════════════
-// 상벌점 입력 기능 (ver2.23)
+// 상벌점 입력 기능 (ver2.24)
 // ══════════════════════════════════════════
 const POINTS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
 let ptsType = null;
