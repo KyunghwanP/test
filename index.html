@@ -445,6 +445,8 @@
   .mytask-cal-cell{
     min-height:80px;padding:4px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);
     cursor:pointer;transition:background .1s;
+    overflow:hidden;
+    min-width:0;
   }
   .mytask-cal-cell:nth-child(7n){border-right:none;}
   .mytask-cal-cell:hover{background:var(--paper-soft);}
@@ -2190,7 +2192,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.57</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.58</div>
   </div>
 </div>
 
@@ -2268,7 +2270,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver2.57</div>
+    <div class="nav-version">ver2.58</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
