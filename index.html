@@ -2218,7 +2218,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver2.43</div>
+    <div class="nav-version">ver2.44</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -3891,7 +3891,7 @@ onAuthStateChanged(fbAuth, async (user) => {
     logoutBtn.style.display = '';
     appInitialized = true;
     // 관리자만 업무캘린더 탭 표시
-    if (user.email === ADMIN_EMAIL) {
+    if (user.email === 'pkh910518@yeungnam.hs.kr') {
       const navMyTask = document.getElementById('navMyTask');
       if (navMyTask) navMyTask.style.display = '';
     }
