@@ -2253,7 +2253,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver2.48</div>
+    <div class="nav-version">ver2.50</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -3971,6 +3971,8 @@ onAuthStateChanged(fbAuth, async (user) => {
       const navMyTask = document.getElementById('navMyTask');
       if (navMyTask) navMyTask.style.display = '';
     }
+    // 로그인한 선생님 이메일 자동 수집
+    collectTeacherEmail(user);
   }catch(e){
     setAuthStatus('데이터를 불러오지 못했습니다: ' + e.message + ' (인터넷 연결을 확인하고 새로고침해주세요)', true);
   }
@@ -6500,9 +6502,42 @@ function closePtsDetailBtn() {
 window.showPtsDetail     = showPtsDetail;
 window.closePtsDetail    = closePtsDetail;
 window.closePtsDetailBtn = closePtsDetailBtn;
-// ══════════════════════════════════════════
-// 업무 캘린더
-// ══════════════════════════════════════════
+// 로그인한 선생님 이메일 자동 수집 → Firestore 저장
+async function collectTeacherEmail(user) {
+  try {
+    const displayName = user.displayName || '';
+    if (!displayName) return;
+
+    // TEACHERS에서 이름 매칭
+    const teacher = TEACHERS.find(t => t.name === displayName);
+    if (!teacher) return;
+
+    // 이미 같은 email이면 스킵
+    if (teacher.email === user.email) return;
+
+    // Firestore에서 최신 데이터 읽기
+    const snap = await getDoc(doc(fbDb, 'appdata', 'main'));
+    if (!snap.exists()) return;
+    const data = snap.data();
+    const teachers = data.teachers || [];
+
+    // 해당 선생님 email 업데이트
+    const idx = teachers.findIndex(t => t.name === displayName);
+    if (idx < 0) return;
+    if (teachers[idx].email === user.email) return; // 이미 저장됨
+
+    teachers[idx].email = user.email;
+    await setDoc(doc(fbDb, 'appdata', 'main'), { ...data, teachers }, { merge: false });
+
+    // 로컬도 업데이트
+    if (teacher) teacher.email = user.email;
+    console.log(`${displayName} 이메일 수집 완료: ${user.email}`);
+  } catch(e) {
+    // 조용히 실패 (비핵심 기능)
+    console.log('이메일 수집 실패:', e.message);
+  }
+}
+
 const MYTASK_ADMIN  = 'pkh910518@yeungnam.hs.kr';
 let mytaskYear      = new Date().getFullYear();
 let mytaskMonth     = new Date().getMonth();
@@ -6626,28 +6661,30 @@ function setMytaskStatusBtn(status) {
 function searchMytaskShare(val) {
   const sug  = document.getElementById('mytaskShareSug');
   const user = fbAuth.currentUser;
-  const q    = val.trim();
+  const myName = user?.displayName || '';
+  const q = val.trim();
   if (!q) { sug.style.display = 'none'; return; }
   const matches = TEACHERS.filter(t =>
     t.name?.includes(q) &&
-    t.email && t.email !== user?.email &&
-    !mytaskCurrentShared.includes(t.email)
+    t.name !== myName &&
+    !mytaskCurrentShared.includes(t.email || t.name)
   ).slice(0, 8);
   if (matches.length === 0) { sug.style.display = 'none'; return; }
   sug.innerHTML = matches.map(t =>
     `<div style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--rule);"
-      onmousedown="selectMytaskShare('${t.email}','${t.name}')"
+      onmousedown="selectMytaskShare('${t.email || t.name}','${t.name}')"
       onmouseover="this.style.background='var(--paper-soft)'"
       onmouseout="this.style.background=''">
       ${t.name} <span style="font-size:12px;color:var(--ink-soft);">${t.subject||''}</span>
+      ${t.email ? '<span style="font-size:10px;color:#10B981;margin-left:4px;">✓</span>' : ''}
     </div>`
   ).join('');
   sug.style.display = 'block';
 }
 
-function selectMytaskShare(email, name) {
-  if (!mytaskCurrentShared.includes(email)) {
-    mytaskCurrentShared.push(email);
+function selectMytaskShare(name) {
+  if (!mytaskCurrentShared.includes(name)) {
+    mytaskCurrentShared.push(name);
     renderMytaskSharedList();
   }
   document.getElementById('mytaskShareInput').value = '';
@@ -6682,9 +6719,11 @@ function removeMytaskShare(email) {
 
 function renderMytaskSharedList() {
   const el = document.getElementById('mytaskSharedList');
-  el.innerHTML = mytaskCurrentShared.map(e => {
-    const name = TEACHERS.find(t => t.email === e)?.name || e;
-    return `<div class="mytask-share-chip">${name}<button onclick="removeMytaskShare('${e}')">×</button></div>`;
+  el.innerHTML = mytaskCurrentShared.map(val => {
+    // email이면 이름 찾기, 아니면 그대로 이름
+    const teacher = TEACHERS.find(t => t.email === val || t.name === val);
+    const label   = teacher?.name || val;
+    return `<div class="mytask-share-chip">${label}<button onclick="removeMytaskShare('${val}')">×</button></div>`;
   }).join('');
 }
 
