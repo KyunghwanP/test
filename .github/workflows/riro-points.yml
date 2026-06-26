@@ -1,0 +1,28 @@
+name: 리로스쿨 상벌점 스크래핑
+
+on:
+  schedule:
+    - cron: '0 17 * * *'  # 매일 KST 02:00 (UTC 17:00)
+  workflow_dispatch:        # 수동 실행
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 의존성 설치
+        run: |
+          npm install playwright firebase-admin
+          npx playwright install chromium --with-deps
+
+      - name: 상벌점 스크래핑
+        env:
+          RIRO_ID: ${{ secrets.RIRO_ID }}
+          RIRO_PW: ${{ secrets.RIRO_PW }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: node scripts/scrape-riro.js
