@@ -247,7 +247,7 @@
   .pts-add-student-btn:disabled{border-color:var(--rule);color:var(--ink-soft);cursor:not-allowed;}
 
   .pts-student-row{
-    display:grid;grid-template-columns:1fr 1fr 1fr 1fr 28px;
+    display:grid;grid-template-columns:72px 72px 64px 1fr 28px;
     gap:6px;align-items:center;
     background:var(--paper-soft);border-radius:8px;
     padding:10px 10px;margin-bottom:6px;
@@ -288,7 +288,7 @@
   .pts-row-label{
     font-family:'IBM Plex Mono';font-size:10px;font-weight:700;
     color:var(--ink-soft);opacity:0.6;margin-bottom:2px;
-    display:grid;grid-template-columns:1fr 1fr 1fr 1fr 28px;gap:6px;
+    display:grid;grid-template-columns:72px 72px 64px 1fr 28px;gap:6px;
     padding:0 10px;
   }
 
@@ -1696,7 +1696,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.14</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.15</div>
   </div>
 </div>
 
@@ -1765,7 +1765,7 @@
       <div class="main-nav-item" data-page="students">
         <span class="main-nav-icon">🎒</span>학생연락망
       </div>
-    <div class="nav-version">ver2.14</div>
+    <div class="nav-version">ver2.15</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -4940,7 +4940,7 @@ function navigateTo(page) {
 }
 
 // ══════════════════════════════════════════
-// 상벌점 입력 기능 (ver2.14)
+// 상벌점 입력 기능 (ver2.15)
 // ══════════════════════════════════════════
 const POINTS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxVT4Z20BvZ9DUwLH79h3_5LhJCazcPOJ3lAWNi1Z_WkwjvOXsomWrs242wpiPUokmbXA/exec';
 let ptsType = null;
@@ -5061,9 +5061,11 @@ function renderStudentRows() {
       </select>
       <input class="points-input pts-num-input" type="number" min="1" max="40" placeholder="번호"
         value="${s.num}" oninput="onStudentNumInput(${idx},this.value)" style="text-align:center;">
-      <input class="points-input pts-name-input ${s.name ? 'pts-name-found' : (s.num ? 'pts-name-notfound' : '')}"
-        type="text" placeholder="이름(자동)" value="${s.name}" readonly
-        id="ptsNameEl_${idx}">
+      <input class="points-input pts-name-input ${s.name ? 'pts-name-found' : ''}"
+        type="text" placeholder="이름" value="${s.name}"
+        oninput="onStudentNameInput(${idx},this.value)"
+        id="ptsNameEl_${idx}"
+        style="min-width:0;">
       <button class="pts-remove-btn" onclick="removeStudentRow(${idx})"
         ${ptsStudentRows.length===1?'style="visibility:hidden;"':''}>×</button>
     `;
@@ -5187,10 +5189,11 @@ function autoFillName(idx) {
     ptsStudentRows[idx].name = found.name;
     nameEl.value = found.name;
     nameEl.className = 'points-input pts-name-input pts-name-found';
+    nameEl.placeholder = '이름';
   } else {
-    ptsStudentRows[idx].name = '';
-    nameEl.value = '';
+    // 자동완성 실패 → 직접 입력 유도 (기존 입력값 유지)
     nameEl.className = 'points-input pts-name-input pts-name-notfound';
+    nameEl.placeholder = '직접 입력';
   }
 }
 
@@ -5207,7 +5210,7 @@ function removeStudentRow(idx) {
 }
 
 // ── 초기화 ──
-function initPointsPage() {
+async function initPointsPage() {
   // 날짜 기본값
   const today = new Date();
   const dateEl = document.getElementById('ptsDate');
@@ -5220,12 +5223,20 @@ function initPointsPage() {
     const nameEl = document.getElementById('ptsTeacherName');
     if (nameEl) nameEl.textContent = user.displayName || user.email.split('@')[0];
   }
+  // allStudents 미리 로딩 (학생 페이지 안 들어갔을 경우 대비)
+  if (allStudents.length === 0) {
+    try {
+      const snap = await getDoc(doc(fbDb, 'students', 'main'));
+      if (snap.exists() && snap.data().students?.length) {
+        allStudents = snap.data().students;
+      }
+    } catch(e) { console.warn('학생 데이터 로딩 실패:', e); }
+  }
   // 학생 행 초기 렌더
   if (!document.getElementById('ptsStudentRows').children.length) {
     ptsStudentRows = [{ grade:'', room:'', num:'', name:'' }];
     renderStudentRows();
   }
-  // 사유 드롭다운 (유형 선택 후 자동 채워짐, 초기엔 공백)
   populateDetailSelect(ptsType || '');
 }
 
