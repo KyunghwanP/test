@@ -2253,7 +2253,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver2.50</div>
+    <div class="nav-version">ver2.52</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -2687,16 +2687,30 @@
         <!-- 담당자 공유 -->
         <div class="mytask-modal-field">
           <label>공유 담당자</label>
-          <div id="mytaskSharedList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;min-height:24px;"></div>
-          <div style="position:relative;">
-            <input type="text" id="mytaskShareInput" placeholder="선생님 이름 검색..."
+          <div id="mytaskShareBox" style="
+            display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+            min-height:44px;padding:8px 12px;
+            border:1.5px solid var(--rule);border-radius:8px;
+            background:var(--paper);cursor:text;
+            transition:border-color .15s;
+          " onclick="document.getElementById('mytaskShareInput').focus()">
+            <div id="mytaskSharedList" style="display:contents;"></div>
+            <input type="text" id="mytaskShareInput"
+              placeholder="이름 검색..."
+              enterkeyhint="done"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck="false"
+              inputmode="search"
               oninput="searchMytaskShare(this.value)"
               onblur="hideMytaskShareSug()"
               onkeydown="mytaskShareKeydown(event)"
-              autocomplete="off"
-              style="width:100%;padding:10px 12px;border:1.5px solid var(--rule);border-radius:8px;font-size:15px;background:var(--paper);color:var(--ink);">
-            <div id="mytaskShareSug" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:9999;background:var(--paper);border:1.5px solid var(--mon);border-radius:8px;box-shadow:0 8px 24px -4px rgba(0,0,0,0.2);max-height:180px;overflow-y:auto;"></div>
+              style="border:none;outline:none;background:transparent;
+                font-size:15px;color:var(--ink);min-width:80px;flex:1;
+                font-family:'Pretendard','Noto Sans KR';padding:0;">
           </div>
+          <div id="mytaskShareSug" style="display:none;position:relative;z-index:9999;background:var(--paper);border:1.5px solid var(--mon);border-radius:8px;box-shadow:0 8px 24px -4px rgba(0,0,0,0.2);max-height:180px;overflow-y:auto;margin-top:4px;"></div>
         </div>
 
         <!-- 연계 일정 -->
@@ -6671,7 +6685,8 @@ function searchMytaskShare(val) {
   ).slice(0, 8);
   if (matches.length === 0) { sug.style.display = 'none'; return; }
   sug.innerHTML = matches.map(t =>
-    `<div style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--rule);"
+    `<div data-val="${t.email || t.name}" data-name="${t.name}"
+      style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--rule);"
       onmousedown="selectMytaskShare('${t.email || t.name}','${t.name}')"
       onmouseover="this.style.background='var(--paper-soft)'"
       onmouseout="this.style.background=''">
@@ -6695,6 +6710,19 @@ function mytaskShareKeydown(e) {
   if (e.key === 'Backspace' && e.target.value === '' && mytaskCurrentShared.length > 0) {
     mytaskCurrentShared.pop();
     renderMytaskSharedList();
+  } else if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    // 자동완성 첫 번째 항목 선택
+    const sug = document.getElementById('mytaskShareSug');
+    const first = sug?.querySelector('div[data-val]');
+    if (first) {
+      selectMytaskShare(first.dataset.val, first.dataset.name);
+    } else {
+      // 직접 이름으로 검색해서 정확히 일치하는 선생님 선택
+      const q = e.target.value.trim();
+      const t = TEACHERS.find(t => t.name === q);
+      if (t) selectMytaskShare(t.email || t.name, t.name);
+    }
   }
 }
 window.mytaskShareKeydown = mytaskShareKeydown;
@@ -6718,13 +6746,15 @@ function removeMytaskShare(email) {
 }
 
 function renderMytaskSharedList() {
-  const el = document.getElementById('mytaskSharedList');
+  const el  = document.getElementById('mytaskSharedList');
+  const box = document.getElementById('mytaskShareBox');
   el.innerHTML = mytaskCurrentShared.map(val => {
-    // email이면 이름 찾기, 아니면 그대로 이름
     const teacher = TEACHERS.find(t => t.email === val || t.name === val);
     const label   = teacher?.name || val;
-    return `<div class="mytask-share-chip">${label}<button onclick="removeMytaskShare('${val}')">×</button></div>`;
+    return `<div class="mytask-share-chip">${label}<button type="button" onmousedown="event.preventDefault();removeMytaskShare('${val}')">×</button></div>`;
   }).join('');
+  // 박스 포커스 스타일
+  if (box) box.style.borderColor = mytaskCurrentShared.length > 0 ? 'var(--mon)' : 'var(--rule)';
 }
 
 function addMytaskLink(val) {
