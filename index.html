@@ -247,7 +247,7 @@
   .pts-add-student-btn:disabled{border-color:var(--rule);color:var(--ink-soft);cursor:not-allowed;}
 
   .pts-student-row{
-    display:grid;grid-template-columns:90px 90px 80px 1fr 60px 28px;
+    display:grid;grid-template-columns:90px 90px 80px 1fr 60px 28px 28px;
     gap:6px;align-items:center;
     background:var(--paper-soft);border-radius:8px;
     padding:10px 10px;margin-bottom:6px;
@@ -285,10 +285,17 @@
     transition:all .12s;flex-shrink:0;
   }
   .pts-remove-btn:hover{background:#FEF2F2;color:#EF4444;}
+  .pts-reset-btn{
+    width:28px;height:28px;border-radius:6px;border:none;
+    background:transparent;color:var(--ink-soft);cursor:pointer;
+    font-size:16px;display:flex;align-items:center;justify-content:center;
+    transition:all .12s;flex-shrink:0;
+  }
+  .pts-reset-btn:hover{background:#FEF9EC;color:#D97706;}
   .pts-row-label{
     font-family:'IBM Plex Mono';font-size:15px;font-weight:700;
     color:var(--ink-soft);opacity:0.6;margin-bottom:2px;
-    display:grid;grid-template-columns:90px 90px 80px 1fr 60px 28px;gap:6px;
+    display:grid;grid-template-columns:90px 90px 80px 1fr 60px 28px 28px;gap:6px;
     padding:0 10px;
   }
 
@@ -382,15 +389,25 @@
       grid-template-columns:1fr 1fr 1fr;
       grid-template-rows:auto auto;
       gap:5px;
+      padding-top:32px;
     }
     /* 1행: 학년/반/번호 */
     .pts-student-row > *:nth-child(1){ grid-column:1; grid-row:1; }
     .pts-student-row > *:nth-child(2){ grid-column:2; grid-row:1; }
     .pts-student-row > *:nth-child(3){ grid-column:3; grid-row:1; }
-    /* 2행: 이름(2칸)/점수/삭제 */
+    /* 2행: 이름(2칸)/점수 */
     .pts-student-row > *:nth-child(4){ grid-column:1/3; grid-row:2; }
     .pts-student-row > *:nth-child(5){ grid-column:3; grid-row:2; }
-    .pts-student-row > *:nth-child(6){ display:none; }
+    /* 삭제/리셋은 grid에서 숨기고 절대위치로 */
+    .pts-student-row > *:nth-child(6),
+    .pts-student-row > *:nth-child(7){ display:none; }
+    .pts-remove-btn, .pts-reset-btn{
+      display:flex !important;
+      position:absolute;top:4px;
+      width:24px;height:24px;font-size:14px;
+    }
+    .pts-remove-btn{ right:4px; }
+    .pts-reset-btn{ right:32px; }
 
     /* 열 레이블도 동일하게 */
     .pts-row-label{
@@ -403,14 +420,8 @@
     .pts-row-label > *:nth-child(3){ grid-column:3; grid-row:1; }
     .pts-row-label > *:nth-child(4){ grid-column:1/3; grid-row:2; }
     .pts-row-label > *:nth-child(5){ grid-column:3; grid-row:2; }
-    .pts-row-label > *:nth-child(6){ display:none; }
-
-    /* 삭제 버튼은 학년 위에 겹치게 우상단 절대위치로 */
-    .pts-student-row{ position:relative; }
-    .pts-remove-btn{
-      position:absolute;top:4px;right:4px;
-      width:22px;height:22px;font-size:14px;
-    }
+    .pts-row-label > *:nth-child(6),
+    .pts-row-label > *:nth-child(7){ display:none; }
 
     .pts-students-header{ flex-wrap:wrap; gap:6px; }
     .pts-students-header > div { width:100%; }
@@ -1782,7 +1793,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.29</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.31</div>
   </div>
 </div>
 
@@ -1857,7 +1868,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver2.29</div>
+    <div class="nav-version">ver2.31</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -2102,7 +2113,7 @@
               </div>
               <!-- 열 레이블 -->
               <div class="pts-row-label">
-                <span>학년</span><span>반</span><span>번호</span><span>이름</span><span>점수</span><span></span>
+                <span>학년</span><span>반</span><span>번호</span><span>이름</span><span>점수</span><span></span><span></span>
               </div>
               <div id="ptsStudentRows">
                 <!-- JS로 렌더링 -->
@@ -5017,7 +5028,7 @@ function navigateTo(page) {
 }
 
 // ══════════════════════════════════════════
-// 상벌점 입력 기능 (ver2.29)
+// 상벌점 입력 기능 (ver2.31)
 // ══════════════════════════════════════════
 const POINTS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
 let ptsType = null;
@@ -5179,7 +5190,8 @@ function renderStudentRows() {
         }).join('')}
       </select>
       <button class="pts-remove-btn" onclick="removeStudentRow(${idx})"
-        ${ptsStudentRows.length===1?'style="visibility:hidden;"':''}>×</button>
+        ${ptsStudentRows.length===1?'style="visibility:hidden;"':''} title="행 삭제">×</button>
+      <button class="pts-reset-btn" onclick="resetStudentRow(${idx})" title="초기화">↺</button>
     `;
 
     // 사유 행
@@ -5403,6 +5415,11 @@ function autoFillName(idx) {
   }
 }
 
+function resetStudentRow(idx) {
+  ptsStudentRows[idx] = { grade:'', room:'', num:'', name:'', score:'', detail:'', detailIdx:undefined, customMode:false, customDetail:'' };
+  renderStudentRows();
+}
+
 function addStudentRow() {
   if (ptsStudentRows.length >= PTS_MAX_STUDENTS) return;
   ptsStudentRows.push({ grade: '', room: '', num: '', name: '' });
@@ -5592,6 +5609,7 @@ async function submitPoints() {
 window.selectPointType      = selectPointType;
 window.setScore             = setScore;
 window.submitPoints         = submitPoints;
+window.resetStudentRow      = resetStudentRow;
 window.addStudentRow        = addStudentRow;
 window.removeStudentRow     = removeStudentRow;
 window.onStudentFieldChange = onStudentFieldChange;
