@@ -1796,7 +1796,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.33</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.34</div>
   </div>
 </div>
 
@@ -1871,7 +1871,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver2.33</div>
+    <div class="nav-version">ver2.34</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -5031,7 +5031,7 @@ function navigateTo(page) {
 }
 
 // ══════════════════════════════════════════
-// 상벌점 입력 기능 (ver2.33)
+// 상벌점 입력 기능 (ver2.34)
 // ══════════════════════════════════════════
 const POINTS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
 let ptsType = null;
@@ -5306,6 +5306,29 @@ function onStudentNumInput(idx, value) {
 }
 
 function onStudentNameInput(idx, value) {
+  // 자동완성으로 확정된 상태에서 이름을 수정하면 학년/반/번호 리셋
+  if (ptsStudentRows[idx].confirmed && ptsStudentRows[idx].name !== value) {
+    ptsStudentRows[idx].grade     = '';
+    ptsStudentRows[idx].room      = '';
+    ptsStudentRows[idx].num       = '';
+    ptsStudentRows[idx].confirmed = false;
+    // 드롭다운도 UI 리셋
+    const container = document.getElementById('ptsStudentRows');
+    if (container) {
+      const wrap = container.children[idx];
+      if (wrap) {
+        const row = wrap.querySelector('.pts-student-row');
+        if (row) {
+          const gradeEl = row.querySelector('select:nth-child(1)');
+          const roomEl  = row.querySelector('select:nth-child(2)');
+          const numEl   = row.querySelector('select:nth-child(3)');
+          if (gradeEl) gradeEl.value = '';
+          if (roomEl)  roomEl.value  = '';
+          if (numEl)   numEl.value   = '';
+        }
+      }
+    }
+  }
   ptsStudentRows[idx].name = value;
 
   // 이름 바뀌면 초록색 해제
@@ -5344,10 +5367,11 @@ function onStudentNameInput(idx, value) {
 }
 
 function applyStudent(idx, st) {
-  ptsStudentRows[idx].grade = String(st.grade);
-  ptsStudentRows[idx].room  = String(st.room);
-  ptsStudentRows[idx].num   = String(st.num);
-  ptsStudentRows[idx].name  = st.name;
+  ptsStudentRows[idx].grade     = String(st.grade);
+  ptsStudentRows[idx].room      = String(st.room);
+  ptsStudentRows[idx].num       = String(st.num);
+  ptsStudentRows[idx].name      = st.name;
+  ptsStudentRows[idx].confirmed = true; // 자동완성 확정 플래그
 
   // renderStudentRows() 하지 않고 DOM 직접 업데이트 (focus 유지)
   const container = document.getElementById('ptsStudentRows');
