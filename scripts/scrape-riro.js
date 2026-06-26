@@ -1,17 +1,17 @@
 // scripts/scrape-riro.js
-// 리로스쿨 상벌점 스크래퍼 → Firestore 저장
-
-import { chromium } from 'playwright';
-import { initializeApp, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+const { chromium } = require('playwright');
+const { initializeApp, cert, getApps } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
 
 const RIRO_ID = process.env.RIRO_ID;
 const RIRO_PW = process.env.RIRO_PW;
 const SITE    = 'https://yeungnam.riroschool.kr';
 
 // Firebase 초기화
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-initializeApp({ credential: cert(serviceAccount) });
+if (!getApps().length) {
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  initializeApp({ credential: cert(serviceAccount) });
+}
 const db = getFirestore();
 
 async function main() {
@@ -21,7 +21,8 @@ async function main() {
 
   // 1. 로그인
   console.log('리로스쿨 로그인 중...');
-  const loginRes = await page.request.post(`${SITE}/ajax.php`, {
+  await page.goto(`${SITE}/user.php?action=signin`, { waitUntil: 'domcontentloaded' });
+  await page.request.post(`${SITE}/ajax.php`, {
     form: {
       app:      'user',
       mode:     'login',
@@ -30,14 +31,16 @@ async function main() {
       pw:       RIRO_PW,
     }
   });
-  const cookies = await context.cookies();
-  console.log('로그인 완료. 쿠키 수:', cookies.length);
+
+  // 로그인 후 메인 페이지 이동
+  await page.goto(`${SITE}`, { waitUntil: 'domcontentloaded' });
+  console.log('로그인 완료');
 
   // 2. 상벌점 전체 내역 페이지
   console.log('상벌점 페이지 로딩...');
   await page.goto(
-    `${SITE}/my_page.php?club=index&action=record&Appwin=reload&db=&cate=&uid=&calendar_type=&my_id=&year=&sort=&sdate=&Group=&mode=&Class=*45&my_id=&Group=&yy=2026&mm=&dd=`,
-    { waitUntil: 'domcontentloaded', timeout: 30000 }
+    `${SITE}/my_page.php?club=index&action=record&Appwin=reload&Class=*45&yy=2026`,
+    { waitUntil: 'domcontentloaded', timeout: 60000 }
   );
 
   // 3. HTML 파싱
@@ -49,10 +52,10 @@ async function main() {
       const tds = row.querySelectorAll('td');
       if (tds.length < 7) return;
 
-      const hakbun = tds[1]?.textContent?.trim(); // ex) 10101
+      const hakbun = tds[1]?.textContent?.trim();
       if (!hakbun || hakbun.length < 4) return;
 
-      // 학번 파싱: 10101 → 1학년 1반 01번
+      // 학번 파싱: 10101 → 1학년 01반 01번
       const grade = parseInt(hakbun[0]);
       const room  = parseInt(hakbun.slice(1, 3));
       const num   = parseInt(hakbun.slice(3));
@@ -63,29 +66,32 @@ async function main() {
       const demerit  = parseInt(tds[5]?.textContent?.trim()) || 0;
       const deducted = parseInt(tds[6]?.textContent?.trim()) || 0;
 
-      // 최근 기록 파싱
+      // 최근 기록
       const recordEl = row.querySelector('.record-p');
       const records  = [];
       if (recordEl) {
         const labels = recordEl.querySelectorAll('.label-record');
         labels.forEach(label => {
           const date   = label.textContent.trim();
-          const detail = label.nextElementSibling?.textContent
-            ?.replace(/<[^>]+>/g, '')
-            ?.trim() || '';
-          records.push({ date, detail });
+          const span   = label.nextElementSibling;
+          const detail = span ? span.textContent.replace(/\s+/g, ' ').trim() : '';
+          if (date && detail) records.push({ date, detail });
         });
       }
 
-      result.push({ hakbun, grade, room, num, name, total, merit, demerit, deducted, records });
+      if (name) result.push({ hakbun, grade, room, num, name, total, merit, demerit, deducted, records });
     });
     return result;
   });
 
   console.log(`파싱 완료: ${students.length}명`);
+  if (students.length === 0) {
+    console.error('학생 데이터가 없습니다. 로그인 실패 또는 페이지 구조 변경 가능성');
+    await browser.close();
+    process.exit(1);
+  }
 
-  // 4. Firestore 저장
-  // 학년별로 분리 저장
+  // 4. Firestore 저장 (학년별)
   const byGrade = { 1: [], 2: [], 3: [] };
   students.forEach(s => {
     if (byGrade[s.grade]) byGrade[s.grade].push(s);
@@ -100,13 +106,12 @@ async function main() {
     });
     console.log(`${grade}학년 ${list.length}명 저장 완료`);
   }
-
   await db.collection('riro_points').doc('meta').set({
     updatedAt: now,
     total: students.length,
   });
 
-  console.log('모든 저장 완료!');
+  console.log(`전체 ${students.length}명 저장 완료!`);
   await browser.close();
 }
 
