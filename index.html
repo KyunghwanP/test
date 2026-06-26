@@ -247,7 +247,7 @@
   .pts-add-student-btn:disabled{border-color:var(--rule);color:var(--ink-soft);cursor:not-allowed;}
 
   .pts-student-row{
-    display:grid;grid-template-columns:90px 90px 80px 1fr 28px;
+    display:grid;grid-template-columns:90px 90px 80px 1fr 60px 28px;
     gap:6px;align-items:center;
     background:var(--paper-soft);border-radius:8px;
     padding:10px 10px;margin-bottom:6px;
@@ -288,7 +288,7 @@
   .pts-row-label{
     font-family:'IBM Plex Mono';font-size:15px;font-weight:700;
     color:var(--ink-soft);opacity:0.6;margin-bottom:2px;
-    display:grid;grid-template-columns:90px 90px 80px 1fr 28px;gap:6px;
+    display:grid;grid-template-columns:90px 90px 80px 1fr 60px 28px;gap:6px;
     padding:0 10px;
   }
 
@@ -365,6 +365,57 @@
   .points-history-score.merit{color:#10B981;}
   .points-history-score.demerit{color:#EF4444;}
   .points-history-empty{padding:24px;text-align:center;color:var(--ink-soft);font-size:16px;}
+
+  /* ── 상벌점 모바일 반응형 ── */
+  @media (max-width: 520px) {
+    .points-body{ padding:8px; }
+    .points-card{ padding:14px 12px 18px; border-radius:10px; }
+    .points-card-title{ font-size:17px; margin-bottom:14px; }
+    .points-type-btn{ font-size:15px; padding:10px 0; }
+    .points-label{ font-size:12px; }
+    .points-input, .points-select, .points-textarea{ font-size:14px; padding:8px 10px; }
+    .pts-detail-row .points-select{ font-size:13px; }
+    .pts-custom-toggle{ font-size:12px; padding:0 8px; }
+
+    /* 학생 행: 2줄로 분리 */
+    .pts-student-row{
+      grid-template-columns:1fr 1fr 1fr;
+      grid-template-rows:auto auto;
+    }
+    .pts-student-row > select:nth-child(1){ grid-column:1; } /* 학년 */
+    .pts-student-row > select:nth-child(2){ grid-column:2; } /* 반 */
+    .pts-student-row > input:nth-child(3) { grid-column:3; } /* 번호 */
+    .pts-student-row > input:nth-child(4) { grid-column:1/3; grid-row:2; } /* 이름 */
+    .pts-student-row > input:nth-child(5) { grid-column:3;   grid-row:2; } /* 점수 */
+    .pts-student-row > button             { grid-column:3;   grid-row:1; justify-self:end; } /* 삭제 */
+
+    .pts-row-label{
+      grid-template-columns:1fr 1fr 1fr;
+      grid-template-rows:auto auto;
+    }
+    .pts-row-label > span:nth-child(1){ grid-column:1; }
+    .pts-row-label > span:nth-child(2){ grid-column:2; }
+    .pts-row-label > span:nth-child(3){ grid-column:3; }
+    .pts-row-label > span:nth-child(4){ grid-column:1/3; grid-row:2; }
+    .pts-row-label > span:nth-child(5){ grid-column:3;   grid-row:2; }
+    .pts-row-label > span:nth-child(6){ display:none; }
+
+    .pts-students-header{ flex-wrap:wrap; gap:6px; }
+    .pts-students-header > div { width:100%; }
+    .pts-students-header > div:last-child{ display:flex; gap:6px; width:100%; }
+    .pts-sync-btn{ flex:1; font-size:12px; height:32px; }
+    .pts-add-student-btn{ flex:1; font-size:12px; }
+
+    .pts-add-student-btn{ font-size:13px; }
+    .points-submit-btn{ font-size:15px; padding:12px; }
+    .points-teacher-info{ font-size:13px; }
+    .points-history-title{ font-size:14px; }
+    .points-history-info{ font-size:13px; }
+    .points-history-info .ph-detail{ font-size:12px; }
+    .points-history-score{ font-size:14px; }
+    .points-history-badge{ font-size:12px; }
+    .points-toast{ font-size:13px; padding:10px 16px; white-space:normal; text-align:center; max-width:90vw; }
+  }
 
   /* 버전 표시 */
   .nav-version{
@@ -1696,7 +1747,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.21</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.23</div>
   </div>
 </div>
 
@@ -1765,7 +1816,7 @@
       <div class="main-nav-item" data-page="students">
         <span class="main-nav-icon">🎒</span>학생연락망
       </div>
-    <div class="nav-version">ver2.21</div>
+    <div class="nav-version">ver2.23</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -2010,7 +2061,7 @@
               </div>
               <!-- 열 레이블 -->
               <div class="pts-row-label">
-                <span>학년</span><span>반</span><span>번호</span><span>이름</span><span></span>
+                <span>학년</span><span>반</span><span>번호</span><span>이름</span><span>점수</span><span></span>
               </div>
               <div id="ptsStudentRows">
                 <!-- JS로 렌더링 -->
@@ -2035,21 +2086,6 @@
             <div class="points-field">
               <div class="points-label">일자</div>
               <input class="points-input" id="ptsDate" type="date" style="max-width:200px;">
-            </div>
-
-            <!-- 점수 -->
-            <div class="points-field">
-              <div class="points-label">점수</div>
-              <div class="points-score-row">
-                <input class="points-input" id="ptsScore" type="number" min="1" max="20" value="1">
-                <div class="points-score-presets">
-                  <button class="points-score-chip" onclick="setScore(1)">1점</button>
-                  <button class="points-score-chip" onclick="setScore(2)">2점</button>
-                  <button class="points-score-chip" onclick="setScore(3)">3점</button>
-                  <button class="points-score-chip" onclick="setScore(5)">5점</button>
-                  <button class="points-score-chip" onclick="setScore(10)">10점</button>
-                </div>
-              </div>
             </div>
 
             <!-- 입력 선생님 -->
@@ -4940,7 +4976,7 @@ function navigateTo(page) {
 }
 
 // ══════════════════════════════════════════
-// 상벌점 입력 기능 (ver2.21)
+// 상벌점 입력 기능 (ver2.23)
 // ══════════════════════════════════════════
 const POINTS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
 let ptsType = null;
@@ -5087,6 +5123,10 @@ function renderStudentRows() {
         oninput="onStudentNameInput(${idx},this.value)"
         id="ptsNameEl_${idx}"
         style="min-width:0;">
+      <input class="points-input" type="number" min="1" max="20" placeholder="점수"
+        value="${s.score||''}"
+        oninput="onStudentScoreInput(${idx},this.value)"
+        style="text-align:center;">
       <button class="pts-remove-btn" onclick="removeStudentRow(${idx})"
         ${ptsStudentRows.length===1?'style="visibility:hidden;"':''}>×</button>
     `;
@@ -5164,13 +5204,14 @@ function syncAllDetails() {
   if (ptsStudentRows.length < 2) { showPointsToast('학생이 2명 이상일 때 사용하세요', 'error'); return; }
   const src = ptsStudentRows[0];
   for (let i = 1; i < ptsStudentRows.length; i++) {
-    ptsStudentRows[i].customMode  = src.customMode;
+    ptsStudentRows[i].customMode   = src.customMode;
     ptsStudentRows[i].customDetail = src.customDetail;
-    ptsStudentRows[i].detailIdx   = src.detailIdx;
-    ptsStudentRows[i].detail      = src.detail;
+    ptsStudentRows[i].detailIdx    = src.detailIdx;
+    ptsStudentRows[i].detail       = src.detail;
+    ptsStudentRows[i].score        = src.score;
   }
   renderStudentRows();
-  showPointsToast('첫 번째 학생 사유를 전체에 적용했습니다', 'success');
+  showPointsToast('첫 번째 학생 사유/점수를 전체에 적용했습니다', 'success');
 }
 
 // 공통 사유 토글 (기존 호환용 — 현재 UI에선 미사용, 안전하게 유지)
@@ -5194,6 +5235,10 @@ function onStudentNumInput(idx, value) {
 
 function onStudentNameInput(idx, value) {
   ptsStudentRows[idx].name = value;
+}
+
+function onStudentScoreInput(idx, value) {
+  ptsStudentRows[idx].score = value;
 }
 
 function autoFillName(idx) {
@@ -5310,7 +5355,7 @@ function addToSessionHistory(entries, detail, date, score) {
         <span class="ph-name">${s.grade}학년 ${s.classNum}반 ${s.studentNum}번 ${s.name}</span>
         <div class="ph-detail">${detail} · ${date}</div>
       </div>
-      <span class="points-history-score ${cls}">${s.type==='상점'?'+':'-'}${score}점</span>
+      <span class="points-history-score ${cls}">${s.type==='상점'?'+':'-'}${s.score}점</span>
     `;
     list.prepend(item);
   });
@@ -5319,18 +5364,16 @@ function addToSessionHistory(entries, detail, date, score) {
 async function submitPoints() {
   if (!ptsType) { showPointsToast('유형(상점/벌점)을 선택하세요', 'error'); return; }
 
-  const date  = document.getElementById('ptsDate').value;
-  const score = Number(document.getElementById('ptsScore').value);
-  if (!date)      { showPointsToast('일자를 선택하세요', 'error'); return; }
-  if (!score || score < 1) { showPointsToast('점수를 입력하세요', 'error'); return; }
+  const date = document.getElementById('ptsDate').value;
+  if (!date) { showPointsToast('일자를 선택하세요', 'error'); return; }
 
-  // 학생 유효성 검사 + 사유 수집
+  // 학생 유효성 검사 + 사유 + 점수 수집
   const validStudents = ptsStudentRows.filter(s => s.grade && s.room && s.num && s.name);
   if (validStudents.length === 0) { showPointsToast('학생 정보를 하나 이상 입력하세요', 'error'); return; }
   const incomplete = ptsStudentRows.find(s => (s.grade||s.room||s.num||s.name) && !(s.grade&&s.room&&s.num&&s.name));
   if (incomplete) { showPointsToast('입력 중인 학생 정보를 완성하거나 삭제하세요', 'error'); return; }
 
-  // 각 학생별 사유 결정
+  // 각 학생별 사유 + 점수 결정
   for (const s of validStudents) {
     if (s.customMode) {
       s._detail = (s.customDetail || '').trim();
@@ -5338,6 +5381,8 @@ async function submitPoints() {
       s._detail = s.detail || '';
     }
     if (!s._detail) { showPointsToast(`${s.name}의 사유를 입력하세요`, 'error'); return; }
+    s._score = Number(s.score);
+    if (!s._score || s._score < 1) { showPointsToast(`${s.name}의 점수를 입력하세요`, 'error'); return; }
   }
 
   const user = fbAuth.currentUser;
@@ -5363,7 +5408,7 @@ async function submitPoints() {
       type: ptsType,
       detail: s._detail,
       date,
-      score: String(score),
+      score: String(s._score),
       teacher,
     });
     try {
@@ -5410,6 +5455,7 @@ window.removeStudentRow     = removeStudentRow;
 window.onStudentFieldChange = onStudentFieldChange;
 window.onStudentNumInput    = onStudentNumInput;
 window.onStudentNameInput   = onStudentNameInput;
+window.onStudentScoreInput  = onStudentScoreInput;
 window.onStudentDetailSelect = onStudentDetailSelect;
 window.toggleStudentCustom  = toggleStudentCustom;
 window.syncAllDetails       = syncAllDetails;
