@@ -2190,7 +2190,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.55</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.57</div>
   </div>
 </div>
 
@@ -2268,7 +2268,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver2.55</div>
+    <div class="nav-version">ver2.57</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -4032,6 +4032,8 @@ onAuthStateChanged(fbAuth, async (user) => {
     }
     // 로그인한 선생님 이메일 자동 수집
     collectTeacherEmail(user);
+    // 학사일정 미리 로딩 (업무 캘린더 학사일정 표시용)
+    preloadScheduleData();
   }catch(e){
     setAuthStatus('데이터를 불러오지 못했습니다: ' + e.message + ' (인터넷 연결을 확인하고 새로고침해주세요)', true);
   }
@@ -5305,6 +5307,7 @@ document.getElementById('studentsSearch').addEventListener('input', function() {
 // ---- 학사일정 ----
 let scheduleInitialized = false;
 let scheduleData = {};       // { '2026-07': [{date,day,content}], ... }
+window._scheduleData = scheduleData;
 let scheduleCurrentMonth = null;
 
 async function initSchedulePage() {
@@ -5316,6 +5319,7 @@ async function initSchedulePage() {
       return;
     }
     scheduleData = snap.data().data || {};
+    window._scheduleData = scheduleData; // 업무 캘린더에서 참조용
 
     // 현재 월 또는 가장 가까운 월 선택
     const now = new Date();
@@ -6561,6 +6565,16 @@ function closePtsDetailBtn() {
 window.showPtsDetail     = showPtsDetail;
 window.closePtsDetail    = closePtsDetail;
 window.closePtsDetailBtn = closePtsDetailBtn;
+// 학사일정 미리 로딩 (업무 캘린더용)
+async function preloadScheduleData() {
+  try {
+    const snap = await getDoc(doc(fbDb, 'schedule', 'main'));
+    if (snap.exists()) {
+      window._scheduleData = snap.data().data || {};
+    }
+  } catch(e) { /* 조용히 실패 */ }
+}
+
 // 로그인한 선생님 이메일 자동 수집 → Firestore 저장
 async function collectTeacherEmail(user) {
   try {
@@ -6692,11 +6706,15 @@ function renderMytaskCalendar() {
   // 학사일정 데이터
   let scheduleItems = [];
   if (calFilters.has('schedule')) {
-    const scheduleData = window._scheduleCache || [];
-    scheduleItems = scheduleData.filter(s => {
-      const ym = `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}`;
-      return s.date?.startsWith(ym);
-    });
+    const ym = `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}`;
+    const monthEvents = (window._scheduleData || {})[ym] || [];
+    scheduleItems = monthEvents.map(e => ({
+      ...e,
+      // e.date는 숫자(일)이므로 전체 날짜로 변환
+      date: `${ym}-${String(e.date).padStart(2,'0')}`,
+      title: e.content || e.title || '',
+      _type: 'schedule'
+    }));
   }
 
   let html = '';
