@@ -601,9 +601,18 @@
   .mytask-modal.show{display:flex;}
   .mytask-modal-box{
     background:var(--paper);border-radius:14px;
-    width:100%;max-width:440px;
+    width:min(92vw, 760px);
+    max-height:90vh;
+    display:flex;flex-direction:column;
     box-shadow:0 8px 40px rgba(0,0,0,0.3);
     overflow:hidden;
+  }
+  @media (min-width:1200px) {
+    .mytask-modal-box{ width:min(80vw, 900px); }
+  }
+  @media (max-width:600px) {
+    .mytask-modal-box{ width:100%; max-height:95vh; border-radius:14px 14px 0 0; }
+    .mytask-modal{ align-items:flex-end; padding:0; }
   }
   .mytask-modal-head{
     padding:16px 20px;border-bottom:1px solid var(--rule);
@@ -633,7 +642,7 @@
   .mytask-modal-field input:focus,
   .mytask-modal-field textarea:focus,
   .mytask-modal-field select:focus{border-color:var(--mon);}
-  .mytask-modal-field textarea{resize:vertical;min-height:100px;}
+  .mytask-modal-field textarea{resize:vertical;min-height:clamp(80px,12vh,160px);}
   .mytask-modal-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
   .mytask-modal-footer{
     padding:14px 20px;border-top:1px solid var(--rule);
@@ -2271,7 +2280,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.91</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.93</div>
   </div>
 </div>
 
@@ -2350,21 +2359,38 @@
       </div>
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
-        <button id="addPanelBtn" onclick="event.stopPropagation();addPanelFromNav()"
-          style="display:none;margin-top:6px;width:100%;padding:4px 0;border-radius:6px;border:1.5px dashed rgba(255,255,255,0.5);background:transparent;color:rgba(255,255,255,0.8);font-size:11px;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">
-          ＋ 패널 추가
-        </button>
       </div>
-    <div class="nav-version">ver2.91</div>
-    <button id="addPanelBtn" onclick="addPanelFromNav()"
-      style="display:none;margin:0 10px 8px;padding:8px 0;border-radius:8px;
-        border:1.5px dashed rgba(255,255,255,0.4);background:transparent;
-        color:rgba(255,255,255,0.8);font-size:13px;font-weight:700;cursor:pointer;
-        font-family:'Pretendard','Noto Sans KR';width:calc(100% - 20px);text-align:center;
-        transition:all .15s;">
-      ＋ 패널 추가
-    </button>
+    <div class="nav-version">ver2.93</div>
     </nav>
+
+    <!-- 업무캘린더 패널 추가 버튼 (사이드바 우측 끝, 데스크탑만) -->
+    <div id="addPanelBtn" onclick="addPanelFromNav()" style="display:none;
+      position:fixed;left:220px;top:50%;transform:translateY(-50%);
+      z-index:200;cursor:pointer;">
+      <div style="
+        width:18px;height:48px;
+        background:var(--mon);
+        border-radius:0 8px 8px 0;
+        display:flex;align-items:center;justify-content:center;
+        color:#fff;font-size:13px;font-weight:700;
+        box-shadow:2px 0 8px rgba(59,130,246,0.4);
+        transition:all .15s;
+        position:relative;
+      " onmouseover="this.style.width='22px';this.querySelector('.panel-tooltip').style.opacity=1;this.querySelector('.panel-tooltip').style.transform='translateY(-50%) translateX(0)'"
+         onmouseout="this.style.width='18px';this.querySelector('.panel-tooltip').style.opacity=0;this.querySelector('.panel-tooltip').style.transform='translateY(-50%) translateX(-4px)'">
+        ›
+        <div class="panel-tooltip" style="
+          position:absolute;left:100%;top:50%;
+          transform:translateY(-50%) translateX(-4px);
+          background:rgba(30,41,59,0.92);color:#fff;
+          font-size:11px;font-weight:600;white-space:nowrap;
+          padding:4px 8px;border-radius:6px;
+          font-family:'Pretendard','Noto Sans KR';
+          pointer-events:none;opacity:0;
+          transition:all .15s;margin-left:6px;
+        ">패널 추가</div>
+      </div>
+    </div>
 
     <!-- 콘텐츠 영역 -->
     <div class="app-content">
@@ -2773,7 +2799,7 @@
 
 <!-- 날짜 클릭 팝업 -->
 <div class="mytask-modal" id="mytaskDayModal" onclick="closeMytaskDayModalOverlay(event)">
-  <div class="mytask-modal-box" style="max-width:420px;max-height:80vh;display:flex;flex-direction:column;">
+  <div class="mytask-modal-box" style="max-width:420px;">
     <div class="mytask-modal-head">
       <div class="mytask-modal-title" id="mytaskDayTitle"></div>
       <button class="mytask-modal-close" onclick="closeMytaskDayModal()">×</button>
@@ -2787,7 +2813,7 @@
 
 <!-- 업무 캘린더 추가/수정 모달 -->
 <div class="mytask-modal" id="mytaskModal" onclick="closeMytaskModalOverlay(event)">
-  <div class="mytask-modal-box" style="width:min(90vw,680px);max-height:90vh;display:flex;flex-direction:column;">
+  <div class="mytask-modal-box">
     <div class="mytask-modal-head">
       <div class="mytask-modal-title" id="mytaskModalTitle">일정 추가</div>
       <button class="mytask-modal-close" onclick="closeMytaskModal()">×</button>
@@ -4378,9 +4404,8 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       pointsPage.classList.remove('active');
       mytaskPage.classList.add('active');
       initMytaskPage();
-      // 데스크탑에서만 + 패널 버튼 표시
       const addPanelBtn = document.getElementById('addPanelBtn');
-      if (addPanelBtn) addPanelBtn.style.display = window.innerWidth > 1024 ? 'block' : 'none';
+      if (addPanelBtn && window.innerWidth > 1024) addPanelBtn.style.display = 'block';
     }
   });
 });
