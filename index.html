@@ -2036,13 +2036,11 @@
     display:grid;grid-template-columns:repeat(7,minmax(0,1fr));
     gap:1px;background:var(--rule);
   }
-  /* 세로 비율: 가로 크기에 따라 자동 */
   .sc-cal-cell{
-    aspect-ratio: 1 / 0.9;
     background:var(--paper);
-    padding:5px;
-    display:flex;flex-direction:column;gap:2px;
-    min-height:0;
+    min-height:90px;
+    padding:6px;
+    display:flex;flex-direction:column;gap:3px;
   }
     font-family:'Noto Sans KR';font-weight:700;font-size:13px;
     color:#fff;text-align:center;padding:10px 4px;
@@ -2060,13 +2058,13 @@
   .sc-cal-cell.has-event{cursor:pointer;}
   .sc-cal-cell.has-event:hover{background:var(--paper-soft);}
   .sc-cal-date{
-    font-family:'IBM Plex Mono';font-size:12px;font-weight:600;
+    font-family:'IBM Plex Mono';font-size:14px;font-weight:700;
     color:var(--ink-soft);line-height:1;
   }
   .sc-cal-cell.today .sc-cal-date{
     background:var(--mon);color:#fff;
-    width:22px;height:22px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;font-size:11px;
+    width:26px;height:26px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:13px;
   }
   .sc-cal-cell.sunday .sc-cal-date{color:#C0392B;}
   .sc-cal-cell.saturday .sc-cal-date{color:#2980B9;}
@@ -2285,7 +2283,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.79</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.80</div>
   </div>
 </div>
 
@@ -2363,7 +2361,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver2.79</div>
+    <div class="nav-version">ver2.80</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -5492,7 +5490,7 @@ function renderSchedule(monthKey) {
     const dateEl = isToday
       ? `<div class="sc-cal-date">${d}</div>`
       : `<span class="sc-cal-date">${d}</span>`;
-    const evEl = ev ? `<div style="font-size:10px;padding:1px 5px;border-radius:4px;background:#EEF2FF;color:#4F46E5;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ev.content.slice(0,10)}</div>` : '';
+    const evEl = ev ? `<div style="font-size:12px;padding:2px 6px;border-radius:4px;background:#EEF2FF;color:#4F46E5;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ev.content.slice(0,12)}</div>` : '';
     calHtml += `<div class="${cls}" data-date="${d}">${dateEl}${evEl}</div>`;
   }
 
@@ -6865,65 +6863,42 @@ function renderRows() {
 
       panelEl.innerHTML = `
         <div class="panel-hd" style="padding:10px 14px 8px;background:var(--paper);border-bottom:1px solid var(--rule);flex-shrink:0;position:relative;">
-          <!-- 1행: 타입 + 월이동 + 호버 버튼들 -->
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-            <div style="display:flex;gap:4px;">
-              <button onclick="setPanelType(${row.id},${panel.id},'calendar')"
-                class="mytask-filter-btn ${panel.type==='calendar'?'active':''}"
-                style="font-size:13px;">📅 캘린더</button>
-              <button onclick="setPanelType(${row.id},${panel.id},'list')"
-                class="mytask-filter-btn ${panel.type==='list'?'active':''}"
-                style="font-size:13px;">📋 목록</button>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:${panel.chipsHidden?'0':'8px'};">
+            <div style="display:flex;gap:4px;flex-shrink:0;">
+              <button onclick="setPanelType(${row.id},${panel.id},'calendar')" class="mytask-filter-btn ${panel.type==='calendar'?'active':''}" style="font-size:12px;padding:3px 8px;">📅</button>
+              <button onclick="setPanelType(${row.id},${panel.id},'list')" class="mytask-filter-btn ${panel.type==='list'?'active':''}" style="font-size:12px;padding:3px 8px;">📋</button>
             </div>
             ${panel.type==='calendar' ? `
-            <div style="display:flex;align-items:center;gap:6px;">
-              <button onclick="panelChangeMonth(${row.id},${panel.id},-1)" class="mytask-nav-btn" style="width:28px;height:28px;font-size:15px;">‹</button>
-              <span id="pml_${panel.id}" style="font-family:'Pretendard','Noto Sans KR';font-size:18px;font-weight:800;white-space:nowrap;">${cy}년 ${cm+1}월</span>
-              <button onclick="panelChangeMonth(${row.id},${panel.id},1)" class="mytask-nav-btn" style="width:28px;height:28px;font-size:15px;">›</button>
-            </div>` : ''}
-            <!-- 호버 시 표시되는 조작 버튼 -->
-            <div class="panel-actions" style="display:none;gap:4px;margin-left:auto;">
-              <button onclick="openMytaskModal()" title="일정 추가"
-                style="padding:4px 10px;border-radius:8px;border:1.5px solid var(--mon);background:var(--mon);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">+ 일정</button>
-              <button onclick="addPanelToRow(${row.id})" title="이 행에 패널 추가"
-                style="padding:4px 10px;border-radius:8px;border:1.5px solid var(--rule);background:var(--paper);color:var(--ink-soft);font-size:12px;cursor:pointer;">＋ 패널</button>
-              <button onclick="addRow()" title="행 추가"
-                style="padding:4px 10px;border-radius:8px;border:1.5px solid var(--rule);background:var(--paper);color:var(--ink-soft);font-size:12px;cursor:pointer;">＋ 행</button>
-              <button onclick="removePanel(${row.id},${panel.id})" title="패널 삭제"
-                style="padding:4px 8px;border-radius:8px;border:none;background:transparent;color:#EF4444;font-size:15px;cursor:pointer;" title="패널 삭제">×</button>
-              ${rows.length > 1 ? `<button onclick="removeRow(${row.id})" style="padding:4px 8px;border-radius:8px;border:none;background:transparent;color:#EF4444;font-size:11px;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">행삭제</button>` : ''}
+            <div style="display:flex;align-items:center;gap:6px;flex:1;justify-content:center;">
+              <button onclick="panelChangeMonth(${row.id},${panel.id},-1)" class="mytask-nav-btn" style="width:26px;height:26px;font-size:14px;">‹</button>
+              <span id="pml_${panel.id}" style="font-family:'Pretendard','Noto Sans KR';font-size:17px;font-weight:800;white-space:nowrap;">${cy}년 ${cm+1}월</span>
+              <button onclick="panelChangeMonth(${row.id},${panel.id},1)" class="mytask-nav-btn" style="width:26px;height:26px;font-size:14px;">›</button>
+            </div>` : '<div style="flex:1;"></div>'}
+            <div style="display:flex;gap:3px;align-items:center;flex-shrink:0;">
+              <button onclick="togglePanelChips(this)" style="padding:2px 7px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:11px;cursor:pointer;">${panel.chipsHidden?'▼':'▲'}</button>
+              <div class="panel-actions" style="display:none;gap:3px;">
+                <button onclick="openMytaskModal()" style="padding:2px 8px;border-radius:6px;border:1.5px solid var(--mon);background:var(--mon);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">+일정</button>
+                <button onclick="addPanelToRow(${row.id})" style="padding:2px 8px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:11px;cursor:pointer;">+패널</button>
+                <button onclick="addRow()" style="padding:2px 8px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:11px;cursor:pointer;">+행</button>
+                <button onclick="removePanel(${row.id},${panel.id})" style="padding:2px 6px;border-radius:6px;border:none;background:transparent;color:#EF4444;font-size:14px;cursor:pointer;">×</button>
+                ${rows.length>1?`<button onclick="removeRow(${row.id})" style="padding:2px 6px;border-radius:6px;border:none;background:transparent;color:#EF4444;font-size:10px;cursor:pointer;">행×</button>`:''}
+              </div>
             </div>
-            <!-- 항상 표시: 칩 숨기기 토글 -->
-            <button class="panel-chip-toggle" onclick="togglePanelChips(this)"
-              style="margin-left:auto;padding:3px 8px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;"
-              title="칩 숨기기/보이기">
-              ${panel.chipsHidden ? '▼ 펼치기' : '▲ 접기'}
-            </button>
           </div>
-          <!-- 2행+3행: 칩들 (숨김 가능) -->
           <div class="panel-chips-wrap" style="display:${panel.chipsHidden?'none':'block'};">
             <div class="mytask-filters" style="margin-bottom:${panel.type==='list'?'6px':'0'};">
-              <button class="mytask-filter-btn ${panel.filters.status.includes('todo')?'active f-todo':''}"
-                onclick="togglePanelStatus(${row.id},${panel.id},'todo')">🔵 시작전</button>
-              <button class="mytask-filter-btn ${panel.filters.status.includes('doing')?'active f-doing':''}"
-                onclick="togglePanelStatus(${row.id},${panel.id},'doing')">🟡 진행중</button>
-              <button class="mytask-filter-btn ${panel.filters.status.includes('done')?'active f-done':''}"
-                onclick="togglePanelStatus(${row.id},${panel.id},'done')">🟢 완료</button>
-              ${panel.type==='calendar' ? `
-              <button class="mytask-filter-btn ${panel.showSchedule?'active':''}"
-                onclick="togglePanelSchedule(${row.id},${panel.id})">📆 학사일정</button>` : ''}
+              <button class="mytask-filter-btn ${panel.filters.status.includes('todo')?'active f-todo':''}" onclick="togglePanelStatus(${row.id},${panel.id},'todo')">🔵 시작전</button>
+              <button class="mytask-filter-btn ${panel.filters.status.includes('doing')?'active f-doing':''}" onclick="togglePanelStatus(${row.id},${panel.id},'doing')">🟡 진행중</button>
+              <button class="mytask-filter-btn ${panel.filters.status.includes('done')?'active f-done':''}" onclick="togglePanelStatus(${row.id},${panel.id},'done')">🟢 완료</button>
+              ${panel.type==='calendar'?`<button class="mytask-filter-btn ${panel.showSchedule?'active':''}" onclick="togglePanelSchedule(${row.id},${panel.id})">📆 학사일정</button>`:''}
             </div>
-            ${panel.type==='list' ? `
-            <div class="mytask-filters">
-              ${periodOpts.map(o=>`<button class="mytask-filter-btn ${panel.period===o.v?'active':''}"
-                onclick="setPanelPeriod(${row.id},${panel.id},'${o.v}')">${o.l}</button>`).join('')}
-            </div>` : ''}
+            ${panel.type==='list'?`<div class="mytask-filters">${periodOpts.map(o=>`<button class="mytask-filter-btn ${panel.period===o.v?'active':''}" onclick="setPanelPeriod(${row.id},${panel.id},'${o.v}')">${o.l}</button>`).join('')}</div>`:''}
           </div>
         </div>
-        <div class="mytask-panel-content" id="pc_${panel.id}" style="flex:1;overflow-y:auto;height:0;display:flex;flex-direction:column;"></div>
+        <div class="mytask-panel-content" id="pc_${panel.id}" style="flex:1;overflow-y:auto;height:0;display:${panel.chipsHidden?'none':'flex'};flex-direction:column;"></div>
       `;
 
-      // 호버 시 조작 버튼 표시
+      // 호버 시 조작 버튼
       const hd = panelEl.querySelector('.panel-hd');
       const actions = panelEl.querySelector('.panel-actions');
       hd.addEventListener('mouseenter', () => actions.style.display = 'flex');
@@ -6936,16 +6911,51 @@ function renderRows() {
 
   // 패널 내용 렌더링
   rows.forEach(row => row.panels.forEach(panel => renderPanelContent(panel)));
+  // 비율 복원
+  requestAnimationFrame(() => restoreLayoutSizes());
 }
 
 // 행 드래그
+function saveLayoutSizes() {
+  try {
+    const container = document.getElementById('mytaskPanelContainer');
+    if (!container) return;
+    const rowEls = [...container.querySelectorAll('[data-row-id]')];
+    const sizes = { rows: {}, cols: {} };
+    rowEls.forEach(rowEl => {
+      const rowId = rowEl.dataset.rowId;
+      sizes.rows[rowId] = rowEl.style.flex || '';
+      const panelEls = [...rowEl.querySelectorAll('.mytask-panel')];
+      sizes.cols[rowId] = panelEls.map(p => p.style.flex || '');
+    });
+    localStorage.setItem('ynhs_layout_sizes', JSON.stringify(sizes));
+  } catch(e) {}
+}
+
+function restoreLayoutSizes() {
+  try {
+    const saved = localStorage.getItem('ynhs_layout_sizes');
+    if (!saved) return;
+    const sizes = JSON.parse(saved);
+    const container = document.getElementById('mytaskPanelContainer');
+    if (!container) return;
+    const rowEls = [...container.querySelectorAll('[data-row-id]')];
+    rowEls.forEach(rowEl => {
+      const rowId = rowEl.dataset.rowId;
+      if (sizes.rows[rowId]) rowEl.style.flex = sizes.rows[rowId];
+      const panelEls = [...rowEl.querySelectorAll('.mytask-panel')];
+      const colSizes = sizes.cols[rowId] || [];
+      panelEls.forEach((p, i) => { if (colSizes[i]) p.style.flex = colSizes[i]; });
+    });
+  } catch(e) {}
+}
+
 function setupRowDrag(handle, ri, container) {
   handle.addEventListener('mousedown', e => {
     e.preventDefault();
     const startY = e.clientY;
     const rowEls = [...container.querySelectorAll('[data-row-id]')];
     const startH = rowEls.map(el => el.getBoundingClientRect().height);
-    const totalH = startH.reduce((a,b)=>a+b,0);
 
     const onMove = ev => {
       const diff = ev.clientY - startY;
@@ -6954,7 +6964,11 @@ function setupRowDrag(handle, ri, container) {
       rowEls[ri-1].style.flex = `0 0 ${newA}px`;
       rowEls[ri].style.flex   = `0 0 ${newB}px`;
     };
-    const onUp = () => { document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); };
+    const onUp = () => {
+      saveLayoutSizes();
+      document.removeEventListener('mousemove',onMove);
+      document.removeEventListener('mouseup',onUp);
+    };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   });
@@ -6975,7 +6989,11 @@ function setupColDrag(handle, pi, rowEl) {
       panelEls[pi-1].style.flex = `0 0 ${newA}px`;
       panelEls[pi].style.flex   = `0 0 ${newB}px`;
     };
-    const onUp = () => { document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); };
+    const onUp = () => {
+      saveLayoutSizes();
+      document.removeEventListener('mousemove',onMove);
+      document.removeEventListener('mouseup',onUp);
+    };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   });
@@ -6983,13 +7001,14 @@ function setupColDrag(handle, pi, rowEl) {
 
 // 패널 함수들
 function togglePanelChips(btn) {
-  const hd   = btn.closest('.panel-hd');
-  const wrap = hd.querySelector('.panel-chips-wrap');
-  const hidden = wrap.style.display === 'none';
-  wrap.style.display = hidden ? 'block' : 'none';
-  btn.textContent = hidden ? '▲ 접기' : '▼ 펼치기';
-  // 패널 데이터에도 저장
+  const hd      = btn.closest('.panel-hd');
   const panelEl = btn.closest('.mytask-panel');
+  const wrap    = hd.querySelector('.panel-chips-wrap');
+  const content = panelEl.querySelector('.mytask-panel-content');
+  const hidden  = wrap.style.display === 'none';
+  wrap.style.display    = hidden ? 'block' : 'none';
+  if (content) content.style.display = hidden ? 'flex' : 'none';
+  btn.textContent = hidden ? '▲' : '▼';
   const panelId = parseInt(panelEl.dataset.panelId);
   const panel = rows.flatMap(r=>r.panels).find(p=>p.id===panelId);
   if (panel) { panel.chipsHidden = !hidden; saveRows(); }
