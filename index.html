@@ -2271,7 +2271,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.85</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.91</div>
   </div>
 </div>
 
@@ -2283,7 +2283,9 @@
       <span></span><span></span><span></span>
     </button>
     <div class="app-header-title"><img src="icon-180.png" style="height:38px;vertical-align:middle;margin-right:10px;">영남고등학교</div>
-    <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+      <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
+    </div>
   </header>
 
   <!-- 모바일 탭바 (사이드바가 접힌 상태에서 표시) -->
@@ -2353,7 +2355,15 @@
           ＋ 패널 추가
         </button>
       </div>
-    <div class="nav-version">ver2.85</div>
+    <div class="nav-version">ver2.91</div>
+    <button id="addPanelBtn" onclick="addPanelFromNav()"
+      style="display:none;margin:0 10px 8px;padding:8px 0;border-radius:8px;
+        border:1.5px dashed rgba(255,255,255,0.4);background:transparent;
+        color:rgba(255,255,255,0.8);font-size:13px;font-weight:700;cursor:pointer;
+        font-family:'Pretendard','Noto Sans KR';width:calc(100% - 20px);text-align:center;
+        transition:all .15s;">
+      ＋ 패널 추가
+    </button>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -4116,6 +4126,10 @@ onAuthStateChanged(fbAuth, async (user) => {
     collectTeacherEmail(user);
     // 학사일정 미리 로딩 (업무 캘린더 학사일정 표시용)
     preloadScheduleData();
+    // 업무 일정 미리 로딩 (관리자)
+    if (user.email === 'pkh910518@yeungnam.hs.kr') {
+      loadMytasks();
+    }
   }catch(e){
     setAuthStatus('데이터를 불러오지 못했습니다: ' + e.message + ' (인터넷 연결을 확인하고 새로고침해주세요)', true);
   }
@@ -6833,14 +6847,14 @@ function renderRows() {
     rowEl.dataset.rowId = row.id;
     rowEl.style.cssText = 'display:flex;flex:1;min-height:0;position:relative;';
 
+    const panelEls = [];
     row.panels.forEach((panel, pi) => {
-      // 패널 간 드래그 핸들
       if (pi > 0) {
         const ph = document.createElement('div');
-        ph.style.cssText = 'width:5px;cursor:col-resize;background:var(--rule);flex-shrink:0;transition:background .15s;';
+        ph.dataset.dragHandle = pi;
+        ph.style.cssText = 'width:5px;cursor:col-resize;background:var(--rule);flex-shrink:0;transition:background .15s;z-index:10;';
         ph.onmouseover = () => ph.style.background = 'var(--mon)';
         ph.onmouseout  = () => ph.style.background = 'var(--rule)';
-        setupColDrag(ph, pi, rowEl);
         rowEl.appendChild(ph);
       }
 
@@ -6904,6 +6918,13 @@ function renderRows() {
       hd.addEventListener('mouseenter', () => actions.style.display = 'flex');
       hd.addEventListener('mouseleave', () => actions.style.display = 'none');
       rowEl.appendChild(panelEl);
+      panelEls.push(panelEl);
+    });
+
+    // 핸들에 드래그 설정 (패널 el 다 생성 후)
+    rowEl.querySelectorAll('[data-drag-handle]').forEach(ph => {
+      const pi = parseInt(ph.dataset.dragHandle);
+      setupColDrag(ph, pi, rowEl, panelEls[pi-1], panelEls[pi]);
     });
 
     container.appendChild(rowEl);
@@ -6985,21 +7006,23 @@ function setupRowDrag(handle, ri, container) {
 }
 
 // 열 드래그
-function setupColDrag(handle, pi, rowEl) {
+function setupColDrag(handle, pi, rowEl, panelElA, panelElB) {
   handle.addEventListener('mousedown', e => {
     e.preventDefault();
-    const startX    = e.clientX;
-    const panelEls  = [...rowEl.querySelectorAll('.mytask-panel')];
-    const totalW    = rowEl.getBoundingClientRect().width;
-    const startPct  = panelEls.map(el => el.getBoundingClientRect().width / totalW * 100);
+    const startX   = e.clientX;
+    const totalW   = rowEl.getBoundingClientRect().width;
+    const startWA  = panelElA.getBoundingClientRect().width;
+    const startWB  = panelElB.getBoundingClientRect().width;
 
     const onMove = ev => {
       const diff    = ev.clientX - startX;
       const diffPct = diff / totalW * 100;
-      const newA = Math.max(8, startPct[pi-1] + diffPct);
-      const newB = Math.max(8, startPct[pi]   - diffPct);
-      panelEls[pi-1].style.flex = `0 0 ${newA.toFixed(2)}%`;
-      panelEls[pi].style.flex   = `0 0 ${newB.toFixed(2)}%`;
+      const pctA = startWA / totalW * 100;
+      const pctB = startWB / totalW * 100;
+      const newA = Math.max(8, pctA + diffPct);
+      const newB = Math.max(8, pctB - diffPct);
+      panelElA.style.flex = `0 0 ${newA.toFixed(2)}%`;
+      panelElB.style.flex = `0 0 ${newB.toFixed(2)}%`;
     };
     const onUp = () => {
       saveLayoutSizes();
@@ -7128,6 +7151,7 @@ function renderPanelContent(panel) {
     calEl.style.cssText = 'flex:1;display:flex;flex-direction:column;min-height:0;padding:8px;';
     calEl.innerHTML = buildPanelCalendar(tasks, cy, cm, panel);
     el.appendChild(calEl);
+    requestAnimationFrame(() => adjustCalChips(el));
   } else {
     el.style.padding = '8px';
     el.innerHTML = buildPanelList(tasks);
@@ -7140,8 +7164,6 @@ function buildPanelCalendar(tasks, cy, cm, panel) {
   const today    = new Date();
   const ym       = `${cy}-${String(cm+1).padStart(2,'0')}`;
   const totalRows = Math.ceil((firstDay + lastDate) / 7);
-
-  // 학사일정
   let scheduleItems = [];
   if (panel.showSchedule) {
     const monthEvents = (window._scheduleData || {})[ym] || [];
@@ -7150,15 +7172,12 @@ function buildPanelCalendar(tasks, cy, cm, panel) {
       title:e.content||e.title||'', _type:'schedule'
     }));
   }
-
-  // 요일 헤더
   let html = `<div style="display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:2px;">
     ${['일','월','화','수','목','금','토'].map((d,i) =>
       `<div style="text-align:center;font-family:'Pretendard','Noto Sans KR';font-size:clamp(11px,1.2vw,15px);font-weight:700;color:${i===0?'#EF4444':i===6?'#3B82F6':'var(--ink-soft)'};">${d}</div>`
     ).join('')}
   </div>
   <div style="display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(${totalRows},1fr);flex:1;border:1px solid var(--rule);border-radius:8px;overflow:hidden;">`;
-
   let dayCount = 1;
   for (let i = 0; i < totalRows*7; i++) {
     const isOther = i < firstDay || dayCount > lastDate;
@@ -7168,10 +7187,9 @@ function buildPanelCalendar(tasks, cy, cm, panel) {
     const dayTasks    = tasks.filter(t => t.startDate<=dateStr && t.endDate>=dateStr);
     const daySchedule = scheduleItems.filter(s => s.date===dateStr);
     const allItems    = [...daySchedule.map(s=>({...s,_type:'schedule'})), ...dayTasks];
-
-    html += `<div style="min-height:0;padding:4px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);overflow:hidden;cursor:pointer;background:var(--paper);${isOther?'opacity:0.3;':''}"
+    html += `<div class="panel-cal-cell" style="min-height:0;padding:4px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);overflow:hidden;cursor:pointer;background:var(--paper);${isOther?'opacity:0.3;':''}"
       ${date?`ondragover="calDragOver(event)" ondrop="calDrop(event,'${dateStr}')" ondragleave="calDragLeave(event)" onclick="mytaskDayClick('${dateStr}',event)"`:''}>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
         <div style="font-family:'IBM Plex Mono';font-size:clamp(11px,1.1vw,15px);font-weight:700;
           ${isToday?`background:var(--mon);color:#fff;border-radius:50%;width:clamp(18px,1.6vw,24px);height:clamp(18px,1.6vw,24px);display:flex;align-items:center;justify-content:center;`:''}
           color:${isToday?'#fff':i%7===0?'#EF4444':i%7===6?'#3B82F6':'var(--ink-soft)'};">
@@ -7181,19 +7199,51 @@ function buildPanelCalendar(tasks, cy, cm, panel) {
           style="opacity:0;width:clamp(14px,1.4vw,20px);height:clamp(14px,1.4vw,20px);border-radius:4px;border:none;background:var(--mon);color:#fff;font-size:clamp(10px,1vw,14px);cursor:pointer;padding:0;line-height:1;"
           onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0">+</button>`:''}
       </div>
-      ${allItems.slice(0,3).map(t => t._type==='schedule'
-        ? `<div style="font-size:clamp(9px,0.9vw,12px);padding:1px 4px;border-radius:3px;background:#FEE2E2;color:#991B1B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px;">${t.title}</div>`
+      <div class="panel-cal-items">
+      ${allItems.map(t => t._type==='schedule'
+        ? `<div style="font-size:clamp(10px,1vw,13px);padding:2px 5px;border-radius:4px;background:#FEE2E2;color:#991B1B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;line-height:1.4;">${t.title}</div>`
         : `<div draggable="true" ondragstart="calDragStart(event,'${t.id}','${t.ownerUid||''}')" ondragend="calDragEnd(event)"
             onclick="event.stopPropagation();openMytaskModal('${t.id}','${t.ownerUid||''}')"
-            style="font-size:clamp(9px,0.9vw,12px);padding:1px 4px;border-radius:3px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:grab;
+            style="font-size:clamp(10px,1vw,13px);padding:2px 5px;border-radius:4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:grab;line-height:1.4;
             ${t.status==='todo'?'background:#EEF2FF;color:#4F46E5;':t.status==='doing'?'background:#FEF3C7;color:#D97706;':'background:#D1FAE5;color:#065F46;text-decoration:line-through;'}">${t.title}</div>`
       ).join('')}
-      ${allItems.length > 3 ? `<div style="font-size:clamp(9px,0.8vw,11px);color:var(--ink-soft);">+${allItems.length-3}</div>` : ''}
+      </div>
     </div>`;
     if (!isOther) dayCount++;
   }
   return html + '</div>';
 }
+
+// 셀 높이에 따라 칩 표시 개수 조정
+function adjustCalChips(contentEl) {
+  const cells = contentEl.querySelectorAll('.panel-cal-cell');
+  cells.forEach(cell => {
+    const cellH    = cell.getBoundingClientRect().height;
+    const headerH  = cell.querySelector('div')?.getBoundingClientRect().height || 22;
+    const available = cellH - headerH - 6;
+    const chipH    = 22; // 칩 높이 (padding + line-height)
+    const maxChips = Math.max(1, Math.floor(available / chipH));
+
+    const itemsWrap = cell.querySelector('.panel-cal-items');
+    if (!itemsWrap) return;
+    const items = [...itemsWrap.children];
+    items.forEach((item, idx) => {
+      item.style.display = idx < maxChips ? '' : 'none';
+    });
+
+    // +N개 표시
+    const hidden = items.length - maxChips;
+    let more = cell.querySelector('.panel-cal-more');
+    if (!more) {
+      more = document.createElement('div');
+      more.className = 'panel-cal-more';
+      more.style.cssText = 'font-size:clamp(9px,0.8vw,11px);color:var(--ink-soft);';
+      cell.appendChild(more);
+    }
+    more.textContent = hidden > 0 ? `+${hidden}개` : '';
+  });
+}
+window.adjustCalChips = adjustCalChips;
 
 function buildPanelList(tasks) {
   const sorted = [...tasks].sort((a,b) => a.startDate?.localeCompare(b.startDate));
@@ -7255,8 +7305,8 @@ let listFilters = new Set(['all']);
 
 function initMytaskPage() {
   if (!mytaskInitialized) {
-    loadMytasks();
     mytaskInitialized = true;
+    if (mytaskTasks.length === 0) loadMytasks();
   }
   initPanelSystem();
 }
@@ -7267,7 +7317,12 @@ async function loadMytasks() {
   try {
     const snap = await getDocs(collection(fbDb, 'tasks', user.uid, 'items'));
     mytaskTasks = snap.docs.map(d => ({ id: d.id, ownerUid: user.uid, ...d.data() }));
-    renderRows();
+    // 패널이 이미 초기화된 경우 바로 렌더링
+    if (mytaskInitialized) {
+      const isMobile = window.innerWidth <= 1024;
+      if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
+      else renderRows();
+    }
   } catch(e) { console.error('캘린더 로딩 실패:', e); }
 }
 
