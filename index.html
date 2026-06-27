@@ -2279,7 +2279,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.70</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.71</div>
   </div>
 </div>
 
@@ -2357,7 +2357,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver2.70</div>
+    <div class="nav-version">ver2.71</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -6755,445 +6755,285 @@ window.triggerWeeklySummaryAction = triggerWeeklySummaryAction;
 // ══════════════════════════════════════════
 // 패널 시스템
 // ══════════════════════════════════════════
-let gridCols = 2;
-let gridRows = 1;
-let panels = [];
+// ══════════════════════════════════════════
+// 행 기반 패널 시스템
+// rows: [{id, panels:[{id,type,filters,...}]}]
+// ══════════════════════════════════════════
+let rows = [];
 let panelIdCounter = 0;
+let rowIdCounter   = 0;
 
 function initPanelSystem() {
   try {
-    const saved = localStorage.getItem('ynhs_panels');
+    const saved = localStorage.getItem('ynhs_rows');
     if (saved) {
       const data = JSON.parse(saved);
-      gridCols = data.cols || 2;
-      gridRows = data.rows || 1;
-      panels   = data.panels || getDefaultPanels();
-      panelIdCounter = panels.reduce((m,p) => Math.max(m,p.id), 0);
+      rows = data.rows || getDefaultRows();
+      panelIdCounter = rows.flatMap(r=>r.panels).reduce((m,p)=>Math.max(m,p.id),0);
+      rowIdCounter   = rows.reduce((m,r)=>Math.max(m,r.id),0);
     } else {
-      panels = getDefaultPanels();
+      rows = getDefaultRows();
     }
-  } catch(e) { panels = getDefaultPanels(); }
+  } catch(e) { rows = getDefaultRows(); }
 
   const isMobile = window.innerWidth <= 768;
   document.getElementById('mytaskMobileBody').style.display    = isMobile ? 'flex' : 'none';
-  document.getElementById('mytaskPanelContainer').style.display = isMobile ? 'none' : 'grid';
-
-  updateGridLabels();
-  renderPanels();
+  document.getElementById('mytaskPanelContainer').style.display = isMobile ? 'none' : 'flex';
+  renderRows();
 }
 
-function getDefaultPanels() {
-  return [
-    { id: ++panelIdCounter, type:'calendar', filters:{status:['todo','doing','done']}, showSchedule:false, period:'month' },
-    { id: ++panelIdCounter, type:'list',     filters:{status:['todo','doing','done']}, period:'all' }
-  ];
+function getDefaultRows() {
+  rowIdCounter = 0; panelIdCounter = 0;
+  return [{
+    id: ++rowIdCounter,
+    panels: [
+      { id:++panelIdCounter, type:'calendar', filters:{status:['todo','doing','done']}, showSchedule:false, period:'month', calYear:new Date().getFullYear(), calMonth:new Date().getMonth() },
+      { id:++panelIdCounter, type:'list',     filters:{status:['todo','doing','done']}, period:'all' }
+    ]
+  }];
 }
 
-function savePanels() {
-  try { localStorage.setItem('ynhs_panels', JSON.stringify({ cols:gridCols, rows:gridRows, panels })); } catch(e) {}
+function saveRows() {
+  try { localStorage.setItem('ynhs_rows', JSON.stringify({ rows })); } catch(e) {}
 }
 
-function updateGridLabels() {
-  const c = document.getElementById('gridColsLabel');
-  const r = document.getElementById('gridRowsLabel');
-  if (c) c.textContent = gridCols;
-  if (r) r.textContent = gridRows;
+// ── 행 추가/삭제 ──
+function addRow() {
+  rows.push({ id:++rowIdCounter, panels:[{ id:++panelIdCounter, type:'list', filters:{status:['todo','doing','done']}, period:'all' }] });
+  renderRows(); saveRows();
+}
+function removeRow(rowId) {
+  if (rows.length <= 1) { alert('최소 1행은 있어야 해요!'); return; }
+  rows = rows.filter(r => r.id !== rowId);
+  renderRows(); saveRows();
 }
 
-function setGridCols(dir) {
-  gridCols = Math.max(1, Math.min(4, gridCols + dir));
-  ensurePanels();
-  updateGridLabels();
-  renderPanels();
-  savePanels();
+// ── 패널 추가/삭제 ──
+function addPanelToRow(rowId) {
+  const r = rows.find(r => r.id === rowId);
+  if (!r) return;
+  if (r.panels.length >= 4) { alert('한 행에 최대 4개!'); return; }
+  r.panels.push({ id:++panelIdCounter, type:'list', filters:{status:['todo','doing','done']}, period:'all' });
+  renderRows(); saveRows();
+}
+function removePanel(rowId, panelId) {
+  const r = rows.find(r => r.id === rowId);
+  if (!r) return;
+  if (r.panels.length <= 1 && rows.length <= 1) { alert('최소 1개 패널은 있어야 해요!'); return; }
+  if (r.panels.length <= 1) { removeRow(rowId); return; }
+  r.panels = r.panels.filter(p => p.id !== panelId);
+  renderRows(); saveRows();
 }
 
-function setGridRows(dir) {
-  gridRows = Math.max(1, Math.min(4, gridRows + dir));
-  ensurePanels();
-  updateGridLabels();
-  renderPanels();
-  savePanels();
-}
-
-function ensurePanels() {
-  const needed = gridCols * gridRows;
-  while (panels.length < needed) {
-    panels.push({ id: ++panelIdCounter, type:'list', filters:{status:['todo','doing','done']}, period:'all' });
-  }
-}
-
-function addPanel() {
-  if (gridCols < 4) { setGridCols(1); return; }
-  if (gridRows < 4) { setGridRows(1); return; }
-  alert('최대 4×4까지 가능해요!');
-}
-
-function removePanel(id) {
-  const total = gridCols * gridRows;
-  if (total <= 1) { alert('최소 1개 패널은 있어야 해요!'); return; }
-  panels = panels.filter(p => p.id !== id);
-  if (gridCols > 1) gridCols--;
-  else if (gridRows > 1) gridRows--;
-  ensurePanels();
-  updateGridLabels();
-  renderPanels();
-  savePanels();
-}
-
-function renderPanels() {
+// ── 렌더링 ──
+function renderRows() {
   const container = document.getElementById('mytaskPanelContainer');
   if (!container) return;
+  container.style.flexDirection = 'column';
+  container.innerHTML = '';
 
   const titleEl = document.getElementById('mytaskMonthTitle');
-  if (titleEl) titleEl.textContent = `${mytaskYear}년 ${mytaskMonth + 1}월`;
+  if (titleEl) titleEl.textContent = `${mytaskYear}년 ${mytaskMonth+1}월`;
 
-  container.style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
-  container.style.gridTemplateRows    = `repeat(${gridRows}, 1fr)`;
-
-  ensurePanels();
-  const needed = gridCols * gridRows;
-
-  container.innerHTML = '';
-  panels.slice(0, needed).forEach(panel => {
-    // 패널별 월 초기화
-    if (!panel.calYear)  panel.calYear  = mytaskYear;
-    if (!panel.calMonth) panel.calMonth = mytaskMonth;
-
-    const el = document.createElement('div');
-    el.className = 'mytask-panel';
-    el.dataset.panelId = panel.id;
-
-    const icons  = { todo:'🔵', doing:'🟡', done:'🟢' };
-    const labels = { todo:'시작전', doing:'진행중', done:'완료' };
-    const statusChips = ['todo','doing','done'].map(s => {
-      const active = panel.filters.status.includes(s);
-      return `<span onclick="togglePanelStatus(${panel.id},'${s}')" style="cursor:pointer;opacity:${active?1:0.3};font-size:12px;white-space:nowrap;">${icons[s]}${labels[s]}</span>`;
-    }).join(' ');
-
-    // 목록 기간 필터
-    const listPeriods = ['최근','이번주','이번달','다음달','전체'];
-    const listPeriodChips = listPeriods.map(p => {
-      const key = {'최근':'recent','이번주':'week','이번달':'month','다음달':'nextmonth','전체':'all'}[p];
-      return `<span onclick="setPanelPeriod(${panel.id},'${key}')" style="cursor:pointer;padding:2px 7px;border-radius:12px;font-size:11px;font-family:'Pretendard','Noto Sans KR';font-weight:700;white-space:nowrap;
-        ${panel.period===key?'background:var(--mon);color:#fff;':'background:var(--paper-soft);color:var(--ink-soft);'}">${p}</span>`;
-    }).join('');
-
-    el.innerHTML = `
-      <div class="mytask-panel-header" style="flex-wrap:wrap;gap:4px;">
-        <!-- 타입 선택 버튼 -->
-        <div style="display:flex;gap:4px;flex-shrink:0;">
-          <button onclick="setPanelType(${panel.id},'calendar')" style="padding:3px 8px;border-radius:6px;border:1.5px solid ${panel.type==='calendar'?'var(--mon)':'var(--rule)'};background:${panel.type==='calendar'?'var(--mon)':'transparent'};color:${panel.type==='calendar'?'#fff':'var(--ink-soft)'};font-size:12px;cursor:pointer;">📅</button>
-          <button onclick="setPanelType(${panel.id},'list')" style="padding:3px 8px;border-radius:6px;border:1.5px solid ${panel.type==='list'?'var(--mon)':'var(--rule)'};background:${panel.type==='list'?'var(--mon)':'transparent'};color:${panel.type==='list'?'#fff':'var(--ink-soft)'};font-size:12px;cursor:pointer;">📋</button>
-        </div>
-
-        <!-- 캘린더: 월 이동 + 학사일정 -->
-        ${panel.type === 'calendar' ? `
-        <div style="display:flex;align-items:center;gap:4px;">
-          <button onclick="panelChangeMonth(${panel.id},-1)" style="width:22px;height:22px;border-radius:6px;border:1px solid var(--rule);background:var(--paper);cursor:pointer;font-size:13px;">‹</button>
-          <span style="font-family:'IBM Plex Mono';font-weight:700;font-size:12px;min-width:60px;text-align:center;" id="panelMonthLabel_${panel.id}">${panel.calYear}년 ${panel.calMonth+1}월</span>
-          <button onclick="panelChangeMonth(${panel.id},1)" style="width:22px;height:22px;border-radius:6px;border:1px solid var(--rule);background:var(--paper);cursor:pointer;font-size:13px;">›</button>
-          <span onclick="togglePanelSchedule(${panel.id})" style="cursor:pointer;padding:2px 7px;border-radius:12px;font-size:11px;font-family:'Pretendard','Noto Sans KR';font-weight:700;white-space:nowrap;
-            ${panel.showSchedule?'background:var(--mon);color:#fff;':'background:var(--paper-soft);color:var(--ink-soft);'}">📆 학사일정</span>
-        </div>
-        ` : ''}
-
-        <!-- 목록: 기간 필터 -->
-        ${panel.type === 'list' ? `
-        <div style="display:flex;gap:3px;flex-wrap:wrap;">${listPeriodChips}</div>
-        ` : ''}
-
-        <!-- 상태 필터 -->
-        <div style="display:flex;gap:4px;align-items:center;margin-left:auto;">${statusChips}
-          <button class="mytask-panel-remove-btn" onclick="removePanel(${panel.id})">×</button>
-        </div>
-      </div>
-      <div class="mytask-panel-content" id="panelContent_${panel.id}"></div>
-    `;
-    container.appendChild(el);
-  });
-
-  // 그리드 열/행 드래그 비율 조정
-  if (gridCols > 1) setupGridDrag(container, 'col');
-  if (gridRows > 1) setupGridDrag(container, 'row');
-}
-
-function setupGridDrag(container, type) {
-  container.querySelectorAll('.grid-drag-handle').forEach(el => el.remove());
-  container.style.position = 'relative';
-
-  const count = type === 'col' ? gridCols : gridRows;
-  for (let i = 1; i < count; i++) {
-    const handle = document.createElement('div');
-    handle.className = 'grid-drag-handle';
-    const pct = (i * 100 / count);
-    if (type === 'col') {
-      handle.style.cssText = `position:absolute;top:0;bottom:0;left:calc(${pct}% - 3px);width:6px;cursor:col-resize;z-index:100;background:transparent;transition:background .15s;`;
-      handle.onmouseover = () => handle.style.background = 'rgba(59,130,246,0.3)';
-      handle.onmouseout  = () => handle.style.background = 'transparent';
-    } else {
-      handle.style.cssText = `position:absolute;left:0;right:0;top:calc(${pct}% - 3px);height:6px;cursor:row-resize;z-index:100;background:transparent;transition:background .15s;`;
-      handle.onmouseover = () => handle.style.background = 'rgba(59,130,246,0.3)';
-      handle.onmouseout  = () => handle.style.background = 'transparent';
+  rows.forEach((row, ri) => {
+    // 행 간 드래그 핸들
+    if (ri > 0) {
+      const handle = document.createElement('div');
+      handle.style.cssText = 'height:5px;cursor:row-resize;background:var(--rule);flex-shrink:0;transition:background .15s;';
+      handle.onmouseover = () => handle.style.background = 'var(--mon)';
+      handle.onmouseout  = () => handle.style.background = 'var(--rule)';
+      setupRowDrag(handle, ri, container);
+      container.appendChild(handle);
     }
 
-    handle.addEventListener('mousedown', e => {
-      e.preventDefault();
-      const startPos = type === 'col' ? e.clientX : e.clientY;
-      const contSize = type === 'col'
-        ? container.getBoundingClientRect().width
-        : container.getBoundingClientRect().height;
-      const template = type === 'col'
-        ? container.style.gridTemplateColumns
-        : container.style.gridTemplateRows;
-      const startFrs = (template || `repeat(${count},1fr)`).split(' ').map(v => parseFloat(v) || 1);
+    // 행 컨테이너
+    const rowEl = document.createElement('div');
+    rowEl.dataset.rowId = row.id;
+    rowEl.style.cssText = 'display:flex;flex:1;min-height:0;position:relative;';
 
-      const onMove = ev => {
-        const pos  = type === 'col' ? ev.clientX : ev.clientY;
-        const diff = pos - startPos;
-        const pctDiff = (diff / contSize) * count;
-        const newFrs = [...startFrs];
-        newFrs[i-1] = Math.max(0.5, startFrs[i-1] + pctDiff);
-        newFrs[i]   = Math.max(0.5, startFrs[i]   - pctDiff);
-        const val = newFrs.map(v => v+'fr').join(' ');
-        if (type === 'col') container.style.gridTemplateColumns = val;
-        else                container.style.gridTemplateRows    = val;
-      };
-      const onUp = () => {
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
-      };
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
+    row.panels.forEach((panel, pi) => {
+      // 패널 간 드래그 핸들
+      if (pi > 0) {
+        const ph = document.createElement('div');
+        ph.style.cssText = 'width:5px;cursor:col-resize;background:var(--rule);flex-shrink:0;transition:background .15s;';
+        ph.onmouseover = () => ph.style.background = 'var(--mon)';
+        ph.onmouseout  = () => ph.style.background = 'var(--rule)';
+        setupColDrag(ph, pi, rowEl);
+        rowEl.appendChild(ph);
+      }
+
+      const panelEl = document.createElement('div');
+      panelEl.className = 'mytask-panel';
+      panelEl.dataset.panelId = panel.id;
+      panelEl.style.flex = '1';
+
+      const icons  = { todo:'🔵', doing:'🟡', done:'🟢' };
+      const lbs    = { todo:'시작전', doing:'진행중', done:'완료' };
+      const statusChips = ['todo','doing','done'].map(s => {
+        const on = panel.filters.status.includes(s);
+        return `<span onclick="togglePanelStatus(${row.id},${panel.id},'${s}')" style="cursor:pointer;opacity:${on?1:0.3};font-size:11px;white-space:nowrap;">${icons[s]}${lbs[s]}</span>`;
+      }).join(' ');
+
+      const periodOpts = [{v:'all',l:'전체'},{v:'recent',l:'최근'},{v:'week',l:'이번주'},{v:'month',l:'이번달'},{v:'next',l:'다음달'},{v:'range',l:'기간'}];
+      const periodChips = periodOpts.map(o =>
+        `<span onclick="setPanelPeriod(${row.id},${panel.id},'${o.v}')" style="cursor:pointer;font-size:10px;padding:1px 6px;border-radius:10px;white-space:nowrap;
+          ${panel.period===o.v?'background:var(--mon);color:#fff;':'background:var(--paper-soft);color:var(--ink-soft);'}">${o.l}</span>`
+      ).join('');
+
+      const cy = panel.calYear  ?? mytaskYear;
+      const cm = panel.calMonth ?? mytaskMonth;
+
+      panelEl.innerHTML = `
+        <div class="mytask-panel-header" style="flex-wrap:wrap;gap:3px;min-height:0;">
+          <div style="display:flex;gap:3px;flex-shrink:0;">
+            <button onclick="setPanelType(${row.id},${panel.id},'calendar')" style="padding:2px 7px;border-radius:5px;border:1px solid ${panel.type==='calendar'?'var(--mon)':'var(--rule)'};background:${panel.type==='calendar'?'var(--mon)':'transparent'};color:${panel.type==='calendar'?'#fff':'var(--ink-soft)'};font-size:11px;cursor:pointer;">📅</button>
+            <button onclick="setPanelType(${row.id},${panel.id},'list')" style="padding:2px 7px;border-radius:5px;border:1px solid ${panel.type==='list'?'var(--mon)':'var(--rule)'};background:${panel.type==='list'?'var(--mon)':'transparent'};color:${panel.type==='list'?'#fff':'var(--ink-soft)'};font-size:11px;cursor:pointer;">📋</button>
+          </div>
+          ${panel.type==='calendar' ? `
+          <div style="display:flex;align-items:center;gap:2px;flex-shrink:0;">
+            <button onclick="panelChangeMonth(${row.id},${panel.id},-1)" style="width:18px;height:18px;border-radius:4px;border:1px solid var(--rule);background:var(--paper);cursor:pointer;font-size:11px;padding:0;">‹</button>
+            <span id="pml_${panel.id}" style="font-family:'IBM Plex Mono';font-size:10px;font-weight:700;white-space:nowrap;">${cy}년 ${cm+1}월</span>
+            <button onclick="panelChangeMonth(${row.id},${panel.id},1)" style="width:18px;height:18px;border-radius:4px;border:1px solid var(--rule);background:var(--paper);cursor:pointer;font-size:11px;padding:0;">›</button>
+            <span onclick="togglePanelSchedule(${row.id},${panel.id})" style="cursor:pointer;font-size:10px;padding:1px 5px;border-radius:8px;white-space:nowrap;
+              ${panel.showSchedule?'background:var(--mon);color:#fff;':'background:var(--paper-soft);color:var(--ink-soft);'}">📆</span>
+          </div>` : `<div style="display:flex;gap:2px;flex-wrap:wrap;">${periodChips}</div>`}
+          <div style="display:flex;gap:3px;align-items:center;margin-left:auto;flex-shrink:0;">${statusChips}
+            <button onclick="addPanelToRow(${row.id})" style="padding:1px 6px;border-radius:5px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:11px;cursor:pointer;" title="이 행에 패널 추가">＋</button>
+            <button onclick="removePanel(${row.id},${panel.id})" style="padding:1px 5px;border-radius:5px;border:none;background:transparent;color:var(--ink-soft);font-size:13px;cursor:pointer;" title="패널 삭제">×</button>
+          </div>
+        </div>
+        <div class="mytask-panel-content" id="pc_${panel.id}" style="flex:1;overflow-y:auto;height:0;display:flex;flex-direction:column;"></div>
+      `;
+      rowEl.appendChild(panelEl);
     });
-    container.appendChild(handle);
-  }
+
+    container.appendChild(rowEl);
+
+    // 행 하단에 행 추가/삭제 버튼
+    const rowCtrl = document.createElement('div');
+    rowCtrl.style.cssText = 'display:flex;justify-content:flex-end;gap:4px;padding:2px 6px;background:var(--paper-soft);flex-shrink:0;border-bottom:1px solid var(--rule);';
+    rowCtrl.innerHTML = `
+      <button onclick="addRow()" style="padding:1px 8px;border-radius:5px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:11px;cursor:pointer;">＋ 행 추가</button>
+      ${rows.length > 1 ? `<button onclick="removeRow(${row.id})" style="padding:1px 8px;border-radius:5px;border:none;background:transparent;color:#EF4444;font-size:11px;cursor:pointer;">× 행 삭제</button>` : ''}
+    `;
+    container.appendChild(rowCtrl);
+  });
+
+  // 패널 내용 렌더링
+  rows.forEach(row => row.panels.forEach(panel => renderPanelContent(panel)));
 }
 
-// 모바일/태블릿 전환
+// 행 드래그
+function setupRowDrag(handle, ri, container) {
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const rowEls = [...container.querySelectorAll('[data-row-id]')];
+    const startH = rowEls.map(el => el.getBoundingClientRect().height);
+    const totalH = startH.reduce((a,b)=>a+b,0);
+
+    const onMove = ev => {
+      const diff = ev.clientY - startY;
+      const newA = Math.max(80, startH[ri-1] + diff);
+      const newB = Math.max(80, startH[ri]   - diff);
+      rowEls[ri-1].style.flex = `0 0 ${newA}px`;
+      rowEls[ri].style.flex   = `0 0 ${newB}px`;
+    };
+    const onUp = () => { document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+// 열 드래그
+function setupColDrag(handle, pi, rowEl) {
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const panelEls = [...rowEl.querySelectorAll('.mytask-panel')];
+    const startW   = panelEls.map(el => el.getBoundingClientRect().width);
+
+    const onMove = ev => {
+      const diff = ev.clientX - startX;
+      const newA = Math.max(120, startW[pi-1] + diff);
+      const newB = Math.max(120, startW[pi]   - diff);
+      panelEls[pi-1].style.flex = `0 0 ${newA}px`;
+      panelEls[pi].style.flex   = `0 0 ${newB}px`;
+    };
+    const onUp = () => { document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+// 패널 함수들
+function panelChangeMonth(rowId, panelId, dir) {
+  const r = rows.find(r=>r.id===rowId);
+  const p = r?.panels.find(p=>p.id===panelId);
+  if (!p) return;
+  p.calYear  = p.calYear  ?? mytaskYear;
+  p.calMonth = p.calMonth ?? mytaskMonth;
+  p.calMonth += dir;
+  if (p.calMonth > 11) { p.calMonth=0; p.calYear++; }
+  if (p.calMonth < 0)  { p.calMonth=11; p.calYear--; }
+  const label = document.getElementById(`pml_${panelId}`);
+  if (label) label.textContent = `${p.calYear}년 ${p.calMonth+1}월`;
+  renderPanelContent(p);
+  saveRows();
+}
+
+function setPanelType(rowId, panelId, type) {
+  const r=rows.find(r=>r.id===rowId); const p=r?.panels.find(p=>p.id===panelId);
+  if(p){p.type=type;renderRows();saveRows();}
+}
+function togglePanelStatus(rowId, panelId, status) {
+  const r=rows.find(r=>r.id===rowId); const p=r?.panels.find(p=>p.id===panelId);
+  if(!p)return;
+  const idx=p.filters.status.indexOf(status);
+  if(idx>=0)p.filters.status.splice(idx,1); else p.filters.status.push(status);
+  renderRows();saveRows();
+}
+function setPanelPeriod(rowId, panelId, period) {
+  const r=rows.find(r=>r.id===rowId); const p=r?.panels.find(p=>p.id===panelId);
+  if(p){p.period=period;renderRows();saveRows();}
+}
+function setPanelDateRange(rowId, panelId, type, val) {
+  const r=rows.find(r=>r.id===rowId); const p=r?.panels.find(p=>p.id===panelId);
+  if(p){if(type==='start')p.startDate=val;else p.endDate=val;renderPanelContent(p);saveRows();}
+}
+function togglePanelSchedule(rowId, panelId) {
+  const r=rows.find(r=>r.id===rowId); const p=r?.panels.find(p=>p.id===panelId);
+  if(p){p.showSchedule=!p.showSchedule;renderRows();saveRows();}
+}
+
+// 모바일 전환
 window.addEventListener('resize', () => {
   if (!mytaskInitialized) return;
   const isMobile = window.innerWidth <= 768;
   const mobileBody = document.getElementById('mytaskMobileBody');
   const panelCon   = document.getElementById('mytaskPanelContainer');
-  if (mobileBody) mobileBody.style.display   = isMobile ? 'flex' : 'none';
-  if (panelCon)   panelCon.style.display     = isMobile ? 'none' : 'grid';
-  if (!isMobile) renderPanels();
+  if (mobileBody) mobileBody.style.display   = isMobile?'flex':'none';
+  if (panelCon)   panelCon.style.display     = isMobile?'none':'flex';
+  if (!isMobile) renderRows();
   else { renderMytaskCalendar(); renderMytaskList(); }
 });
 
-// 패널 외부 클릭 시 설정 닫기
 document.addEventListener('click', e => {
   if (!e.target.closest('.mytask-panel-config') && !e.target.closest('.mytask-panel-setting-btn')) {
-    document.querySelectorAll('.mytask-panel-config').forEach(el => el.classList.remove('show'));
+    document.querySelectorAll('.mytask-panel-config').forEach(el=>el.classList.remove('show'));
   }
 });
 
-
-function panelChangeMonth(id, dir) {
-  const p = panels.find(p => p.id === id);
-  if (!p) return;
-  p.calMonth = (p.calMonth || mytaskMonth) + dir;
-  if (p.calMonth > 11) { p.calMonth = 0; p.calYear = (p.calYear || mytaskYear) + 1; }
-  if (p.calMonth < 0)  { p.calMonth = 11; p.calYear = (p.calYear || mytaskYear) - 1; }
-  const label = document.getElementById(`panelMonthLabel_${id}`);
-  if (label) label.textContent = `${p.calYear}년 ${p.calMonth+1}월`;
-  renderPanelContent(p);
-  savePanels();
-}
-window.panelChangeMonth = panelChangeMonth;
-
-function renderPanelContent(panel) {
-  const el = document.getElementById(`panelContent_${panel.id}`);
-  if (!el) return;
-
-  const now    = new Date();
-  const cy     = panel.calYear  || mytaskYear;
-  const cm     = panel.calMonth !== undefined ? panel.calMonth : mytaskMonth;
-  const ym     = `${cy}-${String(cm+1).padStart(2,'0')}`;
-
-  let tasks = mytaskTasks.filter(t => panel.filters.status.includes(t.status));
-
-  if (panel.type === 'list') {
-    const period = panel.period || 'all';
-    if (period === 'recent') {
-      const from = new Date(now); from.setDate(from.getDate() - 3);
-      const to   = new Date(now); to.setDate(to.getDate() + 4);
-      const fStr = fmt(from), tStr = fmt(to);
-      tasks = tasks.filter(t => t.startDate <= tStr && t.endDate >= fStr);
-    } else if (period === 'week') {
-      const day  = now.getDay();
-      const mon  = new Date(now); mon.setDate(now.getDate() - day);
-      const sun  = new Date(mon); sun.setDate(mon.getDate() + 6);
-      tasks = tasks.filter(t => t.startDate <= fmt(sun) && t.endDate >= fmt(mon));
-    } else if (period === 'month') {
-      const thisYm = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-      tasks = tasks.filter(t => t.startDate?.slice(0,7) === thisYm || t.endDate?.slice(0,7) === thisYm ||
-        (t.startDate <= thisYm+'-31' && t.endDate >= thisYm+'-01'));
-    } else if (period === 'nextmonth') {
-      const nm = new Date(now.getFullYear(), now.getMonth()+1, 1);
-      const nmYm = `${nm.getFullYear()}-${String(nm.getMonth()+1).padStart(2,'0')}`;
-      tasks = tasks.filter(t => t.startDate?.slice(0,7) === nmYm || t.endDate?.slice(0,7) === nmYm);
-    }
-    // 'all'은 필터 없음
-    el.innerHTML = renderPanelList(tasks);
-  } else {
-    // 캘린더: 해당 패널의 월 기준
-    tasks = mytaskTasks.filter(t =>
-      panel.filters.status.includes(t.status) &&
-      t.startDate <= ym+'-31' && t.endDate >= ym+'-01'
-    );
-    el.innerHTML = renderPanelCalendar(panel, tasks, cy, cm);
-  }
-}
-
-function fmt(d) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-
-function renderPanelCalendar(panel, tasks, calYear, calMonth) {
-  calYear  = calYear  ?? mytaskYear;
-  calMonth = calMonth ?? mytaskMonth;
-  const firstDay = new Date(calYear, calMonth, 1).getDay();
-  const lastDate = new Date(calYear, calMonth + 1, 0).getDate();
-  const today    = new Date();
-  const ym       = `${calYear}-${String(calMonth+1).padStart(2,'0')}`;
-  let scheduleItems = [];
-  if (panel.showSchedule) {
-    const monthEvents = (window._scheduleData || {})[ym] || [];
-    scheduleItems = monthEvents.map(e => ({
-      ...e, date:`${ym}-${String(e.date).padStart(2,'0')}`,
-      title:e.content||e.title||'', _type:'schedule'
-    }));
-  }
-  const totalCells = Math.ceil((firstDay + lastDate) / 7) * 7;
-  const totalRows  = totalCells / 7;
-
-  let html = `<div style="display:flex;flex-direction:column;flex:1;height:100%;">
-  <div style="display:grid;grid-template-columns:repeat(7,1fr);font-family:'IBM Plex Mono';font-size:10px;font-weight:700;color:var(--ink-soft);background:var(--paper-soft);flex-shrink:0;">
-    <div style="padding:3px 0;text-align:center;color:#EF4444;">일</div>
-    <div style="padding:3px 0;text-align:center;">월</div><div style="padding:3px 0;text-align:center;">화</div>
-    <div style="padding:3px 0;text-align:center;">수</div><div style="padding:3px 0;text-align:center;">목</div>
-    <div style="padding:3px 0;text-align:center;">금</div>
-    <div style="padding:3px 0;text-align:center;color:#3B82F6;">토</div>
-  </div>
-  <div style="display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(${totalRows},1fr);flex:1;border:1px solid var(--rule);overflow:hidden;">`;
-
-  let dayCount = 1;
-  for (let i = 0; i < totalCells; i++) {
-    const isOther = i < firstDay || dayCount > lastDate;
-    const date    = isOther ? null : dayCount;
-    const isToday = date && calYear === today.getFullYear() &&
-                    calMonth === today.getMonth() && date === today.getDate();
-    const dateStr = date ? `${ym}-${String(date).padStart(2,'0')}` : '';
-    const dayTasks    = tasks.filter(t => t.startDate <= dateStr && t.endDate >= dateStr);
-    const daySchedule = scheduleItems.filter(s => s.date === dateStr);
-    const allItems    = [...daySchedule.map(s=>({...s,_type:'schedule'})), ...dayTasks];
-    html += `<div style="padding:2px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);${isOther?'opacity:0.3;':''}overflow:hidden;cursor:pointer;background:var(--paper);min-height:0;"
-      ${date?`ondragover="calDragOver(event)" ondrop="calDrop(event,'${dateStr}')" ondragleave="calDragLeave(event)" onclick="mytaskDayClick('${dateStr}',event)"`:''}
-      onmouseover="this.querySelector&&this.querySelector('.pcal-add')&&(this.querySelector('.pcal-add').style.display='flex')"
-      onmouseout="this.querySelector&&this.querySelector('.pcal-add')&&(this.querySelector('.pcal-add').style.display='none')">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <div style="font-family:'IBM Plex Mono';font-size:10px;font-weight:700;
-          color:${isToday?'#fff':i%7===0?'#EF4444':i%7===6?'#3B82F6':'var(--ink-soft)'};
-          ${isToday?'background:var(--mon);border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;':''}">
-          ${date||''}
-        </div>
-        ${date?`<button class="pcal-add" onclick="event.stopPropagation();openMytaskModal(null,null,'${dateStr}')"
-          style="display:none;width:14px;height:14px;border-radius:3px;border:none;background:var(--mon);color:#fff;font-size:10px;cursor:pointer;align-items:center;justify-content:center;padding:0;line-height:1;">+</button>`:''}
-      </div>
-      ${allItems.slice(0,2).map(t => t._type==='schedule'
-        ? `<div style="font-size:9px;padding:1px 3px;border-radius:2px;background:#FEE2E2;color:#991B1B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px;">${t.title}</div>`
-        : `<div draggable="true" ondragstart="calDragStart(event,'${t.id}','${t.ownerUid||''}')" ondragend="calDragEnd(event)"
-            onclick="event.stopPropagation();openMytaskModal('${t.id}','${t.ownerUid||''}')"
-            style="font-size:9px;padding:1px 3px;border-radius:2px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:grab;
-              ${t.status==='todo'?'background:#EEF2FF;color:#4F46E5;':t.status==='doing'?'background:#FEF3C7;color:#D97706;':'background:#D1FAE5;color:#065F46;text-decoration:line-through;'}">${t.title}</div>`
-      ).join('')}
-      ${allItems.length > 2 ? `<div style="font-size:8px;color:var(--ink-soft);">+${allItems.length-2}</div>` : ''}
-    </div>`;
-    if (!isOther) dayCount++;
-  }
-  return html + '</div></div>';
-}
-
-function renderPanelList(tasks) {
-  const sorted = [...tasks].sort((a,b) => a.startDate?.localeCompare(b.startDate));
-  if (sorted.length === 0) return '<div style="padding:20px;text-align:center;color:var(--ink-soft);font-size:13px;">일정이 없습니다.</div>';
-  const statusLabel = { todo:'시작전', doing:'진행중', done:'완료' };
-  let html = '<div style="padding:8px;">', lastYm = '';
-  sorted.forEach(t => {
-    const ym = t.startDate?.slice(0,7) || '';
-    if (ym !== lastYm) {
-      const [y,m] = ym.split('-');
-      html += `<div style="font-family:'IBM Plex Mono';font-weight:700;font-size:11px;color:var(--ink-soft);padding:6px 4px 3px;border-bottom:1px solid var(--rule);margin-bottom:4px;">${y}년 ${parseInt(m)}월</div>`;
-      lastYm = ym;
-    }
-    html += `<div class="mytask-item ${t.status}" onclick="openMytaskModal('${t.id}','${t.ownerUid||''}')" style="margin-bottom:5px;">
-      <div class="mytask-item-status ${t.status}"></div>
-      <div class="mytask-item-info">
-        <div class="mytask-item-title" style="font-size:13px;">${t.title}</div>
-        <div class="mytask-item-date" style="font-size:11px;">${t.startDate} ~ ${t.endDate}</div>
-      </div>
-      <select class="mytask-status-select ${t.status}" onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();" onclick="event.stopPropagation();" style="font-size:11px;">
-        <option value="todo" ${t.status==='todo'?'selected':''}>🔵 시작전</option>
-        <option value="doing" ${t.status==='doing'?'selected':''}>🟡 진행중</option>
-        <option value="done" ${t.status==='done'?'selected':''}>🟢 완료</option>
-      </select>
-    </div>`;
-  });
-  return html + '</div>';
-}
-
-function togglePanelConfig(id) {
-  document.querySelectorAll('.mytask-panel-config').forEach(el => {
-    if (el.id !== `panelConfig_${id}`) el.classList.remove('show');
-  });
-  document.getElementById(`panelConfig_${id}`)?.classList.toggle('show');
-}
-
-function setPanelType(id, type) {
-  const p = panels.find(p => p.id === id);
-  if (p) { p.type = type; renderPanels(); savePanels(); }
-}
-
-function togglePanelStatus(id, status) {
-  const p = panels.find(p => p.id === id);
-  if (!p) return;
-  const idx = p.filters.status.indexOf(status);
-  if (idx >= 0) p.filters.status.splice(idx, 1);
-  else p.filters.status.push(status);
-  renderPanels(); savePanels();
-}
-
-function setPanelPeriod(id, period) {
-  const p = panels.find(p => p.id === id);
-  if (p) { p.period = period; renderPanels(); savePanels(); }
-}
-
-function setPanelDateRange(id, type, val) {
-  const p = panels.find(p => p.id === id);
-  if (p) {
-    if (type === 'start') p.startDate = val;
-    else p.endDate = val;
-    renderPanelContent(p); savePanels();
-  }
-}
-
-function togglePanelSchedule(id) {
-  const p = panels.find(p => p.id === id);
-  if (p) { p.showSchedule = !p.showSchedule; renderPanels(); savePanels(); }
-}
-
-window.addPanel             = addPanel;
-window.removePanel          = removePanel;
-window.setGridCols          = setGridCols;
-window.setGridRows          = setGridRows;
-window.togglePanelConfig    = togglePanelConfig;
-window.setPanelType         = setPanelType;
-window.togglePanelStatus    = togglePanelStatus;
-window.setPanelPeriod       = setPanelPeriod;
-window.setPanelDateRange    = setPanelDateRange;
-window.togglePanelSchedule  = togglePanelSchedule;
+window.addRow              = addRow;
+window.removeRow           = removeRow;
+window.addPanelToRow       = addPanelToRow;
+window.removePanel         = removePanel;
+window.panelChangeMonth    = panelChangeMonth;
+window.setPanelType        = setPanelType;
+window.togglePanelStatus   = togglePanelStatus;
+window.setPanelPeriod      = setPanelPeriod;
+window.setPanelDateRange   = setPanelDateRange;
+window.togglePanelSchedule = togglePanelSchedule;
 
 
 let mytaskYear      = new Date().getFullYear();
@@ -7229,7 +7069,7 @@ async function loadMytasks() {
     mytaskTasks = snap.docs.map(d => ({ id: d.id, ownerUid: user.uid, ...d.data() }));
     const isMobile = window.innerWidth <= 768;
     if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
-    else renderPanels();
+    else renderRows();
   } catch(e) { console.error('캘린더 로딩 실패:', e); }
 }
 
@@ -7768,7 +7608,7 @@ async function saveMytask() {
     closeMytaskModal();
     const isMobile = window.innerWidth <= 768;
     if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
-    else renderPanels();
+    else renderRows();
   } catch(e) { alert('저장 실패: ' + e.message); }
 }
 
@@ -7782,7 +7622,7 @@ async function deleteMytask() {
     closeMytaskModal();
     const isMobile = window.innerWidth <= 768;
     if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
-    else renderPanels();
+    else renderRows();
   } catch(e) { alert('삭제 실패: ' + e.message); }
 }
 
