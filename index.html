@@ -2053,9 +2053,14 @@
     display:grid;grid-template-columns:repeat(7,minmax(0,1fr));
     gap:1px;background:var(--rule);
   }
-
-
-  .sc-cal-header span{
+  /* 세로 비율: 가로 크기에 따라 자동 */
+  .sc-cal-cell{
+    aspect-ratio: 1 / 0.9;
+    background:var(--paper);
+    padding:5px;
+    display:flex;flex-direction:column;gap:2px;
+    min-height:0;
+  }
     font-family:'Noto Sans KR';font-weight:700;font-size:13px;
     color:#fff;text-align:center;padding:10px 4px;
   }
@@ -2297,7 +2302,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.76</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.78</div>
   </div>
 </div>
 
@@ -2375,7 +2380,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver2.76</div>
+    <div class="nav-version">ver2.78</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -5468,7 +5473,7 @@ function renderSchedule(monthKey) {
     const dateEl = isToday
       ? `<div class="sc-cal-date">${d}</div>`
       : `<span class="sc-cal-date">${d}</span>`;
-    const evEl = ev ? `<div class="sc-cal-event-dot">● ${ev.content.slice(0,8)}</div>` : '';
+    const evEl = ev ? `<div style="font-size:10px;padding:1px 5px;border-radius:4px;background:#EEF2FF;color:#4F46E5;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ev.content.slice(0,10)}</div>` : '';
     calHtml += `<div class="${cls}" data-date="${d}">${dateEl}${evEl}</div>`;
   }
 
@@ -6868,25 +6873,32 @@ function renderRows() {
                 style="padding:4px 8px;border-radius:8px;border:none;background:transparent;color:#EF4444;font-size:15px;cursor:pointer;" title="패널 삭제">×</button>
               ${rows.length > 1 ? `<button onclick="removeRow(${row.id})" style="padding:4px 8px;border-radius:8px;border:none;background:transparent;color:#EF4444;font-size:11px;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">행삭제</button>` : ''}
             </div>
+            <!-- 항상 표시: 칩 숨기기 토글 -->
+            <button class="panel-chip-toggle" onclick="togglePanelChips(this)"
+              style="margin-left:auto;padding:3px 8px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;"
+              title="칩 숨기기/보이기">
+              ${panel.chipsHidden ? '▼ 펼치기' : '▲ 접기'}
+            </button>
           </div>
-          <!-- 2행: 상태 칩 -->
-          <div class="mytask-filters" style="margin-bottom:${panel.type==='list'?'6px':'0'};">
-            <button class="mytask-filter-btn ${panel.filters.status.includes('todo')?'active f-todo':''}"
-              onclick="togglePanelStatus(${row.id},${panel.id},'todo')">🔵 시작전</button>
-            <button class="mytask-filter-btn ${panel.filters.status.includes('doing')?'active f-doing':''}"
-              onclick="togglePanelStatus(${row.id},${panel.id},'doing')">🟡 진행중</button>
-            <button class="mytask-filter-btn ${panel.filters.status.includes('done')?'active f-done':''}"
-              onclick="togglePanelStatus(${row.id},${panel.id},'done')">🟢 완료</button>
-            ${panel.type==='calendar' ? `
-            <button class="mytask-filter-btn ${panel.showSchedule?'active':''}"
-              onclick="togglePanelSchedule(${row.id},${panel.id})">📆 학사일정</button>` : ''}
+          <!-- 2행+3행: 칩들 (숨김 가능) -->
+          <div class="panel-chips-wrap" style="display:${panel.chipsHidden?'none':'block'};">
+            <div class="mytask-filters" style="margin-bottom:${panel.type==='list'?'6px':'0'};">
+              <button class="mytask-filter-btn ${panel.filters.status.includes('todo')?'active f-todo':''}"
+                onclick="togglePanelStatus(${row.id},${panel.id},'todo')">🔵 시작전</button>
+              <button class="mytask-filter-btn ${panel.filters.status.includes('doing')?'active f-doing':''}"
+                onclick="togglePanelStatus(${row.id},${panel.id},'doing')">🟡 진행중</button>
+              <button class="mytask-filter-btn ${panel.filters.status.includes('done')?'active f-done':''}"
+                onclick="togglePanelStatus(${row.id},${panel.id},'done')">🟢 완료</button>
+              ${panel.type==='calendar' ? `
+              <button class="mytask-filter-btn ${panel.showSchedule?'active':''}"
+                onclick="togglePanelSchedule(${row.id},${panel.id})">📆 학사일정</button>` : ''}
+            </div>
+            ${panel.type==='list' ? `
+            <div class="mytask-filters">
+              ${periodOpts.map(o=>`<button class="mytask-filter-btn ${panel.period===o.v?'active':''}"
+                onclick="setPanelPeriod(${row.id},${panel.id},'${o.v}')">${o.l}</button>`).join('')}
+            </div>` : ''}
           </div>
-          <!-- 3행: 기간 칩 (목록만) -->
-          ${panel.type==='list' ? `
-          <div class="mytask-filters">
-            ${periodOpts.map(o=>`<button class="mytask-filter-btn ${panel.period===o.v?'active':''}"
-              onclick="setPanelPeriod(${row.id},${panel.id},'${o.v}')">${o.l}</button>`).join('')}
-          </div>` : ''}
         </div>
         <div class="mytask-panel-content" id="pc_${panel.id}" style="flex:1;overflow-y:auto;height:0;display:flex;flex-direction:column;"></div>
       `;
@@ -6950,6 +6962,20 @@ function setupColDrag(handle, pi, rowEl) {
 }
 
 // 패널 함수들
+function togglePanelChips(btn) {
+  const hd   = btn.closest('.panel-hd');
+  const wrap = hd.querySelector('.panel-chips-wrap');
+  const hidden = wrap.style.display === 'none';
+  wrap.style.display = hidden ? 'block' : 'none';
+  btn.textContent = hidden ? '▲ 접기' : '▼ 펼치기';
+  // 패널 데이터에도 저장
+  const panelEl = btn.closest('.mytask-panel');
+  const panelId = parseInt(panelEl.dataset.panelId);
+  const panel = rows.flatMap(r=>r.panels).find(p=>p.id===panelId);
+  if (panel) { panel.chipsHidden = !hidden; saveRows(); }
+}
+window.togglePanelChips = togglePanelChips;
+
 function panelChangeMonth(rowId, panelId, dir) {
   const r = rows.find(r=>r.id===rowId);
   const p = r?.panels.find(p=>p.id===panelId);
