@@ -452,7 +452,7 @@
   @media (max-width: 1024px) {
     .mytask-panel-toolbar { display: none; }
     #mytaskPanelContainer { display: none !important; }
-    #mytaskMobileBody { display: flex !important; }
+    #mytaskPage.active #mytaskMobileBody { display: flex !important; }
   }
 
   .mytask-body{
@@ -2282,7 +2282,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.15</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.16</div>
   </div>
 </div>
 
@@ -2362,7 +2362,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver3.15</div>
+    <div class="nav-version">ver3.16</div>
     </nav>
 
     <!-- 업무캘린더 패널 추가 버튼 (사이드바 우측 끝, 데스크탑만) -->
@@ -7402,10 +7402,13 @@ function initMytaskPage() {
 
 let mytaskUnsubscribe = null;
 let mytaskSharedUnsubscribes = [];
+let mytaskLoading = false; // 중복 실행 방지
 
 async function loadMytasks() {
+  if (mytaskLoading) return;
+  mytaskLoading = true;
   const user = fbAuth.currentUser;
-  if (!user) return;
+  if (!user) { mytaskLoading = false; return; }
   const myName = user.displayName || '';
 
   // 기존 리스너 해제
@@ -7413,13 +7416,11 @@ async function loadMytasks() {
   mytaskSharedUnsubscribes.forEach(u => u());
   mytaskSharedUnsubscribes = [];
 
-  // 내 일정 실시간 리스너
   mytaskUnsubscribe = onSnapshot(
     collection(fbDb, 'tasks', user.uid, 'items'),
     snap => {
-      // 내 일정만 업데이트
       const myTasks = snap.docs.map(d => ({ id: d.id, ownerUid: user.uid, ...d.data() }));
-      // 공유받은 일정은 유지하고 내 일정만 교체
+      // 공유받은 일정(ownerUid !== user.uid)은 유지, 내 일정만 교체
       mytaskTasks = [...myTasks, ...mytaskTasks.filter(t => t.ownerUid !== user.uid)];
       if (mytaskInitialized) {
         const isMobile = window.innerWidth <= 1024;
@@ -7454,6 +7455,7 @@ async function loadMytasks() {
     );
     mytaskSharedUnsubscribes.push(unsub);
   });
+  mytaskLoading = false;
 }
 
 function mytaskChangeMonth(dir) {
