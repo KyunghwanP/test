@@ -2282,7 +2282,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.12</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.15</div>
   </div>
 </div>
 
@@ -2362,7 +2362,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver3.12</div>
+    <div class="nav-version">ver3.15</div>
     </nav>
 
     <!-- 업무캘린더 패널 추가 버튼 (사이드바 우측 끝, 데스크탑만) -->
@@ -2416,7 +2416,7 @@
               </div>
               <div class="home-section" id="homeClassTimetable" style="display:none;">
                 <div class="home-section-header home-nav-header" data-goto="timetable-class">
-                  <span class="home-section-title">🏫 우리반(<span id="homeClassName"></span>) 시간표</span>
+                  <span class="home-section-title">🏫 우리반(<span id="homeClassName"></span>) 오늘 시간표</span>
                   <span class="home-section-arrow">›</span>
                 </div>
                 <div class="home-my-tt" id="homeClassTt"></div>
@@ -2436,8 +2436,6 @@
                 <span class="home-section-title">🤖 주간교육활동 요약 <span style="font-size:10px;font-weight:500;color:var(--ink-soft);opacity:0.7;">by Gemini</span></span>
                 <span class="home-section-arrow">›</span>
               </div>
-              <div id="homeAISummaryAdminBtn" style="display:none;padding:4px 16px 0;">
-                <button onclick="triggerWeeklySummaryAction()" style="padding:6px 12px;border-radius:8px;border:1.5px solid var(--mon);background:transparent;color:var(--mon);font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:12px;cursor:pointer;">🔄 AI 요약 갱신</button>
               </div>
               <div id="homeAISummary" style="padding:10px 16px 14px;color:var(--ink);"></div>
             </div>
@@ -2462,8 +2460,6 @@
                   <span class="home-section-title">🤖 주간교육활동 요약 <span style="font-size:10px;font-weight:500;color:var(--ink-soft);opacity:0.7;">by Gemini</span></span>
                   <span class="home-section-arrow">›</span>
                 </div>
-                <div id="homeAISummaryAdminBtnD" style="display:none;padding:4px 16px 0;">
-                  <button onclick="triggerWeeklySummaryAction()" style="padding:6px 12px;border-radius:8px;border:1.5px solid var(--mon);background:transparent;color:var(--mon);font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:12px;cursor:pointer;">🔄 AI 요약 갱신</button>
                 </div>
                 <div id="homeAISummaryD" style="padding:10px 16px 14px;color:var(--ink);"></div>
               </div>
@@ -5672,8 +5668,13 @@ async function initHomePage() {
 
   // ── 내 시간표 ──
   if(myTeacher) {
+    // 전체 schedule이 비어있으면 (수업 없는 선생님) 섹션 숨김
+    const hasAnyClass = Object.values(myTeacher.schedule || {}).some(arr => arr && arr.length > 0);
     const section = document.getElementById('homeMyTimetable');
-    section.style.display = '';
+    if (!hasAnyClass) {
+      section.style.display = 'none';
+    } else {
+      section.style.display = '';
     const periods = BELL_SCHEDULE.filter(b => b.period !== 'lunch');
     const nowMin = today.getHours()*60 + today.getMinutes();
     const ttHtml = periods.map(b => {
@@ -5699,6 +5700,7 @@ async function initHomePage() {
         setTimeout(() => { if(myTeacher) select(myTeacher); }, 100);
       }, 100);
     });
+    } // hasAnyClass end
 
     // ── 담임 학급 시간표 ──
     if(myTeacher.homeroom) {
