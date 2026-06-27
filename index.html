@@ -1441,13 +1441,14 @@
   .modal-overlay.open{opacity:1;visibility:visible;pointer-events:auto;transition:opacity 0.18s ease;}
   .modal-box{
     background:var(--paper);border-radius:10px;
-    max-width:460px;width:100%;max-height:88vh;overflow-y:auto;
+    max-width:460px;width:100%;
+    max-height:90vh;overflow-y:auto;
     padding:26px 24px 22px;position:relative;
     box-shadow:0 30px 60px -20px rgba(0,0,0,0.5);
     transform:scale(0.95);transition:transform 0.18s ease;
   }
   .modal-overlay.open .modal-box{transform:scale(1);}
-  .modal-overlay.wide .modal-box{max-width:min(1150px, 92vw);}
+  .modal-overlay.wide .modal-box{max-width:min(1400px, 96vw);}
   .modal-overlay.medium .modal-box{max-width:min(900px, 92vw);}
 
   .modal-close{
@@ -2281,7 +2282,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.10</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.12</div>
   </div>
 </div>
 
@@ -2361,7 +2362,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver3.10</div>
+    <div class="nav-version">ver3.12</div>
     </nav>
 
     <!-- 업무캘린더 패널 추가 버튼 (사이드바 우측 끝, 데스크탑만) -->
@@ -3805,9 +3806,9 @@ function renderPopup(teacherObj, day, period, entry){
         const c = candidates[i];
         el.addEventListener('click', ()=>{ modalDepth=2; history.pushState({modalDepth:2}, ''); renderSwapPreview(teacherObj, day, period, entry, c); });
         el.addEventListener('mouseenter', ()=>{
-          // 내 시간표에서 교체 위치 깜빡임
-          const cell = swapModalBody.querySelector(`.gt-cell[data-day="${c.day}"][data-period="${c.period}"]`);
-          if(cell) cell.classList.add('cell-blink');
+          // 내 시간표에서 상대방 시간 깜빡임 (교체될 위치)
+          const myCell = swapModalBody.querySelector(`.gt-cell[data-day="${c.day}"][data-period="${c.period}"]`);
+          if(myCell) myCell.classList.add('cell-blink');
           // 오른쪽 패널에 후보 선생님 시간표 표시
           const candPreviewGrid = document.getElementById('candPreviewGrid');
           const candPreviewTitle = document.getElementById('candPreviewTitle');
@@ -3818,20 +3819,20 @@ function renderPopup(teacherObj, day, period, entry){
               const getPeriodC = (d,p)=> (candObj.schedule[d]||[]).find(x=>x.period===p);
               candPreviewTitle.innerHTML = c.teacher + ' 선생님 시간표' + (EXT_MAP[c.teacher] ? ' <span class="preview-ext">☎ ' + EXT_MAP[c.teacher] + '</span>' : '');
               candPreviewGrid.innerHTML = buildWeekGrid(getPeriodC, 'class', false, null, hl, true);
-              // 후보 시간표에서도 교체 위치 깜빡임
+              // 상대방 시간표에서 내가 바꾸려는 시간(day-period) 깜빡임
               setTimeout(()=>{
-                const candCell = candPreviewGrid.querySelector(`.gt-cell[data-day="${c.day}"][data-period="${c.period}"]`);
+                const candCell = candPreviewGrid.querySelector(`.gt-cell[data-day="${day}"][data-period="${period}"]`);
                 if(candCell) candCell.classList.add('cell-blink');
               }, 50);
             }
           }
         });
         el.addEventListener('mouseleave', ()=>{
-          const cell = swapModalBody.querySelector(`.gt-cell[data-day="${c.day}"][data-period="${c.period}"]`);
-          if(cell) cell.classList.remove('cell-blink');
+          const myCell = swapModalBody.querySelector(`.gt-cell[data-day="${c.day}"][data-period="${c.period}"]`);
+          if(myCell) myCell.classList.remove('cell-blink');
           const candPreviewGrid = document.getElementById('candPreviewGrid');
           if(candPreviewGrid) {
-            candPreviewGrid.querySelectorAll('.cell-blink').forEach(c=>c.classList.remove('cell-blink'));
+            candPreviewGrid.querySelectorAll('.cell-blink').forEach(el=>el.classList.remove('cell-blink'));
           }
         });
       });
@@ -3858,7 +3859,7 @@ function renderPopup(teacherObj, day, period, entry){
         });
         el.addEventListener('mouseleave', ()=>{
           const candPreviewGrid = document.getElementById('candPreviewGrid');
-          if(candPreviewGrid) candPreviewGrid.querySelectorAll('.cell-blink').forEach(c=>c.classList.remove('cell-blink'));
+          if(candPreviewGrid) candPreviewGrid.querySelectorAll('.cell-blink').forEach(el=>el.classList.remove('cell-blink'));
         });
       });
     }
@@ -3884,7 +3885,7 @@ function renderCoverPreview(teacherObj, day, period, entry, candName){
     <div class="swap-note">🟢 신규 = 이번에 새로 보강을 맡게 되는 칸입니다. 그 날 다른 수업들과 겹치거나 너무 몰리지 않는지 확인해보세요. 실제 보강 요청은 학교 협의 절차를 따로 거쳐야 해요.</div>
   `;
   setModalContent(html, ()=>{
-    const buildMsg = ()=> `안녕하세요, 선생님. ${teacherObj.name}입니다.\n\n${day} ${period}교시(${entry.class||''}) 수업 보강 가능하실까요?\n\n가능하시면 말씀해 주시면 감사하겠습니다.`;
+    const buildMsg = ()=> `안녕하세요, 선생님.\n\n${day} ${period}교시(${entry.class||''}) 수업 보강 가능하실까요?\n\n가능하시면 말씀해 주시면 감사하겠습니다.`;
     wireRequestButtons('copyCoverReqBtn', 'shareCoverReqBtn', buildMsg);
   }, 'medium');
 }
@@ -3929,7 +3930,7 @@ function renderSwapPreview(teacherObj, day, period, entry, cand){
     <div class="swap-note">🟡 비워짐 = 원래 있던 수업이 빠지는 칸 · 🟢 신규 = 교체로 새로 들어오는 칸. 실제 교체는 학교 협의 절차를 따로 거쳐야 해요.</div>
   `;
   setModalContent(html, ()=>{
-    const buildMsg = ()=> `안녕하세요, 선생님. ${teacherObj.name}입니다.\n\n${day} ${period}교시(${entry.class||''}) ↔ ${cand.day} ${cand.period}교시(${entry.class||''}) 수업 교체 가능하실까요?\n\n가능하시면 말씀해 주시면 감사하겠습니다.`;
+    const buildMsg = ()=> `안녕하세요, 선생님.\n\n${day} ${period}교시(${entry.class||''}) ↔ ${cand.day} ${cand.period}교시(${entry.class||''}) 수업 교체 가능하실까요?\n\n가능하시면 말씀해 주시면 감사하겠습니다.`;
     wireRequestButtons('copySwapReqBtn', 'shareSwapReqBtn', buildMsg);
   }, 'wide');
 }
