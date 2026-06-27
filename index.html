@@ -2281,7 +2281,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.97</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.00</div>
   </div>
 </div>
 
@@ -2361,7 +2361,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver2.97</div>
+    <div class="nav-version">ver3.00</div>
     </nav>
 
     <!-- 업무캘린더 패널 추가 버튼 (사이드바 우측 끝, 데스크탑만) -->
@@ -2950,7 +2950,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, addDoc, getDocs, deleteDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc, getDocs, deleteDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
@@ -4086,7 +4086,10 @@ googleLoginBtn.addEventListener('click', async () => {
 });
 
 if(logoutBtn){
-  logoutBtn.addEventListener('click', () => signOut(fbAuth));
+  logoutBtn.addEventListener('click', () => {
+    if (mytaskUnsubscribe) { mytaskUnsubscribe(); mytaskUnsubscribe = null; }
+    signOut(fbAuth);
+  });
 }
 
 async function loadDataFromFirestore(){
@@ -6928,6 +6931,11 @@ function renderRows() {
                     opacity:${on?1:0.2};transition:opacity .15s;flex-shrink:0;"
                     title="${s==='todo'?'시작전':s==='doing'?'진행중':'완료'}"></div>`;
                 }).join('')}
+                ${panel.type==='calendar' ? `<div onclick="event.stopPropagation();togglePanelSchedule(${row.id},${panel.id})"
+                  style="width:14px;height:14px;border-radius:3px;background:#EF4444;cursor:pointer;
+                  opacity:${panel.showSchedule?1:0.2};transition:opacity .15s;flex-shrink:0;
+                  display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700;"
+                  title="학사일정">학</div>` : ''}
               </div>` : ''}
               <button onclick="togglePanelChips(this)"
                 style="padding:2px 7px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:11px;cursor:pointer;white-space:nowrap;"
@@ -7079,10 +7087,14 @@ function togglePanelChips(btn) {
   const wrap    = hd.querySelector('.panel-chips-wrap');
   const hidden  = wrap.style.display === 'none';
   wrap.style.display = hidden ? 'block' : 'none';
-  btn.textContent    = hidden ? '▲' : '▼';
   const panelId = parseInt(panelEl.dataset.panelId);
   const panel   = rows.flatMap(r=>r.panels).find(p=>p.id===panelId);
-  if (panel) { panel.chipsHidden = !hidden; saveRows(); }
+  if (panel) {
+    panel.chipsHidden = !hidden;
+    saveRows();
+    // 아이콘 표시 업데이트를 위해 재렌더링
+    renderRows();
+  }
 }
 window.togglePanelChips = togglePanelChips;
 
@@ -7349,19 +7361,28 @@ function initMytaskPage() {
   initPanelSystem();
 }
 
+let mytaskUnsubscribe = null; // 실시간 리스너 해제용
+
 async function loadMytasks() {
   const user = fbAuth.currentUser;
   if (!user) return;
-  try {
-    const snap = await getDocs(collection(fbDb, 'tasks', user.uid, 'items'));
-    mytaskTasks = snap.docs.map(d => ({ id: d.id, ownerUid: user.uid, ...d.data() }));
-    // 패널이 이미 초기화된 경우 바로 렌더링
-    if (mytaskInitialized) {
-      const isMobile = window.innerWidth <= 1024;
-      if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
-      else renderRows();
-    }
-  } catch(e) { console.error('캘린더 로딩 실패:', e); }
+
+  // 기존 리스너 해제
+  if (mytaskUnsubscribe) { mytaskUnsubscribe(); mytaskUnsubscribe = null; }
+
+  // 실시간 리스너 등록
+  mytaskUnsubscribe = onSnapshot(
+    collection(fbDb, 'tasks', user.uid, 'items'),
+    snap => {
+      mytaskTasks = snap.docs.map(d => ({ id: d.id, ownerUid: user.uid, ...d.data() }));
+      if (mytaskInitialized) {
+        const isMobile = window.innerWidth <= 1024;
+        if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
+        else renderRows();
+      }
+    },
+    err => console.error('캘린더 실시간 동기화 오류:', err)
+  );
 }
 
 function mytaskChangeMonth(dir) {
