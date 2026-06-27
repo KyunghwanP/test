@@ -452,7 +452,6 @@
   @media (max-width: 1024px) {
     .mytask-panel-toolbar { display: none; }
     #mytaskPanelContainer { display: none !important; }
-    #mytaskPage.active #mytaskMobileBody { display: flex !important; }
   }
 
   .mytask-body{
@@ -2282,7 +2281,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.16</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.17</div>
   </div>
 </div>
 
@@ -2362,7 +2361,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver3.16</div>
+    <div class="nav-version">ver3.17</div>
     </nav>
 
     <!-- 업무캘린더 패널 추가 버튼 (사이드바 우측 끝, 데스크탑만) -->
@@ -4358,7 +4357,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
-      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none');
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
       if(!homeInitialized) initHomePage();
     } else if(page === 'timetable'){
       homePage.classList.remove('active');
@@ -4369,7 +4368,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
-      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none');
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
       // 시간표 탭 클릭 시 본인 시간표 자동 로드
       const _user = fbAuth.currentUser;
       const _name = (_user?.displayName||'').trim().replace(/\s*(선생님|교사|쌤)/,'');
@@ -4384,7 +4383,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
-      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none');
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
       if(!weeklyInitialized) initWeeklyPage();
     } else if(page === 'meal'){
       homePage.classList.remove('active');
@@ -4395,7 +4394,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
-      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none');
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
       if(!mealInitialized) initMealPage();
     } else if(page === 'contacts'){
       homePage.classList.remove('active');
@@ -4406,7 +4405,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
-      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none');
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
       if(!contactsInitialized) initContactsPage();
     } else if(page === 'students'){
       homePage.classList.remove('active');
@@ -4417,7 +4416,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.add('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
-      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none');
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
       if(!studentsInitialized) initStudentsPage();
     } else if(page === 'schedule'){
       homePage.classList.remove('active');
@@ -4428,7 +4427,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.add('active');
       pointsPage.classList.remove('active');
-      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none');
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
       if(!scheduleInitialized) initSchedulePage();
     } else if(page === 'points'){
       homePage.classList.remove('active');
@@ -4439,7 +4438,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.add('active');
-      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none');
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
       initPointsPage();
     } else if(page === 'mytask'){
       homePage.classList.remove('active');
@@ -4452,6 +4451,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       pointsPage.classList.remove('active');
       mytaskPage.classList.add('active');
       initMytaskPage();
+      if(window.innerWidth <= 1024) { const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='flex'; }
       const addPanelBtn = document.getElementById('addPanelBtn');
       if (addPanelBtn && window.innerWidth > 1024) addPanelBtn.style.display = 'block';
     }
@@ -4501,7 +4501,7 @@ document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(tab => {
     schedulePage.classList.remove('active');
     homePage.classList.remove('active');
     pointsPage.classList.remove('active');
-    if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none');
+    if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
     if(page === 'home')         { homePage.classList.add('active'); if(!homeInitialized) initHomePage(); }
     else if(page === 'timetable') { timetablePage.classList.add('active'); }
     else if(page === 'mytask')    { mytaskPage.classList.add('active'); initMytaskPage(); }
@@ -7422,7 +7422,7 @@ async function loadMytasks() {
       const myTasks = snap.docs.map(d => ({ id: d.id, ownerUid: user.uid, ...d.data() }));
       // 공유받은 일정(ownerUid !== user.uid)은 유지, 내 일정만 교체
       mytaskTasks = [...myTasks, ...mytaskTasks.filter(t => t.ownerUid !== user.uid)];
-      if (mytaskInitialized) {
+      if (mytaskInitialized && document.getElementById('mytaskPage')?.classList.contains('active')) {
         const isMobile = window.innerWidth <= 1024;
         if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
         else renderRows();
@@ -7445,7 +7445,7 @@ async function loadMytasks() {
           ...mytaskTasks.filter(t => t.ownerUid !== teacher.uid),
           ...sharedTasks
         ];
-        if (mytaskInitialized) {
+        if (mytaskInitialized && document.getElementById('mytaskPage')?.classList.contains('active')) {
           const isMobile = window.innerWidth <= 1024;
           if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
           else renderRows();
