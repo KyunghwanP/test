@@ -2321,7 +2321,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.44</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.45</div>
   </div>
 </div>
 
@@ -2401,7 +2401,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver3.44</div>
+    <div class="nav-version">ver3.45</div>
     </nav>
 
     <!-- 업무캘린더 패널 추가 버튼 (사이드바 우측 끝, 데스크탑만) -->
@@ -7448,9 +7448,9 @@ function renderHomeTaskSection() {
     const doneSection = _homeShowDone && doneTasks.length > 0 ? `
       <div style="margin-top:8px;">
         <div style="font-size:11px;font-weight:700;color:var(--ink-soft);padding:4px 4px 2px;border-bottom:1px solid var(--rule);margin-bottom:2px;">완료된 업무</div>
-        <div style="max-height:${3*57}px;overflow-y:auto;">
-          ${doneTasks.slice(0,3).map(t => _makeHomeTaskRow(t, todayStr, statusColor)).join('')}
-          ${doneTasks.length>3?`<div style="font-size:11px;color:var(--ink-soft);text-align:center;padding:6px;">외 ${doneTasks.length-3}개</div>`:''}
+        <div style="max-height:260px;overflow-y:auto;">
+          ${doneTasks.map(t => _makeHomeTaskRow(t, todayStr, statusColor)).join('')}
+          
         </div>
       </div>` : '';
     list.innerHTML = `
@@ -7463,17 +7463,16 @@ function renderHomeTaskSection() {
 
   // 진행중 있을 때
   const activeHtml = `
-    <div style="max-height:${3*57}px;overflow-y:auto;">
-      ${activeTasks.slice(0,3).map(t => _makeHomeTaskRow(t, todayStr, statusColor)).join('')}
-      ${activeTasks.length>3?`<div style="font-size:11px;color:var(--ink-soft);text-align:center;padding:6px;">외 ${activeTasks.length-3}개</div>`:''}
+    <div style="max-height:260px;overflow-y:auto;">
+      ${activeTasks.map(t => _makeHomeTaskRow(t, todayStr, statusColor)).join('')}
     </div>`;
 
   const doneSection = _homeShowDone && doneTasks.length > 0 ? `
     <div style="margin-top:6px;">
       <div style="font-size:11px;font-weight:700;color:var(--ink-soft);padding:4px 4px 2px;border-bottom:1px solid var(--rule);margin-bottom:2px;">완료된 업무</div>
-      <div style="max-height:${3*57}px;overflow-y:auto;">
-        ${doneTasks.slice(0,3).map(t => _makeHomeTaskRow(t, todayStr, statusColor)).join('')}
-        ${doneTasks.length>3?`<div style="font-size:11px;color:var(--ink-soft);text-align:center;padding:6px;">외 ${doneTasks.length-3}개</div>`:''}
+      <div style="max-height:260px;overflow-y:auto;">
+        ${doneTasks.map(t => _makeHomeTaskRow(t, todayStr, statusColor)).join('')}
+        
       </div>
     </div>` : '';
 
