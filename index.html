@@ -2281,7 +2281,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.19</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.21</div>
   </div>
 </div>
 
@@ -2361,7 +2361,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver3.19</div>
+    <div class="nav-version">ver3.21</div>
     </nav>
 
     <!-- 업무캘린더 패널 추가 버튼 (사이드바 우측 끝, 데스크탑만) -->
@@ -2420,6 +2420,14 @@
                 </div>
                 <div class="home-my-tt" id="homeClassTt"></div>
               </div>
+            </div>
+            <!-- 이번주 업무일정 -->
+            <div class="home-section" id="homeTaskSection" style="display:none;">
+              <div class="home-section-header home-nav-header" data-goto="mytask">
+                <span class="home-section-title">📌 이번주 업무일정</span>
+                <span class="home-section-arrow">›</span>
+              </div>
+              <div id="homeTaskList" style="padding:8px 16px 12px;display:flex;flex-direction:column;gap:6px;"></div>
             </div>
             <!-- 학사일정 -->
             <div class="home-section" id="homeScheduleSection">
@@ -2807,13 +2815,16 @@
 </div>
 
 <!-- 업무 캘린더 추가/수정 모달 -->
-<div class="mytask-modal" id="mytaskModal" onclick="closeMytaskModalOverlay(event)">
+<div class="mytask-modal" id="mytaskModal" onclick="closeMytaskModalOverlay(event)" autocomplete="off">
   <div class="mytask-modal-box">
     <div class="mytask-modal-head">
       <div class="mytask-modal-title" id="mytaskModalTitle">일정 추가</div>
       <button class="mytask-modal-close" onclick="closeMytaskModal()">×</button>
     </div>
     <div class="mytask-modal-body" style="overflow-y:auto;flex:1;">
+      <!-- 비밀번호 자동완성 방지 -->
+      <input type="text" style="display:none;" autocomplete="username">
+      <input type="password" style="display:none;" autocomplete="current-password">
 
       <!-- 본인만 편집 가능한 영역 -->
       <div id="mytaskOwnerSection">
@@ -2825,16 +2836,16 @@
         </div>
         <div class="mytask-modal-field">
           <label>메모</label>
-          <textarea id="mytaskMemo" placeholder="상세 내용 (선택)"></textarea>
+          <textarea id="mytaskMemo" placeholder="상세 내용 (선택)" autocomplete="off"></textarea>
         </div>
         <div class="mytask-modal-dates">
           <div class="mytask-modal-field">
             <label>시작일</label>
-            <input type="date" id="mytaskStartDate">
+            <input type="date" id="mytaskStartDate" autocomplete="off">
           </div>
           <div class="mytask-modal-field">
             <label>마감일</label>
-            <input type="date" id="mytaskEndDate">
+            <input type="date" id="mytaskEndDate" autocomplete="off">
           </div>
         </div>
 
@@ -5746,7 +5757,8 @@ async function initHomePage() {
     }
   }
 
-  // ── 학사일정 (이번 달 남은 일정) ──
+  // ── 이번주 업무일정 ──
+  renderHomeTaskSection();
   try {
     const snap = await getDoc(doc(fbDb, 'schedule', 'main'));
     const schedData = snap.exists() ? (snap.data().data || {}) : {};
@@ -5767,6 +5779,7 @@ async function initHomePage() {
   document.querySelector('#homeAISummarySectionD .home-nav-header').addEventListener('click', () => navigateTo('weekly'));
   document.querySelector('#homeMealSection .home-nav-header').addEventListener('click', () => navigateTo('meal'));
   document.querySelector('#homeMealSectionD .home-nav-header').addEventListener('click', () => navigateTo('meal'));
+  document.querySelector('#homeTaskSection .home-nav-header')?.addEventListener('click', () => navigateTo('mytask'));
 
   // AI 요약 로드
   try {
@@ -7249,6 +7262,49 @@ function renderPanelContent(panel) {
   }
 }
 
+function renderHomeTaskSection() {
+  const section = document.getElementById('homeTaskSection');
+  const list    = document.getElementById('homeTaskList');
+  if (!section || !list) return;
+
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0,10);
+  // 이번주 월~일
+  const dow = today.getDay(); // 0=일
+  const mon = new Date(today); mon.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
+  const sun = new Date(mon);   sun.setDate(mon.getDate() + 6);
+  const monStr = mon.toISOString().slice(0,10);
+  const sunStr = sun.toISOString().slice(0,10);
+
+  const weekTasks = mytaskTasks.filter(t =>
+    t.startDate <= sunStr && t.endDate >= monStr && t.status !== 'done'
+  ).sort((a,b) => a.startDate.localeCompare(b.startDate));
+
+  if (weekTasks.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = '';
+  const statusLabel = { todo:'시작전', doing:'진행중', done:'완료' };
+  const statusColor = { todo:'#6366F1', doing:'#F59E0B', done:'#10B981' };
+
+  list.innerHTML = weekTasks.map(t => {
+    const isToday = t.startDate <= todayStr && t.endDate >= todayStr;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--rule);">
+      <div style="width:8px;height:8px;border-radius:50%;background:${statusColor[t.status]||'#ccc'};flex-shrink:0;"></div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          ${isToday ? '<span style="font-size:11px;background:#EF4444;color:#fff;border-radius:4px;padding:1px 5px;margin-right:4px;">오늘</span>' : ''}${t.title}
+        </div>
+        <div style="font-size:11px;color:var(--ink-soft);">${t.startDate} ~ ${t.endDate}</div>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:${statusColor[t.status]||'#ccc'};white-space:nowrap;">${statusLabel[t.status]||''}</div>
+    </div>`;
+  }).join('');
+}
+window.renderHomeTaskSection = renderHomeTaskSection;
+
 function buildPanelCalendar(tasks, cy, cm, panel) {
   const firstDay = new Date(cy, cm, 1).getDay();
   const lastDate = new Date(cy, cm+1, 0).getDate();
@@ -7428,6 +7484,10 @@ async function loadMytasks() {
         const isMobile = window.innerWidth <= 1024;
         if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
         else renderRows();
+      }
+      // 현황판도 업데이트
+      if (document.getElementById('homePage')?.classList.contains('active')) {
+        renderHomeTaskSection();
       }
     },
     err => console.error('캘린더 실시간 동기화 오류:', err)
@@ -7993,14 +8053,11 @@ async function saveMytask() {
   try {
     if (mytaskEditId) {
       await setDoc(doc(fbDb, 'tasks', user.uid, 'items', mytaskEditId), data);
-      const idx = mytaskTasks.findIndex(t => t.id === mytaskEditId);
-      if (idx >= 0) mytaskTasks[idx] = { id: mytaskEditId, ownerUid: user.uid, ...data };
     } else {
-      const ref = await addDoc(collection(fbDb, 'tasks', user.uid, 'items'), data);
-      mytaskTasks.push({ id: ref.id, ownerUid: user.uid, ...data });
+      await addDoc(collection(fbDb, 'tasks', user.uid, 'items'), data);
     }
     closeMytaskModal();
-    window.innerWidth<=1024 ? (renderMytaskCalendar(),renderMytaskList()) : renderRows();
+    // 렌더링은 onSnapshot이 자동으로 처리
   } catch(e) { alert('저장 실패: ' + e.message); }
 }
 
