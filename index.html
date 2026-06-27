@@ -449,7 +449,7 @@
     cursor:pointer;font-family:'Pretendard','Noto Sans KR';
   }
   .mytask-panel-config-chip.active{background:var(--mon);border-color:var(--mon);color:#fff;}
-  @media (max-width: 768px) {
+  @media (max-width: 1024px) {
     .mytask-panel-toolbar { display: none; }
     #mytaskPanelContainer { display: none !important; }
     #mytaskMobileBody { display: flex !important; }
@@ -2022,57 +2022,45 @@
   .schedule-calendar{
     background:var(--paper);border-radius:12px;
     box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);
-    overflow:hidden;
-    width:100%;
-    max-width:100%;
-    box-sizing:border-box;
-    flex-shrink:0;
+    overflow:hidden;width:100%;max-width:100%;
+    box-sizing:border-box;flex-shrink:0;
   }
   .sc-cal-header{
     display:grid;grid-template-columns:repeat(7,minmax(0,1fr));
     background:var(--mon);
   }
+  .sc-cal-header span{
+    font-family:'Noto Sans KR';font-weight:700;font-size:13px;
+    color:#fff;text-align:center;padding:10px 4px;
+  }
+  .sc-cal-header span:first-child{color:#ffaaaa;}
+  .sc-cal-header span:last-child{color:#aaddff;}
   .sc-cal-grid{
     display:grid;grid-template-columns:repeat(7,minmax(0,1fr));
     gap:1px;background:var(--rule);
   }
   .sc-cal-cell{
     background:var(--paper);
-    min-height:90px;
     padding:6px;
     display:flex;flex-direction:column;gap:3px;
-  }
-    font-family:'Noto Sans KR';font-weight:700;font-size:13px;
-    color:#fff;text-align:center;padding:10px 4px;
-  }
-  .sc-cal-header span:first-child{color:#ffaaaa;}
-  .sc-cal-header span:last-child{color:#aaddff;}
-
-  .sc-cal-cell{
-    background:var(--paper);
-    min-height:80px;padding:5px;
-    display:flex;flex-direction:column;gap:2px;
+    aspect-ratio:1/1;
+    min-height:60px;
   }
   .sc-cal-cell.other-month{background:var(--paper-soft);}
   .sc-cal-cell.today{background:#FFF8E1;}
   .sc-cal-cell.has-event{cursor:pointer;}
   .sc-cal-cell.has-event:hover{background:var(--paper-soft);}
   .sc-cal-date{
-    font-family:'IBM Plex Mono';font-size:14px;font-weight:700;
+    font-family:'IBM Plex Mono';font-size:clamp(11px,1.2vw,15px);font-weight:700;
     color:var(--ink-soft);line-height:1;
   }
   .sc-cal-cell.today .sc-cal-date{
     background:var(--mon);color:#fff;
-    width:26px;height:26px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;font-size:13px;
+    width:clamp(20px,2vw,28px);height:clamp(20px,2vw,28px);border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
   }
   .sc-cal-cell.sunday .sc-cal-date{color:#C0392B;}
   .sc-cal-cell.saturday .sc-cal-date{color:#2980B9;}
-  .sc-cal-event-dot{
-    font-size:10px;line-height:1.4;color:var(--mon);font-weight:600;
-    word-break:break-all;overflow:hidden;
-    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
-  }
 
   /* 리스트 */
   .schedule-list{
@@ -2283,7 +2271,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.81</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.83</div>
   </div>
 </div>
 
@@ -2361,7 +2349,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver2.81</div>
+    <div class="nav-version">ver2.83</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -6753,7 +6741,7 @@ function initPanelSystem() {
     }
   } catch(e) { rows = getDefaultRows(); }
 
-  const isMobile = window.innerWidth <= 768;
+  const isMobile = window.innerWidth <= 1024;
   document.getElementById('mytaskMobileBody').style.display    = isMobile ? 'flex' : 'none';
   document.getElementById('mytaskPanelContainer').style.display = isMobile ? 'none' : 'flex';
   if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
@@ -6877,7 +6865,6 @@ function renderRows() {
             <div style="display:flex;gap:3px;align-items:center;flex-shrink:0;">
               <button onclick="togglePanelChips(this)" style="padding:2px 7px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:11px;cursor:pointer;">${panel.chipsHidden?'▼':'▲'}</button>
               <div class="panel-actions" style="display:none;gap:3px;">
-                <button onclick="openMytaskModal()" style="padding:2px 8px;border-radius:6px;border:1.5px solid var(--mon);background:var(--mon);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">+일정</button>
                 <button onclick="addPanelToRow(${row.id})" style="padding:2px 8px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:11px;cursor:pointer;">+패널</button>
                 <button onclick="addRow()" style="padding:2px 8px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:11px;cursor:pointer;">+행</button>
                 <button onclick="removePanel(${row.id},${panel.id})" style="padding:2px 6px;border-radius:6px;border:none;background:transparent;color:#EF4444;font-size:14px;cursor:pointer;">×</button>
@@ -7055,7 +7042,7 @@ function togglePanelSchedule(rowId, panelId) {
 // 모바일 전환
 window.addEventListener('resize', () => {
   if (!mytaskInitialized) return;
-  const isMobile = window.innerWidth <= 768;
+  const isMobile = window.innerWidth <= 1024;
   const mobileBody = document.getElementById('mytaskMobileBody');
   const panelCon   = document.getElementById('mytaskPanelContainer');
   if (mobileBody) mobileBody.style.display   = isMobile ? 'flex' : 'none';
@@ -7791,7 +7778,7 @@ async function saveMytask() {
       mytaskTasks.push({ id: ref.id, ownerUid: user.uid, ...data });
     }
     closeMytaskModal();
-    window.innerWidth<=768 ? (renderMytaskCalendar(),renderMytaskList()) : renderRows();
+    window.innerWidth<=1024 ? (renderMytaskCalendar(),renderMytaskList()) : renderRows();
   } catch(e) { alert('저장 실패: ' + e.message); }
 }
 
@@ -7801,7 +7788,7 @@ async function deleteMytask() {
     await deleteDoc(doc(fbDb, 'tasks', user.uid, 'items', mytaskEditId));
     mytaskTasks = mytaskTasks.filter(t => t.id !== mytaskEditId);
     closeMytaskModal();
-    const isMobile = window.innerWidth <= 768;
+    const isMobile = window.innerWidth <= 1024;
     if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
     else renderRows();
   } catch(e) { alert('삭제 실패: ' + e.message); }
