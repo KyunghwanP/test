@@ -2281,7 +2281,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.21</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.23</div>
   </div>
 </div>
 
@@ -2361,7 +2361,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver3.21</div>
+    <div class="nav-version">ver3.23</div>
     </nav>
 
     <!-- 업무캘린더 패널 추가 버튼 (사이드바 우측 끝, 데스크탑만) -->
@@ -2421,10 +2421,10 @@
                 <div class="home-my-tt" id="homeClassTt"></div>
               </div>
             </div>
-            <!-- 이번주 업무일정 -->
+            <!-- 진행중인 업무 -->
             <div class="home-section" id="homeTaskSection" style="display:none;">
               <div class="home-section-header home-nav-header" data-goto="mytask">
-                <span class="home-section-title">📌 이번주 업무일정</span>
+                <span class="home-section-title">📌 진행중인 업무</span>
                 <span class="home-section-arrow">›</span>
               </div>
               <div id="homeTaskList" style="padding:8px 16px 12px;display:flex;flex-direction:column;gap:6px;"></div>
@@ -7269,37 +7269,29 @@ function renderHomeTaskSection() {
 
   const today = new Date();
   const todayStr = today.toISOString().slice(0,10);
-  // 이번주 월~일
-  const dow = today.getDay(); // 0=일
-  const mon = new Date(today); mon.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
-  const sun = new Date(mon);   sun.setDate(mon.getDate() + 6);
-  const monStr = mon.toISOString().slice(0,10);
-  const sunStr = sun.toISOString().slice(0,10);
 
-  const weekTasks = mytaskTasks.filter(t =>
-    t.startDate <= sunStr && t.endDate >= monStr && t.status !== 'done'
-  ).sort((a,b) => a.startDate.localeCompare(b.startDate));
+  const activeTasks = mytaskTasks
+    .filter(t => t.status !== 'done')
+    .sort((a,b) => a.startDate.localeCompare(b.startDate));
 
-  if (weekTasks.length === 0) {
-    section.style.display = 'none';
-    return;
-  }
-
+  if (activeTasks.length === 0) { section.style.display = 'none'; return; }
   section.style.display = '';
-  const statusLabel = { todo:'시작전', doing:'진행중', done:'완료' };
-  const statusColor = { todo:'#6366F1', doing:'#F59E0B', done:'#10B981' };
-
-  list.innerHTML = weekTasks.map(t => {
+  const statusColor = { todo:'#6366F1', doing:'#F59E0B' };
+  const statusLabel = { todo:'시작전', doing:'진행중' };
+  list.innerHTML = activeTasks.map(t => {
     const isToday = t.startDate <= todayStr && t.endDate >= todayStr;
-    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--rule);">
-      <div style="width:8px;height:8px;border-radius:50%;background:${statusColor[t.status]||'#ccc'};flex-shrink:0;"></div>
+    const isPast  = t.endDate < todayStr;
+    return `<div onclick="openMytaskModal('${t.id}','${t.ownerUid||''}')"
+      style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--rule);cursor:pointer;border-radius:6px;transition:background .1s;"
+      onmouseover="this.style.background='var(--paper-soft)'" onmouseout="this.style.background=''">
+      <div style="width:8px;height:8px;border-radius:50%;background:${statusColor[t.status]||'#6366F1'};flex-shrink:0;"></div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:14px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-          ${isToday ? '<span style="font-size:11px;background:#EF4444;color:#fff;border-radius:4px;padding:1px 5px;margin-right:4px;">오늘</span>' : ''}${t.title}
+        <div style="font-size:14px;font-weight:600;color:${isPast?'#EF4444':'var(--ink)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          ${isToday?'<span style="font-size:11px;background:#EF4444;color:#fff;border-radius:4px;padding:1px 5px;margin-right:4px;">오늘</span>':''}${isPast?'<span style="font-size:11px;background:#FEE2E2;color:#EF4444;border-radius:4px;padding:1px 5px;margin-right:4px;">기한초과</span>':''}${t.title}
         </div>
-        <div style="font-size:11px;color:var(--ink-soft);">${t.startDate} ~ ${t.endDate}</div>
+        <div style="font-size:11px;color:var(--ink-soft);">${t.startDate}${t.startDate!==t.endDate?' ~ '+t.endDate:''}</div>
       </div>
-      <div style="font-size:11px;font-weight:600;color:${statusColor[t.status]||'#ccc'};white-space:nowrap;">${statusLabel[t.status]||''}</div>
+      <div style="font-size:11px;font-weight:700;color:${statusColor[t.status]||'#6366F1'};white-space:nowrap;">${statusLabel[t.status]||''}</div>
     </div>`;
   }).join('');
 }
@@ -8095,6 +8087,10 @@ async function deleteMytask() {
     await deleteDoc(doc(fbDb, 'tasks', user.uid, 'items', mytaskEditId));
     mytaskTasks = mytaskTasks.filter(t => t.id !== mytaskEditId);
     closeMytaskModal();
+    // 현황판 업데이트
+    if (document.getElementById('homePage')?.classList.contains('active')) {
+      renderHomeTaskSection();
+    }
   } catch(e) { alert('삭제 실패: ' + e.message); }
 }
 
