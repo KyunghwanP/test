@@ -423,7 +423,7 @@
     background:transparent;color:var(--ink-soft);font-size:14px;cursor:pointer;
   }
   .mytask-panel-remove-btn:hover{color:#EF4444;}
-  .mytask-panel-content{flex:1;overflow-y:auto;padding:10px;}
+  .mytask-panel-content{flex:1;overflow-y:auto;padding:10px;height:0;}
   .mytask-divider{ display:none; } /* 그리드에선 불필요 */
   .mytask-panel-config{
     display:none;position:absolute;top:36px;right:0;z-index:500;
@@ -2279,7 +2279,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.67</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.68</div>
   </div>
 </div>
 
@@ -2357,7 +2357,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver2.67</div>
+    <div class="nav-version">ver2.68</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -6856,11 +6856,14 @@ function renderPanels() {
 
   container.innerHTML = '';
   panels.slice(0, needed).forEach(panel => {
+    // 패널별 월 초기화
+    if (!panel.calYear)  panel.calYear  = mytaskYear;
+    if (!panel.calMonth) panel.calMonth = mytaskMonth;
+
     const el = document.createElement('div');
     el.className = 'mytask-panel';
     el.dataset.panelId = panel.id;
 
-    const typeLabel = panel.type === 'calendar' ? '📅 캘린더' : '📋 목록';
     const icons  = { todo:'🔵', doing:'🟡', done:'🟢' };
     const labels = { todo:'시작전', doing:'진행중', done:'완료' };
     const statusChips = ['todo','doing','done'].map(s => {
@@ -6868,31 +6871,41 @@ function renderPanels() {
       return `<span onclick="togglePanelStatus(${panel.id},'${s}')" style="cursor:pointer;opacity:${active?1:0.3};font-size:12px;white-space:nowrap;">${icons[s]}${labels[s]}</span>`;
     }).join(' ');
 
+    // 목록 기간 필터
+    const listPeriods = ['최근','이번주','이번달','다음달','전체'];
+    const listPeriodChips = listPeriods.map(p => {
+      const key = {'최근':'recent','이번주':'week','이번달':'month','다음달':'nextmonth','전체':'all'}[p];
+      return `<span onclick="setPanelPeriod(${panel.id},'${key}')" style="cursor:pointer;padding:2px 7px;border-radius:12px;font-size:11px;font-family:'Pretendard','Noto Sans KR';font-weight:700;white-space:nowrap;
+        ${panel.period===key?'background:var(--mon);color:#fff;':'background:var(--paper-soft);color:var(--ink-soft);'}">${p}</span>`;
+    }).join('');
+
     el.innerHTML = `
-      <div class="mytask-panel-header">
-        <span class="mytask-panel-title" style="font-size:12px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;">${typeLabel} · ${statusChips}</span>
-        <button class="mytask-panel-setting-btn" onclick="togglePanelConfig(${panel.id})">⚙️</button>
-        <div class="mytask-panel-config" id="panelConfig_${panel.id}">
-          <label>표시 형식</label>
-          <div class="mytask-panel-config-chips">
-            <div class="mytask-panel-config-chip ${panel.type==='calendar'?'active':''}" onclick="setPanelType(${panel.id},'calendar')">📅 캘린더</div>
-            <div class="mytask-panel-config-chip ${panel.type==='list'?'active':''}" onclick="setPanelType(${panel.id},'list')">📋 목록</div>
-          </div>
-          <label>기간</label>
-          <div class="mytask-panel-config-chips">
-            <div class="mytask-panel-config-chip ${panel.period==='all'?'active':''}" onclick="setPanelPeriod(${panel.id},'all')">전체</div>
-            <div class="mytask-panel-config-chip ${panel.period==='month'?'active':''}" onclick="setPanelPeriod(${panel.id},'month')">이번 달</div>
-            <div class="mytask-panel-config-chip ${panel.period==='range'?'active':''}" onclick="setPanelPeriod(${panel.id},'range')">기간 지정</div>
-          </div>
-          ${panel.period === 'range' ? `
-          <label>시작일</label><input type="date" value="${panel.startDate||''}" onchange="setPanelDateRange(${panel.id},'start',this.value)">
-          <label>종료일</label><input type="date" value="${panel.endDate||''}" onchange="setPanelDateRange(${panel.id},'end',this.value)">
-          ` : ''}
-          ${panel.type === 'calendar' ? `
-          <label>학사일정</label>
-          <div class="mytask-panel-config-chips">
-            <div class="mytask-panel-config-chip ${panel.showSchedule?'active':''}" onclick="togglePanelSchedule(${panel.id})">📆 함께 표시</div>
-          </div>` : ''}
+      <div class="mytask-panel-header" style="flex-wrap:wrap;gap:4px;">
+        <!-- 타입 선택 버튼 -->
+        <div style="display:flex;gap:4px;flex-shrink:0;">
+          <button onclick="setPanelType(${panel.id},'calendar')" style="padding:3px 8px;border-radius:6px;border:1.5px solid ${panel.type==='calendar'?'var(--mon)':'var(--rule)'};background:${panel.type==='calendar'?'var(--mon)':'transparent'};color:${panel.type==='calendar'?'#fff':'var(--ink-soft)'};font-size:12px;cursor:pointer;">📅</button>
+          <button onclick="setPanelType(${panel.id},'list')" style="padding:3px 8px;border-radius:6px;border:1.5px solid ${panel.type==='list'?'var(--mon)':'var(--rule)'};background:${panel.type==='list'?'var(--mon)':'transparent'};color:${panel.type==='list'?'#fff':'var(--ink-soft)'};font-size:12px;cursor:pointer;">📋</button>
+        </div>
+
+        <!-- 캘린더: 월 이동 + 학사일정 -->
+        ${panel.type === 'calendar' ? `
+        <div style="display:flex;align-items:center;gap:4px;">
+          <button onclick="panelChangeMonth(${panel.id},-1)" style="width:22px;height:22px;border-radius:6px;border:1px solid var(--rule);background:var(--paper);cursor:pointer;font-size:13px;">‹</button>
+          <span style="font-family:'IBM Plex Mono';font-weight:700;font-size:12px;min-width:60px;text-align:center;" id="panelMonthLabel_${panel.id}">${panel.calYear}년 ${panel.calMonth+1}월</span>
+          <button onclick="panelChangeMonth(${panel.id},1)" style="width:22px;height:22px;border-radius:6px;border:1px solid var(--rule);background:var(--paper);cursor:pointer;font-size:13px;">›</button>
+          <span onclick="togglePanelSchedule(${panel.id})" style="cursor:pointer;padding:2px 7px;border-radius:12px;font-size:11px;font-family:'Pretendard','Noto Sans KR';font-weight:700;white-space:nowrap;
+            ${panel.showSchedule?'background:var(--mon);color:#fff;':'background:var(--paper-soft);color:var(--ink-soft);'}">📆 학사일정</span>
+        </div>
+        ` : ''}
+
+        <!-- 목록: 기간 필터 -->
+        ${panel.type === 'list' ? `
+        <div style="display:flex;gap:3px;flex-wrap:wrap;">${listPeriodChips}</div>
+        ` : ''}
+
+        <!-- 상태 필터 -->
+        <div style="display:flex;gap:4px;align-items:center;margin-left:auto;">${statusChips}
+          <button class="mytask-panel-remove-btn" onclick="removePanel(${panel.id})">×</button>
         </div>
       </div>
       <div class="mytask-panel-content" id="panelContent_${panel.id}"></div>
@@ -6900,7 +6913,61 @@ function renderPanels() {
     container.appendChild(el);
   });
 
-  panels.slice(0, needed).forEach(panel => renderPanelContent(panel));
+  // 그리드 열/행 드래그 비율 조정
+  if (gridCols > 1) setupGridDrag(container, 'col');
+  if (gridRows > 1) setupGridDrag(container, 'row');
+}
+
+function setupGridDrag(container, type) {
+  container.querySelectorAll('.grid-drag-handle').forEach(el => el.remove());
+  container.style.position = 'relative';
+
+  const count = type === 'col' ? gridCols : gridRows;
+  for (let i = 1; i < count; i++) {
+    const handle = document.createElement('div');
+    handle.className = 'grid-drag-handle';
+    const pct = (i * 100 / count);
+    if (type === 'col') {
+      handle.style.cssText = `position:absolute;top:0;bottom:0;left:calc(${pct}% - 3px);width:6px;cursor:col-resize;z-index:100;background:transparent;transition:background .15s;`;
+      handle.onmouseover = () => handle.style.background = 'rgba(59,130,246,0.3)';
+      handle.onmouseout  = () => handle.style.background = 'transparent';
+    } else {
+      handle.style.cssText = `position:absolute;left:0;right:0;top:calc(${pct}% - 3px);height:6px;cursor:row-resize;z-index:100;background:transparent;transition:background .15s;`;
+      handle.onmouseover = () => handle.style.background = 'rgba(59,130,246,0.3)';
+      handle.onmouseout  = () => handle.style.background = 'transparent';
+    }
+
+    handle.addEventListener('mousedown', e => {
+      e.preventDefault();
+      const startPos = type === 'col' ? e.clientX : e.clientY;
+      const contSize = type === 'col'
+        ? container.getBoundingClientRect().width
+        : container.getBoundingClientRect().height;
+      const template = type === 'col'
+        ? container.style.gridTemplateColumns
+        : container.style.gridTemplateRows;
+      const startFrs = (template || `repeat(${count},1fr)`).split(' ').map(v => parseFloat(v) || 1);
+
+      const onMove = ev => {
+        const pos  = type === 'col' ? ev.clientX : ev.clientY;
+        const diff = pos - startPos;
+        const pctDiff = (diff / contSize) * count;
+        const newFrs = [...startFrs];
+        newFrs[i-1] = Math.max(0.2, startFrs[i-1] + pctDiff);
+        newFrs[i]   = Math.max(0.2, startFrs[i]   - pctDiff);
+        const val = newFrs.map(v => v+'fr').join(' ');
+        if (type === 'col') container.style.gridTemplateColumns = val;
+        else                container.style.gridTemplateRows    = val;
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+    container.appendChild(handle);
+  }
 }
 
 // 모바일/태블릿 전환
@@ -6923,58 +6990,106 @@ document.addEventListener('click', e => {
 });
 
 
+function panelChangeMonth(id, dir) {
+  const p = panels.find(p => p.id === id);
+  if (!p) return;
+  p.calMonth = (p.calMonth || mytaskMonth) + dir;
+  if (p.calMonth > 11) { p.calMonth = 0; p.calYear = (p.calYear || mytaskYear) + 1; }
+  if (p.calMonth < 0)  { p.calMonth = 11; p.calYear = (p.calYear || mytaskYear) - 1; }
+  const label = document.getElementById(`panelMonthLabel_${id}`);
+  if (label) label.textContent = `${p.calYear}년 ${p.calMonth+1}월`;
+  renderPanelContent(p);
+  savePanels();
+}
+window.panelChangeMonth = panelChangeMonth;
+
 function renderPanelContent(panel) {
   const el = document.getElementById(`panelContent_${panel.id}`);
   if (!el) return;
-  const now = new Date();
-  const ym  = `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}`;
+
+  const now    = new Date();
+  const cy     = panel.calYear  || mytaskYear;
+  const cm     = panel.calMonth !== undefined ? panel.calMonth : mytaskMonth;
+  const ym     = `${cy}-${String(cm+1).padStart(2,'0')}`;
+
   let tasks = mytaskTasks.filter(t => panel.filters.status.includes(t.status));
-  if (panel.period === 'month') {
-    tasks = tasks.filter(t => t.startDate?.slice(0,7) === ym || t.endDate?.slice(0,7) === ym ||
-      (t.startDate <= ym+'-31' && t.endDate >= ym+'-01'));
-  } else if (panel.period === 'range' && panel.startDate && panel.endDate) {
-    tasks = tasks.filter(t => t.startDate <= panel.endDate && t.endDate >= panel.startDate);
-  }
-  if (panel.type === 'calendar') {
-    el.innerHTML = renderPanelCalendar(panel, tasks);
-  } else {
+
+  if (panel.type === 'list') {
+    const period = panel.period || 'all';
+    if (period === 'recent') {
+      const from = new Date(now); from.setDate(from.getDate() - 3);
+      const to   = new Date(now); to.setDate(to.getDate() + 4);
+      const fStr = fmt(from), tStr = fmt(to);
+      tasks = tasks.filter(t => t.startDate <= tStr && t.endDate >= fStr);
+    } else if (period === 'week') {
+      const day  = now.getDay();
+      const mon  = new Date(now); mon.setDate(now.getDate() - day);
+      const sun  = new Date(mon); sun.setDate(mon.getDate() + 6);
+      tasks = tasks.filter(t => t.startDate <= fmt(sun) && t.endDate >= fmt(mon));
+    } else if (period === 'month') {
+      const thisYm = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      tasks = tasks.filter(t => t.startDate?.slice(0,7) === thisYm || t.endDate?.slice(0,7) === thisYm ||
+        (t.startDate <= thisYm+'-31' && t.endDate >= thisYm+'-01'));
+    } else if (period === 'nextmonth') {
+      const nm = new Date(now.getFullYear(), now.getMonth()+1, 1);
+      const nmYm = `${nm.getFullYear()}-${String(nm.getMonth()+1).padStart(2,'0')}`;
+      tasks = tasks.filter(t => t.startDate?.slice(0,7) === nmYm || t.endDate?.slice(0,7) === nmYm);
+    }
+    // 'all'은 필터 없음
     el.innerHTML = renderPanelList(tasks);
+  } else {
+    // 캘린더: 해당 패널의 월 기준
+    tasks = mytaskTasks.filter(t =>
+      panel.filters.status.includes(t.status) &&
+      t.startDate <= ym+'-31' && t.endDate >= ym+'-01'
+    );
+    el.innerHTML = renderPanelCalendar(panel, tasks, cy, cm);
   }
 }
 
-function renderPanelCalendar(panel, tasks) {
-  const firstDay = new Date(mytaskYear, mytaskMonth, 1).getDay();
-  const lastDate = new Date(mytaskYear, mytaskMonth + 1, 0).getDate();
+function fmt(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function renderPanelCalendar(panel, tasks, calYear, calMonth) {
+  calYear  = calYear  ?? mytaskYear;
+  calMonth = calMonth ?? mytaskMonth;
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const lastDate = new Date(calYear, calMonth + 1, 0).getDate();
   const today    = new Date();
+  const ym       = `${calYear}-${String(calMonth+1).padStart(2,'0')}`;
   let scheduleItems = [];
   if (panel.showSchedule) {
-    const ym = `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}`;
     const monthEvents = (window._scheduleData || {})[ym] || [];
     scheduleItems = monthEvents.map(e => ({
       ...e, date:`${ym}-${String(e.date).padStart(2,'0')}`,
       title:e.content||e.title||'', _type:'schedule'
     }));
   }
-  let html = `<div style="display:grid;grid-template-columns:repeat(7,1fr);font-family:'IBM Plex Mono';font-size:10px;font-weight:700;color:var(--ink-soft);background:var(--paper-soft);overflow:hidden;">
+  const totalCells = Math.ceil((firstDay + lastDate) / 7) * 7;
+  const totalRows  = totalCells / 7;
+
+  let html = `<div style="display:flex;flex-direction:column;height:100%;">
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);font-family:'IBM Plex Mono';font-size:10px;font-weight:700;color:var(--ink-soft);background:var(--paper-soft);flex-shrink:0;">
     <div style="padding:3px 0;text-align:center;color:#EF4444;">일</div>
     <div style="padding:3px 0;text-align:center;">월</div><div style="padding:3px 0;text-align:center;">화</div>
     <div style="padding:3px 0;text-align:center;">수</div><div style="padding:3px 0;text-align:center;">목</div>
     <div style="padding:3px 0;text-align:center;">금</div>
     <div style="padding:3px 0;text-align:center;color:#3B82F6;">토</div>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(7,1fr);border:1px solid var(--rule);overflow:hidden;">`;
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(${totalRows},1fr);flex:1;border:1px solid var(--rule);overflow:hidden;">`;
+
   let dayCount = 1;
-  const totalCells = Math.ceil((firstDay + lastDate) / 7) * 7;
   for (let i = 0; i < totalCells; i++) {
     const isOther = i < firstDay || dayCount > lastDate;
     const date    = isOther ? null : dayCount;
-    const isToday = date && mytaskYear === today.getFullYear() &&
-                    mytaskMonth === today.getMonth() && date === today.getDate();
-    const dateStr = date ? `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}-${String(date).padStart(2,'0')}` : '';
+    const isToday = date && calYear === today.getFullYear() &&
+                    calMonth === today.getMonth() && date === today.getDate();
+    const dateStr = date ? `${ym}-${String(date).padStart(2,'0')}` : '';
     const dayTasks    = tasks.filter(t => t.startDate <= dateStr && t.endDate >= dateStr);
     const daySchedule = scheduleItems.filter(s => s.date === dateStr);
     const allItems    = [...daySchedule.map(s=>({...s,_type:'schedule'})), ...dayTasks];
-    html += `<div style="min-height:60px;padding:2px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);${isOther?'opacity:0.3;':''}overflow:hidden;cursor:pointer;background:var(--paper);"
+    html += `<div style="padding:2px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);${isOther?'opacity:0.3;':''}overflow:hidden;cursor:pointer;background:var(--paper);min-height:0;"
       ${date?`ondragover="calDragOver(event)" ondrop="calDrop(event,'${dateStr}')" ondragleave="calDragLeave(event)" onclick="mytaskDayClick('${dateStr}',event)"`:''}
       onmouseover="this.querySelector&&this.querySelector('.pcal-add')&&(this.querySelector('.pcal-add').style.display='flex')"
       onmouseout="this.querySelector&&this.querySelector('.pcal-add')&&(this.querySelector('.pcal-add').style.display='none')">
@@ -6998,7 +7113,7 @@ function renderPanelCalendar(panel, tasks) {
     </div>`;
     if (!isOther) dayCount++;
   }
-  return html + '</div>';
+  return html + '</div></div>';
 }
 
 function renderPanelList(tasks) {
