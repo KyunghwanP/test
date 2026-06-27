@@ -442,12 +442,16 @@
   .mytask-cal-grid{
     display:grid;grid-template-columns:repeat(7,1fr);
   }
-  .mytask-cal-cell{
-    min-height:80px;padding:4px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);
-    cursor:pointer;transition:background .1s;
-    overflow:hidden;
-    min-width:0;
+  .mytask-cal-cell{ min-height:80px;padding:4px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);
+    cursor:pointer;transition:background .1s;overflow:hidden;min-width:0;
   }
+  .mytask-cal-date-row{ display:flex;align-items:center;justify-content:space-between;margin-bottom:2px; }
+  .mytask-cal-add-btn{
+    display:none;width:18px;height:18px;border-radius:4px;border:none;
+    background:var(--mon);color:#fff;font-size:13px;line-height:1;
+    cursor:pointer;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .mytask-cal-cell:hover .mytask-cal-add-btn{ display:flex; }
   .mytask-cal-cell:nth-child(7n){border-right:none;}
   .mytask-cal-cell:hover{background:var(--paper-soft);}
   .mytask-cal-cell.other-month{opacity:0.35;}
@@ -2196,7 +2200,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.60</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.62</div>
   </div>
 </div>
 
@@ -2274,7 +2278,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver2.60</div>
+    <div class="nav-version">ver2.62</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -4194,6 +4198,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
+      if(mytaskPage) mytaskPage.classList.remove('active');
       if(!homeInitialized) initHomePage();
     } else if(page === 'timetable'){
       homePage.classList.remove('active');
@@ -4204,6 +4209,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
+      if(mytaskPage) mytaskPage.classList.remove('active');
       // 시간표 탭 클릭 시 본인 시간표 자동 로드
       const _user = fbAuth.currentUser;
       const _name = (_user?.displayName||'').trim().replace(/\s*(선생님|교사|쌤)/,'');
@@ -4218,6 +4224,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
+      if(mytaskPage) mytaskPage.classList.remove('active');
       if(!weeklyInitialized) initWeeklyPage();
     } else if(page === 'meal'){
       homePage.classList.remove('active');
@@ -4228,6 +4235,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
+      if(mytaskPage) mytaskPage.classList.remove('active');
       if(!mealInitialized) initMealPage();
     } else if(page === 'contacts'){
       homePage.classList.remove('active');
@@ -4238,6 +4246,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
+      if(mytaskPage) mytaskPage.classList.remove('active');
       if(!contactsInitialized) initContactsPage();
     } else if(page === 'students'){
       homePage.classList.remove('active');
@@ -4248,6 +4257,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.add('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
+      if(mytaskPage) mytaskPage.classList.remove('active');
       if(!studentsInitialized) initStudentsPage();
     } else if(page === 'schedule'){
       homePage.classList.remove('active');
@@ -4258,6 +4268,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.add('active');
       pointsPage.classList.remove('active');
+      if(mytaskPage) mytaskPage.classList.remove('active');
       if(!scheduleInitialized) initSchedulePage();
     } else if(page === 'points'){
       homePage.classList.remove('active');
@@ -6739,7 +6750,10 @@ function renderMytaskCalendar() {
     html += `<div class="mytask-cal-cell ${isOther?'other-month':''} ${isToday?'today':''}"
       ${date ? `ondragover="calDragOver(event)" ondrop="calDrop(event,'${dateStr}')" ondragleave="calDragLeave(event)"` : ''}
       onclick="${date?`mytaskDayClick('${dateStr}', event)`:''}">
-      <div class="mytask-cal-date">${date || ''}</div>
+      <div class="mytask-cal-date-row">
+        <div class="mytask-cal-date">${date || ''}</div>
+        ${date ? `<button class="mytask-cal-add-btn" onclick="event.stopPropagation();openMytaskModal(null,null,'${dateStr}')">+</button>` : ''}
+      </div>
       ${allItems.slice(0,2).map(t => t._type==='schedule'
         ? `<div class="mytask-cal-chip schedule" onclick="event.stopPropagation()">${t.title||t.name||''}</div>`
         : `<div class="mytask-cal-chip ${t.status}"
