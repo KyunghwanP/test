@@ -2281,7 +2281,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.02</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.10</div>
   </div>
 </div>
 
@@ -2361,7 +2361,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver3.02</div>
+    <div class="nav-version">ver3.10</div>
     </nav>
 
     <!-- 업무캘린더 패널 추가 버튼 (사이드바 우측 끝, 데스크탑만) -->
@@ -3756,7 +3756,7 @@ function renderPopup(teacherObj, day, period, entry){
     const otherGroup = coverList.filter(c=>!c.sameDept);
     const rowHtml = c => `
         <div class="swap-cand cover-cand" data-cover-teacher="${c.teacher}">
-          <div class="swap-cand-name">${c.teacher} 선생님${EXT_MAP[c.teacher]?` <span class="preview-ext">☎ ${EXT_MAP[c.teacher]}</span>`:''}</div>
+          <div class="swap-cand-name">${c.teacher} 선생님${EXT_MAP[c.teacher] ? ' <span class="preview-ext">☎ '+EXT_MAP[c.teacher]+'</span>' : ''}</div>
           <div class="swap-cand-sub">${day} ${period}교시 보강 가능</div>
           <div class="swap-cand-arrow">보강 후 미리보기 →</div>
         </div>`;
@@ -3784,14 +3784,10 @@ function renderPopup(teacherObj, day, period, entry){
           : '※ 이 시간에 다른 수업이 없는 선생님 목록입니다. 실제 보강 요청은 학교 협의 절차를 따로 거쳐야 해요.'}</div>
       </div>
       <div class="preview-col">
-        <div class="preview-col-title">${teacherObj.name} 선생님 시간표${EXT_MAP[teacherObj.name]?` <span class="preview-ext">☎ ${EXT_MAP[teacherObj.name]}</span>`:''}</div>
+        <div class="preview-col-title">${teacherObj.name} 선생님 시간표${EXT_MAP[teacherObj.name]?' <span class="preview-ext">☎ '+EXT_MAP[teacherObj.name]+'</span>':''}</div>
         ${gridHtml}
       </div>
-      ${isDesktop ? `
-      <div class="preview-col" id="candPreviewCol" style="min-width:0;">
-        <div class="preview-col-title" id="candPreviewTitle" style="color:var(--ink-soft);">← 목록에서 선생님에 마우스를 올려보세요</div>
-        <div id="candPreviewGrid"></div>
-      </div>` : ''}
+      ${isDesktop ? '<div class="preview-col" id="candPreviewCol" style="min-width:0;"><div class="preview-col-title" id="candPreviewTitle" style="color:var(--ink-soft);">← 목록에서 선생님에 마우스를 올려보세요</div><div id="candPreviewGrid"></div></div>' : ''}
     </div>
   `;
 
@@ -3820,7 +3816,7 @@ function renderPopup(teacherObj, day, period, entry){
             if(candObj) {
               const hl = {}; hl[`${c.day}-${c.period}`] = 'origin';
               const getPeriodC = (d,p)=> (candObj.schedule[d]||[]).find(x=>x.period===p);
-              candPreviewTitle.innerHTML = `${c.teacher} 선생님 시간표${EXT_MAP[c.teacher]?` <span class="preview-ext">☎ ${EXT_MAP[c.teacher]}</span>`:''}`;
+              candPreviewTitle.innerHTML = c.teacher + ' 선생님 시간표' + (EXT_MAP[c.teacher] ? ' <span class="preview-ext">☎ ' + EXT_MAP[c.teacher] + '</span>' : '');
               candPreviewGrid.innerHTML = buildWeekGrid(getPeriodC, 'class', false, null, hl, true);
               // 후보 시간표에서도 교체 위치 깜빡임
               setTimeout(()=>{
@@ -3851,7 +3847,7 @@ function renderPopup(teacherObj, day, period, entry){
             if(candObj) {
               const hl = {}; hl[`${day}-${period}`] = 'in';
               const getPeriodC = (d,p)=> (candObj.schedule[d]||[]).find(x=>x.period===p);
-              candPreviewTitle.innerHTML = `${candName} 선생님 시간표${EXT_MAP[candName]?` <span class="preview-ext">☎ ${EXT_MAP[candName]}</span>`:''}`;
+              candPreviewTitle.innerHTML = candName + ' 선생님 시간표' + (EXT_MAP[candName] ? ' <span class="preview-ext">☎ ' + EXT_MAP[candName] + '</span>' : '');
               candPreviewGrid.innerHTML = buildWeekGrid(getPeriodC, 'class', false, null, hl, true);
               setTimeout(()=>{
                 const candCell = candPreviewGrid.querySelector(`.gt-cell[data-day="${day}"][data-period="${period}"]`);
@@ -3867,7 +3863,9 @@ function renderPopup(teacherObj, day, period, entry){
       });
     }
   }, window.innerWidth > 900 ? 'wide' : 'medium');
-}(teacherObj, day, period, entry, candName){
+}
+
+function renderCoverPreview(teacherObj, day, period, entry, candName){
   const candObj = TEACHERS.find(x=>x.name===candName);
   const after = cloneScheduleWithAdd(candObj.schedule, day, period, entry.subject, entry.class);
   const hl = {}; hl[`${day}-${period}`] = 'in';
@@ -3878,7 +3876,7 @@ function renderPopup(teacherObj, day, period, entry){
     <div class="modal-sub">${candName} 선생님이 ${day} ${period}교시 ${entry.class||''} 수업을 보강하면 시간표가 이렇게 됩니다</div>
     <div class="swap-preview-grids">
       <div class="preview-col preview-col-single">
-        <div class="preview-col-title">${candName} 선생님 (보강 후)${EXT_MAP[candName]?` <span class="preview-ext">☎ ${EXT_MAP[candName]}</span>`:''}</div>
+        <div class="preview-col-title">${candName} 선생님 (보강 후)${EXT_MAP[candName] ? ' <span class="preview-ext">☎ '+EXT_MAP[candName]+'</span>' : ''}</div>
         ${buildWeekGrid(getPeriodC, 'class', false, null, hl, true)}
       </div>
     </div>
@@ -3919,11 +3917,11 @@ function renderSwapPreview(teacherObj, day, period, entry, cand){
     <div class="modal-sub">${teacherObj.name} 선생님의 ${day} ${period}교시 ↔ ${cand.teacher} 선생님의 ${cand.day} ${cand.period}교시</div>
     <div class="swap-preview-grids">
       <div class="preview-col">
-        <div class="preview-col-title">${teacherObj.name} 선생님 (교체 후)${EXT_MAP[teacherObj.name]?` <span class="preview-ext">☎ ${EXT_MAP[teacherObj.name]}</span>`:''}</div>
+        <div class="preview-col-title">${teacherObj.name} 선생님 (교체 후)${EXT_MAP[teacherObj.name] ? ' <span class="preview-ext">☎ '+EXT_MAP[teacherObj.name]+'</span>' : ''}</div>
         ${buildWeekGrid(getPeriodA, 'class', false, null, hlA, true)}
       </div>
       <div class="preview-col">
-        <div class="preview-col-title">${cand.teacher} 선생님 (교체 후)${EXT_MAP[cand.teacher]?` <span class="preview-ext">☎ ${EXT_MAP[cand.teacher]}</span>`:''}</div>
+        <div class="preview-col-title">${cand.teacher} 선생님 (교체 후)${EXT_MAP[cand.teacher] ? ' <span class="preview-ext">☎ '+EXT_MAP[cand.teacher]+'</span>' : ''}</div>
         ${buildWeekGrid(getPeriodB, 'class', false, null, hlB, true)}
       </div>
     </div>
@@ -6764,35 +6762,24 @@ async function collectTeacherEmail(user) {
   try {
     const displayName = user.displayName || '';
     if (!displayName) return;
-
-    // TEACHERS에서 이름 매칭
     const teacher = TEACHERS.find(t => t.name === displayName);
     if (!teacher) return;
-
-    // 이미 같은 email이면 스킵
-    if (teacher.email === user.email) return;
-
-    // Firestore에서 최신 데이터 읽기
+    if (teacher.email === user.email && teacher.uid === user.uid) return;
     const snap = await getDoc(doc(fbDb, 'appdata', 'main'));
     if (!snap.exists()) return;
     const data = snap.data();
     const teachers = data.teachers || [];
-
-    // 해당 선생님 email 업데이트
     const idx = teachers.findIndex(t => t.name === displayName);
     if (idx < 0) return;
-    if (teachers[idx].email === user.email) return; // 이미 저장됨
-
+    if (teachers[idx].email === user.email && teachers[idx].uid === user.uid) return;
     teachers[idx].email = user.email;
+    teachers[idx].uid   = user.uid;
     await setDoc(doc(fbDb, 'appdata', 'main'), { ...data, teachers }, { merge: false });
-
-    // 로컬도 업데이트
-    if (teacher) teacher.email = user.email;
-    console.log(`${displayName} 이메일 수집 완료: ${user.email}`);
-  } catch(e) {
-    // 조용히 실패 (비핵심 기능)
-    console.log('이메일 수집 실패:', e.message);
-  }
+    if (teacher) { teacher.email = user.email; teacher.uid = user.uid; }
+    console.log(`${displayName} 이메일+uid 수집 완료`);
+    // uid 저장 완료 후 공유 일정 구독 재시작
+    loadMytasks();
+  } catch(e) { console.log('이메일/uid 수집 실패:', e.message); }
 }
 
 // 주간교육활동 AI 요약 갱신 (관리자 전용)
@@ -6999,9 +6986,9 @@ function renderRows() {
               <button class="mytask-filter-btn ${panel.filters.status.includes('todo')?'active f-todo':''}" onclick="togglePanelStatus(${row.id},${panel.id},'todo')">🔵 시작전</button>
               <button class="mytask-filter-btn ${panel.filters.status.includes('doing')?'active f-doing':''}" onclick="togglePanelStatus(${row.id},${panel.id},'doing')">🟡 진행중</button>
               <button class="mytask-filter-btn ${panel.filters.status.includes('done')?'active f-done':''}" onclick="togglePanelStatus(${row.id},${panel.id},'done')">🟢 완료</button>
-              ${panel.type==='calendar'?`<button class="mytask-filter-btn ${panel.showSchedule?'active':''}" onclick="togglePanelSchedule(${row.id},${panel.id})">📆 학사일정</button>`:''}
+              ${panel.type==='calendar' ? '<button class="mytask-filter-btn '+(panel.showSchedule?'active':'')+'" onclick="togglePanelSchedule('+row.id+','+panel.id+')">📆 학사일정</button>' : ''}
             </div>
-            ${panel.type==='list'?`<div class="mytask-filters">${periodOpts.map(o=>`<button class="mytask-filter-btn ${panel.period===o.v?'active':''}" onclick="setPanelPeriod(${row.id},${panel.id},'${o.v}')">${o.l}</button>`).join('')}</div>`:''}
+            ${panel.type==='list' ? '<div class="mytask-filters">'+periodOpts.map(o=>'<button class="mytask-filter-btn '+(panel.period===o.v?'active':'')+'" onclick="setPanelPeriod('+row.id+','+panel.id+',\''+o.v+'\')">'+ o.l+'</button>').join('')+'</div>' : ''}
           </div>
         </div>
         <div class="mytask-panel-content" id="pc_${panel.id}" style="flex:1;overflow-y:auto;height:0;display:flex;flex-direction:column;"></div>
@@ -7359,7 +7346,7 @@ function buildPanelList(tasks) {
     html += `<div class="mytask-item ${t.status}" onclick="openMytaskModal('${t.id}','${t.ownerUid||''}')">
       <div class="mytask-item-status ${t.status}"></div>
       <div class="mytask-item-info">
-        <div class="mytask-item-title">${t.title}</div>
+        <div class="mytask-item-title">${t.title}${t.ownerName ? ` <span style="font-size:11px;color:var(--ink-soft);font-weight:400;">[${t.ownerName}]</span>` : ''}</div>
         <div class="mytask-item-date">${t.startDate} ~ ${t.endDate}</div>
       </div>
       <select class="mytask-status-select ${t.status}" onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();" onclick="event.stopPropagation();">
@@ -7410,20 +7397,27 @@ function initMytaskPage() {
   initPanelSystem();
 }
 
-let mytaskUnsubscribe = null; // 실시간 리스너 해제용
+let mytaskUnsubscribe = null;
+let mytaskSharedUnsubscribes = [];
 
 async function loadMytasks() {
   const user = fbAuth.currentUser;
   if (!user) return;
+  const myName = user.displayName || '';
 
   // 기존 리스너 해제
   if (mytaskUnsubscribe) { mytaskUnsubscribe(); mytaskUnsubscribe = null; }
+  mytaskSharedUnsubscribes.forEach(u => u());
+  mytaskSharedUnsubscribes = [];
 
-  // 실시간 리스너 등록
+  // 내 일정 실시간 리스너
   mytaskUnsubscribe = onSnapshot(
     collection(fbDb, 'tasks', user.uid, 'items'),
     snap => {
-      mytaskTasks = snap.docs.map(d => ({ id: d.id, ownerUid: user.uid, ...d.data() }));
+      // 내 일정만 업데이트
+      const myTasks = snap.docs.map(d => ({ id: d.id, ownerUid: user.uid, ...d.data() }));
+      // 공유받은 일정은 유지하고 내 일정만 교체
+      mytaskTasks = [...myTasks, ...mytaskTasks.filter(t => t.ownerUid !== user.uid)];
       if (mytaskInitialized) {
         const isMobile = window.innerWidth <= 1024;
         if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
@@ -7432,6 +7426,31 @@ async function loadMytasks() {
     },
     err => console.error('캘린더 실시간 동기화 오류:', err)
   );
+
+  // uid 있는 선생님들의 일정 중 나를 공유한 것 구독
+  const myIdentifiers = [user.email, user.displayName].filter(Boolean);
+  TEACHERS.filter(t => t.uid && t.uid !== user.uid).forEach(teacher => {
+    const unsub = onSnapshot(
+      collection(fbDb, 'tasks', teacher.uid, 'items'),
+      snap => {
+        const sharedTasks = snap.docs
+          .map(d => ({ id: d.id, ownerUid: teacher.uid, ownerName: teacher.name, ...d.data() }))
+          .filter(t => (t.sharedWith || []).some(s => myIdentifiers.includes(s)));
+        // 기존에서 이 선생님 것 제거 후 새로 추가
+        mytaskTasks = [
+          ...mytaskTasks.filter(t => t.ownerUid !== teacher.uid),
+          ...sharedTasks
+        ];
+        if (mytaskInitialized) {
+          const isMobile = window.innerWidth <= 1024;
+          if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
+          else renderRows();
+        }
+      },
+      err => console.log(`${teacher.name} 공유 일정 구독 오류:`, err.message)
+    );
+    mytaskSharedUnsubscribes.push(unsub);
+  });
 }
 
 function mytaskChangeMonth(dir) {
@@ -7979,14 +7998,39 @@ async function saveMytask() {
 }
 
 async function deleteMytask() {
-    renderRows();
+  if (!mytaskEditId) return;
+  const user = fbAuth.currentUser;
+  if (!user) return;
+  const myName = user.displayName || user.email;
+  const isOwner = !mytaskEditOwner || mytaskEditOwner === user.uid;
+
+  if (!isOwner) {
+    // 공유받은 일정 → sharedWith에서만 제거 + 댓글 추가
+    if (!confirm('공유 목록에서 나를 제거할까요?\n(일정을 작성한 선생님에게는 알림 댓글이 달립니다)')) return;
+    try {
+      const ref  = doc(fbDb, 'tasks', mytaskEditOwner, 'items', mytaskEditId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      const data = snap.data();
+      const newShared   = (data.sharedWith || []).filter(s => s !== user.email && s !== myName);
+      const newComments = [...(data.comments || []), {
+        email: user.email,
+        name: myName,
+        text: '🚫 공유 목록에서 삭제되었습니다.',
+        createdAt: new Date().toISOString()
+      }];
+      await setDoc(ref, { sharedWith: newShared, comments: newComments }, { merge: true });
+      mytaskTasks = mytaskTasks.filter(t => t.id !== mytaskEditId);
+      closeMytaskModal();
+    } catch(e) { alert('삭제 실패: ' + e.message); }
+    return;
+  }
+
+  if (!confirm('이 일정을 삭제할까요?')) return;
   try {
     await deleteDoc(doc(fbDb, 'tasks', user.uid, 'items', mytaskEditId));
     mytaskTasks = mytaskTasks.filter(t => t.id !== mytaskEditId);
     closeMytaskModal();
-    const isMobile = window.innerWidth <= 1024;
-    if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
-    else renderRows();
   } catch(e) { alert('삭제 실패: ' + e.message); }
 }
 
