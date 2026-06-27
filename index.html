@@ -645,6 +645,14 @@
   .mytask-modal-field textarea#mytaskTitle,
   .mytask-modal-field textarea#mytaskShareInput{resize:none;min-height:unset;height:auto;}
   .mytask-modal-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .mytask-modal-field input[type=date]{
+    font-size:16px;padding:12px 12px;cursor:pointer;
+    -webkit-appearance: none; appearance: none;
+  }
+  /* 달력 드롭다운 크게 (Chrome/Edge) */
+  input[type=date]::-webkit-calendar-picker-indicator{
+    width:22px;height:22px;cursor:pointer;opacity:0.7;
+  }
   .mytask-modal-footer{
     padding:14px 20px;border-top:1px solid var(--rule);
     display:flex;gap:8px;justify-content:flex-end;
@@ -684,15 +692,7 @@
     background:none;border:none;color:#fff;cursor:pointer;
     font-size:14px;padding:0;line-height:1;
   }
-  .mytask-link-chip{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:6px 10px;border-radius:8px;
-    background:var(--paper-soft);border:1px solid var(--rule);
-    font-size:13px;font-family:'Pretendard','Noto Sans KR';
-  }
-  .mytask-link-chip button{
-    background:none;border:none;color:var(--ink-soft);cursor:pointer;font-size:14px;
-  }
+
   .mytask-comment-item{
     padding:8px 10px;border-radius:8px;background:var(--paper-soft);
     font-size:13px;
@@ -2283,6 +2283,27 @@
 
   .home-schedule-item.today .home-schedule-date{color:#E8A93A;font-weight:900;}
   .home-schedule-item.today .home-schedule-content{font-weight:700;color:var(--ink);}
+  /* 날짜 프리뷰 팝업 */
+  #dayPreviewPopup{
+    position:fixed;z-index:9999;
+    background:var(--paper);border:1px solid var(--rule);border-radius:12px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.18);
+    padding:12px 16px;min-width:180px;max-width:280px;
+    pointer-events:none;
+    opacity:0;transform:translateY(6px);
+    transition:opacity .15s,transform .15s;
+    font-family:'Pretendard','Noto Sans KR';
+  }
+  #dayPreviewPopup.show{opacity:1;transform:translateY(0);}
+  #dayPreviewPopup .dp-date{
+    font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:8px;
+    border-bottom:1px solid var(--rule);padding-bottom:6px;
+  }
+  #dayPreviewPopup .dp-item{
+    font-size:13px;padding:4px 8px;border-radius:6px;margin-bottom:4px;
+    line-height:1.4;word-break:keep-all;
+  }
+  #dayPreviewPopup .dp-empty{font-size:13px;color:var(--ink-soft);}
 </style>
 </head>
 <body>
@@ -2293,7 +2314,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.37</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.39</div>
   </div>
 </div>
 
@@ -2373,7 +2394,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver3.37</div>
+    <div class="nav-version">ver3.39</div>
     </nav>
 
     <!-- 업무캘린더 패널 추가 버튼 (사이드바 우측 끝, 데스크탑만) -->
@@ -2854,11 +2875,15 @@
         <div class="mytask-modal-dates">
           <div class="mytask-modal-field">
             <label>시작일</label>
-            <input type="date" id="mytaskStartDate" autocomplete="off">
+            <input type="date" id="mytaskStartDate" autocomplete="off"
+              oninput="autoFormatDateInput(this)"
+              onkeydown="handleDateInputKey(event,this,'mytaskEndDate')">
           </div>
           <div class="mytask-modal-field">
             <label>마감일</label>
-            <input type="date" id="mytaskEndDate" autocomplete="off">
+            <input type="date" id="mytaskEndDate" autocomplete="off"
+              oninput="autoFormatDateInput(this)"
+              onkeydown="handleDateInputKey(event,this,null)">
           </div>
         </div>
 
@@ -2884,14 +2909,7 @@
           <div id="mytaskShareSug" style="display:none;position:relative;z-index:9999;background:var(--paper);border:1.5px solid var(--mon);border-radius:8px;box-shadow:0 8px 24px -4px rgba(0,0,0,0.2);max-height:180px;overflow-y:auto;margin-top:4px;"></div>
         </div>
 
-        <!-- 연계 일정 -->
-        <div class="mytask-modal-field">
-          <label>연계 일정</label>
-          <div id="mytaskLinkedList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px;"></div>
-          <select id="mytaskLinkSelect" onchange="addMytaskLink(this.value)">
-            <option value="">+ 내 일정 연결...</option>
-          </select>
-        </div>
+
       </div>
 
       <!-- 상태 (본인+공유자 모두 가능) -->
@@ -5642,6 +5660,29 @@ function renderSchedule(monthKey) {
     });
   });
 
+  // 학사일정 우클릭/롱프레스 팝업
+  const dp = window._dayPreview;
+  if (dp) {
+    cal.querySelectorAll('.sc-cal-cell[data-date]').forEach(cell => {
+      const d = parseInt(cell.dataset.date);
+      if (!d) return;
+      const ev = eventMap[d];
+      const date = new Date(year, month-1, d);
+      const dow = ['일','월','화','수','목','금','토'][date.getDay()];
+      const dateLabel = `${year}년 ${month}월 ${d}일 (${dow})`;
+      const items = ev
+        ? [{ text: ev.content, style: 'background:#EEF2FF;color:#4F46E5;' }]
+        : [];
+      cell.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        dp.showPopup(items, dateLabel, e.clientX, e.clientY);
+      });
+      cell.addEventListener('touchstart', e => dp.startLong(items, dateLabel, e), { passive: true });
+      cell.addEventListener('touchmove', () => dp.cancelLong(), { passive: true });
+      cell.addEventListener('touchend', () => dp.cancelLong());
+    });
+  }
+
   // 이벤트 없으면 안내
   if(!events.length) {
     cal.innerHTML += '<div class="schedule-empty" style="padding:20px;text-align:center;">이 달에 등록된 일정이 없습니다.</div>';
@@ -7310,74 +7351,174 @@ function renderPanelContent(panel) {
     calEl.style.cssText = 'flex:1;display:flex;flex-direction:column;min-height:0;padding:8px;';
     calEl.innerHTML = buildPanelCalendar(tasks, cy, cm, panel);
     el.appendChild(calEl);
-    requestAnimationFrame(() => adjustCalChips(el));
+    requestAnimationFrame(() => {
+      adjustCalChips(el);
+      // 날짜 셀 우클릭/롱프레스 팝업 바인딩
+      bindDayPreview(calEl, tasks, panel);
+    });
   } else {
     el.style.padding = '8px';
     el.innerHTML = buildPanelList(tasks);
   }
 }
 
+let _homeShowDone = false;
+
+function _makeHomeTaskRow(t, todayStr, statusColor) {
+  const isPast   = t.endDate < todayStr;
+  const isShared = t.ownerUid !== (window._myUid||'');
+  const endDate  = new Date(t.endDate + 'T00:00:00');
+  const todayDate= new Date(todayStr + 'T00:00:00');
+  const diff     = Math.ceil((endDate - todayDate) / (1000*60*60*24));
+  const dday = t.status==='done'
+    ? ''
+    : isPast
+    ? `<span style="font-size:11px;background:#FEE2E2;color:#EF4444;border-radius:4px;padding:1px 5px;font-weight:700;">D+${Math.abs(diff)}</span>`
+    : diff===0
+    ? `<span style="font-size:11px;background:#EF4444;color:#fff;border-radius:4px;padding:1px 5px;font-weight:700;">D-day</span>`
+    : `<span style="font-size:11px;background:${diff<=3?'#FEF3C7':'var(--paper-soft)'};color:${diff<=3?'#D97706':'var(--ink-soft)'};border-radius:4px;padding:1px 5px;font-weight:700;">D-${diff}</span>`;
+  const dotColor = t.status==='done' ? '#10B981' : (statusColor[t.status]||'#6366F1');
+  return `<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--rule);">
+    <div style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;"></div>
+    <div onclick="openMytaskModal('${t.id}','${t.ownerUid||''}')" style="flex:1;min-width:0;cursor:pointer;">
+      <div style="font-size:14px;font-weight:600;color:${isPast&&t.status!=='done'?'#EF4444':'var(--ink)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.title}">
+        ${isShared?'<span style="font-size:12px;margin-right:3px;">👥</span>':''}${t.title}
+      </div>
+      <div style="font-size:11px;color:var(--ink-soft);display:flex;align-items:center;gap:4px;margin-top:2px;">
+        ${dday}
+        <span>${t.startDate}${t.startDate!==t.endDate?' ~ '+t.endDate:''}</span>
+      </div>
+    </div>
+    <select onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();"
+      onclick="event.stopPropagation();"
+      style="font-size:11px;font-weight:700;color:${dotColor};
+        border:1.5px solid ${dotColor};border-radius:8px;
+        padding:3px 6px;background:transparent;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">
+      <option value="todo" ${t.status==='todo'?'selected':''}>🔵 시작전</option>
+      <option value="doing" ${t.status==='doing'?'selected':''}>🟡 진행중</option>
+      <option value="done" ${t.status==='done'?'selected':''}>🟢 완료</option>
+    </select>
+  </div>`;
+}
+
 function renderHomeTaskSection() {
   const section = document.getElementById('homeTaskSection');
   const list    = document.getElementById('homeTaskList');
   if (!section || !list) return;
-
-  // 아직 로딩 안 됐으면 표시 유지 (숨기지 않음)
   if (!mytaskInitialized && mytaskTasks.length === 0) return;
 
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0,10);
+  const todayStr   = new Date().toISOString().slice(0,10);
+  const statusColor= { todo:'#6366F1', doing:'#F59E0B' };
+  const activeTasks= mytaskTasks.filter(t => t.status !== 'done').sort((a,b) => a.startDate.localeCompare(b.startDate));
+  const doneTasks  = mytaskTasks.filter(t => t.status === 'done').sort((a,b) => b.startDate.localeCompare(a.startDate));
 
-  const activeTasks = mytaskTasks
-    .filter(t => t.status !== 'done')
-    .sort((a,b) => a.startDate.localeCompare(b.startDate));
+  section.style.display = '';
+
+  // 완료 보기 버튼 (항상 우측에, 작게)
+  const doneBtn = `<button onclick="window._homeShowDone=!window._homeShowDone;renderHomeTaskSection();"
+    style="font-size:11px;padding:2px 8px;border-radius:6px;border:1px solid var(--rule);
+    background:transparent;color:var(--ink-soft);cursor:pointer;white-space:nowrap;font-family:'Pretendard','Noto Sans KR';">
+    ${_homeShowDone ? '▲ 접기' : '✓ 완료 보기'}
+  </button>`;
 
   if (activeTasks.length === 0) {
-    section.style.display = '';
-    list.innerHTML = `<div style="display:flex;justify-content:center;padding:8px 0;">
-      <button onclick="openMytaskModal()" style="padding:10px 28px;border-radius:10px;border:1.5px dashed var(--mon);background:transparent;color:var(--mon);font-size:14px;font-weight:700;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">+ 일정 추가</button>
-    </div>`;
+    // 진행중 없을 때
+    const doneSection = _homeShowDone && doneTasks.length > 0 ? `
+      <div style="margin-top:8px;">
+        <div style="font-size:11px;font-weight:700;color:var(--ink-soft);padding:4px 4px 2px;border-bottom:1px solid var(--rule);margin-bottom:2px;">완료된 업무</div>
+        <div style="max-height:${3*57}px;overflow-y:auto;">
+          ${doneTasks.slice(0,3).map(t => _makeHomeTaskRow(t, todayStr, statusColor)).join('')}
+          ${doneTasks.length>3?`<div style="font-size:11px;color:var(--ink-soft);text-align:center;padding:6px;">외 ${doneTasks.length-3}개</div>`:''}
+        </div>
+      </div>` : '';
+    list.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 4px 4px;">
+        <button onclick="openMytaskModal()" style="flex:1;padding:10px 0;border-radius:10px;border:1.5px dashed var(--mon);background:transparent;color:var(--mon);font-size:14px;font-weight:700;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">+ 일정 추가</button>
+        ${doneTasks.length>0 ? doneBtn : ''}
+      </div>
+      ${doneSection}`;
     return;
   }
-  section.style.display = '';
-  const statusColor = { todo:'#6366F1', doing:'#F59E0B' };
-  list.innerHTML = activeTasks.map(t => {
-    const isPast  = t.endDate < todayStr;
-    const isShared = t.ownerUid !== (window._myUid||'');
-    const endDate = new Date(t.endDate + 'T00:00:00');
-    const todayDate = new Date(todayStr + 'T00:00:00');
-    const diff = Math.ceil((endDate - todayDate) / (1000*60*60*24));
-    const dday = isPast
-      ? `<span style="font-size:11px;background:#FEE2E2;color:#EF4444;border-radius:4px;padding:1px 5px;font-weight:700;">D+${Math.abs(diff)}</span>`
-      : diff === 0
-      ? `<span style="font-size:11px;background:#EF4444;color:#fff;border-radius:4px;padding:1px 5px;font-weight:700;">D-day</span>`
-      : `<span style="font-size:11px;background:${diff<=3?'#FEF3C7':'var(--paper-soft)'};color:${diff<=3?'#D97706':'var(--ink-soft)'};border-radius:4px;padding:1px 5px;font-weight:700;">D-${diff}</span>`;
-    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--rule);">
-      <div style="width:8px;height:8px;border-radius:50%;background:${statusColor[t.status]||'#6366F1'};flex-shrink:0;"></div>
-      <div onclick="openMytaskModal('${t.id}','${t.ownerUid||''}')"
-        style="flex:1;min-width:0;cursor:pointer;">
-        <div style="font-size:14px;font-weight:600;color:${isPast?'#EF4444':'var(--ink)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-          title="${t.title}">
-          ${isShared?'<span style="font-size:12px;margin-right:3px;">👥</span>':''}${t.title}
-        </div>
-        <div style="font-size:11px;color:var(--ink-soft);display:flex;align-items:center;gap:4px;margin-top:2px;">
-          ${dday}
-          <span>${t.startDate}${t.startDate!==t.endDate?' ~ '+t.endDate:''}</span>
-        </div>
-      </div>
-      <select onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();"
-        onclick="event.stopPropagation();"
-        style="font-size:11px;font-weight:700;color:${statusColor[t.status]||'#6366F1'};
-          border:1.5px solid ${statusColor[t.status]||'#6366F1'};border-radius:8px;
-          padding:3px 6px;background:transparent;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">
-        <option value="todo" ${t.status==='todo'?'selected':''}>🔵 시작전</option>
-        <option value="doing" ${t.status==='doing'?'selected':''}>🟡 진행중</option>
-        <option value="done" ${t.status==='done'?'selected':''}>🟢 완료</option>
-      </select>
+
+  // 진행중 있을 때
+  const activeHtml = `
+    <div style="max-height:${3*57}px;overflow-y:auto;">
+      ${activeTasks.slice(0,3).map(t => _makeHomeTaskRow(t, todayStr, statusColor)).join('')}
+      ${activeTasks.length>3?`<div style="font-size:11px;color:var(--ink-soft);text-align:center;padding:6px;">외 ${activeTasks.length-3}개</div>`:''}
     </div>`;
-  }).join('');
+
+  const doneSection = _homeShowDone && doneTasks.length > 0 ? `
+    <div style="margin-top:6px;">
+      <div style="font-size:11px;font-weight:700;color:var(--ink-soft);padding:4px 4px 2px;border-bottom:1px solid var(--rule);margin-bottom:2px;">완료된 업무</div>
+      <div style="max-height:${3*57}px;overflow-y:auto;">
+        ${doneTasks.slice(0,3).map(t => _makeHomeTaskRow(t, todayStr, statusColor)).join('')}
+        ${doneTasks.length>3?`<div style="font-size:11px;color:var(--ink-soft);text-align:center;padding:6px;">외 ${doneTasks.length-3}개</div>`:''}
+      </div>
+    </div>` : '';
+
+  list.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;padding:2px 4px 0;">
+      ${doneTasks.length>0 ? doneBtn : ''}
+    </div>
+    ${activeHtml}
+    ${doneSection}`;
 }
 window.renderHomeTaskSection = renderHomeTaskSection;
+
+// ── 날짜 프리뷰 팝업 (우클릭/롱프레스) ──────────────────────────
+(function() {
+  const popup = document.createElement('div');
+  popup.id = 'dayPreviewPopup';
+  document.body.appendChild(popup);
+
+  let _longTimer = null;
+  let _active = false;
+
+  function showPopup(items, dateLabel, x, y) {
+    _active = true;
+    const viewW = window.innerWidth;
+    const viewH = window.innerHeight;
+    popup.innerHTML = `<div class="dp-date">${dateLabel}</div>` +
+      (items.length === 0
+        ? '<div class="dp-empty">일정 없음</div>'
+        : items.map(it => `<div class="dp-item" style="${it.style}">${it.text}</div>`).join(''));
+    popup.classList.remove('show');
+    popup.style.left = '0'; popup.style.top = '0';
+    document.body.appendChild(popup); // 재삽입으로 크기 확보
+    requestAnimationFrame(() => {
+      const pw = popup.offsetWidth, ph = popup.offsetHeight;
+      let lx = x + 12, ly = y - ph - 12;
+      if (lx + pw > viewW - 8) lx = viewW - pw - 8;
+      if (ly < 8) ly = y + 12;
+      popup.style.left = lx + 'px';
+      popup.style.top  = ly + 'px';
+      popup.classList.add('show');
+    });
+  }
+
+  function hidePopup() {
+    _active = false;
+    popup.classList.remove('show');
+    clearTimeout(_longTimer);
+  }
+
+  // 전역 마우스업/터치엔드에서 숨기기
+  document.addEventListener('mouseup', () => { if (_active) hidePopup(); });
+  document.addEventListener('touchend', () => { if (_active) hidePopup(); });
+  document.addEventListener('touchcancel', () => hidePopup());
+
+  // 스크롤하면 숨기기
+  document.addEventListener('scroll', hidePopup, true);
+
+  window._dayPreview = { showPopup, hidePopup,
+    startLong(items, dateLabel, e) {
+      clearTimeout(_longTimer);
+      const touch = e.touches ? e.touches[0] : e;
+      _longTimer = setTimeout(() => showPopup(items, dateLabel, touch.clientX, touch.clientY), 500);
+    },
+    cancelLong() { clearTimeout(_longTimer); }
+  };
+})();
 
 function buildPanelCalendar(tasks, cy, cm, panel) {
   const firstDay = new Date(cy, cm, 1).getDay();
@@ -7408,7 +7549,7 @@ function buildPanelCalendar(tasks, cy, cm, panel) {
     const dayTasks    = tasks.filter(t => t.startDate<=dateStr && t.endDate>=dateStr);
     const daySchedule = scheduleItems.filter(s => s.date===dateStr);
     const allItems    = [...daySchedule.map(s=>({...s,_type:'schedule'})), ...dayTasks];
-    html += `<div class="panel-cal-cell" style="min-height:0;padding:4px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);overflow:hidden;cursor:pointer;background:var(--paper);${isOther?'opacity:0.3;':''}"
+    html += `<div class="panel-cal-cell" data-datestr="${dateStr}" style="min-height:0;padding:4px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);overflow:hidden;cursor:pointer;background:var(--paper);${isOther?'opacity:0.3;':''}"
       ${date?`ondragover="calDragOver(event)" ondrop="calDrop(event,'${dateStr}')" ondragleave="calDragLeave(event)" onclick="mytaskDayClick('${dateStr}',event)"`:''}>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
         <div style="font-family:'IBM Plex Mono';font-size:clamp(11px,1.1vw,15px);font-weight:700;
@@ -7436,6 +7577,50 @@ function buildPanelCalendar(tasks, cy, cm, panel) {
 }
 
 // 셀 높이에 따라 칩 표시 개수 조정
+function bindDayPreview(calEl, tasks, panel) {
+  const dp = window._dayPreview;
+  if (!dp) return;
+  const ym = calEl.querySelector('[data-datestr]') ? null : null; // dateStr은 셀에서 읽음
+
+  calEl.querySelectorAll('.panel-cal-cell[data-datestr]').forEach(cell => {
+    const dateStr = cell.dataset.datestr;
+    if (!dateStr) return;
+
+    const [cy2, cm2, cd2] = dateStr.split('-').map(Number);
+    const dow = ['일','월','화','수','목','금','토'][new Date(cy2, cm2-1, cd2).getDay()];
+    const dateLabel = `${cy2}년 ${cm2}월 ${cd2}일 (${dow})`;
+
+    // 해당 날짜 아이템 수집
+    const dayTasks = tasks.filter(t => t.startDate <= dateStr && t.endDate >= dateStr);
+    let schedItems = [];
+    if (panel && panel.showSchedule) {
+      const ym2 = dateStr.slice(0,7);
+      const monthEvs = (window._scheduleData || {})[ym2] || [];
+      schedItems = monthEvs.filter(e => String(e.date).padStart(2,'0') === dateStr.slice(8));
+    }
+    const items = [
+      ...schedItems.map(e => ({ text: e.content||e.title||'', style: 'background:#FEE2E2;color:#991B1B;' })),
+      ...dayTasks.map(t => ({
+        text: t.title,
+        style: t.status==='todo' ? 'background:#EEF2FF;color:#4F46E5;'
+             : t.status==='doing' ? 'background:#FEF3C7;color:#D97706;'
+             : 'background:#D1FAE5;color:#065F46;'
+      }))
+    ];
+
+    // 데스크탑: 우클릭
+    cell.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      dp.showPopup(items, dateLabel, e.clientX, e.clientY);
+    });
+    // 모바일: 롱프레스
+    cell.addEventListener('touchstart', e => dp.startLong(items, dateLabel, e), { passive: true });
+    cell.addEventListener('touchmove', () => dp.cancelLong(), { passive: true });
+    cell.addEventListener('touchend', () => dp.cancelLong());
+  });
+}
+window.bindDayPreview = bindDayPreview;
+
 function adjustCalChips(contentEl) {
   const cells = contentEl.querySelectorAll('.panel-cal-cell');
   cells.forEach(cell => {
@@ -7515,7 +7700,7 @@ let mytaskEditId    = null;
 let mytaskEditOwner = null;
 let mytaskCurrentStatus = 'todo';
 let mytaskCurrentShared = [];
-let mytaskCurrentLinked = [];
+
 let mytaskInitialized   = false;
 let mytaskDayDate       = null; // 날짜 팝업용
 
@@ -7967,26 +8152,7 @@ function removeMytaskShare(val) {
   renderMytaskSharedList();
 }
 
-function addMytaskLink(val) {
-  if (!val) return;
-  const t = mytaskTasks.find(t => t.id === val);
-  if (!t || mytaskCurrentLinked.find(l => l.id === val)) return;
-  mytaskCurrentLinked.push({ id: t.id, title: t.title });
-  renderMytaskLinkedList();
-  document.getElementById('mytaskLinkSelect').value = '';
-}
 
-function removeMytaskLink(id) {
-  mytaskCurrentLinked = mytaskCurrentLinked.filter(l => l.id !== id);
-  renderMytaskLinkedList();
-}
-
-function renderMytaskLinkedList() {
-  const el = document.getElementById('mytaskLinkedList');
-  el.innerHTML = mytaskCurrentLinked.map(l =>
-    `<div class="mytask-link-chip"><span>📎 ${l.title}</span><button onclick="removeMytaskLink('${l.id}')">×</button></div>`
-  ).join('');
-}
 
 async function addMytaskComment() {
   const user  = fbAuth.currentUser;
@@ -8046,16 +8212,10 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
   saveBtn.textContent    = isOwner ? '저장' : '상태 저장';
 
   mytaskCurrentShared = [];
-  mytaskCurrentLinked = [];
   mytaskCurrentStatus = 'todo';
 
   // DOM 초기화
   renderMytaskSharedList();
-  renderMytaskLinkedList();
-
-  const linkSel = document.getElementById('mytaskLinkSelect');
-  linkSel.innerHTML = '<option value="">+ 내 일정 연결...</option>' +
-    mytaskTasks.filter(t => t.id !== id).map(t => `<option value="${t.id}">${t.title}</option>`).join('');
 
   const shareInput = document.getElementById('mytaskShareInput');
   if (shareInput) shareInput.value = '';
@@ -8069,16 +8229,15 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
       document.getElementById('mytaskEndDate').value   = t.endDate   || '';
       mytaskCurrentStatus  = t.status || 'todo';
       mytaskCurrentShared  = [...(t.sharedWith || [])];
-      mytaskCurrentLinked  = [...(t.linkedTasks || [])];
       renderMytaskSharedList();
-      renderMytaskLinkedList();
       renderMytaskComments(t.comments || []);
     }
   } else {
+    const todayDefault = new Date().toISOString().slice(0,10);
     document.getElementById('mytaskTitle').value     = '';
     document.getElementById('mytaskMemo').value      = '';
-    document.getElementById('mytaskStartDate').value = dateStr || '';
-    document.getElementById('mytaskEndDate').value   = dateStr || '';
+    document.getElementById('mytaskStartDate').value = dateStr || todayDefault;
+    document.getElementById('mytaskEndDate').value   = dateStr || todayDefault;
   }
   setMytaskStatusBtn(mytaskCurrentStatus);
   modal.classList.add('show');
@@ -8089,6 +8248,26 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
     if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
   });
 }
+
+function autoFormatDateInput(el) {
+  // 숫자만 추출
+  const digits = el.value.replace(/\D/g, '');
+  if (digits.length === 8) {
+    const formatted = `${digits.slice(0,4)}-${digits.slice(4,6)}-${digits.slice(6,8)}`;
+    // date input은 value를 yyyy-mm-dd 형식으로만 받음
+    el.value = formatted;
+  }
+}
+
+function handleDateInputKey(e, el, nextId) {
+  // Enter나 Tab 시 다음 필드로
+  if ((e.key === 'Enter' || e.key === 'Tab') && nextId) {
+    e.preventDefault();
+    document.getElementById(nextId)?.focus();
+  }
+}
+window.autoFormatDateInput = autoFormatDateInput;
+window.handleDateInputKey  = handleDateInputKey;
 
 function closeMytaskModal() {
   document.getElementById('mytaskModal').classList.remove('show');
@@ -8125,7 +8304,6 @@ async function saveMytask() {
     title, memo, startDate, endDate,
     status: mytaskCurrentStatus,
     sharedWith: mytaskCurrentShared,
-    linkedTasks: mytaskCurrentLinked,
     comments: existing.comments || [],
     updatedAt: new Date().toISOString()
   };
@@ -8200,8 +8378,7 @@ window.selectMytaskShare       = selectMytaskShare;
 window.hideMytaskShareSug      = hideMytaskShareSug;
 window.mytaskShareKeydown      = mytaskShareKeydown;
 window.removeMytaskShare       = removeMytaskShare;
-window.addMytaskLink           = addMytaskLink;
-window.removeMytaskLink        = removeMytaskLink;
+
 window.addMytaskComment        = addMytaskComment;
 window.updateMytaskStatus      = updateMytaskStatus;
 
