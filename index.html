@@ -375,6 +375,90 @@
   /* ══════════════════════════════════════════
      업무 캘린더
   ══════════════════════════════════════════ */
+  /* ── 패널 시스템 (태블릿 이상) ── */
+  .mytask-panel-page{
+    display:flex;flex-direction:column;
+    height:100%;overflow:hidden;
+    background:var(--bg-base);
+  }
+  .mytask-panel-toolbar{
+    display:flex;align-items:center;gap:8px;
+    padding:8px 12px;background:var(--paper);
+    border-bottom:1px solid var(--rule);flex-shrink:0;flex-wrap:wrap;
+  }
+  .mytask-panel-toolbar-btn{
+    padding:5px 12px;border-radius:8px;border:1.5px solid var(--rule);
+    background:var(--paper);color:var(--ink-soft);
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:13px;
+    cursor:pointer;transition:all .12s;white-space:nowrap;
+  }
+  .mytask-panel-toolbar-btn:hover{border-color:var(--mon);color:var(--mon);}
+  .mytask-panel-toolbar-btn.active{background:var(--mon);border-color:var(--mon);color:#fff;}
+  .mytask-panel-container{
+    display:flex;flex:1;overflow:hidden;
+  }
+  .mytask-panel-container.vertical{flex-direction:column;}
+  .mytask-panel{
+    display:flex;flex-direction:column;
+    overflow:hidden;min-width:200px;min-height:150px;
+    position:relative;flex:1;
+  }
+  .mytask-panel-header{
+    display:flex;align-items:center;gap:6px;
+    padding:6px 10px;background:var(--paper-soft);
+    border-bottom:1px solid var(--rule);flex-shrink:0;
+  }
+  .mytask-panel-title{
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:13px;
+    color:var(--ink);flex:1;
+  }
+  .mytask-panel-setting-btn{
+    padding:3px 8px;border-radius:6px;border:1px solid var(--rule);
+    background:transparent;color:var(--ink-soft);font-size:12px;cursor:pointer;
+  }
+  .mytask-panel-setting-btn:hover{background:var(--paper);color:var(--mon);}
+  .mytask-panel-remove-btn{
+    padding:3px 7px;border-radius:6px;border:none;
+    background:transparent;color:var(--ink-soft);font-size:14px;cursor:pointer;
+  }
+  .mytask-panel-remove-btn:hover{color:#EF4444;}
+  .mytask-panel-content{flex:1;overflow-y:auto;padding:10px;}
+  .mytask-divider{
+    background:var(--rule);flex-shrink:0;
+    position:relative;transition:background .15s;z-index:10;
+  }
+  .mytask-divider:hover,.mytask-divider.dragging{background:var(--mon);}
+  .mytask-panel-container:not(.vertical) .mytask-divider{width:5px;cursor:col-resize;}
+  .mytask-panel-container.vertical .mytask-divider{height:5px;cursor:row-resize;}
+  .mytask-panel-config{
+    display:none;position:absolute;top:36px;right:0;z-index:500;
+    background:var(--paper);border:1.5px solid var(--mon);border-radius:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.2);padding:14px;min-width:220px;
+  }
+  .mytask-panel-config.show{display:block;}
+  .mytask-panel-config label{
+    display:block;font-size:11px;font-weight:700;color:var(--ink-soft);
+    margin-bottom:5px;margin-top:10px;font-family:'IBM Plex Mono';
+  }
+  .mytask-panel-config label:first-child{margin-top:0;}
+  .mytask-panel-config select,
+  .mytask-panel-config input[type=date]{
+    width:100%;padding:6px 8px;border:1.5px solid var(--rule);border-radius:6px;
+    font-size:13px;background:var(--paper);color:var(--ink);
+    font-family:'Pretendard','Noto Sans KR';
+  }
+  .mytask-panel-config-chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;}
+  .mytask-panel-config-chip{
+    padding:4px 10px;border-radius:20px;border:1.5px solid var(--rule);
+    background:var(--paper);color:var(--ink-soft);font-size:12px;font-weight:700;
+    cursor:pointer;font-family:'Pretendard','Noto Sans KR';
+  }
+  .mytask-panel-config-chip.active{background:var(--mon);border-color:var(--mon);color:#fff;}
+  @media (max-width:768px){
+    .mytask-panel-toolbar{display:none;}
+    .mytask-divider{display:none;}
+  }
+
   .mytask-body{
     flex:1;overflow-y:auto;padding:16px;
     background:var(--bg-base);
@@ -2200,7 +2284,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.63</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.64</div>
   </div>
 </div>
 
@@ -2278,7 +2362,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver2.63</div>
+    <div class="nav-version">ver2.64</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -2641,57 +2725,60 @@
 
       <!-- 업무 캘린더 페이지 -->
       <div class="page-view" id="mytaskPage">
-        <div class="mytask-body">
-          <div class="mytask-wrap">
-            <!-- 헤더 -->
-            <div class="mytask-header">
-              <div class="mytask-nav">
-                <button class="mytask-nav-btn" onclick="mytaskChangeMonth(-1)">‹</button>
-                <div class="mytask-month-title" id="mytaskMonthTitle"></div>
-                <button class="mytask-nav-btn" onclick="mytaskChangeMonth(1)">›</button>
+        <div class="mytask-panel-page">
+          <!-- 툴바 (태블릿 이상) -->
+          <div class="mytask-panel-toolbar">
+            <button class="mytask-add-btn" onclick="openMytaskModal()" style="font-size:13px;padding:6px 14px;">+ 일정 추가</button>
+            <div style="width:1px;height:20px;background:var(--rule);margin:0 2px;"></div>
+            <button class="mytask-panel-toolbar-btn" onclick="addPanel()" title="패널 추가">＋ 패널</button>
+            <button class="mytask-panel-toolbar-btn" id="panelDirBtn" onclick="togglePanelDirection()" title="분할 방향">⇔ 가로분할</button>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+              <div class="mytask-nav" style="gap:4px;">
+                <button class="mytask-nav-btn" onclick="mytaskChangeMonth(-1)" style="width:26px;height:26px;font-size:14px;">‹</button>
+                <div class="mytask-month-title" id="mytaskMonthTitle" style="font-size:15px;min-width:90px;"></div>
+                <button class="mytask-nav-btn" onclick="mytaskChangeMonth(1)" style="width:26px;height:26px;font-size:14px;">›</button>
               </div>
-              <button class="mytask-add-btn" onclick="openMytaskModal()">+ 일정 추가</button>
             </div>
+          </div>
 
-            <!-- 캘린더 필터 -->
-            <div style="margin-bottom:8px;">
-              <div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;font-family:'IBM Plex Mono';">캘린더 표시</div>
-              <div class="mytask-filters" id="mytaskCalFilters">
+          <!-- 모바일용 헤더 -->
+          <div class="mytask-body" id="mytaskMobileBody" style="display:none;">
+            <div class="mytask-wrap">
+              <div class="mytask-header">
+                <div class="mytask-nav">
+                  <button class="mytask-nav-btn" onclick="mytaskChangeMonth(-1)">‹</button>
+                  <div class="mytask-month-title" id="mytaskMonthTitleM"></div>
+                  <button class="mytask-nav-btn" onclick="mytaskChangeMonth(1)">›</button>
+                </div>
+                <button class="mytask-add-btn" onclick="openMytaskModal()">+ 일정 추가</button>
+              </div>
+              <div class="mytask-filters" id="mytaskCalFiltersMobile">
                 <button class="mytask-filter-btn active" data-filter="todo" onclick="toggleCalFilter('todo')">🔵 시작전</button>
                 <button class="mytask-filter-btn active" data-filter="doing" onclick="toggleCalFilter('doing')">🟡 진행중</button>
                 <button class="mytask-filter-btn active" data-filter="done" onclick="toggleCalFilter('done')">🟢 완료</button>
-                <button class="mytask-filter-btn" data-filter="schedule" onclick="toggleCalFilter('schedule')" id="calFilterSchedule">📆 학사일정</button>
+                <button class="mytask-filter-btn" data-filter="schedule" onclick="toggleCalFilter('schedule')">📆 학사일정</button>
               </div>
-            </div>
-
-            <!-- 캘린더 -->
-            <div class="mytask-cal">
-              <div class="mytask-cal-head">
-                <div class="mytask-cal-head-cell">일</div>
-                <div class="mytask-cal-head-cell">월</div>
-                <div class="mytask-cal-head-cell">화</div>
-                <div class="mytask-cal-head-cell">수</div>
-                <div class="mytask-cal-head-cell">목</div>
-                <div class="mytask-cal-head-cell">금</div>
-                <div class="mytask-cal-head-cell">토</div>
+              <div class="mytask-cal">
+                <div class="mytask-cal-head">
+                  <div class="mytask-cal-head-cell">일</div><div class="mytask-cal-head-cell">월</div>
+                  <div class="mytask-cal-head-cell">화</div><div class="mytask-cal-head-cell">수</div>
+                  <div class="mytask-cal-head-cell">목</div><div class="mytask-cal-head-cell">금</div>
+                  <div class="mytask-cal-head-cell">토</div>
+                </div>
+                <div class="mytask-cal-grid" id="mytaskCalGridMobile"></div>
               </div>
-              <div class="mytask-cal-grid" id="mytaskCalGrid"></div>
-            </div>
-
-            <!-- 목록 필터 -->
-            <div style="margin-top:16px;margin-bottom:8px;">
-              <div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;font-family:'IBM Plex Mono';">목록 필터</div>
-              <div class="mytask-filters" id="mytaskListFilters">
+              <div class="mytask-filters" id="mytaskListFiltersMobile" style="margin-top:12px;">
                 <button class="mytask-filter-btn active" data-filter="all" onclick="toggleListFilter('all')">전체</button>
                 <button class="mytask-filter-btn f-todo" data-filter="todo" onclick="toggleListFilter('todo')">🔵 시작전</button>
                 <button class="mytask-filter-btn f-doing" data-filter="doing" onclick="toggleListFilter('doing')">🟡 진행중</button>
                 <button class="mytask-filter-btn f-done" data-filter="done" onclick="toggleListFilter('done')">🟢 완료</button>
               </div>
+              <div class="mytask-list" id="mytaskListMobile"></div>
             </div>
-
-            <!-- 일정 목록 (전체 월) -->
-            <div class="mytask-list" id="mytaskList"></div>
           </div>
+
+          <!-- 패널 컨테이너 -->
+          <div class="mytask-panel-container" id="mytaskPanelContainer"></div>
         </div>
       </div>
 
@@ -6659,7 +6746,373 @@ async function triggerWeeklySummaryAction() {
 }
 window.triggerWeeklySummaryAction = triggerWeeklySummaryAction;
 
-const MYTASK_ADMIN  = 'pkh910518@yeungnam.hs.kr';
+// ══════════════════════════════════════════
+// 패널 시스템
+// ══════════════════════════════════════════
+let panelDirection = 'horizontal'; // horizontal | vertical
+let panels = []; // [{id, type:'calendar'|'list', filters:{status:[],period:'all'|'month'|'range'}, startDate, endDate, showSchedule}]
+let panelIdCounter = 0;
+
+function initPanelSystem() {
+  // 저장된 설정 불러오기
+  try {
+    const saved = localStorage.getItem('ynhs_panels');
+    if (saved) {
+      const data = JSON.parse(saved);
+      panelDirection = data.direction || 'horizontal';
+      panels = data.panels || getDefaultPanels();
+    } else {
+      panels = getDefaultPanels();
+    }
+  } catch(e) { panels = getDefaultPanels(); }
+
+  // 모바일/태블릿 분기
+  const isMobile = window.innerWidth <= 768;
+  document.getElementById('mytaskMobileBody').style.display  = isMobile ? 'flex' : 'none';
+  document.getElementById('mytaskPanelContainer').style.display = isMobile ? 'none' : 'flex';
+
+  renderPanels();
+}
+
+function getDefaultPanels() {
+  return [
+    { id: ++panelIdCounter, type: 'calendar', filters: { status: ['todo','doing','done'] }, showSchedule: false, period: 'month' },
+    { id: ++panelIdCounter, type: 'list',     filters: { status: ['todo','doing','done'] }, period: 'all' }
+  ];
+}
+
+function savePanels() {
+  try { localStorage.setItem('ynhs_panels', JSON.stringify({ direction: panelDirection, panels })); } catch(e) {}
+}
+
+function togglePanelDirection() {
+  panelDirection = panelDirection === 'horizontal' ? 'vertical' : 'horizontal';
+  const btn = document.getElementById('panelDirBtn');
+  if (btn) btn.textContent = panelDirection === 'horizontal' ? '⇔ 가로분할' : '⇕ 세로분할';
+  renderPanels();
+  savePanels();
+}
+
+function addPanel() {
+  if (panels.length >= 4) { alert('최대 4개 패널까지 가능해요!'); return; }
+  panels.push({ id: ++panelIdCounter, type: 'list', filters: { status: ['todo','doing','done'] }, period: 'all' });
+  renderPanels();
+  savePanels();
+}
+
+function removePanel(id) {
+  if (panels.length <= 1) { alert('최소 1개 패널은 있어야 해요!'); return; }
+  panels = panels.filter(p => p.id !== id);
+  renderPanels();
+  savePanels();
+}
+
+function renderPanels() {
+  const container = document.getElementById('mytaskPanelContainer');
+  if (!container) return;
+  container.className = `mytask-panel-container${panelDirection === 'vertical' ? ' vertical' : ''}`;
+
+  // 월 제목 업데이트
+  const titleEl = document.getElementById('mytaskMonthTitle');
+  if (titleEl) titleEl.textContent = `${mytaskYear}년 ${mytaskMonth + 1}월`;
+
+  container.innerHTML = '';
+  panels.forEach((panel, idx) => {
+    // 분할선
+    if (idx > 0) {
+      const div = document.createElement('div');
+      div.className = 'mytask-divider';
+      setupDivider(div, idx, container);
+      container.appendChild(div);
+    }
+
+    const el = document.createElement('div');
+    el.className = 'mytask-panel';
+    el.dataset.panelId = panel.id;
+
+    const statusLabels = { todo:'🔵시작전', doing:'🟡진행중', done:'🟢완료' };
+    const activeStatus = panel.filters.status.map(s => statusLabels[s]).join(' ');
+    const typeLabel    = panel.type === 'calendar' ? '📅 캘린더' : '📋 목록';
+
+    el.innerHTML = `
+      <div class="mytask-panel-header">
+        <span class="mytask-panel-title">${typeLabel} · ${activeStatus || '전체'}</span>
+        <button class="mytask-panel-setting-btn" onclick="togglePanelConfig(${panel.id})">⚙️ 설정</button>
+        <button class="mytask-panel-remove-btn" onclick="removePanel(${panel.id})">×</button>
+        <!-- 설정 팝업 -->
+        <div class="mytask-panel-config" id="panelConfig_${panel.id}">
+          <label>표시 형식</label>
+          <div class="mytask-panel-config-chips">
+            <div class="mytask-panel-config-chip ${panel.type==='calendar'?'active':''}" onclick="setPanelType(${panel.id},'calendar')">📅 캘린더</div>
+            <div class="mytask-panel-config-chip ${panel.type==='list'?'active':''}" onclick="setPanelType(${panel.id},'list')">📋 목록</div>
+          </div>
+          <label>상태 필터</label>
+          <div class="mytask-panel-config-chips">
+            <div class="mytask-panel-config-chip ${panel.filters.status.includes('todo')?'active':''}" onclick="togglePanelStatus(${panel.id},'todo')">🔵 시작전</div>
+            <div class="mytask-panel-config-chip ${panel.filters.status.includes('doing')?'active':''}" onclick="togglePanelStatus(${panel.id},'doing')">🟡 진행중</div>
+            <div class="mytask-panel-config-chip ${panel.filters.status.includes('done')?'active':''}" onclick="togglePanelStatus(${panel.id},'done')">🟢 완료</div>
+          </div>
+          <label>기간</label>
+          <div class="mytask-panel-config-chips">
+            <div class="mytask-panel-config-chip ${panel.period==='all'?'active':''}" onclick="setPanelPeriod(${panel.id},'all')">전체</div>
+            <div class="mytask-panel-config-chip ${panel.period==='month'?'active':''}" onclick="setPanelPeriod(${panel.id},'month')">이번 달</div>
+            <div class="mytask-panel-config-chip ${panel.period==='range'?'active':''}" onclick="setPanelPeriod(${panel.id},'range')">기간 지정</div>
+          </div>
+          ${panel.period === 'range' ? `
+          <label>시작일</label>
+          <input type="date" value="${panel.startDate||''}" onchange="setPanelDateRange(${panel.id},'start',this.value)">
+          <label>종료일</label>
+          <input type="date" value="${panel.endDate||''}" onchange="setPanelDateRange(${panel.id},'end',this.value)">
+          ` : ''}
+          ${panel.type === 'calendar' ? `
+          <label>학사일정</label>
+          <div class="mytask-panel-config-chips">
+            <div class="mytask-panel-config-chip ${panel.showSchedule?'active':''}" onclick="togglePanelSchedule(${panel.id})">📆 함께 표시</div>
+          </div>` : ''}
+        </div>
+      </div>
+      <div class="mytask-panel-content" id="panelContent_${panel.id}"></div>
+    `;
+    container.appendChild(el);
+  });
+
+  // 각 패널 내용 렌더링
+  panels.forEach(panel => renderPanelContent(panel));
+}
+
+function renderPanelContent(panel) {
+  const el = document.getElementById(`panelContent_${panel.id}`);
+  if (!el) return;
+
+  // 필터링된 일정
+  const now = new Date();
+  const ym  = `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}`;
+  let tasks = mytaskTasks.filter(t => panel.filters.status.includes(t.status));
+
+  if (panel.period === 'month') {
+    tasks = tasks.filter(t => t.startDate?.slice(0,7) === ym || t.endDate?.slice(0,7) === ym ||
+      (t.startDate <= ym+'-31' && t.endDate >= ym+'-01'));
+  } else if (panel.period === 'range' && panel.startDate && panel.endDate) {
+    tasks = tasks.filter(t => t.startDate <= panel.endDate && t.endDate >= panel.startDate);
+  }
+
+  if (panel.type === 'calendar') {
+    el.innerHTML = renderPanelCalendar(panel, tasks);
+    // 드래그 이벤트는 이미 인라인으로
+  } else {
+    el.innerHTML = renderPanelList(tasks);
+  }
+}
+
+function renderPanelCalendar(panel, tasks) {
+  const firstDay = new Date(mytaskYear, mytaskMonth, 1).getDay();
+  const lastDate = new Date(mytaskYear, mytaskMonth + 1, 0).getDate();
+  const today    = new Date();
+
+  // 학사일정
+  let scheduleItems = [];
+  if (panel.showSchedule) {
+    const ym = `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}`;
+    const monthEvents = (window._scheduleData || {})[ym] || [];
+    scheduleItems = monthEvents.map(e => ({
+      ...e,
+      date: `${ym}-${String(e.date).padStart(2,'0')}`,
+      title: e.content || e.title || '',
+      _type: 'schedule'
+    }));
+  }
+
+  let html = `<div style="display:grid;grid-template-columns:repeat(7,1fr);font-family:'IBM Plex Mono';font-size:10px;font-weight:700;color:var(--ink-soft);background:var(--paper-soft);border-radius:6px 6px 0 0;overflow:hidden;">
+    <div style="padding:4px 0;text-align:center;color:#EF4444;">일</div>
+    <div style="padding:4px 0;text-align:center;">월</div><div style="padding:4px 0;text-align:center;">화</div>
+    <div style="padding:4px 0;text-align:center;">수</div><div style="padding:4px 0;text-align:center;">목</div>
+    <div style="padding:4px 0;text-align:center;">금</div>
+    <div style="padding:4px 0;text-align:center;color:#3B82F6;">토</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);border:1px solid var(--rule);border-radius:0 0 6px 6px;overflow:hidden;">`;
+
+  let dayCount = 1;
+  const totalCells = Math.ceil((firstDay + lastDate) / 7) * 7;
+  for (let i = 0; i < totalCells; i++) {
+    const isOther = i < firstDay || dayCount > lastDate;
+    const date    = isOther ? null : dayCount;
+    const isToday = date && mytaskYear === today.getFullYear() &&
+                    mytaskMonth === today.getMonth() && date === today.getDate();
+    const dateStr = date ? `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}-${String(date).padStart(2,'0')}` : '';
+    const dayTasks = tasks.filter(t => t.startDate <= dateStr && t.endDate >= dateStr);
+    const daySchedule = scheduleItems.filter(s => s.date === dateStr);
+    const allItems = [...daySchedule.map(s=>({...s,_type:'schedule'})), ...dayTasks];
+
+    html += `<div style="min-height:70px;padding:3px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);${isOther?'opacity:0.3;':''}overflow:hidden;cursor:pointer;background:var(--paper);"
+      ${date?`ondragover="calDragOver(event)" ondrop="calDrop(event,'${dateStr}')" ondragleave="calDragLeave(event)" onclick="mytaskDayClick('${dateStr}',event)"`:''}
+      onmouseover="this.querySelector('.panel-cal-addbtn')&&(this.querySelector('.panel-cal-addbtn').style.display='flex')"
+      onmouseout="this.querySelector('.panel-cal-addbtn')&&(this.querySelector('.panel-cal-addbtn').style.display='none')">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+        <div style="font-family:'IBM Plex Mono';font-size:11px;font-weight:700;color:${isToday?'#fff':i%7===0?'#EF4444':i%7===6?'#3B82F6':'var(--ink-soft)'};
+          ${isToday?'background:var(--mon);border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;':''}">
+          ${date || ''}
+        </div>
+        ${date?`<button class="panel-cal-addbtn" onclick="event.stopPropagation();openMytaskModal(null,null,'${dateStr}')"
+          style="display:none;width:16px;height:16px;border-radius:4px;border:none;background:var(--mon);color:#fff;font-size:11px;cursor:pointer;align-items:center;justify-content:center;padding:0;">+</button>`:''}
+      </div>
+      ${allItems.slice(0,2).map(t => t._type==='schedule'
+        ? `<div style="font-size:10px;padding:1px 4px;border-radius:3px;background:#FEE2E2;color:#991B1B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px;">${t.title}</div>`
+        : `<div draggable="true" ondragstart="calDragStart(event,'${t.id}','${t.ownerUid||''}')" ondragend="calDragEnd(event)"
+            onclick="event.stopPropagation();openMytaskModal('${t.id}','${t.ownerUid||''}')"
+            style="font-size:10px;padding:1px 4px;border-radius:3px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:grab;
+              ${t.status==='todo'?'background:#EEF2FF;color:#4F46E5;':t.status==='doing'?'background:#FEF3C7;color:#D97706;':'background:#D1FAE5;color:#065F46;text-decoration:line-through;'}">${t.title}</div>`
+      ).join('')}
+      ${allItems.length > 2 ? `<div style="font-size:9px;color:var(--ink-soft);padding:0 3px;">+${allItems.length-2}개</div>` : ''}
+    </div>`;
+    if (!isOther) dayCount++;
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderPanelList(tasks) {
+  const sorted = [...tasks].sort((a,b) => a.startDate?.localeCompare(b.startDate));
+  if (sorted.length === 0) return '<div style="padding:24px;text-align:center;color:var(--ink-soft);font-size:14px;">일정이 없습니다.</div>';
+  const statusLabel = { todo:'시작전', doing:'진행중', done:'완료' };
+  let html = '';
+  let lastYm = '';
+  sorted.forEach(t => {
+    const ym = t.startDate?.slice(0,7) || '';
+    if (ym !== lastYm) {
+      const [y,m] = ym.split('-');
+      html += `<div style="font-family:'IBM Plex Mono';font-weight:700;font-size:11px;color:var(--ink-soft);padding:8px 4px 4px;border-bottom:1px solid var(--rule);margin-bottom:4px;">${y}년 ${parseInt(m)}월</div>`;
+      lastYm = ym;
+    }
+    html += `<div class="mytask-item ${t.status}" onclick="openMytaskModal('${t.id}','${t.ownerUid||''}')" style="margin-bottom:6px;">
+      <div class="mytask-item-status ${t.status}"></div>
+      <div class="mytask-item-info">
+        <div class="mytask-item-title" style="font-size:13px;">${t.title}</div>
+        <div class="mytask-item-date" style="font-size:11px;">${t.startDate} ~ ${t.endDate}</div>
+      </div>
+      <select class="mytask-status-select ${t.status}" onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();" onclick="event.stopPropagation();" style="font-size:11px;">
+        <option value="todo" ${t.status==='todo'?'selected':''}>🔵 시작전</option>
+        <option value="doing" ${t.status==='doing'?'selected':''}>🟡 진행중</option>
+        <option value="done" ${t.status==='done'?'selected':''}>🟢 완료</option>
+      </select>
+    </div>`;
+  });
+  return html;
+}
+
+// 패널 설정 함수들
+function togglePanelConfig(id) {
+  document.querySelectorAll('.mytask-panel-config').forEach(el => {
+    if (el.id !== `panelConfig_${id}`) el.classList.remove('show');
+  });
+  document.getElementById(`panelConfig_${id}`)?.classList.toggle('show');
+}
+
+function setPanelType(id, type) {
+  const p = panels.find(p => p.id === id);
+  if (p) { p.type = type; renderPanels(); savePanels(); }
+}
+
+function togglePanelStatus(id, status) {
+  const p = panels.find(p => p.id === id);
+  if (!p) return;
+  const idx = p.filters.status.indexOf(status);
+  if (idx >= 0) p.filters.status.splice(idx, 1);
+  else p.filters.status.push(status);
+  renderPanels(); savePanels();
+}
+
+function setPanelPeriod(id, period) {
+  const p = panels.find(p => p.id === id);
+  if (p) { p.period = period; renderPanels(); savePanels(); }
+}
+
+function setPanelDateRange(id, type, val) {
+  const p = panels.find(p => p.id === id);
+  if (p) {
+    if (type === 'start') p.startDate = val;
+    else p.endDate = val;
+    renderPanelContent(p); savePanels();
+  }
+}
+
+function togglePanelSchedule(id) {
+  const p = panels.find(p => p.id === id);
+  if (p) { p.showSchedule = !p.showSchedule; renderPanels(); savePanels(); }
+}
+
+// 드래그 분할선
+function setupDivider(divEl, idx, container) {
+  let startPos = 0;
+  let startSizes = [];
+
+  divEl.addEventListener('mousedown', e => {
+    e.preventDefault();
+    divEl.classList.add('dragging');
+    startPos = panelDirection === 'horizontal' ? e.clientX : e.clientY;
+
+    const panelEls = [...container.querySelectorAll('.mytask-panel')];
+    startSizes = panelEls.map(el => panelDirection === 'horizontal'
+      ? el.getBoundingClientRect().width
+      : el.getBoundingClientRect().height);
+
+    const totalSize = startSizes.reduce((a,b) => a+b, 0);
+
+    const onMove = e => {
+      const pos  = panelDirection === 'horizontal' ? e.clientX : e.clientY;
+      const diff = pos - startPos;
+      const panelEls2 = [...container.querySelectorAll('.mytask-panel')];
+      const beforeIdx = idx - 1;
+      const afterIdx  = idx;
+      const newBefore = Math.max(100, startSizes[beforeIdx] + diff);
+      const newAfter  = Math.max(100, startSizes[afterIdx]  - diff);
+      if (panelDirection === 'horizontal') {
+        panelEls2[beforeIdx].style.flex = `0 0 ${newBefore}px`;
+        panelEls2[afterIdx].style.flex  = `0 0 ${newAfter}px`;
+      } else {
+        panelEls2[beforeIdx].style.flex = `0 0 ${newBefore}px`;
+        panelEls2[afterIdx].style.flex  = `0 0 ${newAfter}px`;
+      }
+    };
+    const onUp = () => {
+      divEl.classList.remove('dragging');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+// 모바일/태블릿 전환 처리
+window.addEventListener('resize', () => {
+  if (!mytaskInitialized) return;
+  const isMobile = window.innerWidth <= 768;
+  const mobileBody = document.getElementById('mytaskMobileBody');
+  const panelCon   = document.getElementById('mytaskPanelContainer');
+  if (mobileBody) mobileBody.style.display  = isMobile ? 'flex' : 'none';
+  if (panelCon)   panelCon.style.display    = isMobile ? 'none' : 'flex';
+  if (!isMobile) renderPanels();
+  else { renderMytaskCalendar(); renderMytaskList(); }
+});
+
+// 패널 외부 클릭 시 설정 닫기
+document.addEventListener('click', e => {
+  if (!e.target.closest('.mytask-panel-config') && !e.target.closest('.mytask-panel-setting-btn')) {
+    document.querySelectorAll('.mytask-panel-config').forEach(el => el.classList.remove('show'));
+  }
+});
+
+window.addPanel             = addPanel;
+window.removePanel          = removePanel;
+window.togglePanelDirection = togglePanelDirection;
+window.togglePanelConfig    = togglePanelConfig;
+window.setPanelType         = setPanelType;
+window.togglePanelStatus    = togglePanelStatus;
+window.setPanelPeriod       = setPanelPeriod;
+window.setPanelDateRange    = setPanelDateRange;
+window.togglePanelSchedule  = togglePanelSchedule;
+
+
 let mytaskYear      = new Date().getFullYear();
 let mytaskMonth     = new Date().getMonth();
 let mytaskTasks     = [];
@@ -6682,8 +7135,7 @@ function initMytaskPage() {
     loadMytasks();
     mytaskInitialized = true;
   }
-  renderMytaskCalendar();
-  renderMytaskList();
+  initPanelSystem();
 }
 
 async function loadMytasks() {
@@ -6692,8 +7144,9 @@ async function loadMytasks() {
   try {
     const snap = await getDocs(collection(fbDb, 'tasks', user.uid, 'items'));
     mytaskTasks = snap.docs.map(d => ({ id: d.id, ownerUid: user.uid, ...d.data() }));
-    renderMytaskCalendar();
-    renderMytaskList();
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
+    else renderPanels();
   } catch(e) { console.error('캘린더 로딩 실패:', e); }
 }
 
@@ -6708,7 +7161,7 @@ function mytaskChangeMonth(dir) {
 function toggleCalFilter(filter) {
   if (calFilters.has(filter)) calFilters.delete(filter);
   else calFilters.add(filter);
-  document.querySelectorAll('#mytaskCalFilters .mytask-filter-btn').forEach(b => {
+  document.querySelectorAll('#mytaskCalFiltersMobile .mytask-filter-btn').forEach(b => {
     b.classList.toggle('active', calFilters.has(b.dataset.filter));
   });
   renderMytaskCalendar();
@@ -6724,7 +7177,7 @@ function toggleListFilter(filter) {
     else listFilters.add(filter);
     if (listFilters.size === 0) listFilters = new Set(['all']);
   }
-  document.querySelectorAll('#mytaskListFilters .mytask-filter-btn').forEach(b => {
+  document.querySelectorAll('#mytaskListFiltersMobile .mytask-filter-btn').forEach(b => {
     b.classList.toggle('active', listFilters.has(b.dataset.filter));
   });
   renderMytaskList();
@@ -6741,9 +7194,9 @@ function getListTasks() {
 
 // ── 캘린더 렌더링 ──
 function renderMytaskCalendar() {
-  const title = document.getElementById('mytaskMonthTitle');
+  const title = document.getElementById('mytaskMonthTitleM');
   if (title) title.textContent = `${mytaskYear}년 ${mytaskMonth + 1}월`;
-  const grid = document.getElementById('mytaskCalGrid');
+  const grid = document.getElementById('mytaskCalGridMobile');
   if (!grid) return;
 
   const firstDay  = new Date(mytaskYear, mytaskMonth, 1).getDay();
@@ -6923,7 +7376,7 @@ function closeMytaskDayModalOverlay(e) {
 
 // ── 목록 렌더링 (전체 월, 월 구분선) ──
 function renderMytaskList() {
-  const list = document.getElementById('mytaskList');
+  const list = document.getElementById('mytaskListMobile');
   if (!list) return;
   const filtered = getListTasks().sort((a,b) => a.startDate?.localeCompare(b.startDate));
   if (filtered.length === 0) {
@@ -7226,8 +7679,9 @@ async function saveMytask() {
       mytaskTasks.push({ id: ref.id, ownerUid: user.uid, ...data });
     }
     closeMytaskModal();
-    renderMytaskCalendar();
-    renderMytaskList();
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
+    else renderPanels();
   } catch(e) { alert('저장 실패: ' + e.message); }
 }
 
@@ -7239,8 +7693,9 @@ async function deleteMytask() {
     await deleteDoc(doc(fbDb, 'tasks', user.uid, 'items', mytaskEditId));
     mytaskTasks = mytaskTasks.filter(t => t.id !== mytaskEditId);
     closeMytaskModal();
-    renderMytaskCalendar();
-    renderMytaskList();
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
+    else renderPanels();
   } catch(e) { alert('삭제 실패: ' + e.message); }
 }
 
