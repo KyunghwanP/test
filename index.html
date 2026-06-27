@@ -395,13 +395,14 @@
   .mytask-panel-toolbar-btn:hover{border-color:var(--mon);color:var(--mon);}
   .mytask-panel-toolbar-btn.active{background:var(--mon);border-color:var(--mon);color:#fff;}
   .mytask-panel-container{
-    display:flex;flex:1;overflow:hidden;
+    display:grid;flex:1;overflow:hidden;
+    gap:0;
   }
-  .mytask-panel-container.vertical{flex-direction:column;}
   .mytask-panel{
     display:flex;flex-direction:column;
-    overflow:hidden;min-width:200px;min-height:150px;
-    position:relative;flex:1;
+    overflow:hidden;min-width:0;min-height:0;
+    position:relative;
+    border:1px solid var(--rule);
   }
   .mytask-panel-header{
     display:flex;align-items:center;gap:6px;
@@ -423,13 +424,7 @@
   }
   .mytask-panel-remove-btn:hover{color:#EF4444;}
   .mytask-panel-content{flex:1;overflow-y:auto;padding:10px;}
-  .mytask-divider{
-    background:var(--rule);flex-shrink:0;
-    position:relative;transition:background .15s;z-index:10;
-  }
-  .mytask-divider:hover,.mytask-divider.dragging{background:var(--mon);}
-  .mytask-panel-container:not(.vertical) .mytask-divider{width:5px;cursor:col-resize;}
-  .mytask-panel-container.vertical .mytask-divider{height:5px;cursor:row-resize;}
+  .mytask-divider{ display:none; } /* 그리드에선 불필요 */
   .mytask-panel-config{
     display:none;position:absolute;top:36px;right:0;z-index:500;
     background:var(--paper);border:1.5px solid var(--mon);border-radius:10px;
@@ -637,7 +632,7 @@
   .mytask-modal-field input:focus,
   .mytask-modal-field textarea:focus,
   .mytask-modal-field select:focus{border-color:var(--mon);}
-  .mytask-modal-field textarea{resize:vertical;min-height:80px;}
+  .mytask-modal-field textarea{resize:vertical;min-height:100px;}
   .mytask-modal-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
   .mytask-modal-footer{
     padding:14px 20px;border-top:1px solid var(--rule);
@@ -2284,7 +2279,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.64</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver2.66</div>
   </div>
 </div>
 
@@ -2362,7 +2357,7 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
-    <div class="nav-version">ver2.64</div>
+    <div class="nav-version">ver2.66</div>
     </nav>
 
     <!-- 콘텐츠 영역 -->
@@ -2730,8 +2725,19 @@
           <div class="mytask-panel-toolbar">
             <button class="mytask-add-btn" onclick="openMytaskModal()" style="font-size:13px;padding:6px 14px;">+ 일정 추가</button>
             <div style="width:1px;height:20px;background:var(--rule);margin:0 2px;"></div>
-            <button class="mytask-panel-toolbar-btn" onclick="addPanel()" title="패널 추가">＋ 패널</button>
-            <button class="mytask-panel-toolbar-btn" id="panelDirBtn" onclick="togglePanelDirection()" title="분할 방향">⇔ 가로분할</button>
+            <button class="mytask-panel-toolbar-btn" onclick="addPanel()">＋ 패널</button>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:12px;color:var(--ink-soft);font-family:'IBM Plex Mono';">가로</span>
+              <button class="mytask-panel-toolbar-btn" onclick="setGridCols(-1)" style="padding:3px 8px;">−</button>
+              <span id="gridColsLabel" style="font-family:'IBM Plex Mono';font-weight:700;font-size:14px;min-width:16px;text-align:center;"></span>
+              <button class="mytask-panel-toolbar-btn" onclick="setGridCols(1)" style="padding:3px 8px;">＋</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:12px;color:var(--ink-soft);font-family:'IBM Plex Mono';">세로</span>
+              <button class="mytask-panel-toolbar-btn" onclick="setGridRows(-1)" style="padding:3px 8px;">−</button>
+              <span id="gridRowsLabel" style="font-family:'IBM Plex Mono';font-weight:700;font-size:14px;min-width:16px;text-align:center;"></span>
+              <button class="mytask-panel-toolbar-btn" onclick="setGridRows(1)" style="padding:3px 8px;">＋</button>
+            </div>
             <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
               <div class="mytask-nav" style="gap:4px;">
                 <button class="mytask-nav-btn" onclick="mytaskChangeMonth(-1)" style="width:26px;height:26px;font-size:14px;">‹</button>
@@ -2802,7 +2808,7 @@
 
 <!-- 업무 캘린더 추가/수정 모달 -->
 <div class="mytask-modal" id="mytaskModal" onclick="closeMytaskModalOverlay(event)">
-  <div class="mytask-modal-box" style="max-width:520px;max-height:90vh;display:flex;flex-direction:column;">
+  <div class="mytask-modal-box" style="width:min(90vw,680px);max-height:90vh;display:flex;flex-direction:column;">
     <div class="mytask-modal-head">
       <div class="mytask-modal-title" id="mytaskModalTitle">일정 추가</div>
       <button class="mytask-modal-close" onclick="closeMytaskModal()">×</button>
@@ -6749,60 +6755,88 @@ window.triggerWeeklySummaryAction = triggerWeeklySummaryAction;
 // ══════════════════════════════════════════
 // 패널 시스템
 // ══════════════════════════════════════════
-let panelDirection = 'horizontal'; // horizontal | vertical
-let panels = []; // [{id, type:'calendar'|'list', filters:{status:[],period:'all'|'month'|'range'}, startDate, endDate, showSchedule}]
+let gridCols = 2;
+let gridRows = 1;
+let panels = [];
 let panelIdCounter = 0;
 
 function initPanelSystem() {
-  // 저장된 설정 불러오기
   try {
     const saved = localStorage.getItem('ynhs_panels');
     if (saved) {
       const data = JSON.parse(saved);
-      panelDirection = data.direction || 'horizontal';
-      panels = data.panels || getDefaultPanels();
+      gridCols = data.cols || 2;
+      gridRows = data.rows || 1;
+      panels   = data.panels || getDefaultPanels();
+      panelIdCounter = panels.reduce((m,p) => Math.max(m,p.id), 0);
     } else {
       panels = getDefaultPanels();
     }
   } catch(e) { panels = getDefaultPanels(); }
 
-  // 모바일/태블릿 분기
   const isMobile = window.innerWidth <= 768;
-  document.getElementById('mytaskMobileBody').style.display  = isMobile ? 'flex' : 'none';
-  document.getElementById('mytaskPanelContainer').style.display = isMobile ? 'none' : 'flex';
+  document.getElementById('mytaskMobileBody').style.display    = isMobile ? 'flex' : 'none';
+  document.getElementById('mytaskPanelContainer').style.display = isMobile ? 'none' : 'grid';
 
+  updateGridLabels();
   renderPanels();
 }
 
 function getDefaultPanels() {
   return [
-    { id: ++panelIdCounter, type: 'calendar', filters: { status: ['todo','doing','done'] }, showSchedule: false, period: 'month' },
-    { id: ++panelIdCounter, type: 'list',     filters: { status: ['todo','doing','done'] }, period: 'all' }
+    { id: ++panelIdCounter, type:'calendar', filters:{status:['todo','doing','done']}, showSchedule:false, period:'month' },
+    { id: ++panelIdCounter, type:'list',     filters:{status:['todo','doing','done']}, period:'all' }
   ];
 }
 
 function savePanels() {
-  try { localStorage.setItem('ynhs_panels', JSON.stringify({ direction: panelDirection, panels })); } catch(e) {}
+  try { localStorage.setItem('ynhs_panels', JSON.stringify({ cols:gridCols, rows:gridRows, panels })); } catch(e) {}
 }
 
-function togglePanelDirection() {
-  panelDirection = panelDirection === 'horizontal' ? 'vertical' : 'horizontal';
-  const btn = document.getElementById('panelDirBtn');
-  if (btn) btn.textContent = panelDirection === 'horizontal' ? '⇔ 가로분할' : '⇕ 세로분할';
+function updateGridLabels() {
+  const c = document.getElementById('gridColsLabel');
+  const r = document.getElementById('gridRowsLabel');
+  if (c) c.textContent = gridCols;
+  if (r) r.textContent = gridRows;
+}
+
+function setGridCols(dir) {
+  gridCols = Math.max(1, Math.min(4, gridCols + dir));
+  ensurePanels();
+  updateGridLabels();
   renderPanels();
   savePanels();
+}
+
+function setGridRows(dir) {
+  gridRows = Math.max(1, Math.min(4, gridRows + dir));
+  ensurePanels();
+  updateGridLabels();
+  renderPanels();
+  savePanels();
+}
+
+function ensurePanels() {
+  const needed = gridCols * gridRows;
+  while (panels.length < needed) {
+    panels.push({ id: ++panelIdCounter, type:'list', filters:{status:['todo','doing','done']}, period:'all' });
+  }
 }
 
 function addPanel() {
-  if (panels.length >= 4) { alert('최대 4개 패널까지 가능해요!'); return; }
-  panels.push({ id: ++panelIdCounter, type: 'list', filters: { status: ['todo','doing','done'] }, period: 'all' });
-  renderPanels();
-  savePanels();
+  if (gridCols < 4) { setGridCols(1); return; }
+  if (gridRows < 4) { setGridRows(1); return; }
+  alert('최대 4×4까지 가능해요!');
 }
 
 function removePanel(id) {
-  if (panels.length <= 1) { alert('최소 1개 패널은 있어야 해요!'); return; }
+  const total = gridCols * gridRows;
+  if (total <= 1) { alert('최소 1개 패널은 있어야 해요!'); return; }
   panels = panels.filter(p => p.id !== id);
+  if (gridCols > 1) gridCols--;
+  else if (gridRows > 1) gridRows--;
+  ensurePanels();
+  updateGridLabels();
   renderPanels();
   savePanels();
 }
@@ -6810,47 +6844,39 @@ function removePanel(id) {
 function renderPanels() {
   const container = document.getElementById('mytaskPanelContainer');
   if (!container) return;
-  container.className = `mytask-panel-container${panelDirection === 'vertical' ? ' vertical' : ''}`;
 
-  // 월 제목 업데이트
   const titleEl = document.getElementById('mytaskMonthTitle');
   if (titleEl) titleEl.textContent = `${mytaskYear}년 ${mytaskMonth + 1}월`;
 
-  container.innerHTML = '';
-  panels.forEach((panel, idx) => {
-    // 분할선
-    if (idx > 0) {
-      const div = document.createElement('div');
-      div.className = 'mytask-divider';
-      setupDivider(div, idx, container);
-      container.appendChild(div);
-    }
+  container.style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
+  container.style.gridTemplateRows    = `repeat(${gridRows}, 1fr)`;
 
+  ensurePanels();
+  const needed = gridCols * gridRows;
+
+  container.innerHTML = '';
+  panels.slice(0, needed).forEach(panel => {
     const el = document.createElement('div');
     el.className = 'mytask-panel';
     el.dataset.panelId = panel.id;
 
-    const statusLabels = { todo:'🔵시작전', doing:'🟡진행중', done:'🟢완료' };
-    const activeStatus = panel.filters.status.map(s => statusLabels[s]).join(' ');
-    const typeLabel    = panel.type === 'calendar' ? '📅 캘린더' : '📋 목록';
+    const typeLabel = panel.type === 'calendar' ? '📅 캘린더' : '📋 목록';
+    const icons  = { todo:'🔵', doing:'🟡', done:'🟢' };
+    const labels = { todo:'시작전', doing:'진행중', done:'완료' };
+    const statusChips = ['todo','doing','done'].map(s => {
+      const active = panel.filters.status.includes(s);
+      return `<span onclick="togglePanelStatus(${panel.id},'${s}')" style="cursor:pointer;opacity:${active?1:0.3};font-size:12px;white-space:nowrap;">${icons[s]}${labels[s]}</span>`;
+    }).join(' ');
 
     el.innerHTML = `
       <div class="mytask-panel-header">
-        <span class="mytask-panel-title">${typeLabel} · ${activeStatus || '전체'}</span>
-        <button class="mytask-panel-setting-btn" onclick="togglePanelConfig(${panel.id})">⚙️ 설정</button>
-        <button class="mytask-panel-remove-btn" onclick="removePanel(${panel.id})">×</button>
-        <!-- 설정 팝업 -->
+        <span class="mytask-panel-title" style="font-size:12px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;">${typeLabel} · ${statusChips}</span>
+        <button class="mytask-panel-setting-btn" onclick="togglePanelConfig(${panel.id})">⚙️</button>
         <div class="mytask-panel-config" id="panelConfig_${panel.id}">
           <label>표시 형식</label>
           <div class="mytask-panel-config-chips">
             <div class="mytask-panel-config-chip ${panel.type==='calendar'?'active':''}" onclick="setPanelType(${panel.id},'calendar')">📅 캘린더</div>
             <div class="mytask-panel-config-chip ${panel.type==='list'?'active':''}" onclick="setPanelType(${panel.id},'list')">📋 목록</div>
-          </div>
-          <label>상태 필터</label>
-          <div class="mytask-panel-config-chips">
-            <div class="mytask-panel-config-chip ${panel.filters.status.includes('todo')?'active':''}" onclick="togglePanelStatus(${panel.id},'todo')">🔵 시작전</div>
-            <div class="mytask-panel-config-chip ${panel.filters.status.includes('doing')?'active':''}" onclick="togglePanelStatus(${panel.id},'doing')">🟡 진행중</div>
-            <div class="mytask-panel-config-chip ${panel.filters.status.includes('done')?'active':''}" onclick="togglePanelStatus(${panel.id},'done')">🟢 완료</div>
           </div>
           <label>기간</label>
           <div class="mytask-panel-config-chips">
@@ -6859,10 +6885,8 @@ function renderPanels() {
             <div class="mytask-panel-config-chip ${panel.period==='range'?'active':''}" onclick="setPanelPeriod(${panel.id},'range')">기간 지정</div>
           </div>
           ${panel.period === 'range' ? `
-          <label>시작일</label>
-          <input type="date" value="${panel.startDate||''}" onchange="setPanelDateRange(${panel.id},'start',this.value)">
-          <label>종료일</label>
-          <input type="date" value="${panel.endDate||''}" onchange="setPanelDateRange(${panel.id},'end',this.value)">
+          <label>시작일</label><input type="date" value="${panel.startDate||''}" onchange="setPanelDateRange(${panel.id},'start',this.value)">
+          <label>종료일</label><input type="date" value="${panel.endDate||''}" onchange="setPanelDateRange(${panel.id},'end',this.value)">
           ` : ''}
           ${panel.type === 'calendar' ? `
           <label>학사일정</label>
@@ -6876,221 +6900,17 @@ function renderPanels() {
     container.appendChild(el);
   });
 
-  // 각 패널 내용 렌더링
-  panels.forEach(panel => renderPanelContent(panel));
+  panels.slice(0, needed).forEach(panel => renderPanelContent(panel));
 }
 
-function renderPanelContent(panel) {
-  const el = document.getElementById(`panelContent_${panel.id}`);
-  if (!el) return;
-
-  // 필터링된 일정
-  const now = new Date();
-  const ym  = `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}`;
-  let tasks = mytaskTasks.filter(t => panel.filters.status.includes(t.status));
-
-  if (panel.period === 'month') {
-    tasks = tasks.filter(t => t.startDate?.slice(0,7) === ym || t.endDate?.slice(0,7) === ym ||
-      (t.startDate <= ym+'-31' && t.endDate >= ym+'-01'));
-  } else if (panel.period === 'range' && panel.startDate && panel.endDate) {
-    tasks = tasks.filter(t => t.startDate <= panel.endDate && t.endDate >= panel.startDate);
-  }
-
-  if (panel.type === 'calendar') {
-    el.innerHTML = renderPanelCalendar(panel, tasks);
-    // 드래그 이벤트는 이미 인라인으로
-  } else {
-    el.innerHTML = renderPanelList(tasks);
-  }
-}
-
-function renderPanelCalendar(panel, tasks) {
-  const firstDay = new Date(mytaskYear, mytaskMonth, 1).getDay();
-  const lastDate = new Date(mytaskYear, mytaskMonth + 1, 0).getDate();
-  const today    = new Date();
-
-  // 학사일정
-  let scheduleItems = [];
-  if (panel.showSchedule) {
-    const ym = `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}`;
-    const monthEvents = (window._scheduleData || {})[ym] || [];
-    scheduleItems = monthEvents.map(e => ({
-      ...e,
-      date: `${ym}-${String(e.date).padStart(2,'0')}`,
-      title: e.content || e.title || '',
-      _type: 'schedule'
-    }));
-  }
-
-  let html = `<div style="display:grid;grid-template-columns:repeat(7,1fr);font-family:'IBM Plex Mono';font-size:10px;font-weight:700;color:var(--ink-soft);background:var(--paper-soft);border-radius:6px 6px 0 0;overflow:hidden;">
-    <div style="padding:4px 0;text-align:center;color:#EF4444;">일</div>
-    <div style="padding:4px 0;text-align:center;">월</div><div style="padding:4px 0;text-align:center;">화</div>
-    <div style="padding:4px 0;text-align:center;">수</div><div style="padding:4px 0;text-align:center;">목</div>
-    <div style="padding:4px 0;text-align:center;">금</div>
-    <div style="padding:4px 0;text-align:center;color:#3B82F6;">토</div>
-  </div>
-  <div style="display:grid;grid-template-columns:repeat(7,1fr);border:1px solid var(--rule);border-radius:0 0 6px 6px;overflow:hidden;">`;
-
-  let dayCount = 1;
-  const totalCells = Math.ceil((firstDay + lastDate) / 7) * 7;
-  for (let i = 0; i < totalCells; i++) {
-    const isOther = i < firstDay || dayCount > lastDate;
-    const date    = isOther ? null : dayCount;
-    const isToday = date && mytaskYear === today.getFullYear() &&
-                    mytaskMonth === today.getMonth() && date === today.getDate();
-    const dateStr = date ? `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}-${String(date).padStart(2,'0')}` : '';
-    const dayTasks = tasks.filter(t => t.startDate <= dateStr && t.endDate >= dateStr);
-    const daySchedule = scheduleItems.filter(s => s.date === dateStr);
-    const allItems = [...daySchedule.map(s=>({...s,_type:'schedule'})), ...dayTasks];
-
-    html += `<div style="min-height:70px;padding:3px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);${isOther?'opacity:0.3;':''}overflow:hidden;cursor:pointer;background:var(--paper);"
-      ${date?`ondragover="calDragOver(event)" ondrop="calDrop(event,'${dateStr}')" ondragleave="calDragLeave(event)" onclick="mytaskDayClick('${dateStr}',event)"`:''}
-      onmouseover="this.querySelector('.panel-cal-addbtn')&&(this.querySelector('.panel-cal-addbtn').style.display='flex')"
-      onmouseout="this.querySelector('.panel-cal-addbtn')&&(this.querySelector('.panel-cal-addbtn').style.display='none')">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
-        <div style="font-family:'IBM Plex Mono';font-size:11px;font-weight:700;color:${isToday?'#fff':i%7===0?'#EF4444':i%7===6?'#3B82F6':'var(--ink-soft)'};
-          ${isToday?'background:var(--mon);border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;':''}">
-          ${date || ''}
-        </div>
-        ${date?`<button class="panel-cal-addbtn" onclick="event.stopPropagation();openMytaskModal(null,null,'${dateStr}')"
-          style="display:none;width:16px;height:16px;border-radius:4px;border:none;background:var(--mon);color:#fff;font-size:11px;cursor:pointer;align-items:center;justify-content:center;padding:0;">+</button>`:''}
-      </div>
-      ${allItems.slice(0,2).map(t => t._type==='schedule'
-        ? `<div style="font-size:10px;padding:1px 4px;border-radius:3px;background:#FEE2E2;color:#991B1B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px;">${t.title}</div>`
-        : `<div draggable="true" ondragstart="calDragStart(event,'${t.id}','${t.ownerUid||''}')" ondragend="calDragEnd(event)"
-            onclick="event.stopPropagation();openMytaskModal('${t.id}','${t.ownerUid||''}')"
-            style="font-size:10px;padding:1px 4px;border-radius:3px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:grab;
-              ${t.status==='todo'?'background:#EEF2FF;color:#4F46E5;':t.status==='doing'?'background:#FEF3C7;color:#D97706;':'background:#D1FAE5;color:#065F46;text-decoration:line-through;'}">${t.title}</div>`
-      ).join('')}
-      ${allItems.length > 2 ? `<div style="font-size:9px;color:var(--ink-soft);padding:0 3px;">+${allItems.length-2}개</div>` : ''}
-    </div>`;
-    if (!isOther) dayCount++;
-  }
-  html += '</div>';
-  return html;
-}
-
-function renderPanelList(tasks) {
-  const sorted = [...tasks].sort((a,b) => a.startDate?.localeCompare(b.startDate));
-  if (sorted.length === 0) return '<div style="padding:24px;text-align:center;color:var(--ink-soft);font-size:14px;">일정이 없습니다.</div>';
-  const statusLabel = { todo:'시작전', doing:'진행중', done:'완료' };
-  let html = '';
-  let lastYm = '';
-  sorted.forEach(t => {
-    const ym = t.startDate?.slice(0,7) || '';
-    if (ym !== lastYm) {
-      const [y,m] = ym.split('-');
-      html += `<div style="font-family:'IBM Plex Mono';font-weight:700;font-size:11px;color:var(--ink-soft);padding:8px 4px 4px;border-bottom:1px solid var(--rule);margin-bottom:4px;">${y}년 ${parseInt(m)}월</div>`;
-      lastYm = ym;
-    }
-    html += `<div class="mytask-item ${t.status}" onclick="openMytaskModal('${t.id}','${t.ownerUid||''}')" style="margin-bottom:6px;">
-      <div class="mytask-item-status ${t.status}"></div>
-      <div class="mytask-item-info">
-        <div class="mytask-item-title" style="font-size:13px;">${t.title}</div>
-        <div class="mytask-item-date" style="font-size:11px;">${t.startDate} ~ ${t.endDate}</div>
-      </div>
-      <select class="mytask-status-select ${t.status}" onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();" onclick="event.stopPropagation();" style="font-size:11px;">
-        <option value="todo" ${t.status==='todo'?'selected':''}>🔵 시작전</option>
-        <option value="doing" ${t.status==='doing'?'selected':''}>🟡 진행중</option>
-        <option value="done" ${t.status==='done'?'selected':''}>🟢 완료</option>
-      </select>
-    </div>`;
-  });
-  return html;
-}
-
-// 패널 설정 함수들
-function togglePanelConfig(id) {
-  document.querySelectorAll('.mytask-panel-config').forEach(el => {
-    if (el.id !== `panelConfig_${id}`) el.classList.remove('show');
-  });
-  document.getElementById(`panelConfig_${id}`)?.classList.toggle('show');
-}
-
-function setPanelType(id, type) {
-  const p = panels.find(p => p.id === id);
-  if (p) { p.type = type; renderPanels(); savePanels(); }
-}
-
-function togglePanelStatus(id, status) {
-  const p = panels.find(p => p.id === id);
-  if (!p) return;
-  const idx = p.filters.status.indexOf(status);
-  if (idx >= 0) p.filters.status.splice(idx, 1);
-  else p.filters.status.push(status);
-  renderPanels(); savePanels();
-}
-
-function setPanelPeriod(id, period) {
-  const p = panels.find(p => p.id === id);
-  if (p) { p.period = period; renderPanels(); savePanels(); }
-}
-
-function setPanelDateRange(id, type, val) {
-  const p = panels.find(p => p.id === id);
-  if (p) {
-    if (type === 'start') p.startDate = val;
-    else p.endDate = val;
-    renderPanelContent(p); savePanels();
-  }
-}
-
-function togglePanelSchedule(id) {
-  const p = panels.find(p => p.id === id);
-  if (p) { p.showSchedule = !p.showSchedule; renderPanels(); savePanels(); }
-}
-
-// 드래그 분할선
-function setupDivider(divEl, idx, container) {
-  let startPos = 0;
-  let startSizes = [];
-
-  divEl.addEventListener('mousedown', e => {
-    e.preventDefault();
-    divEl.classList.add('dragging');
-    startPos = panelDirection === 'horizontal' ? e.clientX : e.clientY;
-
-    const panelEls = [...container.querySelectorAll('.mytask-panel')];
-    startSizes = panelEls.map(el => panelDirection === 'horizontal'
-      ? el.getBoundingClientRect().width
-      : el.getBoundingClientRect().height);
-
-    const totalSize = startSizes.reduce((a,b) => a+b, 0);
-
-    const onMove = e => {
-      const pos  = panelDirection === 'horizontal' ? e.clientX : e.clientY;
-      const diff = pos - startPos;
-      const panelEls2 = [...container.querySelectorAll('.mytask-panel')];
-      const beforeIdx = idx - 1;
-      const afterIdx  = idx;
-      const newBefore = Math.max(100, startSizes[beforeIdx] + diff);
-      const newAfter  = Math.max(100, startSizes[afterIdx]  - diff);
-      if (panelDirection === 'horizontal') {
-        panelEls2[beforeIdx].style.flex = `0 0 ${newBefore}px`;
-        panelEls2[afterIdx].style.flex  = `0 0 ${newAfter}px`;
-      } else {
-        panelEls2[beforeIdx].style.flex = `0 0 ${newBefore}px`;
-        panelEls2[afterIdx].style.flex  = `0 0 ${newAfter}px`;
-      }
-    };
-    const onUp = () => {
-      divEl.classList.remove('dragging');
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  });
-}
-
-// 모바일/태블릿 전환 처리
+// 모바일/태블릿 전환
 window.addEventListener('resize', () => {
   if (!mytaskInitialized) return;
   const isMobile = window.innerWidth <= 768;
   const mobileBody = document.getElementById('mytaskMobileBody');
   const panelCon   = document.getElementById('mytaskPanelContainer');
-  if (mobileBody) mobileBody.style.display  = isMobile ? 'flex' : 'none';
-  if (panelCon)   panelCon.style.display    = isMobile ? 'none' : 'flex';
+  if (mobileBody) mobileBody.style.display   = isMobile ? 'flex' : 'none';
+  if (panelCon)   panelCon.style.display     = isMobile ? 'none' : 'grid';
   if (!isMobile) renderPanels();
   else { renderMytaskCalendar(); renderMytaskList(); }
 });
@@ -7102,9 +6922,11 @@ document.addEventListener('click', e => {
   }
 });
 
+
 window.addPanel             = addPanel;
 window.removePanel          = removePanel;
-window.togglePanelDirection = togglePanelDirection;
+window.setGridCols          = setGridCols;
+window.setGridRows          = setGridRows;
 window.togglePanelConfig    = togglePanelConfig;
 window.setPanelType         = setPanelType;
 window.togglePanelStatus    = togglePanelStatus;
@@ -7597,6 +7419,10 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
   mytaskCurrentShared = [];
   mytaskCurrentLinked = [];
   mytaskCurrentStatus = 'todo';
+
+  // DOM 초기화
+  renderMytaskSharedList();
+  renderMytaskLinkedList();
 
   const linkSel = document.getElementById('mytaskLinkSelect');
   linkSel.innerHTML = '<option value="">+ 내 일정 연결...</option>' +
