@@ -2321,7 +2321,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.45</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.48</div>
   </div>
 </div>
 
@@ -2348,6 +2348,9 @@
     </div>
     <div class="tab-item" data-page="schedule">
       <span class="tab-item-icon">📆</span>학사일정
+    </div>
+    <div class="tab-item" data-page="mytask">
+      <span class="tab-item-icon">📑</span>업무캘린더
     </div>
     <div class="tab-item" data-page="timetable">
       <span class="tab-item-icon">📅</span>시간표
@@ -2383,6 +2386,9 @@
       <div class="main-nav-item" data-page="schedule">
         <span class="main-nav-icon">📆</span>학사일정
       </div>
+      <div class="main-nav-item" data-page="mytask" id="navMyTask">
+        <span class="main-nav-icon">📑</span>업무캘린더
+      </div>
       <div class="main-nav-item" data-page="timetable">
         <span class="main-nav-icon">📅</span>시간표
       </div>
@@ -2398,39 +2404,33 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-      <div class="main-nav-item" data-page="mytask" id="navMyTask" style="display:none;">
-        <span class="main-nav-icon">📌</span>업무캘린더
-      </div>
-    <div class="nav-version">ver3.45</div>
+    <div class="nav-version">ver3.48</div>
     </nav>
 
-    <!-- 업무캘린더 패널 추가 버튼 (사이드바 우측 끝, 데스크탑만) -->
-    <div id="addPanelBtn" onclick="addPanelFromNav()" style="display:none;
-      position:fixed;right:0;top:50%;transform:translateY(-50%);
-      z-index:200;cursor:pointer;">
-      <div style="
-        width:18px;height:48px;
-        background:var(--mon);
-        border-radius:8px 0 0 8px;
-        display:flex;align-items:center;justify-content:center;
-        color:#fff;font-size:13px;font-weight:700;
-        box-shadow:-2px 0 8px rgba(59,130,246,0.4);
-        transition:all .15s;
-        position:relative;
-      " onmouseover="this.style.width='22px';this.querySelector('.panel-tooltip').style.opacity=1;this.querySelector('.panel-tooltip').style.transform='translateY(-50%) translateX(0)'"
-         onmouseout="this.style.width='18px';this.querySelector('.panel-tooltip').style.opacity=0;this.querySelector('.panel-tooltip').style.transform='translateY(-50%) translateX(4px)'">
-        ‹
-        <div class="panel-tooltip" style="
-          position:absolute;right:100%;top:50%;
-          transform:translateY(-50%) translateX(4px);
-          background:rgba(30,41,59,0.92);color:#fff;
-          font-size:11px;font-weight:600;white-space:nowrap;
-          padding:4px 8px;border-radius:6px;
-          font-family:'Pretendard','Noto Sans KR';
-          pointer-events:none;opacity:0;
-          transition:all .15s;margin-right:6px;
-        ">패널 추가</div>
+    <!-- 업무캘린더 FAB (우하단 고정) -->
+    <div id="mytaskFAB" style="display:none;position:fixed;right:20px;bottom:80px;z-index:500;">
+      <!-- 펼쳐지는 메뉴 -->
+      <div id="mytaskFABMenu" style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;margin-bottom:10px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;transform:translateY(8px);">
+        <button onclick="addPanelFromNav();closeMytaskFAB();"
+          style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:24px;border:none;
+          background:var(--paper);color:var(--ink);font-size:14px;font-weight:700;cursor:pointer;
+          box-shadow:0 4px 16px rgba(0,0,0,0.15);font-family:'Pretendard','Noto Sans KR';white-space:nowrap;">
+          <span>＋</span> 패널 추가
+        </button>
+        <button onclick="openGroupSettings();closeMytaskFAB();"
+          style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:24px;border:none;
+          background:var(--paper);color:var(--ink);font-size:14px;font-weight:700;cursor:pointer;
+          box-shadow:0 4px 16px rgba(0,0,0,0.15);font-family:'Pretendard','Noto Sans KR';white-space:nowrap;">
+          <span>👥</span> 그룹 설정
+        </button>
       </div>
+      <!-- FAB 메인 버튼 -->
+      <button id="mytaskFABBtn" onclick="toggleMytaskFAB()"
+        style="width:52px;height:52px;border-radius:50%;border:none;
+        background:var(--mon);color:#fff;font-size:22px;cursor:pointer;
+        box-shadow:0 4px 20px rgba(59,130,246,0.4);
+        display:flex;align-items:center;justify-content:center;
+        transition:transform .18s,background .15s;">⚙️</button>
     </div>
 
     <!-- 콘텐츠 영역 -->
@@ -2464,7 +2464,7 @@
             <!-- 진행중인 업무 -->
             <div class="home-section" id="homeTaskSection" style="display:none;">
               <div class="home-section-header home-nav-header" data-goto="mytask" id="homeTaskHeader">
-                <span class="home-section-title">📌 진행중인 업무</span>
+                <span class="home-section-title">📑 진행중인 업무</span>
                 <div style="display:flex;align-items:center;gap:8px;">
                   <button id="homeDoneToggleBtn" onclick="event.stopPropagation();window._toggleHomeShowDone();"
                     style="font-size:12px;padding:4px 12px;border-radius:8px;border:1px solid var(--rule);
@@ -2952,6 +2952,67 @@
       <button class="mytask-btn-delete" id="mytaskDeleteBtn" onclick="deleteMytask()" style="display:none;">삭제</button>
       <button class="mytask-btn-cancel" onclick="closeMytaskModal()">취소</button>
       <button class="mytask-btn-save" id="mytaskSaveBtn" onclick="saveMytask()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 그룹 설정 모달 -->
+<div id="groupSettingsModal" style="display:none;position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;padding:16px;" onclick="closeGroupSettings(event)">
+  <div style="background:var(--paper);border-radius:16px;width:100%;max-width:480px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
+    <!-- 헤더 -->
+    <div style="padding:18px 20px 14px;border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-family:'Pretendard','Noto Sans KR';font-size:17px;font-weight:800;color:var(--ink);">👥 그룹 설정</span>
+      <button onclick="closeGroupSettings()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--ink-soft);padding:4px;">×</button>
+    </div>
+    <!-- 바디 -->
+    <div style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px;">
+      <!-- 기본 그룹 목록 -->
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;margin-bottom:8px;">기본 그룹 (관리자 설정)</div>
+        <div id="groupListDefault" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+      <!-- 내 커스텀 그룹 -->
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;margin-bottom:8px;">내 커스텀 그룹</div>
+        <div id="groupListCustom" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <button onclick="openGroupEditor(null)" style="margin-top:8px;width:100%;padding:10px;border-radius:10px;border:1.5px dashed var(--mon);background:transparent;color:var(--mon);font-size:14px;font-weight:700;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">+ 새 그룹 추가</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 그룹 편집 모달 -->
+<div id="groupEditorModal" style="display:none;position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;padding:16px;" onclick="closeGroupEditor(event)">
+  <div style="background:var(--paper);border-radius:16px;width:100%;max-width:420px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
+    <div style="padding:18px 20px 14px;border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;">
+      <span id="groupEditorTitle" style="font-family:'Pretendard','Noto Sans KR';font-size:17px;font-weight:800;color:var(--ink);">그룹 편집</span>
+      <button onclick="closeGroupEditor()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--ink-soft);">×</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:14px;">
+      <!-- 그룹명 -->
+      <div>
+        <label style="display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;">그룹명</label>
+        <input id="groupEditorName" type="text" placeholder="그룹 이름 입력" maxlength="20"
+          style="width:100%;padding:10px 12px;border:1.5px solid var(--rule);border-radius:8px;font-size:15px;font-family:'Pretendard','Noto Sans KR';background:var(--paper);color:var(--ink);outline:none;box-sizing:border-box;">
+      </div>
+      <!-- 멤버 -->
+      <div>
+        <label style="display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;">멤버</label>
+        <div id="groupEditorMemberChips" style="display:flex;flex-wrap:wrap;gap:6px;min-height:36px;padding:8px;border:1.5px solid var(--rule);border-radius:8px;background:var(--paper);margin-bottom:8px;"></div>
+        <div style="position:relative;">
+          <input id="groupEditorMemberInput" type="text" placeholder="이름으로 검색..."
+            style="width:100%;padding:10px 12px;border:1.5px solid var(--rule);border-radius:8px;font-size:14px;font-family:'Pretendard','Noto Sans KR';background:var(--paper);color:var(--ink);outline:none;box-sizing:border-box;"
+            oninput="searchGroupMember(this.value)" autocomplete="off">
+          <div id="groupMemberSug" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--paper);border:1.5px solid var(--mon);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.15);max-height:160px;overflow-y:auto;margin-top:4px;"></div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:14px 20px;border-top:1px solid var(--rule);display:flex;gap:8px;justify-content:space-between;">
+      <button id="groupEditorDeleteBtn" onclick="deleteCurrentGroup()" style="display:none;padding:10px 16px;border-radius:10px;border:none;background:#FEE2E2;color:#EF4444;font-size:14px;font-weight:700;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">삭제</button>
+      <div style="display:flex;gap:8px;margin-left:auto;">
+        <button onclick="closeGroupEditor()" style="padding:10px 18px;border-radius:10px;border:1.5px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:14px;font-weight:700;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">취소</button>
+        <button onclick="saveGroupEditor()" style="padding:10px 18px;border-radius:10px;border:none;background:var(--mon);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">저장</button>
+      </div>
     </div>
   </div>
 </div>
@@ -4240,10 +4301,8 @@ onAuthStateChanged(fbAuth, async (user) => {
     logoutBtn.style.display = '';
     window._myUid = user.uid;
     appInitialized = true;
-    // 관리자만 업무캘린더 탭 + AI 요약 갱신 버튼 표시
+    // 관리자만 AI 요약 갱신 버튼 표시
     if (user.email === 'pkh910518@yeungnam.hs.kr') {
-      const navMyTask = document.getElementById('navMyTask');
-      if (navMyTask) navMyTask.style.display = '';
       const adminBtn  = document.getElementById('homeAISummaryAdminBtn');
       const adminBtnD = document.getElementById('homeAISummaryAdminBtnD');
       if (adminBtn)  adminBtn.style.display  = 'block';
@@ -4253,10 +4312,8 @@ onAuthStateChanged(fbAuth, async (user) => {
     collectTeacherEmail(user);
     // 학사일정 미리 로딩 (업무 캘린더 학사일정 표시용)
     preloadScheduleData();
-    // 업무 일정 미리 로딩 (관리자)
-    if (user.email === 'pkh910518@yeungnam.hs.kr') {
-      loadMytasks();
-    }
+    // 업무 일정 로딩 (전체)
+    loadMytasks();
   }catch(e){
     setAuthStatus('데이터를 불러오지 못했습니다: ' + e.message + ' (인터넷 연결을 확인하고 새로고침해주세요)', true);
   }
@@ -4413,7 +4470,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
-      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('mytaskFAB')&&(document.getElementById('mytaskFAB').style.display='none');closeMytaskFAB&&closeMytaskFAB(); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
       if(!homeInitialized) initHomePage();
     } else if(page === 'timetable'){
       homePage.classList.remove('active');
@@ -4424,7 +4481,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
-      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('mytaskFAB')&&(document.getElementById('mytaskFAB').style.display='none');closeMytaskFAB&&closeMytaskFAB(); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
       // 시간표 탭 클릭 시 본인 시간표 자동 로드
       const _user = fbAuth.currentUser;
       const _name = (_user?.displayName||'').trim().replace(/\s*(선생님|교사|쌤)/,'');
@@ -4439,7 +4496,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
-      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('mytaskFAB')&&(document.getElementById('mytaskFAB').style.display='none');closeMytaskFAB&&closeMytaskFAB(); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
       if(!weeklyInitialized) initWeeklyPage();
     } else if(page === 'meal'){
       homePage.classList.remove('active');
@@ -4450,7 +4507,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
-      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('mytaskFAB')&&(document.getElementById('mytaskFAB').style.display='none');closeMytaskFAB&&closeMytaskFAB(); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
       if(!mealInitialized) initMealPage();
     } else if(page === 'contacts'){
       homePage.classList.remove('active');
@@ -4461,7 +4518,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
-      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('mytaskFAB')&&(document.getElementById('mytaskFAB').style.display='none');closeMytaskFAB&&closeMytaskFAB(); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
       if(!contactsInitialized) initContactsPage();
     } else if(page === 'students'){
       homePage.classList.remove('active');
@@ -4472,7 +4529,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.add('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.remove('active');
-      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('mytaskFAB')&&(document.getElementById('mytaskFAB').style.display='none');closeMytaskFAB&&closeMytaskFAB(); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
       if(!studentsInitialized) initStudentsPage();
     } else if(page === 'schedule'){
       homePage.classList.remove('active');
@@ -4483,7 +4540,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.add('active');
       pointsPage.classList.remove('active');
-      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('mytaskFAB')&&(document.getElementById('mytaskFAB').style.display='none');closeMytaskFAB&&closeMytaskFAB(); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
       if(!scheduleInitialized) initSchedulePage();
     } else if(page === 'points'){
       homePage.classList.remove('active');
@@ -4494,7 +4551,7 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       studentsPage.classList.remove('active');
       schedulePage.classList.remove('active');
       pointsPage.classList.add('active');
-      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('mytaskFAB')&&(document.getElementById('mytaskFAB').style.display='none');closeMytaskFAB&&closeMytaskFAB(); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
       initPointsPage();
     } else if(page === 'mytask'){
       homePage.classList.remove('active');
@@ -4508,8 +4565,8 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       mytaskPage.classList.add('active');
       initMytaskPage();
       if(window.innerWidth <= 1024) { const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='flex'; }
-      const addPanelBtn = document.getElementById('addPanelBtn');
-      if (addPanelBtn && window.innerWidth > 1024) addPanelBtn.style.display = 'block';
+      const mytaskFABEl = document.getElementById('mytaskFAB');
+      if (mytaskFABEl) mytaskFABEl.style.display = 'flex';
     }
   });
 });
@@ -4557,7 +4614,7 @@ document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(tab => {
     schedulePage.classList.remove('active');
     homePage.classList.remove('active');
     pointsPage.classList.remove('active');
-    if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('addPanelBtn')&&(document.getElementById('addPanelBtn').style.display='none'); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
+    if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('mytaskFAB')&&(document.getElementById('mytaskFAB').style.display='none');closeMytaskFAB&&closeMytaskFAB(); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
     if(page === 'home') { homePage.classList.add('active'); if(!homeInitialized) initHomePage(); else renderHomeTaskSection(); }
     else if(page === 'timetable') { timetablePage.classList.add('active'); }
     else if(page === 'mytask')    { mytaskPage.classList.add('active'); initMytaskPage(); }
@@ -6020,14 +6077,14 @@ function navigateTo(page) {
       const mb = document.getElementById('mytaskMobileBody');
       if(mb) mb.style.display = 'flex';
     }
-    const addPanelBtn = document.getElementById('addPanelBtn');
-    if(addPanelBtn && window.innerWidth > 1024) addPanelBtn.style.display = 'block';
+    const mytaskFABEl = document.getElementById('mytaskFAB');
+    if(mytaskFABEl) mytaskFABEl.style.display = 'flex';
   } else {
     // 다른 탭으로 이동 시 업무캘린더 정리
     const mb = document.getElementById('mytaskMobileBody');
     if(mb) mb.style.display = 'none';
-    const addPanelBtn = document.getElementById('addPanelBtn');
-    if(addPanelBtn) addPanelBtn.style.display = 'none';
+    const mytaskFABEl = document.getElementById('mytaskFAB');
+    if(mytaskFABEl) { mytaskFABEl.style.display = 'none'; }
   }
 }
 
@@ -7712,6 +7769,194 @@ window.addPanelFromNav     = addPanelFromNav;
 window.removePanel         = removePanel;
 window.panelChangeMonth    = panelChangeMonth;
 window.setPanelType        = setPanelType;
+
+// ── FAB 제어 ──────────────────────────────────────
+let _fabOpen = false;
+function toggleMytaskFAB() {
+  _fabOpen = !_fabOpen;
+  const menu = document.getElementById('mytaskFABMenu');
+  const btn  = document.getElementById('mytaskFABBtn');
+  if (!menu) return;
+  if (_fabOpen) {
+    menu.style.opacity = '1';
+    menu.style.pointerEvents = 'auto';
+    menu.style.transform = 'translateY(0)';
+    if (btn) btn.style.transform = 'rotate(90deg)';
+  } else {
+    closeMytaskFAB();
+  }
+}
+function closeMytaskFAB() {
+  _fabOpen = false;
+  const menu = document.getElementById('mytaskFABMenu');
+  const btn  = document.getElementById('mytaskFABBtn');
+  if (menu) { menu.style.opacity='0'; menu.style.pointerEvents='none'; menu.style.transform='translateY(8px)'; }
+  if (btn)  btn.style.transform = 'rotate(0deg)';
+}
+document.addEventListener('click', e => {
+  if (_fabOpen && !e.target.closest('#mytaskFAB')) closeMytaskFAB();
+});
+window.toggleMytaskFAB = toggleMytaskFAB;
+window.closeMytaskFAB  = closeMytaskFAB;
+
+let _groups = { default: [], custom: [] };
+let _groupEditorId = null;
+let _groupEditorMembers = [];
+let _groupEditorScope = 'custom';
+const _IS_ADMIN = () => fbAuth.currentUser?.email === 'pkh910518@yeungnam.hs.kr';
+
+async function loadGroups() {
+  const user = fbAuth.currentUser;
+  if (!user) return;
+  try {
+    const snap = await getDoc(doc(fbDb, 'appdata', 'main'));
+    _groups.default = snap.data()?.taskGroups || [];
+  } catch(e) { _groups.default = []; }
+  try {
+    const snap = await getDocs(collection(fbDb, 'tasks', user.uid, 'groups'));
+    _groups.custom = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch(e) { _groups.custom = []; }
+}
+
+async function openGroupSettings() {
+  await loadGroups();
+  renderGroupList();
+  document.getElementById('groupSettingsModal').style.display = 'flex';
+}
+function closeGroupSettings(e) {
+  if (e && e.target !== document.getElementById('groupSettingsModal')) return;
+  document.getElementById('groupSettingsModal').style.display = 'none';
+}
+function renderGroupList() {
+  const defEl = document.getElementById('groupListDefault');
+  defEl.innerHTML = _groups.default.length === 0
+    ? '<div style="font-size:13px;color:var(--ink-soft);padding:8px 0;">기본 그룹 없음</div>'
+    : _groups.default.map(g => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;background:var(--paper-soft);border:1px solid var(--rule);">
+        <div style="min-width:0;flex:1;">
+          <div style="font-size:14px;font-weight:700;color:var(--ink);">${g.name}</div>
+          <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(g.members||[]).join(', ') || '멤버 없음'}</div>
+        </div>
+        ${_IS_ADMIN() ? `<button onclick="openGroupEditor('${g.id}','default')" style="margin-left:8px;padding:4px 10px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:12px;cursor:pointer;flex-shrink:0;">편집</button>` : ''}
+      </div>`).join('');
+  const cusEl = document.getElementById('groupListCustom');
+  cusEl.innerHTML = _groups.custom.length === 0
+    ? '<div style="font-size:13px;color:var(--ink-soft);padding:8px 0;">커스텀 그룹 없음</div>'
+    : _groups.custom.map(g => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;background:var(--paper-soft);border:1px solid var(--rule);">
+        <div style="min-width:0;flex:1;">
+          <div style="font-size:14px;font-weight:700;color:var(--ink);">${g.name}</div>
+          <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(g.members||[]).join(', ') || '멤버 없음'}</div>
+        </div>
+        <button onclick="openGroupEditor('${g.id}','custom')" style="margin-left:8px;padding:4px 10px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:12px;cursor:pointer;flex-shrink:0;">편집</button>
+      </div>`).join('');
+}
+function openGroupEditor(id, scope='custom') {
+  _groupEditorScope = scope;
+  _groupEditorId = id;
+  const list = scope === 'default' ? _groups.default : _groups.custom;
+  const g = id ? list.find(x => x.id === id) : null;
+  _groupEditorMembers = g ? [...(g.members || [])] : [];
+  document.getElementById('groupEditorTitle').textContent = g ? '그룹 편집' : '새 그룹 추가';
+  document.getElementById('groupEditorName').value = g?.name || '';
+  document.getElementById('groupEditorDeleteBtn').style.display = g ? '' : 'none';
+  document.getElementById('groupEditorMemberInput').value = '';
+  document.getElementById('groupMemberSug').style.display = 'none';
+  renderGroupEditorChips();
+  document.getElementById('groupEditorModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('groupEditorName').focus(), 50);
+}
+function closeGroupEditor(e) {
+  if (e && e.target !== document.getElementById('groupEditorModal')) return;
+  document.getElementById('groupEditorModal').style.display = 'none';
+}
+function renderGroupEditorChips() {
+  const el = document.getElementById('groupEditorMemberChips');
+  el.innerHTML = _groupEditorMembers.map(name =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;background:var(--mon);color:#fff;font-size:13px;font-weight:600;font-family:'Pretendard','Noto Sans KR';">
+      ${name}<button onclick="removeGroupMember('${name}')" style="background:none;border:none;color:#fff;cursor:pointer;font-size:14px;line-height:1;padding:0;opacity:0.8;">×</button>
+    </span>`
+  ).join('');
+}
+function removeGroupMember(name) {
+  _groupEditorMembers = _groupEditorMembers.filter(m => m !== name);
+  renderGroupEditorChips();
+}
+function searchGroupMember(val) {
+  const sug = document.getElementById('groupMemberSug');
+  const q = val.trim();
+  if (!q) { sug.style.display = 'none'; return; }
+  const matches = TEACHERS.filter(t => t.name?.includes(q) && !_groupEditorMembers.includes(t.name)).slice(0, 8);
+  if (!matches.length) { sug.style.display = 'none'; return; }
+  sug.style.display = 'block';
+  sug.innerHTML = matches.map(t =>
+    `<div onclick="addGroupMember('${t.name}')" style="padding:10px 14px;cursor:pointer;font-size:14px;font-family:'Pretendard','Noto Sans KR';border-bottom:1px solid var(--rule);" onmouseover="this.style.background='var(--paper-soft)'" onmouseout="this.style.background=''">
+      ${t.name}
+    </div>`).join('');
+}
+function addGroupMember(name) {
+  if (!_groupEditorMembers.includes(name)) _groupEditorMembers.push(name);
+  document.getElementById('groupEditorMemberInput').value = '';
+  document.getElementById('groupMemberSug').style.display = 'none';
+  renderGroupEditorChips();
+}
+async function saveGroupEditor() {
+  const name = document.getElementById('groupEditorName').value.trim();
+  if (!name) { alert('그룹 이름을 입력하세요'); return; }
+  const user = fbAuth.currentUser;
+  const data = { name, members: _groupEditorMembers, updatedAt: new Date().toISOString() };
+  try {
+    if (_groupEditorScope === 'default' && _IS_ADMIN()) {
+      const snap = await getDoc(doc(fbDb, 'appdata', 'main'));
+      let taskGroups = snap.data()?.taskGroups || [];
+      if (_groupEditorId) {
+        taskGroups = taskGroups.map(g => g.id === _groupEditorId ? { ...g, ...data } : g);
+      } else {
+        taskGroups.push({ id: Date.now().toString(), ...data });
+      }
+      await setDoc(doc(fbDb, 'appdata', 'main'), { taskGroups }, { merge: true });
+      _groups.default = taskGroups;
+    } else {
+      if (_groupEditorId) {
+        await setDoc(doc(fbDb, 'tasks', user.uid, 'groups', _groupEditorId), data);
+        const idx = _groups.custom.findIndex(g => g.id === _groupEditorId);
+        if (idx >= 0) _groups.custom[idx] = { id: _groupEditorId, ...data };
+      } else {
+        const ref = doc(collection(fbDb, 'tasks', user.uid, 'groups'));
+        await setDoc(ref, data);
+        _groups.custom.push({ id: ref.id, ...data });
+      }
+    }
+    document.getElementById('groupEditorModal').style.display = 'none';
+    renderGroupList();
+  } catch(e) { alert('저장 실패: ' + e.message); }
+}
+async function deleteCurrentGroup() {
+  if (!_groupEditorId || !confirm('이 그룹을 삭제할까요?')) return;
+  const user = fbAuth.currentUser;
+  try {
+    if (_groupEditorScope === 'default' && _IS_ADMIN()) {
+      const snap = await getDoc(doc(fbDb, 'appdata', 'main'));
+      const taskGroups = (snap.data()?.taskGroups || []).filter(g => g.id !== _groupEditorId);
+      await setDoc(doc(fbDb, 'appdata', 'main'), { taskGroups }, { merge: true });
+      _groups.default = taskGroups;
+    } else {
+      await deleteDoc(doc(fbDb, 'tasks', user.uid, 'groups', _groupEditorId));
+      _groups.custom = _groups.custom.filter(g => g.id !== _groupEditorId);
+    }
+    document.getElementById('groupEditorModal').style.display = 'none';
+    renderGroupList();
+  } catch(e) { alert('삭제 실패: ' + e.message); }
+}
+window.openGroupSettings  = openGroupSettings;
+window.closeGroupSettings = closeGroupSettings;
+window.openGroupEditor    = openGroupEditor;
+window.closeGroupEditor   = closeGroupEditor;
+window.saveGroupEditor    = saveGroupEditor;
+window.deleteCurrentGroup = deleteCurrentGroup;
+window.addGroupMember     = addGroupMember;
+window.removeGroupMember  = removeGroupMember;
+window.searchGroupMember  = searchGroupMember;
 window.togglePanelStatus   = togglePanelStatus;
 window.setPanelPeriod      = setPanelPeriod;
 window.setPanelDateRange   = setPanelDateRange;
