@@ -2357,7 +2357,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.84</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.86</div>
   </div>
 </div>
 
@@ -2440,7 +2440,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.84</div>
+    <div class="nav-version">ver3.86</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4192,47 +4192,57 @@ window.addEventListener('popstate', (e)=>{
     return;
   }
 
-  // 3. 상벌점 반 목록 뒤로가기 (page보다 먼저)
+  // 3. 상벌점 반 목록 뒤로가기
   if (e.state && e.state.ptsRoom !== undefined) {
+    navigateTo('points');
     backToPtsGroups();
     history.replaceState({ page: 'points' }, '');
-    armExitGuard();
+    history.pushState({ page: 'points', root: true }, '');
+    history.pushState({ page: 'points', root: true }, '');
     return;
   }
 
-  // 4. 학생 연락망 그룹 뒤로가기 (page보다 먼저)
+  // 4. 학생 연락망 그룹 뒤로가기
   if(e.state && e.state.studentsGroup !== undefined) {
+    navigateTo('students');
     renderStudentsGroupList();
     history.replaceState({ page: 'students' }, '');
-    armExitGuard();
+    history.pushState({ page: 'students', root: true }, '');
+    history.pushState({ page: 'students', root: true }, '');
     return;
   }
   if(studentsViewMode === 'list' && !(e.state && (e.state.modalDepth !== undefined || e.state.root))) {
+    navigateTo('students');
     renderStudentsGroupList();
     history.replaceState({ page: 'students' }, '');
-    armExitGuard();
+    history.pushState({ page: 'students', root: true }, '');
+    history.pushState({ page: 'students', root: true }, '');
     return;
   }
 
   // 5. 페이지 뒤로가기
   if (e.state && e.state.page && !e.state.ptsRoom && !e.state.studentsGroup) {
     navigateTo(e.state.page);
-    // points/students 페이지로 돌아오면 그룹 목록 복원
     if (e.state.page === 'points') { backToPtsGroups(); }
     if (e.state.page === 'students') { renderStudentsGroupList(); }
+    if (!e.state.root) {
+      history.pushState({ page: e.state.page, root: true }, '');
+      history.pushState({ page: e.state.page, root: true }, '');
+    }
     return;
   }
 
   // 6. 현재 페이지가 home이 아니면 home으로 (단, 하위 state면 제외)
   if (e.state && (e.state.ptsRoom !== undefined || e.state.studentsGroup !== undefined)) {
-    // 이미 위에서 처리됐어야 하는데 못 잡힌 경우 - 다시 처리
     if (e.state.ptsRoom !== undefined) { backToPtsGroups(); return; }
     if (e.state.studentsGroup !== undefined) { renderStudentsGroupList(); return; }
   }
-  const currentPage = document.querySelector('.page-view.active')?.id;
-  if (currentPage && currentPage !== 'homePage' && !(e.state && e.state.root)) {
+  const currentPage2 = document.querySelector('.page-view.active')?.id;
+  if (currentPage2 && currentPage2 !== 'homePage' && !(e.state && e.state.root)) {
     navigateTo('home');
-    armExitGuard();
+    // guard 두 번 쌓아서 현황판에서 뒤로가기 → 토스트 → 종료 순으로
+    history.pushState({ page: 'home', root: true }, '');
+    history.pushState({ page: 'home', root: true }, '');
     return;
   }
 
