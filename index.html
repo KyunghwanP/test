@@ -159,6 +159,19 @@
   .mobile-tab-bar .tab-item.active{color:var(--mon);border-bottom-color:var(--mon);}
   .mobile-tab-bar .tab-item-icon{font-size:18px;}
 
+  /* 탭바 좌우 스크롤 버튼 (좁은 데스크탑 창) */
+  .tab-bar-wrap{position:relative;}
+  .tab-scroll-btn{
+    position:absolute;top:0;bottom:0;width:32px;
+    display:none;align-items:center;justify-content:center;
+    background:var(--paper);border:none;cursor:pointer;
+    font-size:18px;color:var(--ink-soft);z-index:5;
+  }
+  .tab-scroll-btn.left{left:0;box-shadow:6px 0 8px -4px rgba(0,0,0,0.12);}
+  .tab-scroll-btn.right{right:0;box-shadow:-6px 0 8px -4px rgba(0,0,0,0.12);}
+  .tab-scroll-btn:hover{color:var(--mon);}
+  .tab-bar-wrap.scrollable .tab-scroll-btn{display:flex;}
+
   /* 사이드바가 overlay 모드일 때 탭바 표시 */
   .app-shell:not(.desktop-nav) .mobile-tab-bar{display:flex;}
   /* 데스크톱 모드에서는 탭바 숨김 */
@@ -2357,7 +2370,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.96</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.97</div>
   </div>
 </div>
 
@@ -2375,6 +2388,9 @@
   </header>
 
   <!-- 모바일 탭바 (사이드바가 접힌 상태에서 표시) -->
+  <div class="tab-bar-wrap" id="tabBarWrap">
+    <button class="tab-scroll-btn left" onclick="scrollTabBar(-1)">‹</button>
+    <button class="tab-scroll-btn right" onclick="scrollTabBar(1)">›</button>
   <div class="mobile-tab-bar" id="mobileTabBar">
     <div class="tab-item active" data-page="home">
       <span class="tab-item-icon">🏠</span>현황판
@@ -2403,6 +2419,7 @@
     <div class="tab-item" data-page="meal">
       <span class="tab-item-icon">🍱</span>식단표
     </div>
+  </div>
   </div>
 
   <!-- 앱 바디 -->
@@ -2440,7 +2457,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.96</div>
+    <div class="nav-version">ver3.97</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -2523,9 +2540,13 @@
             </div>
             <!-- 학사일정 -->
             <div class="home-section" id="homeScheduleSection">
-              <div class="home-section-header home-nav-header" data-goto="schedule">
-                <span class="home-section-title">📆 이번달 학사일정</span>
-                <span class="home-section-arrow">›</span>
+              <div class="home-section-header" style="cursor:default;">
+                <span class="home-section-title" id="homeScheduleTitle" onclick="navigateTo('schedule')" style="cursor:pointer;">📆 이번달 학사일정</span>
+                <span style="flex:1;"></span>
+                <button onclick="event.stopPropagation();moveScheduleMonth(-1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">‹</button>
+                <span id="homeScheduleMonthLabel" style="font-size:13px;font-weight:700;color:var(--ink-soft);min-width:48px;text-align:center;"></span>
+                <button onclick="event.stopPropagation();moveScheduleMonth(1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">›</button>
+                <span class="home-section-arrow" onclick="navigateTo('schedule')" style="cursor:pointer;">›</span>
               </div>
               <div class="home-schedule-list" id="homeScheduleList" style="max-height:200px;overflow-y:auto;"></div>
             </div>
@@ -2543,7 +2564,6 @@
                 <button onclick="event.stopPropagation();moveMealDate(-1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">‹</button>
                 <span class="home-section-title" id="homeMealTitle" onclick="navigateTo('meal')" style="cursor:pointer;flex:1;text-align:center;">🍱 오늘 급식</span>
                 <button onclick="event.stopPropagation();moveMealDate(1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">›</button>
-                <span class="home-section-arrow" onclick="navigateTo('meal')" style="cursor:pointer;">›</span>
               </div>
               <div class="home-meal-list home-meal-grid" id="homeMealList"></div>
             </div>
@@ -2568,7 +2588,6 @@
                     <button onclick="event.stopPropagation();moveMealDate(-1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">‹</button>
                     <span class="home-section-title" id="homeMealTitleD" onclick="navigateTo('meal')" style="cursor:pointer;flex:1;text-align:center;">🍱 오늘 급식</span>
                     <button onclick="event.stopPropagation();moveMealDate(1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">›</button>
-                    <span class="home-section-arrow" onclick="navigateTo('meal')" style="cursor:pointer;">›</span>
                   </div>
                   <div class="home-meal-list home-meal-grid" id="homeMealListD" style="flex:1;"></div>
                 </div>
@@ -6020,41 +6039,9 @@ async function initHomePage() {
 
   // ── 이번주 업무일정 ──
   renderHomeTaskSection();
-  try {
-    const snap = await getDoc(doc(fbDb, 'schedule', 'main'));
-    const schedData = snap.exists() ? (snap.data().data || {}) : {};
-    const monthKey = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
-    const events = (schedData[monthKey] || []);
-    const schedHtml = events.length
-      ? events.map(e => `<div class="home-schedule-item${e.date === today.getDate() ? ' today' : ''}" data-day="${e.date}">
-          <span class="home-schedule-date">${e.date}일</span>
-          <span class="home-schedule-content">${e.content}</span>
-        </div>`).join('')
-      : '<div class="home-schedule-empty">이번 달 학사일정 없음</div>';
-    const listEl = document.getElementById('homeScheduleList');
-    listEl.innerHTML = schedHtml;
-    // 오늘 날짜 항목으로 스크롤 중앙 정렬
-    const todayEl = listEl.querySelector('.home-schedule-item.today')
-      || listEl.querySelector(`.home-schedule-item[data-day="${today.getDate()}"]`)
-      || (() => {
-          // 오늘 일정 없으면 오늘 날짜에 가장 가까운 앞뒤 항목 중간
-          const items = [...listEl.querySelectorAll('.home-schedule-item[data-day]')];
-          const todayD = today.getDate();
-          const after = items.find(el => parseInt(el.dataset.day) >= todayD);
-          return after || items[Math.floor(items.length / 2)];
-        })();
-    if (todayEl) {
-      requestAnimationFrame(() => {
-        const listH = listEl.offsetHeight;
-        const itemTop = todayEl.offsetTop;
-        const itemH = todayEl.offsetHeight;
-        listEl.scrollTop = itemTop - listH / 2 + itemH / 2;
-      });
-    }
-  } catch(e) {
-    document.getElementById('homeScheduleList').innerHTML = '<div class="home-schedule-empty">불러오기 실패</div>';
-  }
-  document.getElementById('homeScheduleSection').querySelector('.home-nav-header')?.addEventListener('click', () => navigateTo('schedule'));
+  // 학사일정 (월 네비 지원)
+  loadHomeSchedule(0);
+  document.getElementById('homeScheduleSection').querySelector('.home-section-title')?.addEventListener('click', () => navigateTo('schedule'));
   document.querySelector('#homeAISummarySection .home-nav-header')?.addEventListener('click', () => navigateTo('weekly'));
   document.querySelector('#homeAISummarySectionD .home-nav-header')?.addEventListener('click', () => navigateTo('weekly'));
   document.querySelector('#homeTaskSection .home-nav-header')?.addEventListener('click', () => navigateTo('mytask'));
@@ -6158,6 +6145,91 @@ function moveMealDate(dir) {
 }
 window.loadHomeMeal = loadHomeMeal;
 window.moveMealDate = moveMealDate;
+
+// ── 현황판 학사일정 (월 네비) ──
+let _scheduleOffset = 0; // 0=이번달, -1=지난달, +1=다음달
+
+async function loadHomeSchedule(offset) {
+  _scheduleOffset = offset;
+  const base = new Date();
+  base.setDate(1);
+  base.setMonth(base.getMonth() + offset);
+  const y = base.getFullYear();
+  const m = base.getMonth() + 1;
+  const monthKey = `${y}-${String(m).padStart(2,'0')}`;
+
+  // 제목/라벨
+  const titleEl = document.getElementById('homeScheduleTitle');
+  const labelEl = document.getElementById('homeScheduleMonthLabel');
+  if (titleEl) titleEl.textContent = offset === 0 ? '📆 이번달 학사일정' : '📆 학사일정';
+  if (labelEl) labelEl.textContent = `${m}월`;
+
+  const listEl = document.getElementById('homeScheduleList');
+  if (!listEl) return;
+
+  try {
+    const snap = await getDoc(doc(fbDb, 'schedule', 'main'));
+    const schedData = snap.exists() ? (snap.data().data || {}) : {};
+    const events = (schedData[monthKey] || []);
+    const now = new Date();
+    const isThisMonth = (y === now.getFullYear() && m === now.getMonth()+1);
+    const todayD = now.getDate();
+
+    listEl.innerHTML = events.length
+      ? events.map(e => `<div class="home-schedule-item${isThisMonth && e.date === todayD ? ' today' : ''}" data-day="${e.date}">
+          <span class="home-schedule-date">${e.date}일</span>
+          <span class="home-schedule-content">${e.content}</span>
+        </div>`).join('')
+      : '<div class="home-schedule-empty">학사일정 없음</div>';
+
+    // 이번달이면 오늘 위치로 스크롤 중앙 정렬
+    if (isThisMonth) {
+      const todayEl = listEl.querySelector('.home-schedule-item.today')
+        || (() => {
+            const items = [...listEl.querySelectorAll('.home-schedule-item[data-day]')];
+            const after = items.find(el => parseInt(el.dataset.day) >= todayD);
+            return after || items[Math.floor(items.length / 2)];
+          })();
+      if (todayEl) {
+        requestAnimationFrame(() => {
+          listEl.scrollTop = todayEl.offsetTop - listEl.offsetHeight / 2 + todayEl.offsetHeight / 2;
+        });
+      }
+    } else {
+      listEl.scrollTop = 0;
+    }
+  } catch(e) {
+    listEl.innerHTML = '<div class="home-schedule-empty">불러오기 실패</div>';
+  }
+}
+
+function moveScheduleMonth(dir) {
+  loadHomeSchedule(_scheduleOffset + dir);
+}
+window.loadHomeSchedule  = loadHomeSchedule;
+window.moveScheduleMonth = moveScheduleMonth;
+
+// ── 탭바 가로 스크롤 (좁은 데스크탑 창) ──
+function scrollTabBar(dir) {
+  const bar = document.getElementById('mobileTabBar');
+  if (bar) bar.scrollBy({ left: dir * 150, behavior: 'smooth' });
+}
+window.scrollTabBar = scrollTabBar;
+
+function updateTabBarScrollable() {
+  const wrap = document.getElementById('tabBarWrap');
+  const bar  = document.getElementById('mobileTabBar');
+  if (!wrap || !bar) return;
+  // 내용이 넘쳐서 스크롤 가능하면 버튼 표시
+  if (bar.scrollWidth > bar.clientWidth + 4) {
+    wrap.classList.add('scrollable');
+  } else {
+    wrap.classList.remove('scrollable');
+  }
+}
+window.addEventListener('resize', updateTabBarScrollable);
+// 초기 1회 + 약간의 지연 후 (레이아웃 안정화)
+setTimeout(updateTabBarScrollable, 500);
 
 async function fetchWeather() {
   const url = 'https://api.open-meteo.com/v1/forecast?latitude=35.87&longitude=128.60' +
