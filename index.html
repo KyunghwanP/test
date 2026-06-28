@@ -1469,7 +1469,7 @@
     transform:scale(0.95);transition:transform 0.18s ease;
   }
   .modal-overlay.open .modal-box{transform:scale(1);}
-  .modal-overlay.wide .modal-box{max-width:min(1400px, 96vw);height:auto;max-height:92vh;}
+  .modal-overlay.wide .modal-box{max-width:min(1400px, 96vw);height:92vh;max-height:92vh;overflow:hidden;}
   .modal-overlay.medium .modal-box{max-width:min(900px, 92vw);height:auto;max-height:92vh;}
   /* 모달 내부 레이아웃 */
   .modal-inner{
@@ -2357,7 +2357,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.74</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.76</div>
   </div>
 </div>
 
@@ -2440,7 +2440,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.74</div>
+    <div class="nav-version">ver3.76</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3116,7 +3116,7 @@
 <div class="modal-overlay" id="swapModal">
   <div class="modal-box" style="display:flex;flex-direction:column;">
     <button class="modal-close" id="swapModalClose" style="position:absolute;top:14px;right:16px;z-index:10;">×</button>
-    <div id="swapModalBody" style="flex:1;overflow:hidden;display:flex;flex-direction:column;padding:26px 24px 22px;"></div>
+    <div id="swapModalBody" style="flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;padding:26px 24px 22px;"></div>
   </div>
 </div>
 
@@ -6032,12 +6032,31 @@ async function initHomePage() {
     const monthKey = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
     const events = (schedData[monthKey] || []);
     const schedHtml = events.length
-      ? events.map(e => `<div class="home-schedule-item${e.date === today.getDate() ? ' today' : ''}">
+      ? events.map(e => `<div class="home-schedule-item${e.date === today.getDate() ? ' today' : ''}" data-day="${e.date}">
           <span class="home-schedule-date">${e.date}일</span>
           <span class="home-schedule-content">${e.content}</span>
         </div>`).join('')
       : '<div class="home-schedule-empty">이번 달 학사일정 없음</div>';
-    document.getElementById('homeScheduleList').innerHTML = schedHtml;
+    const listEl = document.getElementById('homeScheduleList');
+    listEl.innerHTML = schedHtml;
+    // 오늘 날짜 항목으로 스크롤 중앙 정렬
+    const todayEl = listEl.querySelector('.home-schedule-item.today')
+      || listEl.querySelector(`.home-schedule-item[data-day="${today.getDate()}"]`)
+      || (() => {
+          // 오늘 일정 없으면 오늘 날짜에 가장 가까운 앞뒤 항목 중간
+          const items = [...listEl.querySelectorAll('.home-schedule-item[data-day]')];
+          const todayD = today.getDate();
+          const after = items.find(el => parseInt(el.dataset.day) >= todayD);
+          return after || items[Math.floor(items.length / 2)];
+        })();
+    if (todayEl) {
+      requestAnimationFrame(() => {
+        const listH = listEl.offsetHeight;
+        const itemTop = todayEl.offsetTop;
+        const itemH = todayEl.offsetHeight;
+        listEl.scrollTop = itemTop - listH / 2 + itemH / 2;
+      });
+    }
   } catch(e) {
     document.getElementById('homeScheduleList').innerHTML = '<div class="home-schedule-empty">불러오기 실패</div>';
   }
