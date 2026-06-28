@@ -2357,7 +2357,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.91</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.92</div>
   </div>
 </div>
 
@@ -2440,7 +2440,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.91</div>
+    <div class="nav-version">ver3.92</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -2831,7 +2831,7 @@
               <div id="ptsStudentListWrap" style="display:none;">
                 <!-- 뒤로가기 -->
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                  <button onclick="backToPtsGroups();history.replaceState({page:'points',root:true},'');" style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--rule);background:var(--paper);cursor:pointer;font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;color:var(--ink-soft);">← 목록으로</button>
+                  <button onclick="history.back()" style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--rule);background:var(--paper);cursor:pointer;font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;color:var(--ink-soft);">← 목록으로</button>
                   <span id="ptsCurrentRoom" style="font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:16px;color:var(--ink);"></span>
                 </div>
                 <div class="pts-list-header">
@@ -4186,56 +4186,49 @@ window.addEventListener('popstate', (e)=>{
     return;
   }
 
-  // 3. 상벌점 반 → 그룹 목록
+  // 3. 상벌점 명단 → 그룹 목록
   if (st.ptsRoom !== undefined) {
-    navigateTo('points');
     backToPtsGroups();
     return;
   }
 
   // 4. 학생연락망 그룹 → 목록
   if (st.studentsGroup !== undefined) {
-    navigateTo('students');
     renderStudentsGroupList();
     return;
   }
 
-  // 5. 일반 페이지 state → home이면 토스트, 아니면 현황판으로
-  if (st.page === 'home') {
-    if (st.root) {
-      // 현황판 root → 종료 토스트
+  // 5. 일반 페이지 뒤로가기
+  if (st.page) {
+    const activeId = document.querySelector('.page-view.active')?.id;
+
+    // 현황판에서 root 뒤로가기 → 종료 토스트
+    if (st.page === 'home' && st.root) {
       showExitToast();
       clearTimeout(exitArmTimer);
       exitArmTimer = setTimeout(() => { armExitGuard(); }, 2000);
-    } else {
-      navigateTo('home');
-      armExitGuard();
+      return;
     }
-    return;
-  }
 
-  // 6. 다른 페이지 state
-  if (st.page) {
-    // points 탭인데 명단 보고 있으면 → 그룹 목록
+    // 현황판으로 복원
+    navigateTo(st.page);
+
+    // 상벌점 탭인데 명단 보고있으면 → 그룹으로
     if (st.page === 'points' && document.getElementById('ptsStudentListWrap')?.style.display !== 'none') {
-      navigateTo('points');
       backToPtsGroups();
-      return;
     }
-    // students 탭인데 그룹 내 학생 보고 있으면 → 그룹 목록
+    // 학생연락망 탭인데 목록 보고있으면 → 그룹으로
     if (st.page === 'students' && studentsViewMode === 'list') {
-      navigateTo('students');
       renderStudentsGroupList();
-      return;
     }
-    // 그 외 → 현황판
-    navigateTo('home');
+
     armExitGuard();
     return;
   }
 
-  // 7. state 없음 → 현황판 or 토스트
-  if (document.querySelector('.page-view.active')?.id === 'homePage') {
+  // 6. 아무 state도 없음 → 현황판이면 토스트, 아니면 현황판으로
+  const activeId = document.querySelector('.page-view.active')?.id;
+  if (activeId === 'homePage') {
     showExitToast();
     clearTimeout(exitArmTimer);
     exitArmTimer = setTimeout(() => { armExitGuard(); }, 2000);
@@ -5588,7 +5581,7 @@ function renderStudentsGroupList() {
     card.addEventListener('click', () => {
       const type = card.dataset.type;
       const key  = card.dataset.key;
-      history.replaceState({ page: 'students', studentsGroup: {type, key} }, '');
+      history.pushState({ page: 'students', studentsGroup: {type, key} }, '');
       if(type === 'class') {
         const [grade, room] = key.split('-');
         renderStudentsInGroup({type:'class', key, label:`${grade}학년 ${room}반`});
@@ -5652,8 +5645,7 @@ function renderStudentsInGroup(group) {
     }).join('')}`;
 
   document.getElementById('sgBackBtn').addEventListener('click', () => {
-    renderStudentsGroupList();
-    history.replaceState({ page: 'students', root: true }, '');
+    history.back();
   });
 
   list.querySelectorAll('.student-card').forEach(card => {
@@ -7039,7 +7031,7 @@ function selectPtsRoom(key) {
   ptsCurrentStudents = students;
   ptsSortKey = null;
   renderPtsStudentList(students);
-  history.replaceState({ page: 'points', ptsRoom: key }, '');
+  history.pushState({ page: 'points', ptsRoom: key }, '');
 }
 
 function backToPtsGroups() {
