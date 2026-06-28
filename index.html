@@ -2338,7 +2338,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.52</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.59</div>
   </div>
 </div>
 
@@ -2421,7 +2421,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.52</div>
+    <div class="nav-version">ver3.59</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -2433,6 +2433,12 @@
           background:var(--paper);color:var(--ink);font-size:14px;font-weight:700;cursor:pointer;
           box-shadow:0 4px 16px rgba(0,0,0,0.15);font-family:'Pretendard','Noto Sans KR';white-space:nowrap;">
           <span>＋</span> 패널 추가
+        </button>
+        <button onclick="togglePanelEditMode();closeMytaskFAB();" id="fabPanelEditBtn"
+          style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:24px;border:none;
+          background:var(--paper);color:var(--ink);font-size:14px;font-weight:700;cursor:pointer;
+          box-shadow:0 4px 16px rgba(0,0,0,0.15);font-family:'Pretendard','Noto Sans KR';white-space:nowrap;">
+          <span>✏️</span> 패널 편집
         </button>
         <button onclick="openGroupSettings();closeMytaskFAB();"
           style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:24px;border:none;
@@ -3016,7 +3022,7 @@
 
 <!-- 그룹 편집 모달 -->
 <div id="groupEditorModal" style="display:none;position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;padding:16px;" onclick="closeGroupEditor(event)">
-  <div style="background:var(--paper);border-radius:16px;width:100%;max-width:540px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
+  <div style="background:var(--paper);border-radius:16px;width:100%;max-width:600px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
     <div style="padding:22px 24px 16px;border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;">
       <span id="groupEditorTitle" style="font-family:'Pretendard','Noto Sans KR';font-size:20px;font-weight:800;color:var(--ink);">그룹 편집</span>
       <button onclick="closeGroupEditor()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--ink-soft);">×</button>
@@ -3036,8 +3042,10 @@
         <div style="position:relative;">
           <input id="groupEditorMemberInput" type="text" placeholder="이름으로 검색..."
             style="width:100%;padding:13px 14px;border:1.5px solid var(--rule);border-radius:10px;font-size:15px;font-family:'Pretendard','Noto Sans KR';background:var(--paper);color:var(--ink);outline:none;box-sizing:border-box;"
-            oninput="searchGroupMember(this.value)" autocomplete="off">
-          <div id="groupMemberSug" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--paper);border:1.5px solid var(--mon);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.15);max-height:200px;overflow-y:auto;margin-top:4px;"></div>
+            oninput="searchGroupMember(this.value)"
+            onkeydown="handleGroupMemberKey(event)"
+            autocomplete="off">
+          <div id="groupMemberSug" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:1300;background:var(--paper);border:1.5px solid var(--mon);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.15);max-height:220px;overflow-y:auto;margin-top:4px;"></div>
         </div>
       </div>
     </div>
@@ -4348,6 +4356,7 @@ onAuthStateChanged(fbAuth, async (user) => {
     preloadScheduleData();
     // 업무 일정 로딩 (전체)
     loadMytasks();
+    loadGroups();
   }catch(e){
     setAuthStatus('데이터를 불러오지 못했습니다: ' + e.message + ' (인터넷 연결을 확인하고 새로고침해주세요)', true);
   }
@@ -5781,6 +5790,7 @@ function renderSchedule(monthKey) {
         : [];
       cell.addEventListener('contextmenu', e => {
         e.preventDefault();
+        e.stopPropagation();
         dp.showPopup(items, dateLabel, e.clientX, e.clientY);
       });
       cell.addEventListener('touchstart', e => dp.startLong(items, dateLabel, e), { passive: false });
@@ -7202,48 +7212,51 @@ function renderRows() {
               <button onclick="togglePanelChips(this)"
                 style="padding:4px 12px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:13px;cursor:pointer;white-space:nowrap;min-height:28px;"
                 title="칩 숨기기">${panel.chipsHidden?'▼':'▲'}</button>
-              <div class="panel-actions" style="display:none;gap:3px;">
-                <button onclick="removePanel(${row.id},${panel.id})" style="width:28px;height:28px;border-radius:50%;border:none;background:#FEE2E2;color:#EF4444;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,0.15);" title="패널 삭제">×</button>
-              </div>
+              <button class="panel-delete-btn" onclick="removePanel(${row.id},${panel.id})"
+                style="display:none;width:28px;height:28px;border-radius:50%;border:none;background:#FEE2E2;color:#EF4444;font-size:16px;font-weight:700;cursor:pointer;align-items:center;justify-content:center;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,0.15);margin-left:4px;"
+                title="패널 삭제">×</button>
             </div>
           </div>
           <!-- 칩 영역 - 도트 필터는 여기에 -->
-          ${panel.chipsHidden ? `
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-            <div style="display:flex;gap:5px;align-items:center;">
-              ${[{s:'todo',c:'#6366F1'},{s:'doing',c:'#F59E0B'},{s:'done',c:'#10B981'}].map(({s,c}) => {
-                const on = panel.filters.status.includes(s);
-                return `<div onclick="event.stopPropagation();togglePanelStatus(${row.id},${panel.id},'${s}')"
-                  style="width:16px;height:16px;border-radius:50%;background:${c};cursor:pointer;
-                  opacity:${on?1:0.2};transition:opacity .15s;flex-shrink:0;"
-                  title="${s==='todo'?'시작전':s==='doing'?'진행중':'완료'}"></div>`;
-              }).join('')}
-              ${panel.type==='calendar' ? `<div onclick="event.stopPropagation();togglePanelSchedule(${row.id},${panel.id})"
-                style="width:16px;height:16px;border-radius:3px;background:#EF4444;cursor:pointer;
-                opacity:${panel.showSchedule?1:0.2};transition:opacity .15s;flex-shrink:0;
-                display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700;"
-                title="학사일정">학</div>` : ''}
-            </div>
-          </div>` : ''}
+          ${panel.chipsHidden ? (() => {
+            const dotHtml = [{s:'todo',c:'#6366F1'},{s:'doing',c:'#F59E0B'},{s:'done',c:'#10B981'}].map(({s,c}) => {
+              const on = panel.filters.status.includes(s);
+              const label = s==='todo'?'시작전':s==='doing'?'진행중':'완료';
+              return '<div onclick="event.stopPropagation();togglePanelStatus('+row.id+','+panel.id+',\''+s+'\')"'
+                + ' style="width:16px;height:16px;border-radius:50%;background:'+c+';cursor:pointer;'
+                + 'opacity:'+(on?1:0.2)+';transition:opacity .15s;flex-shrink:0;"'
+                + ' title="'+label+'"></div>';
+            }).join('');
+            const schedDot = panel.type==='calendar'
+              ? '<div onclick="event.stopPropagation();togglePanelSchedule('+row.id+','+panel.id+')"'
+                + ' style="width:16px;height:16px;border-radius:3px;background:#EF4444;cursor:pointer;'
+                + 'opacity:'+(panel.showSchedule?1:0.2)+';transition:opacity .15s;flex-shrink:0;'
+                + 'display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700;"'
+                + ' title="학사일정">학</div>'
+              : '';
+            return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
+              + '<div style="display:flex;gap:5px;align-items:center;">'+dotHtml+schedDot+'</div></div>';
+          })() : ''}
           <div class="panel-chips-wrap" style="display:${panel.chipsHidden?'none':'block'};">
-            <div class="mytask-filters" style="margin-bottom:${panel.type==='list'?'6px':'0'};">
+            <div class="mytask-filters" style="flex-wrap:nowrap;overflow-x:auto;margin-bottom:${panel.type==='list'?'6px':'0'};">
               <button class="mytask-filter-btn ${panel.filters.status.includes('todo')?'active f-todo':''}" onclick="togglePanelStatus(${row.id},${panel.id},'todo')">🔵 시작전</button>
               <button class="mytask-filter-btn ${panel.filters.status.includes('doing')?'active f-doing':''}" onclick="togglePanelStatus(${row.id},${panel.id},'doing')">🟡 진행중</button>
               <button class="mytask-filter-btn ${panel.filters.status.includes('done')?'active f-done':''}" onclick="togglePanelStatus(${row.id},${panel.id},'done')">🟢 완료</button>
               ${panel.type==='calendar' ? '<button class="mytask-filter-btn '+(panel.showSchedule?'active':'')+'" onclick="togglePanelSchedule('+row.id+','+panel.id+')">📆 학사일정</button>' : ''}
             </div>
-            ${panel.type==='list' ? '<div class="mytask-filters">'+periodOpts.map(o=>'<button class="mytask-filter-btn '+(panel.period===o.v?'active':'')+'" onclick="setPanelPeriod('+row.id+','+panel.id+',\''+o.v+'\')">'+ o.l+'</button>').join('')+'</div>' : ''}
+            ${panel.type==='list' ? '<div class="mytask-filters" style="flex-wrap:nowrap;overflow-x:auto;">'+periodOpts.map(o=>'<button class="mytask-filter-btn '+(panel.period===o.v?'active':'')+'" onclick="setPanelPeriod('+row.id+','+panel.id+',\''+o.v+'\')">'+ o.l+'</button>').join('')+'</div>' : ''}
           </div>
         </div>
         <div class="mytask-panel-content" id="pc_${panel.id}" style="flex:1;overflow-y:auto;height:0;display:flex;flex-direction:column;"></div>
       `;
 
-      // 패널 호버 시 × 버튼 표시
-      const actions = panelEl.querySelector('.panel-actions');
-      panelEl.addEventListener('mouseenter', () => actions.style.display = 'flex');
-      panelEl.addEventListener('mouseleave', () => actions.style.display = 'none');
       rowEl.appendChild(panelEl);
       panelEls.push(panelEl);
+      // 편집모드 상태 복원
+      if (_panelEditMode) {
+        const delBtn = panelEl.querySelector('.panel-delete-btn');
+        if (delBtn) delBtn.style.display = 'flex';
+      }
     });
 
     // 핸들에 드래그 설정 (패널 el 다 생성 후)
@@ -7641,13 +7654,6 @@ window.renderHomeTaskSection = renderHomeTaskSection;
   // 스크롤하면 숨기기
   document.addEventListener('scroll', hidePopup, true);
 
-  // 안드로이드 크롬 롱프레스 컨텍스트 메뉴 차단
-  document.addEventListener('contextmenu', e => {
-    if (e.target.closest('.panel-cal-cell, .sc-cal-cell')) {
-      e.preventDefault();
-    }
-  });
-
   window._dayPreview = { showPopup, hidePopup,
     startLong(items, dateLabel, e) {
       clearTimeout(_longTimer);
@@ -7751,6 +7757,7 @@ function bindDayPreview(calEl, tasks, panel) {
     // 데스크탑: 우클릭
     cell.addEventListener('contextmenu', e => {
       e.preventDefault();
+      e.stopPropagation();
       dp.showPopup(items, dateLabel, e.clientX, e.clientY);
     });
     // 모바일: 롱프레스
@@ -7829,6 +7836,22 @@ window.setPanelType        = setPanelType;
 
 // ── FAB 제어 ──────────────────────────────────────
 let _fabOpen = false;
+// ── 패널 편집 모드 ──────────────────────────────────
+let _panelEditMode = false;
+function togglePanelEditMode() {
+  _panelEditMode = !_panelEditMode;
+  const btn = document.getElementById('fabPanelEditBtn');
+  if (btn) {
+    btn.style.background = _panelEditMode ? '#FEE2E2' : 'var(--paper)';
+    btn.style.color = _panelEditMode ? '#EF4444' : 'var(--ink)';
+    btn.innerHTML = _panelEditMode ? '<span>✕</span> 편집 종료' : '<span>✏️</span> 패널 편집';
+  }
+  document.querySelectorAll('.panel-delete-btn').forEach(b => {
+    b.style.display = _panelEditMode ? 'flex' : 'none';
+  });
+}
+window.togglePanelEditMode = togglePanelEditMode;
+
 function toggleMytaskFAB() {
   _fabOpen = !_fabOpen;
   const menu = document.getElementById('mytaskFABMenu');
@@ -7960,10 +7983,27 @@ function searchGroupMember(val) {
   if (!matches.length) { sug.style.display = 'none'; return; }
   sug.style.display = 'block';
   sug.innerHTML = matches.map(t =>
-    `<div onclick="addGroupMember('${t.name}')" style="padding:10px 14px;cursor:pointer;font-size:14px;font-family:'Pretendard','Noto Sans KR';border-bottom:1px solid var(--rule);" onmouseover="this.style.background='var(--paper-soft)'" onmouseout="this.style.background=''">
+    `<div onclick="addGroupMember('${t.name}')" data-name="${t.name}" style="padding:10px 14px;cursor:pointer;font-size:14px;font-family:'Pretendard','Noto Sans KR';border-bottom:1px solid var(--rule);" onmouseover="this.style.background='var(--paper-soft)'" onmouseout="this.style.background=''">
       ${t.name}
     </div>`).join('');
 }
+function handleGroupMemberKey(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const sug = document.getElementById('groupMemberSug');
+    const first = sug?.querySelector('div[data-name]');
+    if (first) {
+      addGroupMember(first.dataset.name);
+    } else {
+      // 정확히 일치하는 이름이 있으면 직접 추가
+      const q = document.getElementById('groupEditorMemberInput').value.trim();
+      const t = TEACHERS.find(t => t.name === q);
+      if (t) addGroupMember(t.name);
+    }
+  }
+}
+window.handleGroupMemberKey = handleGroupMemberKey;
+
 function addGroupMember(name) {
   if (!_groupEditorMembers.includes(name)) _groupEditorMembers.push(name);
   document.getElementById('groupEditorMemberInput').value = '';
@@ -8457,24 +8497,65 @@ function searchMytaskShare(val) {
   const myName = user?.displayName || '';
   const q = val.trim();
   if (!q) { sug.style.display = 'none'; return; }
-  const matches = TEACHERS.filter(t =>
+
+  // 그룹 검색 (기본 + 커스텀)
+  const allGroups = [...(_groups.default||[]), ...(_groups.custom||[])];
+  const groupMatches = allGroups.filter(g => g.name?.includes(q));
+
+  // 교사 검색
+  const teacherMatches = TEACHERS.filter(t =>
     t.name?.includes(q) &&
     t.name !== myName &&
     !mytaskCurrentShared.includes(t.email || t.name)
-  ).slice(0, 8);
-  if (matches.length === 0) { sug.style.display = 'none'; return; }
-  sug.innerHTML = matches.map(t =>
-    `<div data-val="${t.email || t.name}" data-name="${t.name}"
-      style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--rule);"
-      onmousedown="selectMytaskShare('${t.email || t.name}','${t.name}')"
-      onmouseover="this.style.background='var(--paper-soft)'"
-      onmouseout="this.style.background=''">
-      ${t.name} <span style="font-size:12px;color:var(--ink-soft);">${t.subject||''}</span>
-      ${t.email ? '<span style="font-size:10px;color:#10B981;margin-left:4px;">✓</span>' : ''}
-    </div>`
-  ).join('');
+  ).slice(0, 6);
+
+  if (groupMatches.length === 0 && teacherMatches.length === 0) {
+    sug.style.display = 'none'; return;
+  }
+
+  const paperSoft = 'var(--paper-soft)';
+  const groupHtml = groupMatches.map(g => {
+    const memberPreview = (g.members||[]).slice(0,4).join(', ') + ((g.members||[]).length>4 ? ' 외 '+((g.members||[]).length-4)+'명' : '');
+    const gid = g.id || g.name;
+    return '<div style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:8px;"'
+      + ' onmousedown="selectMytaskShareGroup(\'' + gid + '\')"'
+      + ' onmouseover="this.style.background=\'var(--paper-soft)\'"'
+      + ' onmouseout="this.style.background=\'\'">  '
+      + '<span style="font-size:16px;">👥</span>'
+      + '<div><div style="font-weight:700;">' + g.name + '</div>'
+      + '<div style="font-size:11px;color:var(--ink-soft);">' + memberPreview + '</div></div></div>';
+  }).join('');
+
+  const teacherHtml = teacherMatches.map(t => {
+    const val = t.email || t.name;
+    return '<div data-val="' + val + '" data-name="' + t.name + '"'
+      + ' style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--rule);"'
+      + ' onmousedown="selectMytaskShare(\'' + val + '\',\'' + t.name + '\')"'
+      + ' onmouseover="this.style.background=\'var(--paper-soft)\'"'
+      + ' onmouseout="this.style.background=\'\'"> '
+      + t.name + ' <span style="font-size:12px;color:var(--ink-soft);">' + (t.subject||'') + '</span>'
+      + (t.email ? '<span style="font-size:10px;color:#10B981;margin-left:4px;">✓</span>' : '')
+      + '</div>';
+  }).join('');
+
+  sug.innerHTML = groupHtml + teacherHtml;
   sug.style.display = 'block';
 }
+
+function selectMytaskShareGroup(groupIdOrName) {
+  const allGroups = [...(_groups.default||[]), ...(_groups.custom||[])];
+  const g = allGroups.find(g => g.id === groupIdOrName || g.name === groupIdOrName);
+  if (!g) return;
+  (g.members || []).forEach(name => {
+    const t = TEACHERS.find(t => t.name === name);
+    const val = t?.email || name;
+    if (!mytaskCurrentShared.includes(val)) mytaskCurrentShared.push(val);
+  });
+  renderMytaskSharedList();
+  document.getElementById('mytaskShareInput').value = '';
+  document.getElementById('mytaskShareSug').style.display = 'none';
+}
+window.selectMytaskShareGroup = selectMytaskShareGroup;
 
 function selectMytaskShare(val, name) {
   if (!mytaskCurrentShared.includes(val)) {
