@@ -145,7 +145,9 @@
     scrollbar-width:none;
     -webkit-overflow-scrolling:touch;
   }
-  .mobile-tab-bar::-webkit-scrollbar{display:none;}
+  /* FAB 모바일: 탭바 위로 */
+  .app-shell:not(.desktop-nav) #mytaskFAB { bottom: calc(56px + 12px) !important; }
+  .app-shell.desktop-nav #mytaskFAB { bottom: 16px; }
   .mobile-tab-bar .tab-item{
     flex:0 0 auto;
     display:flex;flex-direction:column;align-items:center;
@@ -492,6 +494,10 @@
   .mytask-filters{
     display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;
   }
+  .mytask-filters.nowrap{
+    flex-wrap:nowrap;overflow-x:auto;margin-bottom:0;
+  }
+  .mytask-filters.nowrap::-webkit-scrollbar{display:none;}
   .mytask-filter-btn{
     padding:5px 14px;border-radius:20px;border:1.5px solid var(--rule);
     background:var(--paper);color:var(--ink-soft);
@@ -2343,7 +2349,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.60</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.64</div>
   </div>
 </div>
 
@@ -2426,39 +2432,41 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.60</div>
+    <div class="nav-version">ver3.64</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
-    <div id="mytaskFAB" style="display:none;position:fixed;right:20px;bottom:80px;z-index:500;">
+    <div id="mytaskFAB" style="display:none;position:fixed;right:16px;bottom:16px;z-index:500;">
       <!-- 펼쳐지는 메뉴 -->
       <div id="mytaskFABMenu" style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;margin-bottom:10px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;transform:translateY(8px);">
         <button onclick="addPanelFromNav();closeMytaskFAB();"
-          style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:24px;border:none;
-          background:var(--paper);color:var(--ink);font-size:14px;font-weight:700;cursor:pointer;
+          style="display:flex;align-items:center;gap:8px;padding:7px 14px;border-radius:24px;border:none;
+          background:var(--paper);color:var(--ink);font-size:13px;font-weight:700;cursor:pointer;
           box-shadow:0 4px 16px rgba(0,0,0,0.15);font-family:'Pretendard','Noto Sans KR';white-space:nowrap;">
           <span>＋</span> 패널 추가
         </button>
         <button onclick="togglePanelEditMode();closeMytaskFAB();" id="fabPanelEditBtn"
-          style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:24px;border:none;
-          background:var(--paper);color:var(--ink);font-size:14px;font-weight:700;cursor:pointer;
+          style="display:flex;align-items:center;gap:8px;padding:7px 14px;border-radius:24px;border:none;
+          background:var(--paper);color:var(--ink);font-size:13px;font-weight:700;cursor:pointer;
           box-shadow:0 4px 16px rgba(0,0,0,0.15);font-family:'Pretendard','Noto Sans KR';white-space:nowrap;">
           <span>✏️</span> 패널 편집
         </button>
         <button onclick="openGroupSettings();closeMytaskFAB();"
-          style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:24px;border:none;
-          background:var(--paper);color:var(--ink);font-size:14px;font-weight:700;cursor:pointer;
+          style="display:flex;align-items:center;gap:8px;padding:7px 14px;border-radius:24px;border:none;
+          background:var(--paper);color:var(--ink);font-size:13px;font-weight:700;cursor:pointer;
           box-shadow:0 4px 16px rgba(0,0,0,0.15);font-family:'Pretendard','Noto Sans KR';white-space:nowrap;">
           <span>👥</span> 그룹 설정
         </button>
       </div>
       <!-- FAB 메인 버튼 -->
       <button id="mytaskFABBtn" onclick="toggleMytaskFAB()"
-        style="width:52px;height:52px;border-radius:50%;border:none;
-        background:var(--mon);color:#fff;font-size:22px;cursor:pointer;
-        box-shadow:0 4px 20px rgba(59,130,246,0.4);
+        style="width:44px;height:44px;border-radius:50%;border:none;
+        background:var(--mon);color:#fff;font-size:18px;cursor:pointer;
+        box-shadow:0 4px 16px rgba(59,130,246,0.35);
         display:flex;align-items:center;justify-content:center;
-        transition:transform .18s,background .15s;">⚙️</button>
+        opacity:0.75;transition:transform .18s,opacity .15s;"
+        onmouseover="this.style.opacity='1'"
+        onmouseout="this.style.opacity='0.75'">⚙️</button>
     </div>
 
     <!-- 콘텐츠 영역 -->
@@ -2523,9 +2531,11 @@
             </div>
             <!-- 모바일: 급식 + 날씨 세로 -->
             <div class="home-section home-mobile-meal" id="homeMealSection">
-              <div class="home-section-header home-nav-header" data-goto="meal">
-                <span class="home-section-title">🍱 오늘 급식</span>
-                <span class="home-section-arrow">›</span>
+              <div class="home-section-header" style="cursor:default;">
+                <button onclick="event.stopPropagation();moveMealDate(-1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">‹</button>
+                <span class="home-section-title" id="homeMealTitle" onclick="navigateTo('meal')" style="cursor:pointer;flex:1;text-align:center;">🍱 오늘 급식</span>
+                <button onclick="event.stopPropagation();moveMealDate(1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">›</button>
+                <span class="home-section-arrow" onclick="navigateTo('meal')" style="cursor:pointer;">›</span>
               </div>
               <div class="home-meal-list home-meal-grid" id="homeMealList"></div>
             </div>
@@ -2546,9 +2556,11 @@
               </div>
               <div class="home-half home-meal-stack" style="display:flex;flex-direction:column;gap:10px;align-self:stretch;">
                 <div class="home-section" id="homeMealSectionD" style="flex:1;display:flex;flex-direction:column;">
-                  <div class="home-section-header home-nav-header" data-goto="meal">
-                    <span class="home-section-title">🍱 오늘 급식</span>
-                    <span class="home-section-arrow">›</span>
+                  <div class="home-section-header" style="cursor:default;">
+                    <button onclick="event.stopPropagation();moveMealDate(-1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">‹</button>
+                    <span class="home-section-title" id="homeMealTitleD" onclick="navigateTo('meal')" style="cursor:pointer;flex:1;text-align:center;">🍱 오늘 급식</span>
+                    <button onclick="event.stopPropagation();moveMealDate(1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">›</button>
+                    <span class="home-section-arrow" onclick="navigateTo('meal')" style="cursor:pointer;">›</span>
                   </div>
                   <div class="home-meal-list home-meal-grid" id="homeMealListD" style="flex:1;"></div>
                 </div>
@@ -2920,6 +2932,7 @@
             <label>시작일</label>
             <input type="date" id="mytaskStartDate" autocomplete="off"
               oninput="autoFormatDateInput(this)"
+              onchange="onStartDateChange(this)"
               onkeydown="handleDateInputKey(event,this,'mytaskEndDate')">
           </div>
           <div class="mytask-modal-field">
@@ -5798,9 +5811,6 @@ function renderSchedule(monthKey) {
         e.stopPropagation();
         dp.showPopup(items, dateLabel, e.clientX, e.clientY);
       });
-      cell.addEventListener('touchstart', e => dp.startLong(items, dateLabel, e), { passive: false });
-      cell.addEventListener('touchmove', () => dp.cancelLong(), { passive: true });
-      cell.addEventListener('touchend', () => dp.cancelLong());
     });
   }
 
@@ -6000,34 +6010,7 @@ async function initHomePage() {
   }
 
   // ── 오늘 급식 ──
-  try {
-    const dateStr = today.getFullYear() + String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0');
-    const mealBase = `https://open.neis.go.kr/hub/mealServiceDietInfo?KEY=faa26ac84d27403e8ecd28aaf407f500&Type=json&ATPT_OFCDC_SC_CODE=D10&SD_SCHUL_CODE=7240095&MLSV_YMD=${dateStr}`;
-    const [lunchRes, dinnerRes] = await Promise.all([
-      fetch(mealBase + '&MMEAL_SC_CODE=2'),
-      fetch(mealBase + '&MMEAL_SC_CODE=3')
-    ]);
-    const [lunchData, dinnerData] = await Promise.all([lunchRes.json(), dinnerRes.json()]);
-    const lunchRows = lunchData?.mealServiceDietInfo?.[1]?.row;
-    const dinnerRows = dinnerData?.mealServiceDietInfo?.[1]?.row;
-
-    // 중식/석식 각각 컬럼으로 가로배치
-    const renderCol = (rows, label) => {
-      if(!rows?.length) return '';
-      const items = rows[0].DDISH_NM.split('<br/>').map(m => m.trim()).filter(Boolean).slice(0, 7);
-      return `<div class="home-meal-col">
-        <div class="home-meal-type-label">${label}</div>
-        ${items.map(m => `<div class="home-meal-item">${m}</div>`).join('')}
-      </div>`;
-    };
-    const mealHtml = renderCol(lunchRows,'중식') + renderCol(dinnerRows,'석식');
-    const finalHtml = mealHtml || '<div class="home-meal-empty">오늘 급식 정보 없음</div>';
-    document.getElementById('homeMealList').innerHTML = finalHtml;
-    document.getElementById('homeMealListD').innerHTML = finalHtml;
-  } catch(e) {
-    document.getElementById('homeMealList').innerHTML = '<div class="home-meal-empty">불러오기 실패</div>';
-    document.getElementById('homeMealListD').innerHTML = '<div class="home-meal-empty">불러오기 실패</div>';
-  }
+  loadHomeMeal(0);
 
   // ── 날씨 ──
   try {
@@ -6045,6 +6028,58 @@ async function initHomePage() {
     document.getElementById('homeLoading').style.display = 'none';
   }
 }
+
+let _mealOffset = 0; // 0=오늘, -1=어제, 1=내일, ...
+
+async function loadHomeMeal(offset) {
+  _mealOffset = offset;
+  const base = new Date();
+  base.setDate(base.getDate() + offset);
+  const y = base.getFullYear();
+  const m = String(base.getMonth()+1).padStart(2,'0');
+  const d = String(base.getDate()).padStart(2,'0');
+  const dateStr = y + m + d;
+
+  // 제목 업데이트
+  const label = offset === 0 ? '오늘' : offset === -1 ? '어제' : offset === 1 ? '내일' : `${m}/${d}`;
+  const title = `🍱 ${label} 급식`;
+  const titleEl  = document.getElementById('homeMealTitle');
+  const titleElD = document.getElementById('homeMealTitleD');
+  if (titleEl)  titleEl.textContent  = title;
+  if (titleElD) titleElD.textContent = title;
+
+  const empty = `<div class="home-meal-empty">${label} 급식 정보 없음</div>`;
+  document.getElementById('homeMealList').innerHTML  = '<div class="home-meal-empty">불러오는 중...</div>';
+  document.getElementById('homeMealListD').innerHTML = '<div class="home-meal-empty">불러오는 중...</div>';
+
+  try {
+    const mealBase = `https://open.neis.go.kr/hub/mealServiceDietInfo?KEY=faa26ac84d27403e8ecd28aaf407f500&Type=json&ATPT_OFCDC_SC_CODE=D10&SD_SCHUL_CODE=7240095&MLSV_YMD=${dateStr}`;
+    const [lunchRes, dinnerRes] = await Promise.all([
+      fetch(mealBase + '&MMEAL_SC_CODE=2'),
+      fetch(mealBase + '&MMEAL_SC_CODE=3')
+    ]);
+    const [lunchData, dinnerData] = await Promise.all([lunchRes.json(), dinnerRes.json()]);
+    const lunchRows = lunchData?.mealServiceDietInfo?.[1]?.row;
+    const dinnerRows = dinnerData?.mealServiceDietInfo?.[1]?.row;
+    const renderCol = (rows, lbl) => {
+      if (!rows?.length) return '';
+      const items = rows[0].DDISH_NM.split('<br/>').map(m => m.trim()).filter(Boolean).slice(0, 7);
+      return `<div class="home-meal-col"><div class="home-meal-type-label">${lbl}</div>${items.map(m => `<div class="home-meal-item">${m}</div>`).join('')}</div>`;
+    };
+    const mealHtml = renderCol(lunchRows,'중식') + renderCol(dinnerRows,'석식') || empty;
+    document.getElementById('homeMealList').innerHTML  = mealHtml;
+    document.getElementById('homeMealListD').innerHTML = mealHtml;
+  } catch(e) {
+    document.getElementById('homeMealList').innerHTML  = '<div class="home-meal-empty">불러오기 실패</div>';
+    document.getElementById('homeMealListD').innerHTML = '<div class="home-meal-empty">불러오기 실패</div>';
+  }
+}
+
+function moveMealDate(dir) {
+  loadHomeMeal(_mealOffset + dir);
+}
+window.loadHomeMeal = loadHomeMeal;
+window.moveMealDate = moveMealDate;
 
 async function fetchWeather() {
   const url = 'https://api.open-meteo.com/v1/forecast?latitude=35.87&longitude=128.60' +
@@ -7243,13 +7278,13 @@ function renderRows() {
               + '<div style="display:flex;gap:5px;align-items:center;">'+dotHtml+schedDot+'</div></div>';
           })() : ''}
           <div class="panel-chips-wrap" style="display:${panel.chipsHidden?'none':'block'};">
-            <div class="mytask-filters" style="flex-wrap:nowrap;overflow-x:auto;margin-bottom:${panel.type==='list'?'6px':'0'};">
+            <div class="mytask-filters nowrap" style="margin-bottom:${panel.type==='list'?'6px':'0'};">
               <button class="mytask-filter-btn ${panel.filters.status.includes('todo')?'active f-todo':''}" onclick="togglePanelStatus(${row.id},${panel.id},'todo')">🔵 시작전</button>
               <button class="mytask-filter-btn ${panel.filters.status.includes('doing')?'active f-doing':''}" onclick="togglePanelStatus(${row.id},${panel.id},'doing')">🟡 진행중</button>
               <button class="mytask-filter-btn ${panel.filters.status.includes('done')?'active f-done':''}" onclick="togglePanelStatus(${row.id},${panel.id},'done')">🟢 완료</button>
               ${panel.type==='calendar' ? '<button class="mytask-filter-btn '+(panel.showSchedule?'active':'')+'" onclick="togglePanelSchedule('+row.id+','+panel.id+')">📆 학사일정</button>' : ''}
             </div>
-            ${panel.type==='list' ? '<div class="mytask-filters" style="flex-wrap:nowrap;overflow-x:auto;">'+periodOpts.map(o=>'<button class="mytask-filter-btn '+(panel.period===o.v?'active':'')+'" onclick="setPanelPeriod('+row.id+','+panel.id+',\''+o.v+'\')">'+ o.l+'</button>').join('')+'</div>' : ''}
+            ${panel.type==='list' ? '<div class="mytask-filters nowrap">'+periodOpts.map(o=>'<button class="mytask-filter-btn '+(panel.period===o.v?'active':'')+'" onclick="setPanelPeriod('+row.id+','+panel.id+',\''+o.v+'\')">'+ o.l+'</button>').join('')+'</div>' : ''}
           </div>
         </div>
         <div class="mytask-panel-content" id="pc_${panel.id}" style="flex:1;overflow-y:auto;height:0;display:flex;flex-direction:column;"></div>
@@ -7620,8 +7655,6 @@ window.renderHomeTaskSection = renderHomeTaskSection;
   popup.id = 'dayPreviewPopup';
   document.body.appendChild(popup);
 
-  let _longTimer = null;
-  let _active = false;
 
   function showPopup(items, dateLabel, x, y) {
     _active = true;
@@ -7648,31 +7681,15 @@ window.renderHomeTaskSection = renderHomeTaskSection;
   function hidePopup() {
     _active = false;
     popup.classList.remove('show');
-    clearTimeout(_longTimer);
   }
 
   // 전역 마우스업/터치엔드에서 숨기기
   document.addEventListener('mouseup', () => { if (_active) hidePopup(); });
-  document.addEventListener('touchend', () => { if (_active) hidePopup(); });
-  document.addEventListener('touchcancel', () => hidePopup());
 
   // 스크롤하면 숨기기
   document.addEventListener('scroll', hidePopup, true);
 
-  window._dayPreview = { showPopup, hidePopup,
-    startLong(items, dateLabel, e) {
-      clearTimeout(_longTimer);
-      e.preventDefault();
-      e.stopPropagation();
-      // 텍스트 선택/드래그 방지
-      const target = e.currentTarget || e.target;
-      const noSelect = ev => ev.preventDefault();
-      target.addEventListener('selectstart', noSelect, { once: true });
-      target.addEventListener('dragstart', noSelect, { once: true });
-      const touch = e.touches ? e.touches[0] : e;
-      _longTimer = setTimeout(() => showPopup(items, dateLabel, touch.clientX, touch.clientY), 500);
-    },
-    cancelLong() { clearTimeout(_longTimer); }
+  window._dayPreview = { showPopup, hidePopup
   };
 })();
 
@@ -7770,10 +7787,6 @@ function bindDayPreview(calEl, tasks, panel) {
       e.stopPropagation();
       dp.showPopup(items, dateLabel, e.clientX, e.clientY);
     });
-    // 모바일: 롱프레스
-    cell.addEventListener('touchstart', e => dp.startLong(items, dateLabel, e), { passive: false });
-    cell.addEventListener('touchmove', () => dp.cancelLong(), { passive: true });
-    cell.addEventListener('touchend', () => dp.cancelLong());
   });
 }
 window.bindDayPreview = bindDayPreview;
@@ -8334,9 +8347,6 @@ function renderMytaskCalendar() {
         e.preventDefault(); e.stopPropagation();
         dp.showPopup(items, dateLabel, e.clientX, e.clientY);
       });
-      cell.addEventListener('touchstart', e => dp.startLong(items, dateLabel, e), { passive: false });
-      cell.addEventListener('touchmove', () => dp.cancelLong(), { passive: true });
-      cell.addEventListener('touchend', () => dp.cancelLong());
     });
   }
 }
@@ -8758,24 +8768,39 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
 }
 
 function autoFormatDateInput(el) {
-  // 숫자만 추출
-  const digits = el.value.replace(/\D/g, '');
+  const raw = el.value;
+  const digits = raw.replace(/\D/g, '');
   if (digits.length === 8) {
     const formatted = `${digits.slice(0,4)}-${digits.slice(4,6)}-${digits.slice(6,8)}`;
-    // date input은 value를 yyyy-mm-dd 형식으로만 받음
     el.value = formatted;
+    // 시작일 바뀌면 마감일 동기화
+    if (el.id === 'mytaskStartDate') {
+      const endEl = document.getElementById('mytaskEndDate');
+      if (endEl && (!endEl.value || endEl.value < formatted)) {
+        endEl.value = formatted;
+      }
+    }
   }
 }
 
 function handleDateInputKey(e, el, nextId) {
-  // Enter나 Tab 시 다음 필드로
   if ((e.key === 'Enter' || e.key === 'Tab') && nextId) {
     e.preventDefault();
     document.getElementById(nextId)?.focus();
   }
 }
+
+// 시작일 change 이벤트 — 달력 선택 시에도 마감일 동기화
+function onStartDateChange(el) {
+  autoFormatDateInput(el);
+  const endEl = document.getElementById('mytaskEndDate');
+  if (endEl && el.value && (!endEl.value || endEl.value < el.value)) {
+    endEl.value = el.value;
+  }
+}
 window.autoFormatDateInput = autoFormatDateInput;
 window.handleDateInputKey  = handleDateInputKey;
+window.onStartDateChange   = onStartDateChange;
 
 // ── 반복 설정 ──────────────────────────────────────
 let _mytaskRepeat = 'none';
@@ -8890,6 +8915,38 @@ window.toggleCalFilter         = toggleCalFilter;
 window.toggleListFilter        = toggleListFilter;
 window.openMytaskModal         = openMytaskModal;
 window.closeMytaskModal        = closeMytaskModal;
+
+// ESC 키로 열린 모달 닫기
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  // 업무일정 모달
+  if (document.getElementById('mytaskModal')?.classList.contains('show')) {
+    closeMytaskModal(); return;
+  }
+  // 그룹 편집 모달
+  if (document.getElementById('groupEditorModal')?.style.display === 'flex') {
+    closeGroupEditor(); return;
+  }
+  // 그룹 설정 모달
+  if (document.getElementById('groupSettingsModal')?.style.display === 'flex') {
+    closeGroupSettings(); return;
+  }
+  // 상벌점 상세 팝업
+  if (document.getElementById('ptsDetailModal')?.classList.contains('open')) {
+    closePtsDetailBtn(); return;
+  }
+  // 교체/보강 모달
+  if (document.getElementById('swapModal')?.classList.contains('open')) {
+    closeSwapModal(); return;
+  }
+  // cd-overlay 팝업 (학사일정, 시간표 등)
+  const cdOverlay = document.querySelector('.cd-overlay.open');
+  if (cdOverlay) {
+    cdOverlay.classList.remove('open');
+    setTimeout(() => cdOverlay.remove(), 200);
+    return;
+  }
+});
 window.closeMytaskModalOverlay = closeMytaskModalOverlay;
 window.saveMytask              = saveMytask;
 window.deleteMytask            = deleteMytask;
