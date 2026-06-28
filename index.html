@@ -2357,7 +2357,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.83</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.84</div>
   </div>
 </div>
 
@@ -2440,7 +2440,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.83</div>
+    <div class="nav-version">ver3.84</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4137,7 +4137,8 @@ function showExitToast(){
 }
 
 function armExitGuard(){
-  history.pushState({root:true}, '');
+  const currentPage = document.querySelector('.page-view.active')?.id?.replace('Page','') || 'home';
+  history.pushState({ page: currentPage, root: true }, '');
 }
 armExitGuard(); // 페이지를 처음 열 때 한 번 무장
 // 초기 페이지 상태 등록
@@ -4215,7 +4216,11 @@ window.addEventListener('popstate', (e)=>{
 
   // 5. 페이지 뒤로가기
   if (e.state && e.state.page && !e.state.ptsRoom && !e.state.studentsGroup) {
-    navigateTo(e.state.page); return;
+    navigateTo(e.state.page);
+    // points/students 페이지로 돌아오면 그룹 목록 복원
+    if (e.state.page === 'points') { backToPtsGroups(); }
+    if (e.state.page === 'students') { renderStudentsGroupList(); }
+    return;
   }
 
   // 6. 현재 페이지가 home이 아니면 home으로 (단, 하위 state면 제외)
@@ -4231,8 +4236,9 @@ window.addEventListener('popstate', (e)=>{
     return;
   }
 
-  // 6. home에서 뒤로가기 → 종료 토스트
-  if(modalDepth === 0 && !(e.state && e.state.root)){
+  // 7. home에서 뒤로가기 → 종료 토스트
+  const activePage = document.querySelector('.page-view.active')?.id;
+  if(modalDepth === 0 && activePage === 'homePage'){
     showExitToast();
     clearTimeout(exitArmTimer);
     exitArmTimer = setTimeout(()=>{
