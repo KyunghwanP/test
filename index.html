@@ -2357,7 +2357,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.80</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.81</div>
   </div>
 </div>
 
@@ -2440,7 +2440,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.80</div>
+    <div class="nav-version">ver3.81</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4170,6 +4170,9 @@ window.addEventListener('popstate', (e)=>{
   if (document.getElementById('mytaskModal')?.classList.contains('show')) {
     closeMytaskModal(); armExitGuard(); return;
   }
+  if (document.getElementById('ptsDetailModal')?.classList.contains('open')) {
+    closePtsDetailBtn(); armExitGuard(); return;
+  }
   if (document.querySelector('.cd-overlay.open')) {
     document.querySelector('.cd-overlay.open').classList.remove('open'); armExitGuard(); return;
   }
@@ -4210,9 +4213,14 @@ window.addEventListener('popstate', (e)=>{
     return;
   }
 
-  // 6. 현재 페이지가 home이 아니면 home으로
+  // 6. 현재 페이지가 home이 아니면 home으로 (단, 하위 state면 제외)
+  if (e.state && (e.state.ptsRoom !== undefined || e.state.studentsGroup !== undefined)) {
+    // 이미 위에서 처리됐어야 하는데 못 잡힌 경우 - 다시 처리
+    if (e.state.ptsRoom !== undefined) { backToPtsGroups(); return; }
+    if (e.state.studentsGroup !== undefined) { renderStudentsGroupList(); return; }
+  }
   const currentPage = document.querySelector('.page-view.active')?.id;
-  if (currentPage && currentPage !== 'homePage') {
+  if (currentPage && currentPage !== 'homePage' && !(e.state && e.state.root)) {
     navigateTo('home');
     armExitGuard();
     return;
@@ -5571,7 +5579,7 @@ function renderStudentsGroupList() {
     card.addEventListener('click', () => {
       const type = card.dataset.type;
       const key  = card.dataset.key;
-      history.pushState({studentsGroup: {type, key}}, '');
+      history.pushState({ page: 'students', studentsGroup: {type, key} }, '');
       if(type === 'class') {
         const [grade, room] = key.split('-');
         renderStudentsInGroup({type:'class', key, label:`${grade}학년 ${room}반`});
@@ -7021,7 +7029,7 @@ function selectPtsRoom(key) {
   ptsCurrentStudents = students;
   ptsSortKey = null;
   renderPtsStudentList(students);
-  history.pushState({ ptsRoom: key }, '');
+  history.pushState({ page: 'points', ptsRoom: key }, '');
 }
 
 function backToPtsGroups() {
