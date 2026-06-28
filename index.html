@@ -2357,7 +2357,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.94</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.95</div>
   </div>
 </div>
 
@@ -2440,7 +2440,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.94</div>
+    <div class="nav-version">ver3.95</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4187,7 +4187,6 @@ window.addEventListener('popstate', (e)=>{
   if (document.getElementById('pointsPage')?.classList.contains('active')
       && document.getElementById('ptsStudentListWrap')?.style.display !== 'none') {
     backToPtsGroups();
-    armExitGuard();
     return;
   }
 
@@ -4195,14 +4194,12 @@ window.addEventListener('popstate', (e)=>{
   if (document.getElementById('studentsPage')?.classList.contains('active')
       && studentsViewMode === 'list') {
     renderStudentsGroupList();
-    armExitGuard();
     return;
   }
 
   // 5. 현황판이 아니면 → 현황판으로
   if (!document.getElementById('homePage')?.classList.contains('active')) {
     navigateTo('home');
-    armExitGuard();
     return;
   }
 
