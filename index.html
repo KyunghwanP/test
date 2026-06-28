@@ -2357,7 +2357,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.81</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.83</div>
   </div>
 </div>
 
@@ -2440,7 +2440,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.81</div>
+    <div class="nav-version">ver3.83</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4170,7 +4170,7 @@ window.addEventListener('popstate', (e)=>{
   if (document.getElementById('mytaskModal')?.classList.contains('show')) {
     closeMytaskModal(); armExitGuard(); return;
   }
-  if (document.getElementById('ptsDetailModal')?.classList.contains('open')) {
+  if (document.getElementById('ptsDetailModal')?.classList.contains('show')) {
     closePtsDetailBtn(); armExitGuard(); return;
   }
   if (document.querySelector('.cd-overlay.open')) {
@@ -4191,26 +4191,31 @@ window.addEventListener('popstate', (e)=>{
     return;
   }
 
-  // 3. 상벌점 반 목록 뒤로가기
+  // 3. 상벌점 반 목록 뒤로가기 (page보다 먼저)
   if (e.state && e.state.ptsRoom !== undefined) {
     backToPtsGroups();
+    history.replaceState({ page: 'points' }, '');
+    armExitGuard();
     return;
   }
 
-  // 4. 학생 연락망 그룹 뒤로가기
+  // 4. 학생 연락망 그룹 뒤로가기 (page보다 먼저)
   if(e.state && e.state.studentsGroup !== undefined) {
     renderStudentsGroupList();
+    history.replaceState({ page: 'students' }, '');
+    armExitGuard();
     return;
   }
   if(studentsViewMode === 'list' && !(e.state && (e.state.modalDepth !== undefined || e.state.root))) {
     renderStudentsGroupList();
+    history.replaceState({ page: 'students' }, '');
+    armExitGuard();
     return;
   }
 
   // 5. 페이지 뒤로가기
-  if (e.state && e.state.page) {
-    navigateTo(e.state.page);
-    return;
+  if (e.state && e.state.page && !e.state.ptsRoom && !e.state.studentsGroup) {
+    navigateTo(e.state.page); return;
   }
 
   // 6. 현재 페이지가 home이 아니면 home으로 (단, 하위 state면 제외)
@@ -9023,7 +9028,7 @@ document.addEventListener('keydown', e => {
     closeGroupSettings(); return;
   }
   // 상벌점 상세 팝업
-  if (document.getElementById('ptsDetailModal')?.classList.contains('open')) {
+  if (document.getElementById('ptsDetailModal')?.classList.contains('show')) {
     closePtsDetailBtn(); return;
   }
   // 교체/보강 모달
