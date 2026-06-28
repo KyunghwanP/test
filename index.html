@@ -495,9 +495,13 @@
     display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;
   }
   .mytask-filters.nowrap{
-    flex-wrap:nowrap;overflow-x:auto;margin-bottom:0;
+    flex-wrap:nowrap !important;overflow-x:auto;overflow-y:hidden;margin-bottom:0;white-space:nowrap;
   }
   .mytask-filters.nowrap::-webkit-scrollbar{display:none;}
+  .mytask-filters.nowrap .mytask-filter-btn,
+  .mytask-filters.nowrap .mytask-repeat-btn{
+    flex-shrink:0;
+  }
   .mytask-filter-btn{
     padding:5px 14px;border-radius:20px;border:1.5px solid var(--rule);
     background:var(--paper);color:var(--ink-soft);
@@ -2349,7 +2353,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.68</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.69</div>
   </div>
 </div>
 
@@ -2432,7 +2436,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.68</div>
+    <div class="nav-version">ver3.69</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7233,60 +7237,43 @@ function renderRows() {
       const cm = panel.calMonth ?? mytaskMonth;
 
       panelEl.innerHTML = `
-        <div class="panel-hd" style="padding:10px 14px 8px;background:var(--paper);border-bottom:1px solid var(--rule);flex-shrink:0;position:relative;">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:${panel.chipsHidden?'0':'8px'};flex-wrap:nowrap;overflow:hidden;min-width:0;">
-            <div style="display:flex;gap:4px;flex-shrink:0;">
-              <button onclick="setPanelType(${row.id},${panel.id},'calendar')" class="mytask-filter-btn ${panel.type==='calendar'?'active':''}" style="font-size:12px;padding:3px 8px;">📅</button>
-              <button onclick="setPanelType(${row.id},${panel.id},'list')" class="mytask-filter-btn ${panel.type==='list'?'active':''}" style="font-size:12px;padding:3px 8px;">📋</button>
+        <div class="panel-hd" style="padding:8px 10px;background:var(--paper);border-bottom:1px solid var(--rule);flex-shrink:0;">
+          <div style="display:flex;align-items:center;gap:4px;flex-wrap:nowrap;overflow:hidden;min-width:0;">
+            <div style="display:flex;gap:3px;flex-shrink:0;">
+              <button onclick="setPanelType(${row.id},${panel.id},'calendar')" class="mytask-filter-btn ${panel.type==='calendar'?'active':''}" style="font-size:11px;padding:2px 7px;">📅</button>
+              <button onclick="setPanelType(${row.id},${panel.id},'list')" class="mytask-filter-btn ${panel.type==='list'?'active':''}" style="font-size:11px;padding:2px 7px;">📋</button>
             </div>
-            ${panel.type==='calendar' ? `
-            <div style="display:flex;align-items:center;gap:6px;flex:1;justify-content:center;">
-              <button onclick="panelChangeMonth(${row.id},${panel.id},-1)" class="mytask-nav-btn" style="width:26px;height:26px;font-size:14px;">‹</button>
-              <span id="pml_${panel.id}" style="font-family:'Pretendard','Noto Sans KR';font-size:17px;font-weight:800;white-space:nowrap;">${cy}년 ${cm+1}월</span>
-              <button onclick="panelChangeMonth(${row.id},${panel.id},1)" class="mytask-nav-btn" style="width:26px;height:26px;font-size:14px;">›</button>
+            ${panel.type==='calendar' ? `<div style="display:flex;align-items:center;gap:4px;flex:1;justify-content:center;min-width:0;">
+              <button onclick="panelChangeMonth(${row.id},${panel.id},-1)" class="mytask-nav-btn" style="width:22px;height:22px;font-size:13px;flex-shrink:0;">‹</button>
+              <span id="pml_${panel.id}" style="font-family:'Pretendard','Noto Sans KR';font-size:14px;font-weight:800;white-space:nowrap;">${cy}년 ${cm+1}월</span>
+              <button onclick="panelChangeMonth(${row.id},${panel.id},1)" class="mytask-nav-btn" style="width:22px;height:22px;font-size:13px;flex-shrink:0;">›</button>
             </div>` : '<div style="flex:1;"></div>'}
-          <!-- 우측: 접기 토글 + 삭제 버튼 -->
             <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
-              <button onclick="togglePanelChips(this)"
-                style="padding:4px 12px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:13px;cursor:pointer;white-space:nowrap;min-height:28px;"
-                title="칩 숨기기">${panel.chipsHidden?'▼':'▲'}</button>
-              <button class="panel-delete-btn" onclick="removePanel(${row.id},${panel.id})"
-                style="display:none;width:28px;height:28px;border-radius:50%;border:none;background:#FEE2E2;color:#EF4444;font-size:16px;font-weight:700;cursor:pointer;align-items:center;justify-content:center;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,0.15);margin-left:4px;"
-                title="패널 삭제">×</button>
+              ${(() => {
+                const dots = [{s:'todo',c:'#6366F1'},{s:'doing',c:'#F59E0B'},{s:'done',c:'#10B981'}].map(({s,c})=>{
+                  const on=panel.filters.status.includes(s);
+                  const lbl=s==='todo'?'시작전':s==='doing'?'진행중':'완료';
+                  return '<div onclick="event.stopPropagation();togglePanelStatus('+row.id+','+panel.id+',\''+s+'\')" style="width:14px;height:14px;border-radius:50%;background:'+c+';cursor:pointer;opacity:'+(on?1:0.2)+';transition:opacity .15s;flex-shrink:0;" title="'+lbl+'"></div>';
+                }).join('');
+                const sch = panel.type==='calendar'
+                  ? '<div onclick="event.stopPropagation();togglePanelSchedule('+row.id+','+panel.id+')" style="width:14px;height:14px;border-radius:3px;background:#EF4444;cursor:pointer;opacity:'+(panel.showSchedule?1:0.2)+';transition:opacity .15s;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:700;" title="학사일정">학</div>'
+                  : '';
+                return dots+sch;
+              })()}
+              <button onclick="togglePanelChips(this)" style="padding:2px 8px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:12px;cursor:pointer;white-space:nowrap;" title="칩 숨기기">${panel.chipsHidden?'▼':'▲'}</button>
+              <button class="panel-delete-btn" onclick="removePanel(${row.id},${panel.id})" style="display:none;width:24px;height:24px;border-radius:50%;border:none;background:#FEE2E2;color:#EF4444;font-size:14px;font-weight:700;cursor:pointer;align-items:center;justify-content:center;line-height:1;" title="패널 삭제">×</button>
             </div>
           </div>
-          <!-- 칩 영역 - 도트 필터는 여기에 -->
-          ${panel.chipsHidden ? (() => {
-            const dotHtml = [{s:'todo',c:'#6366F1'},{s:'doing',c:'#F59E0B'},{s:'done',c:'#10B981'}].map(({s,c}) => {
-              const on = panel.filters.status.includes(s);
-              const label = s==='todo'?'시작전':s==='doing'?'진행중':'완료';
-              return '<div onclick="event.stopPropagation();togglePanelStatus('+row.id+','+panel.id+',\''+s+'\')"'
-                + ' style="width:16px;height:16px;border-radius:50%;background:'+c+';cursor:pointer;'
-                + 'opacity:'+(on?1:0.2)+';transition:opacity .15s;flex-shrink:0;"'
-                + ' title="'+label+'"></div>';
-            }).join('');
-            const schedDot = panel.type==='calendar'
-              ? '<div onclick="event.stopPropagation();togglePanelSchedule('+row.id+','+panel.id+')"'
-                + ' style="width:16px;height:16px;border-radius:3px;background:#EF4444;cursor:pointer;'
-                + 'opacity:'+(panel.showSchedule?1:0.2)+';transition:opacity .15s;flex-shrink:0;'
-                + 'display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700;"'
-                + ' title="학사일정">학</div>'
-              : '';
-            return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
-              + '<div style="display:flex;gap:5px;align-items:center;">'+dotHtml+schedDot+'</div></div>';
-          })() : ''}
-          <div class="panel-chips-wrap" style="display:${panel.chipsHidden?'none':'block'};">
-            <div class="mytask-filters nowrap" style="margin-bottom:${panel.type==='list'?'6px':'0'};">
+          <div class="panel-chips-wrap" style="display:${panel.chipsHidden?'none':'block'};margin-top:6px;">
+            <div class="mytask-filters nowrap" style="margin-bottom:${panel.type==='list'?'4px':'0'};">
               <button class="mytask-filter-btn ${panel.filters.status.includes('todo')?'active f-todo':''}" onclick="togglePanelStatus(${row.id},${panel.id},'todo')">🔵 시작전</button>
               <button class="mytask-filter-btn ${panel.filters.status.includes('doing')?'active f-doing':''}" onclick="togglePanelStatus(${row.id},${panel.id},'doing')">🟡 진행중</button>
               <button class="mytask-filter-btn ${panel.filters.status.includes('done')?'active f-done':''}" onclick="togglePanelStatus(${row.id},${panel.id},'done')">🟢 완료</button>
               ${panel.type==='calendar' ? '<button class="mytask-filter-btn '+(panel.showSchedule?'active':'')+'" onclick="togglePanelSchedule('+row.id+','+panel.id+')">📆 학사일정</button>' : ''}
             </div>
-            ${panel.type==='list' ? '<div class="mytask-filters nowrap">'+periodOpts.map(o=>'<button class="mytask-filter-btn '+(panel.period===o.v?'active':'')+'" onclick="setPanelPeriod('+row.id+','+panel.id+',\''+o.v+'\')">'+ o.l+'</button>').join('')+'</div>' : ''}
+            ${panel.type==='list' ? '<div class="mytask-filters nowrap">'+periodOpts.map(o=>'<button class="mytask-filter-btn '+(panel.period===o.v?'active':'')+'" onclick="setPanelPeriod('+row.id+','+panel.id+',\''+o.v+'\')">'+o.l+'</button>').join('')+'</div>' : ''}
           </div>
-        </div>
-        <div class="mytask-panel-content" id="pc_${panel.id}" style="flex:1;overflow-y:auto;height:0;display:flex;flex-direction:column;"></div>
-      `;
+        </div>`
 
       rowEl.appendChild(panelEl);
       panelEls.push(panelEl);
