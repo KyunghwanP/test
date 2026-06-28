@@ -2357,7 +2357,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.92</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.93</div>
   </div>
 </div>
 
@@ -2440,7 +2440,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.92</div>
+    <div class="nav-version">ver3.93</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4137,10 +4137,9 @@ function showExitToast(){
 }
 
 function armExitGuard(){
-  const currentPage = document.querySelector('.page-view.active')?.id?.replace('Page','') || 'home';
-  history.pushState({ page: currentPage, root: true }, '');
+  history.pushState({root:true}, '');
 }
-// 초기 히스토리: home/root 하나만 (guard는 별도로 쌓지 않음)
+armExitGuard();
 history.replaceState({ page: 'home', root: true }, '');
 
 function openSwapModal(teacherObj, day, period, entry){
@@ -4160,84 +4159,52 @@ function closeSwapModal(){
 }
 
 window.addEventListener('popstate', (e)=>{
-  const st = e.state || {};
+  // 1. 열린 모달 닫기
+  if (document.getElementById('groupEditorModal')?.style.display === 'flex') { closeGroupEditor(); armExitGuard(); return; }
+  if (document.getElementById('groupSettingsModal')?.style.display === 'flex') { closeGroupSettings(); armExitGuard(); return; }
+  if (document.getElementById('mytaskModal')?.classList.contains('show')) { closeMytaskModal(); armExitGuard(); return; }
+  if (document.getElementById('ptsDetailModal')?.classList.contains('show')) { closePtsDetailBtn(); armExitGuard(); return; }
+  if (document.querySelector('.cd-overlay.open')) { document.querySelector('.cd-overlay.open').classList.remove('open'); armExitGuard(); return; }
 
-  // 1. 열린 모달 닫기 (최우선)
-  const modals = [
-    [()=>document.getElementById('groupEditorModal')?.style.display==='flex',   ()=>closeGroupEditor()],
-    [()=>document.getElementById('groupSettingsModal')?.style.display==='flex',  ()=>closeGroupSettings()],
-    [()=>document.getElementById('mytaskModal')?.classList.contains('show'),     ()=>closeMytaskModal()],
-    [()=>document.getElementById('ptsDetailModal')?.classList.contains('show'),  ()=>closePtsDetailBtn()],
-    [()=>document.querySelector('.cd-overlay.open'),                              ()=>document.querySelector('.cd-overlay.open').classList.remove('open')],
-  ];
-  for (const [check, close] of modals) {
-    if (check()) { close(); armExitGuard(); return; }
+  // 2. 상벌점 명단 → 그룹 목록 (page보다 먼저)
+  if (e.state && e.state.ptsRoom !== undefined) {
+    backToPtsGroups();
+    return;
   }
 
-  // 2. 교체/보강 모달 뎁스
-  const newDepth = st.modalDepth || 0;
+  // 3. 학생연락망 그룹 → 목록 (page보다 먼저)
+  if (e.state && e.state.studentsGroup !== undefined) {
+    renderStudentsGroupList();
+    return;
+  }
+
+  // 4. 페이지 뒤로가기
+  if (e.state && e.state.page) {
+    navigateTo(e.state.page);
+    return;
+  }
+
+  // 5. 교체/보강 모달 뎁스
+  const newDepth = (e.state && e.state.modalDepth) || 0;
   if (newDepth < modalDepth) {
     modalDepth = newDepth;
     if (modalDepth === 0) {
-      swapModal.classList.remove('open', 'wide', 'medium');
+      swapModal.classList.remove('open');
+      swapModal.classList.remove('wide');
+      swapModal.classList.remove('medium');
     } else if (modalDepth === 1 && lastListArgs) {
       renderPopup(lastListArgs.teacherObj, lastListArgs.day, lastListArgs.period, lastListArgs.entry);
     }
     return;
   }
 
-  // 3. 상벌점 명단 → 그룹 목록
-  if (st.ptsRoom !== undefined) {
-    backToPtsGroups();
-    return;
-  }
-
-  // 4. 학생연락망 그룹 → 목록
-  if (st.studentsGroup !== undefined) {
-    renderStudentsGroupList();
-    return;
-  }
-
-  // 5. 일반 페이지 뒤로가기
-  if (st.page) {
-    const activeId = document.querySelector('.page-view.active')?.id;
-
-    // 현황판에서 root 뒤로가기 → 종료 토스트
-    if (st.page === 'home' && st.root) {
-      showExitToast();
-      clearTimeout(exitArmTimer);
-      exitArmTimer = setTimeout(() => { armExitGuard(); }, 2000);
-      return;
-    }
-
-    // 현황판으로 복원
-    navigateTo(st.page);
-
-    // 상벌점 탭인데 명단 보고있으면 → 그룹으로
-    if (st.page === 'points' && document.getElementById('ptsStudentListWrap')?.style.display !== 'none') {
-      backToPtsGroups();
-    }
-    // 학생연락망 탭인데 목록 보고있으면 → 그룹으로
-    if (st.page === 'students' && studentsViewMode === 'list') {
-      renderStudentsGroupList();
-    }
-
-    armExitGuard();
-    return;
-  }
-
-  // 6. 아무 state도 없음 → 현황판이면 토스트, 아니면 현황판으로
-  const activeId = document.querySelector('.page-view.active')?.id;
-  if (activeId === 'homePage') {
+  // 6. 종료 토스트 (현황판에서만)
+  if (modalDepth === 0 && !(e.state && e.state.root)) {
     showExitToast();
     clearTimeout(exitArmTimer);
-    exitArmTimer = setTimeout(() => { armExitGuard(); }, 2000);
-  } else {
-    navigateTo('home');
-    armExitGuard();
+    exitArmTimer = setTimeout(() => { if (modalDepth === 0) armExitGuard(); }, 2000);
   }
 });
-
 document.getElementById('swapModalClose').addEventListener('click', ()=>{
   if(modalDepth === 2){
     history.back();
