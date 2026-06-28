@@ -13,22 +13,49 @@ const db = admin.firestore();
 const SITES_BASE = 'https://sites.google.com/yeungnam.hs.kr/202633';
 const SCHEDULE_SHEET_ID = '1dWQEv1xgl4AGillRWPfUkJAb0cM3ChLHEC0uiIwRpB4';
 
+// ── 공용: 재시도 헬퍼 ─────────────────────────────────────
+async function withRetry(label, fn, retries = 4, delayMs = 3000) {
+  let lastErr;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      console.warn(`  ⚠️  ${label} 시도 ${attempt}/${retries} 실패: ${e.message}`);
+      if (attempt < retries) {
+        const wait = delayMs * attempt; // 점증 백오프 (3s, 6s, 9s)
+        console.log(`     ${wait/1000}초 후 재시도...`);
+        await new Promise(r => setTimeout(r, wait));
+      }
+    }
+  }
+  throw lastErr;
+}
+
 // ── Google Sheets 인증 (서비스 계정) ──────────────────────
-function getSheetAuth() {
-  return new google.auth.GoogleAuth({
+// 인증 클라이언트를 미리 만들어 토큰을 명시적으로 확보해 둔다.
+async function getSheetsClient() {
+  const auth = new google.auth.GoogleAuth({
     credentials: serviceAccount,
     scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
   });
+  // 토큰을 미리 발급받아 둔다 (여기서 Premature close가 나면 재시도로 흡수)
+  const client = await auth.getClient();
+  await withRetry('토큰 발급', () => client.getAccessToken());
+  return google.sheets({ version: 'v4', auth: client });
 }
 
 // ── 학사일정 읽기 ─────────────────────────────────────────
 async function fetchSchedule() {
   console.log('📅 학사일정 읽는 중...');
-  const auth = getSheetAuth();
-  const sheets = google.sheets({ version: 'v4', auth });
 
-  // 시트 목록 가져오기
-  const meta = await sheets.spreadsheets.get({ spreadsheetId: SCHEDULE_SHEET_ID });
+  // 인증 + 토큰 확보까지 재시도로 감쌈
+  const sheets = await withRetry('Sheets 인증', () => getSheetsClient());
+
+  // 시트 목록 가져오기 (재시도)
+  const meta = await withRetry('시트 목록 조회', () =>
+    sheets.spreadsheets.get({ spreadsheetId: SCHEDULE_SHEET_ID })
+  );
   const sheetList = meta.data.sheets.map(s => s.properties.title);
   console.log(`  → 시트 ${sheetList.length}개: ${sheetList.join(', ')}`);
 
@@ -36,10 +63,12 @@ async function fetchSchedule() {
 
   for (const sheetName of sheetList) {
     try {
-      const res = await sheets.spreadsheets.values.get({
-        spreadsheetId: SCHEDULE_SHEET_ID,
-        range: `'${sheetName}'!A1:E50`,
-      });
+      const res = await withRetry(`${sheetName} 읽기`, () =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SCHEDULE_SHEET_ID,
+          range: `'${sheetName}'!A1:E50`,
+        })
+      );
       const rows = res.data.values || [];
 
       // 월 이름 추출 (시트명에서)
@@ -103,7 +132,7 @@ async function fetchSchedule() {
         }
       }
     } catch(e) {
-      console.warn(`  ⚠️  ${sheetName} 읽기 실패:`, e.message);
+      console.warn(`  ⚠️  ${sheetName} 읽기 최종 실패:`, e.message);
     }
   }
 
@@ -152,16 +181,19 @@ async function main() {
     });
     console.log('  → 주차 목록 저장 완료');
 
-    // 4) 학사일정 읽기 및 저장
+    // 4) 학사일정 읽기 및 저장 (전체를 재시도로 감쌈)
     try {
       const schedule = await fetchSchedule();
-      await db.collection('schedule').doc('main').set({
-        data: schedule,
-        updatedAt: now
-      });
+      // 저장도 재시도
+      await withRetry('학사일정 저장', () =>
+        db.collection('schedule').doc('main').set({
+          data: schedule,
+          updatedAt: now
+        })
+      );
       console.log('  → 학사일정 저장 완료');
     } catch(e) {
-      console.warn('  ⚠️  학사일정 저장 실패:', e.message);
+      console.warn('  ⚠️  학사일정 저장 최종 실패:', e.message);
     }
 
     console.log('✅ 완료!');
