@@ -2301,11 +2301,16 @@
   .home-schedule-item.today .home-schedule-date{color:#E8A93A;font-weight:900;}
   .home-schedule-item.today .home-schedule-content{font-weight:700;color:var(--ink);}
   /* 날짜 셀 텍스트 선택 방지 (롱프레스용) */
-  .panel-cal-cell, .sc-cal-cell,
-  .panel-cal-cell *, .sc-cal-cell * {
+  .panel-cal-cell, .sc-cal-cell, .mytask-cal-cell,
+  .panel-cal-cell *, .sc-cal-cell *, .mytask-cal-cell * {
     -webkit-user-select: none;
     user-select: none;
     -webkit-touch-callout: none;
+  }
+  /* 칩은 드래그 가능하지만 텍스트 선택은 방지 */
+  .mytask-cal-chip {
+    -webkit-user-select: none;
+    user-select: none;
   }
   /* 날짜 프리뷰 팝업 */
   #dayPreviewPopup{
@@ -2338,7 +2343,7 @@
     <p>학교 구글 계정(@yeungnam.hs.kr)으로<br>로그인해주세요.</p>
     <button class="google-login-btn" id="googleLoginBtn">Google로 로그인</button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.59</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.60</div>
   </div>
 </div>
 
@@ -2421,7 +2426,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.59</div>
+    <div class="nav-version">ver3.60</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7657,8 +7662,13 @@ window.renderHomeTaskSection = renderHomeTaskSection;
   window._dayPreview = { showPopup, hidePopup,
     startLong(items, dateLabel, e) {
       clearTimeout(_longTimer);
-      // 텍스트 선택 방지
       e.preventDefault();
+      e.stopPropagation();
+      // 텍스트 선택/드래그 방지
+      const target = e.currentTarget || e.target;
+      const noSelect = ev => ev.preventDefault();
+      target.addEventListener('selectstart', noSelect, { once: true });
+      target.addEventListener('dragstart', noSelect, { once: true });
       const touch = e.touches ? e.touches[0] : e;
       _longTimer = setTimeout(() => showPopup(items, dateLabel, touch.clientX, touch.clientY), 500);
     },
@@ -8293,6 +8303,42 @@ function renderMytaskCalendar() {
     if (!isOther) dayCount++;
   }
   grid.innerHTML = html;
+
+  // 우클릭/롱프레스 팝업 바인딩
+  const dp = window._dayPreview;
+  if (dp) {
+    grid.querySelectorAll('.mytask-cal-cell:not(.other-month)').forEach(cell => {
+      const onclick = cell.getAttribute('onclick') || '';
+      const match = onclick.match(/'(\d{4}-\d{2}-\d{2})'/);
+      if (!match) return;
+      const dateStr = match[1];
+      const [cy2, cm2, cd2] = dateStr.split('-').map(Number);
+      const dow = ['일','월','화','수','목','금','토'][new Date(cy2, cm2-1, cd2).getDay()];
+      const dateLabel = `${cy2}년 ${cm2}월 ${cd2}일 (${dow})`;
+      const dayTasks = getCalTasks().filter(t => t.startDate <= dateStr && t.endDate >= dateStr);
+      const schedItems = calFilters.has('schedule')
+        ? ((window._scheduleData||{})[dateStr.slice(0,7)]||[])
+            .filter(e => String(e.date).padStart(2,'0') === dateStr.slice(8))
+            .map(e => ({ text: e.content||e.title||'', style: 'background:#FEE2E2;color:#991B1B;' }))
+        : [];
+      const items = [
+        ...schedItems,
+        ...dayTasks.map(t => ({
+          text: t.title,
+          style: t.status==='todo' ? 'background:#EEF2FF;color:#4F46E5;'
+               : t.status==='doing' ? 'background:#FEF3C7;color:#D97706;'
+               : 'background:#D1FAE5;color:#065F46;'
+        }))
+      ];
+      cell.addEventListener('contextmenu', e => {
+        e.preventDefault(); e.stopPropagation();
+        dp.showPopup(items, dateLabel, e.clientX, e.clientY);
+      });
+      cell.addEventListener('touchstart', e => dp.startLong(items, dateLabel, e), { passive: false });
+      cell.addEventListener('touchmove', () => dp.cancelLong(), { passive: true });
+      cell.addEventListener('touchend', () => dp.cancelLong());
+    });
+  }
 }
 
 // ── 캘린더 드래그 ──
