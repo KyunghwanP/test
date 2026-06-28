@@ -1727,7 +1727,7 @@
   .meal-nav-btn:hover{background:var(--paper-soft);}
   .meal-nav-btn:active{background:var(--rule);}
   .meal-week-label{
-    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:15px;color:var(--paper);
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:15px;color:var(--ink);
     min-width:100px;text-align:center;
   }
   /* 데스크톱: 5열 그리드 */
@@ -1770,7 +1770,7 @@
   }
   .meal-card-day{
     font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;
-    color:#fff;background:var(--mon);
+    color:var(--ink);background:var(--mon);
     padding:10px 16px;
     display:flex;align-items:baseline;gap:6px;
   }
@@ -2357,7 +2357,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.78</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.80</div>
   </div>
 </div>
 
@@ -2440,7 +2440,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.78</div>
+    <div class="nav-version">ver3.80</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4188,32 +4188,26 @@ window.addEventListener('popstate', (e)=>{
     return;
   }
 
-  // 3. 페이지 뒤로가기
-  if (e.state && e.state.page) {
-    navigateTo(e.state.page);
-    return;
-  }
-
-  // 4. 상벌점 반 목록 뒤로가기
-  if (e.state && e.state.ptsRoom) {
-    backToPtsGroups();
-    return;
-  }
-  if (e.state && e.state.ptsRoom === null) {
+  // 3. 상벌점 반 목록 뒤로가기
+  if (e.state && e.state.ptsRoom !== undefined) {
     backToPtsGroups();
     return;
   }
 
-  // 5. 학생 연락망 그룹 뒤로가기
-  if(e.state && e.state.studentsGroup === null) {
+  // 4. 학생 연락망 그룹 뒤로가기
+  if(e.state && e.state.studentsGroup !== undefined) {
     renderStudentsGroupList();
     return;
   }
-  if(!(e.state && (e.state.modalDepth !== undefined || e.state.root || e.state.ptsRoom !== undefined))) {
-    if(studentsViewMode === 'list') {
-      renderStudentsGroupList();
-      return;
-    }
+  if(studentsViewMode === 'list' && !(e.state && (e.state.modalDepth !== undefined || e.state.root))) {
+    renderStudentsGroupList();
+    return;
+  }
+
+  // 5. 페이지 뒤로가기
+  if (e.state && e.state.page) {
+    navigateTo(e.state.page);
+    return;
   }
 
   // 6. 현재 페이지가 home이 아니면 home으로
