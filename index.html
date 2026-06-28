@@ -2357,7 +2357,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.88</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.89</div>
   </div>
 </div>
 
@@ -2440,7 +2440,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.88</div>
+    <div class="nav-version">ver3.89</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -2831,7 +2831,7 @@
               <div id="ptsStudentListWrap" style="display:none;">
                 <!-- 뒤로가기 -->
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                  <button onclick="backToPtsGroups()" style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--rule);background:var(--paper);cursor:pointer;font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;color:var(--ink-soft);">← 목록으로</button>
+                  <button onclick="history.back()" style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--rule);background:var(--paper);cursor:pointer;font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;color:var(--ink-soft);">← 목록으로</button>
                   <span id="ptsCurrentRoom" style="font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:16px;color:var(--ink);"></span>
                 </div>
                 <div class="pts-list-header">
@@ -4190,7 +4190,6 @@ window.addEventListener('popstate', (e)=>{
   if (st.ptsRoom !== undefined) {
     navigateTo('points');
     backToPtsGroups();
-    history.replaceState({ page: 'points', root: true }, '');
     return;
   }
 
@@ -4198,7 +4197,6 @@ window.addEventListener('popstate', (e)=>{
   if (st.studentsGroup !== undefined) {
     navigateTo('students');
     renderStudentsGroupList();
-    history.replaceState({ page: 'students', root: true }, '');
     return;
   }
 
