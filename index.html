@@ -171,6 +171,8 @@
   .tab-scroll-btn.right{right:0;box-shadow:-6px 0 8px -4px rgba(0,0,0,0.12);}
   .tab-scroll-btn:hover{color:var(--mon);}
   .tab-bar-wrap.scrollable .tab-scroll-btn{display:flex;}
+  /* 화살표가 보일 때 탭이 화살표 밑에 가려지지 않도록 좌우 여백 확보 */
+  .tab-bar-wrap.scrollable .mobile-tab-bar{padding-left:34px;padding-right:34px;}
 
   /* 사이드바가 overlay 모드일 때 탭바 표시 */
   .app-shell:not(.desktop-nav) .mobile-tab-bar{display:flex;}
@@ -210,6 +212,7 @@
   .points-type-btn:hover{border-color:var(--mon);color:var(--mon);}
   .points-type-btn.selected-merit{border-color:#10B981;background:#ECFDF5;color:#065F46;}
   .points-type-btn.selected-demerit{border-color:#EF4444;background:#FEF2F2;color:#991B1B;}
+  .points-type-btn.selected-reduce{border-color:#3B82F6;background:#EFF6FF;color:#1E40AF;}
 
   .points-field{margin-bottom:14px;}
   .points-label{
@@ -2370,7 +2373,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.97</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.99</div>
   </div>
 </div>
 
@@ -2457,7 +2460,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.97</div>
+    <div class="nav-version">ver3.99</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -2754,6 +2757,7 @@
               <div class="points-type-row">
                 <button class="points-type-btn" id="ptsMeritBtn" onclick="selectPointType('상점')">⭐ 상점</button>
                 <button class="points-type-btn" id="ptsDemeritBtn" onclick="selectPointType('벌점')">⚠️ 벌점</button>
+                <button class="points-type-btn" id="ptsReduceBtn" onclick="selectPointType('벌점감점')">♻️ 감점활동</button>
               </div>
             </div>
 
@@ -6419,7 +6423,8 @@ function populateDetailSelect(type) {
   if (!sel) return;
   sel.innerHTML = '<option value="">— 규정에서 선택 —</option>';
   const rules = type === '상점' ? PTS_RULES.상점
-              : type === '벌점' ? [...PTS_RULES.벌점, ...PTS_RULES.벌점감점]
+              : type === '벌점' ? PTS_RULES.벌점
+              : type === '벌점감점' ? PTS_RULES.벌점감점
               : [];
   let lastCat = '';
   rules.forEach((r, i) => {
@@ -6502,7 +6507,7 @@ function renderStudentRows() {
       </div>
       <select class="points-select" onchange="onStudentScoreInput(${idx},this.value)" style="text-align:center;">
         <option value="">점수</option>
-        ${[1,2,3,5,10].map(n => {
+        ${[1,2,3,4,5,6,10].map(n => {
           const label = ptsType === '벌점' ? `-${n}점` : `+${n}점`;
           return `<option value="${n}" ${s.score===String(n)?'selected':''}>${label}</option>`;
         }).join('')}
@@ -6810,6 +6815,7 @@ function selectPointType(type) {
   ptsType = type;
   document.getElementById('ptsMeritBtn').className   = 'points-type-btn' + (type==='상점' ? ' selected-merit' : '');
   document.getElementById('ptsDemeritBtn').className = 'points-type-btn' + (type==='벌점' ? ' selected-demerit' : '');
+  document.getElementById('ptsReduceBtn').className  = 'points-type-btn' + (type==='벌점감점' ? ' selected-reduce' : '');
   // 유형 바뀌면 학생별 사유 초기화 후 재렌더
   ptsStudentRows.forEach(s => { s.detailIdx=undefined; s.detail=''; s.customMode=false; s.customDetail=''; });
   renderStudentRows();
@@ -6846,7 +6852,7 @@ function addToSessionHistory(entries, detail, date, score) {
   if (ptsSessionHistory.length === 0) list.innerHTML = '';
   entries.forEach(s => {
     ptsSessionHistory.unshift(s);
-    const cls = ptsType === '상점' ? 'merit' : 'demerit';
+    const cls = ptsType === '벌점' ? 'demerit' : 'merit';
     const item = document.createElement('div');
     item.className = 'points-history-item';
     item.innerHTML = `
