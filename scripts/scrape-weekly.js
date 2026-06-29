@@ -1,6 +1,12 @@
 const { chromium } = require('@playwright/test');
 const admin = require('firebase-admin');
 const { google } = require('googleapis');
+const https = require('https');
+
+// keep-alive 연결 재사용에서 끊기는 'Premature close' 방지:
+// 매 요청마다 새 연결을 쓰도록 전역 agent 설정
+const noKeepAliveAgent = new https.Agent({ keepAlive: false });
+google.options({ agent: noKeepAliveAgent });
 
 // ── Firebase 초기화 ──────────────────────────────────────
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -32,17 +38,18 @@ async function withRetry(label, fn, retries = 4, delayMs = 3000) {
   throw lastErr;
 }
 
-// ── Google Sheets 인증 (서비스 계정) ──────────────────────
-// 인증 클라이언트를 미리 만들어 토큰을 명시적으로 확보해 둔다.
+// ── Google Sheets 인증 (서비스 계정, JWT 직접) ────────────
+// GoogleAuth 대신 JWT 클래스를 직접 써서 firebase-admin과 동일한
+// 안정적인 토큰 발급 경로를 탄다.
 async function getSheetsClient() {
-  const auth = new google.auth.GoogleAuth({
-    credentials: serviceAccount,
+  const jwtClient = new google.auth.JWT({
+    email: serviceAccount.client_email,
+    key: serviceAccount.private_key,
     scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
   });
-  // 토큰을 미리 발급받아 둔다 (여기서 Premature close가 나면 재시도로 흡수)
-  const client = await auth.getClient();
-  await withRetry('토큰 발급', () => client.getAccessToken());
-  return google.sheets({ version: 'v4', auth: client });
+  // 토큰을 미리 발급받아 둔다 (실패 시 재시도로 흡수)
+  await withRetry('토큰 발급', () => jwtClient.authorize());
+  return google.sheets({ version: 'v4', auth: jwtClient });
 }
 
 // ── 학사일정 읽기 ─────────────────────────────────────────
