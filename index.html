@@ -2383,7 +2383,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.04</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.06</div>
   </div>
 </div>
 
@@ -2470,7 +2470,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.04</div>
+    <div class="nav-version">ver4.06</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3047,6 +3047,7 @@
     </div>
     <div class="mytask-modal-footer">
       <button class="mytask-btn-delete" id="mytaskDeleteBtn" onclick="deleteMytask()" style="display:none;">삭제</button>
+      <button class="mytask-btn-delete" id="mytaskLeaveBtn" onclick="leaveMytaskShare()" style="display:none;">삭제(공유 나가기)</button>
       <button class="mytask-btn-cancel" onclick="closeMytaskModal()">취소</button>
       <button class="mytask-btn-save" id="mytaskSaveBtn" onclick="saveMytask()">저장</button>
     </div>
@@ -4376,10 +4377,34 @@ async function doGoogleLogin(provider) {
   }
 }
 
-// 인앱 브라우저 안내 (iOS에서 카카오톡 등으로 열었을 때)
-if (isInApp && /iphone|ipad|ipod/i.test(navigator.userAgent)) {
-  setAuthStatus('원활한 로그인을 위해 우측 메뉴에서 "Safari로 열기"를 선택해주세요.', true);
-}
+// 인앱 브라우저(카카오톡/라인/인스타/네이버/페이스북) 감지 시
+// 자동으로 외부 브라우저(크롬/사파리/삼성인터넷)로 열기
+(function escapeInAppBrowser() {
+  if (!isInApp) return;
+  const ua = navigator.userAgent.toLowerCase();
+  const target = location.href;
+
+  if (/android/i.test(ua)) {
+    // 안드로이드: intent로 크롬 강제 실행
+    const cleaned = target.replace(/^https?:\/\//, '');
+    location.href = 'intent://' + cleaned
+      + '#Intent;scheme=https;package=com.android.chrome;end';
+  } else if (/iphone|ipad|ipod/i.test(ua)) {
+    // iOS 카카오톡: 외부 사파리 열기 스킴
+    if (/kakaotalk/i.test(ua)) {
+      location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(target);
+    }
+    // 그 외 iOS 인앱(라인/인스타 등)은 스킴이 제각각이라 안내로 대체
+  }
+
+  // 자동 전환이 막힐 때를 대비한 안내 화면
+  document.addEventListener('DOMContentLoaded', () => {
+    const gate = document.getElementById('authStatus');
+    if (gate) {
+      setAuthStatus('카카오톡 등 인앱 브라우저에서는 로그인이 제한됩니다.\n우측 하단(또는 상단) 메뉴 ⋯ 를 눌러 "다른 브라우저로 열기" 또는 "Safari로 열기"를 선택해주세요.', true);
+    }
+  });
+})();
 
 googleLoginBtn.addEventListener('click', async () => {
   setAuthStatus('로그인 창을 여는 중...');
@@ -8934,6 +8959,48 @@ async function deleteMytaskComment(index) {
 }
 window.deleteMytaskComment = deleteMytaskComment;
 
+// 공유받은 일정에서 나가기 (본인만 sharedWith에서 제거 + 댓글 자동 기록)
+async function leaveMytaskShare() {
+  const user = fbAuth.currentUser;
+  if (!mytaskEditId || !mytaskEditOwner) return;
+  if (!confirm('이 일정을 내 목록에서 삭제(공유 해제)할까요?')) return;
+  try {
+    const ref  = doc(fbDb, 'tasks', mytaskEditOwner, 'items', mytaskEditId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) { closeMytaskModal(); return; }
+    const data = snap.data();
+
+    // 내 식별자(이메일·표시이름·등록이름) 중 sharedWith에 있는 값 제거
+    const myTeacher = TEACHERS.find(t => t.email && t.email === user.email)
+                   || TEACHERS.find(t => t.name === user.displayName);
+    const myIds = [user.email, user.displayName, myTeacher?.name, myTeacher?.email].filter(Boolean);
+    const newShared = (data.sharedWith || []).filter(s => !myIds.includes(s));
+
+    // 댓글 자동 기록
+    const myName = myTeacher?.name || user.displayName || user.email;
+    const comments = data.comments || [];
+    comments.push({
+      name: myName,
+      email: user.email,
+      text: `${myName} 선생님이 일정을 삭제하여 공유 해제되었습니다.`,
+      createdAt: new Date().toISOString(),
+      system: true
+    });
+
+    await setDoc(ref, { sharedWith: newShared, comments, updatedAt: new Date().toISOString() }, { merge: true });
+
+    // 로컬에서도 제거
+    mytaskTasks = mytaskTasks.filter(t => t.id !== mytaskEditId);
+    closeMytaskModal();
+    const isMobile = window.innerWidth <= 1024;
+    if (isMobile) { renderMytaskCalendar(); renderMytaskList(); } else renderRows();
+    renderHomeTaskSection();
+  } catch(e) {
+    alert('공유 해제 실패: ' + e.message);
+  }
+}
+window.leaveMytaskShare = leaveMytaskShare;
+
 async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
   const user      = fbAuth.currentUser;
   mytaskEditId    = id;
@@ -8941,12 +9008,14 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
   const isOwner   = !ownerUid || ownerUid === user.uid;
   const modal     = document.getElementById('mytaskModal');
   const delBtn    = document.getElementById('mytaskDeleteBtn');
+  const leaveBtn  = document.getElementById('mytaskLeaveBtn');
   const saveBtn   = document.getElementById('mytaskSaveBtn');
   const ownerSec  = document.getElementById('mytaskOwnerSection');
   const commentSec= document.getElementById('mytaskCommentSection');
 
   document.getElementById('mytaskModalTitle').textContent = id ? '일정 상세' : '일정 추가';
   delBtn.style.display   = (id && isOwner) ? 'block' : 'none';
+  if (leaveBtn) leaveBtn.style.display = (id && !isOwner) ? 'block' : 'none';
   ownerSec.style.display = isOwner ? 'block' : 'none';
   commentSec.style.display = id ? 'block' : 'none';
   saveBtn.textContent    = isOwner ? '저장' : '상태 저장';
