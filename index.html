@@ -2383,7 +2383,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.02</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.03</div>
   </div>
 </div>
 
@@ -2470,7 +2470,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.02</div>
+    <div class="nav-version">ver4.03</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7252,14 +7252,17 @@ async function collectTeacherEmail(user) {
   try {
     const displayName = user.displayName || '';
     if (!displayName) return;
-    const teacher = TEACHERS.find(t => t.name === displayName);
+    // 이름 매칭: 공백 제거 후 비교 (구글 표시이름과 등록이름의 사소한 차이 흡수)
+    const norm = s => (s || '').replace(/\s/g, '');
+    const dn = norm(displayName);
+    const teacher = TEACHERS.find(t => norm(t.name) === dn);
     if (!teacher) return;
     if (teacher.email === user.email && teacher.uid === user.uid) return;
     const snap = await getDoc(doc(fbDb, 'appdata', 'main'));
     if (!snap.exists()) return;
     const data = snap.data();
     const teachers = data.teachers || [];
-    const idx = teachers.findIndex(t => t.name === displayName);
+    const idx = teachers.findIndex(t => norm(t.name) === dn);
     if (idx < 0) return;
     if (teachers[idx].email === user.email && teachers[idx].uid === user.uid) return;
     teachers[idx].email = user.email;
@@ -8342,7 +8345,11 @@ async function loadMytasks() {
   );
 
   // uid 있는 선생님들의 일정 중 나를 공유한 것 구독
-  const myIdentifiers = [user.email, user.displayName].filter(Boolean);
+  // 공유 저장값은 (email || name)이므로, 내 식별자도 email·displayName·TEACHERS등록이름 모두 포함
+  const myTeacher = TEACHERS.find(t => t.email && t.email === user.email)
+                 || TEACHERS.find(t => t.name === user.displayName);
+  const myIdentifiers = [user.email, user.displayName, myTeacher?.name, myTeacher?.email]
+    .filter(Boolean);
   TEACHERS.filter(t => t.uid && t.uid !== user.uid).forEach(teacher => {
     const unsub = onSnapshot(
       collection(fbDb, 'tasks', teacher.uid, 'items'),
@@ -8737,7 +8744,10 @@ function addMytaskShare(email) {
 function searchMytaskShare(val) {
   const sug  = document.getElementById('mytaskShareSug');
   const user = fbAuth.currentUser;
-  const myName = user?.displayName || '';
+  const myName  = user?.displayName || '';
+  const myEmail = user?.email || '';
+  // TEACHERS에서 내 이름도 찾아둔다 (displayName과 다를 수 있으므로)
+  const myTeacherName = TEACHERS.find(t => t.email && t.email === myEmail)?.name || myName;
   const q = val.trim();
   if (!q) { sug.style.display = 'none'; return; }
 
@@ -8745,10 +8755,12 @@ function searchMytaskShare(val) {
   const allGroups = [...(_groups.default||[]), ...(_groups.custom||[])];
   const groupMatches = allGroups.filter(g => g.name?.includes(q));
 
-  // 교사 검색
+  // 교사 검색 (본인 제외: 이름·이메일 모두 비교)
   const teacherMatches = TEACHERS.filter(t =>
     t.name?.includes(q) &&
     t.name !== myName &&
+    t.name !== myTeacherName &&
+    (!t.email || t.email !== myEmail) &&
     !mytaskCurrentShared.includes(t.email || t.name)
   ).slice(0, 6);
 
@@ -8882,15 +8894,44 @@ function renderMytaskComments(comments) {
     el.innerHTML = '<div style="color:var(--ink-soft);font-size:13px;">댓글이 없습니다.</div>';
     return;
   }
-  el.innerHTML = comments.map(c => `
+  const myEmail = fbAuth.currentUser?.email || '';
+  el.innerHTML = comments.map((c, i) => `
     <div class="mytask-comment-item">
-      <div class="mytask-comment-author">${c.name || c.email}</div>
+      <div class="mytask-comment-author">${c.name || c.email}${
+        c.email === myEmail
+          ? ` <button onclick="deleteMytaskComment(${i})" title="댓글 삭제" style="border:none;background:none;color:var(--mon);cursor:pointer;font-size:12px;margin-left:4px;padding:0;">삭제</button>`
+          : ''
+      }</div>
       <div class="mytask-comment-text">${c.text}</div>
       <div class="mytask-comment-time">${new Date(c.createdAt).toLocaleString('ko-KR')}</div>
     </div>
   `).join('');
   el.scrollTop = el.scrollHeight;
 }
+
+// 댓글 삭제 (본인이 쓴 것만)
+async function deleteMytaskComment(index) {
+  const user = fbAuth.currentUser;
+  if (!mytaskEditId) return;
+  try {
+    const ownerUid = mytaskEditOwner || user.uid;
+    const ref      = doc(fbDb, 'tasks', ownerUid, 'items', mytaskEditId);
+    const snap     = await getDoc(ref);
+    const existing = snap.data()?.comments || [];
+    const target   = existing[index];
+    // 본인 댓글만 삭제 허용
+    if (!target || target.email !== user.email) {
+      alert('본인이 작성한 댓글만 삭제할 수 있습니다.');
+      return;
+    }
+    const updated = existing.filter((_, i) => i !== index);
+    await setDoc(ref, { comments: updated }, { merge: true });
+    const t = mytaskTasks.find(t => t.id === mytaskEditId);
+    if (t) t.comments = updated;
+    renderMytaskComments(updated);
+  } catch(e) { alert('댓글 삭제 실패: ' + e.message); }
+}
+window.deleteMytaskComment = deleteMytaskComment;
 
 async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
   const user      = fbAuth.currentUser;
