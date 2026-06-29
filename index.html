@@ -2383,7 +2383,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.03</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.04</div>
   </div>
 </div>
 
@@ -2470,7 +2470,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.03</div>
+    <div class="nav-version">ver4.04</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3163,7 +3163,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, indexedDBLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, addDoc, getDocs, deleteDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -3181,6 +3181,11 @@ const fbApp = initializeApp(firebaseConfig);
 
 // redirect 방식 미사용
 const fbAuth = getAuth(fbApp);
+// PWA(홈화면 설치)에서 세션이 유지되도록 영속성 명시 설정
+// indexedDB 우선, 실패 시 localStorage 폴백
+setPersistence(fbAuth, indexedDBLocalPersistence)
+  .catch(() => setPersistence(fbAuth, browserLocalPersistence))
+  .catch(e => console.log('persistence 설정 실패:', e.message));
 const fbDb = getFirestore(fbApp);
 const TEACHERS = [];
 
@@ -4352,14 +4357,10 @@ getRedirectResult(fbAuth).then(result => {
 });
 
 // 공통 로그인 실행: 팝업 우선, 차단되면 redirect로 우회
+// (PWA standalone 포함 — iOS PWA에서도 사용자 클릭 팝업은 열리는 경우가 많고,
+//  redirect는 PWA→Safari 이탈 후 결과 유실로 멈추는 문제가 있어 팝업을 먼저 시도)
 async function doGoogleLogin(provider) {
-  // PWA standalone 모드에서는 팝업이 막히므로 바로 redirect
-  if (isStandalone) {
-    await signInWithRedirect(fbAuth, provider);
-    return;
-  }
   try {
-    // 일반 브라우저(사파리 포함): 사용자 클릭 기반 팝업 먼저 시도
     await signInWithPopup(fbAuth, provider);
   } catch(e) {
     // 팝업이 차단되거나 환경상 불가하면 redirect로 우회
