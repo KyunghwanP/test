@@ -1,12 +1,5 @@
 const { chromium } = require('@playwright/test');
 const admin = require('firebase-admin');
-const { google } = require('googleapis');
-const https = require('https');
-
-// keep-alive 연결 재사용에서 끊기는 'Premature close' 방지:
-// 매 요청마다 새 연결을 쓰도록 전역 agent 설정
-const noKeepAliveAgent = new https.Agent({ keepAlive: false });
-google.options({ agent: noKeepAliveAgent });
 
 // ── Firebase 초기화 ──────────────────────────────────────
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -17,7 +10,9 @@ admin.initializeApp({
 const db = admin.firestore();
 
 const SITES_BASE = 'https://sites.google.com/yeungnam.hs.kr/202633';
-const SCHEDULE_SHEET_ID = '1dWQEv1xgl4AGillRWPfUkJAb0cM3ChLHEC0uiIwRpB4';
+
+// GAS 웹앱 URL (상벌점/주간요약과 동일한 프로젝트)
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
 
 // ── 공용: 재시도 헬퍼 ─────────────────────────────────────
 async function withRetry(label, fn, retries = 4, delayMs = 3000) {
@@ -29,7 +24,7 @@ async function withRetry(label, fn, retries = 4, delayMs = 3000) {
       lastErr = e;
       console.warn(`  ⚠️  ${label} 시도 ${attempt}/${retries} 실패: ${e.message}`);
       if (attempt < retries) {
-        const wait = delayMs * attempt; // 점증 백오프 (3s, 6s, 9s)
+        const wait = delayMs * attempt;
         console.log(`     ${wait/1000}초 후 재시도...`);
         await new Promise(r => setTimeout(r, wait));
       }
@@ -38,112 +33,31 @@ async function withRetry(label, fn, retries = 4, delayMs = 3000) {
   throw lastErr;
 }
 
-// ── Google Sheets 인증 (서비스 계정, JWT 직접) ────────────
-// GoogleAuth 대신 JWT 클래스를 직접 써서 firebase-admin과 동일한
-// 안정적인 토큰 발급 경로를 탄다.
-async function getSheetsClient() {
-  const jwtClient = new google.auth.JWT({
-    email: serviceAccount.client_email,
-    key: serviceAccount.private_key,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-  });
-  // 토큰을 미리 발급받아 둔다 (실패 시 재시도로 흡수)
-  await withRetry('토큰 발급', () => jwtClient.authorize());
-  return google.sheets({ version: 'v4', auth: jwtClient });
-}
-
-// ── 학사일정 읽기 ─────────────────────────────────────────
+// ── 학사일정 읽기 (GAS 경유) ──────────────────────────────
+// GAS가 구글 내부에서 시트를 읽어 JSON으로 돌려준다.
+// → GitHub 러너에서 구글 OAuth 토큰을 받을 필요가 없어
+//   'Premature close' 문제가 원천적으로 사라진다.
 async function fetchSchedule() {
-  console.log('📅 학사일정 읽는 중...');
+  console.log('📅 학사일정 읽는 중 (GAS 경유)...');
 
-  // 인증 + 토큰 확보까지 재시도로 감쌈
-  const sheets = await withRetry('Sheets 인증', () => getSheetsClient());
+  const json = await withRetry('GAS 학사일정 호출', async () => {
+    const res = await fetch(GAS_URL + '?action=getSchedule', {
+      redirect: 'follow',
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data.success) throw new Error('GAS 오류: ' + (data.error || '알 수 없음'));
+    return data.data || {};
+  });
 
-  // 시트 목록 가져오기 (재시도)
-  const meta = await withRetry('시트 목록 조회', () =>
-    sheets.spreadsheets.get({ spreadsheetId: SCHEDULE_SHEET_ID })
-  );
-  const sheetList = meta.data.sheets.map(s => s.properties.title);
-  console.log(`  → 시트 ${sheetList.length}개: ${sheetList.join(', ')}`);
-
-  const result = {}; // { '2026년 7월': [{date, day, content}], ... }
-
-  for (const sheetName of sheetList) {
-    try {
-      const res = await withRetry(`${sheetName} 읽기`, () =>
-        sheets.spreadsheets.values.get({
-          spreadsheetId: SCHEDULE_SHEET_ID,
-          range: `'${sheetName}'!A1:E50`,
-        })
-      );
-      const rows = res.data.values || [];
-
-      // 월 이름 추출 (시트명에서)
-      const monthMatch = sheetName.match(/(\d+)월/);
-      const month = monthMatch ? parseInt(monthMatch[1]) : null;
-      const yearMatch = sheetName.match(/(\d{4})/);
-      const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
-      if (!month) continue;
-
-      // 현재 파싱 중인 월 (헤더 감지 시 변경될 수 있음)
-      let curMonth = month;
-      const eventsByMonth = {}; // { month: [events] }
-
-      for (const row of rows) {
-        const cellD = String(row[3] || '').trim();
-
-        // D열에 'X월 교육활동 내용' 헤더가 나오면 파싱 월 변경
-        const headerMatch = cellD.match(/^(\d+)월\s*교육활동/);
-        if (headerMatch) {
-          curMonth = parseInt(headerMatch[1]);
-          continue;
-        }
-
-        // B열(1): 날짜
-        const cellB = String(row[1] || '').trim();
-        let date = null;
-        if (/^\d{1,2}$/.test(cellB) && parseInt(cellB) >= 1 && parseInt(cellB) <= 31) {
-          date = parseInt(cellB);
-        }
-        // C열(2): 요일
-        const cellC = String(row[2] || '').trim();
-        const day = /^[월화수목금토일]$/.test(cellC) ? cellC : '';
-
-        // D열(3): 교육활동 내용 (이름 패턴 제외)
-        let evContent = '';
-        if (cellD.length >= 2 && !/^[①②③ㆍ]/.test(cellD) && !/^[가-힣]{2,4}$/.test(cellD)) {
-          evContent = cellD;
-        }
-
-        if (date && evContent) {
-          const lastDay = new Date(year, curMonth, 0).getDate();
-          if (date <= lastDay) {
-            const key = curMonth;
-            if (!eventsByMonth[key]) eventsByMonth[key] = [];
-            eventsByMonth[key].push({ date, day, content: evContent });
-          }
-        }
-      }
-
-      // 각 월별로 result에 저장
-      for (const [m, evs] of Object.entries(eventsByMonth)) {
-        if (evs.length > 0) {
-          const key = `${year}-${String(m).padStart(2,'0')}`;
-          if (!result[key]) result[key] = [];
-          // 중복 제거 후 병합
-          const existing = new Set(result[key].map(e => e.date + '-' + e.content));
-          evs.forEach(e => {
-            if (!existing.has(e.date + '-' + e.content)) result[key].push(e);
-          });
-          console.log(`  → ${sheetName} → ${key}: ${evs.length}개 일정`);
-        }
-      }
-    } catch(e) {
-      console.warn(`  ⚠️  ${sheetName} 읽기 최종 실패:`, e.message);
-    }
+  // 월별 개수 로그
+  const months = Object.keys(json);
+  if (months.length === 0) {
+    console.log('  → 학사일정 데이터 없음');
+  } else {
+    months.forEach(k => console.log(`  → ${k}: ${json[k].length}개 일정`));
   }
-
-  return result;
+  return json;
 }
 
 // ── 메인 실행 ────────────────────────────────────────────
@@ -157,7 +71,7 @@ async function main() {
     // 1) 메인 페이지 로드 (JS 실행 포함)
     console.log('📡 구글 사이트 접속 중...');
     await page.goto(SITES_BASE, { waitUntil: 'networkidle', timeout: 30000 });
-    await page.waitForTimeout(2000); // JS 렌더링 여유 시간
+    await page.waitForTimeout(2000);
 
     // 2) 주차 네비게이션 링크 추출
     console.log('🗂  주차 목록 추출 중...');
@@ -177,21 +91,19 @@ async function main() {
 
     console.log(`  → 주차 ${weekLinks.length}개 발견`);
 
-    // 3) Firestore에 저장
+    // 3) Firestore에 주차 목록 저장
     console.log('☁️  Firestore 저장 중...');
     const now = new Date().toISOString();
 
-    // 주차 목록 저장
     await db.collection('weeklyData').doc('index').set({
       weeks: weekLinks.slice(0, 20),
       updatedAt: now
     });
     console.log('  → 주차 목록 저장 완료');
 
-    // 4) 학사일정 읽기 및 저장 (전체를 재시도로 감쌈)
+    // 4) 학사일정 (GAS 경유) 읽기 및 저장
     try {
       const schedule = await fetchSchedule();
-      // 저장도 재시도
       await withRetry('학사일정 저장', () =>
         db.collection('schedule').doc('main').set({
           data: schedule,
