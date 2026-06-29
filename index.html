@@ -214,6 +214,15 @@
   .points-type-btn.selected-demerit{border-color:#EF4444;background:#FEF2F2;color:#991B1B;}
   .points-type-btn.selected-reduce{border-color:#3B82F6;background:#EFF6FF;color:#1E40AF;}
   .pts-subtype-sel{flex:0 0 auto;font-weight:700;border-color:var(--rule);}
+  /* 점수 칸 강조 — 가장 중요한 입력값 */
+  .pts-score-sel{
+    font-weight:800 !important;font-size:17px !important;
+    color:var(--mon) !important;
+    border:2px solid var(--mon) !important;
+    background:#FFF7F8 !important;
+    border-radius:8px;
+  }
+  .pts-score-sel:focus{outline:none;box-shadow:0 0 0 3px rgba(140,47,57,0.15);}
 
   .points-field{margin-bottom:14px;}
   .points-label{
@@ -2374,7 +2383,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.00</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.01</div>
   </div>
 </div>
 
@@ -2461,7 +2470,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.00</div>
+    <div class="nav-version">ver4.01</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -6504,7 +6513,7 @@ function renderStudentRows() {
           style="min-width:0;width:100%;">
         <div class="pts-suggestions" id="ptsSug_${idx}"></div>
       </div>
-      <select class="points-select" onchange="onStudentScoreInput(${idx},this.value)" style="text-align:center;">
+      <select class="points-select pts-score-sel" onchange="onStudentScoreInput(${idx},this.value)" style="text-align:center;">
         <option value="">점수</option>
         ${[1,2,3,4,5,6,10].map(n => {
           const label = ptsType === '벌점' ? `-${n}점` : `+${n}점`;
@@ -6525,11 +6534,11 @@ function renderStudentRows() {
         <option value="">— 사유 선택 —</option>
         ${detailRules}
       </select>
+      <button class="points-custom-toggle ${s.customMode?'active':''}" onclick="toggleStudentCustom(${idx})">${s.customMode?'직접입력 접기':'+ 직접입력 추가'}</button>
       ${ptsType === '상점' ? `<select class="points-select pts-subtype-sel" onchange="onStudentSubType(${idx},this.value)" title="상점/감점활동 구분">
         <option value="상점" ${(s.subType||'상점')==='상점'?'selected':''}>⭐ 상점</option>
         <option value="벌점감점" ${s.subType==='벌점감점'?'selected':''}>♻️ 감점활동</option>
       </select>` : ''}
-      <button class="points-custom-toggle ${s.customMode?'active':''}" onclick="toggleStudentCustom(${idx})">${s.customMode?'직접입력 접기':'+ 직접입력 추가'}</button>
     `;
     // 직접입력 textarea (customMode일 때 표시)
     if (s.customMode) {
