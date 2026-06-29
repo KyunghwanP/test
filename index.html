@@ -2383,7 +2383,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.01</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.02</div>
   </div>
 </div>
 
@@ -2470,7 +2470,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.01</div>
+    <div class="nav-version">ver4.02</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4334,8 +4334,13 @@ function setAuthStatus(msg, isError){
 
 // 사파리 감지
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+// PWA(홈 화면 추가) standalone 모드 감지 — 이 경우 팝업이 막혀 redirect 필요
+const isStandalone = window.navigator.standalone === true
+  || window.matchMedia('(display-mode: standalone)').matches;
+// 인앱 브라우저(카카오톡/라인/인스타/네이버) 감지
+const isInApp = /kakaotalk|line|instagram|naver|fban|fbav/i.test(navigator.userAgent);
 
-// redirect 결과 처리 (사파리에서 redirect 후 돌아왔을 때)
+// redirect 결과 처리 (redirect 후 돌아왔을 때)
 getRedirectResult(fbAuth).then(result => {
   if (result?.user) {
     // redirect 로그인 성공 - onAuthStateChanged에서 처리됨
@@ -4346,16 +4351,41 @@ getRedirectResult(fbAuth).then(result => {
   }
 });
 
+// 공통 로그인 실행: 팝업 우선, 차단되면 redirect로 우회
+async function doGoogleLogin(provider) {
+  // PWA standalone 모드에서는 팝업이 막히므로 바로 redirect
+  if (isStandalone) {
+    await signInWithRedirect(fbAuth, provider);
+    return;
+  }
+  try {
+    // 일반 브라우저(사파리 포함): 사용자 클릭 기반 팝업 먼저 시도
+    await signInWithPopup(fbAuth, provider);
+  } catch(e) {
+    // 팝업이 차단되거나 환경상 불가하면 redirect로 우회
+    if (e.code === 'auth/popup-blocked'
+        || e.code === 'auth/popup-closed-by-user'
+        || e.code === 'auth/cancelled-popup-request'
+        || e.code === 'auth/operation-not-supported-in-this-environment') {
+      setAuthStatus('화면 전환 방식으로 로그인합니다...');
+      await signInWithRedirect(fbAuth, provider);
+    } else {
+      throw e;
+    }
+  }
+}
+
+// 인앱 브라우저 안내 (iOS에서 카카오톡 등으로 열었을 때)
+if (isInApp && /iphone|ipad|ipod/i.test(navigator.userAgent)) {
+  setAuthStatus('원활한 로그인을 위해 우측 메뉴에서 "Safari로 열기"를 선택해주세요.', true);
+}
+
 googleLoginBtn.addEventListener('click', async () => {
   setAuthStatus('로그인 창을 여는 중...');
   try{
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ hd: 'yeungnam.hs.kr' });
-    if (isSafari) {
-      await signInWithRedirect(fbAuth, provider);
-    } else {
-      await signInWithPopup(fbAuth, provider);
-    }
+    await doGoogleLogin(provider);
   }catch(e){
     setAuthStatus('로그인 실패: ' + e.message, true);
   }
@@ -4370,11 +4400,7 @@ if (googleLoginAltBtn) {
       await signOut(fbAuth); // 기존 세션 초기화
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ hd: 'yeungnam.hs.kr', prompt: 'select_account' });
-      if (isSafari) {
-        await signInWithRedirect(fbAuth, provider);
-      } else {
-        await signInWithPopup(fbAuth, provider);
-      }
+      await doGoogleLogin(provider);
     } catch(e) {
       setAuthStatus('로그인 실패: ' + e.message, true);
     }
