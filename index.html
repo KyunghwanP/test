@@ -2383,7 +2383,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.06</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.08</div>
   </div>
 </div>
 
@@ -2470,7 +2470,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.06</div>
+    <div class="nav-version">ver4.08</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -6019,11 +6019,13 @@ async function initHomePage() {
     } else {
       section.style.display = '';
 
-      // 시간표 렌더링 함수 (주기적 갱신용)
+      // 시간표 렌더링 함수 (주기적 갱신용) - 날짜/요일도 매번 새로 계산
       window._renderHomeMyTt = function() {
-        const nowMin2 = new Date().getHours()*60 + new Date().getMinutes();
+        const nowDate = new Date();
+        const todayDay2 = days[nowDate.getDay()]; // 자정 넘어가면 오늘 요일로 갱신
+        const nowMin2 = nowDate.getHours()*60 + nowDate.getMinutes();
         const ttHtml = periods.map(b => {
-          const found = (myTeacher.schedule[todayDay]||[]).find(x => x.period === b.period);
+          const found = (myTeacher.schedule[todayDay2]||[]).find(x => x.period === b.period);
           const isNow = nowMin2 >= toMinutes(b.start)-5 && nowMin2 <= toMinutes(b.end)+5;
           const cls = ['home-tt-cell', isNow?'now':'', !found?'empty':''].filter(Boolean).join(' ');
           return `<div class="${cls}">
@@ -6037,10 +6039,20 @@ async function initHomePage() {
         if(el) el.innerHTML = ttHtml || '<div class="home-tt-no-class">오늘 수업이 없습니다</div>';
       };
       window._renderHomeMyTt();
-      // 1분마다 갱신
+      // 1분마다 갱신 + 날짜 바뀌면 현황판 전체 새로고침
       if(window._homeTtTimer) clearInterval(window._homeTtTimer);
+      window._lastHomeDate = new Date().toDateString();
       window._homeTtTimer = setInterval(() => {
-        if(document.getElementById('homePage')?.classList.contains('active')) {
+        if(!document.getElementById('homePage')?.classList.contains('active')) return;
+        const nowDateStr = new Date().toDateString();
+        if (nowDateStr !== window._lastHomeDate) {
+          // 날짜가 바뀜 → 오늘 기준으로 현황판 전체 재구성
+          window._lastHomeDate = nowDateStr;
+          _mealOffset = 0;
+          _scheduleOffset = 0;
+          homeInitialized = false;
+          initHomePage();
+        } else {
           window._renderHomeMyTt();
         }
       }, 60000);
@@ -8332,8 +8344,10 @@ let listFilters = new Set(['all']);
 function initMytaskPage() {
   if (!mytaskInitialized) {
     mytaskInitialized = true;
-    if (mytaskTasks.length === 0) loadMytasks();
   }
+  // 탭 진입 시마다 재구독 — 그동안 새로 공유받은 일정/교사를 반영
+  // (loadMytasks 내부 mytaskLoading 가드로 중복 실행은 방지됨)
+  loadMytasks();
   initPanelSystem();
 }
 
@@ -8393,6 +8407,8 @@ async function loadMytasks() {
           if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
           else renderRows();
         }
+        // 현황판도 항상 갱신 (공유 일정 실시간 반영)
+        renderHomeTaskSection();
       },
       err => console.log(`${teacher.name} 공유 일정 구독 오류:`, err.message)
     );
