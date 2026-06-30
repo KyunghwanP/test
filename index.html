@@ -2384,9 +2384,11 @@
   #dayPreviewPopup .dp-empty{font-size:13px;color:var(--ink-soft);}
 
   /* ───────── 학부모 상담 예약 (교사용) ───────── */
-  #consultPage .consult-wrap{max-width:760px;margin:0 auto;padding:18px 16px 60px;}
-  /* 태블릿 이상: 왼쪽(헤더+통계+시간열기) / 오른쪽(예약현황 크게) 2단 */
-  @media (min-width:900px){
+  #consultPage{overflow-x:hidden;}
+  #consultPage *{box-sizing:border-box;}
+  #consultPage .consult-wrap{max-width:760px;width:100%;box-sizing:border-box;margin:0 auto;padding:18px 16px 60px;}
+  /* 태블릿 가로 이상: 왼쪽(헤더+통계+시간열기) / 오른쪽(예약현황 크게) 2단 */
+  @media (min-width:1025px){
     #consultPage .consult-wrap{max-width:none;width:95%;}
     .consult-cols{
       display:grid;
@@ -2493,27 +2495,28 @@
   }
   .consult-stat-box .cs-num{font-size:clamp(16px,5vw,22px);font-weight:800;font-family:'IBM Plex Mono';color:var(--mon);}
   .consult-stat-box .cs-label{font-size:clamp(10px,2.8vw,12px);color:var(--ink-soft);margin-top:2px;white-space:nowrap;}
-  @media (max-width:520px){
+  @media (max-width:1024px){
     .consult-form-grid{grid-template-columns:1fr;}
-    /* 모바일: 전반적으로 살짝 축소 */
+    /* 모바일·좁은 태블릿: 전반적으로 축소 (이 구간이 핵심) */
     #consultPage .consult-wrap{padding:14px 12px 50px;}
-    .consult-intro{padding:16px 16px;}
-    .consult-intro h3{font-size:16px;}
-    .consult-intro p{font-size:12.5px;line-height:1.55;}
-    .consult-intro .ci-url{font-size:11px;padding:6px 9px;}
-    .consult-intro .ci-link{font-size:12px;padding:7px 11px;}
-    .consult-stat{gap:8px;margin-bottom:14px;}
-    .consult-stat-box{padding:10px 6px;}
-    .consult-stat-box .cs-num{font-size:18px;}
-    .consult-stat-box .cs-label{font-size:11px;}
-    .consult-section{padding:15px 14px;}
-    .consult-section h4{font-size:14px;}
-    .consult-col-status > h4{font-size:15px;}
-    /* 캘린더 칸 글자 약간 축소 */
-    .cwn-title{font-size:15px;}
-    .cday-head{font-size:12px;}
-    .cslot-t{font-size:13px;}
-    .cslot-name{font-size:13px;}
+    .consult-intro{padding:15px 15px;}
+    .consult-intro h3{font-size:15px;}
+    .consult-intro p{font-size:12px;line-height:1.5;}
+    .consult-intro .ci-url{font-size:10.5px;padding:6px 9px;}
+    .consult-intro .ci-link{font-size:11.5px;padding:7px 11px;}
+    .consult-intro .ci-link-row{gap:7px;margin-top:10px;}
+    .consult-stat{gap:7px;margin-bottom:12px;}
+    .consult-stat-box{padding:9px 5px;}
+    .consult-stat-box .cs-num{font-size:17px;}
+    .consult-stat-box .cs-label{font-size:10.5px;}
+    .consult-section{padding:14px 13px;}
+    .consult-section h4{font-size:13.5px;}
+    .consult-col-status > h4{font-size:14px;}
+    /* 캘린더 칸 글자 축소 */
+    .cwn-title{font-size:14px;}
+    .cday-head{font-size:11.5px;}
+    .cslot-t{font-size:12.5px;}
+    .cslot-name{font-size:12.5px;}
   }
 
   /* 주 네비게이션 */
@@ -2633,7 +2636,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.28</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.29</div>
   </div>
 </div>
 
@@ -2726,7 +2729,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.28</div>
+    <div class="nav-version">ver4.29</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
