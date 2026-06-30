@@ -408,13 +408,13 @@ confirmBtn.addEventListener('click', async () => {
       ALREADY_BOOKED: '이미 예약된 상담이 있습니다.'
     };
     showMsg(confirmMsg, map[data.error] || ('예약에 실패했습니다: ' + (data.error||'')), 'error');
-    confirmBtn.disabled = false;
-    confirmBtn.textContent = '이 시간으로 예약 확정';
     if(['TAKEN','GONE','ALREADY_BOOKED'].includes(data.error)){
       setTimeout(loadSlots, 1500);
     }
   } catch(e){
     showMsg(confirmMsg, '예약 처리 중 오류가 발생했습니다. 다시 시도해 주세요.', 'error');
+  } finally {
+    // 성공·실패와 무관하게 버튼 상태를 항상 복구 (굳음 방지)
     confirmBtn.disabled = false;
     confirmBtn.textContent = '이 시간으로 예약 확정';
   }
@@ -443,10 +443,9 @@ document.getElementById('cancelBtn').addEventListener('click', async () => {
       return;
     }
     alert('취소에 실패했습니다: ' + (data.error||''));
-    cancelBtn.disabled = false;
-    cancelBtn.textContent = '예약 취소하기';
   } catch(e){
     alert('취소 처리 중 오류가 발생했습니다. 다시 시도해 주세요.');
+  } finally {
     cancelBtn.disabled = false;
     cancelBtn.textContent = '예약 취소하기';
   }
