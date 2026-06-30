@@ -2528,6 +2528,21 @@
     border:1.5px solid var(--rule);border-radius:9px;background:var(--paper-soft);color:var(--ink);
   }
   .cm-edit input:focus{outline:none;border-color:var(--mon);background:#fff;}
+  .consult-direct-btn{
+    font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;
+    background:var(--mon);color:#fff;border:none;border-radius:8px;padding:7px 12px;
+  }
+  .consult-direct-btn:active{opacity:.85;}
+  .cm-direct-divider{
+    font-size:12px;font-weight:700;color:var(--mon);margin:16px 0 10px;
+    padding-top:14px;border-top:1px dashed var(--rule);
+  }
+  .cm-type-toggle{display:flex;gap:6px;}
+  .cm-type-btn{
+    flex:1;padding:11px;border:1.5px solid var(--rule);border-radius:9px;
+    background:var(--paper-soft);font-size:14px;font-weight:700;color:var(--ink-soft);cursor:pointer;font-family:inherit;
+  }
+  .cm-type-btn.active{background:var(--mon);border-color:var(--mon);color:#fff;}
   .cm-actions{display:flex;gap:10px;padding:0 18px 18px;}
   .cm-btn{flex:1;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;}
   .cm-del{background:var(--paper);color:var(--warn);border:1.5px solid var(--rule);flex:0 0 90px;}
@@ -2546,7 +2561,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.18</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.21</div>
   </div>
 </div>
 
@@ -2639,7 +2654,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.18</div>
+    <div class="nav-version">ver4.21</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3089,15 +3104,16 @@
                     </div>
                     <div>
                       <label>시작 시각</label>
-                      <input type="time" id="consultStart" value="14:00">
+                      <input type="time" id="consultStart" value="14:00" step="600" min="08:00" max="21:00">
                     </div>
                     <div>
-                      <label>칸당 시간(분)</label>
+                      <label>상담 진행 시간</label>
                       <select id="consultDuration">
                         <option value="10">10분</option>
                         <option value="15">15분</option>
                         <option value="20" selected>20분</option>
                         <option value="30">30분</option>
+                        <option value="60">1시간</option>
                       </select>
                     </div>
                     <div>
@@ -3124,7 +3140,10 @@
 
               <!-- 오른쪽: 예약 현황 (크게) -->
               <div class="consult-section consult-col-status">
-                <h4>📋 예약 현황</h4>
+                <h4 style="justify-content:space-between;">
+                  <span>📋 예약 현황</span>
+                  <button id="consultDirectBtn" class="consult-direct-btn">+ 직접 예약 추가</button>
+                </h4>
                 <div id="consultList"><div class="consult-loading">불러오는 중...</div></div>
               </div>
 
@@ -3147,8 +3166,33 @@
                   </div>
                   <div>
                     <label>시각</label>
-                    <input type="time" id="cmTime">
+                    <input type="time" id="cmTime" step="600">
                   </div>
+                </div>
+
+                <!-- 교사 직접 예약 입력 (빈 슬롯/신규일 때만 노출) -->
+                <div id="cmDirectFields" style="display:none;">
+                  <div class="cm-direct-divider">전화·직접 접수한 상담 입력</div>
+                  <div class="cm-edit-grid">
+                    <div>
+                      <label>학생 이름</label>
+                      <input type="text" id="cmStudent" placeholder="예: 홍길동" autocomplete="off">
+                    </div>
+                    <div>
+                      <label>방식</label>
+                      <div class="cm-type-toggle">
+                        <button type="button" class="cm-type-btn active" data-cmtype="face">대면</button>
+                        <button type="button" class="cm-type-btn" data-cmtype="phone">전화</button>
+                      </div>
+                    </div>
+                  </div>
+                  <label style="display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin:10px 0 5px;">예약자 / 연락처</label>
+                  <div class="cm-edit-grid">
+                    <input type="text" id="cmParent" placeholder="예: 학부모 성함" autocomplete="off">
+                    <input type="tel" id="cmPhone" placeholder="010-0000-0000" autocomplete="off">
+                  </div>
+                  <label style="display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin:10px 0 5px;">메모 (선택)</label>
+                  <input type="text" id="cmMemo" placeholder="상담 내용 등" autocomplete="off" style="width:100%;font-size:15px;font-family:inherit;padding:11px;border:1.5px solid var(--rule);border-radius:9px;background:var(--paper-soft);color:var(--ink);">
                 </div>
               </div>
               <div class="cm-actions">
@@ -8754,6 +8798,16 @@ function bindConsultForm(){
   document.getElementById('consultModal').addEventListener('click', (e) => {
     if(e.target.id === 'consultModal') closeConsultModal();
   });
+  // 직접 예약 추가 버튼 (신규 모드로 모달 열기)
+  document.getElementById('consultDirectBtn').addEventListener('click', () => openConsultModal(null));
+  // 모달 방식 토글
+  document.querySelectorAll('.cm-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.cm-type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      cmDirectType = btn.dataset.cmtype;
+    });
+  });
 }
 
 // 시작시각 + 칸수 + 길이 + 간격 → 슬롯 시각 배열
@@ -8963,13 +9017,16 @@ function consultRangeLabel(wk, wkEnd){
 
 // ── 변경 모달 ──
 let consultModalSlot = null;
+let cmDirectType = 'face';
 function openConsultModal(s){
-  consultModalSlot = s;
-  const booked = s.status === 'booked';
+  consultModalSlot = s;  // null이면 신규 추가 모드
+  const booked = s && s.status === 'booked';
+  const isNew  = !s;
   const m = document.getElementById('consultModal');
-  document.getElementById('cmTitle').textContent = booked ? '예약 상세 / 변경' : '빈 시간 / 변경';
+  document.getElementById('cmTitle').textContent =
+    booked ? '예약 상세 / 변경' : (isNew ? '직접 예약 추가' : '빈 시간 / 변경');
 
-  // 예약 정보 영역
+  // 예약 정보 영역 (예약된 슬롯만)
   const infoEl = document.getElementById('cmBookingInfo');
   if(booked){
     const method = s.bookedType || s.type || 'face';
@@ -8984,9 +9041,27 @@ function openConsultModal(s){
     infoEl.style.display = 'none';
   }
 
-  // 변경 입력 (날짜·시각)
-  document.getElementById('cmDate').value = s.date;
-  document.getElementById('cmTime').value = s.time;
+  // 직접 예약 입력란: 빈 슬롯 또는 신규일 때만
+  const directEl = document.getElementById('cmDirectFields');
+  directEl.style.display = booked ? 'none' : '';
+  if(!booked){
+    // 입력 초기화
+    document.getElementById('cmStudent').value = '';
+    document.getElementById('cmParent').value  = '';
+    document.getElementById('cmPhone').value   = '';
+    document.getElementById('cmMemo').value     = '';
+    cmDirectType = 'face';
+    document.querySelectorAll('.cm-type-btn').forEach(b => b.classList.toggle('active', b.dataset.cmtype==='face'));
+  }
+
+  // 날짜·시각
+  document.getElementById('cmDate').value = s ? s.date : consultLocalYmd(new Date());
+  document.getElementById('cmTime').value = s ? s.time : '14:00';
+
+  // 삭제 버튼은 기존 슬롯에만
+  document.getElementById('cmDeleteBtn').style.display = isNew ? 'none' : '';
+  // 저장 버튼 라벨
+  document.getElementById('cmSaveBtn').textContent = booked ? '변경 저장' : (isNew ? '예약 추가' : '저장');
 
   m.classList.add('show');
 }
@@ -8996,12 +9071,31 @@ function closeConsultModal(){
 }
 
 async function saveConsultModal(){
-  if(!consultModalSlot) return;
   const newDate = document.getElementById('cmDate').value;
   const newTime = document.getElementById('cmTime').value;
   if(!newDate || !newTime){ alert('날짜와 시각을 입력하세요.'); return; }
 
+  const cur = consultModalSlot;           // null = 신규 추가
+  const isBooked = cur && cur.status === 'booked';
+  const isDirect = !isBooked;             // 빈 슬롯 채우기 or 신규 = 교사 직접 예약 입력
+
+  // 직접 예약(빈 슬롯/신규)이면 입력값 수집·검증
+  let direct = null;
+  if(isDirect){
+    const student = document.getElementById('cmStudent').value.trim();
+    const parent  = document.getElementById('cmParent').value.trim();
+    const phone   = document.getElementById('cmPhone').value.trim();
+    const memo    = document.getElementById('cmMemo').value.trim();
+    // 직접 예약을 입력하려는 경우: 학생 이름이 있으면 예약으로 처리
+    if(student || parent || phone){
+      if(!student){ alert('학생 이름을 입력하세요.'); return; }
+      direct = { student, parent, phone, memo, type: cmDirectType };
+    }
+    // 아무것도 안 넣고 저장하면: (기존 빈 슬롯) 시간만 이동 / (신규) 빈 슬롯 생성
+  }
+
   const btn = document.getElementById('cmSaveBtn');
+  const origLabel = btn.textContent;
   btn.disabled = true; btn.textContent = '저장 중...';
   const ref = doc(fbDb, 'consultations', consultClassKey);
   try {
@@ -9009,23 +9103,63 @@ async function saveConsultModal(){
       const snap  = await tx.get(ref);
       const data  = snap.exists() ? (snap.data()||{}) : {};
       const slots = Array.isArray(data.slots) ? data.slots : [];
-      const idx = slots.findIndex(x => x.id === consultModalSlot.id);
-      if(idx === -1) throw new Error('이미 삭제된 시간입니다.');
-      // 같은 날짜+시각 중복 방지 (자기 자신 제외)
-      if(slots.some((x,i)=> i!==idx && x.date===newDate && x.time===newTime)){
-        throw new Error('그 시간에 이미 다른 슬롯이 있습니다.');
+
+      // 대상 시간에 이미 있는 슬롯 검사 (기존 슬롯 이동 시 자기 자신 제외)
+      const conflictIdx = slots.findIndex(x =>
+        x.date===newDate && x.time===newTime && (!cur || x.id!==cur.id));
+      if(conflictIdx !== -1){
+        if(slots[conflictIdx].status === 'booked'){
+          throw new Error('그 시간엔 이미 예약된 상담이 있습니다.');
+        }
+        slots.splice(conflictIdx, 1); // 빈 슬롯이면 비우고 채움
       }
-      slots[idx].date = newDate;
-      slots[idx].time = newTime;
+
+      if(cur){
+        // 기존 슬롯 (예약 이동 or 빈 슬롯 채우기/이동)
+        const i2 = slots.findIndex(x => x.id === cur.id);
+        if(i2 === -1) throw new Error('이미 삭제된 시간입니다.');
+        slots[i2].date = newDate;
+        slots[i2].time = newTime;
+        if(direct){
+          slots[i2].status      = 'booked';
+          slots[i2].studentName = direct.student;
+          slots[i2].studentNum  = '';
+          slots[i2].bookedName  = direct.parent || direct.student + ' 학부모';
+          slots[i2].bookedPhone = direct.phone;
+          slots[i2].bookedMemo  = direct.memo;
+          slots[i2].bookedType  = direct.type;
+          slots[i2].token       = 'teacher';  // 교사 직접 입력 표시 (학부모 취소 불가)
+          slots[i2].bookedAt    = new Date().toISOString();
+        }
+      } else {
+        // 신규 슬롯 생성 (+필요시 예약)
+        const ns = {
+          id: `${newDate}_${newTime}_${Math.random().toString(36).slice(2,7)}`,
+          date: newDate, time: newTime, duration: 20, status: 'open'
+        };
+        if(direct){
+          ns.status      = 'booked';
+          ns.studentName = direct.student;
+          ns.studentNum  = '';
+          ns.bookedName  = direct.parent || direct.student + ' 학부모';
+          ns.bookedPhone = direct.phone;
+          ns.bookedMemo  = direct.memo;
+          ns.bookedType  = direct.type;
+          ns.token       = 'teacher';
+          ns.bookedAt    = new Date().toISOString();
+        }
+        slots.push(ns);
+      }
       tx.set(ref, { slots, updatedAt: new Date().toISOString() }, { merge: true });
     });
-    consultCurWeek = consultWeekStart(newDate);  // 옮긴 주로 캘린더 이동
+    consultCurWeek = consultWeekStart(newDate);
     closeConsultModal();
   } catch(e){
-    alert('변경 실패: ' + e.message);
-  } finally {
-    btn.disabled = false; btn.textContent = '변경 저장';
+    alert('저장 실패: ' + e.message);
+    btn.disabled = false; btn.textContent = origLabel;
+    return;
   }
+  btn.disabled = false; btn.textContent = origLabel;
 }
 
 async function deleteConsultModalSlot(){
