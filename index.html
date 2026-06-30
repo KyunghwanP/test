@@ -2576,6 +2576,26 @@
     background:var(--paper-soft);font-size:14px;font-weight:700;color:var(--ink-soft);cursor:pointer;font-family:inherit;
   }
   .cm-type-btn.active{background:var(--mon);border-color:var(--mon);color:#fff;}
+  /* 공강 모달: 단위 토글 + 목록 */
+  .ca-unit-btn{
+    flex:1;padding:11px 6px;border:1.5px solid var(--rule);border-radius:9px;
+    background:var(--paper-soft);font-size:13px;font-weight:700;color:var(--ink-soft);cursor:pointer;font-family:inherit;
+  }
+  .ca-unit-btn.active{background:var(--mon);border-color:var(--mon);color:#fff;}
+  .ca-list-label{font-size:13px;font-weight:700;color:var(--ink-soft);margin:16px 0 9px;}
+  .ca-list{display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;}
+  .ca-row{
+    display:flex;align-items:center;gap:12px;cursor:pointer;
+    border:1.5px solid var(--rule);border-radius:11px;padding:13px 15px;
+    background:var(--paper-soft);transition:all .12s;
+  }
+  .ca-row.checked{border-color:var(--mon);background:#EFF6FF;}
+  .ca-row input{width:20px;height:20px;flex-shrink:0;accent-color:var(--mon);}
+  .ca-row .ca-period{font-size:15px;font-weight:800;min-width:64px;}
+  .ca-row .ca-times{flex:1;font-size:14px;color:var(--ink);}
+  .ca-row .ca-times .ca-dim{color:var(--ink-soft);font-size:12.5px;}
+  .ca-row.lunch .ca-period{color:var(--gold);}
+  .ca-empty{text-align:center;color:var(--ink-soft);font-size:14px;padding:24px 0;}
   .cm-actions{display:flex;gap:10px;padding:0 18px 18px;}
   .cm-btn{flex:1;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;}
   .cm-del{background:var(--paper);color:var(--warn);border:1.5px solid var(--rule);flex:0 0 90px;}
@@ -2594,7 +2614,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.24</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.26</div>
   </div>
 </div>
 
@@ -2687,7 +2707,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.24</div>
+    <div class="nav-version">ver4.26</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3182,11 +3202,8 @@
                   <button class="consult-add-btn" id="consultAddBtn">시간 만들기</button>
 
                   <div class="consult-auto-box">
-                    <button class="consult-auto-btn" id="consultAutoBtn">⚡ 오늘 공강 자동 채우기</button>
-                    <label class="consult-auto-lunch">
-                      <input type="checkbox" id="consultAutoLunch"> 점심시간도 포함
-                    </label>
-                    <div class="consult-auto-desc">오늘 수업이 없는 시간대를 30분씩 2칸으로 자동 생성합니다.</div>
+                    <button class="consult-auto-btn" id="consultAutoBtn">📋 일과 중 공강에서 열기</button>
+                    <div class="consult-auto-desc">날짜와 시간 단위를 정하고, 수업 없는 시간대를 골라 상담 슬롯을 만듭니다.</div>
                   </div>
                 </div>
               </div>
@@ -3251,6 +3268,37 @@
               <div class="cm-actions">
                 <button class="cm-btn cm-del" id="cmDeleteBtn">삭제</button>
                 <button class="cm-btn cm-save" id="cmSaveBtn">변경 저장</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 공강에서 상담 열기 모달 -->
+          <div id="consultAutoModal" class="cm-overlay">
+            <div class="cm-box" style="max-width:480px;">
+              <div class="cm-head">
+                <span>📋 일과 중 공강에서 열기</span>
+                <button class="cm-x" id="caCloseBtn">✕</button>
+              </div>
+              <div class="cm-edit">
+                <div class="cm-edit-grid">
+                  <div>
+                    <label>날짜</label>
+                    <input type="date" id="caDate">
+                  </div>
+                  <div>
+                    <label>시간 단위</label>
+                    <div class="cm-type-toggle">
+                      <button type="button" class="ca-unit-btn active" data-unit="30">30분 (2칸)</button>
+                      <button type="button" class="ca-unit-btn" data-unit="60">1시간 (1칸)</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="ca-list-label">상담을 열 시간대를 선택하세요</div>
+                <div id="caList" class="ca-list"></div>
+              </div>
+              <div class="cm-actions">
+                <button class="cm-btn cm-del" id="caAllBtn" style="flex:0 0 90px;color:var(--mon);border-color:var(--mon);">전체선택</button>
+                <button class="cm-btn cm-save" id="caCreateBtn">선택 시간 만들기</button>
               </div>
             </div>
           </div>
@@ -8898,7 +8946,31 @@ function bindConsultForm(){
     if(el) el.addEventListener('change', updateConsultPreview);
   });
   document.getElementById('consultAddBtn').addEventListener('click', addConsultSlots);
-  document.getElementById('consultAutoBtn').addEventListener('click', autoFillConsult);
+  document.getElementById('consultAutoBtn').addEventListener('click', openConsultAutoModal);
+
+  // 공강 모달 컨트롤
+  document.getElementById('caCloseBtn').addEventListener('click', closeConsultAutoModal);
+  document.getElementById('consultAutoModal').addEventListener('click', (e) => {
+    if(e.target.id === 'consultAutoModal') closeConsultAutoModal();
+  });
+  document.getElementById('caDate').addEventListener('change', renderCaList);
+  document.querySelectorAll('.ca-unit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.ca-unit-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      caUnit = parseInt(btn.dataset.unit, 10);
+      renderCaList();  // 칸 미리보기 갱신
+    });
+  });
+  document.getElementById('caAllBtn').addEventListener('click', () => {
+    const boxes = document.querySelectorAll('#caList .ca-check');
+    const allChecked = [...boxes].every(b => b.checked);
+    boxes.forEach(b => {
+      b.checked = !allChecked;
+      b.closest('.ca-row').classList.toggle('checked', b.checked);
+    });
+  });
+  document.getElementById('caCreateBtn').addEventListener('click', createConsultAuto);
 
   // 변경 모달 버튼
   document.getElementById('cmCloseBtn').addEventListener('click', closeConsultModal);
@@ -9017,85 +9089,115 @@ function consultFmtDate(dateStr){
   return `${d.getMonth()+1}월 ${d.getDate()}일 (${CONSULT_WD[d.getDay()]})`;
 }
 
-// 오늘 공강 자동 채우기: 내 시간표에서 수업 없는 교시를 30분 2칸씩 상담 슬롯으로 생성
-async function autoFillConsult(){
+// ── 공강에서 상담 열기 (모달) ──
+let caUnit = 30;  // 30 or 60
+
+function openConsultAutoModal(){
   if(!consultClassKey) return;
+  document.getElementById('caDate').value = consultLocalYmd(new Date());
+  caUnit = 30;
+  document.querySelectorAll('.ca-unit-btn').forEach(b => b.classList.toggle('active', b.dataset.unit==='30'));
+  renderCaList();
+  document.getElementById('consultAutoModal').classList.add('show');
+}
+function closeConsultAutoModal(){
+  document.getElementById('consultAutoModal').classList.remove('show');
+}
 
-  // 오늘 요일 (평일만)
-  const now = new Date();
-  const dowIdx = now.getDay(); // 0=일
+// 선택한 날짜의 공강 + 점심 목록 렌더
+function renderCaList(){
+  const listEl = document.getElementById('caList');
+  const dateStr = document.getElementById('caDate').value;
+  if(!dateStr){ listEl.innerHTML = '<div class="ca-empty">날짜를 선택하세요.</div>'; return; }
+
+  const d = new Date(dateStr + 'T00:00:00');
+  const dowIdx = d.getDay();
   const DAY_KR = ['일','월','화','수','목','금','토'];
-  if(dowIdx < 1 || dowIdx > 5){ alert('오늘은 평일이 아닙니다. 평일에 사용하세요.'); return; }
-  const todayDow = DAY_KR[dowIdx];
-  const date = consultLocalYmd(now);
+  if(dowIdx < 1 || dowIdx > 5){
+    listEl.innerHTML = '<div class="ca-empty">평일을 선택하세요. (주말은 시간표가 없습니다)</div>';
+    return;
+  }
+  const dow = DAY_KR[dowIdx];
 
-  // 내 시간표 (TEACHERS에서 내 정보 → schedule[요일])
   const user = fbAuth.currentUser;
   const me = TEACHERS.find(t => t.email && t.email === user?.email)
           || TEACHERS.find(t => t.name === user?.displayName);
-  const mySched = (me && me.schedule && me.schedule[todayDow]) ? me.schedule[todayDow] : [];
-  const busyPeriods = new Set(mySched.map(x => x.period));  // 수업 있는 교시
+  const mySched = (me && me.schedule && me.schedule[dow]) ? me.schedule[dow] : [];
+  const busy = new Set(mySched.map(x => x.period));
 
-  const includeLunch = document.getElementById('consultAutoLunch').checked;
-
-  // 채울 블록: 각 교시(또는 점심)의 시작시각. 한 블록 = 30분 2칸.
-  const blocks = [];
+  const rows = [];
   BELL_SCHEDULE.forEach(b => {
     if(b.period === 'lunch'){
-      if(includeLunch) blocks.push(b.start);
-      return;
+      rows.push({ key:'lunch', label:'점심시간', start:b.start, isLunch:true });
+    } else if(!busy.has(b.period)){
+      rows.push({ key:String(b.period), label:`${b.period}교시`, start:b.start, isLunch:false });
     }
-    // 공강(수업 없는 교시)만
-    if(!busyPeriods.has(b.period)) blocks.push(b.start);
   });
 
-  if(blocks.length === 0){
-    alert('오늘은 비어있는 시간이 없습니다. (모든 교시에 수업이 있거나 시간표 정보가 없습니다)');
+  if(rows.length === 0){
+    listEl.innerHTML = '<div class="ca-empty">이 날은 비어있는 시간이 없습니다.<br><span style="font-size:12px;">(모든 교시에 수업이 있거나 시간표 정보가 없습니다)</span></div>';
     return;
   }
 
-  // 각 블록을 30분 2칸으로 (시작, 시작+30분)
-  const times = [];
-  blocks.forEach(start => {
-    const base = toMinutes(start);
-    [base, base + 30].forEach(min => {
-      const hh = String(Math.floor(min/60)).padStart(2,'0');
-      const mm = String(min%60).padStart(2,'0');
-      times.push(`${hh}:${mm}`);
-    });
+  listEl.innerHTML = rows.map(r => {
+    const timesTxt = caBlockTimes(r.start).join(', ');
+    return `<label class="ca-row ${r.isLunch?'lunch':''}" data-start="${r.start}">
+      <input type="checkbox" class="ca-check">
+      <span class="ca-period">${r.label}</span>
+      <span class="ca-times">${timesTxt} <span class="ca-dim">(${caUnit===60?'1칸':'2칸'})</span></span>
+    </label>`;
+  }).join('');
+
+  listEl.querySelectorAll('.ca-row').forEach(row => {
+    const cb = row.querySelector('.ca-check');
+    cb.addEventListener('change', () => row.classList.toggle('checked', cb.checked));
   });
+}
 
-  const btn = document.getElementById('consultAutoBtn');
-  btn.disabled = true;
-  btn.textContent = '생성 중...';
+function caBlockTimes(start){
+  const base = toMinutes(start);
+  if(caUnit === 60) return [start];
+  const t2 = base + 30;
+  return [start, `${String(Math.floor(t2/60)).padStart(2,'0')}:${String(t2%60).padStart(2,'0')}`];
+}
 
+async function createConsultAuto(){
+  const dateStr = document.getElementById('caDate').value;
+  if(!dateStr){ alert('날짜를 선택하세요.'); return; }
+  const checkedRows = [...document.querySelectorAll('#caList .ca-row')].filter(r => r.querySelector('.ca-check').checked);
+  if(checkedRows.length === 0){ alert('시간대를 하나 이상 선택하세요.'); return; }
+
+  const times = [];
+  checkedRows.forEach(r => { caBlockTimes(r.dataset.start).forEach(t => times.push(t)); });
+  const dur = caUnit;
+
+  const btn = document.getElementById('caCreateBtn');
+  btn.disabled = true; btn.textContent = '생성 중...';
   const ref = doc(fbDb, 'consultations', consultClassKey);
   try {
-    let added = 0;
     await runTransaction(fbDb, async (tx) => {
       const snap  = await tx.get(ref);
       const data  = snap.exists() ? (snap.data()||{}) : {};
       const slots = Array.isArray(data.slots) ? data.slots : [];
       times.forEach(time => {
-        if(slots.some(s => s.date === date && s.time === time)) return; // 중복 건너뜀
+        if(slots.some(s => s.date === dateStr && s.time === time)) return;
         slots.push({
-          id: `${date}_${time}_${Math.random().toString(36).slice(2,7)}`,
-          date, time, duration: 30, status: 'open'
+          id: `${dateStr}_${time}_${Math.random().toString(36).slice(2,7)}`,
+          date: dateStr, time, duration: dur, status: 'open'
         });
-        added++;
       });
       const myName = TEACHERS.find(t=>t.homeroom===consultClassKey)?.name
                   || fbAuth.currentUser?.displayName || '담임';
       tx.set(ref, { slots, teacher: myName, updatedAt: new Date().toISOString() }, { merge: true });
     });
-    consultCurWeek = consultWeekStart(date);
-    btn.textContent = added > 0 ? `✓ ${added}칸 생성됨` : '이미 다 있음';
-    setTimeout(() => { btn.textContent = '⚡ 오늘 공강 자동 채우기'; btn.disabled = false; }, 1500);
+    consultCurWeek = consultWeekStart(dateStr);
+    closeConsultAutoModal();
   } catch(e){
-    alert('자동 생성 실패: ' + e.message);
-    btn.textContent = '⚡ 오늘 공강 자동 채우기';
-    btn.disabled = false;
+    alert('생성 실패: ' + e.message);
+    btn.disabled = false; btn.textContent = '선택 시간 만들기';
+    return;
   }
+  btn.disabled = false; btn.textContent = '선택 시간 만들기';
 }
 
 // 슬롯 데이터를 전역 보관 (모달·렌더 재사용)
