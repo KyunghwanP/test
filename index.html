@@ -1639,10 +1639,10 @@
     }
     .sidebar.two-col .teacher-col{overflow-y:auto;height:100%;padding-left:4px;}
     .dropdown{display:none !important;}
-    .swap-preview-grids{flex-direction:row;flex:1;overflow:hidden;min-height:0;}
-    .preview-col{flex:1;min-width:0;overflow-y:auto;}
-    .preview-col.swap-col-list{flex:0 1 300px;display:flex;flex-direction:column;overflow:hidden;}
-    .preview-col.swap-col-list .swap-list{flex:1;overflow-y:auto;}
+    .swap-preview-grids{flex-direction:row;align-items:flex-start;overflow:hidden;min-height:0;}
+    .preview-col{flex:1;min-width:0;}
+    .preview-col.swap-col-list{flex:0 1 300px;display:flex;flex-direction:column;overflow:hidden;min-height:0;max-height:72vh;}
+    .preview-col.swap-col-list .swap-list{flex:1;overflow-y:auto;min-height:0;}
   }
 
   /* ---------- phone: tighter page padding ---------- */
@@ -2636,7 +2636,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.32</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.34</div>
   </div>
 </div>
 
@@ -2729,7 +2729,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.32</div>
+    <div class="nav-version">ver4.34</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3600,7 +3600,7 @@
       <button class="modal-close" id="swapModalClose">×</button>
     </div>
     <!-- 스크롤 바디 -->
-    <div id="swapModalBody" style="flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;padding:0 24px 8px;"></div>
+    <div id="swapModalBody" style="flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;padding:0 24px 24px;"></div>
     <!-- sticky 푸터: 요청 문구 버튼 + 노트 -->
     <div id="swapModalFooter" style="flex-shrink:0;display:none;padding:10px 16px 14px;border-top:1px solid var(--rule);background:var(--paper);">
       <button class="copy-req-btn" id="swapFooterCopyBtn">요청 문구 복사 📋</button>
