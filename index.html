@@ -2369,6 +2369,83 @@
     line-height:1.4;word-break:keep-all;
   }
   #dayPreviewPopup .dp-empty{font-size:13px;color:var(--ink-soft);}
+
+  /* ───────── 학부모 상담 예약 (교사용) ───────── */
+  #consultPage .consult-wrap{max-width:760px;margin:0 auto;padding:18px 16px 60px;}
+  .consult-intro{
+    background:linear-gradient(135deg,#3B82F6,#1F3D33);color:#fff;
+    border-radius:14px;padding:18px 20px;margin-bottom:18px;
+  }
+  .consult-intro h3{font-size:18px;font-weight:800;margin-bottom:4px;}
+  .consult-intro p{font-size:13.5px;opacity:.9;line-height:1.6;}
+  .consult-intro .ci-link{
+    display:inline-block;margin-top:10px;font-size:13px;font-weight:700;
+    background:rgba(255,255,255,0.18);color:#fff;text-decoration:none;
+    padding:7px 14px;border-radius:8px;font-family:'IBM Plex Mono';
+  }
+  .consult-section{
+    background:var(--paper);border:1px solid var(--rule);border-radius:14px;
+    padding:18px 18px;margin-bottom:18px;
+  }
+  .consult-section h4{font-size:15px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+  .consult-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .consult-form-grid label{display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;}
+  .consult-form-grid input,.consult-form-grid select{
+    width:100%;font-size:15px;font-family:inherit;padding:11px 12px;
+    border:1.5px solid var(--rule);border-radius:9px;background:var(--paper-soft);color:var(--ink);
+  }
+  .consult-form-grid input:focus,.consult-form-grid select:focus{outline:none;border-color:var(--mon);background:#fff;}
+  .consult-type-toggle{display:flex;gap:8px;}
+  .consult-type-btn{
+    flex:1;padding:11px;border:1.5px solid var(--rule);border-radius:9px;
+    background:var(--paper-soft);font-size:14px;font-weight:700;cursor:pointer;color:var(--ink-soft);
+  }
+  .consult-type-btn.active{background:var(--mon);border-color:var(--mon);color:#fff;}
+  .consult-add-btn{
+    width:100%;margin-top:16px;padding:14px;border:none;border-radius:10px;
+    background:var(--mon);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;
+  }
+  .consult-add-btn:active{opacity:.85;}
+  .consult-add-btn:disabled{opacity:.5;}
+  .consult-preview{margin-top:12px;font-size:13px;color:var(--ink-soft);line-height:1.7;}
+
+  .consult-day{margin-bottom:18px;}
+  .consult-day-head{
+    font-size:14px;font-weight:800;color:var(--ink);padding:7px 2px;
+    border-bottom:2px solid var(--rule);margin-bottom:9px;
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .consult-day-del{font-size:12px;font-weight:600;color:var(--warn);background:none;border:none;cursor:pointer;}
+  .consult-slot{
+    display:flex;align-items:center;gap:10px;padding:11px 13px;
+    border:1.5px solid var(--rule);border-radius:10px;margin-bottom:7px;background:var(--paper-soft);
+  }
+  .consult-slot.booked{background:#ECFDF5;border-color:var(--ok,#10B981);}
+  .consult-slot-time{font-size:15px;font-weight:800;font-family:'IBM Plex Mono';min-width:56px;}
+  .consult-slot-type{font-size:11px;font-weight:700;padding:3px 8px;border-radius:7px;}
+  .consult-slot-type.face{background:#EFF6FF;color:#1E40AF;}
+  .consult-slot-type.phone{background:#FEF3C7;color:#92400E;}
+  .consult-slot-info{flex:1;font-size:13.5px;color:var(--ink);}
+  .consult-slot-info .ci-open{color:var(--ink-soft);font-size:13px;}
+  .consult-slot-info .ci-name{font-weight:700;}
+  .consult-slot-info .ci-phone{color:var(--mon);font-size:13px;margin-left:6px;}
+  .consult-slot-info .ci-memo{display:block;font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
+  .consult-slot-del{font-size:16px;color:var(--ink-soft);background:none;border:none;cursor:pointer;padding:2px 6px;}
+  .consult-slot-del:hover{color:var(--warn);}
+  .consult-empty{text-align:center;color:var(--ink-soft);font-size:14px;padding:30px 0;}
+  .consult-loading{text-align:center;color:var(--ink-soft);font-size:14px;padding:30px 0;}
+  .consult-stat{
+    display:flex;gap:12px;margin-bottom:16px;
+  }
+  .consult-stat-box{
+    flex:1;background:var(--paper-soft);border:1px solid var(--rule);border-radius:10px;
+    padding:12px;text-align:center;
+  }
+  .consult-stat-box .cs-num{font-size:22px;font-weight:800;font-family:'IBM Plex Mono';color:var(--mon);}
+  .consult-stat-box .cs-label{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  @media (max-width:520px){
+    .consult-form-grid{grid-template-columns:1fr;}
+  }
 </style>
 </head>
 <body>
@@ -2383,7 +2460,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.09</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.12</div>
   </div>
 </div>
 
@@ -2423,6 +2500,9 @@
     <div class="tab-item" data-page="points">
       <span class="tab-item-icon">📝</span>상벌점 조회·입력
     </div>
+    <div class="tab-item" data-page="consult">
+      <span class="tab-item-icon">🗓️</span>학부모상담
+    </div>
     <div class="tab-item" data-page="contacts">
       <span class="tab-item-icon">📞</span>교원연락망
     </div>
@@ -2461,6 +2541,9 @@
       <div class="main-nav-item" data-page="points">
         <span class="main-nav-icon">📝</span>상벌점 조회·입력
       </div>
+      <div class="main-nav-item" data-page="consult">
+        <span class="main-nav-icon">🗓️</span>학부모상담
+      </div>
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>교원연락망
       </div>
@@ -2470,7 +2553,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.09</div>
+    <div class="nav-version">ver4.12</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -2881,6 +2964,90 @@
         </div>
       </div>
 
+      <!-- 학부모 상담 예약 페이지 (교사용) -->
+      <div class="page-view" id="consultPage">
+        <div class="consult-wrap">
+
+          <div class="consult-intro">
+            <h3>🗓️ 학부모 상담 예약 관리</h3>
+            <p>상담 가능한 시간을 열어두면, 학부모가 자녀 정보로 인증 후 빈 시간을 예약합니다. 예약 현황이 아래에 실시간으로 표시됩니다.</p>
+            <a class="ci-link" id="consultParentLink" href="parent.html" target="_blank" rel="noopener">학부모용 예약 링크 열기 ↗</a>
+          </div>
+
+          <div id="consultNoHomeroom" class="consult-section" style="display:none;">
+            <div class="consult-empty">
+              담임으로 등록된 학급이 없습니다.<br>
+              <span style="font-size:13px;">상담 예약은 담임 교사만 열 수 있습니다. 시간표 정보에 담임 학급이 등록되어 있어야 합니다.</span>
+            </div>
+          </div>
+
+          <div id="consultMain" style="display:none;">
+            <!-- 통계 -->
+            <div class="consult-stat">
+              <div class="consult-stat-box"><div class="cs-num" id="consultStatOpen">0</div><div class="cs-label">열린 시간</div></div>
+              <div class="consult-stat-box"><div class="cs-num" id="consultStatBooked">0</div><div class="cs-label">예약됨</div></div>
+              <div class="consult-stat-box"><div class="cs-num" id="consultStatClass">—</div><div class="cs-label">담당 학급</div></div>
+            </div>
+
+            <!-- 슬롯 만들기 -->
+            <div class="consult-section">
+              <h4>➕ 상담 시간 열기</h4>
+              <div class="consult-form-grid">
+                <div>
+                  <label>날짜</label>
+                  <input type="date" id="consultDate">
+                </div>
+                <div>
+                  <label>상담 방식</label>
+                  <div class="consult-type-toggle">
+                    <button type="button" class="consult-type-btn active" data-ctype="face">대면</button>
+                    <button type="button" class="consult-type-btn" data-ctype="phone">전화</button>
+                  </div>
+                </div>
+                <div>
+                  <label>시작 시각</label>
+                  <input type="time" id="consultStart" value="14:00">
+                </div>
+                <div>
+                  <label>칸당 시간(분)</label>
+                  <select id="consultDuration">
+                    <option value="10">10분</option>
+                    <option value="15">15분</option>
+                    <option value="20" selected>20분</option>
+                    <option value="30">30분</option>
+                  </select>
+                </div>
+                <div>
+                  <label>만들 칸 수</label>
+                  <select id="consultCount">
+                    <option>1</option><option>2</option><option>3</option><option>4</option>
+                    <option selected>5</option><option>6</option><option>7</option><option>8</option>
+                    <option>9</option><option>10</option>
+                  </select>
+                </div>
+                <div>
+                  <label>칸 사이 쉬는시간(분)</label>
+                  <select id="consultGap">
+                    <option value="0" selected>없음</option>
+                    <option value="5">5분</option>
+                    <option value="10">10분</option>
+                  </select>
+                </div>
+              </div>
+              <div class="consult-preview" id="consultPreview"></div>
+              <button class="consult-add-btn" id="consultAddBtn">시간 만들기</button>
+            </div>
+
+            <!-- 현황 -->
+            <div class="consult-section">
+              <h4>📋 예약 현황</h4>
+              <div id="consultList"><div class="consult-loading">불러오는 중...</div></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
       <!-- 업무 캘린더 페이지 -->
       <div class="page-view" id="mytaskPage">
         <div class="mytask-panel-page">
@@ -3165,7 +3332,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, indexedDBLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, addDoc, getDocs, deleteDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc, getDocs, deleteDoc, collection, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
@@ -4314,6 +4481,15 @@ function initAppUI(){
   initHomePage();
   // 마지막으로 보던 화면 복원 (시간표 데이터 미리 준비)
   restoreLastView();
+  applyConsultTabVisibility();
+}
+
+// [테스트 기간] 학부모상담 탭은 관리자(박경환)에게만 노출
+function applyConsultTabVisibility(){
+  const isAdmin = fbAuth.currentUser?.email === 'pkh910518@yeungnam.hs.kr';
+  document.querySelectorAll('[data-page="consult"]').forEach(el => {
+    el.style.display = isAdmin ? '' : 'none';
+  });
 }
 
 function autoLoadMyTimetable(){
@@ -4566,6 +4742,7 @@ const schedulePage  = document.getElementById('schedulePage');
 const homePage      = document.getElementById('homePage');
 const pointsPage    = document.getElementById('pointsPage');
 const mytaskPage    = document.getElementById('mytaskPage');
+const consultPage   = document.getElementById('consultPage');
 
 // 햄버거 (모바일/좁은화면)
 function updateMobileNavTop(){
@@ -4677,6 +4854,9 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
     item.classList.add('active');
     // 모바일 탭바 동기화
     document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(t => t.classList.toggle('active', t.dataset.page === page));
+    // 학부모상담 페이지는 어느 분기에도 remove 로직이 없으므로 여기서 일괄 정리
+    if(consultPage) consultPage.classList.remove('active');
+    if(page !== 'consult') stopConsultWatch();
 
     // 모바일: 선택 후 자동으로 닫기
     mainNav.classList.remove('open');
@@ -4789,6 +4969,18 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       if(window.innerWidth <= 1024) { const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='flex'; }
       const mytaskFABEl = document.getElementById('mytaskFAB');
       if (mytaskFABEl) mytaskFABEl.style.display = 'flex';
+    } else if(page === 'consult'){
+      homePage.classList.remove('active');
+      timetablePage.classList.remove('active');
+      weeklyPage.classList.remove('active');
+      mealPage.classList.remove('active');
+      contactsPage.classList.remove('active');
+      studentsPage.classList.remove('active');
+      schedulePage.classList.remove('active');
+      pointsPage.classList.remove('active');
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('mytaskFAB')&&(document.getElementById('mytaskFAB').style.display='none');closeMytaskFAB&&closeMytaskFAB(); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
+      consultPage.classList.add('active');
+      initConsultPage();
     }
   });
 });
@@ -4837,6 +5029,8 @@ document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(tab => {
     homePage.classList.remove('active');
     pointsPage.classList.remove('active');
     if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('mytaskFAB')&&(document.getElementById('mytaskFAB').style.display='none');closeMytaskFAB&&closeMytaskFAB(); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
+    if(consultPage) consultPage.classList.remove('active');
+    if(page !== 'consult') stopConsultWatch();
     if(page === 'home') { homePage.classList.add('active'); if(!homeInitialized) initHomePage(); else renderHomeTaskSection(); }
     else if(page === 'timetable') { timetablePage.classList.add('active'); }
     else if(page === 'mytask')    { mytaskPage.classList.add('active'); initMytaskPage(); }
@@ -4846,6 +5040,7 @@ document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(tab => {
     else if(page === 'students')  { studentsPage.classList.add('active'); if(!studentsInitialized) initStudentsPage(); }
     else if(page === 'schedule')  { schedulePage.classList.add('active'); if(!scheduleInitialized) initSchedulePage(); }
     else if(page === 'points')    { pointsPage.classList.add('active'); initPointsPage(); }
+    else if(page === 'consult')   { consultPage.classList.add('active'); initConsultPage(); }
   });
 });
 
@@ -6404,10 +6599,11 @@ function navigateTo(page) {
   // 탭 전환
   document.querySelectorAll('.main-nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
   document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(t => t.classList.toggle('active', t.dataset.page === page));
-  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask'].forEach(p => {
+  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult'].forEach(p => {
     const el = document.getElementById(p + 'Page');
     if(el) el.classList.toggle('active', p === page);
   });
+  if(page !== 'consult') stopConsultWatch();
   if(page === 'home' && homeInitialized) renderHomeTaskSection();
   if(page === 'weekly' && !weeklyInitialized) initWeeklyPage();
   if(page === 'meal' && !mealInitialized) initMealPage();
@@ -6415,6 +6611,7 @@ function navigateTo(page) {
   if(page === 'students' && !studentsInitialized) initStudentsPage();
   if(page === 'schedule' && !scheduleInitialized) initSchedulePage();
   if(page === 'points') initPointsPage();
+  if(page === 'consult') initConsultPage();
   if(page === 'mytask') {
     const mytaskPage = document.getElementById('mytaskPage');
     if(mytaskPage) mytaskPage.classList.add('active');
@@ -8352,6 +8549,272 @@ let mytaskDayDate       = null; // 날짜 팝업용
 let calFilters  = new Set(['todo','doing','done']);
 // 목록 필터 (단일 or 다중)
 let listFilters = new Set(['all']);
+
+// ══════════════════════════════════════════
+// 학부모 상담 예약 (교사용)
+// ══════════════════════════════════════════
+let consultClassKey   = null;   // 내 담임 학급 "1-3"
+let consultUnsub      = null;   // onSnapshot 해제 함수
+let consultInitOnce   = false;  // 폼 이벤트 1회 바인딩
+let consultSelType    = 'face'; // 폼: 선택된 상담 방식
+
+function escConsult(v){
+  if(v==null) return '';
+  return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// 내 담임 학급 알아내기 (teachers의 homeroom + 로그인 이메일 매칭)
+function getMyHomeroom(){
+  const user = fbAuth.currentUser;
+  if(!user) return null;
+  const me = TEACHERS.find(t => t.email && t.email === user.email)
+          || TEACHERS.find(t => t.name === user.displayName);
+  return me && me.homeroom ? me.homeroom : null;
+}
+
+function stopConsultWatch(){
+  if(consultUnsub){ consultUnsub(); consultUnsub = null; }
+}
+
+function initConsultPage(){
+  const noHR  = document.getElementById('consultNoHomeroom');
+  const main  = document.getElementById('consultMain');
+
+  // [테스트 기간] 관리자(박경환)만 접근 허용
+  if(fbAuth.currentUser?.email !== 'pkh910518@yeungnam.hs.kr'){
+    navigateTo('home');
+    return;
+  }
+
+  consultClassKey = getMyHomeroom();
+  // [테스트 기간] 관리자에게 담임반이 없으면 테스트용 1-1 학급으로 진행
+  if(!consultClassKey && fbAuth.currentUser?.email === 'pkh910518@yeungnam.hs.kr'){
+    consultClassKey = '1-1';
+  }
+
+  if(!consultClassKey){
+    noHR.style.display = '';
+    main.style.display = 'none';
+    stopConsultWatch();
+    return;
+  }
+  noHR.style.display = 'none';
+  main.style.display = '';
+  document.getElementById('consultStatClass').textContent = consultClassKey + '반';
+
+  // 폼 이벤트는 1회만 바인딩
+  if(!consultInitOnce){
+    consultInitOnce = true;
+    bindConsultForm();
+  }
+  // 날짜 기본값: 오늘
+  const dateEl = document.getElementById('consultDate');
+  if(dateEl && !dateEl.value){
+    dateEl.value = new Date().toISOString().slice(0,10);
+  }
+  updateConsultPreview();
+
+  // 실시간 구독 시작 (탭 진입마다 재구독)
+  stopConsultWatch();
+  consultUnsub = onSnapshot(doc(fbDb, 'consultations', consultClassKey), snap => {
+    const data  = snap.exists() ? (snap.data()||{}) : {};
+    const slots = Array.isArray(data.slots) ? data.slots : [];
+    renderConsultList(slots);
+  }, err => {
+    document.getElementById('consultList').innerHTML =
+      '<div class="consult-empty">현황을 불러오지 못했습니다.</div>';
+  });
+}
+
+function bindConsultForm(){
+  // 대면/전화 토글
+  document.querySelectorAll('#consultPage .consult-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#consultPage .consult-type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      consultSelType = btn.dataset.ctype;
+    });
+  });
+  // 미리보기 갱신
+  ['consultDate','consultStart','consultDuration','consultCount','consultGap'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('change', updateConsultPreview);
+  });
+  document.getElementById('consultAddBtn').addEventListener('click', addConsultSlots);
+}
+
+// 시작시각 + 칸수 + 길이 + 간격 → 슬롯 시각 배열
+function computeConsultTimes(){
+  const start = document.getElementById('consultStart').value;
+  const dur   = parseInt(document.getElementById('consultDuration').value, 10);
+  const cnt   = parseInt(document.getElementById('consultCount').value, 10);
+  const gap   = parseInt(document.getElementById('consultGap').value, 10);
+  if(!start) return [];
+  const [h, m] = start.split(':').map(Number);
+  let cur = h*60 + m;
+  const times = [];
+  for(let i=0; i<cnt; i++){
+    const hh = String(Math.floor(cur/60)).padStart(2,'0');
+    const mm = String(cur%60).padStart(2,'0');
+    times.push(`${hh}:${mm}`);
+    cur += dur + gap;
+  }
+  return times;
+}
+
+function updateConsultPreview(){
+  const date  = document.getElementById('consultDate').value;
+  const times = computeConsultTimes();
+  const prev  = document.getElementById('consultPreview');
+  if(!date || times.length === 0){ prev.textContent = ''; return; }
+  prev.textContent = `${date} · ${times.join(', ')} (${times.length}칸)`;
+}
+
+async function addConsultSlots(){
+  if(!consultClassKey) return;
+  const date  = document.getElementById('consultDate').value;
+  const dur   = parseInt(document.getElementById('consultDuration').value, 10);
+  const times = computeConsultTimes();
+  if(!date){ alert('날짜를 선택하세요.'); return; }
+  if(times.length === 0){ alert('시작 시각을 확인하세요.'); return; }
+
+  const btn = document.getElementById('consultAddBtn');
+  btn.disabled = true;
+  btn.textContent = '만드는 중...';
+
+  const ref = doc(fbDb, 'consultations', consultClassKey);
+  try {
+    await runTransaction(fbDb, async (tx) => {
+      const snap  = await tx.get(ref);
+      const data  = snap.exists() ? (snap.data()||{}) : {};
+      const slots = Array.isArray(data.slots) ? data.slots : [];
+
+      times.forEach(time => {
+        // 같은 날짜+시각 중복 방지
+        if(slots.some(s => s.date === date && s.time === time)) return;
+        slots.push({
+          id: `${date}_${time}_${Math.random().toString(36).slice(2,7)}`,
+          date, time, type: consultSelType, duration: dur, status: 'open'
+        });
+      });
+      const myName = TEACHERS.find(t=>t.homeroom===consultClassKey)?.name
+                  || fbAuth.currentUser?.displayName
+                  || '담임';
+      tx.set(ref, { slots, teacher: myName, updatedAt: new Date().toISOString() }, { merge: true });
+    });
+    btn.textContent = '✓ 완료';
+    setTimeout(() => { btn.textContent = '시간 만들기'; btn.disabled = false; }, 1200);
+  } catch(e){
+    alert('시간 생성에 실패했습니다: ' + e.message);
+    btn.textContent = '시간 만들기';
+    btn.disabled = false;
+  }
+}
+
+const CONSULT_WD = ['일','월','화','수','목','금','토'];
+function consultFmtDate(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  return `${d.getMonth()+1}월 ${d.getDate()}일 (${CONSULT_WD[d.getDay()]})`;
+}
+
+function renderConsultList(slots){
+  const listEl = document.getElementById('consultList');
+  const openCnt   = slots.filter(s => s.status !== 'booked').length;
+  const bookedCnt = slots.filter(s => s.status === 'booked').length;
+  document.getElementById('consultStatOpen').textContent   = openCnt;
+  document.getElementById('consultStatBooked').textContent = bookedCnt;
+
+  if(slots.length === 0){
+    listEl.innerHTML = '<div class="consult-empty">아직 만든 상담 시간이 없습니다.<br><span style="font-size:13px;">위에서 시간을 열어보세요.</span></div>';
+    return;
+  }
+
+  // 날짜별 그룹
+  const byDate = {};
+  slots.slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time))
+    .forEach(s => { (byDate[s.date] = byDate[s.date] || []).push(s); });
+
+  let html = '';
+  Object.keys(byDate).sort().forEach(date => {
+    html += `<div class="consult-day">
+      <div class="consult-day-head">
+        <span>${escConsult(consultFmtDate(date))}</span>
+        <button class="consult-day-del" data-delday="${escConsult(date)}">이 날짜 비우기</button>
+      </div>`;
+    byDate[date].forEach(s => {
+      const booked = s.status === 'booked';
+      const typeCls = s.type === 'phone' ? 'phone' : 'face';
+      const typeTxt = s.type === 'phone' ? '전화' : '대면';
+      let info;
+      if(booked){
+        info = `<span class="ci-name">${escConsult(s.bookedName||'')}</span>`
+             + `<span class="ci-phone">${escConsult(s.bookedPhone||'')}</span>`
+             + (s.bookedMemo ? `<span class="ci-memo">“${escConsult(s.bookedMemo)}”</span>` : '');
+      } else {
+        info = `<span class="ci-open">예약 가능 (${escConsult(String(s.duration||20))}분)</span>`;
+      }
+      html += `<div class="consult-slot ${booked?'booked':''}">
+        <span class="consult-slot-time">${escConsult(s.time)}</span>
+        <span class="consult-slot-type ${typeCls}">${typeTxt}</span>
+        <span class="consult-slot-info">${info}</span>
+        <button class="consult-slot-del" data-delslot="${escConsult(s.id)}" title="삭제">✕</button>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  listEl.innerHTML = html;
+
+  // 개별 슬롯 삭제
+  listEl.querySelectorAll('[data-delslot]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.delslot;
+      const target = slots.find(s => s.id === id);
+      const warn = target && target.status === 'booked'
+        ? '예약된 시간입니다. 삭제하면 학부모 예약도 함께 사라집니다. 삭제할까요?'
+        : '이 시간을 삭제할까요?';
+      if(confirm(warn)) deleteConsultSlot(id);
+    });
+  });
+  // 날짜 통째 삭제
+  listEl.querySelectorAll('[data-delday]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const date = btn.dataset.delday;
+      const hasBooked = slots.some(s => s.date === date && s.status === 'booked');
+      const warn = hasBooked
+        ? '이 날짜에 예약된 상담이 있습니다. 모두 삭제할까요?'
+        : '이 날짜의 모든 시간을 삭제할까요?';
+      if(confirm(warn)) deleteConsultDay(date);
+    });
+  });
+}
+
+async function deleteConsultSlot(id){
+  const ref = doc(fbDb, 'consultations', consultClassKey);
+  try {
+    await runTransaction(fbDb, async (tx) => {
+      const snap  = await tx.get(ref);
+      const data  = snap.exists() ? (snap.data()||{}) : {};
+      const slots = (Array.isArray(data.slots) ? data.slots : []).filter(s => s.id !== id);
+      tx.set(ref, { slots }, { merge: true });
+    });
+  } catch(e){ alert('삭제 실패: ' + e.message); }
+}
+
+async function deleteConsultDay(date){
+  const ref = doc(fbDb, 'consultations', consultClassKey);
+  try {
+    await runTransaction(fbDb, async (tx) => {
+      const snap  = await tx.get(ref);
+      const data  = snap.exists() ? (snap.data()||{}) : {};
+      const slots = (Array.isArray(data.slots) ? data.slots : []).filter(s => s.date !== date);
+      tx.set(ref, { slots }, { merge: true });
+    });
+  } catch(e){ alert('삭제 실패: ' + e.message); }
+}
+
+window.initConsultPage = initConsultPage;
+window.stopConsultWatch = stopConsultWatch;
 
 function initMytaskPage() {
   if (!mytaskInitialized) {
