@@ -114,6 +114,14 @@
   .booking-card .bc-row .v{font-weight:700;}
 
   .footnote{font-size:13px;color:var(--ink-soft);text-align:center;margin-top:10px;line-height:1.7;}
+
+  .ptype-toggle{display:flex;gap:10px;margin-bottom:4px;}
+  .ptype-btn{
+    flex:1;font-size:16px;font-weight:700;font-family:inherit;
+    padding:14px;border:1.5px solid var(--rule);border-radius:11px;
+    background:var(--paper-soft);color:var(--ink-soft);cursor:pointer;
+  }
+  .ptype-btn.active{background:var(--mon);border-color:var(--mon);color:#fff;}
 </style>
 </head>
 <body>
@@ -185,6 +193,11 @@
         <span class="step-label">STEP 3</span>
         <h2>예약자 정보</h2>
         <p class="sub" id="chosenSlotText">—</p>
+        <label>상담 방식</label>
+        <div class="ptype-toggle">
+          <button type="button" class="ptype-btn active" data-ptype="face">대면 상담</button>
+          <button type="button" class="ptype-btn" data-ptype="phone">전화 상담</button>
+        </div>
         <label>예약자 성함</label>
         <input id="bkName" type="text" placeholder="예: 홍길동 학부모" autocomplete="off">
         <label>연락 가능한 전화번호</label>
@@ -212,6 +225,9 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXh
 let parentToken = null;
 let classKey    = null;
 let teacher     = null;
+let studentName = '';
+let studentNum  = '';
+let selectedType = 'face';   // 학부모가 고른 상담 방식
 let selectedSlot = null;
 
 // ── 유틸 ──
@@ -268,6 +284,8 @@ authBtn.addEventListener('click', async () => {
     parentToken = data.token;
     classKey    = data.classKey;
     teacher     = data.teacher;
+    studentName = data.studentName || '';
+    studentNum  = data.studentNum || '';
 
     document.getElementById('teacherName').textContent =
       teacher ? teacher + ' 선생님' : '담임 미배정';
@@ -329,12 +347,10 @@ async function loadSlots(){
   Object.keys(byDate).sort().forEach(date => {
     html += `<div class="slot-date-group"><div class="slot-date-head">${esc(fmtDate(date))}</div>`;
     byDate[date].forEach(s => {
-      const badgeClass = s.type === 'phone' ? 'phone' : 'face';
       html += `
         <div class="slot" data-id="${esc(s.id)}" role="button">
           <div class="slot-time">${esc(s.time)}</div>
           <div class="slot-meta">${esc(String(s.duration||20))}분 상담</div>
-          <span class="slot-badge ${badgeClass}">${esc(typeLabel(s.type))}</span>
           <div class="slot-check"></div>
         </div>`;
     });
@@ -363,11 +379,20 @@ const confirmMsg = document.getElementById('confirmMsg');
 
 function openConfirm(s){
   document.getElementById('chosenSlotText').textContent =
-    `${fmtDate(s.date)} ${s.time} · ${typeLabel(s.type)} 상담`;
+    `${fmtDate(s.date)} ${s.time} 상담`;
   confirmCard.classList.remove('hidden');
   hideMsg(confirmMsg);
   confirmCard.scrollIntoView({ behavior:'smooth', block:'center' });
 }
+
+// 상담 방식 토글 (학부모 선택)
+document.querySelectorAll('.ptype-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.ptype-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedType = btn.dataset.ptype;
+  });
+});
 
 document.getElementById('backBtn').addEventListener('click', () => {
   confirmCard.classList.add('hidden');
@@ -394,7 +419,8 @@ confirmBtn.addEventListener('click', async () => {
   try {
     const data = await callGas('bookSlot', {
       classKey, token: parentToken, slotId: selectedSlot.id,
-      bkName, bkPhone, bkMemo
+      bkName, bkPhone, bkMemo,
+      studentName, studentNum, bkType: selectedType
     });
 
     if(data.success){
@@ -426,7 +452,7 @@ function showMyBooking(s){
   confirmCard.classList.add('hidden');
   myBookingWrap.classList.remove('hidden');
   document.getElementById('mbWhen').textContent = `${fmtDate(s.date)} ${s.time}`;
-  document.getElementById('mbType').textContent = typeLabel(s.type) + ' 상담';
+  document.getElementById('mbType').textContent = typeLabel(s.bookedType || s.type) + ' 상담';
   document.getElementById('mbWho').textContent  = s.bookedName || '';
 }
 
