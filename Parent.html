@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#3B82F6">
+<title>영남고등학교 학부모 상담 예약</title>
+<style>
+  :root{
+    --bg-base:#F1F5F9; --paper:#FFFFFF; --paper-soft:#F8FAFC;
+    --ink:#0F172A; --ink-soft:#64748B; --rule:#E2E8F0;
+    --mon:#3B82F6; --mon-deep:#1F3D33; --gold:#F59E0B;
+    --ok:#10B981; --warn:#EF4444;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    font-family:'Pretendard','Noto Sans KR',-apple-system,BlinkMacSystemFont,sans-serif;
+    background:var(--bg-base);color:var(--ink);
+    line-height:1.6;font-size:17px;
+    display:flex;flex-direction:column;align-items:center;
+    min-height:100%;padding:0 0 40px;
+  }
+  .topbar{
+    width:100%;background:var(--mon-deep);color:#fff;
+    padding:18px 20px;text-align:center;
+    display:flex;align-items:center;justify-content:center;gap:10px;
+  }
+  .topbar img{height:34px;vertical-align:middle;}
+  .topbar h1{font-size:19px;font-weight:700;}
+  .wrap{width:100%;max-width:560px;padding:22px 18px;}
+  .card{
+    background:var(--paper);border:1px solid var(--rule);
+    border-radius:16px;padding:24px 20px;margin-bottom:18px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.04);
+  }
+  .step-label{
+    display:inline-block;font-size:13px;font-weight:700;
+    color:var(--mon);background:#EFF6FF;
+    padding:4px 12px;border-radius:20px;margin-bottom:14px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  h2{font-size:21px;font-weight:700;margin-bottom:6px;}
+  .sub{font-size:15px;color:var(--ink-soft);margin-bottom:20px;}
+  label{display:block;font-size:15px;font-weight:600;margin:16px 0 7px;}
+  label:first-of-type{margin-top:0;}
+  input,select{
+    width:100%;font-size:18px;font-family:inherit;
+    padding:14px 14px;border:1.5px solid var(--rule);border-radius:11px;
+    background:var(--paper-soft);color:var(--ink);
+  }
+  input:focus,select:focus{outline:none;border-color:var(--mon);background:#fff;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .btn{
+    width:100%;font-size:18px;font-weight:700;font-family:inherit;
+    padding:16px;border:none;border-radius:12px;cursor:pointer;
+    background:var(--mon);color:#fff;margin-top:24px;
+    transition:opacity .15s;
+  }
+  .btn:active{opacity:.8;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .btn-ghost{background:var(--paper);color:var(--ink-soft);border:1.5px solid var(--rule);margin-top:12px;}
+  .btn-danger{background:var(--warn);}
+  .msg{
+    margin-top:16px;padding:13px 15px;border-radius:11px;
+    font-size:15px;font-weight:600;display:none;
+  }
+  .msg.show{display:block;}
+  .msg.error{background:#FEE2E2;color:#991B1B;}
+  .msg.info{background:#EFF6FF;color:#1E40AF;}
+  .hidden{display:none !important;}
+  .loading{text-align:center;color:var(--ink-soft);padding:30px 0;font-size:16px;}
+  .spinner{
+    display:inline-block;width:22px;height:22px;border:3px solid var(--rule);
+    border-top-color:var(--mon);border-radius:50%;
+    animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .teacher-banner{
+    background:linear-gradient(135deg,#3B82F6,#1F3D33);color:#fff;
+    border-radius:14px;padding:18px 20px;margin-bottom:18px;
+  }
+  .teacher-banner .tb-label{font-size:13px;opacity:.85;font-family:'IBM Plex Mono';}
+  .teacher-banner .tb-name{font-size:22px;font-weight:800;margin-top:2px;}
+
+  .slot-date-group{margin-bottom:20px;}
+  .slot-date-head{
+    font-size:15px;font-weight:700;color:var(--ink);
+    padding:8px 2px;border-bottom:2px solid var(--rule);margin-bottom:10px;
+  }
+  .slot{
+    display:flex;align-items:center;gap:12px;
+    border:1.5px solid var(--rule);border-radius:12px;
+    padding:14px 16px;margin-bottom:9px;cursor:pointer;
+    background:var(--paper-soft);transition:all .12s;
+  }
+  .slot:active{transform:scale(0.99);}
+  .slot.selected{border-color:var(--mon);background:#EFF6FF;}
+  .slot-time{font-size:18px;font-weight:800;font-family:'IBM Plex Mono';min-width:64px;}
+  .slot-meta{flex:1;font-size:14px;color:var(--ink-soft);}
+  .slot-badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:8px;}
+  .slot-badge.face{background:#EFF6FF;color:#1E40AF;}
+  .slot-badge.phone{background:#FEF3C7;color:#92400E;}
+  .slot-check{font-size:20px;color:var(--mon);width:22px;text-align:center;}
+
+  .booking-card{
+    background:#ECFDF5;border:1.5px solid var(--ok);border-radius:14px;
+    padding:20px;margin-bottom:18px;
+  }
+  .booking-card .bc-title{font-size:14px;font-weight:700;color:var(--ok);margin-bottom:10px;}
+  .booking-card .bc-row{display:flex;justify-content:space-between;font-size:16px;padding:5px 0;}
+  .booking-card .bc-row .k{color:var(--ink-soft);}
+  .booking-card .bc-row .v{font-weight:700;}
+
+  .footnote{font-size:13px;color:var(--ink-soft);text-align:center;margin-top:10px;line-height:1.7;}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <img src="icon-180.png" alt="">
+    <h1>학부모 상담 예약</h1>
+  </div>
+
+  <div class="wrap">
+
+    <!-- STEP 1: 인증 -->
+    <div id="authCard" class="card">
+      <span class="step-label">STEP 1</span>
+      <h2>자녀 정보 확인</h2>
+      <p class="sub">상담을 예약할 자녀의 정보를 입력해 주세요.<br>학교에 등록된 정보와 일치해야 예약할 수 있습니다.</p>
+
+      <div class="row2">
+        <div>
+          <label>학년</label>
+          <select id="inGrade">
+            <option value="">선택</option>
+            <option value="1">1학년</option>
+            <option value="2">2학년</option>
+            <option value="3">3학년</option>
+          </select>
+        </div>
+        <div>
+          <label>반</label>
+          <input id="inRoom" type="number" inputmode="numeric" placeholder="예: 3" min="1" max="20">
+        </div>
+      </div>
+
+      <label>자녀 이름</label>
+      <input id="inName" type="text" placeholder="예: 홍길동" autocomplete="off">
+
+      <label>자녀 생년월일</label>
+      <input id="inBirth" type="date" min="2005-01-01" max="2015-12-31">
+
+      <button id="authBtn" class="btn">확인하고 예약하기</button>
+      <div id="authMsg" class="msg"></div>
+    </div>
+
+    <!-- STEP 2: 예약 -->
+    <div id="bookCard" class="hidden">
+      <div class="teacher-banner">
+        <div class="tb-label">담임 선생님</div>
+        <div class="tb-name" id="teacherName">—</div>
+      </div>
+
+      <div id="myBookingWrap" class="hidden">
+        <div class="booking-card">
+          <div class="bc-title">✓ 예약 완료</div>
+          <div class="bc-row"><span class="k">일시</span><span class="v" id="mbWhen">—</span></div>
+          <div class="bc-row"><span class="k">방식</span><span class="v" id="mbType">—</span></div>
+          <div class="bc-row"><span class="k">예약자</span><span class="v" id="mbWho">—</span></div>
+        </div>
+        <button id="cancelBtn" class="btn btn-danger">예약 취소하기</button>
+        <div class="footnote">취소 후 다른 시간으로 다시 예약할 수 있습니다.</div>
+      </div>
+
+      <div id="slotCard" class="card">
+        <span class="step-label">STEP 2</span>
+        <h2>상담 시간 선택</h2>
+        <p class="sub">선생님이 열어둔 시간 중 원하는 칸을 선택하세요.</p>
+        <div id="slotList"><div class="loading"><span class="spinner"></span>불러오는 중...</div></div>
+      </div>
+
+      <div id="confirmCard" class="card hidden">
+        <span class="step-label">STEP 3</span>
+        <h2>예약자 정보</h2>
+        <p class="sub" id="chosenSlotText">—</p>
+        <label>예약자 성함</label>
+        <input id="bkName" type="text" placeholder="예: 홍길동 학부모" autocomplete="off">
+        <label>연락 가능한 전화번호</label>
+        <input id="bkPhone" type="tel" inputmode="tel" placeholder="예: 010-1234-5678">
+        <label>선생님께 남길 말 (선택)</label>
+        <input id="bkMemo" type="text" placeholder="상담 희망 내용 등" autocomplete="off">
+        <button id="confirmBtn" class="btn">이 시간으로 예약 확정</button>
+        <button id="backBtn" class="btn btn-ghost">다시 선택</button>
+        <div id="confirmMsg" class="msg"></div>
+      </div>
+    </div>
+
+    <div class="footnote">
+      영남고등학교 · 문의는 담임 선생님 또는 교무실로 연락 주세요.
+    </div>
+  </div>
+
+<script>
+// ※ 이 페이지는 Firestore에 직접 접근하지 않습니다.
+//   모든 조회·예약·취소는 GAS를 거치며, 다른 학부모의 개인정보는
+//   브라우저로 전송되지 않습니다.
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
+
+// ── 상태 ──
+let parentToken = null;
+let classKey    = null;
+let teacher     = null;
+let selectedSlot = null;
+
+// ── 유틸 ──
+function esc(v){
+  if(v==null) return '';
+  return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function showMsg(el, text, type){ el.textContent = text; el.className = 'msg show ' + type; }
+function hideMsg(el){ el.className = 'msg'; }
+
+const WEEKDAY = ['일','월','화','수','목','금','토'];
+function fmtDate(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  return `${d.getMonth()+1}월 ${d.getDate()}일 (${WEEKDAY[d.getDay()]})`;
+}
+function typeLabel(t){ return t === 'phone' ? '전화' : '대면'; }
+
+// GAS 호출 (GET, 파라미터 인코딩)
+async function callGas(action, params){
+  const usp = new URLSearchParams(Object.assign({ action }, params));
+  const res = await fetch(`${GAS_URL}?${usp.toString()}`, { redirect: 'follow' });
+  return await res.json();
+}
+
+// ── STEP 1: 인증 ──
+const authBtn = document.getElementById('authBtn');
+const authMsg = document.getElementById('authMsg');
+
+authBtn.addEventListener('click', async () => {
+  const grade = document.getElementById('inGrade').value.trim();
+  const room  = document.getElementById('inRoom').value.trim();
+  const name  = document.getElementById('inName').value.trim();
+  const birth = document.getElementById('inBirth').value.trim();
+
+  if(!grade || !room || !name || !birth){
+    showMsg(authMsg, '모든 칸을 입력해 주세요.', 'error');
+    return;
+  }
+
+  authBtn.disabled = true;
+  authBtn.textContent = '확인 중...';
+  hideMsg(authMsg);
+
+  try {
+    const data = await callGas('verifyParent', { grade, room, name, birth });
+    if(!data.success){
+      showMsg(authMsg, data.error || '일치하는 자녀 정보를 찾을 수 없습니다. 학년·반·이름·생년월일을 다시 확인해 주세요.', 'error');
+      authBtn.disabled = false;
+      authBtn.textContent = '확인하고 예약하기';
+      return;
+    }
+
+    parentToken = data.token;
+    classKey    = data.classKey;
+    teacher     = data.teacher;
+
+    document.getElementById('teacherName').textContent =
+      teacher ? teacher + ' 선생님' : '담임 미배정';
+    document.getElementById('authCard').classList.add('hidden');
+    document.getElementById('bookCard').classList.remove('hidden');
+
+    await loadSlots();
+  } catch(e){
+    showMsg(authMsg, '서버 연결에 실패했습니다. 잠시 후 다시 시도해 주세요.', 'error');
+    authBtn.disabled = false;
+    authBtn.textContent = '확인하고 예약하기';
+  }
+});
+
+// ── STEP 2: 슬롯 로드 (GAS가 빈 칸만 + 내 예약만 내려줌) ──
+const slotList    = document.getElementById('slotList');
+const slotCard    = document.getElementById('slotCard');
+const confirmCard = document.getElementById('confirmCard');
+const myBookingWrap = document.getElementById('myBookingWrap');
+
+let openSlots = [];
+
+async function loadSlots(){
+  slotList.innerHTML = '<div class="loading"><span class="spinner"></span>불러오는 중...</div>';
+  confirmCard.classList.add('hidden');
+  myBookingWrap.classList.add('hidden');
+  slotCard.classList.remove('hidden');
+  selectedSlot = null;
+
+  let data;
+  try {
+    data = await callGas('getOpenSlots', { classKey, token: parentToken });
+  } catch(e){
+    slotList.innerHTML = '<div class="loading">시간표를 불러오지 못했습니다.</div>';
+    return;
+  }
+  if(!data.success){
+    slotList.innerHTML = `<div class="loading">${esc(data.error||'불러오기 실패')}</div>`;
+    return;
+  }
+
+  // 이미 예약했으면 내 예약 표시
+  if(data.mine){
+    showMyBooking(data.mine);
+    return;
+  }
+
+  openSlots = Array.isArray(data.slots) ? data.slots : [];
+  if(openSlots.length === 0){
+    slotList.innerHTML = '<div class="loading">아직 열린 상담 시간이 없습니다.<br>선생님이 시간을 등록하면 예약할 수 있습니다.</div>';
+    return;
+  }
+
+  // 날짜별 그룹핑
+  const byDate = {};
+  openSlots.forEach(s => { (byDate[s.date] = byDate[s.date] || []).push(s); });
+
+  let html = '';
+  Object.keys(byDate).sort().forEach(date => {
+    html += `<div class="slot-date-group"><div class="slot-date-head">${esc(fmtDate(date))}</div>`;
+    byDate[date].forEach(s => {
+      const badgeClass = s.type === 'phone' ? 'phone' : 'face';
+      html += `
+        <div class="slot" data-id="${esc(s.id)}" role="button">
+          <div class="slot-time">${esc(s.time)}</div>
+          <div class="slot-meta">${esc(String(s.duration||20))}분 상담</div>
+          <span class="slot-badge ${badgeClass}">${esc(typeLabel(s.type))}</span>
+          <div class="slot-check"></div>
+        </div>`;
+    });
+    html += `</div>`;
+  });
+  slotList.innerHTML = html;
+
+  slotList.querySelectorAll('.slot').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.id;
+      const s  = openSlots.find(x => x.id === id);
+      if(!s) return;
+      slotList.querySelectorAll('.slot').forEach(x => x.classList.remove('selected'));
+      slotList.querySelectorAll('.slot-check').forEach(x => x.textContent = '');
+      el.classList.add('selected');
+      el.querySelector('.slot-check').textContent = '✓';
+      selectedSlot = s;
+      openConfirm(s);
+    });
+  });
+}
+
+// ── STEP 3: 확정 ──
+const confirmBtn = document.getElementById('confirmBtn');
+const confirmMsg = document.getElementById('confirmMsg');
+
+function openConfirm(s){
+  document.getElementById('chosenSlotText').textContent =
+    `${fmtDate(s.date)} ${s.time} · ${typeLabel(s.type)} 상담`;
+  confirmCard.classList.remove('hidden');
+  hideMsg(confirmMsg);
+  confirmCard.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
+document.getElementById('backBtn').addEventListener('click', () => {
+  confirmCard.classList.add('hidden');
+  slotList.querySelectorAll('.slot').forEach(x => x.classList.remove('selected'));
+  slotList.querySelectorAll('.slot-check').forEach(x => x.textContent = '');
+  selectedSlot = null;
+});
+
+confirmBtn.addEventListener('click', async () => {
+  if(!selectedSlot) return;
+  const bkName  = document.getElementById('bkName').value.trim();
+  const bkPhone = document.getElementById('bkPhone').value.trim();
+  const bkMemo  = document.getElementById('bkMemo').value.trim();
+
+  if(!bkName || !bkPhone){
+    showMsg(confirmMsg, '성함과 전화번호를 입력해 주세요.', 'error');
+    return;
+  }
+
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = '예약 중...';
+  hideMsg(confirmMsg);
+
+  try {
+    const data = await callGas('bookSlot', {
+      classKey, token: parentToken, slotId: selectedSlot.id,
+      bkName, bkPhone, bkMemo
+    });
+
+    if(data.success){
+      await loadSlots();   // 내 예약 화면으로 전환
+      return;
+    }
+
+    const map = {
+      TAKEN: '방금 다른 분이 이 시간을 예약했습니다. 다른 시간을 선택해 주세요.',
+      GONE:  '선택한 시간이 사라졌습니다. 목록을 다시 불러옵니다.',
+      ALREADY_BOOKED: '이미 예약된 상담이 있습니다.'
+    };
+    showMsg(confirmMsg, map[data.error] || ('예약에 실패했습니다: ' + (data.error||'')), 'error');
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = '이 시간으로 예약 확정';
+    if(['TAKEN','GONE','ALREADY_BOOKED'].includes(data.error)){
+      setTimeout(loadSlots, 1500);
+    }
+  } catch(e){
+    showMsg(confirmMsg, '예약 처리 중 오류가 발생했습니다. 다시 시도해 주세요.', 'error');
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = '이 시간으로 예약 확정';
+  }
+});
+
+// ── 내 예약 + 취소 ──
+function showMyBooking(s){
+  slotCard.classList.add('hidden');
+  confirmCard.classList.add('hidden');
+  myBookingWrap.classList.remove('hidden');
+  document.getElementById('mbWhen').textContent = `${fmtDate(s.date)} ${s.time}`;
+  document.getElementById('mbType').textContent = typeLabel(s.type) + ' 상담';
+  document.getElementById('mbWho').textContent  = s.bookedName || '';
+}
+
+document.getElementById('cancelBtn').addEventListener('click', async () => {
+  if(!confirm('예약을 취소하시겠습니까?')) return;
+  const cancelBtn = document.getElementById('cancelBtn');
+  cancelBtn.disabled = true;
+  cancelBtn.textContent = '취소 중...';
+
+  try {
+    const data = await callGas('cancelBooking', { classKey, token: parentToken });
+    if(data.success){
+      await loadSlots();
+      return;
+    }
+    alert('취소에 실패했습니다: ' + (data.error||''));
+    cancelBtn.disabled = false;
+    cancelBtn.textContent = '예약 취소하기';
+  } catch(e){
+    alert('취소 처리 중 오류가 발생했습니다. 다시 시도해 주세요.');
+    cancelBtn.disabled = false;
+    cancelBtn.textContent = '예약 취소하기';
+  }
+});
+</script>
+</body>
+</html>
