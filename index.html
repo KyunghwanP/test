@@ -2636,7 +2636,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.30</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.31</div>
   </div>
 </div>
 
@@ -2729,7 +2729,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.30</div>
+    <div class="nav-version">ver4.31</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3191,7 +3191,7 @@
                     </div>
                     <div>
                       <label>시작 시각</label>
-                      <input type="time" id="consultStart" value="14:00" step="600" min="08:00" max="21:00">
+                      <input type="time" id="consultStart" value="16:30" step="600" min="08:00" max="21:00">
                     </div>
                     <div>
                       <label>상담 진행 시간</label>
@@ -4852,11 +4852,14 @@ function initAppUI(){
   applyConsultTabVisibility();
 }
 
-// [테스트 기간] 학부모상담 탭은 관리자(박경환)에게만 노출
+// 학부모상담 탭은 담임(담당 학급이 있는) 교사에게 노출
 function applyConsultTabVisibility(){
+  const homeroom = getMyHomeroom();
+  // 담임이면 표시. (관리자 박경환은 담임반 없어도 테스트용 1-1로 표시)
   const isAdmin = fbAuth.currentUser?.email === 'pkh910518@yeungnam.hs.kr';
+  const show = !!homeroom || isAdmin;
   document.querySelectorAll('[data-page="consult"]').forEach(el => {
-    el.style.display = isAdmin ? '' : 'none';
+    el.style.display = show ? '' : 'none';
   });
 }
 
@@ -6568,6 +6571,21 @@ function renderSchedule(monthKey) {
       </div>
     </div>`;
   }).join('');
+
+  // 오늘이 이 달에 있으면, 오늘(또는 가장 가까운 이후) 일정으로 스크롤
+  if(isThisMonth){
+    requestAnimationFrame(() => {
+      let target = list.querySelector('.sl-item.today');
+      if(!target){
+        // 오늘 일정이 없으면, 오늘 이후 첫 일정 찾기
+        const items = [...list.querySelectorAll('.sl-item')];
+        for(let i=0;i<events.length;i++){
+          if(events[i].date >= today.getDate()){ target = items[i]; break; }
+        }
+      }
+      if(target) target.scrollIntoView({ behavior:'smooth', block:'center' });
+    });
+  }
 }
 
 // ---- 홈 현황판 ----
@@ -9007,14 +9025,8 @@ function initConsultPage(){
   const noHR  = document.getElementById('consultNoHomeroom');
   const main  = document.getElementById('consultMain');
 
-  // [테스트 기간] 관리자(박경환)만 접근 허용
-  if(fbAuth.currentUser?.email !== 'pkh910518@yeungnam.hs.kr'){
-    navigateTo('home');
-    return;
-  }
-
   consultClassKey = getMyHomeroom();
-  // [테스트 기간] 관리자에게 담임반이 없으면 테스트용 1-1 학급으로 진행
+  // 관리자(박경환)는 담임반이 없으면 테스트용 1-1 학급으로 진행
   if(!consultClassKey && fbAuth.currentUser?.email === 'pkh910518@yeungnam.hs.kr'){
     consultClassKey = '1-1';
   }
@@ -9485,7 +9497,7 @@ function openConsultModal(s){
 
   // 날짜·시각
   document.getElementById('cmDate').value = s ? s.date : consultLocalYmd(new Date());
-  document.getElementById('cmTime').value = s ? s.time : '14:00';
+  document.getElementById('cmTime').value = s ? s.time : '16:30';
 
   // 삭제 버튼은 기존 슬롯에만
   document.getElementById('cmDeleteBtn').style.display = isNew ? 'none' : '';
