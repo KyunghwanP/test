@@ -2529,7 +2529,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.14</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.15</div>
   </div>
 </div>
 
@@ -2622,7 +2622,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.14</div>
+    <div class="nav-version">ver4.15</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -8699,7 +8699,7 @@ function initConsultPage(){
   // 날짜 기본값: 오늘
   const dateEl = document.getElementById('consultDate');
   if(dateEl && !dateEl.value){
-    dateEl.value = new Date().toISOString().slice(0,10);
+    dateEl.value = consultLocalYmd(new Date());
   }
   updateConsultPreview();
 
@@ -8811,17 +8811,25 @@ function consultFmtDate(dateStr){
 let consultSlots = [];
 let consultCurWeek = null;  // 현재 보고 있는 주의 월요일 yyyy-mm-dd
 
+// 로컬(기기 시간대) 기준 yyyy-mm-dd. toISOString()은 UTC라 KST에서 하루 밀림 → 사용 금지.
+function consultLocalYmd(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+
 // 날짜(yyyy-mm-dd) → 그 주 월요일 yyyy-mm-dd
 function consultWeekStart(dateStr){
   const d = new Date(dateStr + 'T00:00:00');
   const dow = (d.getDay() + 6) % 7; // 월=0
   d.setDate(d.getDate() - dow);
-  return d.toISOString().slice(0,10);
+  return consultLocalYmd(d);
 }
 function consultAddDays(dateStr, n){
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0,10);
+  return consultLocalYmd(d);
 }
 const CONSULT_WD2 = ['월','화','수','목','금','토','일'];
 
@@ -8839,7 +8847,7 @@ function renderConsultList(slots){
       const earliest = slots.map(s => s.date).sort()[0];
       consultCurWeek = consultWeekStart(earliest);
     } else {
-      consultCurWeek = consultWeekStart(new Date().toISOString().slice(0,10));
+      consultCurWeek = consultWeekStart(consultLocalYmd(new Date()));
     }
   }
 
