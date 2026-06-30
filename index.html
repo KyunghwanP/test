@@ -2446,6 +2446,73 @@
   @media (max-width:520px){
     .consult-form-grid{grid-template-columns:1fr;}
   }
+
+  /* 주차 아코디언 */
+  .cweek{border:1px solid var(--rule);border-radius:12px;margin-bottom:12px;overflow:hidden;}
+  .cweek-head{
+    display:flex;align-items:center;gap:10px;padding:13px 15px;cursor:pointer;
+    background:var(--paper-soft);user-select:none;
+  }
+  .cweek-head.open{background:#EFF6FF;}
+  .cweek-arrow{font-size:11px;color:var(--mon);width:14px;}
+  .cweek-title{font-size:14.5px;font-weight:800;flex:1;}
+  .cweek-count{font-size:12px;font-weight:700;color:var(--ink-soft);}
+  .cweek-head.open .cweek-count{color:var(--mon);}
+  .cweek-body{
+    display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:12px;
+    background:var(--paper);
+  }
+  .cday{min-width:0;}
+  .cday-head{font-size:12px;font-weight:700;color:var(--ink-soft);text-align:center;padding:5px 0;border-bottom:1.5px solid var(--rule);margin-bottom:6px;}
+  .cday-slots{display:flex;flex-direction:column;gap:5px;}
+  .cslot{
+    border-radius:7px;padding:6px 7px;font-size:12px;cursor:pointer;
+    display:flex;flex-direction:column;gap:2px;line-height:1.3;
+  }
+  .cslot.booked{background:#ECFDF5;border:1px solid #10B981;}
+  .cslot.empty{background:var(--paper-soft);border:1px dashed var(--rule);opacity:.65;}
+  .cslot-t{font-family:'IBM Plex Mono';font-weight:800;font-size:12px;color:var(--ink);}
+  .cslot-name{font-weight:700;color:var(--ink);word-break:keep-all;}
+  .cslot-m{font-size:10px;font-weight:700;padding:1px 5px;border-radius:5px;align-self:flex-start;}
+  .cslot-m.face{background:#EFF6FF;color:#1E40AF;}
+  .cslot-m.phone{background:#FEF3C7;color:#92400E;}
+  .cslot-open{color:var(--ink-soft);font-size:11px;}
+  .cslot-empty{text-align:center;color:var(--rule);font-size:14px;padding:8px 0;}
+  @media (max-width:680px){
+    .cweek-body{grid-template-columns:repeat(5,minmax(86px,1fr));overflow-x:auto;}
+  }
+
+  /* 변경 모달 */
+  .cm-overlay{
+    display:none;position:fixed;inset:0;background:rgba(15,23,42,0.5);
+    z-index:1000;align-items:center;justify-content:center;padding:18px;
+  }
+  .cm-overlay.show{display:flex;}
+  .cm-box{
+    background:var(--paper);border-radius:16px;width:100%;max-width:420px;
+    box-shadow:0 20px 50px rgba(0,0,0,0.3);overflow:hidden;
+  }
+  .cm-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 18px;border-bottom:1px solid var(--rule);font-size:16px;font-weight:800;
+  }
+  .cm-x{border:none;background:none;font-size:18px;color:var(--ink-soft);cursor:pointer;}
+  .cm-info{padding:16px 18px;background:var(--paper-soft);border-bottom:1px solid var(--rule);}
+  .cm-row{display:flex;gap:10px;padding:4px 0;font-size:14px;}
+  .cm-row .cm-k{color:var(--ink-soft);min-width:54px;font-weight:600;}
+  .cm-row .cm-v{font-weight:700;flex:1;word-break:break-all;}
+  .cm-edit{padding:16px 18px;}
+  .cm-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .cm-edit label{display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;}
+  .cm-edit input{
+    width:100%;font-size:15px;font-family:inherit;padding:11px;
+    border:1.5px solid var(--rule);border-radius:9px;background:var(--paper-soft);color:var(--ink);
+  }
+  .cm-edit input:focus{outline:none;border-color:var(--mon);background:#fff;}
+  .cm-actions{display:flex;gap:10px;padding:0 18px 18px;}
+  .cm-btn{flex:1;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .cm-del{background:var(--paper);color:var(--warn);border:1.5px solid var(--rule);flex:0 0 90px;}
+  .cm-save{background:var(--mon);color:#fff;}
 </style>
 </head>
 <body>
@@ -2460,7 +2527,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.12</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.13</div>
   </div>
 </div>
 
@@ -2553,7 +2620,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.12</div>
+    <div class="nav-version">ver4.13</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -2998,13 +3065,6 @@
                   <input type="date" id="consultDate">
                 </div>
                 <div>
-                  <label>상담 방식</label>
-                  <div class="consult-type-toggle">
-                    <button type="button" class="consult-type-btn active" data-ctype="face">대면</button>
-                    <button type="button" class="consult-type-btn" data-ctype="phone">전화</button>
-                  </div>
-                </div>
-                <div>
                   <label>시작 시각</label>
                   <input type="time" id="consultStart" value="14:00">
                 </div>
@@ -3042,6 +3102,33 @@
             <div class="consult-section">
               <h4>📋 예약 현황</h4>
               <div id="consultList"><div class="consult-loading">불러오는 중...</div></div>
+            </div>
+          </div>
+
+          <!-- 변경 모달 -->
+          <div id="consultModal" class="cm-overlay">
+            <div class="cm-box">
+              <div class="cm-head">
+                <span id="cmTitle">예약 상세 / 변경</span>
+                <button class="cm-x" id="cmCloseBtn">✕</button>
+              </div>
+              <div id="cmBookingInfo" class="cm-info"></div>
+              <div class="cm-edit">
+                <div class="cm-edit-grid">
+                  <div>
+                    <label>날짜</label>
+                    <input type="date" id="cmDate">
+                  </div>
+                  <div>
+                    <label>시각</label>
+                    <input type="time" id="cmTime">
+                  </div>
+                </div>
+              </div>
+              <div class="cm-actions">
+                <button class="cm-btn cm-del" id="cmDeleteBtn">삭제</button>
+                <button class="cm-btn cm-save" id="cmSaveBtn">변경 저장</button>
+              </div>
             </div>
           </div>
 
@@ -8556,7 +8643,6 @@ let listFilters = new Set(['all']);
 let consultClassKey   = null;   // 내 담임 학급 "1-3"
 let consultUnsub      = null;   // onSnapshot 해제 함수
 let consultInitOnce   = false;  // 폼 이벤트 1회 바인딩
-let consultSelType    = 'face'; // 폼: 선택된 상담 방식
 
 function escConsult(v){
   if(v==null) return '';
@@ -8628,20 +8714,20 @@ function initConsultPage(){
 }
 
 function bindConsultForm(){
-  // 대면/전화 토글
-  document.querySelectorAll('#consultPage .consult-type-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#consultPage .consult-type-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      consultSelType = btn.dataset.ctype;
-    });
-  });
   // 미리보기 갱신
   ['consultDate','consultStart','consultDuration','consultCount','consultGap'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.addEventListener('change', updateConsultPreview);
   });
   document.getElementById('consultAddBtn').addEventListener('click', addConsultSlots);
+
+  // 변경 모달 버튼
+  document.getElementById('cmCloseBtn').addEventListener('click', closeConsultModal);
+  document.getElementById('cmSaveBtn').addEventListener('click', saveConsultModal);
+  document.getElementById('cmDeleteBtn').addEventListener('click', deleteConsultModalSlot);
+  document.getElementById('consultModal').addEventListener('click', (e) => {
+    if(e.target.id === 'consultModal') closeConsultModal();
+  });
 }
 
 // 시작시각 + 칸수 + 길이 + 간격 → 슬롯 시각 배열
@@ -8695,7 +8781,7 @@ async function addConsultSlots(){
         if(slots.some(s => s.date === date && s.time === time)) return;
         slots.push({
           id: `${date}_${time}_${Math.random().toString(36).slice(2,7)}`,
-          date, time, type: consultSelType, duration: dur, status: 'open'
+          date, time, duration: dur, status: 'open'
         });
       });
       const myName = TEACHERS.find(t=>t.homeroom===consultClassKey)?.name
@@ -8718,7 +8804,26 @@ function consultFmtDate(dateStr){
   return `${d.getMonth()+1}월 ${d.getDate()}일 (${CONSULT_WD[d.getDay()]})`;
 }
 
+// 슬롯 데이터를 전역 보관 (모달·렌더 재사용)
+let consultSlots = [];
+let consultOpenWeeks = null;  // 펼친 주차 key Set (null이면 자동: 예약있는주 펼침)
+
+// 날짜(yyyy-mm-dd) → 그 주 월요일 yyyy-mm-dd
+function consultWeekStart(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  const dow = (d.getDay() + 6) % 7; // 월=0
+  d.setDate(d.getDate() - dow);
+  return d.toISOString().slice(0,10);
+}
+function consultAddDays(dateStr, n){
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0,10);
+}
+const CONSULT_WD2 = ['월','화','수','목','금','토','일'];
+
 function renderConsultList(slots){
+  consultSlots = slots.slice();
   const listEl = document.getElementById('consultList');
   const openCnt   = slots.filter(s => s.status !== 'booked').length;
   const bookedCnt = slots.filter(s => s.status === 'booked').length;
@@ -8730,63 +8835,180 @@ function renderConsultList(slots){
     return;
   }
 
-  // 날짜별 그룹
-  const byDate = {};
-  slots.slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time))
-    .forEach(s => { (byDate[s.date] = byDate[s.date] || []).push(s); });
+  // 주차별 그룹: { weekStart: { date: [slots] } }
+  const byWeek = {};
+  slots.forEach(s => {
+    const wk = consultWeekStart(s.date);
+    (byWeek[wk] = byWeek[wk] || {});
+    (byWeek[wk][s.date] = byWeek[wk][s.date] || []).push(s);
+  });
+
+  const weekKeys = Object.keys(byWeek).sort();
+
+  // 펼침 상태 자동 결정 (최초): 예약 또는 슬롯이 있는 주는 펼침
+  if(consultOpenWeeks === null){
+    consultOpenWeeks = new Set(weekKeys); // 기본 전체 펼침
+  }
 
   let html = '';
-  Object.keys(byDate).sort().forEach(date => {
-    html += `<div class="consult-day">
-      <div class="consult-day-head">
-        <span>${escConsult(consultFmtDate(date))}</span>
-        <button class="consult-day-del" data-delday="${escConsult(date)}">이 날짜 비우기</button>
+  weekKeys.forEach(wk => {
+    const days = byWeek[wk];
+    const weekSlots = Object.values(days).flat();
+    const wkBooked = weekSlots.filter(s => s.status === 'booked').length;
+    const wkEnd = consultAddDays(wk, 4); // 월~금
+    const open = consultOpenWeeks.has(wk);
+
+    html += `<div class="cweek">
+      <div class="cweek-head ${open?'open':''}" data-week="${escConsult(wk)}">
+        <span class="cweek-arrow">${open?'▼':'▶'}</span>
+        <span class="cweek-title">${escConsult(consultRangeLabel(wk, wkEnd))}</span>
+        <span class="cweek-count">${wkBooked>0?`예약 ${wkBooked}건`:'예약 없음'}</span>
       </div>`;
-    byDate[date].forEach(s => {
-      const booked = s.status === 'booked';
-      const typeCls = s.type === 'phone' ? 'phone' : 'face';
-      const typeTxt = s.type === 'phone' ? '전화' : '대면';
-      let info;
-      if(booked){
-        info = `<span class="ci-name">${escConsult(s.bookedName||'')}</span>`
-             + `<span class="ci-phone">${escConsult(s.bookedPhone||'')}</span>`
-             + (s.bookedMemo ? `<span class="ci-memo">“${escConsult(s.bookedMemo)}”</span>` : '');
-      } else {
-        info = `<span class="ci-open">예약 가능 (${escConsult(String(s.duration||20))}분)</span>`;
+
+    if(open){
+      html += `<div class="cweek-body">`;
+      // 월~금 5칸 가로
+      for(let i=0;i<5;i++){
+        const dStr = consultAddDays(wk, i);
+        const daySlots = (days[dStr]||[]).slice().sort((a,b)=>a.time.localeCompare(b.time));
+        html += `<div class="cday">
+          <div class="cday-head">${dStr.slice(5).replace('-','/')} (${CONSULT_WD2[i]})</div>
+          <div class="cday-slots">`;
+        if(daySlots.length === 0){
+          html += `<div class="cslot-empty">·</div>`;
+        } else {
+          daySlots.forEach(s => {
+            const booked = s.status === 'booked';
+            if(booked){
+              const method = s.bookedType || s.type || 'face';
+              const mTxt = method === 'phone' ? '전화' : '대면';
+              const who = s.studentName || s.bookedName || '';
+              html += `<div class="cslot booked" data-slot="${escConsult(s.id)}">
+                <span class="cslot-t">${escConsult(s.time)}</span>
+                <span class="cslot-name">${escConsult(who)}</span>
+                <span class="cslot-m ${method==='phone'?'phone':'face'}">${mTxt}</span>
+              </div>`;
+            } else {
+              html += `<div class="cslot empty" data-slot="${escConsult(s.id)}">
+                <span class="cslot-t">${escConsult(s.time)}</span>
+                <span class="cslot-open">비어있음</span>
+              </div>`;
+            }
+          });
+        }
+        html += `</div></div>`;
       }
-      html += `<div class="consult-slot ${booked?'booked':''}">
-        <span class="consult-slot-time">${escConsult(s.time)}</span>
-        <span class="consult-slot-type ${typeCls}">${typeTxt}</span>
-        <span class="consult-slot-info">${info}</span>
-        <button class="consult-slot-del" data-delslot="${escConsult(s.id)}" title="삭제">✕</button>
-      </div>`;
-    });
+      html += `</div>`;
+    }
     html += `</div>`;
   });
   listEl.innerHTML = html;
 
-  // 개별 슬롯 삭제
-  listEl.querySelectorAll('[data-delslot]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.delslot;
-      const target = slots.find(s => s.id === id);
-      const warn = target && target.status === 'booked'
-        ? '예약된 시간입니다. 삭제하면 학부모 예약도 함께 사라집니다. 삭제할까요?'
-        : '이 시간을 삭제할까요?';
-      if(confirm(warn)) deleteConsultSlot(id);
+  // 주차 펼치기/접기
+  listEl.querySelectorAll('.cweek-head').forEach(h => {
+    h.addEventListener('click', () => {
+      const wk = h.dataset.week;
+      if(consultOpenWeeks.has(wk)) consultOpenWeeks.delete(wk);
+      else consultOpenWeeks.add(wk);
+      renderConsultList(consultSlots);
     });
   });
-  // 날짜 통째 삭제
-  listEl.querySelectorAll('[data-delday]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const date = btn.dataset.delday;
-      const hasBooked = slots.some(s => s.date === date && s.status === 'booked');
-      const warn = hasBooked
-        ? '이 날짜에 예약된 상담이 있습니다. 모두 삭제할까요?'
-        : '이 날짜의 모든 시간을 삭제할까요?';
-      if(confirm(warn)) deleteConsultDay(date);
+  // 슬롯 클릭 → 변경 모달
+  listEl.querySelectorAll('[data-slot]').forEach(el => {
+    el.addEventListener('click', () => {
+      const s = consultSlots.find(x => x.id === el.dataset.slot);
+      if(s) openConsultModal(s);
     });
   });
+}
+
+// 주 범위 라벨: "7월 1주 (6/30~7/4)"
+function consultRangeLabel(wk, wkEnd){
+  const d = new Date(wk + 'T00:00:00');
+  const month = d.getMonth()+1;
+  // 그 달의 몇째 주
+  const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
+  const weekNum = Math.ceil((d.getDate() + ((firstDay.getDay()+6)%7)) / 7);
+  const s = wk.slice(5).replace('-','/');
+  const e = wkEnd.slice(5).replace('-','/');
+  return `${month}월 ${weekNum}주 (${s}~${e})`;
+}
+
+// ── 변경 모달 ──
+let consultModalSlot = null;
+function openConsultModal(s){
+  consultModalSlot = s;
+  const booked = s.status === 'booked';
+  const m = document.getElementById('consultModal');
+  document.getElementById('cmTitle').textContent = booked ? '예약 상세 / 변경' : '빈 시간 / 변경';
+
+  // 예약 정보 영역
+  const infoEl = document.getElementById('cmBookingInfo');
+  if(booked){
+    const method = s.bookedType || s.type || 'face';
+    infoEl.style.display = '';
+    infoEl.innerHTML = `
+      <div class="cm-row"><span class="cm-k">학생</span><span class="cm-v">${escConsult(s.studentName||'-')}${s.studentNum?` (${escConsult(s.studentNum)}번)`:''}</span></div>
+      <div class="cm-row"><span class="cm-k">예약자</span><span class="cm-v">${escConsult(s.bookedName||'-')}</span></div>
+      <div class="cm-row"><span class="cm-k">연락처</span><span class="cm-v">${escConsult(s.bookedPhone||'-')}</span></div>
+      <div class="cm-row"><span class="cm-k">방식</span><span class="cm-v">${method==='phone'?'전화':'대면'}</span></div>
+      ${s.bookedMemo?`<div class="cm-row"><span class="cm-k">남긴 말</span><span class="cm-v">${escConsult(s.bookedMemo)}</span></div>`:''}`;
+  } else {
+    infoEl.style.display = 'none';
+  }
+
+  // 변경 입력 (날짜·시각)
+  document.getElementById('cmDate').value = s.date;
+  document.getElementById('cmTime').value = s.time;
+
+  m.classList.add('show');
+}
+function closeConsultModal(){
+  document.getElementById('consultModal').classList.remove('show');
+  consultModalSlot = null;
+}
+
+async function saveConsultModal(){
+  if(!consultModalSlot) return;
+  const newDate = document.getElementById('cmDate').value;
+  const newTime = document.getElementById('cmTime').value;
+  if(!newDate || !newTime){ alert('날짜와 시각을 입력하세요.'); return; }
+
+  const btn = document.getElementById('cmSaveBtn');
+  btn.disabled = true; btn.textContent = '저장 중...';
+  const ref = doc(fbDb, 'consultations', consultClassKey);
+  try {
+    await runTransaction(fbDb, async (tx) => {
+      const snap  = await tx.get(ref);
+      const data  = snap.exists() ? (snap.data()||{}) : {};
+      const slots = Array.isArray(data.slots) ? data.slots : [];
+      const idx = slots.findIndex(x => x.id === consultModalSlot.id);
+      if(idx === -1) throw new Error('이미 삭제된 시간입니다.');
+      // 같은 날짜+시각 중복 방지 (자기 자신 제외)
+      if(slots.some((x,i)=> i!==idx && x.date===newDate && x.time===newTime)){
+        throw new Error('그 시간에 이미 다른 슬롯이 있습니다.');
+      }
+      slots[idx].date = newDate;
+      slots[idx].time = newTime;
+      tx.set(ref, { slots, updatedAt: new Date().toISOString() }, { merge: true });
+    });
+    closeConsultModal();
+  } catch(e){
+    alert('변경 실패: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '변경 저장';
+  }
+}
+
+async function deleteConsultModalSlot(){
+  if(!consultModalSlot) return;
+  const booked = consultModalSlot.status === 'booked';
+  const warn = booked
+    ? '예약된 시간입니다. 삭제하면 학부모 예약도 함께 사라집니다. 삭제할까요?'
+    : '이 시간을 삭제할까요?';
+  if(!confirm(warn)) return;
+  await deleteConsultSlot(consultModalSlot.id);
+  closeConsultModal();
 }
 
 async function deleteConsultSlot(id){
