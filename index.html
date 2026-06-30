@@ -2447,20 +2447,22 @@
     .consult-form-grid{grid-template-columns:1fr;}
   }
 
-  /* 주차 아코디언 */
-  .cweek{border:1px solid var(--rule);border-radius:12px;margin-bottom:12px;overflow:hidden;}
-  .cweek-head{
-    display:flex;align-items:center;gap:10px;padding:13px 15px;cursor:pointer;
-    background:var(--paper-soft);user-select:none;
+  /* 주 네비게이션 */
+  .cweek-nav{
+    display:flex;align-items:center;gap:10px;margin-bottom:12px;
   }
-  .cweek-head.open{background:#EFF6FF;}
-  .cweek-arrow{font-size:11px;color:var(--mon);width:14px;}
-  .cweek-title{font-size:14.5px;font-weight:800;flex:1;}
-  .cweek-count{font-size:12px;font-weight:700;color:var(--ink-soft);}
-  .cweek-head.open .cweek-count{color:var(--mon);}
+  .cweek-navbtn{
+    padding:9px 14px;border:1.5px solid var(--rule);border-radius:10px;
+    background:var(--paper);color:var(--ink);font-size:13px;font-weight:700;
+    cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;
+  }
+  .cweek-navbtn:active{background:var(--paper-soft);}
+  .cweek-navlabel{flex:1;text-align:center;}
+  .cwn-title{font-size:15px;font-weight:800;}
+  .cwn-sub{font-size:12px;color:var(--ink-soft);margin-top:2px;}
   .cweek-body{
     display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:12px;
-    background:var(--paper);
+    background:var(--paper);border:1px solid var(--rule);border-radius:12px;
   }
   .cday{min-width:0;}
   .cday-head{font-size:12px;font-weight:700;color:var(--ink-soft);text-align:center;padding:5px 0;border-bottom:1.5px solid var(--rule);margin-bottom:6px;}
@@ -2527,7 +2529,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.13</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.14</div>
   </div>
 </div>
 
@@ -2620,7 +2622,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.13</div>
+    <div class="nav-version">ver4.14</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -8790,6 +8792,7 @@ async function addConsultSlots(){
       tx.set(ref, { slots, teacher: myName, updatedAt: new Date().toISOString() }, { merge: true });
     });
     btn.textContent = '✓ 완료';
+    consultCurWeek = consultWeekStart(date);  // 만든 주로 캘린더 이동
     setTimeout(() => { btn.textContent = '시간 만들기'; btn.disabled = false; }, 1200);
   } catch(e){
     alert('시간 생성에 실패했습니다: ' + e.message);
@@ -8806,7 +8809,7 @@ function consultFmtDate(dateStr){
 
 // 슬롯 데이터를 전역 보관 (모달·렌더 재사용)
 let consultSlots = [];
-let consultOpenWeeks = null;  // 펼친 주차 key Set (null이면 자동: 예약있는주 펼침)
+let consultCurWeek = null;  // 현재 보고 있는 주의 월요일 yyyy-mm-dd
 
 // 날짜(yyyy-mm-dd) → 그 주 월요일 yyyy-mm-dd
 function consultWeekStart(dateStr){
@@ -8830,88 +8833,80 @@ function renderConsultList(slots){
   document.getElementById('consultStatOpen').textContent   = openCnt;
   document.getElementById('consultStatBooked').textContent = bookedCnt;
 
-  if(slots.length === 0){
-    listEl.innerHTML = '<div class="consult-empty">아직 만든 상담 시간이 없습니다.<br><span style="font-size:13px;">위에서 시간을 열어보세요.</span></div>';
-    return;
-  }
-
-  // 주차별 그룹: { weekStart: { date: [slots] } }
-  const byWeek = {};
-  slots.forEach(s => {
-    const wk = consultWeekStart(s.date);
-    (byWeek[wk] = byWeek[wk] || {});
-    (byWeek[wk][s.date] = byWeek[wk][s.date] || []).push(s);
-  });
-
-  const weekKeys = Object.keys(byWeek).sort();
-
-  // 펼침 상태 자동 결정 (최초): 예약 또는 슬롯이 있는 주는 펼침
-  if(consultOpenWeeks === null){
-    consultOpenWeeks = new Set(weekKeys); // 기본 전체 펼침
-  }
-
-  let html = '';
-  weekKeys.forEach(wk => {
-    const days = byWeek[wk];
-    const weekSlots = Object.values(days).flat();
-    const wkBooked = weekSlots.filter(s => s.status === 'booked').length;
-    const wkEnd = consultAddDays(wk, 4); // 월~금
-    const open = consultOpenWeeks.has(wk);
-
-    html += `<div class="cweek">
-      <div class="cweek-head ${open?'open':''}" data-week="${escConsult(wk)}">
-        <span class="cweek-arrow">${open?'▼':'▶'}</span>
-        <span class="cweek-title">${escConsult(consultRangeLabel(wk, wkEnd))}</span>
-        <span class="cweek-count">${wkBooked>0?`예약 ${wkBooked}건`:'예약 없음'}</span>
-      </div>`;
-
-    if(open){
-      html += `<div class="cweek-body">`;
-      // 월~금 5칸 가로
-      for(let i=0;i<5;i++){
-        const dStr = consultAddDays(wk, i);
-        const daySlots = (days[dStr]||[]).slice().sort((a,b)=>a.time.localeCompare(b.time));
-        html += `<div class="cday">
-          <div class="cday-head">${dStr.slice(5).replace('-','/')} (${CONSULT_WD2[i]})</div>
-          <div class="cday-slots">`;
-        if(daySlots.length === 0){
-          html += `<div class="cslot-empty">·</div>`;
-        } else {
-          daySlots.forEach(s => {
-            const booked = s.status === 'booked';
-            if(booked){
-              const method = s.bookedType || s.type || 'face';
-              const mTxt = method === 'phone' ? '전화' : '대면';
-              const who = s.studentName || s.bookedName || '';
-              html += `<div class="cslot booked" data-slot="${escConsult(s.id)}">
-                <span class="cslot-t">${escConsult(s.time)}</span>
-                <span class="cslot-name">${escConsult(who)}</span>
-                <span class="cslot-m ${method==='phone'?'phone':'face'}">${mTxt}</span>
-              </div>`;
-            } else {
-              html += `<div class="cslot empty" data-slot="${escConsult(s.id)}">
-                <span class="cslot-t">${escConsult(s.time)}</span>
-                <span class="cslot-open">비어있음</span>
-              </div>`;
-            }
-          });
-        }
-        html += `</div></div>`;
-      }
-      html += `</div>`;
+  // 현재 주가 안 정해졌으면: 슬롯이 있는 가장 이른 주, 없으면 이번 주
+  if(consultCurWeek === null){
+    if(slots.length > 0){
+      const earliest = slots.map(s => s.date).sort()[0];
+      consultCurWeek = consultWeekStart(earliest);
+    } else {
+      consultCurWeek = consultWeekStart(new Date().toISOString().slice(0,10));
     }
-    html += `</div>`;
-  });
+  }
+
+  const wk = consultCurWeek;
+  const wkEnd = consultAddDays(wk, 4); // 월~금
+
+  // 이 주의 슬롯만
+  const weekSlots = slots.filter(s => consultWeekStart(s.date) === wk);
+  const wkBooked = weekSlots.filter(s => s.status === 'booked').length;
+  const wkOpen   = weekSlots.filter(s => s.status !== 'booked').length;
+
+  // 날짜별
+  const days = {};
+  weekSlots.forEach(s => { (days[s.date] = days[s.date] || []).push(s); });
+
+  let html = `<div class="cweek-nav">
+    <button class="cweek-navbtn" id="cwPrev">◀ 이전주</button>
+    <div class="cweek-navlabel">
+      <div class="cwn-title">${escConsult(consultRangeLabel(wk, wkEnd))}</div>
+      <div class="cwn-sub">${wkBooked>0?`예약 ${wkBooked}건`:'예약 없음'}${wkOpen>0?` · 빈 시간 ${wkOpen}`:''}</div>
+    </div>
+    <button class="cweek-navbtn" id="cwNext">다음주 ▶</button>
+  </div>`;
+
+  html += `<div class="cweek-body">`;
+  for(let i=0;i<5;i++){
+    const dStr = consultAddDays(wk, i);
+    const daySlots = (days[dStr]||[]).slice().sort((a,b)=>a.time.localeCompare(b.time));
+    html += `<div class="cday">
+      <div class="cday-head">${dStr.slice(5).replace('-','/')} (${CONSULT_WD2[i]})</div>
+      <div class="cday-slots">`;
+    if(daySlots.length === 0){
+      html += `<div class="cslot-empty">·</div>`;
+    } else {
+      daySlots.forEach(s => {
+        const booked = s.status === 'booked';
+        if(booked){
+          const method = s.bookedType || s.type || 'face';
+          const mTxt = method === 'phone' ? '전화' : '대면';
+          const who = s.studentName || s.bookedName || '';
+          html += `<div class="cslot booked" data-slot="${escConsult(s.id)}">
+            <span class="cslot-t">${escConsult(s.time)}</span>
+            <span class="cslot-name">${escConsult(who)}</span>
+            <span class="cslot-m ${method==='phone'?'phone':'face'}">${mTxt}</span>
+          </div>`;
+        } else {
+          html += `<div class="cslot empty" data-slot="${escConsult(s.id)}">
+            <span class="cslot-t">${escConsult(s.time)}</span>
+            <span class="cslot-open">비어있음</span>
+          </div>`;
+        }
+      });
+    }
+    html += `</div></div>`;
+  }
+  html += `</div>`;
+
   listEl.innerHTML = html;
 
-  // 주차 펼치기/접기
-  listEl.querySelectorAll('.cweek-head').forEach(h => {
-    h.addEventListener('click', () => {
-      const wk = h.dataset.week;
-      if(consultOpenWeeks.has(wk)) consultOpenWeeks.delete(wk);
-      else consultOpenWeeks.add(wk);
-      renderConsultList(consultSlots);
-    });
+  // 주 이동
+  document.getElementById('cwPrev').addEventListener('click', () => {
+    consultCurWeek = consultAddDays(consultCurWeek, -7);
+    renderConsultList(consultSlots);
+  });
+  document.getElementById('cwNext').addEventListener('click', () => {
+    consultCurWeek = consultAddDays(consultCurWeek, 7);
+    renderConsultList(consultSlots);
   });
   // 슬롯 클릭 → 변경 모달
   listEl.querySelectorAll('[data-slot]').forEach(el => {
@@ -8992,6 +8987,7 @@ async function saveConsultModal(){
       slots[idx].time = newTime;
       tx.set(ref, { slots, updatedAt: new Date().toISOString() }, { merge: true });
     });
+    consultCurWeek = consultWeekStart(newDate);  // 옮긴 주로 캘린더 이동
     closeConsultModal();
   } catch(e){
     alert('변경 실패: ' + e.message);
