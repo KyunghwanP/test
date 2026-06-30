@@ -159,6 +159,21 @@
   .mobile-tab-bar .tab-item.active{color:var(--mon);border-bottom-color:var(--mon);}
   .mobile-tab-bar .tab-item-icon{font-size:18px;}
 
+  /* 탭바 좌우 스크롤 버튼 (좁은 데스크탑 창) */
+  .tab-bar-wrap{position:relative;}
+  .tab-scroll-btn{
+    position:absolute;top:0;bottom:0;width:32px;
+    display:none;align-items:center;justify-content:center;
+    background:var(--paper);border:none;cursor:pointer;
+    font-size:18px;color:var(--ink-soft);z-index:5;
+  }
+  .tab-scroll-btn.left{left:0;box-shadow:6px 0 8px -4px rgba(0,0,0,0.12);}
+  .tab-scroll-btn.right{right:0;box-shadow:-6px 0 8px -4px rgba(0,0,0,0.12);}
+  .tab-scroll-btn:hover{color:var(--mon);}
+  .tab-bar-wrap.scrollable .tab-scroll-btn{display:flex;}
+  /* 화살표가 보일 때 탭이 화살표 밑에 가려지지 않도록 좌우 여백 확보 */
+  .tab-bar-wrap.scrollable .mobile-tab-bar{padding-left:34px;padding-right:34px;}
+
   /* 사이드바가 overlay 모드일 때 탭바 표시 */
   .app-shell:not(.desktop-nav) .mobile-tab-bar{display:flex;}
   /* 데스크톱 모드에서는 탭바 숨김 */
@@ -197,6 +212,17 @@
   .points-type-btn:hover{border-color:var(--mon);color:var(--mon);}
   .points-type-btn.selected-merit{border-color:#10B981;background:#ECFDF5;color:#065F46;}
   .points-type-btn.selected-demerit{border-color:#EF4444;background:#FEF2F2;color:#991B1B;}
+  .points-type-btn.selected-reduce{border-color:#3B82F6;background:#EFF6FF;color:#1E40AF;}
+  .pts-subtype-sel{flex:0 0 auto;font-weight:700;border-color:var(--rule);}
+  /* 점수 칸 강조 — 가장 중요한 입력값 */
+  .pts-score-sel{
+    font-weight:800 !important;font-size:17px !important;
+    color:var(--mon) !important;
+    border:2px solid var(--mon) !important;
+    background:#FFF7F8 !important;
+    border-radius:8px;
+  }
+  .pts-score-sel:focus{outline:none;box-shadow:0 0 0 3px rgba(140,47,57,0.15);}
 
   .points-field{margin-bottom:14px;}
   .points-label{
@@ -1469,7 +1495,7 @@
     transform:scale(0.95);transition:transform 0.18s ease;
   }
   .modal-overlay.open .modal-box{transform:scale(1);}
-  .modal-overlay.wide .modal-box{max-width:min(1400px, 96vw);height:auto;max-height:92vh;}
+  .modal-overlay.wide .modal-box{max-width:min(1400px, 96vw);height:92vh;max-height:92vh;overflow:hidden;}
   .modal-overlay.medium .modal-box{max-width:min(900px, 92vw);height:auto;max-height:92vh;}
   /* 모달 내부 레이아웃 */
   .modal-inner{
@@ -1727,7 +1753,7 @@
   .meal-nav-btn:hover{background:var(--paper-soft);}
   .meal-nav-btn:active{background:var(--rule);}
   .meal-week-label{
-    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:15px;color:var(--paper);
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:15px;color:var(--ink);
     min-width:100px;text-align:center;
   }
   /* 데스크톱: 5열 그리드 */
@@ -1770,7 +1796,7 @@
   }
   .meal-card-day{
     font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;
-    color:#fff;background:var(--mon);
+    color:var(--ink);background:var(--mon);
     padding:10px 16px;
     display:flex;align-items:baseline;gap:6px;
   }
@@ -2297,6 +2323,19 @@
   }
   .home-schedule-content{color:var(--ink);line-height:1.5;font-size:15px;}
   .home-schedule-empty{font-size:11px;color:var(--ink-soft);padding:8px 12px;}
+  /* 홈 상담 일정 */
+  .home-consult-item{
+    display:flex;align-items:center;gap:8px;font-size:14px;
+    padding:8px 10px;border-radius:8px;background:var(--paper-soft);
+  }
+  .home-consult-item.booked{background:#ECFDF5;}
+  .home-consult-item .hc-date{font-weight:700;color:var(--ink-soft);min-width:58px;font-size:13px;}
+  .home-consult-item .hc-time{font-family:'IBM Plex Mono';font-weight:800;min-width:46px;}
+  .home-consult-item .hc-name{font-weight:700;flex:1;word-break:keep-all;}
+  .home-consult-item .hc-open{flex:1;color:var(--ink-soft);font-size:13px;}
+  .home-consult-item .hc-m{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;}
+  .home-consult-item .hc-m.face{background:#EFF6FF;color:#1E40AF;}
+  .home-consult-item .hc-m.phone{background:#FEF3C7;color:#92400E;}
 
   /* 급식 미니 */
   .home-meal-list{padding:6px 10px 8px;display:flex;flex-direction:column;gap:0;}
@@ -2343,6 +2382,204 @@
     line-height:1.4;word-break:keep-all;
   }
   #dayPreviewPopup .dp-empty{font-size:13px;color:var(--ink-soft);}
+
+  /* ───────── 학부모 상담 예약 (교사용) ───────── */
+  #consultPage .consult-wrap{max-width:760px;margin:0 auto;padding:18px 16px 60px;}
+  /* 태블릿 이상: 왼쪽(헤더+통계+시간열기) / 오른쪽(예약현황 크게) 2단 */
+  @media (min-width:900px){
+    #consultPage .consult-wrap{max-width:none;width:95%;}
+    .consult-cols{
+      display:grid;
+      grid-template-columns:360px 1fr;
+      gap:22px;align-items:start;
+    }
+    .consult-col-make{margin-bottom:0;}
+    /* 시간 열기 칸은 한 줄로 (사이드바 폭이 좁으니 입력을 세로로) */
+    .consult-col-make .consult-form-grid{grid-template-columns:1fr;}
+  }
+  .consult-intro{
+    background:linear-gradient(135deg,#3B82F6,#1F3D33);color:#fff;
+    border-radius:14px;padding:18px 20px;margin-bottom:18px;
+  }
+  .consult-intro h3{font-size:18px;font-weight:800;margin-bottom:4px;}
+  .consult-intro p{font-size:13.5px;opacity:.9;line-height:1.6;}
+  .consult-intro .ci-link-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+  .consult-intro .ci-link{
+    display:inline-block;font-size:13px;font-weight:700;
+    background:rgba(255,255,255,0.18);color:#fff;text-decoration:none;
+    padding:8px 14px;border-radius:8px;font-family:'IBM Plex Mono';
+    border:none;cursor:pointer;
+  }
+  .consult-intro .ci-link:active{background:rgba(255,255,255,0.32);}
+  .consult-intro .ci-copy.copied{background:rgba(255,255,255,0.9);color:var(--mon-deep);}
+  .consult-intro .ci-url{
+    margin-top:9px;font-size:12px;color:rgba(255,255,255,0.82);
+    font-family:'IBM Plex Mono';word-break:break-all;
+    background:rgba(0,0,0,0.18);padding:7px 10px;border-radius:7px;
+  }
+  .consult-section{
+    background:var(--paper);border:1px solid var(--rule);border-radius:14px;
+    padding:18px 18px;margin-bottom:18px;
+  }
+  .consult-section h4{font-size:15px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+  /* 예약 현황(오른쪽) 헤더 강조 */
+  .consult-col-status > h4{
+    font-size:17px;padding-bottom:12px;margin-bottom:16px;
+    border-bottom:2px solid var(--rule);
+  }
+  .consult-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .consult-form-grid label{display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;}
+  .consult-form-grid input,.consult-form-grid select{
+    width:100%;font-size:15px;font-family:inherit;padding:11px 12px;
+    border:1.5px solid var(--rule);border-radius:9px;background:var(--paper-soft);color:var(--ink);
+  }
+  .consult-form-grid input:focus,.consult-form-grid select:focus{outline:none;border-color:var(--mon);background:#fff;}
+  .consult-type-toggle{display:flex;gap:8px;}
+  .consult-type-btn{
+    flex:1;padding:11px;border:1.5px solid var(--rule);border-radius:9px;
+    background:var(--paper-soft);font-size:14px;font-weight:700;cursor:pointer;color:var(--ink-soft);
+  }
+  .consult-type-btn.active{background:var(--mon);border-color:var(--mon);color:#fff;}
+  .consult-add-btn{
+    width:100%;margin-top:16px;padding:14px;border:none;border-radius:10px;
+    background:var(--mon);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;
+  }
+  .consult-add-btn:active{opacity:.85;}
+  .consult-add-btn:disabled{opacity:.5;}
+  .consult-auto-box{margin-top:14px;padding-top:14px;border-top:1px dashed var(--rule);}
+  .consult-auto-btn{
+    width:100%;padding:13px;border:1.5px solid var(--mon);border-radius:10px;
+    background:#EFF6FF;color:var(--mon-deep);font-size:14px;font-weight:700;
+    cursor:pointer;font-family:inherit;
+  }
+  .consult-auto-btn:active{background:#DBEAFE;}
+  .consult-auto-btn:disabled{opacity:.5;}
+  .consult-auto-lunch{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink);margin-top:10px;cursor:pointer;}
+  .consult-auto-lunch input{width:16px;height:16px;}
+  .consult-auto-desc{font-size:12px;color:var(--ink-soft);margin-top:7px;line-height:1.5;}
+  .consult-preview{margin-top:12px;font-size:13px;color:var(--ink-soft);line-height:1.7;}
+
+  .consult-day{margin-bottom:18px;}
+  .consult-day-head{
+    font-size:14px;font-weight:800;color:var(--ink);padding:7px 2px;
+    border-bottom:2px solid var(--rule);margin-bottom:9px;
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .consult-day-del{font-size:12px;font-weight:600;color:var(--warn);background:none;border:none;cursor:pointer;}
+  .consult-slot{
+    display:flex;align-items:center;gap:10px;padding:11px 13px;
+    border:1.5px solid var(--rule);border-radius:10px;margin-bottom:7px;background:var(--paper-soft);
+  }
+  .consult-slot.booked{background:#ECFDF5;border-color:var(--ok,#10B981);}
+  .consult-slot-time{font-size:15px;font-weight:800;font-family:'IBM Plex Mono';min-width:56px;}
+  .consult-slot-type{font-size:11px;font-weight:700;padding:3px 8px;border-radius:7px;}
+  .consult-slot-type.face{background:#EFF6FF;color:#1E40AF;}
+  .consult-slot-type.phone{background:#FEF3C7;color:#92400E;}
+  .consult-slot-info{flex:1;font-size:13.5px;color:var(--ink);}
+  .consult-slot-info .ci-open{color:var(--ink-soft);font-size:13px;}
+  .consult-slot-info .ci-name{font-weight:700;}
+  .consult-slot-info .ci-phone{color:var(--mon);font-size:13px;margin-left:6px;}
+  .consult-slot-info .ci-memo{display:block;font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
+  .consult-slot-del{font-size:16px;color:var(--ink-soft);background:none;border:none;cursor:pointer;padding:2px 6px;}
+  .consult-slot-del:hover{color:var(--warn);}
+  .consult-empty{text-align:center;color:var(--ink-soft);font-size:14px;padding:30px 0;}
+  .consult-loading{text-align:center;color:var(--ink-soft);font-size:14px;padding:30px 0;}
+  .consult-stat{
+    display:flex;gap:12px;margin-bottom:16px;
+  }
+  .consult-stat-box{
+    flex:1;background:var(--paper-soft);border:1px solid var(--rule);border-radius:10px;
+    padding:12px;text-align:center;
+  }
+  .consult-stat-box .cs-num{font-size:22px;font-weight:800;font-family:'IBM Plex Mono';color:var(--mon);}
+  .consult-stat-box .cs-label{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  @media (max-width:520px){
+    .consult-form-grid{grid-template-columns:1fr;}
+  }
+
+  /* 주 네비게이션 */
+  .cweek-nav{
+    display:flex;align-items:center;gap:10px;margin-bottom:12px;
+  }
+  .cweek-navbtn{
+    padding:9px 14px;border:1.5px solid var(--rule);border-radius:10px;
+    background:var(--paper);color:var(--ink);font-size:13px;font-weight:700;
+    cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;
+  }
+  .cweek-navbtn:active{background:var(--paper-soft);}
+  .cweek-navlabel{flex:1;text-align:center;}
+  .cwn-title{font-size:17px;font-weight:800;}
+  .cwn-sub{font-size:13px;color:var(--ink-soft);margin-top:3px;}
+  .cweek-body{
+    display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:12px;
+    background:var(--paper);border:1px solid var(--rule);border-radius:12px;
+  }
+  .cday{min-width:0;}
+  .cday-head{font-size:13.5px;font-weight:700;color:var(--ink-soft);text-align:center;padding:6px 0;border-bottom:1.5px solid var(--rule);margin-bottom:7px;}
+  .cday-slots{display:flex;flex-direction:column;gap:6px;}
+  .cslot{
+    border-radius:8px;padding:8px 9px;font-size:13px;cursor:pointer;
+    display:flex;flex-direction:column;gap:3px;line-height:1.35;
+  }
+  .cslot.booked{background:#ECFDF5;border:1px solid #10B981;}
+  .cslot.empty{background:var(--paper-soft);border:1px dashed var(--rule);opacity:.6;}
+  .cslot-t{font-family:'IBM Plex Mono';font-weight:800;font-size:14px;color:var(--ink);}
+  .cslot-name{font-weight:700;font-size:14px;color:var(--ink);word-break:keep-all;}
+  .cslot-m{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;align-self:flex-start;}
+  .cslot-m.face{background:#EFF6FF;color:#1E40AF;}
+  .cslot-m.phone{background:#FEF3C7;color:#92400E;}
+  .cslot-open{color:var(--ink-soft);font-size:12px;}
+  .cslot-empty{text-align:center;color:var(--rule);font-size:14px;padding:8px 0;}
+  @media (max-width:680px){
+    .cweek-body{grid-template-columns:repeat(5,minmax(92px,1fr));overflow-x:auto;}
+  }
+
+  /* 변경 모달 */
+  .cm-overlay{
+    display:none;position:fixed;inset:0;background:rgba(15,23,42,0.5);
+    z-index:1000;align-items:center;justify-content:center;padding:18px;
+  }
+  .cm-overlay.show{display:flex;}
+  .cm-box{
+    background:var(--paper);border-radius:16px;width:100%;max-width:420px;
+    box-shadow:0 20px 50px rgba(0,0,0,0.3);overflow:hidden;
+  }
+  .cm-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 18px;border-bottom:1px solid var(--rule);font-size:16px;font-weight:800;
+  }
+  .cm-x{border:none;background:none;font-size:18px;color:var(--ink-soft);cursor:pointer;}
+  .cm-info{padding:16px 18px;background:var(--paper-soft);border-bottom:1px solid var(--rule);}
+  .cm-row{display:flex;gap:10px;padding:4px 0;font-size:14px;}
+  .cm-row .cm-k{color:var(--ink-soft);min-width:54px;font-weight:600;}
+  .cm-row .cm-v{font-weight:700;flex:1;word-break:break-all;}
+  .cm-edit{padding:16px 18px;}
+  .cm-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .cm-edit label{display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;}
+  .cm-edit input{
+    width:100%;font-size:15px;font-family:inherit;padding:11px;
+    border:1.5px solid var(--rule);border-radius:9px;background:var(--paper-soft);color:var(--ink);
+  }
+  .cm-edit input:focus{outline:none;border-color:var(--mon);background:#fff;}
+  .consult-direct-btn{
+    font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;
+    background:var(--mon);color:#fff;border:none;border-radius:8px;padding:7px 12px;
+  }
+  .consult-direct-btn:active{opacity:.85;}
+  .cm-direct-divider{
+    font-size:12px;font-weight:700;color:var(--mon);margin:16px 0 10px;
+    padding-top:14px;border-top:1px dashed var(--rule);
+  }
+  .cm-type-toggle{display:flex;gap:6px;}
+  .cm-type-btn{
+    flex:1;padding:11px;border:1.5px solid var(--rule);border-radius:9px;
+    background:var(--paper-soft);font-size:14px;font-weight:700;color:var(--ink-soft);cursor:pointer;font-family:inherit;
+  }
+  .cm-type-btn.active{background:var(--mon);border-color:var(--mon);color:#fff;}
+  .cm-actions{display:flex;gap:10px;padding:0 18px 18px;}
+  .cm-btn{flex:1;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .cm-del{background:var(--paper);color:var(--warn);border:1.5px solid var(--rule);flex:0 0 90px;}
+  .cm-save{background:var(--mon);color:#fff;}
 </style>
 </head>
 <body>
@@ -2357,7 +2594,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver3.73</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.24</div>
   </div>
 </div>
 
@@ -2375,6 +2612,9 @@
   </header>
 
   <!-- 모바일 탭바 (사이드바가 접힌 상태에서 표시) -->
+  <div class="tab-bar-wrap" id="tabBarWrap">
+    <button class="tab-scroll-btn left" onclick="scrollTabBar(-1)">‹</button>
+    <button class="tab-scroll-btn right" onclick="scrollTabBar(1)">›</button>
   <div class="mobile-tab-bar" id="mobileTabBar">
     <div class="tab-item active" data-page="home">
       <span class="tab-item-icon">🏠</span>현황판
@@ -2394,6 +2634,9 @@
     <div class="tab-item" data-page="points">
       <span class="tab-item-icon">📝</span>상벌점 조회·입력
     </div>
+    <div class="tab-item" data-page="consult">
+      <span class="tab-item-icon">🗓️</span>학부모상담
+    </div>
     <div class="tab-item" data-page="contacts">
       <span class="tab-item-icon">📞</span>교원연락망
     </div>
@@ -2403,6 +2646,7 @@
     <div class="tab-item" data-page="meal">
       <span class="tab-item-icon">🍱</span>식단표
     </div>
+  </div>
   </div>
 
   <!-- 앱 바디 -->
@@ -2431,6 +2675,9 @@
       <div class="main-nav-item" data-page="points">
         <span class="main-nav-icon">📝</span>상벌점 조회·입력
       </div>
+      <div class="main-nav-item" data-page="consult">
+        <span class="main-nav-icon">🗓️</span>학부모상담
+      </div>
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>교원연락망
       </div>
@@ -2440,7 +2687,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver3.73</div>
+    <div class="nav-version">ver4.24</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -2521,11 +2768,23 @@
               </div>
               <div id="homeTaskList" style="padding:8px 16px 12px;display:flex;flex-direction:column;gap:6px;"></div>
             </div>
+            <!-- 상담 일정 (담임) -->
+            <div class="home-section" id="homeConsultSection" style="display:none;">
+              <div class="home-section-header home-nav-header" data-goto="consult">
+                <span class="home-section-title">🗓️ 상담 일정</span>
+                <span class="home-section-arrow">›</span>
+              </div>
+              <div id="homeConsultList" style="max-height:168px;overflow-y:auto;padding:8px 16px 12px;display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
             <!-- 학사일정 -->
             <div class="home-section" id="homeScheduleSection">
-              <div class="home-section-header home-nav-header" data-goto="schedule">
-                <span class="home-section-title">📆 이번달 학사일정</span>
-                <span class="home-section-arrow">›</span>
+              <div class="home-section-header" style="cursor:default;">
+                <span class="home-section-title" id="homeScheduleTitle" onclick="navigateTo('schedule')" style="cursor:pointer;">📆 이번달 학사일정</span>
+                <span style="flex:1;"></span>
+                <button onclick="event.stopPropagation();moveScheduleMonth(-1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">‹</button>
+                <span id="homeScheduleMonthLabel" style="font-size:13px;font-weight:700;color:var(--ink-soft);min-width:48px;text-align:center;"></span>
+                <button onclick="event.stopPropagation();moveScheduleMonth(1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">›</button>
+                <span class="home-section-arrow" onclick="navigateTo('schedule')" style="cursor:pointer;">›</span>
               </div>
               <div class="home-schedule-list" id="homeScheduleList" style="max-height:200px;overflow-y:auto;"></div>
             </div>
@@ -2543,7 +2802,6 @@
                 <button onclick="event.stopPropagation();moveMealDate(-1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">‹</button>
                 <span class="home-section-title" id="homeMealTitle" onclick="navigateTo('meal')" style="cursor:pointer;flex:1;text-align:center;">🍱 오늘 급식</span>
                 <button onclick="event.stopPropagation();moveMealDate(1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">›</button>
-                <span class="home-section-arrow" onclick="navigateTo('meal')" style="cursor:pointer;">›</span>
               </div>
               <div class="home-meal-list home-meal-grid" id="homeMealList"></div>
             </div>
@@ -2568,7 +2826,6 @@
                     <button onclick="event.stopPropagation();moveMealDate(-1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">‹</button>
                     <span class="home-section-title" id="homeMealTitleD" onclick="navigateTo('meal')" style="cursor:pointer;flex:1;text-align:center;">🍱 오늘 급식</span>
                     <button onclick="event.stopPropagation();moveMealDate(1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">›</button>
-                    <span class="home-section-arrow" onclick="navigateTo('meal')" style="cursor:pointer;">›</span>
                   </div>
                   <div class="home-meal-list home-meal-grid" id="homeMealListD" style="flex:1;"></div>
                 </div>
@@ -2733,7 +2990,7 @@
             <div class="points-field">
               <div class="points-label">유형</div>
               <div class="points-type-row">
-                <button class="points-type-btn" id="ptsMeritBtn" onclick="selectPointType('상점')">⭐ 상점</button>
+                <button class="points-type-btn" id="ptsMeritBtn" onclick="selectPointType('상점')">⭐ 상점·감점활동</button>
                 <button class="points-type-btn" id="ptsDemeritBtn" onclick="selectPointType('벌점')">⚠️ 벌점</button>
               </div>
             </div>
@@ -2831,7 +3088,7 @@
               <div id="ptsStudentListWrap" style="display:none;">
                 <!-- 뒤로가기 -->
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                  <button onclick="backToPtsGroups()" style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--rule);background:var(--paper);cursor:pointer;font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;color:var(--ink-soft);">← 목록으로</button>
+                  <button onclick="history.back()" style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--rule);background:var(--paper);cursor:pointer;font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;color:var(--ink-soft);">← 목록으로</button>
                   <span id="ptsCurrentRoom" style="font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:16px;color:var(--ink);"></span>
                 </div>
                 <div class="pts-list-header">
@@ -2846,6 +3103,158 @@
               <div class="pts-view-empty" id="ptsViewEmpty" style="display:none;">데이터가 없습니다.</div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- 학부모 상담 예약 페이지 (교사용) -->
+      <div class="page-view" id="consultPage">
+        <div class="consult-wrap">
+
+          <div id="consultNoHomeroom" class="consult-section" style="display:none;">
+            <div class="consult-empty">
+              담임으로 등록된 학급이 없습니다.<br>
+              <span style="font-size:13px;">상담 예약은 담임 교사만 열 수 있습니다. 시간표 정보에 담임 학급이 등록되어 있어야 합니다.</span>
+            </div>
+          </div>
+
+          <div id="consultMain" style="display:none;">
+            <div class="consult-cols">
+
+              <!-- 왼쪽: 헤더 + 통계 + 시간 열기 -->
+              <div class="consult-col-left">
+                <div class="consult-intro">
+                  <h3>🗓️ 학부모 상담 예약 관리</h3>
+                  <p>상담 가능한 시간을 열어두면, 학부모가 자녀 정보로 인증 후 빈 시간을 예약합니다. 예약 현황이 오른쪽에 실시간으로 표시됩니다.</p>
+                  <div class="ci-link-row">
+                    <a class="ci-link" id="consultParentLink" href="https://m.site.naver.com/2bxYC" target="_blank" rel="noopener">예약 링크 열기 ↗</a>
+                    <button type="button" class="ci-link ci-copy" id="consultCopyLink">링크 복사</button>
+                  </div>
+                  <div class="ci-url" id="consultShortUrl">https://m.site.naver.com/2bxYC</div>
+                </div>
+
+                <!-- 통계 -->
+                <div class="consult-stat">
+                  <div class="consult-stat-box"><div class="cs-num" id="consultStatOpen">0</div><div class="cs-label">열린 시간</div></div>
+                  <div class="consult-stat-box"><div class="cs-num" id="consultStatBooked">0</div><div class="cs-label">예약됨</div></div>
+                  <div class="consult-stat-box"><div class="cs-num" id="consultStatClass">—</div><div class="cs-label">담당 학급</div></div>
+                </div>
+
+                <!-- 슬롯 만들기 -->
+                <div class="consult-section consult-col-make">
+                  <h4>➕ 상담 시간 열기</h4>
+                  <div class="consult-form-grid">
+                    <div>
+                      <label>날짜</label>
+                      <input type="date" id="consultDate">
+                    </div>
+                    <div>
+                      <label>시작 시각</label>
+                      <input type="time" id="consultStart" value="14:00" step="600" min="08:00" max="21:00">
+                    </div>
+                    <div>
+                      <label>상담 진행 시간</label>
+                      <select id="consultDuration">
+                        <option value="10">10분</option>
+                        <option value="15">15분</option>
+                        <option value="20" selected>20분</option>
+                        <option value="30">30분</option>
+                        <option value="60">1시간</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label>만들 칸 수</label>
+                      <select id="consultCount">
+                        <option>1</option><option>2</option><option>3</option><option>4</option>
+                        <option selected>5</option><option>6</option><option>7</option><option>8</option>
+                        <option>9</option><option>10</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label>칸 사이 쉬는시간(분)</label>
+                      <select id="consultGap">
+                        <option value="0" selected>없음</option>
+                        <option value="5">5분</option>
+                        <option value="10">10분</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="consult-preview" id="consultPreview"></div>
+                  <button class="consult-add-btn" id="consultAddBtn">시간 만들기</button>
+
+                  <div class="consult-auto-box">
+                    <button class="consult-auto-btn" id="consultAutoBtn">⚡ 오늘 공강 자동 채우기</button>
+                    <label class="consult-auto-lunch">
+                      <input type="checkbox" id="consultAutoLunch"> 점심시간도 포함
+                    </label>
+                    <div class="consult-auto-desc">오늘 수업이 없는 시간대를 30분씩 2칸으로 자동 생성합니다.</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 오른쪽: 예약 현황 (크게) -->
+              <div class="consult-section consult-col-status">
+                <h4 style="justify-content:space-between;">
+                  <span>📋 예약 현황</span>
+                  <button id="consultDirectBtn" class="consult-direct-btn">+ 직접 예약 추가</button>
+                </h4>
+                <div id="consultList"><div class="consult-loading">불러오는 중...</div></div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- 변경 모달 -->
+          <div id="consultModal" class="cm-overlay">
+            <div class="cm-box">
+              <div class="cm-head">
+                <span id="cmTitle">예약 상세 / 변경</span>
+                <button class="cm-x" id="cmCloseBtn">✕</button>
+              </div>
+              <div id="cmBookingInfo" class="cm-info"></div>
+              <div class="cm-edit">
+                <div class="cm-edit-grid">
+                  <div>
+                    <label>날짜</label>
+                    <input type="date" id="cmDate">
+                  </div>
+                  <div>
+                    <label>시각</label>
+                    <input type="time" id="cmTime" step="600">
+                  </div>
+                </div>
+
+                <!-- 교사 직접 예약 입력 (빈 슬롯/신규일 때만 노출) -->
+                <div id="cmDirectFields" style="display:none;">
+                  <div class="cm-direct-divider">전화·직접 접수한 상담 입력</div>
+                  <div class="cm-edit-grid">
+                    <div>
+                      <label>학생 이름</label>
+                      <input type="text" id="cmStudent" placeholder="예: 홍길동" autocomplete="off">
+                    </div>
+                    <div>
+                      <label>방식</label>
+                      <div class="cm-type-toggle">
+                        <button type="button" class="cm-type-btn active" data-cmtype="face">대면</button>
+                        <button type="button" class="cm-type-btn" data-cmtype="phone">전화</button>
+                      </div>
+                    </div>
+                  </div>
+                  <label style="display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin:10px 0 5px;">예약자 / 연락처</label>
+                  <div class="cm-edit-grid">
+                    <input type="text" id="cmParent" placeholder="예: 학부모 성함" autocomplete="off">
+                    <input type="tel" id="cmPhone" placeholder="010-0000-0000" autocomplete="off">
+                  </div>
+                  <label style="display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin:10px 0 5px;">메모 (선택)</label>
+                  <input type="text" id="cmMemo" placeholder="상담 내용 등" autocomplete="off" style="width:100%;font-size:15px;font-family:inherit;padding:11px;border:1.5px solid var(--rule);border-radius:9px;background:var(--paper-soft);color:var(--ink);">
+                </div>
+              </div>
+              <div class="cm-actions">
+                <button class="cm-btn cm-del" id="cmDeleteBtn">삭제</button>
+                <button class="cm-btn cm-save" id="cmSaveBtn">변경 저장</button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -3015,6 +3424,7 @@
     </div>
     <div class="mytask-modal-footer">
       <button class="mytask-btn-delete" id="mytaskDeleteBtn" onclick="deleteMytask()" style="display:none;">삭제</button>
+      <button class="mytask-btn-delete" id="mytaskLeaveBtn" onclick="leaveMytaskShare()" style="display:none;">삭제(공유 나가기)</button>
       <button class="mytask-btn-cancel" onclick="closeMytaskModal()">취소</button>
       <button class="mytask-btn-save" id="mytaskSaveBtn" onclick="saveMytask()">저장</button>
     </div>
@@ -3115,15 +3525,24 @@
 
 <div class="modal-overlay" id="swapModal">
   <div class="modal-box" style="display:flex;flex-direction:column;">
-    <button class="modal-close" id="swapModalClose" style="position:absolute;top:14px;right:16px;z-index:10;">×</button>
-    <div id="swapModalBody" style="flex:1;overflow:hidden;display:flex;flex-direction:column;padding:26px 24px 22px;"></div>
+    <!-- sticky 헤더: 닫기 버튼 -->
+    <div style="flex-shrink:0;display:flex;justify-content:flex-end;padding:10px 14px 0;">
+      <button class="modal-close" id="swapModalClose">×</button>
+    </div>
+    <!-- 스크롤 바디 -->
+    <div id="swapModalBody" style="flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;padding:0 24px 8px;"></div>
+    <!-- sticky 푸터: 요청 문구 버튼 + 노트 -->
+    <div id="swapModalFooter" style="flex-shrink:0;display:none;padding:10px 16px 14px;border-top:1px solid var(--rule);background:var(--paper);">
+      <button class="copy-req-btn" id="swapFooterCopyBtn">요청 문구 복사 📋</button>
+      <div class="swap-note" id="swapFooterNote"></div>
+    </div>
   </div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, addDoc, getDocs, deleteDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, indexedDBLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc, getDocs, deleteDoc, collection, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
@@ -3140,6 +3559,11 @@ const fbApp = initializeApp(firebaseConfig);
 
 // redirect 방식 미사용
 const fbAuth = getAuth(fbApp);
+// PWA(홈화면 설치)에서 세션이 유지되도록 영속성 명시 설정
+// indexedDB 우선, 실패 시 localStorage 폴백
+setPersistence(fbAuth, indexedDBLocalPersistence)
+  .catch(() => setPersistence(fbAuth, browserLocalPersistence))
+  .catch(e => console.log('persistence 설정 실패:', e.message));
 const fbDb = getFirestore(fbApp);
 const TEACHERS = [];
 
@@ -3158,6 +3582,18 @@ const BELL_SCHEDULE = [
   {period:6, start:'14:30', end:'15:20'},
   {period:7, start:'15:30', end:'16:20'},
 ];
+
+// 사용자 입력을 innerHTML에 넣기 전 HTML 특수문자를 무력화한다.
+// (XSS 방지: 댓글·일정 제목·이름 등 사람이 자유롭게 입력하는 값은 반드시 통과시킬 것)
+function escapeHtml(v){
+  if(v == null) return '';
+  return String(v)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
 
 function toMinutes(hhmm){
   const [h,m] = hhmm.split(':').map(Number);
@@ -3499,7 +3935,7 @@ function itemHTML(m){
   const key = mode==='teacher' ? m.name : m;
   const activeCls = key===selectedKey ? ' active' : '';
   if(mode==='teacher'){
-    return `<div class="list-item${activeCls}" data-key="${m.name}"><span>${m.name}</span><small>${m.homeroom?(m.homeroom+' 담임'):''}</small></div>`;
+    return `<div class="list-item${activeCls}" data-key="${escapeHtml(m.name)}"><span>${escapeHtml(m.name)}</span><small>${m.homeroom?(escapeHtml(m.homeroom)+' 담임'):''}</small></div>`;
   }
   return `<div class="list-item${activeCls}" data-key="${m}"><span>${m}</span><small>${classHomeroom[m] ? classHomeroom[m]+' 담임' : ''}</small></div>`;
 }
@@ -3638,7 +4074,7 @@ function renderTeacher(t){
   const getPeriod = (day,p)=> (t.schedule[day]||[]).find(x=>x.period===p);
   card.innerHTML = `
     <div class="info-row">
-      <span class="info-name">${t.name} 선생님</span>
+      <span class="info-name">${escapeHtml(t.name)} 선생님</span>
       ${EXT_MAP[t.name]?`<span class="chip ext-chip">☎ ${EXT_MAP[t.name]}</span>`:''}
       ${t.homeroom?`<span class="chip accent">${t.homeroom} 담임</span>`:''}
       ${t.remarks?`<span class="chip">${t.remarks}</span>`:''}
@@ -3805,6 +4241,9 @@ const swapModalBody = document.getElementById('swapModalBody');
 
 // 팝업 내용이 바뀔 때 부드럽게 페이드 전환 (크기 변화도 같이 자연스럽게 보이도록)
 function setModalContent(html, afterRender, sizeClass){
+  // 푸터 초기화 (새 내용 로드 시 숨기기)
+  const footerEl = document.getElementById('swapModalFooter');
+  if (footerEl) footerEl.style.display = 'none';
   const box = swapModal.querySelector('.modal-box');
   const wasOpen = swapModal.classList.contains('open');
   const wasWide = swapModal.classList.contains('wide');
@@ -4053,12 +4492,11 @@ function renderCoverPreview(teacherObj, day, period, entry, candName){
         ${buildWeekGrid(getPeriodC, 'class', false, null, hl, true)}
       </div>
     </div>
-    <button class="copy-req-btn" id="copyCoverReqBtn">요청 문구 복사 📋</button>
-    <div class="swap-note">🟢 신규 = 이번에 새로 보강을 맡게 되는 칸입니다. 그 날 다른 수업들과 겹치거나 너무 몰리지 않는지 확인해보세요. 실제 보강 요청은 학교 협의 절차를 따로 거쳐야 해요.</div>
   `;
   setModalContent(html, ()=>{
     const buildMsg = ()=> `안녕하세요, 선생님.\n\n${day} ${period}교시(${entry.class||''}) 수업 보강 가능하실까요?\n\n가능하시면 말씀해 주시면 감사하겠습니다.`;
-    wireRequestButtons('copyCoverReqBtn', 'shareCoverReqBtn', buildMsg);
+    const f=document.getElementById('swapModalFooter'),fb=document.getElementById('swapFooterCopyBtn'),fn=document.getElementById('swapFooterNote');
+    if(f){f.style.display='block';fb.onclick=()=>navigator.clipboard?.writeText(buildMsg());fn.textContent='🟢 신규 = 이번에 새로 보강을 맡게 되는 칸입니다. 실제 보강 요청은 학교 협의 절차를 따로 거쳐야 해요.';}
   }, 'medium');
 }
 
@@ -4098,12 +4536,11 @@ function renderSwapPreview(teacherObj, day, period, entry, cand){
         ${buildWeekGrid(getPeriodB, 'class', false, null, hlB, true)}
       </div>
     </div>
-    <button class="copy-req-btn" id="copySwapReqBtn">요청 문구 복사 📋</button>
-    <div class="swap-note">🟡 비워짐 = 원래 있던 수업이 빠지는 칸 · 🟢 신규 = 교체로 새로 들어오는 칸. 실제 교체는 학교 협의 절차를 따로 거쳐야 해요.</div>
   `;
   setModalContent(html, ()=>{
     const buildMsg = ()=> `안녕하세요, 선생님.\n\n${day} ${period}교시(${entry.class||''}) ↔ ${cand.day} ${cand.period}교시(${entry.class||''}) 수업 교체 가능하실까요?\n\n가능하시면 말씀해 주시면 감사하겠습니다.`;
-    wireRequestButtons('copySwapReqBtn', 'shareSwapReqBtn', buildMsg);
+    const f=document.getElementById('swapModalFooter'),fb=document.getElementById('swapFooterCopyBtn'),fn=document.getElementById('swapFooterNote');
+    if(f){f.style.display='block';fb.onclick=()=>navigator.clipboard?.writeText(buildMsg());fn.textContent='🟡 비워짐 = 원래 있던 수업이 빠지는 칸 · 🟢 신규 = 교체로 새로 들어오는 칸. 실제 교체는 학교 협의 절차를 따로 거쳐야 해요.';}
   }, 'wide');
 }
 
@@ -4127,11 +4564,13 @@ function showExitToast(){
 }
 
 function armExitGuard(){
-  history.pushState({root:true}, '');
+  // 현재 활성 페이지를 root 가드로 쌓음 (뒤로가기 1회 흡수용)
+  const cur = document.querySelector('.page-view.active')?.id?.replace('Page','') || 'home';
+  history.pushState({ page: cur, root: true }, '');
 }
-armExitGuard(); // 페이지를 처음 열 때 한 번 무장
-// 초기 페이지 상태 등록
-history.replaceState({ page: 'home', root: true }, '');
+// 초기: home을 깔고, 그 위에 가드 1개를 쌓는다 → 스택 [home, home/root]
+history.replaceState({ page: 'home' }, '');
+history.pushState({ page: 'home', root: true }, '');
 
 function openSwapModal(teacherObj, day, period, entry){
   clearTimeout(exitArmTimer); // 팝업을 여는 동안에는 무장 타이머가 끼어들지 않도록
@@ -4150,44 +4589,52 @@ function closeSwapModal(){
 }
 
 window.addEventListener('popstate', (e)=>{
-  // 페이지 뒤로가기
-  if (e.state && e.state.page) {
-    navigateTo(e.state.page);
-    return;
-  }
-  // 학생 연락망 그룹 뒤로가기
-  if(e.state && e.state.studentsGroup === null) {
-    renderStudentsGroupList();
-    return;
-  }
-  if(!(e.state && (e.state.modalDepth !== undefined || e.state.root))) {
-    if(studentsViewMode === 'list') {
-      renderStudentsGroupList();
-      return;
-    }
-  }
-  const newDepth = (e.state && e.state.modalDepth) || 0;
-  if(newDepth < modalDepth){
+  const st = e.state || {};
+
+  // 1. 열린 모달 닫기 (최우선). 가드 1개 다시 쌓아 스택 보존
+  if (document.getElementById('groupEditorModal')?.style.display === 'flex') { closeGroupEditor(); armExitGuard(); return; }
+  if (document.getElementById('groupSettingsModal')?.style.display === 'flex') { closeGroupSettings(); armExitGuard(); return; }
+  if (document.getElementById('mytaskModal')?.classList.contains('show')) { closeMytaskModal(); armExitGuard(); return; }
+  if (document.getElementById('ptsDetailModal')?.classList.contains('show')) { closePtsDetailBtn(); armExitGuard(); return; }
+  if (document.querySelector('.cd-overlay.open')) { document.querySelector('.cd-overlay.open').classList.remove('open'); armExitGuard(); return; }
+
+  // 2. 교체/보강 모달 뎁스
+  const newDepth = st.modalDepth || 0;
+  if (newDepth < modalDepth) {
     modalDepth = newDepth;
-    if(modalDepth === 0){
-      swapModal.classList.remove('open');
-      swapModal.classList.remove('wide');
-      swapModal.classList.remove('medium');
-    } else if(modalDepth === 1 && lastListArgs){
+    if (modalDepth === 0) {
+      swapModal.classList.remove('open', 'wide', 'medium');
+    } else if (modalDepth === 1 && lastListArgs) {
       renderPopup(lastListArgs.teacherObj, lastListArgs.day, lastListArgs.period, lastListArgs.entry);
     }
     return;
   }
-  // 팝업이 닫혀있는 상태(modalDepth===0)에서, 방금 무장해둔 안전장치를 막 소비한 경우
-  if(modalDepth === 0 && !(e.state && e.state.root)){
-    showExitToast();
-    clearTimeout(exitArmTimer);
-    exitArmTimer = setTimeout(()=>{
-      if(modalDepth === 0) armExitGuard();
-    }, 2000);
-  }
-});
 
+  // 3. 상벌점 명단 보고 있으면 → 그룹 목록 (화면 상태로 판단)
+  if (document.getElementById('pointsPage')?.classList.contains('active')
+      && document.getElementById('ptsStudentListWrap')?.style.display !== 'none') {
+    backToPtsGroups();
+    return;
+  }
+
+  // 4. 학생연락망 그룹 내 목록 보고 있으면 → 그룹 목록 (화면 상태로 판단)
+  if (document.getElementById('studentsPage')?.classList.contains('active')
+      && studentsViewMode === 'list') {
+    renderStudentsGroupList();
+    return;
+  }
+
+  // 5. 현황판이 아니면 → 현황판으로
+  if (!document.getElementById('homePage')?.classList.contains('active')) {
+    navigateTo('home');
+    return;
+  }
+
+  // 6. 현황판에서 뒤로가기 → 종료 토스트 (가드 소비된 경우)
+  showExitToast();
+  clearTimeout(exitArmTimer);
+  exitArmTimer = setTimeout(() => { armExitGuard(); }, 2000);
+});
 document.getElementById('swapModalClose').addEventListener('click', ()=>{
   if(modalDepth === 2){
     history.back();
@@ -4244,6 +4691,15 @@ function initAppUI(){
   initHomePage();
   // 마지막으로 보던 화면 복원 (시간표 데이터 미리 준비)
   restoreLastView();
+  applyConsultTabVisibility();
+}
+
+// [테스트 기간] 학부모상담 탭은 관리자(박경환)에게만 노출
+function applyConsultTabVisibility(){
+  const isAdmin = fbAuth.currentUser?.email === 'pkh910518@yeungnam.hs.kr';
+  document.querySelectorAll('[data-page="consult"]').forEach(el => {
+    el.style.display = isAdmin ? '' : 'none';
+  });
 }
 
 function autoLoadMyTimetable(){
@@ -4282,8 +4738,13 @@ function setAuthStatus(msg, isError){
 
 // 사파리 감지
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+// PWA(홈 화면 추가) standalone 모드 감지 — 이 경우 팝업이 막혀 redirect 필요
+const isStandalone = window.navigator.standalone === true
+  || window.matchMedia('(display-mode: standalone)').matches;
+// 인앱 브라우저(카카오톡/라인/인스타/네이버) 감지
+const isInApp = /kakaotalk|line|instagram|naver|fban|fbav/i.test(navigator.userAgent);
 
-// redirect 결과 처리 (사파리에서 redirect 후 돌아왔을 때)
+// redirect 결과 처리 (redirect 후 돌아왔을 때)
 getRedirectResult(fbAuth).then(result => {
   if (result?.user) {
     // redirect 로그인 성공 - onAuthStateChanged에서 처리됨
@@ -4294,16 +4755,61 @@ getRedirectResult(fbAuth).then(result => {
   }
 });
 
+// 공통 로그인 실행: 팝업 우선, 차단되면 redirect로 우회
+// (PWA standalone 포함 — iOS PWA에서도 사용자 클릭 팝업은 열리는 경우가 많고,
+//  redirect는 PWA→Safari 이탈 후 결과 유실로 멈추는 문제가 있어 팝업을 먼저 시도)
+async function doGoogleLogin(provider) {
+  try {
+    await signInWithPopup(fbAuth, provider);
+  } catch(e) {
+    // 팝업이 차단되거나 환경상 불가하면 redirect로 우회
+    if (e.code === 'auth/popup-blocked'
+        || e.code === 'auth/popup-closed-by-user'
+        || e.code === 'auth/cancelled-popup-request'
+        || e.code === 'auth/operation-not-supported-in-this-environment') {
+      setAuthStatus('화면 전환 방식으로 로그인합니다...');
+      await signInWithRedirect(fbAuth, provider);
+    } else {
+      throw e;
+    }
+  }
+}
+
+// 인앱 브라우저(카카오톡/라인/인스타/네이버/페이스북) 감지 시
+// 자동으로 외부 브라우저(크롬/사파리/삼성인터넷)로 열기
+(function escapeInAppBrowser() {
+  if (!isInApp) return;
+  const ua = navigator.userAgent.toLowerCase();
+  const target = location.href;
+
+  if (/android/i.test(ua)) {
+    // 안드로이드: intent로 크롬 강제 실행
+    const cleaned = target.replace(/^https?:\/\//, '');
+    location.href = 'intent://' + cleaned
+      + '#Intent;scheme=https;package=com.android.chrome;end';
+  } else if (/iphone|ipad|ipod/i.test(ua)) {
+    // iOS 카카오톡: 외부 사파리 열기 스킴
+    if (/kakaotalk/i.test(ua)) {
+      location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(target);
+    }
+    // 그 외 iOS 인앱(라인/인스타 등)은 스킴이 제각각이라 안내로 대체
+  }
+
+  // 자동 전환이 막힐 때를 대비한 안내 화면
+  document.addEventListener('DOMContentLoaded', () => {
+    const gate = document.getElementById('authStatus');
+    if (gate) {
+      setAuthStatus('카카오톡 등 인앱 브라우저에서는 로그인이 제한됩니다.\n우측 하단(또는 상단) 메뉴 ⋯ 를 눌러 "다른 브라우저로 열기" 또는 "Safari로 열기"를 선택해주세요.', true);
+    }
+  });
+})();
+
 googleLoginBtn.addEventListener('click', async () => {
   setAuthStatus('로그인 창을 여는 중...');
   try{
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ hd: 'yeungnam.hs.kr' });
-    if (isSafari) {
-      await signInWithRedirect(fbAuth, provider);
-    } else {
-      await signInWithPopup(fbAuth, provider);
-    }
+    await doGoogleLogin(provider);
   }catch(e){
     setAuthStatus('로그인 실패: ' + e.message, true);
   }
@@ -4318,11 +4824,7 @@ if (googleLoginAltBtn) {
       await signOut(fbAuth); // 기존 세션 초기화
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ hd: 'yeungnam.hs.kr', prompt: 'select_account' });
-      if (isSafari) {
-        await signInWithRedirect(fbAuth, provider);
-      } else {
-        await signInWithPopup(fbAuth, provider);
-      }
+      await doGoogleLogin(provider);
     } catch(e) {
       setAuthStatus('로그인 실패: ' + e.message, true);
     }
@@ -4450,6 +4952,7 @@ const schedulePage  = document.getElementById('schedulePage');
 const homePage      = document.getElementById('homePage');
 const pointsPage    = document.getElementById('pointsPage');
 const mytaskPage    = document.getElementById('mytaskPage');
+const consultPage   = document.getElementById('consultPage');
 
 // 햄버거 (모바일/좁은화면)
 function updateMobileNavTop(){
@@ -4561,6 +5064,9 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
     item.classList.add('active');
     // 모바일 탭바 동기화
     document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(t => t.classList.toggle('active', t.dataset.page === page));
+    // 학부모상담 페이지는 어느 분기에도 remove 로직이 없으므로 여기서 일괄 정리
+    if(consultPage) consultPage.classList.remove('active');
+    if(page !== 'consult') stopConsultWatch();
 
     // 모바일: 선택 후 자동으로 닫기
     mainNav.classList.remove('open');
@@ -4673,6 +5179,18 @@ document.querySelectorAll('.main-nav-item').forEach(item => {
       if(window.innerWidth <= 1024) { const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='flex'; }
       const mytaskFABEl = document.getElementById('mytaskFAB');
       if (mytaskFABEl) mytaskFABEl.style.display = 'flex';
+    } else if(page === 'consult'){
+      homePage.classList.remove('active');
+      timetablePage.classList.remove('active');
+      weeklyPage.classList.remove('active');
+      mealPage.classList.remove('active');
+      contactsPage.classList.remove('active');
+      studentsPage.classList.remove('active');
+      schedulePage.classList.remove('active');
+      pointsPage.classList.remove('active');
+      if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('mytaskFAB')&&(document.getElementById('mytaskFAB').style.display='none');closeMytaskFAB&&closeMytaskFAB(); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
+      consultPage.classList.add('active');
+      initConsultPage();
     }
   });
 });
@@ -4721,6 +5239,8 @@ document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(tab => {
     homePage.classList.remove('active');
     pointsPage.classList.remove('active');
     if(mytaskPage) mytaskPage.classList.remove('active'); document.getElementById('mytaskFAB')&&(document.getElementById('mytaskFAB').style.display='none');closeMytaskFAB&&closeMytaskFAB(); const _mb=document.getElementById('mytaskMobileBody'); if(_mb) _mb.style.display='none';
+    if(consultPage) consultPage.classList.remove('active');
+    if(page !== 'consult') stopConsultWatch();
     if(page === 'home') { homePage.classList.add('active'); if(!homeInitialized) initHomePage(); else renderHomeTaskSection(); }
     else if(page === 'timetable') { timetablePage.classList.add('active'); }
     else if(page === 'mytask')    { mytaskPage.classList.add('active'); initMytaskPage(); }
@@ -4730,6 +5250,7 @@ document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(tab => {
     else if(page === 'students')  { studentsPage.classList.add('active'); if(!studentsInitialized) initStudentsPage(); }
     else if(page === 'schedule')  { schedulePage.classList.add('active'); if(!scheduleInitialized) initSchedulePage(); }
     else if(page === 'points')    { pointsPage.classList.add('active'); initPointsPage(); }
+    else if(page === 'consult')   { consultPage.classList.add('active'); initConsultPage(); }
   });
 });
 
@@ -5349,7 +5870,7 @@ function renderContacts(contacts) {
       <div class="contact-card">
         <div class="contact-avatar" style="background:${color}" data-idx="${idx}">${initial}</div>
         <div class="contact-info" data-idx="${idx}" style="cursor:pointer;">
-          <div class="contact-name">${c.name}${c.role ? ' <span style="font-size:11px;font-weight:400;color:var(--ink-soft);">'+c.role+'</span>' : ''}</div>
+          <div class="contact-name">${escapeHtml(c.name)}${c.role ? ' <span style="font-size:11px;font-weight:400;color:var(--ink-soft);">'+escapeHtml(c.role)+'</span>' : ''}</div>
           <div class="contact-dept">${c.dept||''}${c.subject ? ' · '+c.subject : ''}</div>
 
         </div>
@@ -5408,9 +5929,9 @@ function showContactDetail(c) {
   overlay.innerHTML = `
     <div class="cd-box">
       <div class="cd-header" style="background:${color}">
-        <div class="cd-avatar">${c.name[0]}</div>
+        <div class="cd-avatar">${escapeHtml(c.name[0])}</div>
         <div>
-          <div class="cd-name">${c.name}</div>
+          <div class="cd-name">${escapeHtml(c.name)}</div>
           <div class="cd-dept">${c.dept||''}</div>
         </div>
         <button class="cd-close">×</button>
@@ -5531,7 +6052,7 @@ function renderStudentsGroupList() {
     card.addEventListener('click', () => {
       const type = card.dataset.type;
       const key  = card.dataset.key;
-      history.pushState({studentsGroup: {type, key}}, '');
+      history.pushState({ page: 'students', root: true }, '');
       if(type === 'class') {
         const [grade, room] = key.split('-');
         renderStudentsInGroup({type:'class', key, label:`${grade}학년 ${room}반`});
@@ -5588,7 +6109,7 @@ function renderStudentsInGroup(group) {
       return `<div class="student-card" data-idx="${idx}" style="cursor:pointer;">
         <div class="student-num">${group.type==='club' ? (s.grade+'-'+s.room) : String(s.num||'').padStart(2,'0')}<br>${group.type==='club' ? String(s.num||'').padStart(2,'0')+'번' : ''}</div>
         <div class="student-info">
-          <div class="student-name">${s.name||''}</div>
+          <div class="student-name">${escapeHtml(s.name||'')}</div>
           <div class="student-meta">${group.type==='club' ? '' : (s.club ? '🎯 '+s.club : '')}</div>
         </div>
       </div>`;
@@ -5643,7 +6164,7 @@ function showStudentDetail(s) {
       <div class="cd-header" style="background:var(--wed);">
         <div class="cd-avatar">${(s.name||'?')[0]}</div>
         <div>
-          <div class="cd-name">${s.name||''}</div>
+          <div class="cd-name">${escapeHtml(s.name||'')}</div>
           <div class="cd-dept">${s.grade||''}학년 ${s.room||''}반 ${numDisplay}번</div>
         </div>
         <button class="cd-close">×</button>
@@ -5687,7 +6208,7 @@ document.getElementById('studentsSearch').addEventListener('input', function() {
     return `<div class="student-card" data-idx="${idx}" style="cursor:pointer;">
       <div class="student-num">${s.grade||''}-${s.room||''}<br>${String(s.num||'').padStart(2,'0')}</div>
       <div class="student-info">
-        <div class="student-name">${s.name||''}</div>
+        <div class="student-name">${escapeHtml(s.name||'')}</div>
         <div class="student-meta">${s.club ? '🎯 '+s.club : ''}</div>
       </div>
     </div>`;
@@ -5791,7 +6312,7 @@ function renderSchedule(monthKey) {
     const dateEl = isToday
       ? `<div class="sc-cal-date">${d}</div>`
       : `<span class="sc-cal-date">${d}</span>`;
-    const evEl = ev ? `<div title="${ev.content}" style="font-size:12px;padding:2px 6px;border-radius:4px;background:#EEF2FF;color:#4F46E5;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ev.content.slice(0,12)}</div>` : '';
+    const evEl = ev ? `<div title="${escapeHtml(ev.content)}" style="font-size:12px;padding:2px 6px;border-radius:4px;background:#EEF2FF;color:#4F46E5;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(String(ev.content).slice(0,12))}</div>` : '';
     calHtml += `<div class="${cls}" data-date="${d}">${dateEl}${evEl}</div>`;
   }
 
@@ -5827,7 +6348,7 @@ function renderSchedule(monthKey) {
             <button class="cd-close">×</button>
           </div>
           <div class="cd-body">
-            <div style="font-size:15px;color:var(--ink);line-height:1.7;">${ev.content}</div>
+            <div style="font-size:15px;color:var(--ink);line-height:1.7;">${escapeHtml(ev.content)}</div>
           </div>
         </div>`;
       document.body.appendChild(overlay);
@@ -5881,7 +6402,7 @@ function renderSchedule(monthKey) {
         <div class="sl-date-day ${dayCls}">${e.day||dayNames[dow]}</div>
       </div>
       <div class="sl-content">
-        <div class="sl-event">${e.content}</div>
+        <div class="sl-event">${escapeHtml(e.content)}</div>
       </div>
     </div>`;
   }).join('');
@@ -5889,6 +6410,59 @@ function renderSchedule(monthKey) {
 
 // ---- 홈 현황판 ----
 let homeInitialized = false;
+
+// 홈: 상담 일정 (담임 + 상담 슬롯이 있을 때만). 오늘 이후, 날짜·시간순.
+async function loadHomeConsult(){
+  const section = document.getElementById('homeConsultSection');
+  const listEl  = document.getElementById('homeConsultList');
+  if(!section || !listEl) return;
+
+  // 담임 학급 (관리자 테스트는 1-1 폴백)
+  let classKey = getMyHomeroom();
+  if(!classKey && fbAuth.currentUser?.email === 'pkh910518@yeungnam.hs.kr') classKey = '1-1';
+  if(!classKey){ section.style.display = 'none'; return; }
+
+  let slots = [];
+  try {
+    const snap = await getDoc(doc(fbDb, 'consultations', classKey));
+    slots = snap.exists() ? (snap.data().slots || []) : [];
+  } catch(e){ section.style.display = 'none'; return; }
+
+  // 오늘 이후, 오늘이면 지난 시각 제외
+  const now = new Date();
+  const todayStr = consultLocalYmd(now);
+  const nowHM = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  const future = slots.filter(s => {
+    if(s.date < todayStr) return false;
+    if(s.date === todayStr && s.time <= nowHM) return false;
+    return true;
+  }).sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
+
+  if(future.length === 0){ section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  const WD = ['일','월','화','수','목','금','토'];
+  listEl.innerHTML = future.map(s => {
+    const d = new Date(s.date + 'T00:00:00');
+    const dateLabel = `${d.getMonth()+1}/${d.getDate()}(${WD[d.getDay()]})`;
+    const booked = s.status === 'booked';
+    if(booked){
+      const method = s.bookedType || s.type || 'face';
+      const who = escapeHtml(s.studentName || s.bookedName || '');
+      return `<div class="home-consult-item booked">
+        <span class="hc-date">${dateLabel}</span>
+        <span class="hc-time">${escapeHtml(s.time)}</span>
+        <span class="hc-name">${who}</span>
+        <span class="hc-m ${method==='phone'?'phone':'face'}">${method==='phone'?'전화':'대면'}</span>
+      </div>`;
+    }
+    return `<div class="home-consult-item">
+      <span class="hc-date">${dateLabel}</span>
+      <span class="hc-time">${escapeHtml(s.time)}</span>
+      <span class="hc-open">비어있음</span>
+    </div>`;
+  }).join('');
+}
 
 async function initHomePage() {
   homeInitialized = true;
@@ -5915,11 +6489,13 @@ async function initHomePage() {
     } else {
       section.style.display = '';
 
-      // 시간표 렌더링 함수 (주기적 갱신용)
+      // 시간표 렌더링 함수 (주기적 갱신용) - 날짜/요일도 매번 새로 계산
       window._renderHomeMyTt = function() {
-        const nowMin2 = new Date().getHours()*60 + new Date().getMinutes();
+        const nowDate = new Date();
+        const todayDay2 = days[nowDate.getDay()]; // 자정 넘어가면 오늘 요일로 갱신
+        const nowMin2 = nowDate.getHours()*60 + nowDate.getMinutes();
         const ttHtml = periods.map(b => {
-          const found = (myTeacher.schedule[todayDay]||[]).find(x => x.period === b.period);
+          const found = (myTeacher.schedule[todayDay2]||[]).find(x => x.period === b.period);
           const isNow = nowMin2 >= toMinutes(b.start)-5 && nowMin2 <= toMinutes(b.end)+5;
           const cls = ['home-tt-cell', isNow?'now':'', !found?'empty':''].filter(Boolean).join(' ');
           return `<div class="${cls}">
@@ -5933,10 +6509,20 @@ async function initHomePage() {
         if(el) el.innerHTML = ttHtml || '<div class="home-tt-no-class">오늘 수업이 없습니다</div>';
       };
       window._renderHomeMyTt();
-      // 1분마다 갱신
+      // 1분마다 갱신 + 날짜 바뀌면 현황판 전체 새로고침
       if(window._homeTtTimer) clearInterval(window._homeTtTimer);
+      window._lastHomeDate = new Date().toDateString();
       window._homeTtTimer = setInterval(() => {
-        if(document.getElementById('homePage')?.classList.contains('active')) {
+        if(!document.getElementById('homePage')?.classList.contains('active')) return;
+        const nowDateStr = new Date().toDateString();
+        if (nowDateStr !== window._lastHomeDate) {
+          // 날짜가 바뀜 → 오늘 기준으로 현황판 전체 재구성
+          window._lastHomeDate = nowDateStr;
+          _mealOffset = 0;
+          _scheduleOffset = 0;
+          homeInitialized = false;
+          initHomePage();
+        } else {
           window._renderHomeMyTt();
         }
       }, 60000);
@@ -6000,25 +6586,14 @@ async function initHomePage() {
 
   // ── 이번주 업무일정 ──
   renderHomeTaskSection();
-  try {
-    const snap = await getDoc(doc(fbDb, 'schedule', 'main'));
-    const schedData = snap.exists() ? (snap.data().data || {}) : {};
-    const monthKey = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
-    const events = (schedData[monthKey] || []);
-    const schedHtml = events.length
-      ? events.map(e => `<div class="home-schedule-item${e.date === today.getDate() ? ' today' : ''}">
-          <span class="home-schedule-date">${e.date}일</span>
-          <span class="home-schedule-content">${e.content}</span>
-        </div>`).join('')
-      : '<div class="home-schedule-empty">이번 달 학사일정 없음</div>';
-    document.getElementById('homeScheduleList').innerHTML = schedHtml;
-  } catch(e) {
-    document.getElementById('homeScheduleList').innerHTML = '<div class="home-schedule-empty">불러오기 실패</div>';
-  }
-  document.getElementById('homeScheduleSection').querySelector('.home-nav-header')?.addEventListener('click', () => navigateTo('schedule'));
+  // 학사일정 (월 네비 지원)
+  loadHomeSchedule(0);
+  document.getElementById('homeScheduleSection').querySelector('.home-section-title')?.addEventListener('click', () => navigateTo('schedule'));
   document.querySelector('#homeAISummarySection .home-nav-header')?.addEventListener('click', () => navigateTo('weekly'));
   document.querySelector('#homeAISummarySectionD .home-nav-header')?.addEventListener('click', () => navigateTo('weekly'));
   document.querySelector('#homeTaskSection .home-nav-header')?.addEventListener('click', () => navigateTo('mytask'));
+  document.querySelector('#homeConsultSection .home-nav-header')?.addEventListener('click', () => navigateTo('consult'));
+  loadHomeConsult();
 
   // AI 요약 로드
   try {
@@ -6120,6 +6695,91 @@ function moveMealDate(dir) {
 window.loadHomeMeal = loadHomeMeal;
 window.moveMealDate = moveMealDate;
 
+// ── 현황판 학사일정 (월 네비) ──
+let _scheduleOffset = 0; // 0=이번달, -1=지난달, +1=다음달
+
+async function loadHomeSchedule(offset) {
+  _scheduleOffset = offset;
+  const base = new Date();
+  base.setDate(1);
+  base.setMonth(base.getMonth() + offset);
+  const y = base.getFullYear();
+  const m = base.getMonth() + 1;
+  const monthKey = `${y}-${String(m).padStart(2,'0')}`;
+
+  // 제목/라벨
+  const titleEl = document.getElementById('homeScheduleTitle');
+  const labelEl = document.getElementById('homeScheduleMonthLabel');
+  if (titleEl) titleEl.textContent = offset === 0 ? '📆 이번달 학사일정' : '📆 학사일정';
+  if (labelEl) labelEl.textContent = `${m}월`;
+
+  const listEl = document.getElementById('homeScheduleList');
+  if (!listEl) return;
+
+  try {
+    const snap = await getDoc(doc(fbDb, 'schedule', 'main'));
+    const schedData = snap.exists() ? (snap.data().data || {}) : {};
+    const events = (schedData[monthKey] || []);
+    const now = new Date();
+    const isThisMonth = (y === now.getFullYear() && m === now.getMonth()+1);
+    const todayD = now.getDate();
+
+    listEl.innerHTML = events.length
+      ? events.map(e => `<div class="home-schedule-item${isThisMonth && e.date === todayD ? ' today' : ''}" data-day="${e.date}">
+          <span class="home-schedule-date">${e.date}일</span>
+          <span class="home-schedule-content">${escapeHtml(e.content)}</span>
+        </div>`).join('')
+      : '<div class="home-schedule-empty">학사일정 없음</div>';
+
+    // 이번달이면 오늘 위치로 스크롤 중앙 정렬
+    if (isThisMonth) {
+      const todayEl = listEl.querySelector('.home-schedule-item.today')
+        || (() => {
+            const items = [...listEl.querySelectorAll('.home-schedule-item[data-day]')];
+            const after = items.find(el => parseInt(el.dataset.day) >= todayD);
+            return after || items[Math.floor(items.length / 2)];
+          })();
+      if (todayEl) {
+        requestAnimationFrame(() => {
+          listEl.scrollTop = todayEl.offsetTop - listEl.offsetHeight / 2 + todayEl.offsetHeight / 2;
+        });
+      }
+    } else {
+      listEl.scrollTop = 0;
+    }
+  } catch(e) {
+    listEl.innerHTML = '<div class="home-schedule-empty">불러오기 실패</div>';
+  }
+}
+
+function moveScheduleMonth(dir) {
+  loadHomeSchedule(_scheduleOffset + dir);
+}
+window.loadHomeSchedule  = loadHomeSchedule;
+window.moveScheduleMonth = moveScheduleMonth;
+
+// ── 탭바 가로 스크롤 (좁은 데스크탑 창) ──
+function scrollTabBar(dir) {
+  const bar = document.getElementById('mobileTabBar');
+  if (bar) bar.scrollBy({ left: dir * 150, behavior: 'smooth' });
+}
+window.scrollTabBar = scrollTabBar;
+
+function updateTabBarScrollable() {
+  const wrap = document.getElementById('tabBarWrap');
+  const bar  = document.getElementById('mobileTabBar');
+  if (!wrap || !bar) return;
+  // 내용이 넘쳐서 스크롤 가능하면 버튼 표시
+  if (bar.scrollWidth > bar.clientWidth + 4) {
+    wrap.classList.add('scrollable');
+  } else {
+    wrap.classList.remove('scrollable');
+  }
+}
+window.addEventListener('resize', updateTabBarScrollable);
+// 초기 1회 + 약간의 지연 후 (레이아웃 안정화)
+setTimeout(updateTabBarScrollable, 500);
+
 async function fetchWeather() {
   const url = 'https://api.open-meteo.com/v1/forecast?latitude=35.87&longitude=128.60' +
     '&current=temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m' +
@@ -6204,10 +6864,11 @@ function navigateTo(page) {
   // 탭 전환
   document.querySelectorAll('.main-nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
   document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(t => t.classList.toggle('active', t.dataset.page === page));
-  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask'].forEach(p => {
+  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult'].forEach(p => {
     const el = document.getElementById(p + 'Page');
     if(el) el.classList.toggle('active', p === page);
   });
+  if(page !== 'consult') stopConsultWatch();
   if(page === 'home' && homeInitialized) renderHomeTaskSection();
   if(page === 'weekly' && !weeklyInitialized) initWeeklyPage();
   if(page === 'meal' && !mealInitialized) initMealPage();
@@ -6215,6 +6876,7 @@ function navigateTo(page) {
   if(page === 'students' && !studentsInitialized) initStudentsPage();
   if(page === 'schedule' && !scheduleInitialized) initSchedulePage();
   if(page === 'points') initPointsPage();
+  if(page === 'consult') initConsultPage();
   if(page === 'mytask') {
     const mytaskPage = document.getElementById('mytaskPage');
     if(mytaskPage) mytaskPage.classList.add('active');
@@ -6307,8 +6969,8 @@ function populateDetailSelect(type) {
   const sel = document.getElementById('ptsCommonDetailSelect');
   if (!sel) return;
   sel.innerHTML = '<option value="">— 규정에서 선택 —</option>';
-  const rules = type === '상점' ? PTS_RULES.상점
-              : type === '벌점' ? [...PTS_RULES.벌점, ...PTS_RULES.벌점감점]
+  const rules = type === '상점' ? [...PTS_RULES.상점, ...PTS_RULES.벌점감점]
+              : type === '벌점' ? PTS_RULES.벌점
               : [];
   let lastCat = '';
   rules.forEach((r, i) => {
@@ -6381,7 +7043,7 @@ function renderStudentRows() {
       </select>
       <div class="pts-name-wrap" style="position:relative;min-width:0;">
         <input class="points-input pts-name-input ${s.name ? 'pts-name-found' : ''}"
-          type="text" placeholder="이름 검색" value="${s.name}"
+          type="text" placeholder="이름 검색" value="${escapeHtml(s.name)}"
           oninput="onStudentNameInput(${idx},this.value)"
           onblur="hideSuggestions(${idx})"
           autocomplete="off"
@@ -6389,9 +7051,9 @@ function renderStudentRows() {
           style="min-width:0;width:100%;">
         <div class="pts-suggestions" id="ptsSug_${idx}"></div>
       </div>
-      <select class="points-select" onchange="onStudentScoreInput(${idx},this.value)" style="text-align:center;">
+      <select class="points-select pts-score-sel" onchange="onStudentScoreInput(${idx},this.value)" style="text-align:center;">
         <option value="">점수</option>
-        ${[1,2,3,5,10].map(n => {
+        ${[1,2,3,4,5,6,10].map(n => {
           const label = ptsType === '벌점' ? `-${n}점` : `+${n}점`;
           return `<option value="${n}" ${s.score===String(n)?'selected':''}>${label}</option>`;
         }).join('')}
@@ -6411,6 +7073,10 @@ function renderStudentRows() {
         ${detailRules}
       </select>
       <button class="points-custom-toggle ${s.customMode?'active':''}" onclick="toggleStudentCustom(${idx})">${s.customMode?'직접입력 접기':'+ 직접입력 추가'}</button>
+      ${ptsType === '상점' ? `<select class="points-select pts-subtype-sel" onchange="onStudentSubType(${idx},this.value)" title="상점/감점활동 구분">
+        <option value="상점" ${(s.subType||'상점')==='상점'?'selected':''}>⭐ 상점</option>
+        <option value="벌점감점" ${s.subType==='벌점감점'?'selected':''}>♻️ 감점활동</option>
+      </select>` : ''}
     `;
     // 직접입력 textarea (customMode일 때 표시)
     if (s.customMode) {
@@ -6437,8 +7103,8 @@ function renderStudentRows() {
 }
 
 function buildDetailOptions() {
-  const rules = ptsType === '상점' ? PTS_RULES.상점
-              : ptsType === '벌점' ? [...PTS_RULES.벌점, ...PTS_RULES.벌점감점]
+  const rules = ptsType === '상점' ? [...PTS_RULES.상점, ...PTS_RULES.벌점감점]
+              : ptsType === '벌점' ? PTS_RULES.벌점
               : [];
   let html = '';
   let lastCat = '';
@@ -6473,6 +7139,11 @@ function onStudentDetailSelect(idx, sel) {
 function toggleStudentCustom(idx) {
   ptsStudentRows[idx].customMode = !ptsStudentRows[idx].customMode;
   renderStudentRows();
+}
+
+// 학생별 상점/감점활동 구분 변경
+function onStudentSubType(idx, val) {
+  ptsStudentRows[idx].subType = val;
 }
 
 // 첫 번째 학생 사유를 나머지 전체에 동일 적용
@@ -6699,8 +7370,8 @@ function selectPointType(type) {
   ptsType = type;
   document.getElementById('ptsMeritBtn').className   = 'points-type-btn' + (type==='상점' ? ' selected-merit' : '');
   document.getElementById('ptsDemeritBtn').className = 'points-type-btn' + (type==='벌점' ? ' selected-demerit' : '');
-  // 유형 바뀌면 학생별 사유 초기화 후 재렌더
-  ptsStudentRows.forEach(s => { s.detailIdx=undefined; s.detail=''; s.customMode=false; s.customDetail=''; });
+  // 유형 바뀌면 학생별 사유 초기화 후 재렌더 (상점/감점활동 구분은 기본 '상점')
+  ptsStudentRows.forEach(s => { s.detailIdx=undefined; s.detail=''; s.customMode=false; s.customDetail=''; s.subType='상점'; });
   renderStudentRows();
   populateDetailSelect(type);
 }
@@ -6735,13 +7406,13 @@ function addToSessionHistory(entries, detail, date, score) {
   if (ptsSessionHistory.length === 0) list.innerHTML = '';
   entries.forEach(s => {
     ptsSessionHistory.unshift(s);
-    const cls = ptsType === '상점' ? 'merit' : 'demerit';
+    const cls = ptsType === '벌점' ? 'demerit' : 'merit';
     const item = document.createElement('div');
     item.className = 'points-history-item';
     item.innerHTML = `
       <span class="points-history-badge ${cls}">${s.type}</span>
       <div class="points-history-info">
-        <span class="ph-name">${s.grade}학년 ${s.classNum}반 ${s.studentNum}번 ${s.name}</span>
+        <span class="ph-name">${s.grade}학년 ${s.classNum}반 ${s.studentNum}번 ${escapeHtml(s.name)}</span>
         <div class="ph-detail">${detail} · ${date}</div>
       </div>
       <span class="points-history-score ${cls}">${s.type==='상점'?'+':'-'}${s.score}점</span>
@@ -6790,13 +7461,15 @@ async function submitPoints() {
   const savedEntries = [];
   for (let i = 0; i < validStudents.length; i++) {
     const s = validStudents[i];
+    // 상점 유형이면 학생별 구분(상점/감점활동)을, 벌점이면 벌점 그대로
+    const sendType = ptsType === '상점' ? (s.subType || '상점') : ptsType;
     const params = new URLSearchParams({
       action: 'savePoints',
       grade: s.grade,
       classNum: s.room,
       studentNum: s.num,
       name: s.name,
-      type: ptsType,
+      type: sendType,
       detail: s._detail,
       date,
       score: String(s._score),
@@ -6812,7 +7485,7 @@ async function submitPoints() {
       try { json = JSON.parse(text); } catch(pe) { throw new Error('응답 파싱 오류: ' + text.slice(0,80)); }
       if (json.success) {
         successCount++;
-        savedEntries.push({ ...s, type: ptsType, detail: s._detail, date, score: s._score, teacher });
+        savedEntries.push({ ...s, type: sendType, detail: s._detail, date, score: s._score, teacher });
         btnText.textContent = `저장 중... (${successCount}/${validStudents.length})`;
       } else {
         showPointsToast(`${s.name} 저장 실패: ${json.error||'오류'}`, 'error');
@@ -6851,6 +7524,7 @@ window.onStudentScoreInput  = onStudentScoreInput;
 window.applyStudent         = applyStudent;
 window.hideSuggestions      = hideSuggestions;
 window.onStudentDetailSelect = onStudentDetailSelect;
+window.onStudentSubType      = onStudentSubType;
 window.toggleStudentCustom  = toggleStudentCustom;
 window.syncAllDetails       = syncAllDetails;
 window.toggleCommonCustom   = toggleCommonCustom;
@@ -6954,7 +7628,6 @@ function selectPtsRoom(key) {
   ptsViewRoom = key;
   renderPtsGroups();
   const [g, r] = key.split('-');
-  // 그룹 카드 숨기기
   document.getElementById('ptsGroupSection').style.display = 'none';
   document.getElementById('ptsCurrentRoom').textContent = `${g}학년 ${r}반`;
   const students = ptsViewData
@@ -6963,6 +7636,7 @@ function selectPtsRoom(key) {
   ptsCurrentStudents = students;
   ptsSortKey = null;
   renderPtsStudentList(students);
+  history.pushState({ page: 'points', root: true }, '');
 }
 
 function backToPtsGroups() {
@@ -7030,7 +7704,7 @@ function renderPtsStudentList(students) {
     const gradeRoom = ptsViewRoom ? '' : `<span style="font-size:11px;color:var(--ink-soft);font-family:'IBM Plex Mono';">${s.grade}-${s.room}</span>`;
     return `<div class="pts-student-item" onclick="showPtsDetail(${i}, '${encodeURIComponent(JSON.stringify(s))}')">
       <span class="pts-snum">${String(s.num).padStart(2,'0')}</span>
-      <span class="pts-sname">${s.name} ${gradeRoom}</span>
+      <span class="pts-sname">${escapeHtml(s.name)} ${gradeRoom}</span>
       <span class="pts-stotal ${totalCls}">${s.total > 0 ? '+':''}${s.total}</span>
       <span class="pts-smerit">+${s.merit}</span>
       <span class="pts-sdemerit">${s.demerit}</span>
@@ -7090,14 +7764,17 @@ async function collectTeacherEmail(user) {
   try {
     const displayName = user.displayName || '';
     if (!displayName) return;
-    const teacher = TEACHERS.find(t => t.name === displayName);
+    // 이름 매칭: 공백 제거 후 비교 (구글 표시이름과 등록이름의 사소한 차이 흡수)
+    const norm = s => (s || '').replace(/\s/g, '');
+    const dn = norm(displayName);
+    const teacher = TEACHERS.find(t => norm(t.name) === dn);
     if (!teacher) return;
     if (teacher.email === user.email && teacher.uid === user.uid) return;
     const snap = await getDoc(doc(fbDb, 'appdata', 'main'));
     if (!snap.exists()) return;
     const data = snap.data();
     const teachers = data.teachers || [];
-    const idx = teachers.findIndex(t => t.name === displayName);
+    const idx = teachers.findIndex(t => norm(t.name) === dn);
     if (idx < 0) return;
     if (teachers[idx].email === user.email && teachers[idx].uid === user.uid) return;
     teachers[idx].email = user.email;
@@ -7310,7 +7987,8 @@ function renderRows() {
             </div>
             ${panel.type==='list' ? '<div class="mytask-filters nowrap">'+periodOpts.map(o=>'<button class="mytask-filter-btn '+(panel.period===o.v?'active':'')+'" onclick="setPanelPeriod('+row.id+','+panel.id+',\''+o.v+'\')">'+o.l+'</button>').join('')+'</div>' : ''}
           </div>
-        </div>`
+        </div>
+        <div class="mytask-panel-content" id="pc_${panel.id}"></div>`
 
       rowEl.appendChild(panelEl);
       panelEls.push(panelEl);
@@ -7591,8 +8269,8 @@ function _makeHomeTaskRow(t, todayStr, statusColor) {
   return `<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--rule);">
     <div style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;"></div>
     <div onclick="openMytaskModal('${t.id}','${t.ownerUid||''}')" style="flex:1;min-width:0;cursor:pointer;">
-      <div style="font-size:14px;font-weight:600;color:${isPast&&t.status!=='done'?'#EF4444':'var(--ink)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.title}">
-        ${isShared?'<span style="font-size:12px;margin-right:3px;">👥</span>':''}${t.title}
+      <div style="font-size:14px;font-weight:600;color:${isPast&&t.status!=='done'?'#EF4444':'var(--ink)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(t.title)}">
+        ${isShared?'<span style="font-size:12px;margin-right:3px;">👥</span>':''}${escapeHtml(t.title)}
       </div>
       <div style="font-size:11px;color:var(--ink-soft);display:flex;align-items:center;gap:4px;margin-top:2px;">
         ${dday}
@@ -7682,10 +8360,10 @@ window.renderHomeTaskSection = renderHomeTaskSection;
     _active = true;
     const viewW = window.innerWidth;
     const viewH = window.innerHeight;
-    popup.innerHTML = `<div class="dp-date">${dateLabel}</div>` +
+    popup.innerHTML = `<div class="dp-date">${escapeHtml(dateLabel)}</div>` +
       (items.length === 0
         ? '<div class="dp-empty">일정 없음</div>'
-        : items.map(it => `<div class="dp-item" style="${it.style}">${it.text}</div>`).join(''));
+        : items.map(it => `<div class="dp-item" style="${it.style}">${escapeHtml(it.text)}</div>`).join(''));
     popup.classList.remove('show');
     popup.style.left = '0'; popup.style.top = '0';
     document.body.appendChild(popup); // 재삽입으로 크기 확보
@@ -7760,11 +8438,11 @@ function buildPanelCalendar(tasks, cy, cm, panel) {
       </div>
       <div class="panel-cal-items">
       ${allItems.map(t => t._type==='schedule'
-        ? `<div title="${t.title}" style="font-size:clamp(10px,1vw,13px);padding:2px 5px;border-radius:4px;background:#FEE2E2;color:#991B1B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;line-height:1.4;">${t.title}</div>`
-        : `<div draggable="true" title="${t.title}" ondragstart="calDragStart(event,'${t.id}','${t.ownerUid||''}')" ondragend="calDragEnd(event)"
+        ? `<div title="${escapeHtml(t.title)}" style="font-size:clamp(10px,1vw,13px);padding:2px 5px;border-radius:4px;background:#FEE2E2;color:#991B1B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;line-height:1.4;">${escapeHtml(t.title)}</div>`
+        : `<div draggable="true" title="${escapeHtml(t.title)}" ondragstart="calDragStart(event,'${t.id}','${t.ownerUid||''}')" ondragend="calDragEnd(event)"
             onclick="event.stopPropagation();openMytaskModal('${t.id}','${t.ownerUid||''}')"
             style="font-size:clamp(10px,1vw,13px);padding:2px 5px;border-radius:4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:grab;line-height:1.4;
-            ${t.status==='todo'?'background:#EEF2FF;color:#4F46E5;':t.status==='doing'?'background:#FEF3C7;color:#D97706;':'background:#D1FAE5;color:#065F46;text-decoration:line-through;'}">${t.title}</div>`
+            ${t.status==='todo'?'background:#EEF2FF;color:#4F46E5;':t.status==='doing'?'background:#FEF3C7;color:#D97706;':'background:#D1FAE5;color:#065F46;text-decoration:line-through;'}">${escapeHtml(t.title)}</div>`
       ).join('')}
       </div>
     </div>`;
@@ -7860,7 +8538,7 @@ function buildPanelList(tasks) {
     html += `<div class="mytask-item ${t.status}" onclick="openMytaskModal('${t.id}','${t.ownerUid||''}')">
       <div class="mytask-item-status ${t.status}"></div>
       <div class="mytask-item-info">
-        <div class="mytask-item-title">${t.title}${t.ownerName ? ` <span style="font-size:11px;color:var(--ink-soft);font-weight:400;">[${t.ownerName}]</span>` : ''}</div>
+        <div class="mytask-item-title">${escapeHtml(t.title)}${t.ownerName ? ` <span style="font-size:11px;color:var(--ink-soft);font-weight:400;">[${escapeHtml(t.ownerName)}]</span>` : ''}</div>
         <div class="mytask-item-date">${t.startDate} ~ ${t.endDate}</div>
       </div>
       <select class="mytask-status-select ${t.status}" onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();" onclick="event.stopPropagation();">
@@ -8031,7 +8709,7 @@ function searchGroupMember(val) {
   sug.style.display = 'block';
   sug.innerHTML = matches.map(t =>
     `<div onclick="addGroupMember('${t.name}')" data-name="${t.name}" style="padding:10px 14px;cursor:pointer;font-size:14px;font-family:'Pretendard','Noto Sans KR';border-bottom:1px solid var(--rule);" onmouseover="this.style.background='var(--paper-soft)'" onmouseout="this.style.background=''">
-      ${t.name}
+      ${escapeHtml(t.name)}
     </div>`).join('');
 }
 function handleGroupMemberKey(e) {
@@ -8137,11 +8815,611 @@ let calFilters  = new Set(['todo','doing','done']);
 // 목록 필터 (단일 or 다중)
 let listFilters = new Set(['all']);
 
+// ══════════════════════════════════════════
+// 학부모 상담 예약 (교사용)
+// ══════════════════════════════════════════
+let consultClassKey   = null;   // 내 담임 학급 "1-3"
+let consultUnsub      = null;   // onSnapshot 해제 함수
+let consultInitOnce   = false;  // 폼 이벤트 1회 바인딩
+
+function escConsult(v){
+  if(v==null) return '';
+  return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// 내 담임 학급 알아내기 (teachers의 homeroom + 로그인 이메일 매칭)
+function getMyHomeroom(){
+  const user = fbAuth.currentUser;
+  if(!user) return null;
+  const me = TEACHERS.find(t => t.email && t.email === user.email)
+          || TEACHERS.find(t => t.name === user.displayName);
+  return me && me.homeroom ? me.homeroom : null;
+}
+
+function stopConsultWatch(){
+  if(consultUnsub){ consultUnsub(); consultUnsub = null; }
+}
+
+function initConsultPage(){
+  const noHR  = document.getElementById('consultNoHomeroom');
+  const main  = document.getElementById('consultMain');
+
+  // [테스트 기간] 관리자(박경환)만 접근 허용
+  if(fbAuth.currentUser?.email !== 'pkh910518@yeungnam.hs.kr'){
+    navigateTo('home');
+    return;
+  }
+
+  consultClassKey = getMyHomeroom();
+  // [테스트 기간] 관리자에게 담임반이 없으면 테스트용 1-1 학급으로 진행
+  if(!consultClassKey && fbAuth.currentUser?.email === 'pkh910518@yeungnam.hs.kr'){
+    consultClassKey = '1-1';
+  }
+
+  if(!consultClassKey){
+    noHR.style.display = '';
+    main.style.display = 'none';
+    stopConsultWatch();
+    return;
+  }
+  noHR.style.display = 'none';
+  main.style.display = '';
+  document.getElementById('consultStatClass').textContent = consultClassKey + '반';
+
+  // 폼 이벤트는 1회만 바인딩
+  if(!consultInitOnce){
+    consultInitOnce = true;
+    bindConsultForm();
+  }
+  // 날짜 기본값: 오늘
+  const dateEl = document.getElementById('consultDate');
+  if(dateEl && !dateEl.value){
+    dateEl.value = consultLocalYmd(new Date());
+  }
+  updateConsultPreview();
+
+  // 실시간 구독 시작 (탭 진입마다 재구독)
+  stopConsultWatch();
+  consultUnsub = onSnapshot(doc(fbDb, 'consultations', consultClassKey), snap => {
+    const data  = snap.exists() ? (snap.data()||{}) : {};
+    const slots = Array.isArray(data.slots) ? data.slots : [];
+    renderConsultList(slots);
+  }, err => {
+    document.getElementById('consultList').innerHTML =
+      '<div class="consult-empty">현황을 불러오지 못했습니다.</div>';
+  });
+}
+
+function bindConsultForm(){
+  // 미리보기 갱신
+  ['consultDate','consultStart','consultDuration','consultCount','consultGap'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('change', updateConsultPreview);
+  });
+  document.getElementById('consultAddBtn').addEventListener('click', addConsultSlots);
+  document.getElementById('consultAutoBtn').addEventListener('click', autoFillConsult);
+
+  // 변경 모달 버튼
+  document.getElementById('cmCloseBtn').addEventListener('click', closeConsultModal);
+  document.getElementById('cmSaveBtn').addEventListener('click', saveConsultModal);
+  document.getElementById('cmDeleteBtn').addEventListener('click', deleteConsultModalSlot);
+  document.getElementById('consultModal').addEventListener('click', (e) => {
+    if(e.target.id === 'consultModal') closeConsultModal();
+  });
+  // 직접 예약 추가 버튼 (신규 모드로 모달 열기)
+  document.getElementById('consultDirectBtn').addEventListener('click', () => openConsultModal(null));
+  // 링크 복사 버튼
+  const copyBtn = document.getElementById('consultCopyLink');
+  if(copyBtn){
+    copyBtn.addEventListener('click', async () => {
+      const url = document.getElementById('consultShortUrl').textContent.trim();
+      try {
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          await navigator.clipboard.writeText(url);
+        } else {
+          // 폴백: 임시 textarea
+          const ta = document.createElement('textarea');
+          ta.value = url; ta.style.position='fixed'; ta.style.opacity='0';
+          document.body.appendChild(ta); ta.select();
+          document.execCommand('copy'); document.body.removeChild(ta);
+        }
+        copyBtn.textContent = '✓ 복사됨';
+        copyBtn.classList.add('copied');
+        setTimeout(() => { copyBtn.textContent = '링크 복사'; copyBtn.classList.remove('copied'); }, 1500);
+      } catch(e){
+        alert('복사에 실패했습니다. 아래 주소를 길게 눌러 복사하세요.');
+      }
+    });
+  }
+  // 모달 방식 토글
+  document.querySelectorAll('.cm-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.cm-type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      cmDirectType = btn.dataset.cmtype;
+    });
+  });
+}
+
+// 시작시각 + 칸수 + 길이 + 간격 → 슬롯 시각 배열
+function computeConsultTimes(){
+  const start = document.getElementById('consultStart').value;
+  const dur   = parseInt(document.getElementById('consultDuration').value, 10);
+  const cnt   = parseInt(document.getElementById('consultCount').value, 10);
+  const gap   = parseInt(document.getElementById('consultGap').value, 10);
+  if(!start) return [];
+  const [h, m] = start.split(':').map(Number);
+  let cur = h*60 + m;
+  const times = [];
+  for(let i=0; i<cnt; i++){
+    const hh = String(Math.floor(cur/60)).padStart(2,'0');
+    const mm = String(cur%60).padStart(2,'0');
+    times.push(`${hh}:${mm}`);
+    cur += dur + gap;
+  }
+  return times;
+}
+
+function updateConsultPreview(){
+  const date  = document.getElementById('consultDate').value;
+  const times = computeConsultTimes();
+  const prev  = document.getElementById('consultPreview');
+  if(!date || times.length === 0){ prev.textContent = ''; return; }
+  prev.textContent = `${date} · ${times.join(', ')} (${times.length}칸)`;
+}
+
+async function addConsultSlots(){
+  if(!consultClassKey) return;
+  const date  = document.getElementById('consultDate').value;
+  const dur   = parseInt(document.getElementById('consultDuration').value, 10);
+  const times = computeConsultTimes();
+  if(!date){ alert('날짜를 선택하세요.'); return; }
+  if(times.length === 0){ alert('시작 시각을 확인하세요.'); return; }
+
+  const btn = document.getElementById('consultAddBtn');
+  btn.disabled = true;
+  btn.textContent = '만드는 중...';
+
+  const ref = doc(fbDb, 'consultations', consultClassKey);
+  try {
+    await runTransaction(fbDb, async (tx) => {
+      const snap  = await tx.get(ref);
+      const data  = snap.exists() ? (snap.data()||{}) : {};
+      const slots = Array.isArray(data.slots) ? data.slots : [];
+
+      times.forEach(time => {
+        // 같은 날짜+시각 중복 방지
+        if(slots.some(s => s.date === date && s.time === time)) return;
+        slots.push({
+          id: `${date}_${time}_${Math.random().toString(36).slice(2,7)}`,
+          date, time, duration: dur, status: 'open'
+        });
+      });
+      const myName = TEACHERS.find(t=>t.homeroom===consultClassKey)?.name
+                  || fbAuth.currentUser?.displayName
+                  || '담임';
+      tx.set(ref, { slots, teacher: myName, updatedAt: new Date().toISOString() }, { merge: true });
+    });
+    btn.textContent = '✓ 완료';
+    consultCurWeek = consultWeekStart(date);  // 만든 주로 캘린더 이동
+    setTimeout(() => { btn.textContent = '시간 만들기'; btn.disabled = false; }, 1200);
+  } catch(e){
+    alert('시간 생성에 실패했습니다: ' + e.message);
+    btn.textContent = '시간 만들기';
+    btn.disabled = false;
+  }
+}
+
+const CONSULT_WD = ['일','월','화','수','목','금','토'];
+function consultFmtDate(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  return `${d.getMonth()+1}월 ${d.getDate()}일 (${CONSULT_WD[d.getDay()]})`;
+}
+
+// 오늘 공강 자동 채우기: 내 시간표에서 수업 없는 교시를 30분 2칸씩 상담 슬롯으로 생성
+async function autoFillConsult(){
+  if(!consultClassKey) return;
+
+  // 오늘 요일 (평일만)
+  const now = new Date();
+  const dowIdx = now.getDay(); // 0=일
+  const DAY_KR = ['일','월','화','수','목','금','토'];
+  if(dowIdx < 1 || dowIdx > 5){ alert('오늘은 평일이 아닙니다. 평일에 사용하세요.'); return; }
+  const todayDow = DAY_KR[dowIdx];
+  const date = consultLocalYmd(now);
+
+  // 내 시간표 (TEACHERS에서 내 정보 → schedule[요일])
+  const user = fbAuth.currentUser;
+  const me = TEACHERS.find(t => t.email && t.email === user?.email)
+          || TEACHERS.find(t => t.name === user?.displayName);
+  const mySched = (me && me.schedule && me.schedule[todayDow]) ? me.schedule[todayDow] : [];
+  const busyPeriods = new Set(mySched.map(x => x.period));  // 수업 있는 교시
+
+  const includeLunch = document.getElementById('consultAutoLunch').checked;
+
+  // 채울 블록: 각 교시(또는 점심)의 시작시각. 한 블록 = 30분 2칸.
+  const blocks = [];
+  BELL_SCHEDULE.forEach(b => {
+    if(b.period === 'lunch'){
+      if(includeLunch) blocks.push(b.start);
+      return;
+    }
+    // 공강(수업 없는 교시)만
+    if(!busyPeriods.has(b.period)) blocks.push(b.start);
+  });
+
+  if(blocks.length === 0){
+    alert('오늘은 비어있는 시간이 없습니다. (모든 교시에 수업이 있거나 시간표 정보가 없습니다)');
+    return;
+  }
+
+  // 각 블록을 30분 2칸으로 (시작, 시작+30분)
+  const times = [];
+  blocks.forEach(start => {
+    const base = toMinutes(start);
+    [base, base + 30].forEach(min => {
+      const hh = String(Math.floor(min/60)).padStart(2,'0');
+      const mm = String(min%60).padStart(2,'0');
+      times.push(`${hh}:${mm}`);
+    });
+  });
+
+  const btn = document.getElementById('consultAutoBtn');
+  btn.disabled = true;
+  btn.textContent = '생성 중...';
+
+  const ref = doc(fbDb, 'consultations', consultClassKey);
+  try {
+    let added = 0;
+    await runTransaction(fbDb, async (tx) => {
+      const snap  = await tx.get(ref);
+      const data  = snap.exists() ? (snap.data()||{}) : {};
+      const slots = Array.isArray(data.slots) ? data.slots : [];
+      times.forEach(time => {
+        if(slots.some(s => s.date === date && s.time === time)) return; // 중복 건너뜀
+        slots.push({
+          id: `${date}_${time}_${Math.random().toString(36).slice(2,7)}`,
+          date, time, duration: 30, status: 'open'
+        });
+        added++;
+      });
+      const myName = TEACHERS.find(t=>t.homeroom===consultClassKey)?.name
+                  || fbAuth.currentUser?.displayName || '담임';
+      tx.set(ref, { slots, teacher: myName, updatedAt: new Date().toISOString() }, { merge: true });
+    });
+    consultCurWeek = consultWeekStart(date);
+    btn.textContent = added > 0 ? `✓ ${added}칸 생성됨` : '이미 다 있음';
+    setTimeout(() => { btn.textContent = '⚡ 오늘 공강 자동 채우기'; btn.disabled = false; }, 1500);
+  } catch(e){
+    alert('자동 생성 실패: ' + e.message);
+    btn.textContent = '⚡ 오늘 공강 자동 채우기';
+    btn.disabled = false;
+  }
+}
+
+// 슬롯 데이터를 전역 보관 (모달·렌더 재사용)
+let consultSlots = [];
+let consultCurWeek = null;  // 현재 보고 있는 주의 월요일 yyyy-mm-dd
+
+// 로컬(기기 시간대) 기준 yyyy-mm-dd. toISOString()은 UTC라 KST에서 하루 밀림 → 사용 금지.
+function consultLocalYmd(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+
+// 날짜(yyyy-mm-dd) → 그 주 월요일 yyyy-mm-dd
+function consultWeekStart(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  const dow = (d.getDay() + 6) % 7; // 월=0
+  d.setDate(d.getDate() - dow);
+  return consultLocalYmd(d);
+}
+function consultAddDays(dateStr, n){
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return consultLocalYmd(d);
+}
+const CONSULT_WD2 = ['월','화','수','목','금','토','일'];
+
+function renderConsultList(slots){
+  consultSlots = slots.slice();
+  const listEl = document.getElementById('consultList');
+  const openCnt   = slots.filter(s => s.status !== 'booked').length;
+  const bookedCnt = slots.filter(s => s.status === 'booked').length;
+  document.getElementById('consultStatOpen').textContent   = openCnt;
+  document.getElementById('consultStatBooked').textContent = bookedCnt;
+
+  // 현재 주가 안 정해졌으면: 슬롯이 있는 가장 이른 주, 없으면 이번 주
+  if(consultCurWeek === null){
+    if(slots.length > 0){
+      const earliest = slots.map(s => s.date).sort()[0];
+      consultCurWeek = consultWeekStart(earliest);
+    } else {
+      consultCurWeek = consultWeekStart(consultLocalYmd(new Date()));
+    }
+  }
+
+  const wk = consultCurWeek;
+  const wkEnd = consultAddDays(wk, 4); // 월~금
+
+  // 이 주의 슬롯만
+  const weekSlots = slots.filter(s => consultWeekStart(s.date) === wk);
+  const wkBooked = weekSlots.filter(s => s.status === 'booked').length;
+  const wkOpen   = weekSlots.filter(s => s.status !== 'booked').length;
+
+  // 날짜별
+  const days = {};
+  weekSlots.forEach(s => { (days[s.date] = days[s.date] || []).push(s); });
+
+  let html = `<div class="cweek-nav">
+    <button class="cweek-navbtn" id="cwPrev">◀ 이전주</button>
+    <div class="cweek-navlabel">
+      <div class="cwn-title">${escConsult(consultRangeLabel(wk, wkEnd))}</div>
+      <div class="cwn-sub">${wkBooked>0?`예약 ${wkBooked}건`:'예약 없음'}${wkOpen>0?` · 빈 시간 ${wkOpen}`:''}</div>
+    </div>
+    <button class="cweek-navbtn" id="cwNext">다음주 ▶</button>
+  </div>`;
+
+  html += `<div class="cweek-body">`;
+  for(let i=0;i<5;i++){
+    const dStr = consultAddDays(wk, i);
+    const daySlots = (days[dStr]||[]).slice().sort((a,b)=>a.time.localeCompare(b.time));
+    html += `<div class="cday">
+      <div class="cday-head">${dStr.slice(5).replace('-','/')} (${CONSULT_WD2[i]})</div>
+      <div class="cday-slots">`;
+    if(daySlots.length === 0){
+      html += `<div class="cslot-empty">·</div>`;
+    } else {
+      daySlots.forEach(s => {
+        const booked = s.status === 'booked';
+        if(booked){
+          const method = s.bookedType || s.type || 'face';
+          const mTxt = method === 'phone' ? '전화' : '대면';
+          const who = s.studentName || s.bookedName || '';
+          html += `<div class="cslot booked" data-slot="${escConsult(s.id)}">
+            <span class="cslot-t">${escConsult(s.time)}</span>
+            <span class="cslot-name">${escConsult(who)}</span>
+            <span class="cslot-m ${method==='phone'?'phone':'face'}">${mTxt}</span>
+          </div>`;
+        } else {
+          html += `<div class="cslot empty" data-slot="${escConsult(s.id)}">
+            <span class="cslot-t">${escConsult(s.time)}</span>
+            <span class="cslot-open">비어있음</span>
+          </div>`;
+        }
+      });
+    }
+    html += `</div></div>`;
+  }
+  html += `</div>`;
+
+  listEl.innerHTML = html;
+
+  // 주 이동
+  document.getElementById('cwPrev').addEventListener('click', () => {
+    consultCurWeek = consultAddDays(consultCurWeek, -7);
+    renderConsultList(consultSlots);
+  });
+  document.getElementById('cwNext').addEventListener('click', () => {
+    consultCurWeek = consultAddDays(consultCurWeek, 7);
+    renderConsultList(consultSlots);
+  });
+  // 슬롯 클릭 → 변경 모달
+  listEl.querySelectorAll('[data-slot]').forEach(el => {
+    el.addEventListener('click', () => {
+      const s = consultSlots.find(x => x.id === el.dataset.slot);
+      if(s) openConsultModal(s);
+    });
+  });
+}
+
+// 주 범위 라벨: "7월 1주 (6/30~7/4)"
+function consultRangeLabel(wk, wkEnd){
+  const d = new Date(wk + 'T00:00:00');
+  const month = d.getMonth()+1;
+  // 그 달의 몇째 주
+  const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
+  const weekNum = Math.ceil((d.getDate() + ((firstDay.getDay()+6)%7)) / 7);
+  const s = wk.slice(5).replace('-','/');
+  const e = wkEnd.slice(5).replace('-','/');
+  return `${month}월 ${weekNum}주 (${s}~${e})`;
+}
+
+// ── 변경 모달 ──
+let consultModalSlot = null;
+let cmDirectType = 'face';
+function openConsultModal(s){
+  consultModalSlot = s;  // null이면 신규 추가 모드
+  const booked = s && s.status === 'booked';
+  const isNew  = !s;
+  const m = document.getElementById('consultModal');
+  document.getElementById('cmTitle').textContent =
+    booked ? '예약 상세 / 변경' : (isNew ? '직접 예약 추가' : '빈 시간 / 변경');
+
+  // 예약 정보 영역 (예약된 슬롯만)
+  const infoEl = document.getElementById('cmBookingInfo');
+  if(booked){
+    const method = s.bookedType || s.type || 'face';
+    infoEl.style.display = '';
+    infoEl.innerHTML = `
+      <div class="cm-row"><span class="cm-k">학생</span><span class="cm-v">${escConsult(s.studentName||'-')}${s.studentNum?` (${escConsult(s.studentNum)}번)`:''}</span></div>
+      <div class="cm-row"><span class="cm-k">예약자</span><span class="cm-v">${escConsult(s.bookedName||'-')}</span></div>
+      <div class="cm-row"><span class="cm-k">연락처</span><span class="cm-v">${escConsult(s.bookedPhone||'-')}</span></div>
+      <div class="cm-row"><span class="cm-k">방식</span><span class="cm-v">${method==='phone'?'전화':'대면'}</span></div>
+      ${s.bookedMemo?`<div class="cm-row"><span class="cm-k">남긴 말</span><span class="cm-v">${escConsult(s.bookedMemo)}</span></div>`:''}`;
+  } else {
+    infoEl.style.display = 'none';
+  }
+
+  // 직접 예약 입력란: 빈 슬롯 또는 신규일 때만
+  const directEl = document.getElementById('cmDirectFields');
+  directEl.style.display = booked ? 'none' : '';
+  if(!booked){
+    // 입력 초기화
+    document.getElementById('cmStudent').value = '';
+    document.getElementById('cmParent').value  = '';
+    document.getElementById('cmPhone').value   = '';
+    document.getElementById('cmMemo').value     = '';
+    cmDirectType = 'face';
+    document.querySelectorAll('.cm-type-btn').forEach(b => b.classList.toggle('active', b.dataset.cmtype==='face'));
+  }
+
+  // 날짜·시각
+  document.getElementById('cmDate').value = s ? s.date : consultLocalYmd(new Date());
+  document.getElementById('cmTime').value = s ? s.time : '14:00';
+
+  // 삭제 버튼은 기존 슬롯에만
+  document.getElementById('cmDeleteBtn').style.display = isNew ? 'none' : '';
+  // 저장 버튼 라벨
+  document.getElementById('cmSaveBtn').textContent = booked ? '변경 저장' : (isNew ? '예약 추가' : '저장');
+
+  m.classList.add('show');
+}
+function closeConsultModal(){
+  document.getElementById('consultModal').classList.remove('show');
+  consultModalSlot = null;
+}
+
+async function saveConsultModal(){
+  const newDate = document.getElementById('cmDate').value;
+  const newTime = document.getElementById('cmTime').value;
+  if(!newDate || !newTime){ alert('날짜와 시각을 입력하세요.'); return; }
+
+  const cur = consultModalSlot;           // null = 신규 추가
+  const isBooked = cur && cur.status === 'booked';
+  const isDirect = !isBooked;             // 빈 슬롯 채우기 or 신규 = 교사 직접 예약 입력
+
+  // 직접 예약(빈 슬롯/신규)이면 입력값 수집·검증
+  let direct = null;
+  if(isDirect){
+    const student = document.getElementById('cmStudent').value.trim();
+    const parent  = document.getElementById('cmParent').value.trim();
+    const phone   = document.getElementById('cmPhone').value.trim();
+    const memo    = document.getElementById('cmMemo').value.trim();
+    // 직접 예약을 입력하려는 경우: 학생 이름이 있으면 예약으로 처리
+    if(student || parent || phone){
+      if(!student){ alert('학생 이름을 입력하세요.'); return; }
+      direct = { student, parent, phone, memo, type: cmDirectType };
+    }
+    // 아무것도 안 넣고 저장하면: (기존 빈 슬롯) 시간만 이동 / (신규) 빈 슬롯 생성
+  }
+
+  const btn = document.getElementById('cmSaveBtn');
+  const origLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = '저장 중...';
+  const ref = doc(fbDb, 'consultations', consultClassKey);
+  try {
+    await runTransaction(fbDb, async (tx) => {
+      const snap  = await tx.get(ref);
+      const data  = snap.exists() ? (snap.data()||{}) : {};
+      const slots = Array.isArray(data.slots) ? data.slots : [];
+
+      // 대상 시간에 이미 있는 슬롯 검사 (기존 슬롯 이동 시 자기 자신 제외)
+      const conflictIdx = slots.findIndex(x =>
+        x.date===newDate && x.time===newTime && (!cur || x.id!==cur.id));
+      if(conflictIdx !== -1){
+        if(slots[conflictIdx].status === 'booked'){
+          throw new Error('그 시간엔 이미 예약된 상담이 있습니다.');
+        }
+        slots.splice(conflictIdx, 1); // 빈 슬롯이면 비우고 채움
+      }
+
+      if(cur){
+        // 기존 슬롯 (예약 이동 or 빈 슬롯 채우기/이동)
+        const i2 = slots.findIndex(x => x.id === cur.id);
+        if(i2 === -1) throw new Error('이미 삭제된 시간입니다.');
+        slots[i2].date = newDate;
+        slots[i2].time = newTime;
+        if(direct){
+          slots[i2].status      = 'booked';
+          slots[i2].studentName = direct.student;
+          slots[i2].studentNum  = '';
+          slots[i2].bookedName  = direct.parent || direct.student + ' 학부모';
+          slots[i2].bookedPhone = direct.phone;
+          slots[i2].bookedMemo  = direct.memo;
+          slots[i2].bookedType  = direct.type;
+          slots[i2].token       = 'teacher';  // 교사 직접 입력 표시 (학부모 취소 불가)
+          slots[i2].bookedAt    = new Date().toISOString();
+        }
+      } else {
+        // 신규 슬롯 생성 (+필요시 예약)
+        const ns = {
+          id: `${newDate}_${newTime}_${Math.random().toString(36).slice(2,7)}`,
+          date: newDate, time: newTime, duration: 20, status: 'open'
+        };
+        if(direct){
+          ns.status      = 'booked';
+          ns.studentName = direct.student;
+          ns.studentNum  = '';
+          ns.bookedName  = direct.parent || direct.student + ' 학부모';
+          ns.bookedPhone = direct.phone;
+          ns.bookedMemo  = direct.memo;
+          ns.bookedType  = direct.type;
+          ns.token       = 'teacher';
+          ns.bookedAt    = new Date().toISOString();
+        }
+        slots.push(ns);
+      }
+      tx.set(ref, { slots, updatedAt: new Date().toISOString() }, { merge: true });
+    });
+    consultCurWeek = consultWeekStart(newDate);
+    closeConsultModal();
+  } catch(e){
+    alert('저장 실패: ' + e.message);
+    btn.disabled = false; btn.textContent = origLabel;
+    return;
+  }
+  btn.disabled = false; btn.textContent = origLabel;
+}
+
+async function deleteConsultModalSlot(){
+  if(!consultModalSlot) return;
+  const booked = consultModalSlot.status === 'booked';
+  const warn = booked
+    ? '예약된 시간입니다. 삭제하면 학부모 예약도 함께 사라집니다. 삭제할까요?'
+    : '이 시간을 삭제할까요?';
+  if(!confirm(warn)) return;
+  await deleteConsultSlot(consultModalSlot.id);
+  closeConsultModal();
+}
+
+async function deleteConsultSlot(id){
+  const ref = doc(fbDb, 'consultations', consultClassKey);
+  try {
+    await runTransaction(fbDb, async (tx) => {
+      const snap  = await tx.get(ref);
+      const data  = snap.exists() ? (snap.data()||{}) : {};
+      const slots = (Array.isArray(data.slots) ? data.slots : []).filter(s => s.id !== id);
+      tx.set(ref, { slots }, { merge: true });
+    });
+  } catch(e){ alert('삭제 실패: ' + e.message); }
+}
+
+async function deleteConsultDay(date){
+  const ref = doc(fbDb, 'consultations', consultClassKey);
+  try {
+    await runTransaction(fbDb, async (tx) => {
+      const snap  = await tx.get(ref);
+      const data  = snap.exists() ? (snap.data()||{}) : {};
+      const slots = (Array.isArray(data.slots) ? data.slots : []).filter(s => s.date !== date);
+      tx.set(ref, { slots }, { merge: true });
+    });
+  } catch(e){ alert('삭제 실패: ' + e.message); }
+}
+
+window.initConsultPage = initConsultPage;
+window.stopConsultWatch = stopConsultWatch;
+
 function initMytaskPage() {
   if (!mytaskInitialized) {
     mytaskInitialized = true;
-    if (mytaskTasks.length === 0) loadMytasks();
   }
+  // 탭 진입 시마다 재구독 — 그동안 새로 공유받은 일정/교사를 반영
+  // (loadMytasks 내부 mytaskLoading 가드로 중복 실행은 방지됨)
+  loadMytasks();
   initPanelSystem();
 }
 
@@ -8179,7 +9457,11 @@ async function loadMytasks() {
   );
 
   // uid 있는 선생님들의 일정 중 나를 공유한 것 구독
-  const myIdentifiers = [user.email, user.displayName].filter(Boolean);
+  // 공유 저장값은 (email || name)이므로, 내 식별자도 email·displayName·TEACHERS등록이름 모두 포함
+  const myTeacher = TEACHERS.find(t => t.email && t.email === user.email)
+                 || TEACHERS.find(t => t.name === user.displayName);
+  const myIdentifiers = [user.email, user.displayName, myTeacher?.name, myTeacher?.email]
+    .filter(Boolean);
   TEACHERS.filter(t => t.uid && t.uid !== user.uid).forEach(teacher => {
     const unsub = onSnapshot(
       collection(fbDb, 'tasks', teacher.uid, 'items'),
@@ -8197,6 +9479,8 @@ async function loadMytasks() {
           if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
           else renderRows();
         }
+        // 현황판도 항상 갱신 (공유 일정 실시간 반영)
+        renderHomeTaskSection();
       },
       err => console.log(`${teacher.name} 공유 일정 구독 오류:`, err.message)
     );
@@ -8327,13 +9611,13 @@ function renderMytaskCalendar() {
         ${date ? `<button class="mytask-cal-add-btn" onclick="event.stopPropagation();openMytaskModal(null,null,'${dateStr}')">+</button>` : ''}
       </div>
       ${allItems.slice(0,2).map(t => t._type==='schedule'
-        ? `<div class="mytask-cal-chip schedule" onclick="event.stopPropagation()">${t.title||t.name||''}</div>`
+        ? `<div class="mytask-cal-chip schedule" onclick="event.stopPropagation()">${escapeHtml(t.title||t.name||'')}</div>`
         : `<div class="mytask-cal-chip ${t.status}"
             draggable="true"
             ondragstart="calDragStart(event,'${t.id}','${t.ownerUid||''}')"
             ondragend="calDragEnd(event)"
             onclick="event.stopPropagation();openMytaskModal('${t.id}','${t.ownerUid||''}')"
-            style="cursor:grab;">${t.title}</div>`
+            style="cursor:grab;">${escapeHtml(t.title)}</div>`
       ).join('')}
       ${allItems.length > 2 ? `<div class="mytask-cal-more">+${allItems.length-2}개</div>` : ''}
     </div>`;
@@ -8464,7 +9748,7 @@ function mytaskDayClick(dateStr, e) {
     if (daySchedule.length > 0) {
       scheduleHtml = daySchedule.map(s =>
         `<div style="padding:10px 12px;border-radius:8px;background:#FEE2E2;color:#991B1B;font-size:14px;font-weight:700;margin-bottom:6px;">
-          📆 ${s.content || s.title || ''}
+          📆 ${escapeHtml(s.content || s.title || '')}
         </div>`
       ).join('');
     }
@@ -8477,7 +9761,7 @@ function mytaskDayClick(dateStr, e) {
     <div class="mytask-item ${t.status}" onclick="closeMytaskDayModal();openMytaskModal('${t.id}','${t.ownerUid||''}')">
       <div class="mytask-item-status ${t.status}"></div>
       <div class="mytask-item-info">
-        <div class="mytask-item-title">${t.title}</div>
+        <div class="mytask-item-title">${escapeHtml(t.title)}</div>
       </div>
       <span class="mytask-item-badge ${t.status}">${statusLabel[t.status]}</span>
     </div>
@@ -8524,7 +9808,7 @@ function renderMytaskList() {
       <div class="mytask-item ${t.status}" onclick="openMytaskModal('${t.id}','${t.ownerUid||''}')">
         <div class="mytask-item-status ${t.status}"></div>
         <div class="mytask-item-info">
-          <div class="mytask-item-title">${t.title}</div>
+          <div class="mytask-item-title">${escapeHtml(t.title)}</div>
           <div class="mytask-item-date">${t.startDate} ~ ${t.endDate}</div>
         </div>
         <select class="mytask-status-select ${t.status}" onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();" onclick="event.stopPropagation();">
@@ -8574,7 +9858,10 @@ function addMytaskShare(email) {
 function searchMytaskShare(val) {
   const sug  = document.getElementById('mytaskShareSug');
   const user = fbAuth.currentUser;
-  const myName = user?.displayName || '';
+  const myName  = user?.displayName || '';
+  const myEmail = user?.email || '';
+  // TEACHERS에서 내 이름도 찾아둔다 (displayName과 다를 수 있으므로)
+  const myTeacherName = TEACHERS.find(t => t.email && t.email === myEmail)?.name || myName;
   const q = val.trim();
   if (!q) { sug.style.display = 'none'; return; }
 
@@ -8582,10 +9869,12 @@ function searchMytaskShare(val) {
   const allGroups = [...(_groups.default||[]), ...(_groups.custom||[])];
   const groupMatches = allGroups.filter(g => g.name?.includes(q));
 
-  // 교사 검색
+  // 교사 검색 (본인 제외: 이름·이메일 모두 비교)
   const teacherMatches = TEACHERS.filter(t =>
     t.name?.includes(q) &&
     t.name !== myName &&
+    t.name !== myTeacherName &&
+    (!t.email || t.email !== myEmail) &&
     !mytaskCurrentShared.includes(t.email || t.name)
   ).slice(0, 6);
 
@@ -8677,7 +9966,7 @@ function renderMytaskSharedList() {
   el.innerHTML = mytaskCurrentShared.map(val => {
     const teacher = TEACHERS.find(t => t.email === val || t.name === val);
     const label   = teacher?.name || val;
-    return `<div class="mytask-share-chip">${label}<button type="button" onmousedown="event.preventDefault();removeMytaskShare('${val}')">×</button></div>`;
+    return `<div class="mytask-share-chip">${escapeHtml(label)}<button type="button" onmousedown="event.preventDefault();removeMytaskShare('${val}')">×</button></div>`;
   }).join('');
   if (box) box.style.borderColor = mytaskCurrentShared.length > 0 ? 'var(--mon)' : 'var(--rule)';
 }
@@ -8719,15 +10008,86 @@ function renderMytaskComments(comments) {
     el.innerHTML = '<div style="color:var(--ink-soft);font-size:13px;">댓글이 없습니다.</div>';
     return;
   }
-  el.innerHTML = comments.map(c => `
+  const myEmail = fbAuth.currentUser?.email || '';
+  el.innerHTML = comments.map((c, i) => `
     <div class="mytask-comment-item">
-      <div class="mytask-comment-author">${c.name || c.email}</div>
-      <div class="mytask-comment-text">${c.text}</div>
+      <div class="mytask-comment-author">${escapeHtml(c.name || c.email)}${
+        c.email === myEmail
+          ? ` <button onclick="deleteMytaskComment(${i})" title="댓글 삭제" style="border:none;background:none;color:var(--mon);cursor:pointer;font-size:12px;margin-left:4px;padding:0;">삭제</button>`
+          : ''
+      }</div>
+      <div class="mytask-comment-text">${escapeHtml(c.text)}</div>
       <div class="mytask-comment-time">${new Date(c.createdAt).toLocaleString('ko-KR')}</div>
     </div>
   `).join('');
   el.scrollTop = el.scrollHeight;
 }
+
+// 댓글 삭제 (본인이 쓴 것만)
+async function deleteMytaskComment(index) {
+  const user = fbAuth.currentUser;
+  if (!mytaskEditId) return;
+  try {
+    const ownerUid = mytaskEditOwner || user.uid;
+    const ref      = doc(fbDb, 'tasks', ownerUid, 'items', mytaskEditId);
+    const snap     = await getDoc(ref);
+    const existing = snap.data()?.comments || [];
+    const target   = existing[index];
+    // 본인 댓글만 삭제 허용
+    if (!target || target.email !== user.email) {
+      alert('본인이 작성한 댓글만 삭제할 수 있습니다.');
+      return;
+    }
+    const updated = existing.filter((_, i) => i !== index);
+    await setDoc(ref, { comments: updated }, { merge: true });
+    const t = mytaskTasks.find(t => t.id === mytaskEditId);
+    if (t) t.comments = updated;
+    renderMytaskComments(updated);
+  } catch(e) { alert('댓글 삭제 실패: ' + e.message); }
+}
+window.deleteMytaskComment = deleteMytaskComment;
+
+// 공유받은 일정에서 나가기 (본인만 sharedWith에서 제거 + 댓글 자동 기록)
+async function leaveMytaskShare() {
+  const user = fbAuth.currentUser;
+  if (!mytaskEditId || !mytaskEditOwner) return;
+  if (!confirm('이 일정을 내 목록에서 삭제(공유 해제)할까요?')) return;
+  try {
+    const ref  = doc(fbDb, 'tasks', mytaskEditOwner, 'items', mytaskEditId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) { closeMytaskModal(); return; }
+    const data = snap.data();
+
+    // 내 식별자(이메일·표시이름·등록이름) 중 sharedWith에 있는 값 제거
+    const myTeacher = TEACHERS.find(t => t.email && t.email === user.email)
+                   || TEACHERS.find(t => t.name === user.displayName);
+    const myIds = [user.email, user.displayName, myTeacher?.name, myTeacher?.email].filter(Boolean);
+    const newShared = (data.sharedWith || []).filter(s => !myIds.includes(s));
+
+    // 댓글 자동 기록
+    const myName = myTeacher?.name || user.displayName || user.email;
+    const comments = data.comments || [];
+    comments.push({
+      name: myName,
+      email: user.email,
+      text: `${myName} 선생님이 일정을 삭제하여 공유 해제되었습니다.`,
+      createdAt: new Date().toISOString(),
+      system: true
+    });
+
+    await setDoc(ref, { sharedWith: newShared, comments, updatedAt: new Date().toISOString() }, { merge: true });
+
+    // 로컬에서도 제거
+    mytaskTasks = mytaskTasks.filter(t => t.id !== mytaskEditId);
+    closeMytaskModal();
+    const isMobile = window.innerWidth <= 1024;
+    if (isMobile) { renderMytaskCalendar(); renderMytaskList(); } else renderRows();
+    renderHomeTaskSection();
+  } catch(e) {
+    alert('공유 해제 실패: ' + e.message);
+  }
+}
+window.leaveMytaskShare = leaveMytaskShare;
 
 async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
   const user      = fbAuth.currentUser;
@@ -8736,12 +10096,14 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
   const isOwner   = !ownerUid || ownerUid === user.uid;
   const modal     = document.getElementById('mytaskModal');
   const delBtn    = document.getElementById('mytaskDeleteBtn');
+  const leaveBtn  = document.getElementById('mytaskLeaveBtn');
   const saveBtn   = document.getElementById('mytaskSaveBtn');
   const ownerSec  = document.getElementById('mytaskOwnerSection');
   const commentSec= document.getElementById('mytaskCommentSection');
 
   document.getElementById('mytaskModalTitle').textContent = id ? '일정 상세' : '일정 추가';
   delBtn.style.display   = (id && isOwner) ? 'block' : 'none';
+  if (leaveBtn) leaveBtn.style.display = (id && !isOwner) ? 'block' : 'none';
   ownerSec.style.display = isOwner ? 'block' : 'none';
   commentSec.style.display = id ? 'block' : 'none';
   saveBtn.textContent    = isOwner ? '저장' : '상태 저장';
@@ -8956,7 +10318,7 @@ document.addEventListener('keydown', e => {
     closeGroupSettings(); return;
   }
   // 상벌점 상세 팝업
-  if (document.getElementById('ptsDetailModal')?.classList.contains('open')) {
+  if (document.getElementById('ptsDetailModal')?.classList.contains('show')) {
     closePtsDetailBtn(); return;
   }
   // 교체/보강 모달
