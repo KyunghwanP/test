@@ -2636,7 +2636,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.29</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.30</div>
   </div>
 </div>
 
@@ -2729,7 +2729,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.29</div>
+    <div class="nav-version">ver4.30</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3636,6 +3636,94 @@ setPersistence(fbAuth, indexedDBLocalPersistence)
   .catch(e => console.log('persistence 설정 실패:', e.message));
 const fbDb = getFirestore(fbApp);
 const TEACHERS = [];
+
+// ── 알림 (Neutralino 데스크톱 / 브라우저 공통) ──
+const IS_NEUTRALINO = (typeof Neutralino !== 'undefined');
+let notifyReady = false;
+
+// 앱 시작 시 1회: 브라우저면 권한 요청 (Neutralino는 권한 불필요)
+function initNotify(){
+  if(IS_NEUTRALINO){ notifyReady = true; return; }
+  if(typeof Notification === 'undefined') return;
+  if(Notification.permission === 'granted'){ notifyReady = true; return; }
+  if(Notification.permission !== 'denied'){
+    Notification.requestPermission().then(p => { notifyReady = (p === 'granted'); }).catch(()=>{});
+  }
+}
+
+// 알림 띄우기
+function showAppNotify(title, body){
+  try {
+    if(IS_NEUTRALINO){
+      Neutralino.os.showNotification(title, body);
+      return;
+    }
+    if(typeof Notification !== 'undefined' && Notification.permission === 'granted'){
+      new Notification(title, { body, icon: 'icon-180.png' });
+    }
+  } catch(e){ /* 알림 실패는 조용히 무시 */ }
+}
+
+// ── 새 상담 예약 감시 (앱 켜져 있는 동안 상시) ──
+let consultNotifyUnsub = null;
+let consultNotifySeen = null;   // 이미 본 예약 slotId 집합 (null=첫 로드 전)
+function startConsultNotifyWatch(user){
+  // 담임 학급 결정 (관리자 테스트는 1-1)
+  let classKey = getMyHomeroom ? getMyHomeroom() : null;
+  if(!classKey && user.email === 'pkh910518@yeungnam.hs.kr') classKey = '1-1';
+  if(!classKey) return;
+
+  if(consultNotifyUnsub) consultNotifyUnsub();
+  consultNotifySeen = null;
+  consultNotifyUnsub = onSnapshot(doc(fbDb, 'consultations', classKey), snap => {
+    const data  = snap.exists() ? (snap.data()||{}) : {};
+    const slots = Array.isArray(data.slots) ? data.slots : [];
+    const booked = slots.filter(s => s.status === 'booked');
+
+    if(consultNotifySeen === null){
+      // 첫 로드: 기준선만 기록, 알림 안 띄움
+      consultNotifySeen = new Set(booked.map(s => s.id));
+      return;
+    }
+    // 새로 예약된 것만 알림
+    booked.forEach(s => {
+      if(!consultNotifySeen.has(s.id)){
+        consultNotifySeen.add(s.id);
+        const who = s.studentName || s.bookedName || '학부모';
+        const when = `${s.date.slice(5).replace('-','/')} ${s.time}`;
+        showAppNotify('새 상담 예약', `${who} · ${when}`);
+      }
+    });
+    // 취소된 것 정리
+    const cur = new Set(booked.map(s => s.id));
+    consultNotifySeen.forEach(id => { if(!cur.has(id)) consultNotifySeen.delete(id); });
+  }, err => { /* 구독 실패 무시 */ });
+}
+
+// ── 공유받은 업무 일정 감시 ──
+let taskNotifyUnsubs = [];
+function startTaskNotifyWatch(user){
+  taskNotifyUnsubs.forEach(u => { try{u();}catch(e){} });
+  taskNotifyUnsubs = [];
+
+  const myIds = [user.email, user.displayName].filter(Boolean);
+  TEACHERS.forEach(t => {
+    if(!t.uid || t.uid === user.uid) return;
+    let firstSnap = true;  // 이 교사 일정의 첫 스냅샷은 기준선
+    const unsub = onSnapshot(collection(fbDb, 'tasks', t.uid, 'items'), snap => {
+      if(firstSnap){ firstSnap = false; return; }  // 기존 항목은 알림 안 띄움
+      snap.docChanges().forEach(ch => {
+        if(ch.type !== 'added') return;
+        const d = ch.doc.data();
+        const sharedToMe = (d.sharedWith || []).some(s => myIds.includes(s));
+        if(!sharedToMe) return;
+        showAppNotify('공유된 업무 일정', d.title || '새 일정이 공유되었습니다');
+      });
+    }, err => {});
+    taskNotifyUnsubs.push(unsub);
+  });
+}
+
 
 const DAYS = ['월','화','수','목','금'];
 const PERIODS = [1,2,3,4,5,6,7];
@@ -4980,6 +5068,10 @@ onAuthStateChanged(fbAuth, async (user) => {
     // 업무 일정 로딩 (전체)
     loadMytasks();
     loadGroups();
+    // 알림 초기화 + 상담/업무 새 항목 감시 시작
+    initNotify();
+    startConsultNotifyWatch(user);
+    startTaskNotifyWatch(user);
   }catch(e){
     // 타임아웃이나 네트워크 오류 시에도 앱은 일단 진행
     console.warn('Firestore 로딩 오류:', e.message);
