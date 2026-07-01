@@ -1641,7 +1641,7 @@
     .dropdown{display:none !important;}
     .swap-preview-grids{flex-direction:row;align-items:flex-start;overflow:hidden;min-height:0;}
     .preview-col{flex:1;min-width:0;}
-    .preview-col.swap-col-list{flex:0 1 300px;display:flex;flex-direction:column;overflow:hidden;min-height:0;max-height:72vh;}
+    .preview-col.swap-col-list{flex:0 1 300px;display:flex;flex-direction:column;overflow:hidden;min-height:0;max-height:56vh;}
     .preview-col.swap-col-list .swap-list{flex:1;overflow-y:auto;min-height:0;}
   }
 
@@ -2636,7 +2636,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.34</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.36</div>
   </div>
 </div>
 
@@ -2729,7 +2729,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.34</div>
+    <div class="nav-version">ver4.36</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4546,7 +4546,7 @@ function renderPopup(teacherObj, day, period, entry){
     <div class="modal-sub">${popupTab==='swap'
       ? `${teacherObj.name} 선생님의 이 시간, 같은 반에 들어가는 다른 선생님과 교체할 수 있는 경우 (다른 칸을 클릭하면 그 시간 기준으로 다시 찾아드려요)`
       : `${teacherObj.name} 선생님의 이 시간, 이때 비어 있어 보강 가능한 선생님 (동교과 우선)`}</div>
-    <div class="swap-preview-grids" style="${isDesktop?'display:grid;grid-template-columns:260px 1fr 1fr;gap:16px;':''}">
+    <div class="swap-preview-grids" style="${isDesktop?'display:grid;grid-template-columns:260px 1fr 1fr;gap:16px;align-items:start;':''}">
       <div class="preview-col swap-col-list">
         <div class="swap-list">${listHtml}</div>
         <div class="swap-note">${popupTab==='swap'
@@ -4562,6 +4562,24 @@ function renderPopup(teacherObj, day, period, entry){
   `;
 
   setModalContent(html, ()=>{
+    // 목록 컬럼 높이를 시간표 컬럼 높이에 맞춤 (목록이 길어도 모달이 안 늘어나게)
+    if(isDesktop){
+      requestAnimationFrame(() => {
+        const grids = swapModalBody.querySelector('.swap-preview-grids');
+        const listCol = grids?.querySelector('.swap-col-list');
+        const cols = grids?.querySelectorAll('.preview-col');
+        const ttCol = cols && cols[1]; // 두 번째 = 내 시간표 (기준 높이)
+        if(listCol && ttCol){
+          const h = ttCol.offsetHeight;
+          if(h > 0){
+            listCol.style.maxHeight = h + 'px';
+            listCol.style.overflowY = 'hidden';
+            const list = listCol.querySelector('.swap-list');
+            if(list){ list.style.overflowY = 'auto'; list.style.maxHeight = '100%'; }
+          }
+        }
+      });
+    }
     swapModalBody.querySelectorAll('.popup-tab-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         if(popupTab===btn.dataset.tab) return;
