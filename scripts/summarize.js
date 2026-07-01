@@ -59,7 +59,7 @@ ${text}`;
   const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
   const GEMINI_BODY = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 2000, temperature: 0.3, responseMimeType: "text/plain" }
+    generationConfig: { maxOutputTokens: 8000, temperature: 0.3, responseMimeType: "text/plain" }
   });
 
   let data;
