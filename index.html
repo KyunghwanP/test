@@ -2727,7 +2727,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.51</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.52</div>
   </div>
 </div>
 
@@ -2826,7 +2826,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.51</div>
+    <div class="nav-version">ver4.52</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -6919,7 +6919,10 @@ async function loadHomeSchedule(offset) {
           })();
       if (todayEl) {
         requestAnimationFrame(() => {
-          listEl.scrollTop = todayEl.offsetTop - listEl.offsetHeight / 2 + todayEl.offsetHeight / 2;
+          const lr = listEl.getBoundingClientRect();
+          const tr = todayEl.getBoundingClientRect();
+          // 현재 scrollTop 기준 델타로 계산 — offsetParent 구조와 무관하게 정확
+          listEl.scrollTop += (tr.top - lr.top) - (lr.height / 2 - tr.height / 2);
         });
       }
     } else {
