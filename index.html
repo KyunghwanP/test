@@ -2718,7 +2718,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.48</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.50</div>
   </div>
 </div>
 
@@ -2817,7 +2817,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.48</div>
+    <div class="nav-version">ver4.50</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3759,7 +3759,13 @@ function showAppNotify(title, body){
       Neutralino.os.showNotification(title, body);
       return;
     }
-    if(typeof Notification !== 'undefined' && Notification.permission === 'granted'){
+    if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    // Android(크롬·삼성인터넷·PWA)는 new Notification() 미지원 → 서비스워커 경유 필수
+    if(navigator.serviceWorker && navigator.serviceWorker.controller){
+      navigator.serviceWorker.ready
+        .then(reg => reg.showNotification(title, { body, icon: 'icon-180.png', badge: 'icon-192.png' }))
+        .catch(() => { try { new Notification(title, { body, icon: 'icon-180.png' }); } catch(e){} });
+    } else {
       new Notification(title, { body, icon: 'icon-180.png' });
     }
   } catch(e){ /* 알림 실패는 조용히 무시 */ }
@@ -7809,7 +7815,7 @@ async function submitPoints() {
       try { json = JSON.parse(text); } catch(pe) { throw new Error('응답 파싱 오류: ' + text.slice(0,80)); }
       if (json.success) {
         successCount++;
-        savedEntries.push({ ...s, type: sendType, detail: s._detail, date, score: s._score, teacher });
+        savedEntries.push({ ...s, classNum: s.room, studentNum: s.num, type: sendType, detail: s._detail, date, score: s._score, teacher });
         btnText.textContent = `저장 중... (${successCount}/${validStudents.length})`;
       } else {
         showPointsToast(`${s.name} 저장 실패: ${json.error||'오류'}`, 'error');
@@ -7825,7 +7831,7 @@ async function submitPoints() {
 
   if (successCount > 0) {
     showPointsToast(`✓ ${successCount}명 저장 완료!`, 'success');
-    addToSessionHistory(savedEntries, '(학생별 사유)', date, score);
+    addToSessionHistory(savedEntries, '(학생별 사유)', date);
     // 초기화
     ptsStudentRows = [{ grade: '', room: '', num:'', name:'' }];
     renderStudentRows();
