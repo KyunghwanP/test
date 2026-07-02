@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ynhs-v231';
+const CACHE_NAME = 'ynhs-v232';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -15,10 +15,12 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (!e.request.url.startsWith(self.location.origin)) return;
+  // 대용량 PDF(/docs/)는 sw 미개입 — 브라우저가 range 요청 직접 처리, 캐시 낭비 방지
+  if (new URL(e.request.url).pathname.includes('/docs/')) return;
   e.respondWith(
     fetch(e.request)
       .then(res => {
-        if(res.ok) {
+        if(res.ok && res.status === 200) {
           const clone = res.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
         }
