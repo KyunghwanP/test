@@ -689,6 +689,48 @@
     font-size:13px;font-weight:700;cursor:pointer;padding:4px 8px;
   }
 
+  /* ── 업무캘린더 패널 헤더 ── */
+  .panel-hd{padding:9px 12px 8px;background:var(--paper);}
+  .phd-row{display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden;}
+  .phd-seg{
+    display:flex;background:var(--paper-soft);border-radius:9px;
+    padding:2.5px;gap:2px;flex-shrink:0;
+  }
+  .phd-seg button{
+    border:none;background:transparent;font-size:12px;padding:4px 9px;
+    border-radius:7px;cursor:pointer;line-height:1;opacity:0.55;
+    transition:all .12s;
+  }
+  .phd-seg button.active{
+    background:var(--paper);box-shadow:0 1px 3px rgba(15,23,42,0.14);opacity:1;
+  }
+  .phd-nav{display:flex;align-items:center;gap:7px;flex:1;justify-content:center;min-width:0;}
+  .phd-nav-btn{
+    width:26px;height:26px;border-radius:8px;border:1px solid var(--rule);
+    background:var(--paper);cursor:pointer;font-size:14px;color:var(--ink);
+    line-height:1;flex-shrink:0;transition:all .12s;
+  }
+  .phd-nav-btn:hover{border-color:var(--mon);color:var(--mon);}
+  .phd-title{font-size:15px;font-weight:800;white-space:nowrap;color:var(--ink);}
+  .phd-dots{display:flex;gap:6px;align-items:center;flex-shrink:0;}
+  .phd-dot{
+    width:17px;height:17px;border-radius:50%;cursor:pointer;border:none;padding:0;
+    transition:all .15s;box-shadow:0 0 0 2px var(--paper), 0 0 0 3.5px currentColor;
+    color:transparent;font-size:0;
+  }
+  .phd-dot.off{opacity:0.22;transform:scale(0.82);box-shadow:none;}
+  .phd-dot.sched{
+    border-radius:6px;background:#EF4444;color:#fff;font-size:9px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;box-shadow:none;
+  }
+  .phd-dot.sched.off{opacity:0.22;}
+  .phd-ghost{
+    width:26px;height:26px;border-radius:8px;border:1px solid var(--rule);
+    background:transparent;color:var(--ink-soft);font-size:13px;cursor:pointer;
+    line-height:1;transition:all .12s;margin-left:2px;
+  }
+  .phd-ghost:hover{border-color:var(--mon);color:var(--mon);}
+
   /* 일정 목록 */
   .mytask-list{ display:flex;flex-direction:column;gap:8px;padding-bottom:80px; }
   .mytask-item{
@@ -2825,7 +2867,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.56</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.57</div>
   </div>
 </div>
 
@@ -2937,7 +2979,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.56</div>
+    <div class="nav-version">ver4.57</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -8516,30 +8558,30 @@ function renderRows() {
       const cm = panel.calMonth ?? mytaskMonth;
 
       panelEl.innerHTML = `
-        <div class="panel-hd" style="padding:8px 10px;background:var(--paper);border-bottom:1px solid var(--rule);flex-shrink:0;">
-          <div style="display:flex;align-items:center;gap:4px;flex-wrap:nowrap;overflow:hidden;min-width:0;">
-            <div style="display:flex;gap:3px;flex-shrink:0;">
-              <button onclick="setPanelType(${row.id},${panel.id},'calendar')" class="mytask-filter-btn ${panel.type==='calendar'?'active':''}" style="font-size:11px;padding:2px 7px;">📅</button>
-              <button onclick="setPanelType(${row.id},${panel.id},'list')" class="mytask-filter-btn ${panel.type==='list'?'active':''}" style="font-size:11px;padding:2px 7px;">📋</button>
+        <div class="panel-hd" style="flex-shrink:0;">
+          <div class="phd-row">
+            <div class="phd-seg">
+              <button onclick="setPanelType(${row.id},${panel.id},'calendar')" class="${panel.type==='calendar'?'active':''}" title="달력 보기">📅</button>
+              <button onclick="setPanelType(${row.id},${panel.id},'list')" class="${panel.type==='list'?'active':''}" title="목록 보기">📋</button>
             </div>
-            ${panel.type==='calendar' ? `<div style="display:flex;align-items:center;gap:4px;flex:1;justify-content:center;min-width:0;">
-              <button onclick="panelChangeMonth(${row.id},${panel.id},-1)" class="mytask-nav-btn" style="width:22px;height:22px;font-size:13px;flex-shrink:0;">‹</button>
-              <span id="pml_${panel.id}" style="font-family:'Pretendard','Noto Sans KR';font-size:14px;font-weight:800;white-space:nowrap;">${cy}년 ${cm+1}월</span>
-              <button onclick="panelChangeMonth(${row.id},${panel.id},1)" class="mytask-nav-btn" style="width:22px;height:22px;font-size:13px;flex-shrink:0;">›</button>
+            ${panel.type==='calendar' ? `<div class="phd-nav">
+              <button onclick="panelChangeMonth(${row.id},${panel.id},-1)" class="phd-nav-btn">‹</button>
+              <span id="pml_${panel.id}" class="phd-title">${cy}년 ${cm+1}월</span>
+              <button onclick="panelChangeMonth(${row.id},${panel.id},1)" class="phd-nav-btn">›</button>
             </div>` : '<div style="flex:1;"></div>'}
-            <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
+            <div class="phd-dots">
               ${(() => {
                 const dots = [{s:'todo',c:'#6366F1'},{s:'doing',c:'#F59E0B'},{s:'done',c:'#10B981'}].map(({s,c})=>{
                   const on=panel.filters.status.includes(s);
                   const lbl=s==='todo'?'시작전':s==='doing'?'진행중':'완료';
-                  return '<div onclick="event.stopPropagation();togglePanelStatus('+row.id+','+panel.id+',\''+s+'\')" style="width:14px;height:14px;border-radius:50%;background:'+c+';cursor:pointer;opacity:'+(on?1:0.2)+';transition:opacity .15s;flex-shrink:0;" title="'+lbl+'"></div>';
+                  return '<button onclick="event.stopPropagation();togglePanelStatus('+row.id+','+panel.id+',\''+s+'\')" class="phd-dot'+(on?'':' off')+'" style="background:'+c+';" title="'+lbl+'"></button>';
                 }).join('');
                 const sch = panel.type==='calendar'
-                  ? '<div onclick="event.stopPropagation();togglePanelSchedule('+row.id+','+panel.id+')" style="width:14px;height:14px;border-radius:3px;background:#EF4444;cursor:pointer;opacity:'+(panel.showSchedule?1:0.2)+';transition:opacity .15s;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:700;" title="학사일정">학</div>'
+                  ? '<button onclick="event.stopPropagation();togglePanelSchedule('+row.id+','+panel.id+')" class="phd-dot sched'+(panel.showSchedule?'':' off')+'" title="학사일정">학</button>'
                   : '';
                 return dots+sch;
               })()}
-              <button onclick="togglePanelChips(this)" style="padding:2px 8px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);font-size:12px;cursor:pointer;white-space:nowrap;" title="칩 숨기기">${panel.chipsHidden?'▼':'▲'}</button>
+              <button onclick="togglePanelChips(this)" class="phd-ghost" title="${panel.chipsHidden?'필터 펼치기':'필터 접기'}">${panel.chipsHidden?'▾':'▴'}</button>
               <button class="panel-delete-btn" onclick="removePanel(${row.id},${panel.id})" style="display:none;width:24px;height:24px;border-radius:50%;border:none;background:#FEE2E2;color:#EF4444;font-size:14px;font-weight:700;cursor:pointer;align-items:center;justify-content:center;line-height:1;" title="패널 삭제">×</button>
             </div>
           </div>
