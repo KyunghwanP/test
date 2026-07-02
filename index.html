@@ -2718,7 +2718,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.46</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.47</div>
   </div>
 </div>
 
@@ -2761,6 +2761,9 @@
     <div class="tab-item" data-page="consult">
       <span class="tab-item-icon">🗓️</span>학부모상담
     </div>
+    <div class="tab-item" data-page="docs">
+      <span class="tab-item-icon">📋</span>업무자료
+    </div>
     <div class="tab-item" data-page="contacts">
       <span class="tab-item-icon">📞</span>교원연락망
     </div>
@@ -2769,9 +2772,6 @@
     </div>
     <div class="tab-item" data-page="meal">
       <span class="tab-item-icon">🍱</span>식단표
-    </div>
-    <div class="tab-item" data-page="docs">
-      <span class="tab-item-icon">📋</span>업무자료
     </div>
   </div>
   </div>
@@ -2805,6 +2805,9 @@
       <div class="main-nav-item" data-page="consult">
         <span class="main-nav-icon">🗓️</span>학부모상담
       </div>
+      <div class="main-nav-item" data-page="docs">
+        <span class="main-nav-icon">📋</span>업무자료
+      </div>
       <div class="main-nav-item" data-page="contacts">
         <span class="main-nav-icon">📞</span>교원연락망
       </div>
@@ -2814,10 +2817,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-      <div class="main-nav-item" data-page="docs">
-        <span class="main-nav-icon">📋</span>업무자료
-      </div>
-    <div class="nav-version">ver4.46</div>
+    <div class="nav-version">ver4.47</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4898,6 +4898,14 @@ window.addEventListener('popstate', (e)=>{
   if (document.getElementById('studentsPage')?.classList.contains('active')
       && studentsViewMode === 'list') {
     renderStudentsGroupList();
+    return;
+  }
+
+  // 4.5. 업무자료 상세 보고 있으면 → 목록 (모바일 드릴다운, 화면 상태로 판단)
+  if (document.getElementById('docsPage')?.classList.contains('active')
+      && window.innerWidth < 900
+      && document.getElementById('docsLayout')?.classList.contains('detail')) {
+    showDocsList();
     return;
   }
 
