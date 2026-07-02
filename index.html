@@ -41,7 +41,7 @@
   html, body{height:100%;overflow:hidden;margin:0;padding:0;}
   body{background:var(--bg-base);font-family:'Pretendard','Noto Sans KR',sans-serif;color:var(--ink);}
 
-  .app-shell{display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+  .app-shell{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden;}
 
   /* 상단 헤더 */
   .app-header{
@@ -2427,6 +2427,8 @@
   .home-consult-item .hc-m{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;}
   .home-consult-item .hc-m.face{background:#EFF6FF;color:#1E40AF;}
   .home-consult-item .hc-m.phone{background:#FEF3C7;color:#92400E;}
+  .home-consult-item.past{opacity:.45;background:var(--paper-soft);}
+  .home-consult-item.past .hc-m{background:var(--rule);color:var(--ink-soft);}
 
   /* 급식 미니 */
   .home-meal-list{padding:6px 10px 8px;display:flex;flex-direction:column;gap:0;}
@@ -2727,7 +2729,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.52</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.54</div>
   </div>
 </div>
 
@@ -2826,7 +2828,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.52</div>
+    <div class="nav-version">ver4.54</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -6595,13 +6597,13 @@ async function loadHomeConsult(slotsOverride){
   const now = new Date();
   const todayStr = consultLocalYmd(now);
   const nowHM = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-  // 예약된 상담만, 오늘 이후 (지난 것·빈 슬롯 제외)
+  // 예약된 상담만, 오늘 이후 (어제 이전 제외 · 오늘 지난 건은 흐리게 표시)
   const future = slots.filter(s => {
     if(s.status !== 'booked') return false;           // 빈 슬롯 제외 (예약된 것만)
-    if(s.date < todayStr) return false;
-    if(s.date === todayStr && s.time <= nowHM) return false;
+    if(s.date < todayStr) return false;               // 어제 이전만 제외
     return true;
-  }).sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
+  }).map(s => ({ ...s, _past: s.date === todayStr && s.time <= nowHM }))
+    .sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
 
   if(future.length === 0){ section.style.display = 'none'; return; }
   section.style.display = '';
@@ -6614,11 +6616,11 @@ async function loadHomeConsult(slotsOverride){
     if(booked){
       const method = s.bookedType || s.type || 'face';
       const who = escapeHtml(s.studentName || s.bookedName || '');
-      return `<div class="home-consult-item booked">
+      return `<div class="home-consult-item booked${s._past ? ' past' : ''}">
         <span class="hc-date">${dateLabel}</span>
         <span class="hc-time">${escapeHtml(s.time)}</span>
         <span class="hc-name">${who}</span>
-        <span class="hc-m ${method==='phone'?'phone':'face'}">${method==='phone'?'전화':'대면'}</span>
+        <span class="hc-m ${method==='phone'?'phone':'face'}">${s._past ? '완료' : (method==='phone'?'전화':'대면')}</span>
       </div>`;
     }
     return `<div class="home-consult-item">
