@@ -2718,7 +2718,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.45</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.46</div>
   </div>
 </div>
 
@@ -2817,7 +2817,7 @@
       <div class="main-nav-item" data-page="docs">
         <span class="main-nav-icon">📋</span>업무자료
       </div>
-    <div class="nav-version">ver4.45</div>
+    <div class="nav-version">ver4.46</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7009,11 +7009,17 @@ const APPROVAL_LINES = [
 ];
 
 const DOCS_ITEMS = [
-  { id:'approval', type:'table', title:'✅ 결재라인 안내', desc:'복무·출장·휴가 등 유형별 결재선 및 비고' },
   // PDF 추가 방법: 저장소 docs/ 폴더에 영문 소문자 파일명으로 업로드 후 아래에 한 줄 추가
   // { id:'고유id', type:'pdf', title:'제목', desc:'설명', src:'docs/파일명.pdf' },
-  { id:'overtime', type:'pdf', title:'⏱️ 초과근무(시간외근무) 신청 안내', desc:'초과근무 신청 방법 안내 (PDF)', src:'docs/overtime.pdf' },
-  { id:'plan2026', type:'pdf', title:'📖 2026학년도 교육계획서', desc:'2026학년도 교육계획 (PDF)', src:'docs/plan2026.pdf' },
+  { id:'plan2026',   type:'pdf',   title:'📖 2026학년도 교육계획서', desc:'2026학년도 교육계획 (PDF)', src:'docs/plan2026.pdf' },
+  { id:'duties',     type:'pdf',   title:'🗂️ 업무 분장', desc:'부서별 업무 분장표 (PDF)', src:'docs/duties.pdf' },
+  { id:'approval',   type:'table', title:'✅ 결재라인 안내', desc:'복무·출장·휴가 등 유형별 결재선 및 비고' },
+  { id:'curriculum', type:'pdf',   title:'📚 교육과정 편제표', desc:'교육과정 편제 및 단위 배당 (PDF)', src:'docs/curriculum.pdf' },
+  { id:'overtime',   type:'pdf',   title:'⏱️ 초과근무(시간외근무) 신청 안내', desc:'초과근무 신청 방법 안내 (PDF)', src:'docs/overtime.pdf' },
+  { id:'recording',  type:'pdf',   title:'✏️ 학교생활기록부 기재요령', desc:'생기부 기재요령 (PDF)', src:'docs/recordingguidelines.pdf' },
+  { id:'schoolregs', type:'pdf',   title:'📜 교칙', desc:'학교 규칙 (PDF)', src:'docs/schoolregulations.pdf' },
+  { id:'attendance', type:'pdf',   title:'🕐 출결 규정', desc:'출결 처리 규정 (PDF)', src:'docs/attendancepolicy.pdf' },
+  { id:'conduct',    type:'pdf',   title:'🎓 학생생활규정', desc:'학생 생활 규정 (PDF)', src:'docs/codeofconduct.pdf' },
 ];
 
 let docsInitialized = false;
