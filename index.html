@@ -643,6 +643,52 @@
   .pc-chip.done{border-left-color:#10B981;color:var(--ink-soft);text-decoration:line-through;cursor:grab;}
   .panel-cal-more{font-size:clamp(9px,0.8vw,11px);color:var(--ink-soft);padding:0 4px;}
 
+  /* ── 커스텀 날짜 피커 ── */
+  .dp-wrap{position:relative;display:flex;align-items:center;}
+  .dp-wrap input{flex:1;min-width:0;}
+  .dp-input::-webkit-calendar-picker-indicator{display:none;}
+  .dp-btn{
+    position:absolute;right:8px;border:none;background:transparent;
+    font-size:16px;cursor:pointer;padding:4px;line-height:1;
+  }
+  #datePickerPop{
+    position:fixed;z-index:10000;width:300px;
+    background:var(--paper);border:1px solid var(--rule);border-radius:14px;
+    box-shadow:0 12px 32px -8px rgba(15,23,42,0.25);
+    padding:12px;
+  }
+  .dpk-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .dpk-title{font-weight:800;font-size:15px;color:var(--ink);}
+  .dpk-nav{
+    width:30px;height:30px;border-radius:8px;border:1px solid var(--rule);
+    background:var(--paper-soft);cursor:pointer;font-size:15px;color:var(--ink);
+  }
+  .dpk-nav:hover{border-color:var(--mon);}
+  .dpk-week{
+    display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:4px;
+  }
+  .dpk-week span{text-align:center;font-size:11px;font-weight:700;color:var(--ink-soft);padding:3px 0;}
+  .dpk-week .sun{color:#F87171;}
+  .dpk-week .sat{color:#60A5FA;}
+  .dpk-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+  .dpk-day{
+    height:36px;border:none;border-radius:8px;background:transparent;
+    font-family:'IBM Plex Mono';font-size:13px;font-weight:700;color:var(--ink);
+    cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+  .dpk-day:hover{background:var(--paper-soft);box-shadow:inset 0 0 0 1.5px #CBD5E1;}
+  .dpk-day.other{color:#CBD5E1;}
+  .dpk-day.sun{color:#EF4444;}
+  .dpk-day.sat{color:#3B82F6;}
+  .dpk-day.other.sun,.dpk-day.other.sat{color:#CBD5E1;}
+  .dpk-day.today{box-shadow:inset 0 0 0 1.5px var(--mon);}
+  .dpk-day.selected{background:var(--mon);color:#fff !important;}
+  .dpk-foot{display:flex;justify-content:flex-end;margin-top:8px;}
+  .dpk-today{
+    border:none;background:transparent;color:var(--mon);
+    font-size:13px;font-weight:700;cursor:pointer;padding:4px 8px;
+  }
+
   /* 일정 목록 */
   .mytask-list{ display:flex;flex-direction:column;gap:8px;padding-bottom:80px; }
   .mytask-item{
@@ -2779,7 +2825,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.55</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.56</div>
   </div>
 </div>
 
@@ -2800,7 +2846,20 @@
   <div class="tab-bar-wrap" id="tabBarWrap">
     <button class="tab-scroll-btn left" onclick="scrollTabBar(-1)">‹</button>
     <button class="tab-scroll-btn right" onclick="scrollTabBar(1)">›</button>
-  <div class="mobile-tab-bar" id="mobileTabBar">
+  <div id="datePickerPop" style="display:none;">
+  <div class="dpk-head">
+    <button type="button" class="dpk-nav" onclick="dpMove(-1)">‹</button>
+    <span class="dpk-title" id="dpkTitle"></span>
+    <button type="button" class="dpk-nav" onclick="dpMove(1)">›</button>
+  </div>
+  <div class="dpk-week">
+    <span class="sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat">토</span>
+  </div>
+  <div class="dpk-grid" id="dpkGrid"></div>
+  <div class="dpk-foot"><button type="button" class="dpk-today" onclick="dpToday()">오늘</button></div>
+</div>
+
+<div class="mobile-tab-bar" id="mobileTabBar">
     <div class="tab-item active" data-page="home">
       <span class="tab-item-icon">🏠</span>현황판
     </div>
@@ -2878,7 +2937,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.55</div>
+    <div class="nav-version">ver4.56</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3221,7 +3280,7 @@
             <!-- 일자 -->
             <div class="points-field">
               <div class="points-label">일자</div>
-              <input class="points-input" id="ptsDate" type="date" style="max-width:200px;">
+              <input class="points-input" id="ptsDate" type="date" min="2020-01-01" max="2099-12-31" style="max-width:200px;">
             </div>
 
             <!-- 입력 선생님 -->
@@ -3336,7 +3395,7 @@
                   <div class="consult-form-grid">
                     <div>
                       <label>날짜</label>
-                      <input type="date" id="consultDate">
+                      <input type="date" id="consultDate" min="2020-01-01" max="2099-12-31">
                     </div>
                     <div>
                       <label>시작 시각</label>
@@ -3403,7 +3462,7 @@
                 <div class="cm-edit-grid">
                   <div>
                     <label>날짜</label>
-                    <input type="date" id="cmDate">
+                    <input type="date" id="cmDate" min="2020-01-01" max="2099-12-31">
                   </div>
                   <div>
                     <label>시각</label>
@@ -3454,7 +3513,7 @@
                 <div class="cm-edit-grid">
                   <div>
                     <label>날짜</label>
-                    <input type="date" id="caDate">
+                    <input type="date" id="caDate" min="2020-01-01" max="2099-12-31">
                   </div>
                   <div>
                     <label>시간 단위</label>
@@ -3579,16 +3638,22 @@
         <div class="mytask-modal-dates">
           <div class="mytask-modal-field">
             <label>시작일</label>
-            <input type="date" id="mytaskStartDate" autocomplete="off"
-              oninput="autoFormatDateInput(this)"
-              onchange="onStartDateChange(this)"
-              onkeydown="handleDateInputKey(event,this,'mytaskEndDate')">
+            <div class="dp-wrap">
+              <input type="date" id="mytaskStartDate" class="dp-input" autocomplete="off" min="2020-01-01" max="2099-12-31"
+                oninput="autoFormatDateInput(this)"
+                onchange="onStartDateChange(this)"
+                onkeydown="handleDateInputKey(event,this,'mytaskEndDate')">
+              <button type="button" class="dp-btn" onclick="openDatePicker('mytaskStartDate',this)">📅</button>
+            </div>
           </div>
           <div class="mytask-modal-field">
             <label>마감일</label>
-            <input type="date" id="mytaskEndDate" autocomplete="off"
-              oninput="autoFormatDateInput(this)"
-              onkeydown="handleDateInputKey(event,this,null)">
+            <div class="dp-wrap">
+              <input type="date" id="mytaskEndDate" class="dp-input" autocomplete="off" min="2020-01-01" max="2099-12-31"
+                oninput="autoFormatDateInput(this)"
+                onkeydown="handleDateInputKey(event,this,null)">
+              <button type="button" class="dp-btn" onclick="openDatePicker('mytaskEndDate',this)">📅</button>
+            </div>
           </div>
         </div>
 
@@ -3603,8 +3668,11 @@
           </div>
           <div id="mytaskRepeatUntilWrap" style="display:none;margin-top:8px;display:none;">
             <label style="font-size:12px;color:var(--ink-soft);margin-bottom:4px;display:block;">반복 종료일</label>
-            <input type="date" id="mytaskRepeatUntil" autocomplete="off"
-              style="width:100%;padding:10px 12px;border:1.5px solid var(--rule);border-radius:8px;font-size:14px;font-family:'Pretendard','Noto Sans KR';background:var(--paper);color:var(--ink);outline:none;box-sizing:border-box;">
+            <div class="dp-wrap">
+              <input type="date" id="mytaskRepeatUntil" class="dp-input" autocomplete="off" min="2020-01-01" max="2099-12-31"
+                style="width:100%;padding:10px 12px;border:1.5px solid var(--rule);border-radius:8px;font-size:14px;font-family:'Pretendard','Noto Sans KR';background:var(--paper);color:var(--ink);outline:none;box-sizing:border-box;">
+              <button type="button" class="dp-btn" onclick="openDatePicker('mytaskRepeatUntil',this)">📅</button>
+            </div>
           </div>
         </div>
 
@@ -7252,6 +7320,96 @@ window.toggleDocsNote = toggleDocsNote;
 window.docsPdfFindInput = docsPdfFindInput;
 window.docsPdfFindNav = docsPdfFindNav;
 window.bindDocsPdfFind = bindDocsPdfFind;
+
+// ── 커스텀 날짜 피커 ──
+let dpTargetId = null, dpY = 0, dpM = 0;   // dpM: 0-based
+
+function openDatePicker(inputId, btn){
+  const pop = document.getElementById('datePickerPop');
+  const input = document.getElementById(inputId);
+  if(!pop || !input) return;
+  if(dpTargetId === inputId && pop.style.display !== 'none'){ closeDatePicker(); return; }
+  dpTargetId = inputId;
+  const base = input.value ? new Date(input.value + 'T00:00:00') : new Date();
+  dpY = base.getFullYear(); dpM = base.getMonth();
+  dpRender();
+  pop.style.display = '';
+  // 버튼 기준 위치 (화면 밖 방지)
+  const r = btn.getBoundingClientRect();
+  const pw = 300, ph = pop.offsetHeight || 340;
+  let left = Math.min(r.left, window.innerWidth - pw - 10);
+  let top  = r.bottom + 6;
+  if(top + ph > window.innerHeight - 10) top = Math.max(10, r.top - ph - 6);
+  pop.style.left = Math.max(10, left) + 'px';
+  pop.style.top  = top + 'px';
+}
+
+function dpRender(){
+  const title = document.getElementById('dpkTitle');
+  const grid  = document.getElementById('dpkGrid');
+  if(!title || !grid) return;
+  title.textContent = `${dpY}년 ${dpM+1}월`;
+  const firstDay = new Date(dpY, dpM, 1).getDay();
+  const lastDate = new Date(dpY, dpM+1, 0).getDate();
+  const prevLast = new Date(dpY, dpM, 0).getDate();
+  const today = consultLocalYmd(new Date());
+  const selected = document.getElementById(dpTargetId)?.value || '';
+  const ymd = (y,m,d) => `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  let html = '';
+  const total = Math.ceil((firstDay + lastDate) / 7) * 7;
+  for(let i = 0; i < total; i++){
+    let y = dpY, m = dpM, d, other = false;
+    if(i < firstDay){ d = prevLast - firstDay + 1 + i; m = dpM - 1; other = true; }
+    else if(i - firstDay + 1 > lastDate){ d = i - firstDay + 1 - lastDate; m = dpM + 1; other = true; }
+    else d = i - firstDay + 1;
+    if(m < 0){ m = 11; y--; } else if(m > 11){ m = 0; y++; }
+    const ds = ymd(y, m, d);
+    const cls = ['dpk-day'];
+    if(other) cls.push('other');
+    if(i % 7 === 0) cls.push('sun');
+    if(i % 7 === 6) cls.push('sat');
+    if(ds === today) cls.push('today');
+    if(ds === selected) cls.push('selected');
+    html += `<button type="button" class="${cls.join(' ')}" onclick="dpPick('${ds}')">${d}</button>`;
+  }
+  grid.innerHTML = html;
+}
+
+function dpMove(dir){
+  dpM += dir;
+  if(dpM < 0){ dpM = 11; dpY--; } else if(dpM > 11){ dpM = 0; dpY++; }
+  dpRender();
+}
+
+function dpPick(ds){
+  const input = document.getElementById(dpTargetId);
+  if(input){
+    input.value = ds;
+    input.dispatchEvent(new Event('change'));   // onStartDateChange 등 기존 로직 재사용
+  }
+  closeDatePicker();
+}
+
+function dpToday(){ dpPick(consultLocalYmd(new Date())); }
+
+function closeDatePicker(){
+  const pop = document.getElementById('datePickerPop');
+  if(pop) pop.style.display = 'none';
+  dpTargetId = null;
+}
+
+// 외부 클릭 / ESC 닫기
+document.addEventListener('click', e => {
+  const pop = document.getElementById('datePickerPop');
+  if(!pop || pop.style.display === 'none') return;
+  if(!pop.contains(e.target) && !e.target.closest('.dp-btn')) closeDatePicker();
+});
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeDatePicker(); });
+
+window.openDatePicker = openDatePicker;
+window.dpMove = dpMove;
+window.dpPick = dpPick;
+window.dpToday = dpToday;
 
 function navigateTo(page) {
   // 현재 페이지와 다를 때만 히스토리 추가
