@@ -2357,6 +2357,13 @@
   .docs-content-body.pdf{padding:0;overflow:hidden;}
   .docs-content-body iframe{width:100%;height:100%;border:none;display:block;}
   .docs-empty{color:var(--ink-soft);font-size:14px;padding:24px;text-align:center;}
+  .docs-search{
+    width:100%;box-sizing:border-box;margin-bottom:12px;
+    padding:9px 12px;border:1px solid var(--rule);border-radius:10px;
+    font-size:14px;font-family:inherit;background:var(--paper-soft);color:var(--ink);
+    outline:none;
+  }
+  .docs-search:focus{border-color:var(--mon);background:var(--paper);}
   .docs-table{width:100%;border-collapse:collapse;font-size:14px;}
   .docs-table th,.docs-table td{
     border:1px solid var(--rule);padding:8px 10px;text-align:left;vertical-align:top;
@@ -2367,7 +2374,17 @@
   @media(min-width:900px){
     .docs-list{width:300px;flex-shrink:0;}
   }
+  .docs-note-row td{background:var(--paper-soft);color:var(--ink-soft);font-size:12px;line-height:1.5;}
+  .docs-note-hint{color:var(--mon);font-size:12px;}
+  @media(min-width:900px){
+    .docs-note-row{display:none !important;}
+    .docs-note-hint{display:none;}
+  }
   @media(max-width:899px){
+    .docs-table th:nth-child(3),
+    .docs-table td:nth-child(3){display:none;}
+    .docs-table{font-size:13px;}
+    .docs-table td.dt-line{white-space:nowrap;letter-spacing:-0.02em;}
     .docs-layout{flex-direction:column;padding:12px;}
     .docs-layout .docs-content{display:none;}
     .docs-layout.detail .docs-list{display:none;}
@@ -2687,7 +2704,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.41</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.44</div>
   </div>
 </div>
 
@@ -2786,7 +2803,7 @@
       <div class="main-nav-item" data-page="docs">
         <span class="main-nav-icon">📋</span>업무자료
       </div>
-    <div class="nav-version">ver4.41</div>
+    <div class="nav-version">ver4.44</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -6979,8 +6996,10 @@ const APPROVAL_LINES = [
 
 const DOCS_ITEMS = [
   { id:'approval', type:'table', title:'✅ 결재라인 안내', desc:'복무·출장·휴가 등 유형별 결재선 및 비고' },
+  // PDF 추가 방법: 저장소 docs/ 폴더에 영문 소문자 파일명으로 업로드 후 아래에 한 줄 추가
+  // { id:'고유id', type:'pdf', title:'제목', desc:'설명', src:'docs/파일명.pdf' },
   { id:'overtime', type:'pdf', title:'⏱️ 초과근무(시간외근무) 신청 안내', desc:'초과근무 신청 방법 안내 (PDF)', src:'docs/overtime.pdf' },
-  { id:'plan2026', type:'pdfjs', title:'📖 2026학년도 교육계획서', desc:'검색·목차·썸네일 지원 (PDF.js 뷰어)', src:'docs/plan2026.pdf' },
+  { id:'plan2026', type:'pdf', title:'📖 2026학년도 교육계획서', desc:'2026학년도 교육계획 (PDF)', src:'docs/plan2026.pdf' },
 ];
 
 let docsInitialized = false;
@@ -7016,15 +7035,14 @@ function openDocsItem(id){
   if(item.type === 'table'){
     body.classList.remove('pdf');
     body.innerHTML = `
-      <table class="docs-table">
+      <input class="docs-search" id="docsTableSearch" type="search" placeholder="🔍 검색 (예: 병가, 교장, 출장)" oninput="filterDocsTable(this.value)">
+      <table class="docs-table" id="docsApprovalTable">
         <thead><tr><th>구분</th><th>결재선</th><th>비고</th></tr></thead>
-        <tbody>${APPROVAL_LINES.map(a => `<tr><td>${a.name}</td><td class="dt-line">${a.line}</td><td>${a.note || '—'}</td></tr>`).join('')}</tbody>
-      </table>`;
+        <tbody>${APPROVAL_LINES.map((a, i) => `<tr${a.note ? ` onclick="toggleDocsNote(${i})" style="cursor:pointer;"` : ''}><td>${a.name}${a.note ? ' <span class="docs-note-hint">ⓘ</span>' : ''}</td><td class="dt-line">${a.line}</td><td>${a.note || '—'}</td></tr>${a.note ? `<tr class="docs-note-row" id="docsNoteRow${i}" style="display:none;"><td colspan="3">${a.note}</td></tr>` : ''}`).join('')}</tbody>
+      </table>
+      <div class="docs-empty" id="docsTableNoResult" style="display:none;">검색 결과가 없습니다.</div>`;
   } else if(item.type === 'pdf'){
-    body.classList.add('pdf');
-    body.innerHTML = `<iframe src="${item.src}#toolbar=1" title="${item.title}"></iframe>`;
-  } else if(item.type === 'pdfjs'){
-    // PDF.js 프리빌트 뷰어 (검색·목차·썸네일) — 대용량 PDF는 range 요청으로 부분 로딩
+    // 모든 PDF는 PDF.js 프리빌트 뷰어로 통일 (검색·목차·썸네일, range 요청 부분 로딩)
     body.classList.add('pdf');
     body.innerHTML = `<iframe src="pdfjs/web/viewer.html?file=${encodeURIComponent('../../' + item.src)}" title="${item.title}"></iframe>`;
   }
@@ -7036,9 +7054,31 @@ function showDocsList(){
   docsCurrentId = null;
   renderDocsList();
 }
-// onclick 속성에서 호출 — module 스크립트라 전역 노출 필수
+function filterDocsTable(q){
+  q = (q || '').trim().toLowerCase();
+  let visible = 0;
+  document.querySelectorAll('#docsApprovalTable tbody tr:not(.docs-note-row)').forEach(tr => {
+    const show = !q || tr.textContent.toLowerCase().includes(q);
+    tr.style.display = show ? '' : 'none';
+    if(show) visible++;
+  });
+  // 필터 변경 시 펼쳐진 비고 행은 모두 닫기
+  document.querySelectorAll('#docsApprovalTable .docs-note-row').forEach(tr => tr.style.display = 'none');
+  const noRes = document.getElementById('docsTableNoResult');
+  if(noRes) noRes.style.display = visible === 0 ? '' : 'none';
+}
+
+function toggleDocsNote(i){
+  if(window.innerWidth >= 900) return; // 데스크톱은 비고 열이 항상 보임
+  const row = document.getElementById('docsNoteRow' + i);
+  if(row) row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+
+// onclick/oninput 속성에서 호출 — module 스크립트라 전역 노출 필수
 window.openDocsItem = openDocsItem;
 window.showDocsList = showDocsList;
+window.filterDocsTable = filterDocsTable;
+window.toggleDocsNote = toggleDocsNote;
 
 function navigateTo(page) {
   // 현재 페이지와 다를 때만 히스토리 추가
