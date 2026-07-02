@@ -2687,7 +2687,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.38</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.39</div>
   </div>
 </div>
 
@@ -2786,7 +2786,7 @@
       <div class="main-nav-item" data-page="docs">
         <span class="main-nav-icon">📋</span>업무자료
       </div>
-    <div class="nav-version">ver4.38</div>
+    <div class="nav-version">ver4.39</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7145,6 +7145,7 @@ const APPROVAL_LINES = [
 const DOCS_ITEMS = [
   { id:'approval', type:'table', title:'✅ 결재라인 안내', desc:'복무·출장·휴가 등 유형별 결재선 및 비고' },
   { id:'overtime', type:'pdf', title:'⏱️ 초과근무(시간외근무) 신청 안내', desc:'초과근무 신청 방법 안내 (PDF)', src:'docs/overtime.pdf' },
+  { id:'plan2026', type:'pdfjs', title:'📖 2026학년도 교육계획서', desc:'검색·목차·썸네일 지원 (PDF.js 뷰어)', src:'docs/plan2026.pdf' },
 ];
 
 let docsInitialized = false;
@@ -7187,6 +7188,10 @@ function openDocsItem(id){
   } else if(item.type === 'pdf'){
     body.classList.add('pdf');
     body.innerHTML = `<iframe src="${item.src}#toolbar=1" title="${item.title}"></iframe>`;
+  } else if(item.type === 'pdfjs'){
+    // PDF.js 프리빌트 뷰어 (검색·목차·썸네일) — 대용량 PDF는 range 요청으로 부분 로딩
+    body.classList.add('pdf');
+    body.innerHTML = `<iframe src="pdfjs/web/viewer.html?file=${encodeURIComponent('../../' + item.src)}" title="${item.title}"></iframe>`;
   }
   document.getElementById('docsLayout')?.classList.add('detail');
 }
