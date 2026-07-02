@@ -2687,7 +2687,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.40</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.41</div>
   </div>
 </div>
 
@@ -2786,7 +2786,7 @@
       <div class="main-nav-item" data-page="docs">
         <span class="main-nav-icon">📋</span>업무자료
       </div>
-    <div class="nav-version">ver4.40</div>
+    <div class="nav-version">ver4.41</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7036,6 +7036,9 @@ function showDocsList(){
   docsCurrentId = null;
   renderDocsList();
 }
+// onclick 속성에서 호출 — module 스크립트라 전역 노출 필수
+window.openDocsItem = openDocsItem;
+window.showDocsList = showDocsList;
 
 function navigateTo(page) {
   // 현재 페이지와 다를 때만 히스토리 추가
