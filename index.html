@@ -1062,7 +1062,7 @@
     overflow:hidden;
   }
   .pts-student-item{
-    display:grid;grid-template-columns:40px 1fr 60px 60px 60px;
+    display:grid;grid-template-columns:40px 1fr 56px 52px 52px 52px;
     gap:8px;align-items:center;
     padding:12px 16px;border-bottom:1px solid var(--rule);
   }
@@ -1075,13 +1075,14 @@
   .pts-stotal.minus{color:#EF4444;}
   .pts-smerit{font-size:13px;color:#10B981;text-align:center;}
   .pts-sdemerit{font-size:13px;color:#EF4444;text-align:center;}
+  .pts-sdeducted{font-size:13px;color:#D97706;text-align:center;}
   .pts-view-empty{padding:40px;text-align:center;color:var(--ink-soft);font-size:15px;}
   .pts-view-updated{
     text-align:center;font-size:12px;color:var(--ink-soft);
     font-family:'IBM Plex Mono';margin-bottom:12px;
   }
   .pts-list-header{
-    display:grid;grid-template-columns:40px 1fr 60px 60px 60px;
+    display:grid;grid-template-columns:40px 1fr 56px 52px 52px 52px;
     gap:8px;padding:8px 16px;
     background:var(--paper-soft);border-bottom:1px solid var(--rule);
     font-size:12px;font-weight:700;color:var(--ink-soft);
@@ -2867,7 +2868,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.58</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.59</div>
   </div>
 </div>
 
@@ -2979,7 +2980,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.58</div>
+    <div class="nav-version">ver4.59</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3388,6 +3389,7 @@
                   <span style="text-align:center;cursor:pointer;" onclick="sortPtsBy('total')" id="ptsSort_total">합계 ↕</span>
                   <span style="text-align:center;cursor:pointer;" onclick="sortPtsBy('merit')" id="ptsSort_merit">상점 ↕</span>
                   <span style="text-align:center;cursor:pointer;" onclick="sortPtsBy('demerit')" id="ptsSort_demerit">벌점 ↕</span>
+                  <span style="text-align:center;cursor:pointer;" onclick="sortPtsBy('deducted')" id="ptsSort_deducted">감점 ↕</span>
                 </div>
                 <div class="pts-student-list" id="ptsStudentList"></div>
               </div>
@@ -3859,6 +3861,10 @@
       <div class="pts-detail-score-item">
         <div class="pts-detail-score-label">벌점</div>
         <div class="pts-detail-score-val minus" id="ptsDetailDemerit"></div>
+      </div>
+      <div class="pts-detail-score-item">
+        <div class="pts-detail-score-label">벌점감점</div>
+        <div class="pts-detail-score-val" id="ptsDetailDeducted" style="color:#D97706;"></div>
       </div>
     </div>
     <div class="pts-detail-records" id="ptsDetailRecords"></div>
@@ -8262,10 +8268,10 @@ function sortPtsBy(key) {
     ptsSortDesc = true;
   }
   // 헤더 표시 업데이트
-  ['total','merit','demerit'].forEach(k => {
+  ['total','merit','demerit','deducted'].forEach(k => {
     const el = document.getElementById(`ptsSort_${k}`);
     if (!el) return;
-    const labels = { total:'합계', merit:'상점', demerit:'벌점' };
+    const labels = { total:'합계', merit:'상점', demerit:'벌점', deducted:'감점' };
     el.textContent = labels[k] + (k === ptsSortKey ? (ptsSortDesc ? ' ↓' : ' ↑') : ' ↕');
   });
   const sorted = [...ptsCurrentStudents].sort((a,b) => {
@@ -8315,6 +8321,7 @@ function renderPtsStudentList(students) {
       <span class="pts-stotal ${totalCls}">${s.total > 0 ? '+':''}${s.total}</span>
       <span class="pts-smerit">+${s.merit}</span>
       <span class="pts-sdemerit">${s.demerit}</span>
+      <span class="pts-sdeducted">${s.deducted ? '-' + Math.abs(s.deducted) : 0}</span>
     </div>`;
   }).join('');
 }
@@ -8332,6 +8339,7 @@ function showPtsDetail(idx, encoded) {
   totalEl.className = 'pts-detail-score-val ' + (s.total > 0 ? 'plus' : s.total < 0 ? 'minus' : '');
   document.getElementById('ptsDetailMerit').textContent = '+' + (s.merit || 0);
   document.getElementById('ptsDetailDemerit').textContent = s.demerit || 0;
+  document.getElementById('ptsDetailDeducted').textContent = s.deducted ? '-' + Math.abs(s.deducted) : 0;
 
   const recordsEl = document.getElementById('ptsDetailRecords');
   if (!s.records || s.records.length === 0) {
