@@ -2718,7 +2718,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.47</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.48</div>
   </div>
 </div>
 
@@ -2817,7 +2817,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.47</div>
+    <div class="nav-version">ver4.48</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3798,6 +3798,8 @@ function startConsultNotifyWatch(user){
     // 취소된 것 정리
     const cur = new Set(booked.map(s => s.id));
     consultNotifySeen.forEach(id => { if(!cur.has(id)) consultNotifySeen.delete(id); });
+    // 홈 현황판 상담 섹션 실시간 갱신 (예약·삭제 즉시 반영)
+    loadHomeConsult(slots);
   }, err => { /* 구독 실패 무시 */ });
 }
 
@@ -6554,7 +6556,7 @@ function renderSchedule(monthKey) {
 let homeInitialized = false;
 
 // 홈: 상담 일정 (담임 + 상담 슬롯이 있을 때만). 오늘 이후, 날짜·시간순.
-async function loadHomeConsult(){
+async function loadHomeConsult(slotsOverride){
   const section = document.getElementById('homeConsultSection');
   const listEl  = document.getElementById('homeConsultList');
   if(!section || !listEl) return;
@@ -6565,10 +6567,14 @@ async function loadHomeConsult(){
   if(!classKey){ section.style.display = 'none'; return; }
 
   let slots = [];
-  try {
-    const snap = await getDoc(doc(fbDb, 'consultations', classKey));
-    slots = snap.exists() ? (snap.data().slots || []) : [];
-  } catch(e){ section.style.display = 'none'; return; }
+  if(Array.isArray(slotsOverride)){
+    slots = slotsOverride;   // 실시간 스냅샷에서 전달받은 경우 getDoc 생략
+  } else {
+    try {
+      const snap = await getDoc(doc(fbDb, 'consultations', classKey));
+      slots = snap.exists() ? (snap.data().slots || []) : [];
+    } catch(e){ section.style.display = 'none'; return; }
+  }
 
   // 오늘 이후, 오늘이면 지난 시각 제외
   const now = new Date();
@@ -7178,7 +7184,7 @@ function navigateTo(page) {
     if(el) el.classList.toggle('active', p === page);
   });
   if(page !== 'consult') stopConsultWatch();
-  if(page === 'home') { if(!homeInitialized) initHomePage(); else renderHomeTaskSection(); }
+  if(page === 'home') { if(!homeInitialized) initHomePage(); else { renderHomeTaskSection(); loadHomeConsult(); } }
   if(page === 'timetable') {
     // 본인 시간표 자동 로드 (구형 핸들러에서 이관)
     const _user = fbAuth.currentUser;
