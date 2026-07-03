@@ -2869,7 +2869,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.61</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.64</div>
   </div>
 </div>
 
@@ -2981,7 +2981,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.61</div>
+    <div class="nav-version">ver4.64</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5259,8 +5259,10 @@ async function doGoogleLogin(provider) {
   if (/android/i.test(ua)) {
     // 안드로이드: intent로 크롬 강제 실행
     const cleaned = target.replace(/^https?:\/\//, '');
+    // 크롬 미설치 시 Play스토어로 튕기지 않게 fallback 지정 (인앱에 남아 아래 안내 표시)
     location.href = 'intent://' + cleaned
-      + '#Intent;scheme=https;package=com.android.chrome;end';
+      + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url='
+      + encodeURIComponent(target) + ';end';
   } else if (/iphone|ipad|ipod/i.test(ua)) {
     // iOS 카카오톡: 외부 사파리 열기 스킴
     if (/kakaotalk/i.test(ua)) {
@@ -5312,17 +5314,7 @@ if(logoutBtn){
   });
 }
 
-async function loadDataFromFirestore(){
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('데이터 로딩 시간 초과 (네트워크 확인)')), 10000)
-  );
-  const snap = await Promise.race([
-    getDoc(doc(fbDb, 'appdata', 'main')),
-    timeout
-  ]);
-  if(!snap.exists()) throw new Error('데이터를 찾을 수 없습니다.');
-  const data = snap.data();
-
+function applyAppData(data){
   if(Array.isArray(data.teachers)){
     TEACHERS.length = 0;
     TEACHERS.push(...data.teachers);
@@ -5340,6 +5332,33 @@ async function loadDataFromFirestore(){
     ELECTIVE_BLOCKS.length = 0;
     ELECTIVE_BLOCKS.push(...data.electiveBlocks);
     rebuildElectiveLockSet();
+  }
+}
+
+async function loadDataFromFirestore(){
+  const fetchPromise = getDoc(doc(fbDb, 'appdata', 'main'));
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('데이터 로딩 시간 초과 (네트워크 확인)')), 10000)
+  );
+  try {
+    const snap = await Promise.race([fetchPromise, timeout]);
+    if(!snap.exists()) throw new Error('데이터를 찾을 수 없습니다.');
+    applyAppData(snap.data());
+  } catch(e) {
+    // 타임아웃이어도 원 요청은 백그라운드에서 계속 진행 중 —
+    // 늦게라도 도착하면 데이터 반영 + 의존 UI 재렌더 (느린 회선 대응)
+    fetchPromise.then(snap => {
+      if(!snap.exists() || TEACHERS.length) return;
+      applyAppData(snap.data());
+      rebuildFromTeachers();
+      refreshGradeDropdown();
+      renderSubjectSelectors();
+      refreshLists();
+      applyConsultTabVisibility();
+      autoLoadMyTimetable();
+      console.info('appdata 지연 도착 — UI 갱신 완료');
+    }).catch(() => {});
+    throw e;
   }
 }
 
@@ -6966,8 +6985,18 @@ async function initHomePage() {
     document.getElementById('homeWeather').innerHTML = wx;
     document.getElementById('homeWeatherD').innerHTML = wx;
   } catch(e) {
-    document.getElementById('homeWeather').innerHTML = '<span style="font-size:12px;color:var(--ink-soft);">날씨 정보를 불러올 수 없습니다</span>';
-    document.getElementById('homeWeatherD').innerHTML = '<span style="font-size:12px;color:var(--ink-soft);">날씨 정보를 불러올 수 없습니다</span>';
+    // 만료된 캐시라도 있으면 표시 (갱신 시각 표기)
+    let fallback = '<span style="font-size:12px;color:var(--ink-soft);">날씨 정보를 불러올 수 없습니다</span>';
+    try {
+      const c = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY) || 'null');
+      if (c && c.html) {
+        const ago = new Date(c.t);
+        const hm = String(ago.getHours()).padStart(2,'0') + ':' + String(ago.getMinutes()).padStart(2,'0');
+        fallback = c.html + `<div style="font-size:9.5px;color:var(--ink-soft);margin-top:4px;">⚠️ ${hm} 기준 (갱신 실패)</div>`;
+      }
+    } catch(e2){}
+    document.getElementById('homeWeather').innerHTML = fallback;
+    document.getElementById('homeWeatherD').innerHTML = fallback;
   }
 
   } catch(homeErr) {
@@ -7130,7 +7159,15 @@ window.addEventListener('resize', updateTabBarScrollable);
 // 초기 1회 + 약간의 지연 후 (레이아웃 안정화)
 setTimeout(updateTabBarScrollable, 500);
 
+const WEATHER_CACHE_KEY = 'ynhs-weather-cache';
+const WEATHER_CACHE_TTL = 30 * 60 * 1000;   // 30분 — 학교 공인IP 요청량 절감 (rate limit 예방)
+
 async function fetchWeather() {
+  // 유효한 캐시가 있으면 API 호출 생략
+  try {
+    const c = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY) || 'null');
+    if (c && Date.now() - c.t < WEATHER_CACHE_TTL) return c.html;
+  } catch(e){}
   const url = 'https://api.open-meteo.com/v1/forecast?latitude=35.87&longitude=128.60' +
     '&current=temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m' +
     '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max' +
@@ -7163,7 +7200,7 @@ async function fetchWeather() {
     </div>`;
   }).join("");
 
-  return `<div class="home-weather-main">
+  const html = `<div class="home-weather-main">
     <span class="home-weather-icon">${icon}</span>
     <div>
       <div class="home-weather-temp">${temp}°</div>
@@ -7176,6 +7213,8 @@ async function fetchWeather() {
     <span class="home-weather-chip">📍 대구</span>
   </div>
   <div class="home-weather-weekly">${weeklyHtml}</div>`;
+  try { localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ t: Date.now(), html })); } catch(e){}
+  return html;
 }
 
 function weatherIcon(code) {
