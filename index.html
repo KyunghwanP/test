@@ -2869,7 +2869,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.66</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.67</div>
   </div>
 </div>
 
@@ -2981,7 +2981,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.66</div>
+    <div class="nav-version">ver4.67</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7211,17 +7211,44 @@ const WEATHER_CACHE_KEY = 'ynhs-weather-cache';
 const WEATHER_CACHE_TTL = 30 * 60 * 1000;   // 30분 — 학교 공인IP 요청량 절감 (rate limit 예방)
 
 async function fetchWeather() {
-  // 유효한 캐시가 있으면 API 호출 생략
+  // 1) 유효한 로컬 캐시가 있으면 API 호출 생략
   try {
     const c = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY) || 'null');
     if (c && Date.now() - c.t < WEATHER_CACHE_TTL) return c.html;
+  } catch(e){}
+  // 2) Firestore 공유 캐시 — 30분 내 다른 교사가 갱신한 것이 있으면 그대로 사용
+  //    (학교 공인 IP에서 Open-Meteo 요청량을 전체 1회/30분으로 절감 — rate limit 근본 대응)
+  let _wxShared = null;
+  try {
+    const snap = await getDoc(doc(fbDb, 'appdata', 'weather'));
+    if (snap.exists()) _wxShared = snap.data();
+    if (_wxShared && _wxShared.html && Date.now() - _wxShared.t < WEATHER_CACHE_TTL) {
+      try { localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ t: _wxShared.t, html: _wxShared.html })); } catch(e){}
+      return _wxShared.html;
+    }
   } catch(e){}
   const url = 'https://api.open-meteo.com/v1/forecast?latitude=35.87&longitude=128.60' +
     '&current=temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m' +
     '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max' +
     '&timezone=Asia%2FSeoul&forecast_days=7';
-  const res = await fetch(url);
-  const data = await res.json();
+  // 3) 직접 호출 (6초 타임아웃 — IP 차단 시 현황판 로딩이 30초+ 걸려있지 않도록)
+  let data;
+  try {
+    const _wxCtrl = new AbortController();
+    const _wxTid = setTimeout(() => _wxCtrl.abort(), 6000);
+    const res = await fetch(url, { signal: _wxCtrl.signal });
+    clearTimeout(_wxTid);
+    data = await res.json();
+  } catch(err) {
+    // 실패: 오래된 공유 캐시라도 로컬로 승격 → 호출부 폴백이 "HH:MM 기준"으로 표시
+    if (_wxShared && _wxShared.html) {
+      try {
+        const c = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY) || 'null');
+        if (!c || _wxShared.t > c.t) localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ t: _wxShared.t, html: _wxShared.html }));
+      } catch(e){}
+    }
+    throw err;
+  }
   const c = data.current;
   const d = data.daily;
   const temp     = Math.round(c.temperature_2m);
@@ -7262,6 +7289,10 @@ async function fetchWeather() {
   </div>
   <div class="home-weather-weekly">${weeklyHtml}</div>`;
   try { localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ t: Date.now(), html })); } catch(e){}
+  // 성공분을 공유 캐시에 저장 (보기 모드 제외, 실패는 조용히 무시 — 규칙상 거부돼도 기능 저하 없음)
+  if (!isViewAs()) {
+    try { setDoc(doc(fbDb, 'appdata', 'weather'), { t: Date.now(), html }).catch(()=>{}); } catch(e){}
+  }
   return html;
 }
 
