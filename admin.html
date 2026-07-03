@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>관리자 페이지 — 영남고 교사 대시보드</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<style>
+  :root {
+    --bg: #F1F5F9;
+    --card: #FFFFFF;
+    --ink: #1E293B;
+    --ink-soft: #64748B;
+    --accent: #3B82F6;
+    --line: #E2E8F0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── 상단 바 ── */
+  .admin-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+  .admin-bar .title {
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .admin-bar select {
+    font: inherit;
+    font-size: 14px;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ink);
+    max-width: 260px;
+  }
+  .badge-readonly {
+    font-size: 11px;
+    font-weight: 700;
+    color: #B45309;
+    background: #FEF3C7;
+    border: 1px solid #FDE68A;
+    border-radius: 999px;
+    padding: 3px 10px;
+    white-space: nowrap;
+  }
+  .admin-bar .spacer { flex: 1; }
+  .admin-bar .who { font-size: 12px; color: var(--ink-soft); }
+  .admin-bar button {
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ink-soft);
+    cursor: pointer;
+  }
+  .admin-bar button:hover { background: var(--bg); }
+
+  /* ── iframe ── */
+  #viewFrame {
+    flex: 1;
+    width: 100%;
+    border: none;
+    background: var(--bg);
+    display: none;
+  }
+
+  /* ── 안내/게이트 화면 ── */
+  .gate {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 24px;
+    text-align: center;
+  }
+  .gate .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 32px 28px;
+    max-width: 360px;
+    width: 100%;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+  }
+  .gate h1 { font-size: 18px; margin-bottom: 8px; }
+  .gate p { font-size: 13px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 18px; }
+  .gate .login-btn {
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+  }
+  .gate .login-btn:hover { filter: brightness(0.95); }
+  .gate .err { color: #c0392b; font-size: 13px; margin-top: 12px; white-space: pre-line; }
+
+  .placeholder {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--ink-soft);
+    font-size: 14px;
+  }
+  .placeholder .big { font-size: 40px; }
+
+  @media (max-width: 600px) {
+    .admin-bar { padding: 8px 10px; gap: 8px; }
+    .admin-bar .who { display: none; }
+    .admin-bar select { max-width: 170px; font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- 상단 바 (로그인 후 표시) -->
+  <div class="admin-bar" id="adminBar" style="display:none;">
+    <div class="title">🛠️ 관리자</div>
+    <select id="teacherSelect">
+      <option value="">교사 선택…</option>
+    </select>
+    <span class="badge-readonly">읽기 전용</span>
+    <div class="spacer"></div>
+    <span class="who" id="whoAmI"></span>
+    <button id="openDashBtn" type="button">내 대시보드</button>
+    <button id="logoutBtn" type="button">로그아웃</button>
+  </div>
+
+  <!-- 로그인 게이트 -->
+  <div class="gate" id="gate">
+    <div class="card">
+      <h1>🛠️ 관리자 페이지</h1>
+      <p>다른 선생님의 화면을 읽기 전용으로 확인합니다.<br>관리자 계정으로만 접속할 수 있습니다.</p>
+      <button class="login-btn" id="loginBtn" type="button">구글 계정으로 로그인</button>
+      <div class="err" id="gateErr"></div>
+    </div>
+  </div>
+
+  <!-- 교사 미선택 안내 -->
+  <div class="placeholder" id="placeholder">
+    <div class="big">👆</div>
+    <div>위 드롭다운에서 선생님을 선택하세요</div>
+  </div>
+
+  <!-- 선택한 교사 시점의 대시보드 -->
+  <iframe id="viewFrame" title="교사 화면 미리보기"></iframe>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, indexedDBLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
+  authDomain: "ynhs-7b5ba.firebaseapp.com",
+  projectId: "ynhs-7b5ba",
+  storageBucket: "ynhs-7b5ba.firebasestorage.app",
+  messagingSenderId: "1031618043470",
+  appId: "1:1031618043470:web:edb5b8d1f98db029916d1f",
+  measurementId: "G-MTXQWT10P1"
+};
+const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
+
+const fbApp = initializeApp(firebaseConfig);
+const fbAuth = getAuth(fbApp);
+setPersistence(fbAuth, indexedDBLocalPersistence)
+  .catch(() => setPersistence(fbAuth, browserLocalPersistence))
+  .catch(() => {});
+const fbDb = getFirestore(fbApp);
+
+const gate = document.getElementById('gate');
+const gateErr = document.getElementById('gateErr');
+const adminBar = document.getElementById('adminBar');
+const placeholder = document.getElementById('placeholder');
+const viewFrame = document.getElementById('viewFrame');
+const teacherSelect = document.getElementById('teacherSelect');
+const whoAmI = document.getElementById('whoAmI');
+
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  gateErr.textContent = '';
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ hd: 'yeungnam.hs.kr', prompt: 'select_account' });
+  try { await signInWithPopup(fbAuth, provider); }
+  catch(e) { gateErr.textContent = '로그인 실패: ' + e.message; }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => signOut(fbAuth));
+document.getElementById('openDashBtn').addEventListener('click', () => { location.href = 'index.html'; });
+
+async function loadTeachers(){
+  const snap = await getDoc(doc(fbDb, 'appdata', 'main'));
+  if(!snap.exists()) throw new Error('appdata/main 문서를 찾을 수 없습니다.');
+  const teachers = Array.isArray(snap.data().teachers) ? snap.data().teachers : [];
+  // 이름순 정렬, 담임 학급 함께 표시. 이메일 없는(로그인 이력 없는) 교사는 선택 불가.
+  const sorted = [...teachers].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ko'));
+  for(const t of sorted){
+    const opt = document.createElement('option');
+    if(t.email){
+      opt.value = t.email;
+      opt.textContent = t.name + (t.homeroom ? ` (담임 ${t.homeroom})` : '');
+    } else {
+      opt.value = '';
+      opt.disabled = true;
+      opt.textContent = `${t.name} — 로그인 이력 없음`;
+    }
+    teacherSelect.appendChild(opt);
+  }
+}
+
+teacherSelect.addEventListener('change', () => {
+  const email = teacherSelect.value;
+  if(!email){
+    viewFrame.style.display = 'none';
+    viewFrame.src = 'about:blank';
+    placeholder.style.display = 'flex';
+    return;
+  }
+  placeholder.style.display = 'none';
+  viewFrame.style.display = 'block';
+  viewFrame.src = 'index.html?viewAs=' + encodeURIComponent(email);
+});
+
+onAuthStateChanged(fbAuth, async (user) => {
+  if(!user){
+    gate.style.display = 'flex';
+    adminBar.style.display = 'none';
+    placeholder.style.display = 'none';
+    viewFrame.style.display = 'none';
+    viewFrame.src = 'about:blank';
+    return;
+  }
+  if(user.email !== ADMIN_EMAIL){
+    gateErr.textContent = '관리자 계정이 아닙니다.\n현재: ' + (user.email || '알 수 없음');
+    await signOut(fbAuth);
+    return;
+  }
+  try {
+    if(teacherSelect.options.length <= 1) await loadTeachers();
+    gate.style.display = 'none';
+    adminBar.style.display = 'flex';
+    placeholder.style.display = 'flex';
+    whoAmI.textContent = user.email;
+  } catch(e) {
+    gateErr.textContent = '교사 목록 로딩 실패: ' + e.message;
+    gate.style.display = 'flex';
+  }
+});
+</script>
+</body>
+</html>

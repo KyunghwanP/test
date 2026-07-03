@@ -2869,7 +2869,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.64</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.65</div>
   </div>
 </div>
 
@@ -2981,7 +2981,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.64</div>
+    <div class="nav-version">ver4.65</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3891,7 +3891,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, indexedDBLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, addDoc, getDocs, deleteDoc, collection, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc as _fsSetDoc, addDoc as _fsAddDoc, getDocs, deleteDoc as _fsDeleteDoc, collection, onSnapshot, runTransaction as _fsRunTransaction } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
@@ -3915,6 +3915,46 @@ setPersistence(fbAuth, indexedDBLocalPersistence)
   .catch(e => console.log('persistence 설정 실패:', e.message));
 const fbDb = getFirestore(fbApp);
 const TEACHERS = [];
+
+// ── 관리자 '다른 교사로 보기' (admin.html → index.html?viewAs=이메일, 읽기 전용) ──
+const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
+const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
+const isViewAs = () => !!VIEW_AS_EMAIL && fbAuth.currentUser?.email === ADMIN_EMAIL;
+const stripTeacherSuffix = s => (s || '').trim().replace(/\s*(선생님|교사|쌤)/, '');
+
+// 유효 사용자: 보기 모드면 선택한 교사의 TEACHERS 레코드, 아니면 로그인 사용자의 레코드
+function effTeacher(){
+  if(isViewAs()) return TEACHERS.find(t => t.email === VIEW_AS_EMAIL) || null;
+  const u = fbAuth.currentUser;
+  if(!u) return null;
+  return TEACHERS.find(t => t.email && t.email === u.email)
+      || TEACHERS.find(t => t.name === stripTeacherSuffix(u.displayName));
+}
+function effUid(){ return isViewAs() ? (effTeacher()?.uid || null) : (fbAuth.currentUser?.uid || null); }
+
+// 보기 모드에서는 모든 Firestore 쓰기를 단일 지점에서 차단 (읽기 전용 보장)
+let _viewAsToastTimer = null;
+function _viewAsBlock(){
+  let el = document.getElementById('viewAsToast');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'viewAsToast';
+    el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1E293B;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;z-index:99999;box-shadow:0 4px 16px rgba(0,0,0,.25);';
+    el.textContent = '읽기 전용 보기 — 변경사항은 저장되지 않습니다';
+    document.body.appendChild(el);
+  }
+  el.style.display = '';
+  clearTimeout(_viewAsToastTimer);
+  _viewAsToastTimer = setTimeout(() => { el.style.display = 'none'; }, 2200);
+  return Promise.reject(new Error('읽기 전용 보기 모드'));
+}
+const setDoc = (...a) => isViewAs() ? _viewAsBlock() : _fsSetDoc(...a);
+const addDoc = (...a) => isViewAs() ? _viewAsBlock() : _fsAddDoc(...a);
+const deleteDoc = (...a) => isViewAs() ? _viewAsBlock() : _fsDeleteDoc(...a);
+const runTransaction = (...a) => isViewAs() ? _viewAsBlock() : _fsRunTransaction(...a);
+window.addEventListener('unhandledrejection', e => {
+  if(e.reason && e.reason.message === '읽기 전용 보기 모드') e.preventDefault();
+});
 
 // ── 알림 (Neutralino 데스크톱 / 브라우저 공통) ──
 const IS_NEUTRALINO = (typeof Neutralino !== 'undefined');
@@ -3955,7 +3995,7 @@ let consultNotifySeen = null;   // 이미 본 예약 slotId 집합 (null=첫 로
 function startConsultNotifyWatch(user){
   // 담임 학급 결정 (관리자 테스트는 1-1)
   let classKey = getMyHomeroom ? getMyHomeroom() : null;
-  if(!classKey && user.email === 'pkh910518@yeungnam.hs.kr') classKey = '1-1';
+  if(!classKey && !isViewAs() && user.email === ADMIN_EMAIL) classKey = '1-1';
   if(!classKey) return;
 
   if(consultNotifyUnsub) consultNotifyUnsub();
@@ -5168,8 +5208,8 @@ function initAppUI(){
 // 학부모상담 탭은 담임(담당 학급이 있는) 교사에게 노출
 function applyConsultTabVisibility(){
   const homeroom = getMyHomeroom();
-  // 담임이면 표시. (관리자 박경환은 담임반 없어도 테스트용 1-1로 표시)
-  const isAdmin = fbAuth.currentUser?.email === 'pkh910518@yeungnam.hs.kr';
+  // 담임이면 표시. (관리자 박경환은 담임반 없어도 테스트용 1-1로 표시. 보기 모드는 대상 교사 기준)
+  const isAdmin = !isViewAs() && fbAuth.currentUser?.email === ADMIN_EMAIL;
   const show = !!homeroom || isAdmin;
   document.querySelectorAll('[data-page="consult"]').forEach(el => {
     el.style.display = show ? '' : 'none';
@@ -5177,12 +5217,9 @@ function applyConsultTabVisibility(){
 }
 
 function autoLoadMyTimetable(){
-  const user = fbAuth.currentUser;
-  if(!user || !TEACHERS.length) return;
-  // 구글 계정 표시 이름에서 이름 추출 (예: "김경규" 또는 "김경규 선생님")
-  const displayName = (user.displayName || '').trim().replace(/\s*(선생님|교사|쌤)/, '');
-  if(!displayName) return;
-  const teacher = TEACHERS.find(t => t.name === displayName);
+  if(!fbAuth.currentUser || !TEACHERS.length) return;
+  // 유효 사용자(보기 모드면 선택한 교사) 기준으로 시간표 자동 로드
+  const teacher = effTeacher();
   if(teacher) {
     mode = 'teacher';
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.mode==='teacher'));
@@ -5387,14 +5424,24 @@ onAuthStateChanged(fbAuth, async (user) => {
     initAppUI();
     authGate.classList.remove('open');
     logoutBtn.style.display = '';
-    window._myUid = user.uid;
+    window._myUid = effUid() || user.uid;
     appInitialized = true;
-    // 관리자만 AI 요약 갱신 버튼 표시
-    if (user.email === 'pkh910518@yeungnam.hs.kr') {
+    // 관리자만 AI 요약 갱신 버튼 표시 (보기 모드 제외 — 대상 교사 화면 그대로)
+    if (!isViewAs() && user.email === ADMIN_EMAIL) {
       const adminBtn  = document.getElementById('homeAISummaryAdminBtn');
       const adminBtnD = document.getElementById('homeAISummaryAdminBtnD');
       if (adminBtn)  adminBtn.style.display  = 'block';
       if (adminBtnD) adminBtnD.style.display = 'block';
+      // 사이드바에 관리자 페이지 링크 (iframe 내부가 아닐 때만)
+      if (window.self === window.top && !document.getElementById('adminPageNavLink')) {
+        const link = document.createElement('div');
+        link.id = 'adminPageNavLink';
+        link.className = 'main-nav-item';
+        link.innerHTML = '<span class="main-nav-icon">🛠️</span>관리자 페이지';
+        link.addEventListener('click', () => { location.href = 'admin.html'; });
+        const nv = document.querySelector('.nav-version');
+        if (nv && nv.parentNode) nv.parentNode.insertBefore(link, nv);
+      }
     }
     // 로그인한 선생님 이메일 자동 수집
     collectTeacherEmail(user);
@@ -5403,10 +5450,12 @@ onAuthStateChanged(fbAuth, async (user) => {
     // 업무 일정 로딩 (전체)
     loadMytasks();
     loadGroups();
-    // 알림 초기화 + 상담/업무 새 항목 감시 시작
-    initNotify();
-    startConsultNotifyWatch(user);
-    startTaskNotifyWatch(user);
+    // 알림 초기화 + 상담/업무 새 항목 감시 시작 (보기 모드에서는 알림 감시 안 함)
+    if(!isViewAs()){
+      initNotify();
+      startConsultNotifyWatch(user);
+      startTaskNotifyWatch(user);
+    }
   }catch(e){
     // 타임아웃이나 네트워크 오류 시에도 앱은 일단 진행
     console.warn('Firestore 로딩 오류:', e.message);
@@ -5414,7 +5463,7 @@ onAuthStateChanged(fbAuth, async (user) => {
       initAppUI();
       authGate.classList.remove('open');
       logoutBtn.style.display = '';
-      window._myUid = user.uid;
+      window._myUid = effUid() || user.uid;
       appInitialized = true;
       setAuthStatus('일부 데이터 로딩 실패 (새로고침 권장)', true);
       setTimeout(() => setAuthStatus(''), 4000);
@@ -6764,9 +6813,9 @@ async function loadHomeConsult(slotsOverride){
   const listEl  = document.getElementById('homeConsultList');
   if(!section || !listEl) return;
 
-  // 담임 학급 (관리자 테스트는 1-1 폴백)
+  // 담임 학급 (관리자 테스트는 1-1 폴백. 보기 모드는 대상 교사 기준)
   let classKey = getMyHomeroom();
-  if(!classKey && fbAuth.currentUser?.email === 'pkh910518@yeungnam.hs.kr') classKey = '1-1';
+  if(!classKey && !isViewAs() && fbAuth.currentUser?.email === ADMIN_EMAIL) classKey = '1-1';
   if(!classKey){ section.style.display = 'none'; return; }
 
   let slots = [];
@@ -7515,10 +7564,8 @@ function navigateTo(page) {
   if(page !== 'consult') stopConsultWatch();
   if(page === 'home') { if(!homeInitialized) initHomePage(); else { renderHomeTaskSection(); loadHomeConsult(); } }
   if(page === 'timetable') {
-    // 본인 시간표 자동 로드 (구형 핸들러에서 이관)
-    const _user = fbAuth.currentUser;
-    const _name = (_user?.displayName||'').trim().replace(/\s*(선생님|교사|쌤)/,'');
-    const _teacher = TEACHERS.find(t => t.name === _name);
+    // 본인(보기 모드면 선택한 교사) 시간표 자동 로드
+    const _teacher = effTeacher();
     if(_teacher) select(_teacher);
   }
   if(page === 'weekly' && !weeklyInitialized) initWeeklyPage();
@@ -9254,7 +9301,7 @@ let _groups = { default: [], custom: [] };
 let _groupEditorId = null;
 let _groupEditorMembers = [];
 let _groupEditorScope = 'custom';
-const _IS_ADMIN = () => fbAuth.currentUser?.email === 'pkh910518@yeungnam.hs.kr';
+const _IS_ADMIN = () => !isViewAs() && fbAuth.currentUser?.email === ADMIN_EMAIL;
 
 async function loadGroups() {
   const user = fbAuth.currentUser;
@@ -9277,8 +9324,13 @@ async function loadGroups() {
     _groups.default = taskGroups || [];
   } catch(e) { _groups.default = []; }
   try {
-    const snap = await getDocs(collection(fbDb, 'tasks', user.uid, 'groups'));
-    _groups.custom = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const _gUid = effUid();
+    if (_gUid) {
+      const snap = await getDocs(collection(fbDb, 'tasks', _gUid, 'groups'));
+      _groups.custom = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } else {
+      _groups.custom = [];
+    }
   } catch(e) { _groups.custom = []; }
 }
 
@@ -9474,12 +9526,9 @@ function escConsult(v){
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-// 내 담임 학급 알아내기 (teachers의 homeroom + 로그인 이메일 매칭)
+// 내 담임 학급 알아내기 (유효 사용자 — 보기 모드면 선택한 교사)
 function getMyHomeroom(){
-  const user = fbAuth.currentUser;
-  if(!user) return null;
-  const me = TEACHERS.find(t => t.email && t.email === user.email)
-          || TEACHERS.find(t => t.name === user.displayName);
+  const me = effTeacher();
   return me && me.homeroom ? me.homeroom : null;
 }
 
@@ -9492,8 +9541,8 @@ function initConsultPage(){
   const main  = document.getElementById('consultMain');
 
   consultClassKey = getMyHomeroom();
-  // 관리자(박경환)는 담임반이 없으면 테스트용 1-1 학급으로 진행
-  if(!consultClassKey && fbAuth.currentUser?.email === 'pkh910518@yeungnam.hs.kr'){
+  // 관리자(박경환)는 담임반이 없으면 테스트용 1-1 학급으로 진행 (보기 모드는 대상 교사 기준)
+  if(!consultClassKey && !isViewAs() && fbAuth.currentUser?.email === ADMIN_EMAIL){
     consultClassKey = '1-1';
   }
 
@@ -10126,7 +10175,10 @@ async function loadMytasks() {
   mytaskLoading = true;
   const user = fbAuth.currentUser;
   if (!user) { mytaskLoading = false; return; }
-  const myName = user.displayName || '';
+  // 유효 사용자(보기 모드면 선택한 교사) 기준
+  const effMe = effTeacher();
+  const myUid = effUid();
+  if (!myUid) { mytaskLoading = false; mytaskTasks = []; renderHomeTaskSection(); return; }
 
   // 기존 리스너 해제
   if (mytaskUnsubscribe) { mytaskUnsubscribe(); mytaskUnsubscribe = null; }
@@ -10134,11 +10186,11 @@ async function loadMytasks() {
   mytaskSharedUnsubscribes = [];
 
   mytaskUnsubscribe = onSnapshot(
-    collection(fbDb, 'tasks', user.uid, 'items'),
+    collection(fbDb, 'tasks', myUid, 'items'),
     snap => {
-      const myTasks = snap.docs.map(d => ({ id: d.id, ownerUid: user.uid, ...d.data() }));
-      // 공유받은 일정(ownerUid !== user.uid)은 유지, 내 일정만 교체
-      mytaskTasks = [...myTasks, ...mytaskTasks.filter(t => t.ownerUid !== user.uid)];
+      const myTasks = snap.docs.map(d => ({ id: d.id, ownerUid: myUid, ...d.data() }));
+      // 공유받은 일정(ownerUid !== myUid)은 유지, 내 일정만 교체
+      mytaskTasks = [...myTasks, ...mytaskTasks.filter(t => t.ownerUid !== myUid)];
       if (mytaskInitialized && document.getElementById('mytaskPage')?.classList.contains('active')) {
         const isMobile = window.innerWidth <= 1024;
         if (isMobile) { renderMytaskCalendar(); renderMytaskList(); }
@@ -10152,11 +10204,11 @@ async function loadMytasks() {
 
   // uid 있는 선생님들의 일정 중 나를 공유한 것 구독
   // 공유 저장값은 (email || name)이므로, 내 식별자도 email·displayName·TEACHERS등록이름 모두 포함
-  const myTeacher = TEACHERS.find(t => t.email && t.email === user.email)
-                 || TEACHERS.find(t => t.name === user.displayName);
-  const myIdentifiers = [user.email, user.displayName, myTeacher?.name, myTeacher?.email]
-    .filter(Boolean);
-  TEACHERS.filter(t => t.uid && t.uid !== user.uid).forEach(teacher => {
+  // (보기 모드에서는 선택한 교사의 식별자만 사용)
+  const myIdentifiers = isViewAs()
+    ? [effMe?.email, effMe?.name].filter(Boolean)
+    : [user.email, user.displayName, effMe?.name, effMe?.email].filter(Boolean);
+  TEACHERS.filter(t => t.uid && t.uid !== myUid).forEach(teacher => {
     const unsub = onSnapshot(
       collection(fbDb, 'tasks', teacher.uid, 'items'),
       snap => {
