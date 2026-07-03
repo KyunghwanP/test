@@ -977,10 +977,11 @@
   .pts-name-wrap{ position:relative; min-width:0; }
   .pts-suggestions{
     display:none;
-    position:absolute;top:100%;left:0;right:0;z-index:999;
+    position:absolute;top:100%;left:0;z-index:999;
+    min-width:100%;width:max-content;max-width:min(320px, 80vw);
     background:var(--paper);border:1.5px solid var(--mon);
     border-radius:8px;box-shadow:0 8px 24px -4px rgba(0,0,0,0.2);
-    max-height:200px;overflow-y:auto;
+    max-height:200px;overflow-y:auto;overflow-x:hidden;
   }
   .pts-suggestions.show{ display:block; }
   .pts-suggestion-item{
@@ -996,7 +997,7 @@
     background:var(--mon);color:#fff;
     padding:2px 6px;border-radius:4px;white-space:nowrap;flex-shrink:0;
   }
-  .pts-suggestion-name{ font-weight:700; }
+  .pts-suggestion-name{ font-weight:700;white-space:nowrap; }
 
   /* 상벌점 조회·입력/조회 탭 */
   .pts-mode-tabs{
@@ -2868,7 +2869,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.60</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.61</div>
   </div>
 </div>
 
@@ -2980,7 +2981,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.60</div>
+    <div class="nav-version">ver4.61</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
