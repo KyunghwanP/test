@@ -2869,7 +2869,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.68</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.67</div>
   </div>
 </div>
 
@@ -2981,7 +2981,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.68</div>
+    <div class="nav-version">ver4.67</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7244,25 +7244,14 @@ async function fetchWeather() {
     data = await res.json();
   } catch(err) {
     // 실패: 오래된 공유 캐시라도 로컬로 승격 → 호출부 폴백이 "HH:MM 기준"으로 표시
-    if (_wxShared && _wxSharedHtml) {
+    if (_wxShared && _wxShared.html) {
       try {
         const c = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY) || 'null');
-        if (!c || _wxShared.t > c.t) localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ t: _wxShared.t, html: _wxSharedHtml }));
+        if (!c || _wxShared.t > c.t) localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ t: _wxShared.t, html: _wxShared.html }));
       } catch(e){}
     }
     throw err;
   }
-  const html = buildWeatherHtml(data);
-  try { localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ t: Date.now(), html })); } catch(e){}
-  // 성공분을 공유 캐시에 저장 (보기 모드 제외, 실패는 조용히 무시 — 규칙상 거부돼도 기능 저하 없음)
-  if (!isViewAs()) {
-    try { setDoc(doc(fbDb, 'appdata', 'weather'), { t: Date.now(), data }).catch(()=>{}); } catch(e){}
-  }
-  return html;
-}
-
-// 날씨 HTML 생성 — 직접 호출 결과와 Actions 공유 캐시(appdata/weather의 data) 공용
-function buildWeatherHtml(data) {
   const c = data.current;
   const d = data.daily;
   const temp     = Math.round(c.temperature_2m);
@@ -7302,6 +7291,11 @@ function buildWeatherHtml(data) {
     <span class="home-weather-chip">📍 대구</span>
   </div>
   <div class="home-weather-weekly">${weeklyHtml}</div>`;
+  try { localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ t: Date.now(), html })); } catch(e){}
+  // 성공분을 공유 캐시에 저장 (보기 모드 제외, 실패는 조용히 무시 — 규칙상 거부돼도 기능 저하 없음)
+  if (!isViewAs()) {
+    try { setDoc(doc(fbDb, 'appdata', 'weather'), { t: Date.now(), html }).catch(()=>{}); } catch(e){}
+  }
   return html;
 }
 
