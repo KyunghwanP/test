@@ -2869,7 +2869,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.68</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.69</div>
   </div>
 </div>
 
@@ -2981,7 +2981,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.68</div>
+    <div class="nav-version">ver4.69</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5432,16 +5432,7 @@ onAuthStateChanged(fbAuth, async (user) => {
       const adminBtnD = document.getElementById('homeAISummaryAdminBtnD');
       if (adminBtn)  adminBtn.style.display  = 'block';
       if (adminBtnD) adminBtnD.style.display = 'block';
-      // 사이드바에 관리자 페이지 링크 (iframe 내부가 아닐 때만)
-      if (window.self === window.top && !document.getElementById('adminPageNavLink')) {
-        const link = document.createElement('div');
-        link.id = 'adminPageNavLink';
-        link.className = 'main-nav-item';
-        link.innerHTML = '<span class="main-nav-icon">🛠️</span>관리자 페이지';
-        link.addEventListener('click', () => { location.href = 'admin.html'; });
-        const nv = document.querySelector('.nav-version');
-        if (nv && nv.parentNode) nv.parentNode.insertBefore(link, nv);
-      }
+      // 관리자 페이지(admin.html)는 사이드바에 노출하지 않음 — 주소 직접 입력으로만 접근
     }
     // 로그인한 선생님 이메일 자동 수집
     collectTeacherEmail(user);
@@ -7209,7 +7200,7 @@ setTimeout(updateTabBarScrollable, 500);
 
 const WEATHER_CACHE_KEY = 'ynhs-weather-cache';
 const WEATHER_CACHE_TTL = 30 * 60 * 1000;   // 30분 — 학교 공인IP 요청량 절감 (rate limit 예방)
-const WEATHER_SHARED_TTL = 45 * 60 * 1000;  // 공유 캐시(appdata/weather)는 Actions cron 지연 감안 45분
+const WEATHER_SHARED_TTL = 75 * 60 * 1000;  // 공유 캐시(appdata/weather) — Actions cron이 실측 ~65분 간격이라 여유있게 75분
 
 async function fetchWeather() {
   // 1) 유효한 로컬 캐시가 있으면 API 호출 생략
