@@ -832,11 +832,9 @@
     font-size:16px;padding:12px 12px;cursor:pointer;
     -webkit-appearance: none; appearance: none;
   }
-  .mytask-time-select{display:flex;align-items:center;gap:4px;flex-shrink:0;}
-  .mytask-time-select select{
-    width:auto;padding:12px 6px;font-size:14px;cursor:pointer;
+  .mytask-modal-field select.mytask-time-single{
+    width:104px;flex-shrink:0;padding:12px 6px;font-size:14px;cursor:pointer;
   }
-  .mytask-time-colon{font-weight:700;color:var(--ink-soft);}
   /* 달력 드롭다운 크게 (Chrome/Edge) */
   input[type=date]::-webkit-calendar-picker-indicator{
     width:22px;height:22px;cursor:pointer;opacity:0.7;
@@ -2885,7 +2883,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.73</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.74</div>
   </div>
 </div>
 
@@ -2997,7 +2995,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.73</div>
+    <div class="nav-version">ver4.74</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3707,11 +3705,7 @@
                   onkeydown="handleDateInputKey(event,this,'mytaskEndDate')">
                 <button type="button" class="dp-btn" onclick="openDatePicker('mytaskStartDate',this)">📅</button>
               </div>
-              <div class="mytask-time-select">
-                <select id="mytaskStartHour"></select>
-                <span class="mytask-time-colon">:</span>
-                <select id="mytaskStartMin"></select>
-              </div>
+              <select id="mytaskStartTime" class="mytask-time-single"></select>
             </div>
           </div>
           <div class="mytask-modal-field">
@@ -3723,11 +3717,7 @@
                   onkeydown="handleDateInputKey(event,this,null)">
                 <button type="button" class="dp-btn" onclick="openDatePicker('mytaskEndDate',this)">📅</button>
               </div>
-              <div class="mytask-time-select">
-                <select id="mytaskEndHour"></select>
-                <span class="mytask-time-colon">:</span>
-                <select id="mytaskEndMin"></select>
-              </div>
+              <select id="mytaskEndTime" class="mytask-time-single"></select>
             </div>
           </div>
         </div>
@@ -10962,43 +10952,37 @@ async function leaveMytaskShare() {
 }
 window.leaveMytaskShare = leaveMytaskShare;
 
-// 시작/마감 시간 드롭다운 (시 00~23, 분 10분 단위)
-const MYTASK_TIME_MINUTES = ['00','10','20','30','40','50'];
+// 시작/마감 시간 드롭다운 — 10분 단위로 합쳐진 단일 목록(구글 캘린더 방식)
+const MYTASK_TIME_STEP_MIN = 10;
 function initMytaskTimeSelects() {
-  const hourOpts = ['<option value="">--</option>'];
-  for (let h = 0; h < 24; h++) hourOpts.push(`<option value="${String(h).padStart(2,'0')}">${String(h).padStart(2,'0')}</option>`);
-  const minOpts = MYTASK_TIME_MINUTES.map(m => `<option value="${m}">${m}</option>`).join('');
-  ['mytaskStartHour','mytaskEndHour'].forEach(id => {
+  const opts = ['<option value="">종일(시간 없음)</option>'];
+  for (let mins = 0; mins < 24*60; mins += MYTASK_TIME_STEP_MIN) {
+    const hh = String(Math.floor(mins/60)).padStart(2,'0');
+    const mm = String(mins%60).padStart(2,'0');
+    opts.push(`<option value="${hh}:${mm}">${hh}:${mm}</option>`);
+  }
+  const optsHtml = opts.join('');
+  ['mytaskStartTime','mytaskEndTime'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.innerHTML = hourOpts.join('');
-  });
-  ['mytaskStartMin','mytaskEndMin'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = minOpts;
+    if (el) el.innerHTML = optsHtml;
   });
 }
 initMytaskTimeSelects();
 
-// timeStr("HH:MM" 또는 '')을 시/분 드롭다운에 반영. 10분 단위가 아닌 값도 그대로 보존.
-function setMytaskTimeSelect(prefix, timeStr) {
-  const hourEl = document.getElementById(prefix + 'Hour');
-  const minEl  = document.getElementById(prefix + 'Min');
-  if (!hourEl || !minEl) return;
-  minEl.querySelectorAll('option[data-extra]').forEach(o => o.remove());
-  if (!timeStr) { hourEl.value = ''; minEl.value = '00'; return; }
-  const [h, m] = timeStr.split(':');
-  hourEl.value = h;
-  if (!MYTASK_TIME_MINUTES.includes(m)) {
+// timeStr("HH:MM" 또는 '')을 드롭다운에 반영. 10분 단위가 아닌 기존 값도 그대로 보존.
+function setMytaskTimeSelect(id, timeStr) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.querySelectorAll('option[data-extra]').forEach(o => o.remove());
+  if (timeStr && !el.querySelector(`option[value="${timeStr}"]`)) {
     const opt = document.createElement('option');
-    opt.value = m; opt.textContent = m; opt.dataset.extra = '1';
-    minEl.appendChild(opt);
+    opt.value = timeStr; opt.textContent = timeStr; opt.dataset.extra = '1';
+    el.appendChild(opt);
   }
-  minEl.value = m;
+  el.value = timeStr || '';
 }
-function getMytaskTimeValue(prefix) {
-  const hour = document.getElementById(prefix + 'Hour').value;
-  const min  = document.getElementById(prefix + 'Min').value || '00';
-  return hour ? `${hour}:${min}` : '';
+function getMytaskTimeValue(id) {
+  return document.getElementById(id).value;
 }
 
 async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
@@ -11039,8 +11023,8 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
       document.getElementById('mytaskMemo').value      = t.memo  || '';
       document.getElementById('mytaskStartDate').value = t.startDate || '';
       document.getElementById('mytaskEndDate').value   = t.endDate   || '';
-      setMytaskTimeSelect('mytaskStart', t.startTime || '');
-      setMytaskTimeSelect('mytaskEnd', t.endTime || '');
+      setMytaskTimeSelect('mytaskStartTime', t.startTime || '');
+      setMytaskTimeSelect('mytaskEndTime', t.endTime || '');
       mytaskCurrentStatus  = t.status || 'todo';
       mytaskCurrentShared  = [...(t.sharedWith || [])];
       // 반복 설정 복원
@@ -11056,8 +11040,8 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
     document.getElementById('mytaskMemo').value      = '';
     document.getElementById('mytaskStartDate').value = dateStr || todayDefault;
     document.getElementById('mytaskEndDate').value   = dateStr || todayDefault;
-    setMytaskTimeSelect('mytaskStart', '');
-    setMytaskTimeSelect('mytaskEnd', '');
+    setMytaskTimeSelect('mytaskStartTime', '');
+    setMytaskTimeSelect('mytaskEndTime', '');
   }
   setMytaskStatusBtn(mytaskCurrentStatus);
   modal.classList.add('show');
@@ -11144,8 +11128,8 @@ async function saveMytask() {
   const memo      = document.getElementById('mytaskMemo').value.trim();
   const startDate = document.getElementById('mytaskStartDate').value;
   const endDate   = document.getElementById('mytaskEndDate').value;
-  const startTime = getMytaskTimeValue('mytaskStart');
-  const endTime   = getMytaskTimeValue('mytaskEnd');
+  const startTime = getMytaskTimeValue('mytaskStartTime');
+  const endTime   = getMytaskTimeValue('mytaskEndTime');
   if (!title)     { alert('제목을 입력하세요'); return; }
   if (!startDate) { alert('시작일을 입력하세요'); return; }
   if (!endDate)   { alert('마감일을 입력하세요'); return; }
