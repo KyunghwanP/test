@@ -832,6 +832,9 @@
     font-size:16px;padding:12px 12px;cursor:pointer;
     -webkit-appearance: none; appearance: none;
   }
+  .mytask-modal-field input[type=time]{
+    font-size:14px;padding:12px 8px;cursor:pointer;
+  }
   /* 달력 드롭다운 크게 (Chrome/Edge) */
   input[type=date]::-webkit-calendar-picker-indicator{
     width:22px;height:22px;cursor:pointer;opacity:0.7;
@@ -1817,6 +1820,7 @@
     .search-box input{padding:7px 10px;font-size:13px;}
     .class-select-box{min-width:0;flex:1;}
     .class-select-box select{padding:7px 8px;font-size:13px;}
+    .mytask-modal-dates{grid-template-columns:1fr;}
   }
 
   @media (max-height: 960px){
@@ -3683,21 +3687,27 @@
         <div class="mytask-modal-dates">
           <div class="mytask-modal-field">
             <label>시작일</label>
-            <div class="dp-wrap">
-              <input type="date" id="mytaskStartDate" class="dp-input" autocomplete="off" min="2020-01-01" max="2099-12-31"
-                oninput="autoFormatDateInput(this)"
-                onchange="onStartDateChange(this)"
-                onkeydown="handleDateInputKey(event,this,'mytaskEndDate')">
-              <button type="button" class="dp-btn" onclick="openDatePicker('mytaskStartDate',this)">📅</button>
+            <div style="display:flex;gap:6px;">
+              <div class="dp-wrap" style="flex:1;">
+                <input type="date" id="mytaskStartDate" class="dp-input" autocomplete="off" min="2020-01-01" max="2099-12-31"
+                  oninput="autoFormatDateInput(this)"
+                  onchange="onStartDateChange(this)"
+                  onkeydown="handleDateInputKey(event,this,'mytaskEndDate')">
+                <button type="button" class="dp-btn" onclick="openDatePicker('mytaskStartDate',this)">📅</button>
+              </div>
+              <input type="time" id="mytaskStartTime" autocomplete="off" style="width:132px;flex-shrink:0;">
             </div>
           </div>
           <div class="mytask-modal-field">
             <label>마감일</label>
-            <div class="dp-wrap">
-              <input type="date" id="mytaskEndDate" class="dp-input" autocomplete="off" min="2020-01-01" max="2099-12-31"
-                oninput="autoFormatDateInput(this)"
-                onkeydown="handleDateInputKey(event,this,null)">
-              <button type="button" class="dp-btn" onclick="openDatePicker('mytaskEndDate',this)">📅</button>
+            <div style="display:flex;gap:6px;">
+              <div class="dp-wrap" style="flex:1;">
+                <input type="date" id="mytaskEndDate" class="dp-input" autocomplete="off" min="2020-01-01" max="2099-12-31"
+                  oninput="autoFormatDateInput(this)"
+                  onkeydown="handleDateInputKey(event,this,null)">
+                <button type="button" class="dp-btn" onclick="openDatePicker('mytaskEndDate',this)">📅</button>
+              </div>
+              <input type="time" id="mytaskEndTime" autocomplete="off" style="width:132px;flex-shrink:0;">
             </div>
           </div>
         </div>
@@ -9031,6 +9041,26 @@ window._toggleHomeShowDone = function() {
   renderHomeTaskSection();
 };
 
+// 일정 날짜(+시간) 표시 텍스트 조립
+function formatMytaskDateRange(t) {
+  const sameDay = t.startDate === t.endDate;
+  if (sameDay) {
+    if (!t.startTime && !t.endTime) return t.startDate;
+    if (t.startTime && t.endTime)   return `${t.startDate} ${t.startTime} ~ ${t.endTime}`;
+    return `${t.startDate} ${t.startTime || t.endTime}`;
+  }
+  const start = t.startTime ? `${t.startDate} ${t.startTime}` : t.startDate;
+  const end   = t.endTime   ? `${t.endDate} ${t.endTime}`     : t.endDate;
+  return `${start} ~ ${end}`;
+}
+window.formatMytaskDateRange = formatMytaskDateRange;
+
+// 캘린더 칩에 시작 시각 표시 (해당 날짜가 시작일일 때만)
+function mytaskChipLabel(t, dateStr) {
+  return (t.startTime && dateStr === t.startDate) ? `${t.startTime} ${t.title}` : t.title;
+}
+window.mytaskChipLabel = mytaskChipLabel;
+
 function _makeHomeTaskRow(t, todayStr, statusColor) {
   const isPast   = t.endDate < todayStr;
   const isShared = t.ownerUid !== (window._myUid||'');
@@ -9053,7 +9083,7 @@ function _makeHomeTaskRow(t, todayStr, statusColor) {
       </div>
       <div style="font-size:11px;color:var(--ink-soft);display:flex;align-items:center;gap:4px;margin-top:2px;">
         ${dday}
-        <span>${t.startDate}${t.startDate!==t.endDate?' ~ '+t.endDate:''}</span>
+        <span>${formatMytaskDateRange(t)}</span>
       </div>
     </div>
     <select onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();"
@@ -9213,7 +9243,7 @@ function buildPanelCalendar(tasks, cy, cm, panel) {
       ${allItems.map(t => t._type==='schedule'
         ? `<div class="pc-chip schedule" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</div>`
         : `<div class="pc-chip ${t.status}" draggable="true" title="${escapeHtml(t.title)}" ondragstart="calDragStart(event,'${t.id}','${t.ownerUid||''}')" ondragend="calDragEnd(event)"
-            onclick="event.stopPropagation();openMytaskModal('${t.id}','${t.ownerUid||''}')">${escapeHtml(t.title)}</div>`
+            onclick="event.stopPropagation();openMytaskModal('${t.id}','${t.ownerUid||''}')">${escapeHtml(mytaskChipLabel(t,dateStr))}</div>`
       ).join('')}
       </div>
     </div>`;
@@ -9247,7 +9277,7 @@ function bindDayPreview(calEl, tasks, panel) {
     const items = [
       ...schedItems.map(e => ({ text: e.content||e.title||'', style: 'background:#FEE2E2;color:#991B1B;' })),
       ...dayTasks.map(t => ({
-        text: t.title,
+        text: mytaskChipLabel(t, dateStr),
         style: t.status==='todo' ? 'background:#EEF2FF;color:#4F46E5;'
              : t.status==='doing' ? 'background:#FEF3C7;color:#D97706;'
              : 'background:#D1FAE5;color:#065F46;'
@@ -9309,7 +9339,7 @@ function buildPanelList(tasks) {
       <div class="mytask-item-status ${t.status}"></div>
       <div class="mytask-item-info">
         <div class="mytask-item-title">${escapeHtml(t.title)}${t.ownerName ? ` <span style="font-size:11px;color:var(--ink-soft);font-weight:400;">[${escapeHtml(t.ownerName)}]</span>` : ''}</div>
-        <div class="mytask-item-date">${t.startDate} ~ ${t.endDate}</div>
+        <div class="mytask-item-date">${formatMytaskDateRange(t)}</div>
       </div>
       <select class="mytask-status-select ${t.status}" onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();" onclick="event.stopPropagation();">
         <option value="todo" ${t.status==='todo'?'selected':''}>🔵 시작전</option>
@@ -10440,7 +10470,7 @@ function renderMytaskCalendar() {
             ondragstart="calDragStart(event,'${t.id}','${t.ownerUid||''}')"
             ondragend="calDragEnd(event)"
             onclick="event.stopPropagation();openMytaskModal('${t.id}','${t.ownerUid||''}')"
-            style="cursor:grab;">${escapeHtml(t.title)}</div>`
+            style="cursor:grab;">${escapeHtml(mytaskChipLabel(t,dateStr))}</div>`
       ).join('')}
       ${allItems.length > 2 ? `<div class="mytask-cal-more">+${allItems.length-2}개</div>` : ''}
     </div>`;
@@ -10632,7 +10662,7 @@ function renderMytaskList() {
         <div class="mytask-item-status ${t.status}"></div>
         <div class="mytask-item-info">
           <div class="mytask-item-title">${escapeHtml(t.title)}</div>
-          <div class="mytask-item-date">${t.startDate} ~ ${t.endDate}</div>
+          <div class="mytask-item-date">${formatMytaskDateRange(t)}</div>
         </div>
         <select class="mytask-status-select ${t.status}" onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();" onclick="event.stopPropagation();">
           <option value="todo" ${t.status==='todo'?'selected':''}>🔵 시작전</option>
@@ -10950,6 +10980,8 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
       document.getElementById('mytaskMemo').value      = t.memo  || '';
       document.getElementById('mytaskStartDate').value = t.startDate || '';
       document.getElementById('mytaskEndDate').value   = t.endDate   || '';
+      document.getElementById('mytaskStartTime').value = t.startTime || '';
+      document.getElementById('mytaskEndTime').value   = t.endTime   || '';
       mytaskCurrentStatus  = t.status || 'todo';
       mytaskCurrentShared  = [...(t.sharedWith || [])];
       // 반복 설정 복원
@@ -10965,6 +10997,8 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
     document.getElementById('mytaskMemo').value      = '';
     document.getElementById('mytaskStartDate').value = dateStr || todayDefault;
     document.getElementById('mytaskEndDate').value   = dateStr || todayDefault;
+    document.getElementById('mytaskStartTime').value = '';
+    document.getElementById('mytaskEndTime').value   = '';
   }
   setMytaskStatusBtn(mytaskCurrentStatus);
   modal.classList.add('show');
@@ -11051,9 +11085,14 @@ async function saveMytask() {
   const memo      = document.getElementById('mytaskMemo').value.trim();
   const startDate = document.getElementById('mytaskStartDate').value;
   const endDate   = document.getElementById('mytaskEndDate').value;
+  const startTime = document.getElementById('mytaskStartTime').value;
+  const endTime   = document.getElementById('mytaskEndTime').value;
   if (!title)     { alert('제목을 입력하세요'); return; }
   if (!startDate) { alert('시작일을 입력하세요'); return; }
   if (!endDate)   { alert('마감일을 입력하세요'); return; }
+  if (startDate === endDate && startTime && endTime && endTime < startTime) {
+    alert('마감 시간이 시작 시간보다 빠릅니다'); return;
+  }
   const repeatUntil = document.getElementById('mytaskRepeatUntil').value;
   const repeat = _mytaskRepeat !== 'none'
     ? { type: _mytaskRepeat, until: repeatUntil || null }
@@ -11061,6 +11100,8 @@ async function saveMytask() {
   const existing = mytaskEditId ? (mytaskTasks.find(t => t.id === mytaskEditId) || {}) : {};
   const data = {
     title, memo, startDate, endDate,
+    startTime: startTime || null,
+    endTime: endTime || null,
     status: mytaskCurrentStatus,
     sharedWith: mytaskCurrentShared,
     repeat: repeat,
