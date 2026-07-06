@@ -103,6 +103,8 @@
   .slot-badge.face{background:#EFF6FF;color:#1E40AF;}
   .slot-badge.phone{background:#FEF3C7;color:#92400E;}
   .slot-check{font-size:20px;color:var(--mon);width:22px;text-align:center;}
+  .slot.booked{opacity:.55;cursor:default;pointer-events:none;}
+  .slot-badge.taken{background:#F1F5F9;color:var(--ink-soft);}
 
   .booking-card{
     background:#ECFDF5;border:1.5px solid var(--ok);border-radius:14px;
@@ -347,18 +349,27 @@ async function loadSlots(){
   Object.keys(byDate).sort().forEach(date => {
     html += `<div class="slot-date-group"><div class="slot-date-head">${esc(fmtDate(date))}</div>`;
     byDate[date].forEach(s => {
-      html += `
-        <div class="slot" data-id="${esc(s.id)}" role="button">
-          <div class="slot-time">${esc(s.time)}</div>
-          <div class="slot-meta">${esc(String(s.duration||20))}분 상담</div>
-          <div class="slot-check"></div>
-        </div>`;
+      if (s.booked) {
+        html += `
+          <div class="slot booked">
+            <div class="slot-time">${esc(s.time)}</div>
+            <div class="slot-meta">${esc(String(s.duration||20))}분 상담</div>
+            <span class="slot-badge taken">예약됨</span>
+          </div>`;
+      } else {
+        html += `
+          <div class="slot" data-id="${esc(s.id)}" role="button">
+            <div class="slot-time">${esc(s.time)}</div>
+            <div class="slot-meta">${esc(String(s.duration||20))}분 상담</div>
+            <div class="slot-check"></div>
+          </div>`;
+      }
     });
     html += `</div>`;
   });
   slotList.innerHTML = html;
 
-  slotList.querySelectorAll('.slot').forEach(el => {
+  slotList.querySelectorAll('.slot:not(.booked)').forEach(el => {
     el.addEventListener('click', () => {
       const id = el.dataset.id;
       const s  = openSlots.find(x => x.id === id);
