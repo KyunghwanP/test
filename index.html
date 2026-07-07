@@ -381,6 +381,13 @@
     font-family:'Pretendard','Noto Sans KR';font-weight:900;font-size:17px;color:var(--ink);
     display:flex;align-items:center;gap:6px;
   }
+  .points-sheet-link{
+    margin-left:auto;display:inline-flex;align-items:center;gap:4px;
+    font-size:13px;font-weight:700;color:var(--ink-soft);text-decoration:none;
+    padding:5px 12px;border:1px solid var(--rule);border-radius:8px;
+    transition:all .15s;white-space:nowrap;
+  }
+  .points-sheet-link:hover{color:var(--ink);border-color:var(--ink-soft);}
   .points-history-list{max-height:300px;overflow-y:auto;}
   .points-history-item{
     padding:12px 20px;border-bottom:1px solid var(--rule);
@@ -2883,7 +2890,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.74</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.75</div>
   </div>
 </div>
 
@@ -2995,7 +3002,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.74</div>
+    <div class="nav-version">ver4.75</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3359,7 +3366,9 @@
 
           <!-- 세션 내역 -->
           <div class="points-history" id="ptsHistoryBox">
-            <div class="points-history-title">📋 이번 세션 입력 내역</div>
+            <div class="points-history-title">📋 이번 세션 입력 내역
+              <a class="points-sheet-link" id="ptsSheetLink" href="#" target="_blank" rel="noopener" style="display:none">📊 시트에서 확인</a>
+            </div>
             <div class="points-history-list" id="ptsHistoryList">
               <div class="points-history-empty">아직 입력한 내역이 없습니다.</div>
             </div>
@@ -7697,6 +7706,12 @@ function navigateTo(page) {
 // 상벌점 조회·입력 기능 (ver2.42)
 // ══════════════════════════════════════════
 const POINTS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
+// 상벌점 구글 시트 링크 — 값이 있으면 세션 내역 위에 "시트에서 확인" 버튼 표시
+const POINTS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1fJpTxEWEJHZ6Xg1dWjBB0G8w9Rf_Nev30UoJ8bDbXZk/edit?gid=264713345#gid=264713345';
+{
+  const sheetLink = document.getElementById('ptsSheetLink');
+  if (POINTS_SHEET_URL && sheetLink) { sheetLink.href = POINTS_SHEET_URL; sheetLink.style.display = ''; }
+}
 let ptsType = null;
 const ptsSessionHistory = [];
 let ptsCustomMode = false;
@@ -8197,22 +8212,22 @@ function showPointsToast(msg, type = 'success') {
   });
 }
 
-function addToSessionHistory(entries, detail, date, score) {
+function addToSessionHistory(entries) {
   const list = document.getElementById('ptsHistoryList');
   if (!list) return;
   if (ptsSessionHistory.length === 0) list.innerHTML = '';
   entries.forEach(s => {
     ptsSessionHistory.unshift(s);
-    const cls = ptsType === '벌점' ? 'demerit' : 'merit';
+    const cls = s.type === '벌점' ? 'demerit' : 'merit';
     const item = document.createElement('div');
     item.className = 'points-history-item';
     item.innerHTML = `
       <span class="points-history-badge ${cls}">${s.type}</span>
       <div class="points-history-info">
         <span class="ph-name">${s.grade}학년 ${s.classNum}반 ${s.studentNum}번 ${escapeHtml(s.name)}</span>
-        <div class="ph-detail">${detail} · ${date}</div>
+        <div class="ph-detail">${escapeHtml(s.detail)} · ${s.date}</div>
       </div>
-      <span class="points-history-score ${cls}">${s.type==='상점'?'+':'-'}${s.score}점</span>
+      <span class="points-history-score ${cls}">${s.type==='상점'?'+':'-'}${Math.abs(s.score)}점</span>
     `;
     list.prepend(item);
   });
@@ -8298,7 +8313,7 @@ async function submitPoints() {
 
   if (successCount > 0) {
     showPointsToast(`✓ ${successCount}명 저장 완료!`, 'success');
-    addToSessionHistory(savedEntries, '(학생별 사유)', date);
+    addToSessionHistory(savedEntries);
     // 초기화
     ptsStudentRows = [{ grade: '', room: '', num:'', name:'' }];
     renderStudentRows();
