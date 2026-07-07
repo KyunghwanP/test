@@ -2890,7 +2890,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.77</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.78</div>
   </div>
 </div>
 
@@ -3008,7 +3008,7 @@
       <div class="main-nav-item" data-page="grades" style="display:none;">
         <span class="main-nav-icon">📊</span>성적조회 <span style="font-size:11px;opacity:.6;">(테스트)</span>
       </div>
-    <div class="nav-version">ver4.77</div>
+    <div class="nav-version">ver4.78</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3614,9 +3614,14 @@
       <div class="page-view" id="gradesPage">
         <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;">
           <span style="font-family:'Pretendard','Noto Sans KR';font-weight:900;font-size:16px;color:var(--ink);">📊 성적조회 <span style="font-size:12px;color:var(--ink-soft);font-weight:700;">(테스트)</span></span>
-          <a href="https://script.google.com/a/macros/yeungnam.hs.kr/s/AKfycbxvU0vHeskRCTAwQfrW8GR5NP7RPFk9jyC0JjYtvWA7OId8oDfBSLcsY4Xo1AT9-sEj/exec" target="_blank" rel="noopener" style="margin-left:auto;font-size:13px;font-weight:700;color:var(--ink-soft);text-decoration:none;padding:5px 12px;border:1px solid var(--rule);border-radius:8px;white-space:nowrap;">↗ 새 탭에서 열기</a>
+          <a href="https://script.google.com/a/macros/yeungnam.hs.kr/s/AKfycbxvU0vHeskRCTAwQfrW8GR5NP7RPFk9jyC0JjYtvWA7OId8oDfBSLcsY4Xo1AT9-sEj/exec" target="_blank" rel="noopener" onclick="return gradesExternalClick(event)" style="margin-left:auto;font-size:13px;font-weight:700;color:var(--ink-soft);text-decoration:none;padding:5px 12px;border:1px solid var(--rule);border-radius:8px;white-space:nowrap;">↗ 새 탭에서 열기</a>
         </div>
         <iframe id="gradesFrame" data-src="https://script.google.com/a/macros/yeungnam.hs.kr/s/AKfycbxvU0vHeskRCTAwQfrW8GR5NP7RPFk9jyC0JjYtvWA7OId8oDfBSLcsY4Xo1AT9-sEj/exec" title="성적조회" style="flex:1;width:100%;border:0;background:#fff;"></iframe>
+        <!-- 데스크톱 앱(Neutralino): 웹뷰에 구글 세션이 없어 iframe 표시 불가 → 기본 브라우저로 안내 -->
+        <div id="gradesNeuBox" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--ink-soft);font-size:14px;padding:24px;text-align:center;">
+          <div>데스크톱 앱에서는 이 페이지를 내장해서 표시할 수 없습니다.<br>기본 브라우저에서 열어주세요. (학교 구글 계정 로그인 필요)</div>
+          <button onclick="gradesExternalClick(event)" style="font-family:inherit;font-weight:800;font-size:14px;padding:10px 20px;border:1px solid var(--rule);border-radius:10px;background:#fff;color:var(--ink);cursor:pointer;">🌐 기본 브라우저에서 열기</button>
+        </div>
       </div>
 
       <!-- 업무자료 페이지 -->
@@ -7701,9 +7706,16 @@ function navigateTo(page) {
   if(page === 'consult') initConsultPage();
   if(page === 'docs') initDocsPage();
   if(page === 'grades') {
-    // 첫 진입 때만 iframe 로드 (다른 사용자/평소에는 GAS 웹앱 요청 안 나가게)
     const gf = document.getElementById('gradesFrame');
-    if(gf && !gf.src) gf.src = gf.dataset.src;
+    if (IS_NEUTRALINO) {
+      // 데스크톱 앱 웹뷰는 구글 세션이 없어 iframe 불가 → 브라우저 열기 안내 표시
+      if(gf) gf.style.display = 'none';
+      const nb = document.getElementById('gradesNeuBox');
+      if(nb) nb.style.display = 'flex';
+    } else if(gf && !gf.src) {
+      // 첫 진입 때만 iframe 로드 (다른 사용자/평소에는 GAS 웹앱 요청 안 나가게)
+      gf.src = gf.dataset.src;
+    }
   }
   if(page === 'mytask') {
     const mytaskPage = document.getElementById('mytaskPage');
@@ -7729,6 +7741,19 @@ function navigateTo(page) {
 // 상벌점 조회·입력 기능 (ver2.42)
 // ══════════════════════════════════════════
 const POINTS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
+// 성적조회 외부 열기 — Neutralino면 기본 브라우저로, 브라우저면 새 탭(<a> 기본 동작)
+function gradesExternalClick(e){
+  const url = document.getElementById('gradesFrame')?.dataset.src;
+  if (IS_NEUTRALINO && url) {
+    e.preventDefault();
+    Neutralino.os.open(url);
+    return false;
+  }
+  if (e.currentTarget?.tagName !== 'A' && url) window.open(url, '_blank');
+  return true;
+}
+window.gradesExternalClick = gradesExternalClick;
+
 // 상벌점 구글 시트 링크 — 값이 있으면 세션 내역 위에 "시트에서 확인" 버튼 표시
 const POINTS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1fJpTxEWEJHZ6Xg1dWjBB0G8w9Rf_Nev30UoJ8bDbXZk/edit?gid=264713345#gid=264713345';
 {
