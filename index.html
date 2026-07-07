@@ -2890,7 +2890,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.76</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.77</div>
   </div>
 </div>
 
@@ -2958,6 +2958,9 @@
     <div class="tab-item" data-page="meal">
       <span class="tab-item-icon">🍱</span>식단표
     </div>
+    <div class="tab-item" data-page="grades" style="display:none;">
+      <span class="tab-item-icon">📊</span>성적조회
+    </div>
   </div>
   </div>
 
@@ -3002,7 +3005,10 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.76</div>
+      <div class="main-nav-item" data-page="grades" style="display:none;">
+        <span class="main-nav-icon">📊</span>성적조회 <span style="font-size:11px;opacity:.6;">(테스트)</span>
+      </div>
+    <div class="nav-version">ver4.77</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3602,6 +3608,15 @@
           </div>
 
         </div>
+      </div>
+
+      <!-- 성적조회(테스트) 페이지 — 관리자 전용, GAS 웹앱 iframe 임베드 -->
+      <div class="page-view" id="gradesPage">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;">
+          <span style="font-family:'Pretendard','Noto Sans KR';font-weight:900;font-size:16px;color:var(--ink);">📊 성적조회 <span style="font-size:12px;color:var(--ink-soft);font-weight:700;">(테스트)</span></span>
+          <a href="https://script.google.com/a/macros/yeungnam.hs.kr/s/AKfycbxvU0vHeskRCTAwQfrW8GR5NP7RPFk9jyC0JjYtvWA7OId8oDfBSLcsY4Xo1AT9-sEj/exec" target="_blank" rel="noopener" style="margin-left:auto;font-size:13px;font-weight:700;color:var(--ink-soft);text-decoration:none;padding:5px 12px;border:1px solid var(--rule);border-radius:8px;white-space:nowrap;">↗ 새 탭에서 열기</a>
+        </div>
+        <iframe id="gradesFrame" data-src="https://script.google.com/a/macros/yeungnam.hs.kr/s/AKfycbxvU0vHeskRCTAwQfrW8GR5NP7RPFk9jyC0JjYtvWA7OId8oDfBSLcsY4Xo1AT9-sEj/exec" title="성적조회" style="flex:1;width:100%;border:0;background:#fff;"></iframe>
       </div>
 
       <!-- 업무자료 페이지 -->
@@ -5508,6 +5523,8 @@ onAuthStateChanged(fbAuth, async (user) => {
       const adminBtnD = document.getElementById('homeAISummaryAdminBtnD');
       if (adminBtn)  adminBtn.style.display  = 'block';
       if (adminBtnD) adminBtnD.style.display = 'block';
+      // 성적조회 테스트 탭 (관리자 전용)
+      document.querySelectorAll('[data-page="grades"]').forEach(el => { el.style.display = ''; });
       // 관리자 페이지(admin.html)는 사이드바에 노출하지 않음 — 주소 직접 입력으로만 접근
     }
     // 로그인한 선생님 이메일 자동 수집
@@ -7664,7 +7681,7 @@ function navigateTo(page) {
   // 탭 전환
   document.querySelectorAll('.main-nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
   document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(t => t.classList.toggle('active', t.dataset.page === page));
-  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult','docs'].forEach(p => {
+  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult','docs','grades'].forEach(p => {
     const el = document.getElementById(p + 'Page');
     if(el) el.classList.toggle('active', p === page);
   });
@@ -7683,6 +7700,11 @@ function navigateTo(page) {
   if(page === 'points') initPointsPage();
   if(page === 'consult') initConsultPage();
   if(page === 'docs') initDocsPage();
+  if(page === 'grades') {
+    // 첫 진입 때만 iframe 로드 (다른 사용자/평소에는 GAS 웹앱 요청 안 나가게)
+    const gf = document.getElementById('gradesFrame');
+    if(gf && !gf.src) gf.src = gf.dataset.src;
+  }
   if(page === 'mytask') {
     const mytaskPage = document.getElementById('mytaskPage');
     if(mytaskPage) mytaskPage.classList.add('active');
