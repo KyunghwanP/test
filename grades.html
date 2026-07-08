@@ -232,10 +232,10 @@
           </div>
 
           <div id="gpa_area" style="display:none; gap: 8px; align-items: center; margin-left: 10px;">
-            <div style="background: #ffc107; color: #212529; padding: 4px 14px; border-radius: 30px; font-size: 0.85rem; font-weight: 800; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <div id="badge_gpa9" style="background: #ffc107; color: #212529; padding: 4px 14px; border-radius: 30px; font-size: 0.85rem; font-weight: 800; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
               5등급제 <span id="v_gpa9" style="color: #d93025; font-size: 1rem; margin-left: 4px;">-</span>
             </div>
-            <div style="background: #d93025; color: #ffffff; padding: 4px 14px; border-radius: 30px; font-size: 0.85rem; font-weight: 800; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <div id="badge_gpa5" style="background: #d93025; color: #ffffff; padding: 4px 14px; border-radius: 30px; font-size: 0.85rem; font-weight: 800; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
               9등급제 <span id="v_gpa5" style="color: #ffc107; font-size: 1rem; margin-left: 4px;">-</span>
             </div>
             <button onclick="window.print()" class="btn btn-sm btn-outline-primary fw-bold px-3 ms-2 text-nowrap" style="border-radius: 30px; font-size: 0.85rem;">
@@ -404,6 +404,9 @@
             historyList = res.history;
             document.getElementById('v_gpa9').innerText = res.gpa9 || '-';
             document.getElementById('v_gpa5').innerText = res.gpa5 || '-';
+            // 값이 없는 등급제 배지는 숨김 (예: 3학년은 9등급제만 표시)
+            document.getElementById('badge_gpa9').style.display = (res.gpa9 && res.gpa9 !== '-') ? '' : 'none';
+            document.getElementById('badge_gpa5').style.display = (res.gpa5 && res.gpa5 !== '-') ? '' : 'none';
             document.getElementById('gpa_area').style.display = 'flex';
         } else if (Array.isArray(res)) {
             historyList = res;

@@ -48,7 +48,9 @@ const cell = (row, i) => String(row[i] ?? '').trim();
   console.log(`  모의고사 ${mockRows.length}행, 학생 명렬 ${rosterRows.length}행`);
 
   // ── 학생 명렬: 내신 등급 맵 (학년|반|번호|이름 → {gpa9, gpa5}) ──
-  // 원본 GAS와 동일: F열 "a/b" → gpa9=a, gpa5=b, '/' 없으면 gpa9에 그대로
+  // F열 "a/b" → a=5등급제, b=9등급제. 필드명은 원본 GAS 명명 그대로
+  // (gpa9 필드 = 화면 '5등급제' 배지, gpa5 필드 = '9등급제' 배지 — 이름과 반대이니 주의).
+  // '/' 없이 값이 하나면 9등급제 단일 값(3학년)으로 취급해 9등급제 배지에만 표시.
   const gpaMap = {};
   for (let i = 1; i < rosterRows.length; i++) {
     const r = rosterRows[i];
@@ -59,7 +61,7 @@ const cell = (row, i) => String(row[i] ?? '').trim();
       const p = raw.split('/');
       gpaMap[key] = { gpa9: p[0].trim(), gpa5: p[1].trim() };
     } else {
-      gpaMap[key] = { gpa9: raw, gpa5: '-' };
+      gpaMap[key] = { gpa9: '-', gpa5: raw };
     }
   }
 
