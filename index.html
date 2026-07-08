@@ -2937,7 +2937,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.04</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.05</div>
   </div>
 </div>
 
@@ -3061,7 +3061,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver5.04</div>
+    <div class="nav-version">ver5.05</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -6791,6 +6791,7 @@ async function s360LoadSusi(){
 
 // 성적→입결 매칭: 이 학생의 내신(9등급제) ±범위에서 수시 최종합격한 졸업생 사례
 let s360SusiRange = 0.3; // 마지막 선택 범위 기억 (학생을 바꿔도 유지)
+let s360SusiSort = null; // {f:필드, asc:true|false} — null이면 기본(내신 가까운 순)
 async function s360RenderSusiMatch(st){
   const el = document.getElementById('s360SusiMatch');
   if (!el) return;
@@ -6816,9 +6817,22 @@ async function s360RenderSusiMatch(st){
         if (isNaN(s) || dist(s) > RANGE + 1e-9) return false; // 1e-9: 부동소수점 경계 보정(3.1-2.8=0.30000...4)
         const f = r.final || '';
         return f.includes('합격') && !f.includes('불합격');
-      }).sort((a,b) =>
-        dist(parseFloat(a.score)) - dist(parseFloat(b.score))
-        || String(b.year).localeCompare(String(a.year)));
+      });
+      // 정렬: 기본은 내신 가까운 순, 열 제목 클릭 시 해당 열 오름/내림차순
+      const srt = s360SusiSort;
+      if (srt) {
+        const dir = srt.asc ? 1 : -1;
+        const num = ['year', 'score'].includes(srt.f);
+        hits.sort((a,b) => {
+          const va = a[srt.f] || '', vb = b[srt.f] || '';
+          const c = num ? (parseFloat(va) || 0) - (parseFloat(vb) || 0) : String(va).localeCompare(String(vb), 'ko');
+          return dir * c;
+        });
+      } else {
+        hits.sort((a,b) =>
+          dist(parseFloat(a.score)) - dist(parseFloat(b.score))
+          || String(b.year).localeCompare(String(a.year)));
+      }
       const chips = [0.1, 0.3, 0.5].map(r =>
         `<button class="s360-range-btn${r === RANGE ? ' on' : ''}" data-r="${r}">±${r}</button>`).join('');
       const trs = hits.slice(0, MAX_SHOW).map(r => `
@@ -6829,9 +6843,14 @@ async function s360RenderSusiMatch(st){
           <td>${escapeHtml(r.type || '-')}${r.detail ? `<span style="color:var(--ink-soft);font-size:12px;"> · ${escapeHtml(r.detail)}</span>` : ''}</td>
           <td style="font-family:'IBM Plex Mono';font-weight:700;color:#1d4ed8;">${escapeHtml(r.score || '-')}</td>
         </tr>`).join('');
+      const ths = [['year','졸업년도'], ['univ','대학'], ['unit','모집단위'], ['type','전형'], ['score','내신']]
+        .map(([f, label]) => {
+          const mark = srt && srt.f === f ? (srt.asc ? ' ▲' : ' ▼') : ' ↕';
+          return `<th data-f="${f}" style="cursor:pointer;user-select:none;" title="클릭해서 정렬 (다시 클릭: 역순 → 기본순)">${label}<span style="font-size:11px;opacity:${srt && srt.f === f ? 1 : 0.45};">${mark}</span></th>`;
+        }).join('');
       const body = hits.length ? `
         <div class="s360-table-wrap s360-susi-wrap"><table class="s360-table">
-          <thead><tr><th>졸업년도</th><th>대학</th><th>모집단위</th><th>전형</th><th>내신</th></tr></thead>
+          <thead><tr>${ths}</tr></thead>
           <tbody>${trs}</tbody>
         </table></div>`
         : `<div style="font-size:13.5px;color:var(--ink-soft);">해당 범위의 수시 최종합격 사례가 없습니다. 범위를 넓혀보세요.</div>`;
@@ -6840,12 +6859,21 @@ async function s360RenderSusiMatch(st){
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
             <span style="font-size:14px;font-weight:800;color:var(--ink);">🎓 이 내신으로 합격한 선배들</span>
             ${chips}
-            <span style="font-weight:700;color:var(--ink-soft);font-size:12.5px;">내신 ${gLabel} ±${RANGE} · 수시 최종합격 ${hits.length}건${hits.length > MAX_SHOW ? ` 중 가까운 순 ${MAX_SHOW}건` : ''}</span>
+            <span style="font-weight:700;color:var(--ink-soft);font-size:12.5px;">내신 ${gLabel} ±${RANGE} · 수시 최종합격 ${hits.length}건${hits.length > MAX_SHOW ? ` 중 ${srt ? '' : '가까운 순 '}${MAX_SHOW}건` : ''}</span>
           </div>
           ${body}
         </div>`;
       el.querySelectorAll('.s360-range-btn').forEach(b =>
         b.addEventListener('click', () => { s360SusiRange = parseFloat(b.dataset.r); draw(); }));
+      // 열 제목 클릭: 오름차순 → 내림차순 → 기본(가까운 순) 순환
+      el.querySelectorAll('th[data-f]').forEach(th =>
+        th.addEventListener('click', () => {
+          const f = th.dataset.f;
+          if (!s360SusiSort || s360SusiSort.f !== f) s360SusiSort = { f, asc: true };
+          else if (s360SusiSort.asc) s360SusiSort.asc = false;
+          else s360SusiSort = null;
+          draw();
+        }));
     };
     draw();
   } catch(e) {
