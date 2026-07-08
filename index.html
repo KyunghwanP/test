@@ -1009,15 +1009,16 @@
   }
   .pts-suggestion-name{ font-weight:700;white-space:nowrap; }
 
-  /* 학생 종합검색 탭 (구 스포트라이트 모달, ver4.89 탭 승격) */
-  .s360-layout{flex:1;display:flex;overflow:hidden;min-height:0;}
-  .s360-side{width:340px;flex-shrink:0;border-right:1px solid var(--rule);background:var(--paper);display:flex;flex-direction:column;min-height:0;}
-  .s360-search{padding:12px;border-bottom:1px solid var(--rule);flex-shrink:0;}
-  .s360-search input{width:100%;box-sizing:border-box;padding:10px 14px;border:1.5px solid var(--rule);border-radius:8px;font-family:inherit;font-size:16px;background:var(--paper);color:var(--ink);outline:none;}
-  .s360-search input:focus{border-color:var(--mon);}
-  .s360-list{flex:1;overflow-y:auto;}
-  .s360-list .spot-row.sel{background:rgba(59,130,246,.12);}
-  .s360-main{flex:1;overflow-y:auto;background:var(--bg-base);padding:20px;min-height:0;}
+  /* 학생 종합검색 탭 (ver4.94: 상단 검색 + 그룹 브라우징) */
+  .s360-top{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px 16px 12px;background:var(--paper);border-bottom:1px solid var(--rule);}
+  .s360-top input{width:100%;max-width:680px;box-sizing:border-box;padding:11px 16px;border:1.5px solid var(--rule);border-radius:10px;font-family:inherit;font-size:16px;background:var(--paper);color:var(--ink);outline:none;}
+  .s360-top input:focus{border-color:var(--mon);}
+  .s360-body{flex:1;overflow-y:auto;background:var(--bg-base);padding:16px;min-height:0;}
+  .s360-groups{max-width:1100px;margin:0 auto;}
+  .s360-body .sg-section-label{color:var(--ink-soft);opacity:1;}
+  .s360-body .sg-current-label{color:var(--ink);}
+  .s360-list-box{max-width:900px;margin:0 auto;background:var(--paper);border-radius:12px;border:1px solid var(--rule);overflow:hidden;}
+  .s360-list-head{max-width:900px;margin:0 auto;}
   .s360-card{max-width:1400px;margin:0 auto;background:var(--paper);border-radius:14px;box-shadow:0 4px 20px -8px rgba(0,0,0,.15);padding:24px 28px;}
   .s360-records{max-height:260px;overflow-y:auto;border:1px solid var(--rule);border-radius:8px;padding:8px 12px;background:var(--paper-soft);}
   .s360-records > div{font-size:13.5px !important;}
@@ -1027,17 +1028,13 @@
   .s360-table td{padding:8px 12px;border-bottom:1px solid var(--rule);text-align:center;font-family:'IBM Plex Mono';font-weight:600;color:var(--ink);}
   .s360-table tr:last-child td{border-bottom:none;}
   .s360-table td:first-child{font-family:'Pretendard','Noto Sans KR';font-weight:700;}
-  .s360-back{display:none;background:none;border:0;color:var(--ink-soft);font-weight:700;cursor:pointer;padding:0 0 10px;font-size:14px;font-family:inherit;}
+  .s360-back{display:inline-block;background:none;border:0;color:var(--ink-soft);font-weight:700;cursor:pointer;padding:0 0 10px;font-size:14px;font-family:inherit;}
   .s360-back:hover{color:var(--ink);}
   .s360-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin-bottom:12px;}
   .s360-chart{border:1px solid var(--rule);border-radius:10px;padding:12px 12px 8px;background:var(--paper);}
   .s360-chart-title{font-size:13.5px;font-weight:900;color:var(--ink);text-align:center;letter-spacing:.02em;margin-bottom:6px;}
   @media(max-width:768px){
-    .s360-side{width:100%;border-right:0;}
-    .s360-main{display:none;padding:12px;}
-    .s360-layout.detail .s360-side{display:none;}
-    .s360-layout.detail .s360-main{display:block;}
-    .s360-back{display:inline-block;}
+    .s360-body{padding:12px;}
   }
   .spot-row{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--rule);}
   .spot-row:hover{background:rgba(30,58,138,.06);}
@@ -2932,7 +2929,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.93</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.94</div>
   </div>
 </div>
 
@@ -3057,7 +3054,7 @@
       <div class="main-nav-item" data-page="search" style="display:none;">
         <span class="main-nav-icon">🔍</span>학생 종합검색 <span style="font-size:11px;opacity:.6;">(테스트)</span>
       </div>
-    <div class="nav-version">ver4.93</div>
+    <div class="nav-version">ver4.94</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3671,17 +3668,14 @@
 
       <!-- 학생 종합검색 페이지 (테스터 전용) -->
       <div class="page-view" id="searchPage">
-        <div class="s360-layout" id="s360Layout">
-          <aside class="s360-side">
-            <div class="s360-search">
-              <input id="s360Input" type="text" placeholder="🔍 학생 이름 · 반(2-3) 검색" autocomplete="off">
-            </div>
-            <div class="s360-list" id="s360List"></div>
-          </aside>
-          <section class="s360-main" id="s360Main">
-            <div class="spot-empty">학생을 검색한 뒤 선택하세요</div>
-          </section>
+        <div class="s360-top">
+          <input id="s360Input" type="text" placeholder="🔍 학생 이름 · 반(2-3) 검색" autocomplete="off">
+          <div class="students-tab-row" id="s360Tabs">
+            <button class="students-tab active" data-mode="class">학급별</button>
+            <button class="students-tab" data-mode="club">동아리별</button>
+          </div>
         </div>
+        <div class="s360-body" id="s360Body"></div>
       </div>
 
       <!-- 업무자료 페이지 -->
@@ -5244,11 +5238,10 @@ window.addEventListener('popstate', (e)=>{
     return;
   }
 
-  // 4.6. 학생 종합검색 상세 보고 있으면 → 검색 목록 (모바일 드릴다운)
+  // 4.6. 학생 종합검색 드릴다운(그룹 학생 목록·검색 결과·상세) → 한 단계 뒤로
   if (document.getElementById('searchPage')?.classList.contains('active')
-      && window.innerWidth <= 768
-      && document.getElementById('s360Layout')?.classList.contains('detail')) {
-    document.getElementById('s360Layout').classList.remove('detail');
+      && typeof s360View !== 'undefined' && s360View !== 'groups') {
+    s360Back();
     return;
   }
 
@@ -6783,7 +6776,6 @@ let spotLoading = null;
 let spotLoaded = false;
 const spotPts = new Map();   // 'g-r-n' → riro_points 학생 레코드
 const spotGradeCls = {};     // 'g-r' → gradesMock 반 문서 캐시
-let spotLastQuery = '';
 
 function spotKey(s){ return `${parseInt(s.grade)}-${parseInt(s.room)}-${parseInt(s.num)}`; }
 
@@ -6807,49 +6799,161 @@ function spotLoadData(){
 }
 
 let s360Init = false;
-let s360SelKey = null;
+let s360Mode = 'class';   // 그룹 탭: class | club
+let s360Group = null;     // 선택된 그룹 { type, key, label } | null
+let s360View = 'groups';  // groups | list | detail
 
 function initSearchPage(){
   const inp = document.getElementById('s360Input');
   if (!s360Init){
     s360Init = true;
-    inp.addEventListener('input', () => s360RenderList(inp.value.trim()));
-    s360RenderList('');
-    spotLoadData().then(() => s360RenderList(inp.value.trim()))
-      .catch(e => { document.getElementById('s360List').innerHTML = `<div class="spot-empty">불러오기 실패: ${e.message}</div>`; });
+    inp.addEventListener('input', () => { s360Group = null; s360Render(); });
+    document.getElementById('s360Tabs').addEventListener('click', e => {
+      const btn = e.target.closest('.students-tab');
+      if (!btn) return;
+      s360Mode = btn.dataset.mode;
+      document.querySelectorAll('#s360Tabs .students-tab').forEach(b => b.classList.toggle('active', b === btn));
+      s360Group = null;
+      inp.value = '';
+      s360Render();
+    });
+    s360Render();
+    // 로드 완료 후 갱신 — 단, 사용자가 이미 상세를 열었다면 덮어쓰지 않음
+    spotLoadData().then(() => { if (s360View !== 'detail') s360Render(); })
+      .catch(e => { document.getElementById('s360Body').innerHTML = `<div class="spot-empty">불러오기 실패: ${e.message}</div>`; });
   }
-  // 데스크톱은 목록·상세 동시 표시 — 진입 즉시 검색 가능하게
   if (window.innerWidth > 768) setTimeout(() => inp.focus(), 60);
 }
 
-function s360RenderList(q){
-  spotLastQuery = q;
-  const list = document.getElementById('s360List');
-  if (!spotLoaded){ list.innerHTML = '<div class="spot-empty">학생 데이터를 불러오는 중...</div>'; return; }
-  if (!allStudents.length){ list.innerHTML = '<div class="spot-empty">학생 연락망 데이터가 없습니다.</div>'; return; }
-  if (!q){ list.innerHTML = '<div class="spot-empty">이름 또는 반(예: 2-3)으로 검색하세요</div>'; return; }
-  const ql = q.toLowerCase().replace(/\s/g, '');
-  const matched = allStudents.filter(s =>
-    (s.name || '').toLowerCase().includes(ql)
-    || `${s.grade}-${s.room}` === ql
-  ).sort((a, b) =>
-    (parseInt(a.grade)||0)-(parseInt(b.grade)||0) || (parseInt(a.room)||0)-(parseInt(b.room)||0) || (parseInt(a.num)||0)-(parseInt(b.num)||0)
-  ).slice(0, 60);
-  if (!matched.length){ list.innerHTML = '<div class="spot-empty">검색 결과 없음</div>'; return; }
-  list.innerHTML = matched.map((s, i) => {
-    const k = spotKey(s);
-    const p = spotPts.get(k);
+// 현재 상태(검색어 / 선택 그룹)에 맞는 화면 렌더
+function s360Render(){
+  const body = document.getElementById('s360Body');
+  if (!spotLoaded){ body.innerHTML = '<div class="spot-empty">학생 데이터를 불러오는 중...</div>'; return; }
+  if (!allStudents.length){ body.innerHTML = '<div class="spot-empty">학생 연락망 데이터가 없습니다.</div>'; return; }
+  const q = document.getElementById('s360Input').value.trim();
+  if (q) { s360RenderSearch(q); return; }
+  if (s360Group) { s360RenderGroupStudents(); return; }
+  s360RenderGroups();
+}
+
+// 상세/드릴다운에서 한 단계 뒤로 (popstate·뒤로가기 버튼 공용)
+function s360Back(){
+  if (s360View === 'detail') { s360Render(); return; }
+  // 그룹 학생 목록 → 그룹, 검색 결과 → 그룹
+  s360Group = null;
+  document.getElementById('s360Input').value = '';
+  s360Render();
+}
+
+// ── 그룹 카드 (학급별 / 동아리별 — 학생연락망과 동일 패턴) ──
+function s360RenderGroups(){
+  s360View = 'groups';
+  const body = document.getElementById('s360Body');
+  let html = '<div class="s360-groups">';
+
+  if (s360Mode === 'class') {
+    const classKeys = [...new Set(allStudents.map(s => s.grade && s.room ? `${parseInt(s.grade)}-${parseInt(s.room)}` : null).filter(Boolean))]
+      .sort((a,b) => { const [ag,ar]=a.split('-').map(Number),[bg,br]=b.split('-').map(Number); return ag-bg||ar-br; });
+    const grades = [...new Set(classKeys.map(k => k.split('-')[0]))].sort();
+    grades.forEach(grade => {
+      html += `<div class="sg-section-label">${grade}학년</div><div class="sg-group-grid">`;
+      html += classKeys.filter(k => k.split('-')[0]===grade).map(key => {
+        const [g, room] = key.split('-');
+        const cnt = allStudents.filter(s => String(parseInt(s.grade))===g && String(parseInt(s.room))===room).length;
+        const homeroomTeacher = TEACHERS.find(t => t.homeroom === key);
+        return `<div class="sg-group-card" data-type="class" data-key="${key}">
+          <span class="sg-group-name">${room}반</span>
+          <span class="sg-group-sub">${cnt}명</span>
+          ${homeroomTeacher ? `<span class="sg-group-count">${homeroomTeacher.name}</span>` : ''}
+        </div>`;
+      }).join('');
+      html += `</div>`;
+    });
+  } else {
+    const clubs = [...new Set(allStudents.map(s => s.club).filter(Boolean))].sort();
+    html += `<div class="sg-group-grid">`;
+    html += clubs.map(club => {
+      const cnt = allStudents.filter(s => s.club === club).length;
+      return `<div class="sg-group-card" data-type="club" data-key="${escapeHtml(club)}">
+        <span class="sg-group-name">${escapeHtml(club)}</span>
+        <span class="sg-group-count">${cnt}명</span>
+      </div>`;
+    }).join('');
+    html += `</div>`;
+  }
+  html += '</div>';
+  body.innerHTML = html;
+
+  body.querySelectorAll('.sg-group-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const type = card.dataset.type;
+      const key  = card.dataset.key;
+      history.pushState({ page: 'search' }, '');
+      if (type === 'class') {
+        const [grade, room] = key.split('-');
+        s360Group = { type, key, label: `${grade}학년 ${room}반` };
+      } else {
+        s360Group = { type, key, label: key };
+      }
+      s360Render();
+    });
+  });
+}
+
+// ── 학생 목록 공용 렌더 (그룹/검색 결과) ──
+function s360RenderRows(students, headLabel){
+  s360View = 'list';
+  const body = document.getElementById('s360Body');
+  const rows = students.map((s, i) => {
+    const p = spotPts.get(spotKey(s));
     const ptsBadge = p ? `<span class="spot-badge ${Number(p.total) < 0 ? 'neg' : 'pos'}">상벌점 ${p.total}</span>` : '';
-    return `<div class="spot-row ${k === s360SelKey ? 'sel' : ''}" data-i="${i}">
+    return `<div class="spot-row" data-i="${i}">
       <span class="spot-grn">${s.grade}-${s.room}-${String(s.num||'').padStart(2,'0')}</span>
       <span class="spot-name">${escapeHtml(s.name||'')}</span>
       ${s.club ? `<span class="spot-badge">🎯 ${escapeHtml(s.club)}</span>` : ''}
       <span class="spot-badges">${ptsBadge}</span>
     </div>`;
   }).join('');
-  list.querySelectorAll('.spot-row').forEach(row => {
-    row.addEventListener('click', () => s360ShowDetail(matched[parseInt(row.dataset.i)]));
+  body.innerHTML = `
+    <div class="s360-list-head">
+      <div class="sg-back-row">
+        <button class="sg-back-btn" id="s360ListBack">← 목록으로</button>
+        <span class="sg-current-label">${headLabel} · ${students.length}명</span>
+      </div>
+    </div>
+    ${rows ? `<div class="s360-list-box">${rows}</div>` : '<div class="spot-empty">검색 결과 없음</div>'}`;
+  document.getElementById('s360ListBack').addEventListener('click', () => s360Back());
+  body.querySelectorAll('.spot-row').forEach(row => {
+    row.addEventListener('click', () => {
+      history.pushState({ page: 'search' }, '');
+      s360ShowDetail(students[parseInt(row.dataset.i)]);
+    });
   });
+}
+
+function s360RenderGroupStudents(){
+  const g = s360Group;
+  let filtered;
+  if (g.type === 'class') {
+    const [grade, room] = g.key.split('-');
+    filtered = allStudents.filter(s => String(parseInt(s.grade))===grade && String(parseInt(s.room))===room)
+      .sort((a,b) => (parseInt(a.num)||0)-(parseInt(b.num)||0));
+  } else {
+    filtered = allStudents.filter(s => s.club === g.key)
+      .sort((a,b) => (parseInt(a.grade)||0)-(parseInt(b.grade)||0) || (parseInt(a.room)||0)-(parseInt(b.room)||0) || (parseInt(a.num)||0)-(parseInt(b.num)||0));
+  }
+  s360RenderRows(filtered, g.label);
+}
+
+function s360RenderSearch(q){
+  const ql = q.toLowerCase().replace(/\s/g, '');
+  const matched = allStudents.filter(s =>
+    (s.name || '').toLowerCase().includes(ql)
+    || `${s.grade}-${s.room}` === ql
+  ).sort((a, b) =>
+    (parseInt(a.grade)||0)-(parseInt(b.grade)||0) || (parseInt(a.room)||0)-(parseInt(b.room)||0) || (parseInt(a.num)||0)-(parseInt(b.num)||0)
+  ).slice(0, 80);
+  s360RenderRows(matched, `'${escapeHtml(q)}' 검색 결과`);
 }
 
 // 모의고사 추이 그래프 — 진로진학 grades.html과 동일한 Chart.js 3종
@@ -6958,12 +7062,10 @@ function s360RenderCharts(history){
 }
 
 async function s360ShowDetail(s){
-  s360SelKey = spotKey(s);
-  const list = document.getElementById('s360List');
-  list.querySelectorAll('.spot-row').forEach(r => r.classList.remove('sel'));
-  document.getElementById('s360Layout').classList.add('detail'); // 모바일: 상세 화면 전환
-  const main = document.getElementById('s360Main');
-  const p = spotPts.get(s360SelKey);
+  s360View = 'detail';
+  const main = document.getElementById('s360Body');
+  main.scrollTop = 0;
+  const p = spotPts.get(spotKey(s));
 
   const phoneRow = (label, v) => v ? `
     <div style="display:flex;align-items:center;gap:8px;padding:5px 0;">
@@ -6988,7 +7090,7 @@ async function s360ShowDetail(s){
   }
 
   main.innerHTML = `
-    <button class="s360-back" id="s360BackBtn">← 검색 목록으로</button>
+    <button class="s360-back" id="s360BackBtn">← 학생 목록으로</button>
     <div class="s360-card">
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
         <span style="font-size:24px;font-weight:900;color:var(--ink);">${escapeHtml(s.name||'')}</span>
@@ -7003,9 +7105,7 @@ async function s360ShowDetail(s){
         <div id="s360Grades" style="font-size:14px;color:var(--ink-soft);">불러오는 중...</div>
       </div>
     </div>`;
-  document.getElementById('s360BackBtn').addEventListener('click', () => {
-    document.getElementById('s360Layout').classList.remove('detail');
-  });
+  document.getElementById('s360BackBtn').addEventListener('click', () => s360Back());
 
   // 성적: 해당 반 gradesMock 문서만 지연 로드
   const gEl = document.getElementById('s360Grades');
@@ -7051,9 +7151,6 @@ async function s360ShowDetail(s){
   } catch(e) {
     gEl.textContent = '성적 로드 실패: ' + e.message;
   }
-
-  // 목록 하이라이트 (재검색 없이 선택만 바뀐 경우)
-  s360RenderList(spotLastQuery);
 }
 
 // 헤더 🔍 버튼: 탭으로 이동 (구 스포트라이트 모달 대체)
