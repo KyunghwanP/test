@@ -6,8 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+  <!-- Chart.js 셀프호스팅: 학교망에서 cdn.jsdelivr.net 차단 시 그래프가 안 뜨는 문제 대응 -->
+  <script src="vendor/chart.umd.min.js"></script>
+  <script src="vendor/datalabels.min.js"></script>
 
   <!--
     원작: 2026학년도 영남고등학교 진로진학부팀 (Apps Script 웹앱 Test.html)
@@ -79,10 +80,10 @@
       font-size: 1.15rem;
     }
 
-    .table-compact { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 10px; position: relative; z-index: 2; background: rgba(255, 255, 255, 0.4); }
-    .table-compact th, .table-compact td { border: 1px solid #dee2e6; padding: 8px 4px; text-align: center; background: transparent; vertical-align: middle; }
+    .table-compact { width: 100%; border-collapse: collapse; font-size: 1rem; margin-top: 10px; position: relative; z-index: 2; background: rgba(255, 255, 255, 0.4); }
+    .table-compact th, .table-compact td { border: 1px solid #dee2e6; padding: 10px 6px; text-align: center; background: transparent; vertical-align: middle; }
     .table-compact th { background-color: rgba(248, 249, 250, 0.65); font-weight: bold; color: #333; }
-    .val-grade { font-weight: 800; color: #d93025; font-size: 0.95rem; }
+    .val-grade { font-weight: 800; color: #d93025; font-size: 1.1rem; }
 
     .chart-container {
       background: #ffffff;
@@ -262,7 +263,7 @@
         <div class="col-md-4">
           <div class="chart-container chart-container-p">
             <div class="chart-title">국수탐 평균 백분위</div>
-            <div class="chart-wrapper" style="position: relative; height: 210px; width: 100%;">
+            <div class="chart-wrapper" style="position: relative; height: 260px; width: 100%;">
               <canvas id="chartPercentile"></canvas>
             </div>
           </div>
@@ -270,7 +271,7 @@
         <div class="col-md-4">
           <div class="chart-container chart-container-s">
             <div class="chart-title">국수탐 표준점수 합</div>
-            <div class="chart-wrapper" style="position: relative; height: 210px; width: 100%;">
+            <div class="chart-wrapper" style="position: relative; height: 260px; width: 100%;">
               <canvas id="chartStandardScore"></canvas>
             </div>
           </div>
@@ -278,7 +279,7 @@
         <div class="col-md-4">
           <div class="chart-container chart-container-g">
             <div class="chart-title">국수탐 평균 등급</div>
-            <div class="chart-wrapper" style="position: relative; height: 210px; width: 100%;">
+            <div class="chart-wrapper" style="position: relative; height: 260px; width: 100%;">
               <canvas id="chartGrade"></canvas>
             </div>
           </div>
@@ -293,7 +294,7 @@
         <table class="table-compact table-hover mb-3 text-center align-middle" style="min-width: 900px;">
           <thead style="background-color: rgba(248, 249, 250, 0.8);">
             <tr>
-              <th rowspan="2" style="width: 90px;">시험 날짜</th>
+              <th rowspan="2" style="width: 112px; white-space: nowrap;">시험 날짜</th>
               <th colspan="3" style="color: #e52d75;">국수탐 요약</th>
               <th colspan="4">국어</th>
               <th colspan="4">수학</th>
@@ -446,12 +447,12 @@
             <td class="val-grade">${fixNum(h.avgG, 2)}</td>
             <td>${h.sumSS || '-'}</td>
 
-            <td class="text-secondary fw-bold" style="font-size:0.75rem;">${h.kor.sub||'-'}</td>
+            <td class="text-secondary fw-bold" style="font-size:0.88rem;">${h.kor.sub||'-'}</td>
             <td>${h.kor.ss||'-'}</td>
             <td>${fixNum(h.kor.p,0)}</td>
             <td class="val-grade">${h.kor.g||'-'}</td>
 
-            <td class="text-secondary fw-bold" style="font-size:0.75rem;">${h.math.sub||'-'}</td>
+            <td class="text-secondary fw-bold" style="font-size:0.88rem;">${h.math.sub||'-'}</td>
             <td>${h.math.ss||'-'}</td>
             <td>${fixNum(h.math.p,0)}</td>
             <td class="val-grade">${h.math.g||'-'}</td>
@@ -459,12 +460,12 @@
             <td class="val-grade">${h.eng||'-'}</td>
             <td class="val-grade">${h.hist||'-'}</td>
 
-            <td class="text-secondary fw-bold" style="font-size:0.75rem;">${h.tam1.sub||'-'}</td>
+            <td class="text-secondary fw-bold" style="font-size:0.88rem;">${h.tam1.sub||'-'}</td>
             <td>${h.tam1.ss||'-'}</td>
             <td>${fixNum(h.tam1.p,0)}</td>
             <td class="val-grade">${h.tam1.g||'-'}</td>
 
-            <td class="text-secondary fw-bold" style="font-size:0.75rem;">${h.tam2.sub||'-'}</td>
+            <td class="text-secondary fw-bold" style="font-size:0.88rem;">${h.tam2.sub||'-'}</td>
             <td>${h.tam2.ss||'-'}</td>
             <td>${fixNum(h.tam2.p,0)}</td>
             <td class="val-grade">${h.tam2.g||'-'}</td>
@@ -487,6 +488,7 @@
       if (chartG) chartG.destroy();
 
       Chart.defaults.font.family = "'Pretendard', sans-serif";
+      Chart.defaults.font.size = 14;
       Chart.defaults.color = '#64748b';
 
       const commonOptions = {
@@ -512,7 +514,7 @@
             anchor: 'end',
             offset: 4,
             color: function(context) { return context.dataset.borderColor; },
-            font: { family: "'Pretendard', sans-serif", weight: 'bold', size: 11 },
+            font: { family: "'Pretendard', sans-serif", weight: 'bold', size: 13 },
             formatter: function(value) { return value !== null && value !== undefined ? value : ''; }
           }
         },
