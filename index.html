@@ -2937,7 +2937,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.05</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.06</div>
   </div>
 </div>
 
@@ -3061,7 +3061,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver5.05</div>
+    <div class="nav-version">ver5.06</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7171,14 +7171,6 @@ async function s360ShowDetail(s){
   main.scrollTop = 0;
   const p = spotPts.get(spotKey(s));
 
-  const phoneRow = (label, v) => v ? `
-    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;">
-      <span style="min-width:38px;font-size:13.5px;font-weight:800;color:var(--ink-soft);">${label}</span>
-      <span style="font-family:'IBM Plex Mono';font-size:15.5px;font-weight:700;color:var(--ink);">${v}</span>
-      <a class="contact-btn phone" href="tel:${String(v).replace(/-/g,'')}">📞</a>
-      <a class="contact-btn sms" href="sms:${String(v).replace(/-/g,'')}">💬</a>
-    </div>` : '';
-
   let ptsHtml = '<div style="font-size:14px;color:var(--ink-soft);">상벌점 데이터 없음</div>';
   if (p) {
     const records = (p.records || []).slice().reverse()
@@ -7200,9 +7192,7 @@ async function s360ShowDetail(s){
         <span style="font-size:24px;font-weight:900;color:var(--ink);">${escapeHtml(s.name||'')}</span>
         <span style="font-family:'IBM Plex Mono';font-size:14.5px;color:var(--ink-soft);font-weight:700;">${s.grade}학년 ${s.room}반 ${s.num}번</span>
         ${s.club ? `<span class="spot-badge">🎯 ${escapeHtml(s.club)}</span>` : ''}
-      </div>
-      <div class="spot-sec"><div class="spot-sec-title">연락처</div>
-        ${(phoneRow('학생', s.phone) + phoneRow('부', s.fatherPhone) + phoneRow('모', s.motherPhone)) || '<div style="font-size:14px;color:var(--ink-soft);">등록된 연락처 없음</div>'}
+        <button id="s360ContactBtn" class="spot-badge" style="border:none;cursor:pointer;font-family:inherit;">📞 연락처 보기</button>
       </div>
       <div class="spot-sec"><div class="spot-sec-title">상벌점 (전체 이력)</div>${ptsHtml}</div>
       <div class="spot-sec" style="margin-bottom:0;"><div class="spot-sec-title">성적 (내신 · 모의고사 전체 회차)</div>
@@ -7210,6 +7200,7 @@ async function s360ShowDetail(s){
       </div>
     </div>`;
   document.getElementById('s360BackBtn').addEventListener('click', () => s360Back());
+  document.getElementById('s360ContactBtn').addEventListener('click', () => showStudentDetail(s));
 
   // 성적: 해당 반 gradesMock 문서만 지연 로드
   const gEl = document.getElementById('s360Grades');
