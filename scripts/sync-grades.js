@@ -79,6 +79,10 @@ async function readRange(range, sheetId = SHEET_ID) {
 }
 
 const cell = (row, i) => String(row[i] ?? '').trim();
+// 학년·반·번호 정규화: '03'→'3', ' 2 '→'2' — 시트 탭마다 0패딩·공백이 달라도 같은 키가 되도록
+const num = v => { const n = parseInt(String(v ?? '').trim(), 10); return Number.isNaN(n) ? String(v ?? '').trim() : String(n); };
+// 이름 정규화: 공백 제거 ('김 민준' ↔ '김민준')
+const normName = s => String(s || '').replace(/\s/g, '');
 
 (async () => {
   console.log('📊 성적 시트 읽는 중...');
@@ -88,46 +92,65 @@ const cell = (row, i) => String(row[i] ?? '').trim();
   ]);
   console.log(`  모의고사 ${mockRows.length}행, 학생 명렬 ${rosterRows.length}행`);
 
-  // ── 학생 명렬: 내신 등급 맵 (학년|반|번호|이름 → {gpa9, gpa5}) ──
+  // ── 학생 명렬: 내신 등급 맵 (학년|반|번호 → {name, gpa9, gpa5}) ──
+  // 키는 정규화된 학년·반·번호만 사용 — 이름은 표기 차이('김 민준' vs '김민준')로
+  // 매칭이 깨지지 않게 키에서 빼고, 모의고사 쪽 이름과 다르면 경고만 남긴다.
   // F열 "a/b" → a=5등급제, b=9등급제. 필드명은 원본 GAS 명명 그대로
   // (gpa9 필드 = 화면 '5등급제' 배지, gpa5 필드 = '9등급제' 배지 — 이름과 반대이니 주의).
   // '/' 없이 값이 하나면 9등급제 단일 값(3학년)으로 취급해 9등급제 배지에만 표시.
   const gpaMap = {};
   for (let i = 1; i < rosterRows.length; i++) {
     const r = rosterRows[i];
-    const key = [cell(r,1), cell(r,2), cell(r,3), cell(r,4)].join('|');
+    const grade = num(cell(r,1)), ban = num(cell(r,2)), bun = num(cell(r,3)), name = cell(r,4);
+    if (!grade || !ban || !bun || !name) continue;
     const raw = cell(r,5);
-    if (!raw) continue;
+    let gpa9 = '-', gpa5 = '-';
     if (raw.includes('/')) {
       const p = raw.split('/');
-      gpaMap[key] = { gpa9: p[0].trim(), gpa5: p[1].trim() };
-    } else {
-      gpaMap[key] = { gpa9: '-', gpa5: raw };
+      gpa9 = p[0].trim() || '-'; gpa5 = p[1].trim() || '-';
+    } else if (raw) {
+      gpa5 = raw;
     }
+    gpaMap[[grade, ban, bun].join('|')] = { name, gpa9, gpa5 };
   }
 
-  // ── 모의고사: 학생 트리 + 반별 성적 이력 ──
+  // ── 학생 트리 + 반별 문서: 학생 명렬 기준으로 먼저 전원 등록 ──
+  // 모의고사 미응시 학생도 내신은 앱에 보여야 하므로, 명렬의 모든 학생을
+  // 빈 history로 시딩한 뒤 모의고사 행을 얹는다.
+  const tree = {};
+  const classes = {}; // "학년-반" → { 번호: { name, gpa9, gpa5, history } }
+  Object.entries(gpaMap).forEach(([key, v]) => {
+    const [grade, ban, bun] = key.split('|');
+    (tree[grade] ??= {});
+    (tree[grade][ban] ??= {});
+    tree[grade][ban][bun] = v.name;
+    ((classes[grade + '-' + ban] ??= {}))[bun] = { name: v.name, gpa9: v.gpa9, gpa5: v.gpa5, history: [] };
+  });
+
+  // ── 모의고사: 반별 성적 이력 ──
   // 열 배치(원본 GAS와 동일): B(1)시험명 D(3)학년 E(4)반 F(5)번호 G(6)이름
   //   H(7)백분위평균 I(8)평균등급 J(9)표점합 K-N(10~13)국어 O-R(14~17)수학
   //   S(18)영어 T(19)한국사 U-X(20~23)탐구1 Y-AB(24~27)탐구2
-  const tree = {};
-  const classes = {}; // "학년-반" → { 번호: { name, gpa9, gpa5, history } }
   let mockCount = 0;
+  const nameMismatch = new Set(); // 학생당 1회만 경고 (모의고사 행마다 반복 방지)
 
   for (let i = 1; i < mockRows.length; i++) {
     const row = mockRows[i];
-    const grade = cell(row,3), ban = cell(row,4), bun = cell(row,5), name = cell(row,6);
+    const grade = num(cell(row,3)), ban = num(cell(row,4)), bun = num(cell(row,5)), name = cell(row,6);
     if (!grade || !ban || !bun || !name) continue;
-
-    (tree[grade] ??= {});
-    (tree[grade][ban] ??= {});
-    tree[grade][ban][bun] = name;
 
     const clsKey = grade + '-' + ban;
     (classes[clsKey] ??= {});
     if (!classes[clsKey][bun]) {
-      const gpa = gpaMap[[grade, ban, bun, name].join('|')] || { gpa9: '-', gpa5: '-' };
-      classes[clsKey][bun] = { name, gpa9: gpa.gpa9, gpa5: gpa.gpa5, history: [] };
+      // 명렬에 없는 학생(전출 후 명렬 미갱신 등) — 모의고사 기록만으로 등록
+      (tree[grade] ??= {});
+      (tree[grade][ban] ??= {});
+      tree[grade][ban][bun] = name;
+      classes[clsKey][bun] = { name, gpa9: '-', gpa5: '-', history: [] };
+    } else if (normName(classes[clsKey][bun].name) !== normName(name) && !nameMismatch.has(clsKey + '|' + bun)) {
+      // 번호는 같은데 이름이 다르면 두 탭의 번호가 어긋난 것 — 로그로 알림
+      nameMismatch.add(clsKey + '|' + bun);
+      console.warn(`  ⚠️ ${clsKey}반 ${bun}번 이름 불일치: 명렬 '${classes[clsKey][bun].name}' vs 모의고사 '${name}' — 시트 확인 필요`);
     }
     classes[clsKey][bun].history.push({
       examDate: cell(row,1) || '-',
@@ -142,7 +165,10 @@ const cell = (row, i) => String(row[i] ?? '').trim();
   }
 
   const classIds = Object.keys(classes);
-  console.log(`  학생 트리 완성 — 반 ${classIds.length}개, 성적 ${mockCount}건`);
+  const rosterCount = Object.keys(gpaMap).length;
+  const gpaCount = Object.values(gpaMap).filter(v => v.gpa9 !== '-' || v.gpa5 !== '-').length;
+  if (nameMismatch.size) console.warn(`  ⚠️ 이름 불일치 학생 총 ${nameMismatch.size}명 — 두 탭의 번호·이름을 대조해 시트를 수정하세요`);
+  console.log(`  학생 트리 완성 — 반 ${classIds.length}개, 명렬 ${rosterCount}명(내신 ${gpaCount}명), 모의고사 ${mockCount}건`);
 
   // ── Firestore 저장 (index + 반별 문서, 사라진 반 문서는 정리) ──
   const t = Date.now();
