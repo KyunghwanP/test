@@ -1,0 +1,36 @@
+rules_version = '2';
+
+// 영남고 교사용 앱 Firestore 보안 규칙
+// 적용 방법: Firebase 콘솔 → Firestore Database → 규칙 탭에 전체 붙여넣기 → 게시
+//
+// 원칙:
+//  - 모든 데이터는 학교 계정(@yeungnam.hs.kr)으로 로그인한 사용자만 접근
+//  - 성적(gradesMock)은 읽기 전용 — 쓰기는 GitHub Actions(Admin SDK, 규칙 미적용)만 수행
+//  - 학부모 예약 페이지(parent.html)는 Firestore를 사용하지 않으므로 비로그인 허용 불필요
+//
+// 사용 중인 컬렉션: appdata(설정/날씨 캐시), tasks(업무캘린더), consultations(학부모상담),
+//  contacts(교원연락망), students(학생연락망), schedule(학사일정), weeklyData(주간교육활동),
+//  riro_points(상벌점 수집), gradesMock(모의고사 성적)
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 학교 계정으로 로그인한 교사인지 확인
+    function isTeacher() {
+      return request.auth != null
+        && request.auth.token.email is string
+        && request.auth.token.email.matches('.*@yeungnam[.]hs[.]kr');
+    }
+
+    // 모의고사 성적: 교사 읽기 전용 (쓰기는 서버 동기화만)
+    match /gradesMock/{docId} {
+      allow read: if isTeacher();
+      allow write: if false;
+    }
+
+    // 그 외 모든 앱 데이터: 교사 읽기/쓰기
+    match /{document=**} {
+      allow read, write: if isTeacher();
+    }
+  }
+}
