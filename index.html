@@ -2929,7 +2929,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.95</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.96</div>
   </div>
 </div>
 
@@ -3054,7 +3054,7 @@
       <div class="main-nav-item" data-page="search" style="display:none;">
         <span class="main-nav-icon">🔍</span>학생 종합검색 <span style="font-size:11px;opacity:.6;">(테스트)</span>
       </div>
-    <div class="nav-version">ver4.95</div>
+    <div class="nav-version">ver4.96</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7158,9 +7158,13 @@ async function s360ShowDetail(s){
         .catch(() => { const c = gEl.querySelector('.s360-charts'); if (c) c.remove(); });
     }
   } catch(e) {
-    gEl.textContent = (e.code === 'permission-denied')
-      ? '🔒 성적 데이터는 해당 반 담임과 부장·교장·교감·관리자만 조회할 수 있습니다.'
-      : '성적 로드 실패: ' + e.message;
+    if (e.code === 'permission-denied') {
+      // 열람 권한 없는 반 → 성적 섹션을 통째로 숨김 (안내 문구 없이)
+      const sec = gEl.closest('.spot-sec');
+      if (sec) sec.style.display = 'none'; else gEl.innerHTML = '';
+    } else {
+      gEl.textContent = '성적 로드 실패: ' + e.message;
+    }
   }
 }
 
