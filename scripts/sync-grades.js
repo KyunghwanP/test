@@ -313,16 +313,17 @@ const normName = s => String(s || '').replace(/\s/g, '');
     if (!rows.length) { console.warn(`  ⚠️ '${tab}' 탭이 비어있음 — 건너뜀`); continue; }
 
     const hcell = h => String(h ?? '').trim();
-    // 헤더가 어느 행에 있는지 몰라 위 3행 중 '주소' 열이 있는 행을 찾는다(정확일치 → 부분일치 순).
+    // 헤더가 어느 행에 있는지 몰라 위 8행 중 '주소' 열이 있는 행을 찾는다(정확일치 → 부분일치 순).
+    // (1학년/2학년/3학년 탭은 실측 결과 4행이 헤더 — 위 1~3행은 학기·단위수·선택인원 요약행)
     let headerRowIdx = -1, addrIdx = -1;
-    for (let r = 0; r < Math.min(3, rows.length); r++) {
+    for (let r = 0; r < Math.min(8, rows.length); r++) {
       let idx = rows[r].findIndex(h => hcell(h) === '주소');
       if (idx === -1) idx = rows[r].findIndex(h => hcell(h).includes('주소'));
       if (idx !== -1) { headerRowIdx = r; addrIdx = idx; break; }
     }
     if (addrIdx === -1) {
-      console.warn(`  ⚠️ '${tab}': 위 3행에서 '주소' 열을 못 찾아 선택과목 구간을 판단할 수 없음 — 건너뜀`);
-      for (let r = 0; r < Math.min(3, rows.length); r++) {
+      console.warn(`  ⚠️ '${tab}': 위 8행에서 '주소' 열을 못 찾아 선택과목 구간을 판단할 수 없음 — 건너뜀`);
+      for (let r = 0; r < Math.min(8, rows.length); r++) {
         console.warn(`     행${r + 1}: ${JSON.stringify(rows[r].map(hcell))}`);
       }
       continue;
