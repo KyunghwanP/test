@@ -2929,7 +2929,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.98</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.99</div>
   </div>
 </div>
 
@@ -2942,7 +2942,6 @@
     </button>
     <div class="app-header-title" onclick="navigateTo('home')" style="cursor:pointer;"><img src="icon-180.png" style="height:38px;vertical-align:middle;margin-right:10px;">영남고등학교</div>
     <div style="display:flex;align-items:center;gap:8px;">
-      <button class="app-logout-btn" id="spotlightBtn" title="학생 종합검색 탭 열기 (연락처·상벌점·성적)">🔍 학생검색</button>
       <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
     </div>
   </header>
@@ -3054,7 +3053,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.98</div>
+    <div class="nav-version">ver4.99</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7149,9 +7148,6 @@ async function s360ShowDetail(s){
     }
   }
 }
-
-// 헤더 🔍 버튼: 탭으로 이동 (구 스포트라이트 모달 대체)
-document.getElementById('spotlightBtn').addEventListener('click', () => navigateTo('search'));
 
 // ---- 학사일정 ----
 let scheduleInitialized = false;
