@@ -8,6 +8,7 @@ on:
   push:
     paths:
       - 'scripts/sync-grades.js'
+      - 'scripts/grade-roles.json'
       - '.github/workflows/sync-grades.yml'
 
 jobs:

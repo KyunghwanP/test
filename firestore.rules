@@ -39,11 +39,19 @@ service cloud.firestore {
                  && request.auth.token.email_verified == true;
       allow write: if false;
     }
-    // ── 모의고사 성적 (진로진학부 시트 → GitHub Actions 동기화) ──
-    // 교사 읽기 전용. 쓰기는 서비스 계정(Admin SDK, 규칙 미적용)의 동기화만 수행.
-    // 학생 계정(숫자 7자리) 차단은 isYnhsTeacher()에 포함되어 있음.
-    match /gradesMock/{docId} {
+    // ── 성적 열람 권한 문서 (sync-grades Actions가 매일 생성) ──
+    // { managers: [이메일...], homerooms: { 이메일: '학년-반' } }
+    // 교사 읽기 허용(앱이 탭 노출 판단에 사용). 쓰기는 서비스 계정만.
+    match /acl/{docId} {
       allow read: if isYnhsTeacher();
+      allow write: if false;
+    }
+    // ── 모의고사 성적 (진로진학부 시트 → GitHub Actions 동기화) ──
+    // 읽기: 전체열람 권한자(관리자·교장·교감·부장) 또는 자기 반 담임만.
+    // 담임은 학생 트리(index)와 자기 반 문서만 읽을 수 있다.
+    // 쓰기는 서비스 계정(Admin SDK, 규칙 미적용)의 동기화만 수행.
+    match /gradesMock/{docId} {
+      allow read: if canReadGrades(docId);
       allow write: if false;
     }
     // ── 졸업생 수시 합격 현황 (진로진학부 시트 → GitHub Actions 동기화) ──
@@ -88,6 +96,20 @@ service cloud.firestore {
         && request.auth.token.email.matches('.*@yeungnam[.]hs[.]kr$')
         && !request.auth.token.email.matches('^[0-9]{7}@yeungnam[.]hs[.]kr$')
         && request.auth.token.email_verified == true;
+    }
+    // 성적 열람 권한: acl/gradeRoles 문서 기준
+    // (문서가 아직 없으면 get() 오류 → 전면 거부되므로, 규칙 적용 전에
+    //  sync-grades Actions를 한 번 실행해 문서를 만들어 둘 것)
+    function gradeAcl() {
+      return get(/databases/$(database)/documents/acl/gradeRoles).data;
+    }
+    function canReadGrades(docId) {
+      return isYnhsTeacher() && (
+        request.auth.token.email in gradeAcl().managers
+        || (request.auth.token.email in gradeAcl().homerooms
+            && (docId == 'index'
+                || gradeAcl().homerooms[request.auth.token.email] == docId))
+      );
     }
     // sharedWith 배열에 내 식별자(email 또는 displayName/name)가 있는지
     function isSharedWithMe(sharedWith) {

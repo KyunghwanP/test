@@ -2929,7 +2929,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.94</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.95</div>
   </div>
 </div>
 
@@ -3054,7 +3054,7 @@
       <div class="main-nav-item" data-page="search" style="display:none;">
         <span class="main-nav-icon">🔍</span>학생 종합검색 <span style="font-size:11px;opacity:.6;">(테스트)</span>
       </div>
-    <div class="nav-version">ver4.94</div>
+    <div class="nav-version">ver4.95</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5591,22 +5591,31 @@ onAuthStateChanged(fbAuth, async (user) => {
       if (adminBtnD) adminBtnD.style.display = 'block';
       // 관리자 페이지(admin.html)는 사이드바에 노출하지 않음 — 주소 직접 입력으로만 접근
     }
-    // 진로진학 테스트 탭 노출: 관리자 + 지정 테스터 (이름 기준 — 이메일은 로그인 시 자동 수집됨)
+    // 성적 데이터 접근 권한(acl/gradeRoles — sync-grades Actions가 매일 생성) 기반 탭 노출
+    //   전체열람(관리자·교장·교감·부장): 진로진학 + 학생 종합검색
+    //   담임: 학생 종합검색만 (성적은 자기 반 학생만 — Firestore 규칙으로도 강제됨)
     // 보기 모드(viewAs)에서는 '보기 대상' 기준으로 판별 — 그 선생님이 실제 보는 화면 그대로 재현
-    {
-      const GRADES_TEST_TEACHERS = ['장조은'];
-      const _norm = s => (s || '').replace(/\s/g, '');
-      const _name = isViewAs()
-        ? _norm(effTeacher()?.name)
-        : (_norm(TEACHERS.find(t => t.email === user.email)?.name) || _norm(stripTeacherSuffix(user.displayName)));
-      const _isTester = GRADES_TEST_TEACHERS.some(n => _norm(n) === _name);
-      if ((!isViewAs() && user.email === ADMIN_EMAIL) || _isTester) {
-        // 학생 종합검색 탭도 같은 대상에게 노출 (성적 데이터 포함)
-        document.querySelectorAll('[data-page="grades"], [data-page="search"]').forEach(el => { el.style.display = ''; });
-        const sb = document.getElementById('spotlightBtn');
-        if (sb) sb.style.display = '';
-      }
-    }
+    (async () => {
+      try {
+        const email = isViewAs() ? (effTeacher()?.email || '') : user.email;
+        let managers = [], homerooms = {};
+        try {
+          const aclSnap = await getDoc(doc(fbDb, 'acl', 'gradeRoles'));
+          if (aclSnap.exists()) { managers = aclSnap.data().managers || []; homerooms = aclSnap.data().homerooms || {}; }
+        } catch(_) { /* 권한 문서 미생성/조회 실패 → 관리자 특례만 적용 */ }
+        window._gradeAcl = { managers, homerooms };
+        const isMgr = email === ADMIN_EMAIL || managers.includes(email);
+        const myHomeroom = homerooms[email] || null;
+        if (isMgr) {
+          document.querySelectorAll('[data-page="grades"]').forEach(el => { el.style.display = ''; });
+        }
+        if (isMgr || myHomeroom) {
+          document.querySelectorAll('[data-page="search"]').forEach(el => { el.style.display = ''; });
+          const sb = document.getElementById('spotlightBtn');
+          if (sb) sb.style.display = '';
+        }
+      } catch(e) { console.log('성적 권한 판별 실패:', e.message); }
+    })();
     // 로그인한 선생님 이메일 자동 수집
     collectTeacherEmail(user);
     // 학사일정 미리 로딩 (업무 캘린더 학사일정 표시용)
@@ -7149,7 +7158,9 @@ async function s360ShowDetail(s){
         .catch(() => { const c = gEl.querySelector('.s360-charts'); if (c) c.remove(); });
     }
   } catch(e) {
-    gEl.textContent = '성적 로드 실패: ' + e.message;
+    gEl.textContent = (e.code === 'permission-denied')
+      ? '🔒 성적 데이터는 해당 반 담임과 부장·교장·교감·관리자만 조회할 수 있습니다.'
+      : '성적 로드 실패: ' + e.message;
   }
 }
 

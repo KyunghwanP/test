@@ -29,6 +29,37 @@ const jwt = new JWT({
   scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
 });
 
+// ── 성적 열람 권한(acl/gradeRoles) 동기화 ──
+// firestore.rules가 이 문서를 get()으로 참조해 gradesMock 읽기를 제한한다.
+//   managers: 전체 열람(관리자·교장·교감·부장) — grade-roles.json 이름 → teachers에서 이메일 해석
+//   homerooms: { 이메일: '학년-반' } — 담임은 자기 반 문서만 열람
+const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
+async function syncGradeRoles() {
+  const fs = require('fs');
+  const path = require('path');
+  const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'grade-roles.json'), 'utf8'));
+  const appSnap = await db.doc('appdata/main').get();
+  const teachers = appSnap.exists ? (appSnap.data().teachers || []) : [];
+  const norm = s => String(s || '').replace(/\s/g, '');
+
+  const managers = new Set([ADMIN_EMAIL]);
+  (cfg.managers || []).forEach(name => {
+    const t = teachers.find(t => norm(t.name) === norm(name));
+    if (t && t.email) managers.add(t.email);
+    else console.warn(`  ⚠️ 전체열람 권한자 '${name}' 이메일 미수집 — 본인이 앱에 로그인하면 다음 동기화에 반영됩니다`);
+  });
+
+  const homerooms = {};
+  teachers.forEach(t => {
+    if (!t.homeroom || !t.email) return;
+    // '2-03' 같은 표기도 gradesMock 문서 ID('2-3')와 맞도록 정규화
+    homerooms[t.email] = String(t.homeroom).split('-').map(Number).join('-');
+  });
+
+  await db.doc('acl/gradeRoles').set({ t: Date.now(), managers: [...managers], homerooms });
+  console.log(`✅ acl/gradeRoles 저장 — 전체열람 ${managers.size}명, 담임 ${Object.keys(homerooms).length}명`);
+}
+
 async function readRange(range, sheetId = SHEET_ID) {
   const url = 'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId
     + '/values/' + encodeURIComponent(range)
@@ -216,6 +247,8 @@ const cell = (row, i) => String(row[i] ?? '').trim();
   }
 
   console.log(`✅ gradesIpgyeol 저장 완료 — 수시 ${ipSusiRows.length}행/${nSusi}청크, 정시 ${ipJeongsiRows.length}행/${nJeongsi}청크 (${new Date().toISOString()})`);
+
+  await syncGradeRoles();
   process.exit(0);
 })().catch(e => {
   console.error('❌ 실패:', e.response?.data?.error?.message || e.message);
