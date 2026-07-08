@@ -1,36 +1,94 @@
 rules_version = '2';
-
-// 영남고 교사용 앱 Firestore 보안 규칙
-// 적용 방법: Firebase 콘솔 → Firestore Database → 규칙 탭에 전체 붙여넣기 → 게시
-//
-// 원칙:
-//  - 모든 데이터는 학교 계정(@yeungnam.hs.kr)으로 로그인한 사용자만 접근
-//  - 성적(gradesMock)은 읽기 전용 — 쓰기는 GitHub Actions(Admin SDK, 규칙 미적용)만 수행
-//  - 학부모 예약 페이지(parent.html)는 Firestore를 사용하지 않으므로 비로그인 허용 불필요
-//
-// 사용 중인 컬렉션: appdata(설정/날씨 캐시), tasks(업무캘린더), consultations(학부모상담),
-//  contacts(교원연락망), students(학생연락망), schedule(학사일정), weeklyData(주간교육활동),
-//  riro_points(상벌점 수집), gradesMock(모의고사 성적)
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // 학교 계정으로 로그인한 교사인지 확인
-    function isTeacher() {
-      return request.auth != null
-        && request.auth.token.email is string
-        && request.auth.token.email.matches('.*@yeungnam[.]hs[.]kr');
+    match /appdata/{docId} {
+      allow read, write: if request.auth != null
+                        && request.auth.token.email.matches('.*@yeungnam[.]hs[.]kr$')
+                        && !request.auth.token.email.matches('^[0-9]{7}@yeungnam[.]hs[.]kr$')
+                        && request.auth.token.email_verified == true;
     }
-
-    // 모의고사 성적: 교사 읽기 전용 (쓰기는 서버 동기화만)
-    match /gradesMock/{docId} {
-      allow read: if isTeacher();
+    match /weeklyData/{docId} {
+      allow read, write: if request.auth != null
+                        && request.auth.token.email.matches('.*@yeungnam[.]hs[.]kr$')
+                        && !request.auth.token.email.matches('^[0-9]{7}@yeungnam[.]hs[.]kr$')
+                        && request.auth.token.email_verified == true;
+    }
+    match /contacts/{docId} {
+      allow read, write: if request.auth != null
+                        && request.auth.token.email.matches('.*@yeungnam[.]hs[.]kr$')
+                        && !request.auth.token.email.matches('^[0-9]{7}@yeungnam[.]hs[.]kr$')
+                        && request.auth.token.email_verified == true;
+    }
+    match /students/{docId} {
+      allow read, write: if request.auth != null
+                        && request.auth.token.email.matches('.*@yeungnam[.]hs[.]kr$')
+                        && !request.auth.token.email.matches('^[0-9]{7}@yeungnam[.]hs[.]kr$')
+                        && request.auth.token.email_verified == true;
+    }
+    match /schedule/{docId} {
+      allow read: if request.auth != null
+                 && request.auth.token.email.matches('.*@yeungnam[.]hs[.]kr$')
+                 && !request.auth.token.email.matches('^[0-9]{7}@yeungnam[.]hs[.]kr$')
+                 && request.auth.token.email_verified == true;
       allow write: if false;
     }
-
-    // 그 외 모든 앱 데이터: 교사 읽기/쓰기
-    match /{document=**} {
-      allow read, write: if isTeacher();
+    match /riro_points/{docId} {
+      allow read: if request.auth != null
+                 && request.auth.token.email.matches('.*@yeungnam[.]hs[.]kr$')
+                 && !request.auth.token.email.matches('^[0-9]{7}@yeungnam[.]hs[.]kr$')
+                 && request.auth.token.email_verified == true;
+      allow write: if false;
+    }
+    // ── 모의고사 성적 (진로진학부 시트 → GitHub Actions 동기화) ──
+    // 교사 읽기 전용. 쓰기는 서비스 계정(Admin SDK, 규칙 미적용)의 동기화만 수행.
+    // 학생 계정(숫자 7자리) 차단은 isYnhsTeacher()에 포함되어 있음.
+    match /gradesMock/{docId} {
+      allow read: if isYnhsTeacher();
+      allow write: if false;
+    }
+    // 업무 캘린더
+    match /tasks/{userId}/items/{itemId} {
+      // 학교 교사면 읽기 가능 (공유 일정 구독)
+      allow read: if isYnhsTeacher();
+      // 소유자는 전체 쓰기 가능
+      allow write: if isYnhsTeacher() && request.auth.uid == userId;
+      // 공유받은 사람은 status / comments 필드만 수정 가능
+      // (기존 문서가 있고, 본인이 sharedWith에 포함된 경우)
+      allow update: if isYnhsTeacher()
+                   && resource.data.sharedWith != null
+                   && isSharedWithMe(resource.data.sharedWith)
+                   && onlyStatusOrComments();
+    }
+    // (혹시 하위 경로를 더 쓰는 경우 대비) 그 외 tasks 문서는 소유자만
+    match /tasks/{userId}/{document=**} {
+      allow read: if isYnhsTeacher();
+      allow write: if isYnhsTeacher() && request.auth.uid == userId;
+    }
+    // ── 학부모 상담 예약 ──
+    // 학부모(비로그인)는 Firestore를 직접 접근하지 않는다. 조회·예약·취소는
+    // 모두 GAS(서비스계정)가 처리하며, 서비스계정은 보안 규칙의 적용을 받지
+    // 않으므로(관리자 권한) 학부모용 동작은 여기서 전부 차단해도 된다.
+    // → 교사(학교 계정 로그인)만 직접 읽기/쓰기 가능. 외부인은 차단.
+    match /consultations/{classKey} {
+      allow read, write: if isYnhsTeacher();
+    }
+    // ── 공통 함수 ──
+    function isYnhsTeacher() {
+      return request.auth != null
+        && request.auth.token.email.matches('.*@yeungnam[.]hs[.]kr$')
+        && !request.auth.token.email.matches('^[0-9]{7}@yeungnam[.]hs[.]kr$')
+        && request.auth.token.email_verified == true;
+    }
+    // sharedWith 배열에 내 식별자(email 또는 displayName/name)가 있는지
+    function isSharedWithMe(sharedWith) {
+      return sharedWith.hasAny([request.auth.token.email, request.auth.token.name]);
+    }
+    // 이번 수정이 status / comments / sharedWith 필드만 건드렸는지 검사
+    // (sharedWith: 공유받은 사람이 '공유 나가기'로 본인을 제거하는 경우)
+    function onlyStatusOrComments() {
+      return request.resource.data.diff(resource.data)
+               .affectedKeys()
+               .hasOnly(['status', 'comments', 'sharedWith', 'updatedAt']);
     }
   }
 }
