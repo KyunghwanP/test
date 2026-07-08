@@ -1,0 +1,37 @@
+name: 모의고사 성적 동기화
+
+on:
+  schedule:
+    # 매일 20:30 UTC = 05:30 KST
+    - cron: '30 20 * * *'
+  workflow_dispatch:  # 수동 실행 버튼
+  push:
+    paths:
+      - 'scripts/sync-grades.js'
+      - '.github/workflows/sync-grades.yml'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 의존성 설치 (firebase-admin + google-auth-library)
+        run: |
+          mkdir -p /tmp/gsdeps
+          cd /tmp/gsdeps
+          npm init -y > /dev/null
+          npm install firebase-admin@^12.0.0 google-auth-library@^9.0.0 --no-audit --no-fund
+
+      - name: 성적 동기화 실행
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          NODE_PATH: /tmp/gsdeps/node_modules
+        run: node scripts/sync-grades.js

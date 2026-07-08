@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>개별 모의고사 성적 분석</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
+  <!--
+    원작: 2026학년도 영남고등학교 진로진학부팀 (Apps Script 웹앱 Test.html)
+    이 파일은 원작의 화면을 그대로 유지하고, 데이터 소스만
+    google.script.run → Firestore(gradesMock, GitHub Actions 동기화)로 교체한 이식본입니다.
+  -->
+  <style>
+    body { background-color: #f1f5f9; font-family: 'Pretendard', sans-serif; padding: 15px; }
+    .container-custom { max-width: 1400px; margin: 0 auto; }
+
+    .header-panel {
+      background: #e52d75;
+      color: white;
+      border-radius: 12px;
+      padding: 10px 20px;
+      margin-bottom: 15px;
+    }
+
+    /* 📌 상단 고정 메뉴 스타일 */
+    .sticky-top-menu {
+      position: sticky;
+      top: 10px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.95) !important;
+      backdrop-filter: blur(5px);
+    }
+
+    .counseling-card {
+      background: white;
+      border: 2px solid #e52d75;
+      padding: 25px;
+      border-radius: 10px;
+      position: relative;
+      z-index: 1;
+      box-shadow: 0 4px 20px rgba(148, 163, 184, 0.12);
+    }
+
+    .watermark {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      overflow: hidden;
+      border-radius: 8px;
+      z-index: -1;
+      pointer-events: none;
+    }
+    .watermark::before {
+      content: "";
+      position: absolute;
+      top: 52%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 680px;
+      height: 680px;
+      background-image: url('https://lh3.googleusercontent.com/d/1kQiYl51Fk_VGwrvXGCAZsG4wbJQUCWBM');
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      opacity: 0.05;
+    }
+
+    .section-title-container { display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px 0; flex-wrap: wrap; gap: 10px; position: relative; z-index: 2; }
+    .section-title {
+      border-left: 5px solid #11caa0;
+      padding-left: 10px;
+      color: #e52d75;
+      font-weight: 700;
+      margin: 0;
+      font-size: 1.15rem;
+    }
+
+    .table-compact { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 10px; position: relative; z-index: 2; background: rgba(255, 255, 255, 0.4); }
+    .table-compact th, .table-compact td { border: 1px solid #dee2e6; padding: 8px 4px; text-align: center; background: transparent; vertical-align: middle; }
+    .table-compact th { background-color: rgba(248, 249, 250, 0.65); font-weight: bold; color: #333; }
+    .val-grade { font-weight: 800; color: #d93025; font-size: 0.95rem; }
+
+    .chart-container {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 20px;
+      height: 300px;
+      position: relative;
+      z-index: 2;
+      box-shadow: 0 4px 20px rgba(148, 163, 184, 0.12);
+      transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+    }
+
+    .chart-container:hover { transform: translateY(-8px); }
+    .chart-container-p:hover { box-shadow: 0 20px 35px rgba(17, 202, 160, 0.25); border-color: #11caa0; }
+    .chart-container-s:hover { box-shadow: 0 20px 35px rgba(229, 45, 117, 0.25); border-color: #e52d75; }
+    .chart-container-g:hover { box-shadow: 0 20px 35px rgba(217, 48, 37, 0.25); border-color: #d93025; }
+
+    .chart-title {
+      text-align: center;
+      font-weight: 800;
+      font-size: 1.05rem;
+      color: #1e293b;
+      margin-bottom: 15px;
+    }
+
+    #initial_loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000; }
+    .loading-spinner { width: 3rem; height: 3rem; border: 0.35em solid #f3f3f3; border-top: 0.35em solid #e52d75; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    #fetch_loading { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; justify-content:center; align-items:center; flex-direction: column; }
+
+    /* 🌟 인쇄 가로 모드 최적화 */
+    @media print {
+      @page {
+        size: A4 landscape;
+        margin: 8mm 10mm;
+      }
+      body { background-color: #ffffff; padding: 0 !important; margin: 0 !important; font-size: 11px; }
+      .container-custom { max-width: 100% !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
+      .counseling-card { border: none !important; box-shadow: none !important; padding: 0 !important; page-break-inside: avoid; }
+
+      /* 필요 없는 UI 강제 제거 */
+      #initial_loading, #fetch_loading, .card, [style*="background-color: #f8f9fa"], .text-end, .header-panel, .credit-footer {
+        display: none !important;
+      }
+
+      .print-title {
+        display: block !important;
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #e52d75;
+        border-bottom: 2px solid #e52d75;
+        padding-bottom: 5px;
+        margin-bottom: 10px !important;
+        text-align: center;
+      }
+
+      .section-title-container { margin: 10px 0 5px 0 !important; }
+      .section-title { font-size: 1rem !important; }
+
+      #charts_area {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        width: 100% !important;
+        margin-bottom: 30px !important;
+        gap: 15px !important;
+      }
+      #charts_area .col-md-4 {
+        width: 33.333% !important;
+        flex: 1 1 33.333% !important;
+        max-width: 33.333% !important;
+      }
+      .chart-container {
+        height: 220px !important;
+        padding: 10px !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 12px !important;
+        box-shadow: none !important;
+      }
+      .chart-title { font-size: 0.85rem !important; margin-bottom: 5px !important; }
+
+      .chart-wrapper {
+        height: 170px !important;
+        width: 100% !important;
+      }
+
+      .table-responsive { overflow: visible !important; }
+      .table-compact { width: 100% !important; font-size: 0.73rem !important; margin-top: 5px !important; }
+      .table-compact th, .table-compact td { padding: 3px 1px !important; }
+      .table-compact th { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+    .print-title { display: none; }
+  </style>
+</head>
+<body>
+
+  <div style="background-color: #f8f9fa; padding: 10px 20px; border-bottom: 1px solid #ddd; text-align: right; font-size: 14px; color: #666; font-weight: bold;">
+      접속 계정: <span style="color: #e52d75;" id="user_email">확인 중...</span>
+  </div>
+
+  <div id="initial_loading">
+    <div class="loading-spinner"></div>
+    <h4 class="fw-bold text-dark text-center px-3" id="loading_title">잠시만 기다려 주시면 곧 연결됩니다.</h4>
+    <p class="text-muted text-center px-3" id="loading_desc">모의고사 성적 추이 분석 데이터를 동기화 중입니다.</p>
+  </div>
+
+  <div id="fetch_loading">
+    <div class="spinner-border text-primary mb-2"></div>
+    <strong id="loading_msg">학생 성적 데이터를 분석하는 중...</strong>
+  </div>
+
+  <div class="container-fluid container-custom mt-2">
+
+    <div class="header-panel d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center gap-3 w-100 flex-wrap">
+        <img src="https://lh3.googleusercontent.com/d/1kQiYl51Fk_VGwrvXGCAZsG4wbJQUCWBM" alt="영남고 엠블럼" style="width: 42px; height: auto;">
+        <div class="d-flex align-items-baseline gap-3 flex-wrap">
+          <h4 class="fw-bold mb-0">개별 모의고사 성적 분석</h4>
+          <span class="fs-6 opacity-75 fw-medium">| 개별 학생 3개년 모의고사 및 내신 조회</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-2 mb-3 shadow-sm border-0 sticky-top-menu" style="border-radius: 10px; border: 1px solid #dee2e6 !important;">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+
+        <div class="d-flex align-items-center flex-wrap gap-3 flex-grow-1">
+          <div class="d-flex align-items-center gap-2">
+            <label class="small fw-bold text-nowrap mb-0" style="color: #e52d75; min-width: 55px;">학년</label>
+            <select id="sel_grade" class="form-select form-select-sm" style="width: 100px;">
+              <option value="3">3학년</option>
+              <option value="2">2학년</option>
+              <option value="1">1학년</option>
+            </select>
+          </div>
+
+          <div class="d-flex align-items-center gap-2">
+            <label class="small fw-bold text-nowrap mb-0" style="color: #e52d75; min-width: 45px;">반</label>
+            <select id="sel_ban" class="form-select form-select-sm" style="width: 110px;"></select>
+          </div>
+
+          <div class="d-flex align-items-center gap-2">
+            <label class="small fw-bold text-nowrap mb-0" style="color: #e52d75; min-width: 55px;">학생</label>
+            <select id="sel_bun" class="form-select form-select-sm" style="width: 160px;" disabled></select>
+          </div>
+
+          <div id="gpa_area" style="display:none; gap: 8px; align-items: center; margin-left: 10px;">
+            <div style="background: #ffc107; color: #212529; padding: 4px 14px; border-radius: 30px; font-size: 0.85rem; font-weight: 800; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+              5등급제 <span id="v_gpa9" style="color: #d93025; font-size: 1rem; margin-left: 4px;">-</span>
+            </div>
+            <div style="background: #d93025; color: #ffffff; padding: 4px 14px; border-radius: 30px; font-size: 0.85rem; font-weight: 800; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+              9등급제 <span id="v_gpa5" style="color: #ffc107; font-size: 1rem; margin-left: 4px;">-</span>
+            </div>
+            <button onclick="window.print()" class="btn btn-sm btn-outline-primary fw-bold px-3 ms-2 text-nowrap" style="border-radius: 30px; font-size: 0.85rem;">
+              🖨️ 성적표 출력
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="counseling-card" id="card_content" style="display:none; pt: 15px;">
+      <div class="watermark"></div>
+
+      <div class="print-title">
+        <span id="v_info_title_print"></span> 성적 분석 보고서
+      </div>
+
+      <div class="section-title-container" style="margin-top: 0;">
+        <div class="section-title">학년도별 모의고사 성적</div>
+      </div>
+
+      <div class="row g-3 mb-4" id="charts_area">
+        <div class="col-md-4">
+          <div class="chart-container chart-container-p">
+            <div class="chart-title">국수탐 평균 백분위</div>
+            <div class="chart-wrapper" style="position: relative; height: 210px; width: 100%;">
+              <canvas id="chartPercentile"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="chart-container chart-container-s">
+            <div class="chart-title">국수탐 표준점수 합</div>
+            <div class="chart-wrapper" style="position: relative; height: 210px; width: 100%;">
+              <canvas id="chartStandardScore"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="chart-container chart-container-g">
+            <div class="chart-title">국수탐 평균 등급</div>
+            <div class="chart-wrapper" style="position: relative; height: 210px; width: 100%;">
+              <canvas id="chartGrade"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title-container">
+        <div class="section-title">학년도별 전체 과목 성적</div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table-compact table-hover mb-3 text-center align-middle" style="min-width: 900px;">
+          <thead style="background-color: rgba(248, 249, 250, 0.8);">
+            <tr>
+              <th rowspan="2" style="width: 90px;">시험 날짜</th>
+              <th colspan="3" style="color: #e52d75;">국수탐 요약</th>
+              <th colspan="4">국어</th>
+              <th colspan="4">수학</th>
+              <th>영어</th>
+              <th>한국사</th>
+              <th colspan="4">탐구1</th>
+              <th colspan="4">탐구2</th>
+            </tr>
+            <tr>
+              <th>백분위</th><th>등급</th><th>표점합</th>
+              <th>선택</th><th>표점</th><th>백분위</th><th>등급</th>
+              <th>선택</th><th>표점</th><th>백분위</th><th>등급</th>
+              <th>등급</th><th>등급</th>
+              <th>선택</th><th>표점</th><th>백분위</th><th>등급</th>
+              <th>선택</th><th>표점</th><th>백분위</th><th>등급</th>
+            </tr>
+          </thead>
+          <tbody id="history_tbody"></tbody>
+        </table>
+      </div>
+
+      <div id="no_history_data" class="alert alert-warning text-center mt-3 fw-bold" style="display:none; position:relative; z-index:2;">
+        선택한 학생의 등록된 모의고사 데이터가 없습니다.
+      </div>
+    </div>
+
+    <div class="credit-footer" style="text-align: right; font-size: 12px; color: #6c757d; margin-top: 30px; padding-bottom: 10px; line-height: 1.6;">
+      원작·데이터 제공 : 2026학년도 영남고등학교 진로진학부팀
+    </div>
+
+  </div>
+
+  <script>
+    let mData = null;
+    let chartP = null;
+    let chartS = null;
+    let chartG = null;
+
+    // Firestore에서 데이터를 받는 두 함수 (원본의 google.script.run 대체) — module 스크립트에서 주입
+    // window.gradesGetInitialData(): { studentTree }
+    // window.gradesGetStudentHistory(grade, ban, bun): { history, gpa9, gpa5 }
+
+    function initAfterData(data) {
+      mData = data;
+      document.getElementById('initial_loading').style.display = 'none';
+      document.getElementById('sel_grade').dispatchEvent(new Event('change'));
+    }
+
+    document.getElementById('sel_grade').onchange = function() {
+      const grade = this.value;
+      const bSel = document.getElementById('sel_ban');
+
+      bSel.innerHTML = '<option value="">반 선택</option>';
+      document.getElementById('sel_bun').innerHTML = '<option value="">학생 선택</option>';
+      document.getElementById('sel_bun').disabled = true;
+      document.getElementById('card_content').style.display = 'none';
+
+      if (grade && mData && mData.studentTree && mData.studentTree[grade]) {
+        Object.keys(mData.studentTree[grade]).sort((a,b) => a-b).forEach(b => {
+          bSel.add(new Option(b + '반', b));
+        });
+      }
+    };
+
+    document.getElementById('sel_ban').onchange = function() {
+      const grade = document.getElementById('sel_grade').value;
+      const ban = this.value;
+      const bSel = document.getElementById('sel_bun');
+
+      bSel.innerHTML = '<option value="">학생 선택</option>';
+      document.getElementById('card_content').style.display = 'none';
+
+      if (grade && ban && mData && mData.studentTree[grade] && mData.studentTree[grade][ban]) {
+        bSel.disabled = false;
+        Object.keys(mData.studentTree[grade][ban]).sort((a,b) => a-b).forEach(n => {
+          const name = mData.studentTree[grade][ban][n];
+          const opt = new Option(`${n}번 ${name}`, n);
+          opt.dataset.name = name;
+          bSel.add(opt);
+        });
+      } else {
+        bSel.disabled = true;
+      }
+    };
+
+    document.getElementById('sel_bun').onchange = function() {
+      const grade = document.getElementById('sel_grade').value;
+      const ban = document.getElementById('sel_ban').value;
+      const bun = this.value;
+      if(!bun) return;
+
+      const name = this.options[this.selectedIndex].dataset.name;
+
+      document.getElementById('fetch_loading').style.display = 'flex';
+
+      window.gradesGetStudentHistory(grade, ban, bun).then(res => {
+        document.getElementById('fetch_loading').style.display = 'none';
+        document.getElementById('card_content').style.display = 'block';
+
+        const infoStr = `${grade}학년 ${ban}반 ${bun}번 ${name} 학생`;
+        document.getElementById('v_info_title_print').innerText = infoStr;
+
+        const tbody = document.getElementById('history_tbody');
+        tbody.innerHTML = '';
+
+        let historyList = [];
+        if (res && res.history) {
+            historyList = res.history;
+            document.getElementById('v_gpa9').innerText = res.gpa9 || '-';
+            document.getElementById('v_gpa5').innerText = res.gpa5 || '-';
+            document.getElementById('gpa_area').style.display = 'flex';
+        } else if (Array.isArray(res)) {
+            historyList = res;
+            document.getElementById('gpa_area').style.display = 'none';
+        }
+
+        if(!historyList || historyList.length === 0) {
+          document.getElementById('no_history_data').style.display = 'block';
+          document.getElementById('charts_area').style.display = 'none';
+          return;
+        }
+
+        document.getElementById('no_history_data').style.display = 'none';
+        document.getElementById('charts_area').style.display = 'flex';
+
+        const fixNum = (val, d) => (val !== "" && !isNaN(val) && val !== null) ? Number(val).toFixed(d) : '-';
+
+        const labels = [];
+        const percentileData = [];
+        const ssData = [];
+        const gradeData = [];
+
+        historyList.forEach(h => {
+          labels.push(h.examDate);
+          percentileData.push(h.avgP || null);
+          ssData.push(h.sumSS || null);
+          gradeData.push(h.avgG || null);
+        });
+
+        const reversedHistory = [...historyList].reverse();
+
+        reversedHistory.forEach(h => {
+          let tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="fw-bold" style="color:#e52d75;">${h.examDate}</td>
+            <td class="val-grade">${fixNum(h.avgP, 1)}</td>
+            <td class="val-grade">${fixNum(h.avgG, 2)}</td>
+            <td>${h.sumSS || '-'}</td>
+
+            <td class="text-secondary fw-bold" style="font-size:0.75rem;">${h.kor.sub||'-'}</td>
+            <td>${h.kor.ss||'-'}</td>
+            <td>${fixNum(h.kor.p,0)}</td>
+            <td class="val-grade">${h.kor.g||'-'}</td>
+
+            <td class="text-secondary fw-bold" style="font-size:0.75rem;">${h.math.sub||'-'}</td>
+            <td>${h.math.ss||'-'}</td>
+            <td>${fixNum(h.math.p,0)}</td>
+            <td class="val-grade">${h.math.g||'-'}</td>
+
+            <td class="val-grade">${h.eng||'-'}</td>
+            <td class="val-grade">${h.hist||'-'}</td>
+
+            <td class="text-secondary fw-bold" style="font-size:0.75rem;">${h.tam1.sub||'-'}</td>
+            <td>${h.tam1.ss||'-'}</td>
+            <td>${fixNum(h.tam1.p,0)}</td>
+            <td class="val-grade">${h.tam1.g||'-'}</td>
+
+            <td class="text-secondary fw-bold" style="font-size:0.75rem;">${h.tam2.sub||'-'}</td>
+            <td>${h.tam2.ss||'-'}</td>
+            <td>${fixNum(h.tam2.p,0)}</td>
+            <td class="val-grade">${h.tam2.g||'-'}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        renderCharts(labels, percentileData, ssData, gradeData);
+      }).catch(e => {
+        document.getElementById('fetch_loading').style.display = 'none';
+        alert('성적 데이터를 불러오지 못했습니다: ' + e.message);
+      });
+    };
+
+    function renderCharts(labels, pData, sData, gData) {
+      Chart.register(ChartDataLabels);
+
+      if (chartP) chartP.destroy();
+      if (chartS) chartS.destroy();
+      if (chartG) chartG.destroy();
+
+      Chart.defaults.font.family = "'Pretendard', sans-serif";
+      Chart.defaults.color = '#64748b';
+
+      const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            titleColor: '#1e293b',
+            bodyColor: '#1e293b',
+            borderColor: '#e2e8f0',
+            borderWidth: 1,
+            padding: 12,
+            boxPadding: 6,
+            usePointStyle: true,
+            titleFont: { size: 13, weight: 'bold' },
+            bodyFont: { size: 14, weight: 'bold' }
+          },
+          datalabels: {
+            display: true,
+            align: 'top',
+            anchor: 'end',
+            offset: 4,
+            color: function(context) { return context.dataset.borderColor; },
+            font: { family: "'Pretendard', sans-serif", weight: 'bold', size: 11 },
+            formatter: function(value) { return value !== null && value !== undefined ? value : ''; }
+          }
+        },
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: { grid: { display: false }, offset: true },
+          y: { grid: { color: '#f1f5f9' }, border: { dash: [4, 4] } }
+        },
+        layout: { padding: { top: 20 } }
+      };
+
+      function getGradient(ctx, colorStart, colorEnd) {
+        const gradient = ctx.createLinearGradient(0, 0, 0, 250);
+        gradient.addColorStop(0, colorStart);
+        gradient.addColorStop(1, colorEnd);
+        return gradient;
+      }
+
+      const ctxP = document.getElementById('chartPercentile').getContext('2d');
+      chartP = new Chart(ctxP, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '평균 백분위',
+            data: pData,
+            borderColor: '#11caa0',
+            backgroundColor: getGradient(ctxP, 'rgba(17, 202, 160, 0.4)', 'rgba(17, 202, 160, 0.0)'),
+            borderWidth: 3,
+            pointBackgroundColor: '#ffffff',
+            pointBorderColor: '#11caa0',
+            pointBorderWidth: 2,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, suggestedMin: 0, suggestedMax: 100 } } }
+      });
+
+      const ctxS = document.getElementById('chartStandardScore').getContext('2d');
+      chartS = new Chart(ctxS, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '표준점수 합',
+            data: sData,
+            borderColor: '#e52d75',
+            backgroundColor: getGradient(ctxS, 'rgba(229, 45, 117, 0.4)', 'rgba(229, 45, 117, 0.0)'),
+            borderWidth: 3,
+            pointBackgroundColor: '#ffffff',
+            pointBorderColor: '#e52d75',
+            pointBorderWidth: 2,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, suggestedMin: 150, suggestedMax: 450 } } }
+      });
+
+      const ctxG = document.getElementById('chartGrade').getContext('2d');
+      chartG = new Chart(ctxG, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '평균 등급',
+            data: gData,
+            borderColor: '#d93025',
+            backgroundColor: getGradient(ctxG, 'rgba(217, 48, 37, 0.4)', 'rgba(217, 48, 37, 0.0)'),
+            borderWidth: 3,
+            pointBackgroundColor: '#ffffff',
+            pointBorderColor: '#d93025',
+            pointBorderWidth: 2,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, reverse: true, suggestedMin: 1, suggestedMax: 9 } } }
+      });
+    }
+
+    window.onbeforeprint = function() {
+      if (chartP) { chartP.resize(); chartP.update('none'); }
+      if (chartS) { chartS.resize(); chartS.update('none'); }
+      if (chartG) { chartG.resize(); chartG.update('none'); }
+    };
+
+    window.onafterprint = function() {
+      if (chartP) { chartP.resize(); chartP.update('none'); }
+      if (chartS) { chartS.resize(); chartS.update('none'); }
+      if (chartG) { chartG.resize(); chartG.update('none'); }
+    };
+  </script>
+
+  <!-- 데이터 계층: Firebase 로그인 세션(앱과 같은 도메인이라 자동 공유) + Firestore gradesMock -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
+    const app = initializeApp({
+      apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
+      authDomain: "ynhs-7b5ba.firebaseapp.com",
+      projectId: "ynhs-7b5ba",
+      storageBucket: "ynhs-7b5ba.firebasestorage.app",
+      messagingSenderId: "1031618043470",
+      appId: "1:1031618043470:web:edb5b8d1f98db029916d1f"
+    });
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const classCache = {};
+    window.gradesGetStudentHistory = async function(grade, ban, bun) {
+      const key = grade + '-' + ban;
+      if (!classCache[key]) {
+        const snap = await getDoc(doc(db, 'gradesMock', key));
+        classCache[key] = snap.exists() ? snap.data() : { students: {} };
+      }
+      const st = classCache[key].students[bun];
+      if (!st) return { history: [], gpa9: '-', gpa5: '-' };
+      return { history: st.history || [], gpa9: st.gpa9 || '-', gpa5: st.gpa5 || '-' };
+    };
+
+    function showBlock(title, desc) {
+      document.querySelector('#initial_loading .loading-spinner').style.display = 'none';
+      document.getElementById('loading_title').textContent = title;
+      document.getElementById('loading_desc').textContent = desc;
+    }
+
+    let resolved = false;
+    onAuthStateChanged(auth, async (user) => {
+      if (resolved) return;
+      if (!user) {
+        // 앱 안(iframe)에서는 로그인 세션이 자동 공유되므로 여기 올 일이 없고,
+        // 이 페이지를 단독으로 열었을 때만 표시됨
+        showBlock('로그인이 필요합니다.', '영남고 교사용 앱에서 로그인한 뒤 성적조회 탭으로 이용해주세요.');
+        return;
+      }
+      resolved = true;
+      document.getElementById('user_email').textContent = user.email;
+      try {
+        const snap = await getDoc(doc(db, 'gradesMock', 'index'));
+        if (!snap.exists()) {
+          showBlock('아직 데이터가 없습니다.', '성적 동기화가 아직 실행되지 않았습니다. 관리자에게 문의해주세요.');
+          return;
+        }
+        initAfterData({ studentTree: snap.data().tree });
+      } catch (e) {
+        showBlock('데이터를 불러오지 못했습니다.', e.message);
+      }
+    });
+  </script>
+</body>
+</html>
