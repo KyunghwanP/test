@@ -2937,7 +2937,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.07</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.08</div>
   </div>
 </div>
 
@@ -3061,7 +3061,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver5.07</div>
+    <div class="nav-version">ver5.08</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -6774,6 +6774,7 @@ let spotLoading = null;
 let spotLoaded = false;
 const spotPts = new Map();   // 'g-r-n' → riro_points 학생 레코드
 const spotGradeCls = {};     // 'g-r' → gradesMock 반 문서 캐시
+const spotElectiveCls = {};  // 'g-r' → electives 반 문서 캐시
 let spotSusiRows = null;     // gradesSusi(졸업생 수시 합격 현황) 전체 청크 병합 캐시
 
 // 졸업생 수시 데이터 로드 — susi.html과 동일하게 chunk-N 문서를 순서대로 병합
@@ -7165,6 +7166,31 @@ function s360RenderCharts(history){
   mk('s360ChartG', '평균 등급', gData, '#d93025', '217, 48, 37', { reverse: true, suggestedMin: 1, suggestedMax: 9 });
 }
 
+// 선택과목: 해당 반 electives 문서만 지연 로드 (교육과정 현황 시트 → sync-grades.js)
+async function s360LoadElectives(s){
+  const el = document.getElementById('s360Electives');
+  if (!el) return;
+  try {
+    const key = `${parseInt(s.grade)}-${parseInt(s.room)}`;
+    if (!spotElectiveCls[key]) {
+      const snap = await getDoc(doc(fbDb, 'electives', key));
+      spotElectiveCls[key] = snap.exists() ? snap.data() : { students: {} };
+    }
+    const st = spotElectiveCls[key].students?.[String(parseInt(s.num))];
+    if (!st || (!st.current?.length && !st.prevGrade?.length)) {
+      el.innerHTML = '<div style="font-size:14px;color:var(--ink-soft);">등록된 선택과목 데이터 없음</div>';
+      return;
+    }
+    const badges = list => list.map(name => `<span class="spot-badge">${escapeHtml(name)}</span>`).join('');
+    el.innerHTML = `
+      ${st.current?.length ? `<div style="margin-bottom:6px;"><div style="font-size:12.5px;font-weight:800;color:var(--ink-soft);margin-bottom:4px;">이번학년</div><div style="display:flex;gap:6px;flex-wrap:wrap;">${badges(st.current)}</div></div>` : ''}
+      ${st.prevGrade?.length ? `<div><div style="font-size:12.5px;font-weight:800;color:var(--ink-soft);margin-bottom:4px;">직전학년</div><div style="display:flex;gap:6px;flex-wrap:wrap;">${badges(st.prevGrade)}</div></div>` : ''}`;
+  } catch(e) {
+    if (e.code === 'permission-denied') { const sec = el.closest('.spot-sec'); if (sec) sec.style.display = 'none'; else el.innerHTML = ''; }
+    else el.textContent = '선택과목 로드 실패: ' + e.message;
+  }
+}
+
 async function s360ShowDetail(s){
   s360View = 'detail';
   const main = document.getElementById('s360Body');
@@ -7195,12 +7221,16 @@ async function s360ShowDetail(s){
         <button id="s360ContactBtn" class="spot-badge" style="border:none;cursor:pointer;font-family:inherit;">📞 연락처 보기</button>
       </div>
       <div class="spot-sec"><div class="spot-sec-title">상벌점 (전체 이력)</div>${ptsHtml}</div>
+      <div class="spot-sec"><div class="spot-sec-title">선택과목</div>
+        <div id="s360Electives" style="font-size:14px;color:var(--ink-soft);">불러오는 중...</div>
+      </div>
       <div class="spot-sec" style="margin-bottom:0;"><div class="spot-sec-title">성적 (내신 · 모의고사 전체 회차)</div>
         <div id="s360Grades" style="font-size:14px;color:var(--ink-soft);">불러오는 중...</div>
       </div>
     </div>`;
   document.getElementById('s360BackBtn').addEventListener('click', () => s360Back());
   document.getElementById('s360ContactBtn').addEventListener('click', () => showStudentDetail(s));
+  s360LoadElectives(s);
 
   // 성적: 해당 반 gradesMock 문서만 지연 로드
   const gEl = document.getElementById('s360Grades');

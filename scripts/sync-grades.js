@@ -5,16 +5,19 @@
 // Firestore 구조:
 //   gradesMock/index          → { t, tree: { 학년: { 반: { 번호: 이름 } } } }
 //   gradesMock/{학년}-{반}    → { t, students: { 번호: { name, gpa9, gpa5, history: [...] } } }
+//   electives/index           → { t, tree: { 학년: { 반: { 번호: 이름 } } } }
+//   electives/{학년}-{반}     → { t, students: { 번호: { name, current:[과목명...], prevGrade:[과목명...] } } }
 //
 // 사전 조건:
 //   1) GCP 프로젝트(ynhs-7b5ba)에 Google Sheets API 활성화
-//   2) 시트를 서비스 계정 이메일(client_email)에 뷰어로 공유
+//   2) 시트를 서비스 계정 이메일(client_email)에 뷰어로 공유 (선택과목 시트 포함, 탭 '1학년'/'2학년'/'3학년' 필요)
 const admin = require('firebase-admin');
 const { JWT } = require('google-auth-library');
 
 const SHEET_ID = '1RIVq_WIPFyrbFtgqwJbzGpGXOizU1Qylf2C_Cd9IjLc';        // 모의고사·학생 명렬
 const SUSI_SHEET_ID = '1uR9WAW60AcEQN_lRNMw8a-zCmAR08xtvd-Glel6HrCE';   // 졸업생 수시 합격 현황
 const IPGYEOL_SHEET_ID = '1DQILv_vIxgtAO8pN6dXC0SV8tf5uyrBXzDG_08xjf9Y'; // 수시·정시 입결('수시'/'정시' 탭)
+const ELECTIVE_SHEET_ID = '1x1bg94AiYov0SkAQcnRl3fNwid6BU6ft45OEZ_jysMc'; // 학생 선택과목('1학년'/'2학년'/'3학년' 탭)
 
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 admin.initializeApp({
@@ -283,6 +286,99 @@ const normName = s => String(s || '').replace(/\s/g, '');
   }
 
   console.log(`✅ gradesIpgyeol 저장 완료 — 수시 ${ipSusiRows.length}행/${nSusi}청크, 정시 ${ipJeongsiRows.length}행/${nJeongsi}청크 (${new Date().toISOString()})`);
+
+  // ══════════════════════════════════════════
+  // 학생 선택과목 → electives (학년별 탭 '1학년'/'2학년'/'3학년')
+  // 열 구성(왼쪽부터): 신반,신번호,임시반,임시번호,성명,... 주소 뒤로 과목 헤더가 이어짐.
+  //   - 헤더가 채워진 열 = 과목명, 그 학생 행의 같은 열에 값이 있으면 그 과목을 선택한 것.
+  //   - 헤더가 빈 열 = 이동수업 내부 코드 열 — 통째로 무시.
+  //   - "단위수" 헤더가 나오면 이번학년 선택과목 블록 종료, 그 뒤 빈 열(구분용) 하나를 지나
+  //     다시 나오는 과목 헤더들은 직전학년 선택과목 블록(같은 규칙).
+  // 열 위치를 하드코딩하지 않고 매번 헤더 행에서 동적으로 감지 — 시트 구성이 바뀌어도 안전.
+  // ══════════════════════════════════════════
+  console.log('📚 선택과목 시트 읽는 중...');
+  const ELECTIVE_GRADES = [1, 2, 3];
+  const elTree = {};
+  const elClasses = {}; // "학년-반" → { 번호: { name, current:[...], prevGrade:[...] } }
+
+  for (const grade of ELECTIVE_GRADES) {
+    const tab = `${grade}학년`;
+    let rows;
+    try {
+      rows = await readRange(`${tab}!A1:CZ`, ELECTIVE_SHEET_ID);
+    } catch (e) {
+      console.warn(`  ⚠️ '${tab}' 탭을 읽지 못함 — 건너뜀 (${e.response?.data?.error?.message || e.message})`);
+      continue;
+    }
+    if (!rows.length) { console.warn(`  ⚠️ '${tab}' 탭이 비어있음 — 건너뜀`); continue; }
+
+    const header = rows[0];
+    const hcell = h => String(h ?? '').trim();
+    const addrIdx = header.findIndex(h => hcell(h) === '주소');
+    if (addrIdx === -1) {
+      console.warn(`  ⚠️ '${tab}': '주소' 열을 못 찾아 선택과목 구간을 판단할 수 없음 — 건너뜀`);
+      continue;
+    }
+
+    // 헤더를 스캔해 이번학년/직전학년 과목 열을 동적으로 분리
+    const block1 = [], block2 = [];
+    let state = 'block1'; // block1 → afterUnit(구분용 빈열 대기) → block2
+    for (let c = addrIdx + 1; c < header.length; c++) {
+      const h = hcell(header[c]);
+      if (state === 'block1') {
+        if (h === '단위수') { state = 'afterUnit'; continue; }
+        if (!h) continue; // 이동수업 내부 코드 열
+        block1.push({ col: c, name: h });
+      } else if (state === 'afterUnit') {
+        if (h === '단위수') continue; // 단위수 열이 연달아 나올 수 있음
+        if (!h) { state = 'block2'; continue; } // 구분용 빈 열 통과
+        // 구분 빈 열 없이 바로 과목이 나오는 경우도 방어적으로 블록2로 인정
+        state = 'block2';
+        block2.push({ col: c, name: h });
+      } else { // block2
+        if (!h || h === '단위수') continue;
+        block2.push({ col: c, name: h });
+      }
+    }
+    console.log(`  ${tab}: 이번학년 선택과목 열 ${block1.length}개(${block1.map(s=>s.name).join(',')}), 직전학년 선택과목 열 ${block2.length}개(${block2.map(s=>s.name).join(',')})`);
+
+    let studentCount = 0;
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const room = num(cell(row, 0));  // 신반
+      const seat = num(cell(row, 1));  // 신번호
+      const name = cell(row, 4);       // 성명
+      if (!room || !seat || !name) continue;
+
+      const current = [...new Set(block1.filter(sc => cell(row, sc.col)).map(sc => sc.name))];
+      const prevGrade = [...new Set(block2.filter(sc => cell(row, sc.col)).map(sc => sc.name))];
+
+      (elTree[grade] ??= {});
+      (elTree[grade][room] ??= {});
+      elTree[grade][room][seat] = name;
+      (elClasses[grade + '-' + room] ??= {})[seat] = { name, current, prevGrade };
+      studentCount++;
+    }
+    console.log(`  ${tab}: 학생 ${studentCount}명 처리`);
+  }
+
+  const elClassIds = Object.keys(elClasses);
+  if (elClassIds.length) {
+    const elBatchOps = [{ set: 'electives/index', data: { t, tree: elTree } }];
+    elClassIds.forEach(id => elBatchOps.push({ set: 'electives/' + id, data: { t, students: elClasses[id] } }));
+    const elExisting = await db.collection('electives').listDocuments();
+    elExisting.forEach(ref => {
+      if (ref.id !== 'index' && !elClasses[ref.id]) elBatchOps.push({ delRef: ref });
+    });
+    for (let i = 0; i < elBatchOps.length; i += 400) {
+      const b = db.batch();
+      elBatchOps.slice(i, i + 400).forEach(op => op.set ? b.set(db.doc(op.set), op.data) : b.delete(op.delRef));
+      await b.commit();
+    }
+    console.log(`✅ electives 저장 완료 — 반 ${elClassIds.length}개`);
+  } else {
+    console.warn('  ⚠️ electives: 처리된 학생이 0명이라 Firestore에 쓰지 않음 — 탭 이름/헤더 구성을 확인하세요');
+  }
 
   await syncGradeRoles();
   process.exit(0);
