@@ -131,7 +131,8 @@ const normName = s => String(s || '').replace(/\s/g, '');
   // 열 배치(원본 GAS와 동일): B(1)시험명 D(3)학년 E(4)반 F(5)번호 G(6)이름
   //   H(7)백분위평균 I(8)평균등급 J(9)표점합 K-N(10~13)국어 O-R(14~17)수학
   //   S(18)영어 T(19)한국사 U-X(20~23)탐구1 Y-AB(24~27)탐구2
-  let mockCount = 0, nameMismatch = 0;
+  let mockCount = 0;
+  const nameMismatch = new Set(); // 학생당 1회만 경고 (모의고사 행마다 반복 방지)
 
   for (let i = 1; i < mockRows.length; i++) {
     const row = mockRows[i];
@@ -146,9 +147,10 @@ const normName = s => String(s || '').replace(/\s/g, '');
       (tree[grade][ban] ??= {});
       tree[grade][ban][bun] = name;
       classes[clsKey][bun] = { name, gpa9: '-', gpa5: '-', history: [] };
-    } else if (normName(classes[clsKey][bun].name) !== normName(name)) {
+    } else if (normName(classes[clsKey][bun].name) !== normName(name) && !nameMismatch.has(clsKey + '|' + bun)) {
       // 번호는 같은데 이름이 다르면 두 탭의 번호가 어긋난 것 — 로그로 알림
-      if (++nameMismatch <= 10) console.warn(`  ⚠️ ${clsKey}반 ${bun}번 이름 불일치: 명렬 '${classes[clsKey][bun].name}' vs 모의고사 '${name}' — 시트 확인 필요`);
+      nameMismatch.add(clsKey + '|' + bun);
+      console.warn(`  ⚠️ ${clsKey}반 ${bun}번 이름 불일치: 명렬 '${classes[clsKey][bun].name}' vs 모의고사 '${name}' — 시트 확인 필요`);
     }
     classes[clsKey][bun].history.push({
       examDate: cell(row,1) || '-',
@@ -165,7 +167,7 @@ const normName = s => String(s || '').replace(/\s/g, '');
   const classIds = Object.keys(classes);
   const rosterCount = Object.keys(gpaMap).length;
   const gpaCount = Object.values(gpaMap).filter(v => v.gpa9 !== '-' || v.gpa5 !== '-').length;
-  if (nameMismatch > 10) console.warn(`  ⚠️ 이름 불일치 총 ${nameMismatch}건 (상위 10건만 표시)`);
+  if (nameMismatch.size) console.warn(`  ⚠️ 이름 불일치 학생 총 ${nameMismatch.size}명 — 두 탭의 번호·이름을 대조해 시트를 수정하세요`);
   console.log(`  학생 트리 완성 — 반 ${classIds.length}개, 명렬 ${rosterCount}명(내신 ${gpaCount}명), 모의고사 ${mockCount}건`);
 
   // ── Firestore 저장 (index + 반별 문서, 사라진 반 문서는 정리) ──
