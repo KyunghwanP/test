@@ -1009,6 +1009,27 @@
   }
   .pts-suggestion-name{ font-weight:700;white-space:nowrap; }
 
+  /* 통합 학생 검색 (스포트라이트) */
+  .spot-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9000;display:none;align-items:flex-start;justify-content:center;padding:8vh 16px 16px;}
+  .spot-overlay.open{display:flex;}
+  .spot-box{background:#fff;width:100%;max-width:560px;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;display:flex;flex-direction:column;max-height:80vh;}
+  .spot-input{border:0;outline:0;padding:16px 18px;font-size:16px;font-family:inherit;flex:1;background:transparent;color:var(--ink);}
+  .spot-body{overflow-y:auto;}
+  .spot-row{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--rule);}
+  .spot-row:hover{background:rgba(30,58,138,.06);}
+  .spot-grn{font-family:'IBM Plex Mono';font-size:12px;font-weight:700;color:var(--ink-soft);min-width:56px;}
+  .spot-name{font-weight:800;font-size:15px;color:var(--ink);}
+  .spot-badges{margin-left:auto;display:flex;gap:6px;}
+  .spot-badge{padding:2px 8px;border-radius:12px;background:#f1f5f9;color:#475569;white-space:nowrap;font-size:11px;font-weight:700;}
+  .spot-badge.neg{background:#fee2e2;color:#b91c1c;}
+  .spot-badge.pos{background:#dcfce7;color:#15803d;}
+  .spot-empty{padding:28px;text-align:center;color:var(--ink-soft);font-size:14px;}
+  .spot-detail{padding:16px 18px;}
+  .spot-sec{margin-bottom:14px;}
+  .spot-sec-title{font-size:12px;font-weight:900;color:var(--ink-soft);letter-spacing:.06em;margin-bottom:6px;}
+  .spot-back{background:none;border:0;color:var(--ink-soft);font-weight:700;cursor:pointer;padding:10px 16px;text-align:left;font-size:13px;border-bottom:1px solid var(--rule);font-family:inherit;width:100%;}
+  .spot-back:hover{color:var(--ink);}
+
   /* 상벌점 조회·입력/조회 탭 */
   .pts-mode-tabs{
     display:grid;grid-template-columns:1fr 1fr;
@@ -2890,7 +2911,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.87</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.88</div>
   </div>
 </div>
 
@@ -2902,7 +2923,8 @@
       <span></span><span></span><span></span>
     </button>
     <div class="app-header-title" onclick="navigateTo('home')" style="cursor:pointer;"><img src="icon-180.png" style="height:38px;vertical-align:middle;margin-right:10px;">영남고등학교</div>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button class="app-logout-btn" id="spotlightBtn" style="display:none;" title="학생 통합 검색 (연락처·상벌점·성적)">🔍 학생검색</button>
       <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
     </div>
   </header>
@@ -3008,7 +3030,7 @@
       <div class="main-nav-item" data-page="grades" style="display:none;">
         <span class="main-nav-icon">🎓</span>진로진학 <span style="font-size:11px;opacity:.6;">(테스트)</span>
       </div>
-    <div class="nav-version">ver4.87</div>
+    <div class="nav-version">ver4.88</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3882,6 +3904,17 @@
         <button onclick="saveGroupEditor()" style="padding:12px 22px;border-radius:10px;border:none;background:var(--mon);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">저장</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- 통합 학생 검색 (스포트라이트) 모달 -->
+<div class="spot-overlay" id="spotOverlay">
+  <div class="spot-box">
+    <div style="display:flex;align-items:center;border-bottom:1px solid var(--rule);">
+      <input class="spot-input" id="spotInput" type="text" placeholder="🔍 학생 이름 · 반(2-3) 검색..." autocomplete="off">
+      <button id="spotCloseBtn" style="background:none;border:0;font-size:22px;color:var(--ink-soft);cursor:pointer;padding:0 16px;font-family:inherit;">×</button>
+    </div>
+    <div class="spot-body" id="spotBody"></div>
   </div>
 </div>
 
@@ -5537,6 +5570,9 @@ onAuthStateChanged(fbAuth, async (user) => {
       const _isTester = GRADES_TEST_TEACHERS.some(n => _norm(n) === _name);
       if ((!isViewAs() && user.email === ADMIN_EMAIL) || _isTester) {
         document.querySelectorAll('[data-page="grades"]').forEach(el => { el.style.display = ''; });
+        // 통합 학생 검색도 같은 대상에게 노출 (성적 데이터 포함)
+        const sb = document.getElementById('spotlightBtn');
+        if (sb) sb.style.display = '';
       }
     }
     // 로그인한 선생님 이메일 자동 수집
@@ -6699,6 +6735,151 @@ document.getElementById('studentsSearch').addEventListener('input', function() {
   });
 });
 
+
+// ══════════════════════════════════════════
+// 통합 학생 검색 (스포트라이트) — 연락처 + 상벌점 + 내신/모의고사 요약 (ver4.88)
+// 노출 대상: 진로진학 테스트 탭과 동일 (성적 데이터 포함이므로)
+// ══════════════════════════════════════════
+let spotLoading = null;
+let spotLoaded = false;
+const spotPts = new Map();   // 'g-r-n' → riro_points 학생 레코드
+const spotGradeCls = {};     // 'g-r' → gradesMock 반 문서 캐시
+let spotLastQuery = '';
+
+function spotKey(s){ return `${parseInt(s.grade)}-${parseInt(s.room)}-${parseInt(s.num)}`; }
+
+function spotLoadData(){
+  if (spotLoading) return spotLoading;
+  spotLoading = (async () => {
+    const [stu, p1, p2, p3] = await Promise.all([
+      allStudents.length ? null : getDoc(doc(fbDb, 'students', 'main')).catch(() => null),
+      getDoc(doc(fbDb, 'riro_points', 'grade1')).catch(() => null),
+      getDoc(doc(fbDb, 'riro_points', 'grade2')).catch(() => null),
+      getDoc(doc(fbDb, 'riro_points', 'grade3')).catch(() => null),
+    ]);
+    if (stu?.exists()) allStudents = stu.data().students || [];
+    [p1, p2, p3].forEach(snap => {
+      if (!snap?.exists()) return;
+      (snap.data().students || []).forEach(p => spotPts.set(spotKey(p), p));
+    });
+    spotLoaded = true;
+  })();
+  return spotLoading;
+}
+
+function openSpotlight(){
+  document.getElementById('spotOverlay').classList.add('open');
+  const inp = document.getElementById('spotInput');
+  inp.value = spotLastQuery = '';
+  renderSpotResults('');
+  setTimeout(() => inp.focus(), 60);
+  spotLoadData().then(() => renderSpotResults(spotLastQuery))
+    .catch(e => { document.getElementById('spotBody').innerHTML = `<div class="spot-empty">불러오기 실패: ${e.message}</div>`; });
+}
+function closeSpotlight(){ document.getElementById('spotOverlay').classList.remove('open'); }
+
+function renderSpotResults(q){
+  spotLastQuery = q;
+  const body = document.getElementById('spotBody');
+  if (!spotLoaded){ body.innerHTML = '<div class="spot-empty">학생 데이터를 불러오는 중...</div>'; return; }
+  if (!allStudents.length){ body.innerHTML = '<div class="spot-empty">학생 연락망 데이터가 없습니다.</div>'; return; }
+  if (!q){ body.innerHTML = '<div class="spot-empty">이름 또는 반(예: 2-3)으로 검색하세요</div>'; return; }
+  const ql = q.toLowerCase().replace(/\s/g, '');
+  const matched = allStudents.filter(s =>
+    (s.name || '').toLowerCase().includes(ql)
+    || `${s.grade}-${s.room}` === ql
+  ).sort((a, b) =>
+    (parseInt(a.grade)||0)-(parseInt(b.grade)||0) || (parseInt(a.room)||0)-(parseInt(b.room)||0) || (parseInt(a.num)||0)-(parseInt(b.num)||0)
+  ).slice(0, 40);
+  if (!matched.length){ body.innerHTML = '<div class="spot-empty">검색 결과 없음</div>'; return; }
+  body.innerHTML = matched.map((s, i) => {
+    const p = spotPts.get(spotKey(s));
+    const ptsBadge = p ? `<span class="spot-badge ${Number(p.total) < 0 ? 'neg' : 'pos'}">상벌점 ${p.total}</span>` : '';
+    return `<div class="spot-row" data-i="${i}">
+      <span class="spot-grn">${s.grade}-${s.room}-${String(s.num||'').padStart(2,'0')}</span>
+      <span class="spot-name">${escapeHtml(s.name||'')}</span>
+      ${s.club ? `<span class="spot-badge">🎯 ${escapeHtml(s.club)}</span>` : ''}
+      <span class="spot-badges">${ptsBadge}</span>
+    </div>`;
+  }).join('');
+  body.querySelectorAll('.spot-row').forEach(row => {
+    row.addEventListener('click', () => showSpotDetail(matched[parseInt(row.dataset.i)]));
+  });
+}
+
+async function showSpotDetail(s){
+  const body = document.getElementById('spotBody');
+  const p = spotPts.get(spotKey(s));
+
+  const phoneRow = (label, v) => v ? `
+    <div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
+      <span style="min-width:34px;font-size:12px;font-weight:800;color:var(--ink-soft);">${label}</span>
+      <span style="font-family:'IBM Plex Mono';font-size:14px;font-weight:700;color:var(--ink);">${v}</span>
+      <a class="contact-btn phone" href="tel:${String(v).replace(/-/g,'')}">📞</a>
+      <a class="contact-btn sms" href="sms:${String(v).replace(/-/g,'')}">💬</a>
+    </div>` : '';
+
+  let ptsHtml = '<div style="font-size:13px;color:var(--ink-soft);">상벌점 데이터 없음</div>';
+  if (p) {
+    const recent = (p.records || []).slice(-3).reverse()
+      .map(r => `<div style="font-size:12px;color:var(--ink-soft);padding:2px 0;">· ${r.date} ${escapeHtml(r.detail)}</div>`).join('');
+    ptsHtml = `
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+        <span class="spot-badge ${Number(p.total)<0?'neg':'pos'}">합계 ${p.total}</span>
+        <span class="spot-badge pos">상점 ${p.merit}</span>
+        <span class="spot-badge neg">벌점 ${p.demerit}</span>
+        <span class="spot-badge">감점 ${p.deducted}</span>
+      </div>${recent}`;
+  }
+
+  body.innerHTML = `
+    <button class="spot-back" id="spotBackBtn">← 검색 결과로</button>
+    <div class="spot-detail">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+        <span style="font-size:20px;font-weight:900;color:var(--ink);">${escapeHtml(s.name||'')}</span>
+        <span style="font-family:'IBM Plex Mono';font-size:13px;color:var(--ink-soft);font-weight:700;">${s.grade}학년 ${s.room}반 ${s.num}번</span>
+        ${s.club ? `<span class="spot-badge">🎯 ${escapeHtml(s.club)}</span>` : ''}
+      </div>
+      <div class="spot-sec"><div class="spot-sec-title">연락처</div>
+        ${(phoneRow('학생', s.phone) + phoneRow('부', s.fatherPhone) + phoneRow('모', s.motherPhone)) || '<div style="font-size:13px;color:var(--ink-soft);">등록된 연락처 없음</div>'}
+      </div>
+      <div class="spot-sec"><div class="spot-sec-title">상벌점</div>${ptsHtml}</div>
+      <div class="spot-sec"><div class="spot-sec-title">성적 (내신 · 모의고사)</div>
+        <div id="spotGrades" style="font-size:13px;color:var(--ink-soft);">불러오는 중...</div>
+      </div>
+    </div>`;
+  document.getElementById('spotBackBtn').addEventListener('click', () => {
+    document.getElementById('spotInput').value = spotLastQuery;
+    renderSpotResults(spotLastQuery);
+  });
+
+  // 성적: 해당 반 gradesMock 문서만 지연 로드
+  const gEl = document.getElementById('spotGrades');
+  try {
+    const key = `${parseInt(s.grade)}-${parseInt(s.room)}`;
+    if (!spotGradeCls[key]) {
+      const snap = await getDoc(doc(fbDb, 'gradesMock', key));
+      spotGradeCls[key] = snap.exists() ? snap.data() : { students: {} };
+    }
+    const st = spotGradeCls[key].students?.[String(parseInt(s.num))];
+    if (!st) { gEl.textContent = '등록된 성적 데이터 없음'; return; }
+    const gpa = [
+      st.gpa9 && st.gpa9 !== '-' ? `<span class="spot-badge" style="background:#fef3c7;color:#92400e;">내신 5등급제 ${st.gpa9}</span>` : '',
+      st.gpa5 && st.gpa5 !== '-' ? `<span class="spot-badge neg">내신 9등급제 ${st.gpa5}</span>` : ''
+    ].join('');
+    const recent = (st.history || []).slice(-2).reverse().map(h => `
+      <div style="font-size:12px;color:var(--ink-soft);padding:2px 0;">· ${escapeHtml(h.examDate)} — 백분위 ${h.avgP || '-'} / 평균등급 ${h.avgG || '-'}</div>`).join('');
+    gEl.innerHTML = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">${gpa || '<span style="font-size:13px;">내신 정보 없음</span>'}</div>${recent || '<div style="font-size:12px;">모의고사 기록 없음</div>'}`;
+  } catch(e) {
+    gEl.textContent = '성적 로드 실패: ' + e.message;
+  }
+}
+
+document.getElementById('spotlightBtn').addEventListener('click', openSpotlight);
+document.getElementById('spotInput').addEventListener('input', function(){ renderSpotResults(this.value.trim()); });
+document.getElementById('spotCloseBtn').addEventListener('click', closeSpotlight);
+document.getElementById('spotOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeSpotlight(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSpotlight(); });
 
 // ---- 학사일정 ----
 let scheduleInitialized = false;
