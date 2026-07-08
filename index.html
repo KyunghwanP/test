@@ -1029,11 +1029,9 @@
   .s360-table td:first-child{font-family:'Pretendard','Noto Sans KR';font-weight:700;}
   .s360-back{display:none;background:none;border:0;color:var(--ink-soft);font-weight:700;cursor:pointer;padding:0 0 10px;font-size:14px;font-family:inherit;}
   .s360-back:hover{color:var(--ink);}
-  .s360-chart{position:relative;margin-bottom:12px;border:1px solid var(--rule);border-radius:8px;padding:12px 14px 8px;background:var(--paper);}
-  .s360-chart-title{font-size:13.5px;font-weight:900;color:var(--ink-soft);letter-spacing:.04em;margin-bottom:6px;}
-  .s360-chart svg{display:block;width:100%;height:auto;}
-  .s360-hit{cursor:pointer;}
-  .s360-tip{position:absolute;display:none;background:var(--ink);color:#fff;font-size:12.5px;font-weight:700;padding:6px 10px;border-radius:6px;pointer-events:none;white-space:nowrap;z-index:5;transform:translate(-50%,-118%);}
+  .s360-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin-bottom:12px;}
+  .s360-chart{border:1px solid var(--rule);border-radius:10px;padding:12px 12px 8px;background:var(--paper);}
+  .s360-chart-title{font-size:13.5px;font-weight:900;color:var(--ink);text-align:center;letter-spacing:.02em;margin-bottom:6px;}
   @media(max-width:768px){
     .s360-side{width:100%;border-right:0;}
     .s360-main{display:none;padding:12px;}
@@ -2934,7 +2932,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.91</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.92</div>
   </div>
 </div>
 
@@ -3059,7 +3057,7 @@
       <div class="main-nav-item" data-page="search" style="display:none;">
         <span class="main-nav-icon">🔍</span>학생 종합검색 <span style="font-size:11px;opacity:.6;">(테스트)</span>
       </div>
-    <div class="nav-version">ver4.91</div>
+    <div class="nav-version">ver4.92</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -6854,70 +6852,109 @@ function s360RenderList(q){
   });
 }
 
-// 모의고사 평균백분위 추이 라인 차트 (인라인 SVG, 단일 시리즈)
-// 등급(1~9)은 백분위와 스케일이 달라 같은 축에 못 그림 — 툴팁과 표에서 표시
-function s360TrendChart(history, boxW){
-  const pts = (history || [])
-    .map(h => ({ d: h.examDate || '', p: parseFloat(h.avgP), g: h.avgG || '-' }))
-    .filter(x => isFinite(x.p));
-  if (pts.length < 2) return '';
-  // viewBox를 실제 컨테이너 폭에 맞춰 1:1 렌더 — 축소 시 글자가 작아지는 것 방지
-  const W = Math.min(860, Math.max(300, (boxW || 560) - 30)), H = 200, L = 42, R = 18, T = 22, B = 30;
-  const vals = pts.map(x => x.p);
-  const lo = Math.max(0, Math.floor((Math.min(...vals) - 4) / 10) * 10);
-  const hi = Math.min(100, Math.ceil((Math.max(...vals) + 4) / 10) * 10);
-  const X = i => L + (W - L - R) * i / (pts.length - 1);
-  const Y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
-  // 시험일 축 라벨: 'yyyy-mm-dd'·'m/d'·'m월 d일' 어느 형식이든 월/일만 추출
-  const fmt = d => {
-    const m = String(d).match(/(\d{1,2})\s*[월.\/-]\s*(\d{1,2})\s*일?$/);
-    return m ? `${+m[1]}/${+m[2]}` : String(d).slice(-5);
-  };
-  const step = Math.max(1, Math.ceil(pts.length / 6)); // x 라벨 과밀 방지
-  const grid = [lo, (lo + hi) / 2, hi].map(v => `
-    <line x1="${L}" y1="${Y(v)}" x2="${W - R}" y2="${Y(v)}" stroke="var(--rule)" stroke-width="1"/>
-    <text x="${L - 7}" y="${Y(v) + 4}" text-anchor="end" font-size="12.5" fill="var(--ink-soft)">${v}</text>`).join('');
-  const xLabels = pts.map((x, i) =>
-    (i % step === 0 || i === pts.length - 1)
-      ? `<text x="${X(i)}" y="${H - 9}" text-anchor="middle" font-size="12.5" fill="var(--ink-soft)">${escapeHtml(fmt(x.d))}</text>` : ''
-  ).join('');
-  const path = pts.map((x, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(x.p).toFixed(1)}`).join('');
-  const dots = pts.map((x, i) => `
-    <circle cx="${X(i)}" cy="${Y(x.p)}" r="4.5" fill="var(--mon)" stroke="var(--paper)" stroke-width="2"/>
-    <circle class="s360-hit" cx="${X(i)}" cy="${Y(x.p)}" r="14" fill="transparent"
-      data-tip="${escapeHtml(x.d)} — 백분위 ${x.p} · 평균등급 ${escapeHtml(String(x.g))}"/>`).join('');
-  const last = pts[pts.length - 1];
-  const lastLabel = `<text x="${X(pts.length - 1)}" y="${Y(last.p) - 11}" text-anchor="middle" font-size="13.5" font-weight="700" fill="var(--ink)">${last.p}</text>`;
-  return `
-    <div class="s360-chart">
-      <div class="s360-chart-title">모의고사 평균백분위 추이</div>
-      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="모의고사 평균백분위 추이 차트">
-        ${grid}
-        <path d="${path}" fill="none" stroke="var(--mon)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-        ${dots}${lastLabel}${xLabels}
-      </svg>
-      <div class="s360-tip"></div>
-    </div>`;
+// 모의고사 추이 그래프 — 진로진학 grades.html과 동일한 Chart.js 3종
+// (국수탐 평균 백분위 / 표준점수 합 / 평균 등급). vendor/ 셀프호스팅 파일을 지연 로드.
+let s360ChartLibP = null;
+let s360Charts = [];
+
+function s360LoadChartLib(){
+  if (window.Chart && window.ChartDataLabels) return Promise.resolve();
+  if (s360ChartLibP) return s360ChartLibP;
+  const load = src => new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    sc.src = src;
+    sc.onload = res;
+    sc.onerror = () => rej(new Error(src + ' 로드 실패'));
+    document.head.appendChild(sc);
+  });
+  s360ChartLibP = load('vendor/chart.umd.min.js').then(() => load('vendor/datalabels.min.js'));
+  return s360ChartLibP;
 }
 
-// 차트 점 호버/탭 → 툴팁 (innerHTML 삽입 후 호출)
-function s360WireChartTip(root){
-  const chart = root.querySelector('.s360-chart');
-  if (!chart) return;
-  const tip = chart.querySelector('.s360-tip');
-  chart.querySelectorAll('.s360-hit').forEach(hit => {
-    const show = () => {
-      const c = chart.getBoundingClientRect();
-      const r = hit.getBoundingClientRect();
-      tip.textContent = hit.dataset.tip;
-      tip.style.left = (r.left + r.width / 2 - c.left) + 'px';
-      tip.style.top = (r.top + r.height / 2 - c.top - 8) + 'px';
-      tip.style.display = 'block';
-    };
-    hit.addEventListener('mouseenter', show);
-    hit.addEventListener('click', show);
-    hit.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+// 차트 3개 영역 마크업 (데이터 로드 후 s360RenderCharts가 캔버스에 그림)
+function s360ChartsHtml(history){
+  const has = k => (history || []).some(h => h[k] !== '' && h[k] != null && !isNaN(parseFloat(h[k])));
+  const box = (id, title) => `
+    <div class="s360-chart">
+      <div class="s360-chart-title">${title}</div>
+      <div style="position:relative;height:230px;width:100%;"><canvas id="${id}"></canvas></div>
+    </div>`;
+  // 값이 있는 지표만 차트 생성 (빈 차트 박스 방지)
+  const boxes = [
+    has('avgP')  ? box('s360ChartP', '국수탐 평균 백분위') : '',
+    has('sumSS') ? box('s360ChartS', '국수탐 표준점수 합') : '',
+    has('avgG')  ? box('s360ChartG', '국수탐 평균 등급') : ''
+  ].join('');
+  return boxes ? `<div class="s360-charts">${boxes}</div>` : '';
+}
+
+// grades.html renderCharts와 동일한 옵션·색으로 렌더
+function s360RenderCharts(history){
+  Chart.register(ChartDataLabels);
+  Chart.defaults.font.family = "'Pretendard','Noto Sans KR',sans-serif";
+  Chart.defaults.font.size = 13;
+  Chart.defaults.color = '#64748b';
+
+  s360Charts.forEach(c => c.destroy());
+  s360Charts = [];
+
+  const labels = [], pData = [], sData = [], gData = [];
+  (history || []).forEach(h => {
+    labels.push(h.examDate);
+    pData.push(h.avgP || null);
+    sData.push(h.sumSS || null);
+    gData.push(h.avgG || null);
   });
+
+  const commonOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        titleColor: '#1e293b', bodyColor: '#1e293b',
+        borderColor: '#e2e8f0', borderWidth: 1,
+        padding: 12, boxPadding: 6, usePointStyle: true,
+        titleFont: { size: 13, weight: 'bold' },
+        bodyFont: { size: 14, weight: 'bold' }
+      },
+      datalabels: {
+        display: true, align: 'top', anchor: 'end', offset: 4,
+        color: ctx => ctx.dataset.borderColor,
+        font: { family: "'Pretendard', sans-serif", weight: 'bold', size: 13 },
+        formatter: v => (v !== null && v !== undefined) ? v : ''
+      }
+    },
+    interaction: { mode: 'index', intersect: false },
+    scales: {
+      x: { grid: { display: false }, offset: true },
+      y: { grid: { color: '#f1f5f9' }, border: { dash: [4, 4] } }
+    },
+    layout: { padding: { top: 20 } }
+  };
+
+  const mk = (id, label, data, color, rgb, yExtra) => {
+    const cv = document.getElementById(id);
+    if (!cv) return; // 값이 없어 박스를 만들지 않은 지표
+    const ctx = cv.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 250);
+    gradient.addColorStop(0, `rgba(${rgb}, 0.4)`);
+    gradient.addColorStop(1, `rgba(${rgb}, 0.0)`);
+    s360Charts.push(new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets: [{
+        label, data,
+        borderColor: color, backgroundColor: gradient, borderWidth: 3,
+        pointBackgroundColor: '#ffffff', pointBorderColor: color, pointBorderWidth: 2,
+        pointRadius: 5, pointHoverRadius: 7, fill: true, tension: 0.4
+      }]},
+      options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, ...yExtra } } }
+    }));
+  };
+  mk('s360ChartP', '평균 백분위', pData, '#11caa0', '17, 202, 160', { suggestedMin: 0, suggestedMax: 100 });
+  mk('s360ChartS', '표준점수 합', sData, '#e52d75', '229, 45, 117', { suggestedMin: 150, suggestedMax: 450 });
+  mk('s360ChartG', '평균 등급', gData, '#d93025', '217, 48, 37', { reverse: true, suggestedMin: 1, suggestedMax: 9 });
 }
 
 async function s360ShowDetail(s){
@@ -7004,8 +7041,13 @@ async function s360ShowDetail(s){
         <tbody>${rows}</tbody>
       </table></div>
       <div style="font-size:12.5px;color:var(--ink-soft);margin-top:6px;">국어·수학·탐구는 등급 /백분위 표기</div>` : '<div style="font-size:14px;">모의고사 기록 없음</div>';
-    gEl.innerHTML = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">${gpa || '<span style="font-size:14px;">내신 정보 없음</span>'}</div>${s360TrendChart(st.history, gEl.clientWidth)}${table}`;
-    s360WireChartTip(gEl);
+    gEl.innerHTML = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">${gpa || '<span style="font-size:14px;">내신 정보 없음</span>'}</div>${s360ChartsHtml(st.history)}${table}`;
+    // 차트 라이브러리(vendor 셀프호스팅) 지연 로드 후 렌더 — 실패해도 표는 그대로 표시
+    if (gEl.querySelector('.s360-charts')) {
+      s360LoadChartLib()
+        .then(() => s360RenderCharts(st.history))
+        .catch(() => { const c = gEl.querySelector('.s360-charts'); if (c) c.remove(); });
+    }
   } catch(e) {
     gEl.textContent = '성적 로드 실패: ' + e.message;
   }
