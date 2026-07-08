@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>졸업생 수시 합격 현황</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!--
+    원작: 2026학년도 영남고등학교 진로진학부팀 (Apps Script 웹앱 '졸업생 수시 합격 현황 조회')
+    이 파일은 원작 화면을 그대로 유지하고, 데이터 소스만
+    google.script.run → Firestore(gradesSusi, GitHub Actions 동기화)로 교체한 이식본입니다.
+  -->
+  <style>
+    body {
+      font-family: 'Malgun Gothic', sans-serif;
+      background-color: #f1f5f9;
+      margin: 0;
+      padding: 0;
+      color: #1e293b;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    /* 화면 중앙 고정 워터마크 */
+    .watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 650px;
+      height: 650px;
+      background: url('icon-512.png') no-repeat center center / contain;
+      opacity: 0.25;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    /* 헤더 레이아웃 */
+    .header {
+      background: #1e3a8a;
+      color: #ffffff;
+      padding: 1rem 2rem;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .header h1 { margin: 0; font-size: 1.3rem; font-weight: 700; }
+
+    /* 통계 분석 버튼 */
+    .stats-btn {
+      background-color: #f59e0b;
+      color: #ffffff;
+      border: none;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      text-decoration: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .stats-btn:hover {
+      background-color: #d97706;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+
+    /* 홈 가기 버튼 */
+    .home-btn {
+      background-color: #ffffff;
+      color: #1e3a8a;
+      border: none;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      text-decoration: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .home-btn:hover {
+      background-color: #f8fafc;
+      color: #2563eb;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+
+    /* 검색창 영역 */
+    .search-container {
+      margin: 20px;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(2px);
+      padding: 18px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      border: 1px solid #cbd5e1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+    }
+
+    .search-item { display: flex; flex-direction: column; gap: 6px; }
+    .search-item label {
+      font-size: 15px;
+      font-weight: bold;
+      color: #1e3a8a;
+      letter-spacing: -0.5px;
+    }
+
+    .search-item input, .search-item select {
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+      background: #ffffff;
+      color: #1e293b;
+      transition: all 0.2s;
+    }
+    .search-item input:focus, .search-item select:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+
+    /* 테이블 컨테이너 */
+    .table-container {
+      margin: 0 20px 20px 20px;
+      background: rgba(255, 255, 255, 0.35);
+      backdrop-filter: blur(1px);
+      border-radius: 8px;
+      overflow-y: auto;
+      max-height: 70vh;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+      border: 1px solid #1e3a8a;
+    }
+
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; table-layout: fixed; background: transparent; }
+    th, td { padding: 6px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+
+    th:nth-child(1), td:nth-child(1) { width: 4%; }
+    th:nth-child(2), td:nth-child(2) { width: 6%; }
+    th:nth-child(3), td:nth-child(3) { width: 5%; }
+    th:nth-child(4), td:nth-child(4) { width: 4%; }
+    th:nth-child(5), td:nth-child(5) { width: 4%; }
+    th:nth-child(6), td:nth-child(6) { width: 12%; text-align: left; }
+    th:nth-child(7), td:nth-child(7) { width: 12%; text-align: left; }
+    th:nth-child(8), td:nth-child(8) { width: 12%; text-align: left; }
+    th:nth-child(9), td:nth-child(9) { width: 5%; }
+    th:nth-child(10), td:nth-child(10) { width: 7%; }
+    th:nth-child(11), td:nth-child(11) { width: 7%; }
+    th:nth-child(12), td:nth-child(12) { width: 7%; }
+    th:nth-child(13), td:nth-child(13) { width: 15%; text-align: left; }
+
+    th {
+      background: #1e3a8a;
+      color: #ffffff;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 2px solid #3b82f6;
+      cursor: pointer;
+      user-select: none;
+    }
+    th:hover { background: #1d4ed8; }
+
+    .data-row { cursor: default; transition: background-color 0.2s; border-bottom: 1px solid #e2e8f0; background: transparent; }
+    .data-row:hover { background-color: rgba(30, 58, 138, 0.08); }
+
+    .year-2025 { color: #dc2626; font-weight: bold; }
+    .year-2026 { color: #b45309; font-weight: bold; }
+    .status-pass { color: #dc2626; font-weight: bold; }
+    .status-fail { color: #94a3b8; font-weight: normal; }
+    .reason-fail { color: #dc2626; }
+
+    .loading { text-align: center; padding: 40px; font-size: 15px; color: #1e3a8a; font-weight: bold; }
+
+    /* 📊 팝업(모달) 전용 검색창 스타일 추가 */
+    .modal-search-container {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      background: #f1f5f9;
+      padding: 12px 18px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+    }
+    .modal-search-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+    }
+    .modal-search-item label {
+      font-size: 13px;
+      font-weight: bold;
+      color: #1e3a8a;
+    }
+    .modal-search-item input, .modal-search-item select {
+      padding: 8px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+      background: #ffffff;
+      color: #1e293b;
+      box-sizing: border-box;
+    }
+    .modal-search-item input:focus, .modal-search-item select:focus {
+      border-color: #3b82f6;
+    }
+
+    /* 📊 모달 대시보드 레이아웃 */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 100;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.4);
+      backdrop-filter: blur(2px);
+    }
+    .modal-content {
+      background-color: #f8fafc;
+      margin: 5% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 80%;
+      max-width: 1000px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 10px;
+      margin-bottom: 15px;
+    }
+    .modal-header h2 { margin: 0; color: #1e3a8a; font-size: 1.25rem; }
+
+    .close-btn {
+      font-size: 26px; font-weight: bold; color: #94a3b8; cursor: pointer; transition: color 0.2s;
+    }
+    .close-btn:hover { color: #1e293b; }
+
+    .chart-layout-grid {
+      display: grid;
+      grid-template-columns: 1.8fr 1.2fr;
+      gap: 20px;
+    }
+
+    .chart-box {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 15px;
+      height: 380px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chart-box h3, .chart-box div {
+      margin-top: 0;
+      margin-bottom: 10px;
+      flex-shrink: 0;
+      font-size: 0.95rem;
+      color: #1e3a8a;
+      text-align: center;
+    }
+
+    .chart-box canvas {
+      flex: 1 !important;
+      min-height: 0 !important;
+      display: block !important;
+    }
+
+    .credit-footer {
+      text-align: right;
+      font-size: 12px;
+      color: #6c757d;
+      margin: 0 20px 20px 0;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="watermark"></div>
+
+  <div class="header">
+    <div class="title-group">
+      <h1>🎓 영남고등학교 졸업생 수시 합격 현황 조회</h1>
+      <button class="stats-btn" onclick="openStatsModal()">
+        📊 영남고 합격 현황 분석
+      </button>
+      </div>
+
+    <a href="career.html" class="home-btn">
+      🏠 영남고등학교 진로진학 상담 시스템&lt;홈&gt;으로 돌아가기
+    </a>
+  </div>
+
+  <div class="search-container">
+    <div class="search-item">
+      <label for="f-year"> 1️⃣학년도</label>
+      <select id="f-year" onchange="filter()"></select>
+    </div>
+
+    <div class="search-item">
+      <label for="f-univ"> 2️⃣대학교 (검색)</label>
+      <input type="text" id="f-univ" list="univ-list" placeholder="선택 또는 입력..." oninput="filter()">
+      <datalist id="univ-list"></datalist>
+    </div>
+
+    <div class="search-item">
+      <label for="f-detail"> 3️⃣세부 유형 (검색)</label>
+      <input type="text" id="f-detail" list="detail-list" placeholder="선택 또는 입력..." oninput="filter()">
+      <datalist id="detail-list"></datalist>
+    </div>
+
+    <div class="search-item">
+      <label for="f-unit"> 4️⃣모집단위 (검색)</label>
+      <input type="text" id="f-unit" list="unit-list" placeholder="선택 또는 입력..." oninput="filter()">
+      <datalist id="unit-list"></datalist>
+    </div>
+
+    <div class="search-item">
+      <label for="f-stage1"> 5️⃣1단계 결과</label>
+      <select id="f-stage1" onchange="filter()">
+        <option value="">전체보기</option>
+      </select>
+    </div>
+    <div class="search-item">
+      <label for="f-final"> 6️⃣최종결과</label>
+      <select id="f-final" onchange="filter()">
+        <option value="">전체보기</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="sortByField('year')">년도 ↕</th>
+          <th onclick="sortByField('gradeClassNum')">학-반-번 ↕</th>
+          <th onclick="sortByField('name')">이름 ↕</th>
+          <th onclick="sortByField('score')">내신 ↕</th>
+          <th onclick="sortByField('convScore')">환산 ↕</th>
+          <th style="text-align: left;" onclick="sortByField('univ')">대학교 ↕</th>
+          <th style="text-align: left;" onclick="sortByField('detail')">세부 유형 ↕</th>
+          <th style="text-align: left;" onclick="sortByField('unit')">모집단위 ↕</th>
+          <th onclick="sortByField('count')">모집 인원 ↕</th>
+          <th onclick="sortByField('stage1')">1단계 결과 ↕</th>
+          <th onclick="sortByField('final')">최종결과 ↕</th>
+          <th onclick="sortByField('rank')">최초 후보순위 ↕</th>
+          <th style="text-align: left;" class="reason-fail" onclick="sortByField('failReason')">불합격 사유 ↕</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr>
+          <td colspan="13" class="loading">⏳ 데이터를 안전하게 불러오는 중입니다...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="credit-footer">원작·데이터 제공 : 2026학년도 영남고등학교 진로진학부팀</div>
+
+  <div id="statsModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📊 졸업생 수시 대학교 및 전형별 합격/불합격 분석</h2>
+        <span class="close-btn" onclick="closeStatsModal()">×</span>
+      </div>
+
+      <div class="modal-search-container">
+        <div class="modal-search-item">
+          <label for="m-f-year">📅 학년도 선택</label>
+          <select id="m-f-year" onchange="renderSearchTargetChart()">
+            <option value="">전체보기</option>
+          </select>
+        </div>
+        <div class="modal-search-item">
+          <label for="m-f-univ">🏫 대학교 실시간 검색 (타이핑/드롭다운)</label>
+          <input type="text" id="m-f-univ" list="m-univ-list" placeholder="대학교 이름을 입력하거나 선택하세요..." oninput="renderSearchTargetChart()">
+          <datalist id="m-univ-list"></datalist>
+        </div>
+        <div class="modal-search-item">
+          <label for="m-f-detail">📋 세부 유형 실시간 검색 (타이핑/드롭다운)</label>
+          <input type="text" id="m-f-detail" list="m-detail-list" placeholder="세부 전형을 입력하거나 선택하세요..." oninput="renderSearchTargetChart()">
+          <datalist id="m-detail-list"></datalist>
+        </div>
+      </div>
+
+      <div class="chart-layout-grid">
+        <div class="chart-box">
+          <h3 id="baseChartTitle">🏫 전체 대학교별 합격 / 불합격 수 비교 (원본 기준)</h3>
+          <canvas id="baseUnivCompareChart"></canvas>
+        </div>
+
+        <div class="chart-box">
+          <h3 id="targetChartTitle">🎯 검색 조건별 합격 비율</h3>
+          <canvas id="searchTargetChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allData = [];
+    let currentFilteredData = [];
+    let sortState = { field: '', isAsc: true };
+
+    // 차트 인스턴스 보존 변수
+    let baseChartInstance = null;
+    let targetChartInstance = null;
+
+    // 데이터 도착 시 module 스크립트가 호출 (원본 loadData의 성공 핸들러와 동일)
+    function initWithData(data) {
+      allData = data;
+      currentFilteredData = [...data];
+      initFilterOptions(data);
+      render(currentFilteredData);
+    }
+    function showLoadError(msg) {
+      document.getElementById('tableBody').innerHTML =
+        `<tr><td colspan="13" class="loading" style="color:#dc2626;">❌ ${msg}</td></tr>`;
+    }
+
+   function initFilterOptions(data) {
+      const years = new Set();
+      const stage1Options = new Set();
+      const finalOptions = new Set();
+
+      data.forEach(r => {
+        if (r.year) years.add(String(r.year) + "년");
+        if (r.stage1) stage1Options.add(r.stage1);
+        if (r.final) finalOptions.add(r.final);
+      });
+
+      const yearSelect = document.getElementById('f-year');
+      let yearHtml = '<option value="">전체보기</option>';
+      Array.from(years).sort().reverse().forEach(y => {
+        yearHtml += `<option value="${y.replace('년','')}">${y}</option>`;
+      });
+      yearSelect.innerHTML = yearHtml;
+
+      // 🎯 팝업(모달)의 학년도 드롭다운에도 동일한 데이터를 넣어줍니다.
+      document.getElementById('m-f-year').innerHTML = yearHtml;
+
+      const stageSelect = document.getElementById('f-stage1');
+      let stageHtml = '<option value="">전체보기</option>';
+      Array.from(stage1Options).sort().forEach(s => {
+        stageHtml += `<option value="${s}">${s}</option>`;
+      });
+      stageSelect.innerHTML = stageHtml;
+
+      const finalSelect = document.getElementById('f-final');
+      let finalHtml = '<option value="">전체보기</option>';
+      Array.from(finalOptions).sort().forEach(f => {
+        finalHtml += `<option value="${f}">${f}</option>`;
+      });
+      finalSelect.innerHTML = finalHtml;
+
+      updateDynamicLists();
+      setupInstantEvents();
+    }
+
+    function setupInstantEvents() {
+      const uInput = document.getElementById('f-univ');
+      const dInput = document.getElementById('f-detail');
+
+      uInput.addEventListener('change', () => {
+        dInput.value = "";
+        document.getElementById('f-unit').value = "";
+        filter();
+      });
+
+      dInput.addEventListener('change', () => {
+        document.getElementById('f-unit').value = "";
+        filter();
+      });
+    }
+
+    function updateDynamicLists() {
+      const univVal = document.getElementById('f-univ').value.trim().toLowerCase();
+      const detailVal = document.getElementById('f-detail').value.trim().toLowerCase();
+
+      const univs = new Set();
+      allData.forEach(r => {
+        if (r.univ && r.univ.trim()) univs.add(r.univ.trim());
+      });
+
+      const univDatalist = document.getElementById('univ-list');
+      let univHtml = '';
+      Array.from(univs).sort().forEach(u => { univHtml += `<option value="${u}"></option>`; });
+      univDatalist.innerHTML = univHtml;
+
+      const details = new Set();
+      allData.forEach(r => {
+        const matchUniv = !univVal || (r.univ && r.univ.toLowerCase().includes(univVal));
+        if (matchUniv && r.detail && r.detail.trim()) {
+          details.add(r.detail.trim());
+        }
+      });
+
+      const detailDatalist = document.getElementById('detail-list');
+      let detailHtml = '';
+      Array.from(details).sort().forEach(d => { detailHtml += `<option value="${d}"></option>`; });
+      detailDatalist.innerHTML = detailHtml;
+
+      const units = new Set();
+      allData.forEach(r => {
+        const matchUniv = !univVal || (r.univ && r.univ.toLowerCase().includes(univVal));
+        const matchDetail = !detailVal || (r.detail && r.detail.toLowerCase().includes(detailVal));
+        if (matchUniv && matchDetail && r.unit && r.unit.trim()) {
+          units.add(r.unit.trim());
+        }
+      });
+
+      const unitDatalist = document.getElementById('unit-list');
+      let unitHtml = '';
+      Array.from(units).sort().forEach(un => { unitHtml += `<option value="${un}"></option>`; });
+      unitDatalist.innerHTML = unitHtml;
+    }
+
+    function anonymizeName(name) {
+      if (!name) return "-";
+      return name.charAt(0) + "OO";
+    }
+
+    function render(data) {
+      const tbody = document.getElementById('tableBody');
+      if (!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="13" class="loading">조회된 데이터가 없습니다.</td></tr>`;
+        return;
+      }
+
+      let html = '';
+      data.forEach((r, index) => {
+        let yearClass = '';
+        if (String(r.year) === '2025') yearClass = 'year-2025';
+        else if (String(r.year) === '2026') yearClass = 'year-2026';
+
+        let statusClass = '';
+        if (r.final) {
+          if (r.final.includes('불합격')) statusClass = 'status-fail';
+          else if (r.final.includes('합격')) statusClass = 'status-pass';
+        }
+
+        let stage1Class = '';
+        if (r.stage1) {
+          if (r.stage1.includes('불합격')) stage1Class = 'status-fail';
+          else if (r.stage1.includes('합격')) statusClass = 'status-pass';
+        }
+
+        const displayGradeClassNum = (r.grade || '-') + '-' + (r.class || '-') + '-' + (r.num || '-');
+
+        html += `
+          <tr class="data-row">
+            <td class="${yearClass}">${r.year || '-'}년</td>
+            <td>${displayGradeClassNum}</td>
+            <td>${anonymizeName(r.name)}</td>
+            <td style="color:#1d4ed8; font-weight:bold;">${r.score || '-'}</td>
+            <td style="color:#16a34a; font-weight:bold;">${r.convScore || '-'}</td>
+            <td style="text-align: left;" title="${r.univ || ''}">${r.univ || '-'}</td>
+            <td style="text-align: left;" title="${r.detail || ''}">${r.detail || '-'}</td>
+            <td style="text-align: left;" title="${r.unit || ''}">${r.unit || '-'}</td>
+            <td>${r.count ? r.count + '명' : '-'}</td>
+            <td class="${stage1Class}">${r.stage1 || '-'}</td>
+            <td class="${statusClass}">${r.final || '-'}</td>
+            <td>${r.rank || '-'}</td>
+            <td style="text-align: left;" class="reason-fail" title="${r.failReason || ''}">${r.failReason || '-'}</td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+    }
+
+    function filter() {
+      const yearVal = document.getElementById('f-year').value.trim().toLowerCase();
+      const univVal = document.getElementById('f-univ').value.trim().toLowerCase();
+      const detailVal = document.getElementById('f-detail').value.trim().toLowerCase();
+      const unitVal = document.getElementById('f-unit').value.trim().toLowerCase();
+      const stageVal = document.getElementById('f-stage1').value.trim().toLowerCase();
+      const finalVal = document.getElementById('f-final').value.trim().toLowerCase();
+
+      currentFilteredData = allData.filter(r => {
+        const matchYear = !yearVal || (r.year && String(r.year).toLowerCase().includes(yearVal));
+        const matchUniv = !univVal || (r.univ && r.univ.toLowerCase().includes(univVal));
+        const matchDetail = !detailVal || (r.detail && r.detail.toLowerCase().includes(detailVal));
+        const matchUnit = !unitVal || (r.unit && r.unit.toLowerCase().includes(unitVal));
+        const matchStage = !stageVal || (r.stage1 && r.stage1.toLowerCase().includes(stageVal));
+        const matchFinal = !finalVal || (r.final && r.final.toLowerCase().includes(finalVal));
+
+        return matchYear && matchUniv && matchDetail && matchUnit && matchStage && matchFinal;
+      });
+
+      updateDynamicLists();
+
+      if (sortState.field) {
+        sortData(sortState.field, sortState.isAsc);
+      } else {
+        render(currentFilteredData);
+      }
+    }
+
+    function sortByField(field) {
+      if (sortState.field === field) {
+        sortState.isAsc = !sortState.isAsc;
+      } else {
+        sortState.field = field;
+        sortState.isAsc = true;
+      }
+      sortData(field, sortState.isAsc);
+    }
+
+    function sortData(field, isAsc) {
+      currentFilteredData.sort((a, b) => {
+        let valA, valB;
+
+        if (field === 'gradeClassNum') {
+          valA = `${String(a.grade || '').padStart(2,'0')}${String(a.class || '').padStart(2,'0')}${String(a.num || '').padStart(3,'0')}`;
+          valB = `${String(b.grade || '').padStart(2,'0')}${String(b.class || '').padStart(2,'0')}${String(b.num || '').padStart(3,'0')}`;
+        } else {
+          valA = a[field];
+          valB = b[field];
+        }
+
+        if (valA === undefined || valA === null || valA === '') return 1;
+        if (valB === undefined || valB === null || valB === '') return -1;
+
+        if (typeof valA === 'number' && typeof valB === 'number') {
+          return isAsc ? valA - valB : valB - valA;
+        }
+
+        if (!isNaN(valA) && !isNaN(valB)) {
+          return isAsc ? Number(valA) - Number(valB) : Number(valB) - Number(valA);
+        }
+
+        valA = String(valA).toLowerCase();
+        valB = String(valB).toLowerCase();
+
+        if (valA < valB) return isAsc ? -1 : 1;
+        if (valA > valB) return isAsc ? 1 : -1;
+        return 0;
+      });
+
+      render(currentFilteredData);
+    }
+
+    /* 📊 모달 내부 드롭다운 목록 생성/필터링 함수 */
+    function updateModalDatalists() {
+      const mUnivVal = document.getElementById('m-f-univ').value.trim().toLowerCase();
+
+      // 1. 대학교 전체 리스트 구축
+      const univs = new Set();
+      allData.forEach(r => { if (r.univ && r.univ.trim()) univs.add(r.univ.trim()); });
+      const mUnivDatalist = document.getElementById('m-univ-list');
+      let univHtml = '';
+      Array.from(univs).sort().forEach(u => { univHtml += `<option value="${u}"></option>`; });
+      mUnivDatalist.innerHTML = univHtml;
+
+      // 2. 선택/입력된 대학교에 맞는 세부 유형 리스트 구축
+      const details = new Set();
+      allData.forEach(r => {
+        const matchUniv = !mUnivVal || (r.univ && r.univ.toLowerCase().includes(mUnivVal));
+        if (matchUniv && r.detail && r.detail.trim()) {
+          details.add(r.detail.trim());
+        }
+      });
+      const mDetailDatalist = document.getElementById('m-detail-list');
+      let detailHtml = '';
+      Array.from(details).sort().forEach(d => { detailHtml += `<option value="${d}"></option>`; });
+      mDetailDatalist.innerHTML = detailHtml;
+    }
+
+    /* 팝업 열기 */
+    function openStatsModal() {
+      document.getElementById('statsModal').style.display = 'block';
+
+      // 모달 내부 검색창 드롭다운 동적 할당
+      updateModalDatalists();
+
+      // 차트 렌더링
+      renderSearchTargetChart();
+    }
+
+    function closeStatsModal() {
+      document.getElementById('statsModal').style.display = 'none';
+    }
+
+    /* 차트 1: 기본 대학교별 비교 띄우다가 대학교 검색 시 해당 대학의 전형별 그래프로 전환 */
+    function renderBaseCompareChart() {
+      if (baseChartInstance) {
+        baseChartInstance.destroy();
+      }
+
+      const targetYear = document.getElementById('m-f-year').value.trim();
+      const targetUniv = document.getElementById('m-f-univ').value.trim().toLowerCase();
+      const rawUnivText = document.getElementById('m-f-univ').value.trim();
+
+      const titleEl = document.getElementById('baseChartTitle');
+
+      let labels = [];
+      let passCounts = [];
+      let failCounts = [];
+
+      // 1️⃣ 대학교 검색어가 없을 때 ➡️ 전체 대학교별 합격/불합격 수 비교 (상위 12개)
+      if (!targetUniv) {
+        titleEl.innerText = "🏫 전체 대학교별 합격 / 불합격 수 비교 (원본 기준)";
+
+        const tracker = {};
+        allData.forEach(r => {
+          const yMatch = !targetYear || (r.year && String(r.year) === targetYear);
+          if (!yMatch) return;
+
+          const uName = (r.univ || '미지정').trim();
+          const finalStatus = r.final || '';
+          const isPass = finalStatus.includes('합격') && !finalStatus.includes('불합격');
+          const isFail = finalStatus.includes('불합격');
+
+          if (!tracker[uName]) {
+            tracker[uName] = { pass: 0, fail: 0, total: 0 };
+          }
+          tracker[uName].total += 1;
+          if (isPass) tracker[uName].pass += 1;
+          if (isFail) tracker[uName].fail += 1;
+        });
+
+        // 지원자가 많은 상위 12개 대학 추출
+        const sorted = Object.entries(tracker)
+          .sort((a, b) => b[1].total - a[1].total)
+          .slice(0, 12);
+
+        sorted.forEach(([univ, obj]) => {
+          labels.push(univ);
+          passCounts.push(obj.pass);
+          failCounts.push(obj.fail);
+        });
+
+      // 2️⃣ 대학교 검색어가 있을 때 ➡️ 해당 대학교의 [전형별] 합격/불합격 수 비교 그래프로 전환!
+      } else {
+        titleEl.innerText = `🏫 [${rawUnivText}] 전형별 합격 / 불합격 수 비교`;
+
+        const detailTracker = {};
+        allData.forEach(r => {
+          const yMatch = !targetYear || (r.year && String(r.year) === targetYear);
+          const uMatch = r.univ && r.univ.toLowerCase().includes(targetUniv);
+
+          if (yMatch && uMatch) {
+            const dName = (r.detail || '미지정 전형').trim();
+            const finalStatus = r.final || '';
+            const isPass = finalStatus.includes('합격') && !finalStatus.includes('불합격');
+            const isFail = finalStatus.includes('불합격');
+
+            if (!detailTracker[dName]) {
+              detailTracker[dName] = { pass: 0, fail: 0 };
+            }
+            if (isPass) detailTracker[dName].pass += 1;
+            if (isFail) detailTracker[dName].fail += 1;
+          }
+        });
+
+        Object.entries(detailTracker).forEach(([detail, obj]) => {
+          labels.push(detail);
+          passCounts.push(obj.pass);
+          failCounts.push(obj.fail);
+        });
+      }
+
+      // 차트 그리기 수행
+      const ctx = document.getElementById('baseUnivCompareChart').getContext('2d');
+      baseChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: '최종 합격 수 (건)',
+              data: passCounts,
+              backgroundColor: '#dc2626'
+            },
+            {
+              label: '최종 불합격 수 (건)',
+              data: failCounts,
+              backgroundColor: '#94a3b8'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { stacked: true, ticks: { font: { size: 10 } } },
+            y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } }
+          }
+        }
+      });
+    }
+
+   /* 차트 2: 타이핑/드롭다운 연동 실시간 조건 타겟 분석기 (총 지원자 수 및 대기자 반영 버전) */
+    function renderSearchTargetChart() {
+      renderBaseCompareChart(); // 🎯 대학교 검색 시 첫 번째 차트도 함께 새로 고침합니다.
+      updateModalDatalists(); // 모달 내부 드롭다운 목록 업데이트
+
+      if (targetChartInstance) {
+        targetChartInstance.destroy();
+      }
+
+      // 모달 내부 전용 검색창(m-f-year, m-f-univ, m-f-detail) 값을 가져옴
+      const targetYear = document.getElementById('m-f-year').value.trim();
+      const targetUniv = document.getElementById('m-f-univ').value.trim().toLowerCase();
+      const targetDetail = document.getElementById('m-f-detail').value.trim().toLowerCase();
+
+      let passCount = 0;
+      let failCount = 0;
+      let totalCount = 0; // 🎯 총 지원자 수 카운트 변수
+
+      allData.forEach(r => {
+        const yMatch = !targetYear || (r.year && String(r.year) === targetYear);
+        const uMatch = !targetUniv || (r.univ && r.univ.toLowerCase().includes(targetUniv));
+        const dMatch = !targetDetail || (r.detail && r.detail.toLowerCase().includes(targetDetail));
+
+        if (yMatch && uMatch && dMatch) {
+          totalCount++; // 조건에 부합하는 모든 지원자 누적
+
+          const finalStatus = r.final || '';
+          if (finalStatus.includes('합격') && !finalStatus.includes('불합격')) passCount++;
+          else if (finalStatus.includes('불합격')) failCount++;
+        }
+      });
+
+      // 합격/불합격 판정이 아직 없는 대기자(또는 미정) 인원 계산
+      const pendingCount = totalCount - passCount - failCount;
+
+      // 🎯 차트 제목에 총 지원자 수 직관적으로 표시
+      const titleEl = document.getElementById('targetChartTitle');
+      if (targetUniv || targetDetail) {
+        const uText = targetUniv ? document.getElementById('m-f-univ').value.trim() : '전체대학';
+        const dText = targetDetail ? document.getElementById('m-f-detail').value.trim() : '전체전형';
+        titleEl.innerHTML = `🎯 [${uText} - ${dText}] 분석 <br><span style="font-size: 13px; color: #475569; font-weight: normal;">(총 지원자: ${totalCount}명)</span>`;
+      } else {
+        titleEl.innerHTML = `🎯 검색 조건별 합격 비율 <br><span style="font-size: 13px; color: #475569; font-weight: normal;">(총 지원자: ${totalCount}명)</span>`;
+      }
+
+      const noData = totalCount === 0;
+      let displayData, displayLabels, displayColors;
+
+      if (noData) {
+        displayData = [1];
+        displayLabels = ['조회 조건 결과 없음'];
+        displayColors = ['#cbd5e1'];
+      } else {
+        displayData = [passCount, failCount];
+        displayLabels = ['최종 합격', '최종 불합격'];
+        displayColors = ['#dc2626', '#94a3b8'];
+
+        // 🎯 아직 결과가 나오지 않은 인원이 있다면 노란색 영역으로 추가 표시
+        if (pendingCount > 0) {
+          displayData.push(pendingCount);
+          displayLabels.push('결과 미정(대기)');
+          displayColors.push('#f59e0b');
+        }
+      }
+
+      const ctx = document.getElementById('searchTargetChart').getContext('2d');
+      targetChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: displayLabels,
+          datasets: [{
+            data: displayData,
+            backgroundColor: displayColors,
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', ticks: { font: { size: 11 } } },
+            // 🎯 마우스 오버(툴팁) 시 명수와 함께 퍼센트(%) 비율 계산하여 표기
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  if (noData) return ' 조회 데이터가 없습니다.';
+                  let label = context.label || '';
+                  let value = context.parsed || 0;
+                  let percentage = Math.round((value / totalCount) * 100);
+                  return ` ${label}: ${value}명 (${percentage}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // 모달 영역 바깥쪽 클릭 시 부드럽게 닫히도록 마스킹 제어
+    window.onclick = function(event) {
+      const modal = document.getElementById('statsModal');
+      if (event.target == modal) {
+        modal.style.display = "none";
+      }
+    }
+  </script>
+
+  <!-- 데이터 계층: Firebase 로그인 세션(앱과 같은 도메인이라 자동 공유) + Firestore gradesSusi 청크 병합 -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
+    const app = initializeApp({
+      apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
+      authDomain: "ynhs-7b5ba.firebaseapp.com",
+      projectId: "ynhs-7b5ba",
+      storageBucket: "ynhs-7b5ba.firebasestorage.app",
+      messagingSenderId: "1031618043470",
+      appId: "1:1031618043470:web:edb5b8d1f98db029916d1f"
+    });
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let resolved = false;
+    onAuthStateChanged(auth, async (user) => {
+      if (resolved) return;
+      if (!user) {
+        showLoadError('로그인이 필요합니다. 영남고 교사용 앱에서 로그인 후 이용해주세요.');
+        return;
+      }
+      resolved = true;
+      try {
+        const snap = await getDocs(collection(db, 'gradesSusi'));
+        // chunk-0, chunk-1... 순서대로 병합 (index 문서는 제외)
+        const chunks = [];
+        snap.forEach(d => {
+          const m = d.id.match(/^chunk-(\d+)$/);
+          if (m) chunks[Number(m[1])] = d.data().rows || [];
+        });
+        const data = chunks.flat();
+        if (data.length === 0) {
+          showLoadError('아직 데이터가 없습니다. 성적 동기화가 실행되었는지 확인해주세요.');
+          return;
+        }
+        initWithData(data);
+      } catch (e) {
+        showLoadError('데이터를 로드하는 데 실패했습니다: ' + e.message);
+      }
+    });
+  </script>
+</body>
+</html>

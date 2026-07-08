@@ -12,7 +12,8 @@
 const admin = require('firebase-admin');
 const { JWT } = require('google-auth-library');
 
-const SHEET_ID = '1RIVq_WIPFyrbFtgqwJbzGpGXOizU1Qylf2C_Cd9IjLc';
+const SHEET_ID = '1RIVq_WIPFyrbFtgqwJbzGpGXOizU1Qylf2C_Cd9IjLc';        // 모의고사·학생 명렬
+const SUSI_SHEET_ID = '1uR9WAW60AcEQN_lRNMw8a-zCmAR08xtvd-Glel6HrCE';   // 졸업생 수시 합격 현황
 
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 admin.initializeApp({
@@ -27,8 +28,8 @@ const jwt = new JWT({
   scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
 });
 
-async function readRange(range) {
-  const url = 'https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID
+async function readRange(range, sheetId = SHEET_ID) {
+  const url = 'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId
     + '/values/' + encodeURIComponent(range)
     + '?valueRenderOption=FORMATTED_VALUE';
   const res = await jwt.request({ url });
@@ -112,7 +113,58 @@ const cell = (row, i) => String(row[i] ?? '').trim();
   });
   await batch.commit();
 
-  console.log(`✅ gradesMock 저장 완료 — index + 반 ${classIds.length}개 (${new Date().toISOString()})`);
+  console.log(`✅ gradesMock 저장 완료 — index + 반 ${classIds.length}개`);
+
+  // ══════════════════════════════════════════
+  // 졸업생 수시 합격 현황 → gradesSusi (청크 문서)
+  // 원본 GAS getData()와 동일한 열 매핑. 수천 행이라 1MB 문서 제한을 피해
+  // CHUNK행 단위로 쪼개 저장하고, 프런트(susi.html)가 전체 청크를 합쳐 사용.
+  // ══════════════════════════════════════════
+  console.log('🎓 졸업생 수시 시트 읽는 중...');
+  const susiRows = await readRange('졸업생 수시!A:AA', SUSI_SHEET_ID);
+  console.log(`  졸업생 수시 ${susiRows.length}행`);
+
+  const susiData = [];
+  for (let i = 1; i < susiRows.length; i++) {
+    const r = susiRows[i];
+    if (!cell(r,8) && !cell(r,5)) continue; // 대학교·이름 둘 다 없으면 빈 행
+    susiData.push({
+      year: cell(r,0),       // A: 졸업년도
+      grade: cell(r,2),      // C: 학년
+      class: cell(r,3),      // D: 반
+      num: cell(r,4),        // E: 번호
+      name: cell(r,5),       // F: 이름
+      region: cell(r,7),     // H: 지역
+      univ: cell(r,8),       // I: 대학교
+      type: cell(r,10),      // K: 전형 유형
+      detail: cell(r,12),    // M: 세부 유형
+      field: cell(r,14),     // O: 계열
+      unit: cell(r,15),      // P: 모집 단위
+      count: cell(r,16),     // Q: 모집 인원
+      score: cell(r,20),     // U: 내신 등급(일반)
+      convScore: cell(r,22), // W: 대학 자체 환산 등급
+      stage1: cell(r,23),    // X: 1단계
+      final: cell(r,24),     // Y: 최종 단계
+      failReason: cell(r,25),// Z: 불합격 사유
+      rank: cell(r,26)       // AA: 최초 후보 순위
+    });
+  }
+
+  const CHUNK = 700;
+  const chunkCount = Math.max(1, Math.ceil(susiData.length / CHUNK));
+  const susiBatch = db.batch();
+  susiBatch.set(db.doc('gradesSusi/index'), { t, chunks: chunkCount, rows: susiData.length });
+  for (let c = 0; c < chunkCount; c++) {
+    susiBatch.set(db.doc('gradesSusi/chunk-' + c), { t, rows: susiData.slice(c * CHUNK, (c + 1) * CHUNK) });
+  }
+  const susiExisting = await db.collection('gradesSusi').listDocuments();
+  susiExisting.forEach(ref => {
+    const m = ref.id.match(/^chunk-(\d+)$/);
+    if (m && Number(m[1]) >= chunkCount) susiBatch.delete(ref);
+  });
+  await susiBatch.commit();
+
+  console.log(`✅ gradesSusi 저장 완료 — ${susiData.length}행 / 청크 ${chunkCount}개 (${new Date().toISOString()})`);
   process.exit(0);
 })().catch(e => {
   console.error('❌ 실패:', e.response?.data?.error?.message || e.message);

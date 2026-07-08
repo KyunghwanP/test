@@ -46,6 +46,11 @@ service cloud.firestore {
       allow read: if isYnhsTeacher();
       allow write: if false;
     }
+    // ── 졸업생 수시 합격 현황 (진로진학부 시트 → GitHub Actions 동기화) ──
+    match /gradesSusi/{docId} {
+      allow read: if isYnhsTeacher();
+      allow write: if false;
+    }
     // 업무 캘린더
     match /tasks/{userId}/items/{itemId} {
       // 학교 교사면 읽기 가능 (공유 일정 구독)
