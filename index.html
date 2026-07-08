@@ -1040,7 +1040,7 @@
   .s360-back:hover{color:var(--ink);}
   .s360-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin-bottom:12px;}
   .s360-chart{border:1px solid var(--rule);border-radius:10px;padding:12px 12px 8px;background:var(--paper);}
-  .s360-chart-title{font-size:13.5px;font-weight:900;color:var(--ink);text-align:center;letter-spacing:.02em;margin-bottom:6px;}
+  .s360-chart-title{font-size:16px;font-weight:900;color:var(--ink);text-align:center;letter-spacing:.02em;margin-bottom:12px;}
   @media(max-width:768px){
     .s360-body{padding:12px;}
   }
@@ -2937,7 +2937,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.06</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.07</div>
   </div>
 </div>
 
@@ -3061,7 +3061,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver5.06</div>
+    <div class="nav-version">ver5.07</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7139,7 +7139,7 @@ function s360RenderCharts(history){
       x: { grid: { display: false }, offset: true },
       y: { grid: { color: '#f1f5f9' }, border: { dash: [4, 4] } }
     },
-    layout: { padding: { top: 20 } }
+    layout: { padding: { top: 30 } }
   };
 
   const mk = (id, label, data, color, rgb, yExtra) => {
