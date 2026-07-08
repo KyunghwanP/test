@@ -1010,8 +1010,9 @@
   .pts-suggestion-name{ font-weight:700;white-space:nowrap; }
 
   /* 학생 종합검색 탭 (ver4.94: 상단 검색 + 그룹 브라우징) */
-  .s360-top{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px 16px 12px;background:var(--paper);border-bottom:1px solid var(--rule);}
-  .s360-top input{width:100%;max-width:680px;box-sizing:border-box;padding:11px 16px;border:1.5px solid var(--rule);border-radius:10px;font-family:inherit;font-size:16px;background:var(--paper);color:var(--ink);outline:none;}
+  .s360-top{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;padding:14px 16px 12px;background:var(--paper);border-bottom:1px solid var(--rule);}
+  .s360-top input{flex:1;min-width:220px;max-width:680px;box-sizing:border-box;padding:11px 16px;border:1.5px solid var(--rule);border-radius:10px;font-family:inherit;font-size:16px;background:var(--paper);color:var(--ink);outline:none;}
+  .s360-top .students-tab-row{flex-shrink:0;}
   .s360-top input:focus{border-color:var(--mon);}
   .s360-body{flex:1;overflow-y:auto;background:var(--bg-base);padding:16px;min-height:0;}
   .s360-groups{max-width:1100px;margin:0 auto;}
@@ -2936,7 +2937,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.02</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.03</div>
   </div>
 </div>
 
@@ -3060,7 +3061,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver5.02</div>
+    <div class="nav-version">ver5.03</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3675,11 +3676,11 @@
       <!-- 학생 종합검색 페이지 (테스터 전용) -->
       <div class="page-view" id="searchPage">
         <div class="s360-top">
-          <input id="s360Input" type="text" placeholder="🔍 학생 이름 · 반(2-3) 검색" autocomplete="off">
           <div class="students-tab-row" id="s360Tabs">
             <button class="students-tab active" data-mode="class">학급별</button>
             <button class="students-tab" data-mode="club">동아리별</button>
           </div>
+          <input id="s360Input" type="text" placeholder="🔍 학생 이름 · 반(2-3) 검색" autocomplete="off">
         </div>
         <div class="s360-body" id="s360Body"></div>
       </div>
