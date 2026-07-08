@@ -312,13 +312,33 @@ const normName = s => String(s || '').replace(/\s/g, '');
     }
     if (!rows.length) { console.warn(`  ⚠️ '${tab}' 탭이 비어있음 — 건너뜀`); continue; }
 
-    const header = rows[0];
     const hcell = h => String(h ?? '').trim();
-    const addrIdx = header.findIndex(h => hcell(h) === '주소');
+    // 헤더가 어느 행에 있는지 몰라 위 3행 중 '주소' 열이 있는 행을 찾는다(정확일치 → 부분일치 순).
+    let headerRowIdx = -1, addrIdx = -1;
+    for (let r = 0; r < Math.min(3, rows.length); r++) {
+      let idx = rows[r].findIndex(h => hcell(h) === '주소');
+      if (idx === -1) idx = rows[r].findIndex(h => hcell(h).includes('주소'));
+      if (idx !== -1) { headerRowIdx = r; addrIdx = idx; break; }
+    }
     if (addrIdx === -1) {
-      console.warn(`  ⚠️ '${tab}': '주소' 열을 못 찾아 선택과목 구간을 판단할 수 없음 — 건너뜀`);
+      console.warn(`  ⚠️ '${tab}': 위 3행에서 '주소' 열을 못 찾아 선택과목 구간을 판단할 수 없음 — 건너뜀`);
+      for (let r = 0; r < Math.min(3, rows.length); r++) {
+        console.warn(`     행${r + 1}: ${JSON.stringify(rows[r].map(hcell))}`);
+      }
       continue;
     }
+    const header = rows[headerRowIdx];
+    const dataStartRow = headerRowIdx + 1;
+    // 신원 열도 하드코딩하지 않고 헤더에서 이름으로 찾음 (없으면 알려진 기본 위치로 폴백)
+    const findCol = (label, fallback) => {
+      const idx = header.findIndex(h => hcell(h) === label);
+      if (idx === -1) console.warn(`     '${label}' 열을 헤더에서 못 찾아 기본 위치(${fallback})로 폴백`);
+      return idx === -1 ? fallback : idx;
+    };
+    const roomCol = findCol('신반', 0);
+    const seatCol = findCol('신번호', 1);
+    const nameCol = findCol('성명', 4);
+    console.log(`  ${tab}: 헤더 ${headerRowIdx + 1}행에서 발견 (신반=열${roomCol + 1}, 신번호=열${seatCol + 1}, 성명=열${nameCol + 1}, 주소=열${addrIdx + 1})`);
 
     // 헤더를 스캔해 이번학년/직전학년 과목 열을 동적으로 분리
     const block1 = [], block2 = [];
@@ -343,11 +363,11 @@ const normName = s => String(s || '').replace(/\s/g, '');
     console.log(`  ${tab}: 이번학년 선택과목 열 ${block1.length}개(${block1.map(s=>s.name).join(',')}), 직전학년 선택과목 열 ${block2.length}개(${block2.map(s=>s.name).join(',')})`);
 
     let studentCount = 0;
-    for (let i = 1; i < rows.length; i++) {
+    for (let i = dataStartRow; i < rows.length; i++) {
       const row = rows[i];
-      const room = num(cell(row, 0));  // 신반
-      const seat = num(cell(row, 1));  // 신번호
-      const name = cell(row, 4);       // 성명
+      const room = num(cell(row, roomCol));
+      const seat = num(cell(row, seatCol));
+      const name = cell(row, nameCol);
       if (!room || !seat || !name) continue;
 
       const current = [...new Set(block1.filter(sc => cell(row, sc.col)).map(sc => sc.name))];
