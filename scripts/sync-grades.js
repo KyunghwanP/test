@@ -14,6 +14,7 @@ const { JWT } = require('google-auth-library');
 
 const SHEET_ID = '1RIVq_WIPFyrbFtgqwJbzGpGXOizU1Qylf2C_Cd9IjLc';        // 모의고사·학생 명렬
 const SUSI_SHEET_ID = '1uR9WAW60AcEQN_lRNMw8a-zCmAR08xtvd-Glel6HrCE';   // 졸업생 수시 합격 현황
+const IPGYEOL_SHEET_ID = '1DQILv_vIxgtAO8pN6dXC0SV8tf5uyrBXzDG_08xjf9Y'; // 수시·정시 입결('수시'/'정시' 탭)
 
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 admin.initializeApp({
@@ -164,7 +165,55 @@ const cell = (row, i) => String(row[i] ?? '').trim();
   });
   await susiBatch.commit();
 
-  console.log(`✅ gradesSusi 저장 완료 — ${susiData.length}행 / 청크 ${chunkCount}개 (${new Date().toISOString()})`);
+  console.log(`✅ gradesSusi 저장 완료 — ${susiData.length}행 / 청크 ${chunkCount}개`);
+
+  // ══════════════════════════════════════════
+  // 수시·정시 입결 → gradesIpgyeol (프리픽스별 청크 문서)
+  // 원본 GAS와 동일하게 시트 원본 배열을 그대로 전달 (헤더 행 포함, 필터링은 프런트 담당).
+  // Firestore는 배열 안의 배열을 허용하지 않아 각 행을 {c:[...]}로 감싸 저장.
+  // ══════════════════════════════════════════
+  console.log('📝 수시·정시 입결 시트 읽는 중...');
+  const [ipSusiRaw, ipJeongsiRaw] = await Promise.all([
+    readRange('수시!A:I', IPGYEOL_SHEET_ID),
+    readRange('정시!A:S', IPGYEOL_SHEET_ID)
+  ]);
+  console.log(`  수시 ${ipSusiRaw.length}행, 정시 ${ipJeongsiRaw.length}행`);
+
+  const pad = (r, n) => { const a = r.slice(0, n); while (a.length < n) a.push(''); return a.map(v => v ?? ''); };
+  const ipSusiRows = ipSusiRaw.map(r => pad(r, 9));
+  // 정시: 원본 GAS getRegularSpreadsheetData와 동일한 열 재배치 [B,D,E,F,H,J,K,O,M,S]
+  const ipJeongsiRows = ipJeongsiRaw.map(r => pad([r[1], r[3], r[4], r[5], r[7], r[9], r[10], r[14], r[12], r[18]], 10));
+
+  const IP_CHUNK = 1500;
+  const ops = [];
+  function queueChunks(prefix, rows) {
+    const n = Math.max(1, Math.ceil(rows.length / IP_CHUNK));
+    ops.push({ set: 'gradesIpgyeol/' + prefix + '-index', data: { t, chunks: n, rows: rows.length } });
+    for (let c = 0; c < n; c++) {
+      ops.push({ set: 'gradesIpgyeol/' + prefix + '-chunk-' + c,
+                 data: { t, rows: rows.slice(c * IP_CHUNK, (c + 1) * IP_CHUNK).map(a => ({ c: a })) } });
+    }
+    return n;
+  }
+  const nSusi = queueChunks('susi', ipSusiRows);
+  const nJeongsi = queueChunks('jeongsi', ipJeongsiRows);
+
+  const ipExisting = await db.collection('gradesIpgyeol').listDocuments();
+  ipExisting.forEach(ref => {
+    let m = ref.id.match(/^susi-chunk-(\d+)$/);
+    if (m && Number(m[1]) >= nSusi) { ops.push({ delRef: ref }); return; }
+    m = ref.id.match(/^jeongsi-chunk-(\d+)$/);
+    if (m && Number(m[1]) >= nJeongsi) ops.push({ delRef: ref });
+  });
+
+  // Firestore 배치는 최대 500 작업 — 400개 단위로 나눠 커밋
+  for (let i = 0; i < ops.length; i += 400) {
+    const b = db.batch();
+    ops.slice(i, i + 400).forEach(op => op.set ? b.set(db.doc(op.set), op.data) : b.delete(op.delRef));
+    await b.commit();
+  }
+
+  console.log(`✅ gradesIpgyeol 저장 완료 — 수시 ${ipSusiRows.length}행/${nSusi}청크, 정시 ${ipJeongsiRows.length}행/${nJeongsi}청크 (${new Date().toISOString()})`);
   process.exit(0);
 })().catch(e => {
   console.error('❌ 실패:', e.response?.data?.error?.message || e.message);

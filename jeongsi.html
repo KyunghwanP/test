@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>영남고등학교 진로 진학 상담 시스템 (정시)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!--
+      원작: 2026학년도 영남고등학교 진로진학부팀 (Apps Script 웹앱 정시 입결 Index2.html)
+      이 파일은 원작 화면을 그대로 유지하고, 데이터 소스만
+      google.script.run → Firestore(gradesIpgyeol/jeongsi-*, GitHub Actions 동기화)로 교체한 이식본입니다.
+    -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Noto Sans KR', 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        /* 워터마크 스타일 */
+        .watermark-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: -1;
+            pointer-events: none;
+            opacity: 0.1;
+            width: 60%;
+            max-width: 600px;
+        }
+
+        /* 표 배경 투명화 및 글자 가독성 유지 */
+        .glass-card {
+            background-color: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+
+        table {
+            background-color: transparent !important;
+        }
+
+        th, td {
+            background-color: transparent !important;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased">
+
+    <div class="watermark-container">
+        <img src="icon-512.png" alt="영남고 엠블럼" class="w-full">
+    </div>
+
+    <header class="bg-indigo-900 text-white shadow-md sticky top-0 z-50">
+        <div class="bg-slate-800 px-6 py-2 flex justify-end">
+            <a href="career.html"
+               class="inline-flex items-center gap-1.5 text-xs sm:text-sm text-slate-300 hover:text-white transition-colors font-medium">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                교사용 통합 관리 센터&lt;첫 화면&gt;으로 돌아가기
+            </a>
+        </div>
+        <div class="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <span class="bg-white text-indigo-900 font-bold px-3 py-1 rounded-md text-sm shadow-sm">영남고</span>
+                <h1 class="text-xl font-bold tracking-tight">진로 진학 상담 시스템 <span class="text-indigo-200 font-normal text-base">| 정시 입결 추이 분석</span></h1>
+            </div>
+            <div id="loadingStatus" class="text-sm bg-indigo-800 px-4 py-2 rounded-full flex items-center gap-2">
+                <span class="animate-ping inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+                데이터 로딩 중...
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8 relative">
+        <div class="flex border-b border-slate-200 mb-8 glass-card p-2 rounded-xl shadow-sm">
+            <button onclick="switchTab('trendTab')" id="btn-trendTab" class="flex-1 py-3 px-4 font-semibold text-center rounded-lg bg-indigo-600 text-white transition-all">
+                 대학/전형/모집단위별 추이 분석
+            </button>
+            <button onclick="switchTab('gpaTab')" id="btn-gpaTab" class="flex-1 py-3 px-4 font-semibold text-center rounded-lg text-slate-600 hover:bg-slate-100 transition-all">
+                 수능 백분위별 대학 검색
+            </button>
+        </div>
+
+        <section id="trendTab" class="tab-content space-y-6">
+            <div class="bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded-r-xl shadow-xs">
+                <p class="text-sm text-indigo-700 font-medium">
+                    💡 <strong>안내:</strong> 검색 필터는 2026학년도 개설 현황 기준이며 과거 입결 추이를 분석합니다.
+                </p>
+            </div>
+
+            <div class="glass-card p-6 rounded-2xl shadow-sm border grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-600 mb-2">1. 대학교 선택</label>
+                    <div class="relative">
+                        <input type="text" id="univInput" onclick="toggleUnivDropdown()" oninput="filterUnivOptions()" placeholder="-- 대학교 검색 --" class="w-full p-3 bg-white/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" autocomplete="off">
+                        <div id="univDropdown" class="hidden absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border rounded-xl shadow-lg z-50 divide-y"></div>
+                    </div>
+                    <input type="hidden" id="univSelect" value="">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-slate-600 mb-2">2. 모집군 선택</label>
+                    <select id="groupSelect" onchange="updateTypeSelect()" class="w-full p-3 bg-white/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" disabled>
+                        <option value="">-- 대학교를 먼저 선택하세요 --</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-slate-600 mb-2">3. 전형 선택 (2026 기준)</label>
+                    <select id="typeSelect" onchange="updateMajorSelect()" class="w-full p-3 bg-white/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" disabled>
+                        <option value="">-- 모집군을 먼저 선택하세요 --</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-slate-600 mb-2">4. 모집 단위 선택 (2026 기준)</label>
+                    <select id="majorSelect" onchange="analyzeTrend()" class="w-full p-3 bg-white/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" disabled>
+                        <option value="">-- 전형을 먼저 선택하세요 --</option>
+                    </select>
+                </div>
+            </div>
+            <div id="trendResult" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="glass-card p-6 rounded-2xl shadow-sm lg:col-span-2">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4">📈 동일 전형/학과 학년도별 추이</h3>
+                    <div class="relative h-80 w-full"><canvas id="trendChart"></canvas></div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl shadow-sm">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4">ℹ️ 전형 요약 정보</h3>
+                    <div id="infoCards" class="space-y-3 overflow-y-auto max-h-[320px] pr-2"></div>
+                </div>
+
+                <div class="glass-card p-6 rounded-2xl shadow-sm lg:col-span-3 overflow-x-auto">
+                    <table id="trendTable" class="w-full text-left border-collapse">
+    <thead>
+        <tr class="border-b border-slate-200 text-slate-500 text-sm bg-slate-50/50 select-none">
+            <th class="p-4 font-semibold cursor-pointer hover:bg-slate-100" onclick="sortTable('trendTable', 0, true)">학년도</th>
+            <th class="p-4 font-semibold cursor-pointer hover:bg-slate-100" onclick="sortTable('trendTable', 1)">모집군</th>
+            <th class="p-4 font-semibold cursor-pointer hover:bg-slate-100" onclick="sortTable('trendTable', 2)">전형명</th>
+            <th class="p-4 font-semibold cursor-pointer hover:bg-slate-100" onclick="sortTable('trendTable', 3, true)">모집 인원</th>
+            <th class="p-4 font-semibold cursor-pointer hover:bg-slate-100" onclick="sortTable('trendTable', 4, true)">경쟁률</th>
+            <th class="p-4 font-semibold cursor-pointer hover:bg-slate-100" onclick="sortTable('trendTable', 5, true)">충원 인원</th>
+            <th class="p-4 font-semibold text-indigo-600 cursor-pointer hover:bg-slate-100" onclick="sortTable('trendTable', 6, true)">70% 백분위</th>
+            <th class="p-4 font-semibold text-emerald-600 cursor-pointer hover:bg-slate-100" onclick="sortTable('trendTable', 7, true)">70% 환산점수</th>
+        </tr>
+    </thead>
+    <tbody id="trendTableBody" class="text-sm divide-y divide-slate-100"></tbody>
+</table>
+                </div>
+            </div>
+        </section>
+
+        <section id="gpaTab" class="tab-content hidden space-y-6">
+            <div class="glass-card p-6 rounded-2xl shadow-sm">
+                <h3 class="text-lg font-bold text-slate-800 mb-4">🔍 지원 가능한 수능 백분위 범위 및 모집단위 검색</h3>
+                <div class="flex flex-wrap items-end gap-4">
+                    <div class="flex flex-col gap-2">
+    <span class="text-sm font-semibold text-slate-600">70% 수능 백분위 범위 설정</span>
+    <div class="flex items-center gap-2">
+        <input type="number" id="minGpa" step="1" min="0" max="100" placeholder="예: 65" class="p-3 bg-white/50 border rounded-xl w-36">
+        <span class="text-slate-400">~</span>
+        <input type="number" id="maxGpa" step="1" min="0" max="100" placeholder="예: 73" class="p-3 bg-white/50 border rounded-xl w-36">
+    </div>
+</div>
+                    <div class="flex flex-col gap-2 flex-1 min-w-[240px]">
+                        <span class="text-sm font-semibold text-slate-600">대학교 또는 모집단위 검색</span>
+                        <input type="text" id="gpaMajorKeyword" placeholder="경북대, 서울대, 컴퓨터, 경영, 간호 등" class="p-3 bg-white/50 border rounded-xl w-full">
+                    </div>
+                    <button onclick="filterByGpa()" class="bg-indigo-600 text-white font-semibold px-6 py-3 rounded-xl shadow-sm transition-colors h-[48px]">조건 검색</button>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-2xl shadow-sm overflow-hidden">
+                <div class="p-4 bg-slate-50/50 border-b flex justify-between items-center">
+                    <span class="text-sm font-semibold text-slate-600">조건 일치 학과 수: <span id="gpaCount" class="text-indigo-600 font-bold">0</span>개</span>
+                </div>
+                <div class="overflow-x-auto max-h-[700px]">
+                    <table id="gpaTable" class="w-full text-left border-collapse">
+    <thead class="sticky top-0 bg-slate-100 shadow-sm z-10 select-none">
+        <tr class="text-slate-600 text-sm">
+            <th class="p-4 font-semibold cursor-pointer hover:bg-slate-200" onclick="sortTable('gpaTable', 0)">대학교</th>
+            <th class="p-4 font-semibold text-center cursor-pointer hover:bg-slate-200" onclick="sortTable('gpaTable', 1)">모집군</th>
+            <th class="p-4 font-semibold cursor-pointer hover:bg-slate-200" onclick="sortTable('gpaTable', 2)">전형</th>
+            <th class="p-4 font-semibold cursor-pointer hover:bg-slate-200" onclick="sortTable('gpaTable', 3)">모집 단위</th>
+            <th class="p-4 font-semibold text-center cursor-pointer hover:bg-slate-200" onclick="sortTable('gpaTable', 4, true)">학년도</th>
+            <th class="p-4 font-semibold text-center cursor-pointer hover:bg-slate-200" onclick="sortTable('gpaTable', 5, true)">모집 인원</th>
+            <th class="p-4 font-semibold text-center cursor-pointer hover:bg-slate-200" onclick="sortTable('gpaTable', 6, true)">경쟁률</th>
+            <th class="p-4 font-semibold text-center cursor-pointer hover:bg-slate-200" onclick="sortTable('gpaTable', 7, true)">충원 인원</th>
+            <th class="p-4 font-semibold text-center text-indigo-600 cursor-pointer hover:bg-slate-200" onclick="sortTable('gpaTable', 8, true)">70% 백분위</th>
+            <th class="p-4 font-semibold text-center text-emerald-600 cursor-pointer hover:bg-slate-200" onclick="sortTable('gpaTable', 9, true)">70% 환산점수</th>
+        </tr>
+    </thead>
+    <tbody id="gpaTableBody" class="text-sm divide-y divide-slate-100"></tbody>
+</table>
+                </div>
+            </div>
+        </section>
+
+        <div class="text-right text-xs text-slate-400 mt-8 pb-4">원작·데이터 제공 : 2026학년도 영남고등학교 진로진학부팀</div>
+    </main>
+
+    <script>
+        // --- 스크립트 부분은 기존의 정시 전용 데이터 처리 로직을 그대로 유지합니다 ---
+        let rawData = [];
+        let trendChartInstance = null;
+
+        window.addEventListener('DOMContentLoaded', fetchData);
+
+        function fetchData() {
+            window.__loadIpgyeolData()
+                .then(data => {
+                    if (data && data.length > 0) processData(data);
+                    else document.getElementById('loadingStatus').innerHTML = '⚠️ 데이터가 비어있습니다.';
+                })
+                .catch(err => {
+                    document.getElementById('loadingStatus').innerHTML = '⚠️ ' + (err.message || '서버 오류');
+                });
+        }
+
+        function processData(data) {
+            rawData = data.filter((row, index) => index !== 0 && !isNaN(parseInt(row[0])) && parseInt(row[0]) >= 2020)
+                .map(row => ({
+                    year: String(row[0]).trim(),
+                    univ: row[1] ? String(row[1]).trim() : '',
+                    major: row[2] ? String(row[2]).trim() : '',
+                    type: row[3] ? String(row[3]).trim() : '',
+                    quota: row[4] ? String(row[4]).trim() : '-',
+                    rate: row[5] && !isNaN(parseFloat(row[5])) ? parseFloat(row[5]) : 0,
+                    addPass: row[6] ? String(row[6]).trim() : '-',
+                    gpaCut: row[7] && !isNaN(parseFloat(row[7])) ? parseFloat(row[7]) : null,
+                    scoreCut: row[8] && !isNaN(parseFloat(row[8])) ? parseFloat(row[8]) : null,
+                    group: row[9] ? String(row[9]).trim() : '-'
+                }));
+
+            const univs2026 = [...new Set(rawData.filter(item => item.year === '2026').map(item => item.univ))].filter(Boolean).sort();
+            window.univList2026 = univs2026;
+            renderUnivDropdown(univs2026);
+
+            const status = document.getElementById('loadingStatus');
+            status.className = "text-sm bg-emerald-600 text-white px-4 py-2 rounded-full";
+            status.innerHTML = "✓ 정시 데이터 동기화 완료";
+        }
+
+        function renderUnivDropdown(list) {
+            const dropdown = document.getElementById('univDropdown');
+            dropdown.innerHTML = list.map(univ => `
+                <div class="p-3 text-sm text-slate-700 hover:bg-indigo-50 cursor-pointer" onclick="selectUniv('${univ}')">${univ}</div>
+            `).join('');
+        }
+
+        function selectUniv(univ) {
+            document.getElementById('univInput').value = univ;
+            document.getElementById('univSelect').value = univ;
+            document.getElementById('univDropdown').classList.add('hidden');
+            updateGroupSelect(); // 1. 대학교 선택 후 모집군 선택 박스 활성화
+        }
+
+        function toggleUnivDropdown() {
+            document.getElementById('univDropdown').classList.toggle('hidden');
+            filterUnivOptions();
+        }
+
+        function filterUnivOptions() {
+            const keyword = document.getElementById('univInput').value.trim().toLowerCase();
+            const filtered = (window.univList2026 || []).filter(univ => univ.toLowerCase().includes(keyword));
+            renderUnivDropdown(filtered);
+            document.getElementById('univDropdown').classList.remove('hidden');
+        }
+
+        // [신설] 대학교에 해당하는 모집군 리스트 불러오기
+        function updateGroupSelect() {
+            const selectedUniv = document.getElementById('univSelect').value;
+            const groupSelect = document.getElementById('groupSelect');
+            const typeSelect = document.getElementById('typeSelect');
+            const majorSelect = document.getElementById('majorSelect');
+
+            groupSelect.innerHTML = '<option value="">-- 모집군 선택 --</option>';
+            typeSelect.innerHTML = '<option value="">-- 모집군을 먼저 선택하세요 --</option>';
+            majorSelect.innerHTML = '<option value="">-- 전형을 먼저 선택하세요 --</option>';
+            typeSelect.disabled = true;
+            majorSelect.disabled = true;
+            document.getElementById('trendResult').classList.add('hidden');
+
+            if (!selectedUniv) { groupSelect.disabled = true; return; }
+
+            // 2026학년도 데이터에서 우선적으로 군 추출, 없으면 전체 연도 기준
+            let filteredGroups = [...new Set(rawData.filter(item => item.univ === selectedUniv && item.year === '2026').map(item => item.group))].filter(Boolean).sort();
+            if (filteredGroups.length === 0) filteredGroups = [...new Set(rawData.filter(item => item.univ === selectedUniv).map(item => item.group))].filter(Boolean).sort();
+
+            filteredGroups.forEach(group => {
+                const opt = document.createElement('option');
+                opt.value = group; opt.textContent = group;
+                groupSelect.appendChild(opt);
+            });
+            groupSelect.disabled = false;
+        }
+
+        // [수정] 대학교와 모집군이 둘 다 일치하는 전형 리스트 불러오기
+        function updateTypeSelect() {
+            const selectedUniv = document.getElementById('univSelect').value;
+            const selectedGroup = document.getElementById('groupSelect').value;
+            const typeSelect = document.getElementById('typeSelect');
+            const majorSelect = document.getElementById('majorSelect');
+
+            typeSelect.innerHTML = '<option value="">-- 전형 선택 --</option>';
+            majorSelect.innerHTML = '<option value="">-- 전형을 먼저 선택하세요 --</option>';
+            majorSelect.disabled = true;
+            document.getElementById('trendResult').classList.add('hidden');
+
+            if (!selectedUniv || !selectedGroup) { typeSelect.disabled = true; return; }
+
+            let filteredTypes = [...new Set(rawData.filter(item => item.univ === selectedUniv && item.group === selectedGroup && item.year === '2026').map(item => item.type))].filter(Boolean).sort();
+            if (filteredTypes.length === 0) filteredTypes = [...new Set(rawData.filter(item => item.univ === selectedUniv && item.group === selectedGroup).map(item => item.type))].filter(Boolean).sort();
+
+            filteredTypes.forEach(type => {
+                const opt = document.createElement('option');
+                opt.value = type; opt.textContent = type;
+                typeSelect.appendChild(opt);
+            });
+            typeSelect.disabled = false;
+        }
+
+        // [수정] 대학교 + 모집군 + 전형 3가지가 모두 일치하는 학과(모집단위) 리스트 불러오기
+        function updateMajorSelect() {
+            const selectedUniv = document.getElementById('univSelect').value;
+            const selectedGroup = document.getElementById('groupSelect').value;
+            const selectedType = document.getElementById('typeSelect').value;
+            const majorSelect = document.getElementById('majorSelect');
+            majorSelect.innerHTML = '<option value="">-- 모집단위 선택 --</option>';
+            document.getElementById('trendResult').classList.add('hidden');
+
+            if (!selectedUniv || !selectedGroup || !selectedType) { majorSelect.disabled = true; return; }
+
+            let filteredMajors = [...new Set(rawData.filter(item => item.univ === selectedUniv && item.group === selectedGroup && item.type === selectedType && item.year === '2026').map(item => item.major))].filter(Boolean).sort();
+            if (filteredMajors.length === 0) filteredMajors = [...new Set(rawData.filter(item => item.univ === selectedUniv && item.group === selectedGroup && item.type === selectedType).map(item => item.major))].filter(Boolean).sort();
+
+            filteredMajors.forEach(major => {
+                const opt = document.createElement('option');
+                opt.value = major; opt.textContent = major;
+                majorSelect.appendChild(opt);
+            });
+            majorSelect.disabled = false;
+        }
+
+        // [수정] 모집군 데이터까지 필터 조건에 추가하여 추이 분석 표출 및 전년 대비 변동 수치(+값) 표시
+        function analyzeTrend() {
+            const univ = document.getElementById('univSelect').value;
+            const group = document.getElementById('groupSelect').value;
+            const type = document.getElementById('typeSelect').value;
+            const major = document.getElementById('majorSelect').value;
+            if (!univ || !group || !type || !major) return;
+
+            // 차트용 데이터는 기존처럼 연도순(오름차순)으로 유지하기 위해 원본 보존
+            const baseData = rawData.filter(item => item.univ === univ && item.group === group && item.type === type && item.major === major);
+
+            // 차트에는 과거 -> 최신 순서(오름차순)로 전달
+            const chartData = [...baseData].sort((a, b) => parseInt(a.year) - parseInt(b.year));
+            // 표(Table)에는 최신 -> 과거 순서(내림차순)로 정렬하여 반영
+            const tableData = [...baseData].sort((a, b) => parseInt(b.year) - parseInt(a.year));
+
+            document.getElementById('trendResult').classList.remove('hidden');
+
+            const tbody = document.getElementById('trendTableBody');
+            const infoCards = document.getElementById('infoCards');
+            tbody.innerHTML = ''; infoCards.innerHTML = '';
+
+            tableData.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors";
+
+                const formattedGpa = (item.gpaCut !== null && !isNaN(item.gpaCut)) ? Number(item.gpaCut).toFixed(1) : '-';
+                const formattedScore = (item.scoreCut !== null && !isNaN(item.scoreCut)) ? Number(item.scoreCut).toFixed(2) : '-';
+
+                // [수정] 전년도 대비 백분위 등락 화살표 및 변동 수치 계산 로직
+                let trendArrow = '';
+                if (item.gpaCut !== null && !isNaN(item.gpaCut)) {
+                    const prevYear = (parseInt(item.year) - 1).toString();
+                    const prevItem = baseData.find(h => h.year === prevYear && h.gpaCut !== null && !isNaN(h.gpaCut));
+
+                    if (prevItem) {
+                        const diff = item.gpaCut - prevItem.gpaCut;
+                        if (diff > 0) {
+                            trendArrow = ` <span class="text-rose-500 text-xs font-bold" title="전년 대비 ${diff.toFixed(1)}p 상승">▲${diff.toFixed(1)}</span>`;
+                        } else if (diff < 0) {
+                            trendArrow = ` <span class="text-blue-500 text-xs font-bold" title="전년 대비 ${Math.abs(diff).toFixed(1)}p 하락">▼${Math.abs(diff).toFixed(1)}</span>`;
+                        } else {
+                            trendArrow = ` <span class="text-slate-400 text-xs">-0.0</span>`;
+                        }
+                    }
+                }
+
+                tr.innerHTML = `
+                    <td class="p-4 font-medium">${item.year}학년도</td>
+                    <td class="p-4 text-center font-bold text-teal-600">${item.group || '-'}</td>
+                    <td class="p-4 text-slate-600">${item.type}</td>
+                    <td class="p-4">${item.quota}명</td>
+                    <td class="p-4">${item.rate ? item.rate + ':1' : '-'}</td>
+                    <td class="p-4">${item.addPass}명</td>
+                    <td class="p-4 font-semibold text-indigo-600">${formattedGpa}${trendArrow}</td>
+                    <td class="p-4 font-semibold text-emerald-600">${formattedScore}</td>
+                `;
+                tbody.appendChild(tr);
+
+                const card = document.createElement('div');
+                card.className = "p-3 bg-white/50 rounded-xl border text-xs";
+                card.innerHTML = `<b>${item.year}년 [${item.group} / ${item.type}]</b><br>백분위: ${formattedGpa}${trendArrow} | 환산점: ${formattedScore}`;
+                infoCards.appendChild(card);
+            });
+
+            renderChart(chartData);
+        }
+
+        function renderChart(filtered) {
+            const labels = filtered.map(item => item.year + '학년도');
+            const gpaData = filtered.map(item => item.gpaCut);
+            const rateData = filtered.map(item => item.rate);
+            if (trendChartInstance) trendChartInstance.destroy();
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            trendChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: '백분위 (%)', data: gpaData, borderColor: '#4f46e5', tension: 0.2, yAxisID: 'yGpa' },
+                        { label: '경쟁률 (:1)', data: rateData, borderColor: '#f59e0b', tension: 0.2, yAxisID: 'yRate' }
+                    ]
+                },
+                options: { scales: { yGpa: { min: 0, max: 100 }, yRate: { position: 'right', grid: { drawOnChartArea: false } } } }
+            });
+        }
+
+        function filterByGpa() {
+            const minGpa = parseFloat(document.getElementById('minGpa').value) || 0;
+            const maxGpa = parseFloat(document.getElementById('maxGpa').value) || 100;
+            const keyword = document.getElementById('gpaMajorKeyword').value.trim().toLowerCase();
+
+            const uniqueDepts = [];
+            const seen = new Set();
+            rawData.filter(item => item.year === '2026').forEach(item => {
+                const key = `${item.univ}|${item.group}|${item.type}|${item.major}`;
+                if (!seen.has(key)) { seen.add(key); uniqueDepts.push(item); }
+            });
+
+            const matched = [];
+            uniqueDepts.forEach(dept => {
+                // [수정] 키워드가 '모집단위(학과)' 또는 '대학교명' 중 하나라도 포함하면 매칭되도록 변경
+                if (keyword && !dept.major.toLowerCase().includes(keyword) && !dept.univ.toLowerCase().includes(keyword)) return;
+
+                const history = rawData.filter(i => i.univ === dept.univ && i.group === dept.group && i.type === dept.type && i.major === dept.major).sort((a,b) => parseInt(a.year) - parseInt(b.year));
+                const latest = [...history].reverse().find(i => i.gpaCut !== null);
+                if (latest && latest.gpaCut >= minGpa && latest.gpaCut <= maxGpa) matched.push({ dept, history });
+            });
+
+            renderGpaTable(matched);
+        }
+
+        function renderGpaTable(matched) {
+            const tbody = document.getElementById('gpaTableBody');
+            tbody.innerHTML = '';
+
+            matched.forEach(group => {
+                // [수정] 각 모집단위별 이력(history) 데이터를 학년도 내림차순(최신순)으로 정렬
+                const sortedHistory = [...group.history].sort((a, b) => parseInt(b.year) - parseInt(a.year));
+
+                sortedHistory.forEach((item, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = idx === 0 ? "border-t-2 border-slate-300" : "border-t border-slate-100";
+
+                    const formattedGpa = (item.gpaCut !== null && !isNaN(item.gpaCut)) ? Number(item.gpaCut).toFixed(1) : '-';
+                    const formattedScore = (item.scoreCut !== null && !isNaN(item.scoreCut)) ? Number(item.scoreCut).toFixed(2) : '-';
+                    const groupName = item.group || '-';
+
+                    // 전년도 대비 백분위 등락 화살표 및 수치 계산 로직
+                    let trendArrow = '';
+                    if (item.gpaCut !== null && !isNaN(item.gpaCut)) {
+                        // 현재 학년도보다 1년 전 과거 데이터 찾기
+                        const prevYear = (parseInt(item.year) - 1).toString();
+                        const prevItem = group.history.find(h => h.year === prevYear && h.gpaCut !== null && !isNaN(h.gpaCut));
+
+                        if (prevItem) {
+                            const diff = item.gpaCut - prevItem.gpaCut;
+                            if (diff > 0) {
+                                trendArrow = ` <span class="text-rose-500 text-xs font-bold" title="전년 대비 ${diff.toFixed(1)}p 상승">▲${diff.toFixed(1)}</span>`;
+                            } else if (diff < 0) {
+                                trendArrow = ` <span class="text-blue-500 text-xs font-bold" title="전년 대비 ${Math.abs(diff).toFixed(1)}p 하락">▼${Math.abs(diff).toFixed(1)}</span>`;
+                            } else {
+                                trendArrow = ` <span class="text-slate-400 text-xs">-0.0</span>`;
+                            }
+                        }
+                    }
+
+                    tr.innerHTML = `
+                        ${idx === 0 ? `
+                            <td class="p-4 font-semibold" rowspan="${sortedHistory.length}">${item.univ}</td>
+                            <td class="p-4 text-center font-bold text-teal-600" rowspan="${sortedHistory.length}">${groupName}</td>
+                            <td class="p-4" rowspan="${sortedHistory.length}">${item.type}</td>
+                            <td class="p-4 font-bold" rowspan="${sortedHistory.length}">${item.major}</td>
+                        ` : ''}
+                        <td class="p-4 text-center">${item.year}</td>
+                        <td class="p-4 text-center">${item.quota}명</td>
+                        <td class="p-4 text-center">${item.rate}:1</td>
+                        <td class="p-4 text-center">${item.addPass}명</td>
+                        <td class="p-4 text-center font-bold text-indigo-700">${formattedGpa}${trendArrow}</td>
+                        <td class="p-4 text-center">${formattedScore}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            });
+            document.getElementById('gpaCount').textContent = matched.length;
+        }
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
+            const isTrend = tabId === 'trendTab';
+            document.getElementById('btn-trendTab').className = isTrend ? "flex-1 py-3 px-4 font-semibold text-center rounded-lg bg-indigo-600 text-white" : "flex-1 py-3 px-4 font-semibold text-center rounded-lg text-slate-600 hover:bg-slate-100";
+            document.getElementById('btn-gpaTab').className = !isTrend ? "flex-1 py-3 px-4 font-semibold text-center rounded-lg bg-indigo-600 text-white" : "flex-1 py-3 px-4 font-semibold text-center rounded-lg text-slate-600 hover:bg-slate-100";
+        }
+        // --- [신설] 테이블 정렬용 상태 관리 객체 및 함수 ---
+        const sortStates = {
+            trendTable: { colIndex: -1, asc: true },
+            gpaTable: { colIndex: -1, asc: true }
+        };
+
+       function sortTable(tableId, colIndex, isNumeric = false) {
+            const table = document.getElementById(tableId);
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const state = sortStates[tableId];
+
+            // 방향 전환
+            if (state.colIndex === colIndex) {
+                state.asc = !state.asc;
+            } else {
+                state.colIndex = colIndex;
+                state.asc = true;
+            }
+
+            // 헤더 아이콘 업데이트
+            const headers = table.querySelectorAll('thead th');
+            headers.forEach((th, idx) => {
+                th.innerHTML = th.innerHTML.replace(/ [▲▼]/g, '');
+                if (idx === colIndex) {
+                    th.innerHTML += state.asc ? ' ▲' : ' ▼';
+                }
+            });
+
+            // --- [핵심 수정] 2번째 탭(gpaTable)의 rowspan 구조 안전 정렬 로직 ---
+            if (tableId === 'gpaTable') {
+                // 1. 행들을 대학교/모집단위별 '그룹'으로 다시 묶기
+                const groups = [];
+                let currentGroup = null;
+
+                rows.forEach(row => {
+                    // 대학교 셀(cells[0])이 존재하고 rowspan 속성이 있다면 새로운 그룹의 시작임
+                    if (row.cells[0] && row.cells[0].hasAttribute('rowspan')) {
+                        if (currentGroup) groups.push(currentGroup);
+                        currentGroup = {
+                            mainRow: row, // 대학교/학과 정보가 있는 메인 행
+                            subRows: [],  // 아래에 종속된 과거 학년도 행들
+                            sortValue: '' // 정렬 기준이 될 값
+                        };
+                    } else {
+                        if (currentGroup) currentGroup.subRows.push(row);
+                    }
+                });
+                if (currentGroup) groups.push(currentGroup);
+
+                // 2. 그룹별 정렬 기준값 세팅하기
+                groups.forEach(g => {
+                    let cellText = '';
+                    if (colIndex < 4) {
+                        // 0~3번 열(대학, 군, 전형, 학과)은 메인 행에서 가져옴
+                        cellText = g.mainRow.cells[colIndex]?.innerText.trim() || '';
+                    } else {
+                        // 4~9번 열(학년도, 지표 등)은 정렬할 때 '최신 학년도(메인 행)' 값을 기준으로 그룹 전체를 이동
+                        cellText = g.mainRow.cells[colIndex]?.innerText.trim() || '';
+                    }
+                    g.sortValue = cellText;
+                });
+
+                // 3. 그룹 자체를 정렬
+                groups.sort((groupA, groupB) => {
+                    let valA = groupA.sortValue;
+                    let valB = groupB.sortValue;
+
+                    if (isNumeric) {
+                        const numA = parseFloat(valA.replace(/[^0-9.-]/g, '')) || 0;
+                        const numB = parseFloat(valB.replace(/[^0-9.-]/g, '')) || 0;
+                        return state.asc ? numA - numB : numB - numA;
+                    }
+                    return state.asc ? valA.localeCompare(valB, 'ko') : valB.localeCompare(valA, 'ko');
+                });
+
+                // 4. 정렬된 그룹 순서대로 표에 다시 채워넣기
+                tbody.innerHTML = '';
+                groups.forEach(g => {
+                    tbody.appendChild(g.mainRow);
+                    g.subRows.forEach(subRow => tbody.appendChild(subRow));
+                });
+
+            } else {
+                // 첫 번째 탭(trendTable)은 일반적인 테이블이므로 기존 로직 유지
+                rows.sort((rowA, rowB) => {
+                    let cellA = rowA.cells[colIndex]?.innerText.trim() || '';
+                    let cellB = rowB.cells[colIndex]?.innerText.trim() || '';
+
+                    if (isNumeric) {
+                        const numA = parseFloat(cellA.replace(/[^0-9.-]/g, '')) || 0;
+                        const numB = parseFloat(cellB.replace(/[^0-9.-]/g, '')) || 0;
+                        return state.asc ? numA - numB : numB - numA;
+                    }
+                    return state.asc ? cellA.localeCompare(cellB, 'ko') : cellB.localeCompare(cellA, 'ko');
+                });
+                rows.forEach(row => tbody.appendChild(row));
+            }
+        }
+    </script>
+
+    <!-- 데이터 계층: Firebase 로그인 세션(앱과 같은 도메인이라 자동 공유) + Firestore gradesIpgyeol/jeongsi-* 청크 병합 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
+        const app = initializeApp({
+            apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
+            authDomain: "ynhs-7b5ba.firebaseapp.com",
+            projectId: "ynhs-7b5ba",
+            storageBucket: "ynhs-7b5ba.firebasestorage.app",
+            messagingSenderId: "1031618043470",
+            appId: "1:1031618043470:web:edb5b8d1f98db029916d1f"
+        });
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.__loadIpgyeolData = () => new Promise((resolve, reject) => {
+            let done = false;
+            onAuthStateChanged(auth, async (user) => {
+                if (done) return;
+                if (!user) { reject(new Error('로그인이 필요합니다. 영남고 교사용 앱에서 로그인 후 이용해주세요.')); return; }
+                done = true;
+                try {
+                    const idx = await getDoc(doc(db, 'gradesIpgyeol', 'jeongsi-index'));
+                    if (!idx.exists()) { reject(new Error('아직 데이터가 없습니다. 동기화 실행을 확인해주세요.')); return; }
+                    const n = idx.data().chunks || 0;
+                    const snaps = await Promise.all(
+                        Array.from({ length: n }, (_, i) => getDoc(doc(db, 'gradesIpgyeol', 'jeongsi-chunk-' + i)))
+                    );
+                    // {c:[...]} 래핑 해제 → 원본 GAS getRegularSpreadsheetData()와 동일한 2차원 배열
+                    resolve(snaps.flatMap(s => (s.data()?.rows || []).map(w => w.c)));
+                } catch (e) { reject(e); }
+            });
+        });
+    </script>
+</body>
+</html>
