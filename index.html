@@ -2929,7 +2929,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.97</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.98</div>
   </div>
 </div>
 
@@ -3054,7 +3054,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver4.97</div>
+    <div class="nav-version">ver4.98</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7108,8 +7108,12 @@ async function s360ShowDetail(s){
       st.gpa9 && st.gpa9 !== '-' ? `<span class="spot-badge" style="background:#fef3c7;color:#92400e;">내신 5등급제 ${st.gpa9}</span>` : '',
       st.gpa5 && st.gpa5 !== '-' ? `<span class="spot-badge neg">내신 9등급제 ${st.gpa5}</span>` : ''
     ].join('');
-    // 등급 셀: "등급 / 백분위" (영어·한국사는 등급만 제공)
-    const gc = o => (o && (o.g || o.p)) ? `${o.g || '-'}<span style="color:var(--ink-soft);font-size:12.5px;"> /${o.p || '-'}</span>` : '-';
+    // 등급 셀: 선택과목명(위) + "등급 / 백분위" (영어·한국사는 등급만 제공)
+    const gc = o => {
+      if (!o || (!o.g && !o.p)) return '-';
+      const sub = o.sub ? `<div style="font-size:11px;font-weight:700;color:var(--ink-soft);white-space:nowrap;">${escapeHtml(o.sub)}</div>` : '';
+      return `${sub}${o.g || '-'}<span style="color:var(--ink-soft);font-size:12.5px;"> /${o.p || '-'}</span>`;
+    };
     const rows = (st.history || []).slice().reverse().map(h => `
       <tr>
         <td>${escapeHtml(h.examDate || '-')}</td>
