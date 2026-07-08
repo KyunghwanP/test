@@ -114,15 +114,22 @@
     .card-trend .card-deco { background: linear-gradient(90deg, #f59e0b, #d4a017); }
     .card-csat .card-deco { background: linear-gradient(90deg, #8b5cf6, #6a1b9a); }
 
-    /* 새 탭으로 열리는 메뉴 표시 배지 */
-    .newtab-badge {
+    /* 아직 이식 전인 메뉴 — 비활성 표시 (새 탭 열림 방지) */
+    .card-disabled {
+      cursor: default;
+      opacity: 0.55;
+      filter: grayscale(0.35);
+    }
+    .card-disabled:hover { transform: none; box-shadow: 0 4px 20px rgba(148, 163, 184, 0.12) !important; border-color: #e2e8f0 !important; }
+    .card-disabled:hover .icon-circle { transform: none; }
+    .prep-badge {
       position: absolute;
       top: 14px;
       right: 16px;
       font-size: 0.72rem;
       font-weight: 700;
-      color: #94a3b8;
-      background: #f1f5f9;
+      color: #64748b;
+      background: #e2e8f0;
       border-radius: 20px;
       padding: 3px 10px;
     }
@@ -159,8 +166,8 @@
       </div>
 
       <div class="col-xl-3 col-md-6 col-sm-6 col-12">
-        <div class="home-card card-grad" onclick="window.open('https://script.google.com/a/macros/yeungnam.hs.kr/s/AKfycbwuDEc0us5h5NT0iArD9OIDxB0zhNzbejLzhlf0kMG-CXaYlKBPzVtn0lAz1qM51HnO/exec', '_blank')">
-          <span class="newtab-badge">↗ 새 탭</span>
+        <div class="home-card card-grad card-disabled" title="앱 내 이식 준비 중입니다">
+          <span class="prep-badge">준비 중</span>
           <div class="icon-circle">🎓</div>
           <h3><span class="text-primary fw-bold">졸업생 수시</span><br>결과 조회</h3>
           <p style="color: #000;">2025~2026 졸업생들의 수시 합격 결과 및 통계를 새 창에서 조회</p>
@@ -169,8 +176,8 @@
       </div>
 
       <div class="col-xl-3 col-md-6 col-sm-6 col-12">
-        <div class="home-card card-trend" onclick="window.open('https://script.google.com/a/macros/yeungnam.hs.kr/s/AKfycbwQVN4j6JOmx8GQooaSsThiq92fzSgc6z1lZAIw-_bM_0tApRcKSHvtWYykeepPkuyu/exec', '_blank')">
-          <span class="newtab-badge">↗ 새 탭</span>
+        <div class="home-card card-trend card-disabled" title="앱 내 이식 준비 중입니다">
+          <span class="prep-badge">준비 중</span>
           <div class="icon-circle">📝</div>
           <h3><span class="text-danger fw-bold">수시</span> 입결 조회</h3>
           <p style="color: #000;">2024~2026 3년 대학교 및 전형별 과거 입결 및 지원 가능 내신 컷 검색</p>
@@ -179,8 +186,8 @@
       </div>
 
       <div class="col-xl-3 col-md-6 col-sm-6 col-12">
-        <div class="home-card card-csat" onclick="window.open('https://script.google.com/a/macros/yeungnam.hs.kr/s/AKfycbwQVN4j6JOmx8GQooaSsThiq92fzSgc6z1lZAIw-_bM_0tApRcKSHvtWYykeepPkuyu/exec?mode=regular', '_blank')">
-          <span class="newtab-badge">↗ 새 탭</span>
+        <div class="home-card card-csat card-disabled" title="앱 내 이식 준비 중입니다">
+          <span class="prep-badge">준비 중</span>
           <div class="icon-circle">🎯</div>
           <h3><span class="text-primary fw-bold">정시</span> 입결 조회</h3>
           <p style="color: #000;">수능 점수 기반 지원 가능 대학 및 정시 지원 희망 확인</p>
