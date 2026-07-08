@@ -1032,6 +1032,9 @@
   .s360-susi-wrap{max-height:320px;overflow-y:auto;}
   .s360-susi-wrap th{position:sticky;top:0;z-index:1;}
   .s360-susi-wrap td{font-family:'Pretendard','Noto Sans KR';}
+  .s360-range-btn{border:1px solid var(--rule);background:var(--paper-soft);color:var(--ink-soft);
+    font-size:12.5px;font-weight:800;padding:3px 10px;border-radius:20px;cursor:pointer;font-family:'IBM Plex Mono';}
+  .s360-range-btn.on{background:var(--ink);color:var(--paper,#fff);border-color:var(--ink);}
   .s360-back{display:inline-block;background:none;border:0;color:var(--ink-soft);font-weight:700;cursor:pointer;padding:0 0 10px;font-size:14px;font-family:inherit;}
   .s360-back:hover{color:var(--ink);}
   .s360-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin-bottom:12px;}
@@ -2933,7 +2936,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.00</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.01</div>
   </div>
 </div>
 
@@ -3057,7 +3060,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver5.00</div>
+    <div class="nav-version">ver5.01</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -6781,7 +6784,8 @@ async function s360LoadSusi(){
   return spotSusiRows;
 }
 
-// 성적→입결 매칭: 이 학생의 내신(9등급제) ±0.3 범위에서 수시 최종합격한 졸업생 사례
+// 성적→입결 매칭: 이 학생의 내신(9등급제) ±범위에서 수시 최종합격한 졸업생 사례
+let s360SusiRange = 0.3; // 마지막 선택 범위 기억 (학생을 바꿔도 유지)
 async function s360RenderSusiMatch(st){
   const el = document.getElementById('s360SusiMatch');
   if (!el) return;
@@ -6789,39 +6793,47 @@ async function s360RenderSusiMatch(st){
   if (isNaN(g)) return;
   el.innerHTML = '<div style="font-size:13px;color:var(--ink-soft);margin-top:12px;">🎓 이 내신대 선배들의 합격 사례 찾는 중...</div>';
   try {
-    const RANGE = 0.3, MAX_SHOW = 150;
     const rows = await s360LoadSusi();
-    const hits = rows.filter(r => {
-      const s = parseFloat(r.score);
-      if (isNaN(s) || Math.abs(s - g) > RANGE) return false;
-      const f = r.final || '';
-      return f.includes('합격') && !f.includes('불합격');
-    }).sort((a,b) =>
-      Math.abs(parseFloat(a.score) - g) - Math.abs(parseFloat(b.score) - g)
-      || String(b.year).localeCompare(String(a.year)));
-    if (!hits.length) {
-      el.innerHTML = `<div style="font-size:13.5px;color:var(--ink-soft);margin-top:12px;">🎓 내신 ${g} ±${RANGE} 범위의 졸업생 수시 최종합격 사례가 없습니다.</div>`;
-      return;
-    }
-    const trs = hits.slice(0, MAX_SHOW).map(r => `
-      <tr>
-        <td>${escapeHtml(r.year || '-')}</td>
-        <td style="font-weight:800;">${escapeHtml(r.univ || '-')}</td>
-        <td>${escapeHtml(r.unit || '-')}</td>
-        <td>${escapeHtml(r.type || '-')}${r.detail ? `<span style="color:var(--ink-soft);font-size:12px;"> · ${escapeHtml(r.detail)}</span>` : ''}</td>
-        <td style="font-family:'IBM Plex Mono';font-weight:700;color:#1d4ed8;">${escapeHtml(r.score || '-')}</td>
-      </tr>`).join('');
-    el.innerHTML = `
-      <div style="margin-top:14px;">
-        <div style="font-size:14px;font-weight:800;color:var(--ink);margin-bottom:6px;">
-          🎓 이 내신으로 합격한 선배들
-          <span style="font-weight:700;color:var(--ink-soft);font-size:12.5px;">내신 ${g} ±${RANGE} · 수시 최종합격 ${hits.length}건${hits.length > MAX_SHOW ? ` 중 가까운 순 ${MAX_SHOW}건` : ''}</span>
-        </div>
+    const MAX_SHOW = 150;
+    const draw = () => {
+      const RANGE = s360SusiRange;
+      const hits = rows.filter(r => {
+        const s = parseFloat(r.score);
+        if (isNaN(s) || Math.abs(s - g) > RANGE) return false;
+        const f = r.final || '';
+        return f.includes('합격') && !f.includes('불합격');
+      }).sort((a,b) =>
+        Math.abs(parseFloat(a.score) - g) - Math.abs(parseFloat(b.score) - g)
+        || String(b.year).localeCompare(String(a.year)));
+      const chips = [0.1, 0.3, 0.5].map(r =>
+        `<button class="s360-range-btn${r === RANGE ? ' on' : ''}" data-r="${r}">±${r}</button>`).join('');
+      const trs = hits.slice(0, MAX_SHOW).map(r => `
+        <tr>
+          <td>${escapeHtml(r.year || '-')}</td>
+          <td style="font-weight:800;">${escapeHtml(r.univ || '-')}</td>
+          <td>${escapeHtml(r.unit || '-')}</td>
+          <td>${escapeHtml(r.type || '-')}${r.detail ? `<span style="color:var(--ink-soft);font-size:12px;"> · ${escapeHtml(r.detail)}</span>` : ''}</td>
+          <td style="font-family:'IBM Plex Mono';font-weight:700;color:#1d4ed8;">${escapeHtml(r.score || '-')}</td>
+        </tr>`).join('');
+      const body = hits.length ? `
         <div class="s360-table-wrap s360-susi-wrap"><table class="s360-table">
           <thead><tr><th>졸업년도</th><th>대학</th><th>모집단위</th><th>전형</th><th>내신</th></tr></thead>
           <tbody>${trs}</tbody>
-        </table></div>
-      </div>`;
+        </table></div>`
+        : `<div style="font-size:13.5px;color:var(--ink-soft);">해당 범위의 수시 최종합격 사례가 없습니다. 범위를 넓혀보세요.</div>`;
+      el.innerHTML = `
+        <div style="margin-top:14px;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+            <span style="font-size:14px;font-weight:800;color:var(--ink);">🎓 이 내신으로 합격한 선배들</span>
+            ${chips}
+            <span style="font-weight:700;color:var(--ink-soft);font-size:12.5px;">내신 ${g} ±${RANGE} · 수시 최종합격 ${hits.length}건${hits.length > MAX_SHOW ? ` 중 가까운 순 ${MAX_SHOW}건` : ''}</span>
+          </div>
+          ${body}
+        </div>`;
+      el.querySelectorAll('.s360-range-btn').forEach(b =>
+        b.addEventListener('click', () => { s360SusiRange = parseFloat(b.dataset.r); draw(); }));
+    };
+    draw();
   } catch(e) {
     el.innerHTML = ''; // 로드 실패 시 섹션을 조용히 비움 (성적 화면 자체는 유지)
   }
