@@ -31,19 +31,29 @@ const jwt = new JWT({
 
 // ── 성적 열람 권한(acl/gradeRoles) 동기화 ──
 // firestore.rules가 이 문서를 get()으로 참조해 gradesMock 읽기를 제한한다.
-//   managers: 전체 열람(관리자·교장·교감·부장) — grade-roles.json 이름 → teachers에서 이메일 해석
-//   homerooms: { 이메일: '학년-반' } — 담임은 자기 반 문서만 열람
+//   managers: 전체 열람 — 교원연락망(contacts/main.staff)의 직위(role)가 교장·교감·부장인
+//             교사 자동 포함 + grade-roles.json 추가 명단 + 관리자(항상)
+//   homerooms: { 이메일: '학년-반' } — 담임은 자기 반 문서만 열람 (teachers.homeroom 자동)
+// 이메일은 appdata/main.teachers에서 이름으로 해석(앱 로그인 시 자동 수집된 값).
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 async function syncGradeRoles() {
   const fs = require('fs');
   const path = require('path');
   const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'grade-roles.json'), 'utf8'));
-  const appSnap = await db.doc('appdata/main').get();
+  const [appSnap, contactsSnap] = await Promise.all([
+    db.doc('appdata/main').get(),
+    db.doc('contacts/main').get()
+  ]);
   const teachers = appSnap.exists ? (appSnap.data().teachers || []) : [];
+  const staff = contactsSnap.exists ? (contactsSnap.data().staff || []) : [];
   const norm = s => String(s || '').replace(/\s/g, '');
 
+  // 교원연락망 직위 기준 자동 명단 + JSON 추가 명단
+  const autoNames = staff.filter(c => /교장|교감|부장/.test(c.role || '')).map(c => c.name);
+  const wantNames = [...new Set([...autoNames, ...(cfg.managers || [])])];
+
   const managers = new Set([ADMIN_EMAIL]);
-  (cfg.managers || []).forEach(name => {
+  wantNames.forEach(name => {
     const t = teachers.find(t => norm(t.name) === norm(name));
     if (t && t.email) managers.add(t.email);
     else console.warn(`  ⚠️ 전체열람 권한자 '${name}' 이메일 미수집 — 본인이 앱에 로그인하면 다음 동기화에 반영됩니다`);
@@ -57,7 +67,7 @@ async function syncGradeRoles() {
   });
 
   await db.doc('acl/gradeRoles').set({ t: Date.now(), managers: [...managers], homerooms });
-  console.log(`✅ acl/gradeRoles 저장 — 전체열람 ${managers.size}명, 담임 ${Object.keys(homerooms).length}명`);
+  console.log(`✅ acl/gradeRoles 저장 — 전체열람 ${managers.size}명(직위 자동 ${autoNames.length}명), 담임 ${Object.keys(homerooms).length}명`);
 }
 
 async function readRange(range, sheetId = SHEET_ID) {
