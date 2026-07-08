@@ -2936,7 +2936,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.01</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.02</div>
   </div>
 </div>
 
@@ -3060,7 +3060,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver5.01</div>
+    <div class="nav-version">ver5.02</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -6789,21 +6789,30 @@ let s360SusiRange = 0.3; // 마지막 선택 범위 기억 (학생을 바꿔도 
 async function s360RenderSusiMatch(st){
   const el = document.getElementById('s360SusiMatch');
   if (!el) return;
-  const g = parseFloat(st.gpa5);
-  if (isNaN(g)) return;
+  // 내신값 파싱: 3학년은 단일값("2.75"), 1·2학년 9등급 환산은 범위("2.3~2.8")로 옴
+  // → 범위면 [최솟값−a, 최댓값+a]로 필터링
+  const rawG = String(st.gpa5 || '').trim();
+  const rm = rawG.match(/^(\d+(?:\.\d+)?)\s*[~〜–-]\s*(\d+(?:\.\d+)?)$/);
+  let gLo = rm ? parseFloat(rm[1]) : parseFloat(rawG);
+  let gHi = rm ? parseFloat(rm[2]) : gLo;
+  if (isNaN(gLo) || isNaN(gHi)) return;
+  if (gLo > gHi) [gLo, gHi] = [gHi, gLo];
+  const gLabel = rm ? `${gLo}~${gHi}` : `${gLo}`;
   el.innerHTML = '<div style="font-size:13px;color:var(--ink-soft);margin-top:12px;">🎓 이 내신대 선배들의 합격 사례 찾는 중...</div>';
   try {
     const rows = await s360LoadSusi();
     const MAX_SHOW = 150;
     const draw = () => {
       const RANGE = s360SusiRange;
+      // 구간 밖 거리(구간 안이면 0) — 필터와 '가까운 순' 정렬에 함께 사용
+      const dist = s => s < gLo ? gLo - s : (s > gHi ? s - gHi : 0);
       const hits = rows.filter(r => {
         const s = parseFloat(r.score);
-        if (isNaN(s) || Math.abs(s - g) > RANGE) return false;
+        if (isNaN(s) || dist(s) > RANGE + 1e-9) return false; // 1e-9: 부동소수점 경계 보정(3.1-2.8=0.30000...4)
         const f = r.final || '';
         return f.includes('합격') && !f.includes('불합격');
       }).sort((a,b) =>
-        Math.abs(parseFloat(a.score) - g) - Math.abs(parseFloat(b.score) - g)
+        dist(parseFloat(a.score)) - dist(parseFloat(b.score))
         || String(b.year).localeCompare(String(a.year)));
       const chips = [0.1, 0.3, 0.5].map(r =>
         `<button class="s360-range-btn${r === RANGE ? ' on' : ''}" data-r="${r}">±${r}</button>`).join('');
@@ -6826,7 +6835,7 @@ async function s360RenderSusiMatch(st){
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
             <span style="font-size:14px;font-weight:800;color:var(--ink);">🎓 이 내신으로 합격한 선배들</span>
             ${chips}
-            <span style="font-weight:700;color:var(--ink-soft);font-size:12.5px;">내신 ${g} ±${RANGE} · 수시 최종합격 ${hits.length}건${hits.length > MAX_SHOW ? ` 중 가까운 순 ${MAX_SHOW}건` : ''}</span>
+            <span style="font-weight:700;color:var(--ink-soft);font-size:12.5px;">내신 ${gLabel} ±${RANGE} · 수시 최종합격 ${hits.length}건${hits.length > MAX_SHOW ? ` 중 가까운 순 ${MAX_SHOW}건` : ''}</span>
           </div>
           ${body}
         </div>`;
