@@ -476,7 +476,11 @@
         renderCharts(labels, percentileData, ssData, gradeData);
       }).catch(e => {
         document.getElementById('fetch_loading').style.display = 'none';
-        alert('성적 데이터를 불러오지 못했습니다: ' + e.message);
+        if (e.code === 'permission-denied') {
+          alert('해당 반의 성적은 담임·부장·교장·교감·관리자만 조회할 수 있습니다.');
+        } else {
+          alert('성적 데이터를 불러오지 못했습니다: ' + e.message);
+        }
       });
     };
 
@@ -670,7 +674,11 @@
         }
         initAfterData({ studentTree: snap.data().tree });
       } catch (e) {
-        showBlock('데이터를 불러오지 못했습니다.', e.message);
+        if (e.code === 'permission-denied') {
+          showBlock('성적 열람 권한이 없습니다.', '모의고사 성적 분석은 담임(자기 반)·부장·교장·교감·관리자만 이용할 수 있습니다.');
+        } else {
+          showBlock('데이터를 불러오지 못했습니다.', e.message);
+        }
       }
     });
   </script>

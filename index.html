@@ -2929,7 +2929,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.96</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.97</div>
   </div>
 </div>
 
@@ -2942,7 +2942,7 @@
     </button>
     <div class="app-header-title" onclick="navigateTo('home')" style="cursor:pointer;"><img src="icon-180.png" style="height:38px;vertical-align:middle;margin-right:10px;">영남고등학교</div>
     <div style="display:flex;align-items:center;gap:8px;">
-      <button class="app-logout-btn" id="spotlightBtn" style="display:none;" title="학생 종합검색 탭 열기 (연락처·상벌점·성적)">🔍 학생검색</button>
+      <button class="app-logout-btn" id="spotlightBtn" title="학생 종합검색 탭 열기 (연락처·상벌점·성적)">🔍 학생검색</button>
       <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
     </div>
   </header>
@@ -2977,6 +2977,12 @@
     <div class="tab-item" data-page="mytask">
       <span class="tab-item-icon">📌</span>업무캘린더
     </div>
+    <div class="tab-item" data-page="grades">
+      <span class="tab-item-icon">🎓</span>진로진학 상담
+    </div>
+    <div class="tab-item" data-page="search">
+      <span class="tab-item-icon">🔍</span>학생 종합검색
+    </div>
     <div class="tab-item" data-page="timetable">
       <span class="tab-item-icon">📅</span>시간표
     </div>
@@ -2997,12 +3003,6 @@
     </div>
     <div class="tab-item" data-page="meal">
       <span class="tab-item-icon">🍱</span>식단표
-    </div>
-    <div class="tab-item" data-page="grades" style="display:none;">
-      <span class="tab-item-icon">🎓</span>진로진학
-    </div>
-    <div class="tab-item" data-page="search" style="display:none;">
-      <span class="tab-item-icon">🔍</span>학생 종합검색
     </div>
   </div>
   </div>
@@ -3027,6 +3027,12 @@
       <div class="main-nav-item" data-page="mytask" id="navMyTask">
         <span class="main-nav-icon">📌</span>업무캘린더
       </div>
+      <div class="main-nav-item" data-page="grades">
+        <span class="main-nav-icon">🎓</span>진로진학 상담
+      </div>
+      <div class="main-nav-item" data-page="search">
+        <span class="main-nav-icon">🔍</span>학생 종합검색
+      </div>
       <div class="main-nav-item" data-page="timetable">
         <span class="main-nav-icon">📅</span>시간표
       </div>
@@ -3048,13 +3054,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-      <div class="main-nav-item" data-page="grades" style="display:none;">
-        <span class="main-nav-icon">🎓</span>진로진학 <span style="font-size:11px;opacity:.6;">(테스트)</span>
-      </div>
-      <div class="main-nav-item" data-page="search" style="display:none;">
-        <span class="main-nav-icon">🔍</span>학생 종합검색 <span style="font-size:11px;opacity:.6;">(테스트)</span>
-      </div>
-    <div class="nav-version">ver4.96</div>
+    <div class="nav-version">ver4.97</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3661,7 +3661,7 @@
            데이터: GitHub Actions(sync-grades.js)가 성적 시트를 Firestore gradesMock에 동기화 -->
       <div class="page-view" id="gradesPage">
         <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;">
-          <span style="font-family:'Pretendard','Noto Sans KR';font-weight:900;font-size:16px;color:var(--ink);">🎓 진로진학 상담 <span style="font-size:12px;color:var(--ink-soft);font-weight:700;">(테스트)</span></span>
+          <span style="font-family:'Pretendard','Noto Sans KR';font-weight:900;font-size:16px;color:var(--ink);">🎓 진로진학 상담</span>
         </div>
         <iframe id="gradesFrame" data-src="career.html" title="진로진학 상담" style="flex:1;width:100%;border:0;background:#f1f5f9;"></iframe>
       </div>
@@ -5591,31 +5591,9 @@ onAuthStateChanged(fbAuth, async (user) => {
       if (adminBtnD) adminBtnD.style.display = 'block';
       // 관리자 페이지(admin.html)는 사이드바에 노출하지 않음 — 주소 직접 입력으로만 접근
     }
-    // 성적 데이터 접근 권한(acl/gradeRoles — sync-grades Actions가 매일 생성) 기반 탭 노출
-    //   전체열람(관리자·교장·교감·부장): 진로진학 + 학생 종합검색
-    //   담임: 학생 종합검색만 (성적은 자기 반 학생만 — Firestore 규칙으로도 강제됨)
-    // 보기 모드(viewAs)에서는 '보기 대상' 기준으로 판별 — 그 선생님이 실제 보는 화면 그대로 재현
-    (async () => {
-      try {
-        const email = isViewAs() ? (effTeacher()?.email || '') : user.email;
-        let managers = [], homerooms = {};
-        try {
-          const aclSnap = await getDoc(doc(fbDb, 'acl', 'gradeRoles'));
-          if (aclSnap.exists()) { managers = aclSnap.data().managers || []; homerooms = aclSnap.data().homerooms || {}; }
-        } catch(_) { /* 권한 문서 미생성/조회 실패 → 관리자 특례만 적용 */ }
-        window._gradeAcl = { managers, homerooms };
-        const isMgr = email === ADMIN_EMAIL || managers.includes(email);
-        const myHomeroom = homerooms[email] || null;
-        if (isMgr) {
-          document.querySelectorAll('[data-page="grades"]').forEach(el => { el.style.display = ''; });
-        }
-        if (isMgr || myHomeroom) {
-          document.querySelectorAll('[data-page="search"]').forEach(el => { el.style.display = ''; });
-          const sb = document.getElementById('spotlightBtn');
-          if (sb) sb.style.display = '';
-        }
-      } catch(e) { console.log('성적 권한 판별 실패:', e.message); }
-    })();
+    // 진로진학·학생 종합검색 탭은 ver4.97부터 전체 공개.
+    // 성적 데이터 접근 제한(담임 자기 반·부장·교장·교감·관리자)은 Firestore 규칙
+    // (acl/gradeRoles + canReadGrades)이 담당하며, 권한 없는 화면은 조용히 비워진다.
     // 로그인한 선생님 이메일 자동 수집
     collectTeacherEmail(user);
     // 학사일정 미리 로딩 (업무 캘린더 학사일정 표시용)
