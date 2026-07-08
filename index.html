@@ -2890,7 +2890,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.82</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.83</div>
   </div>
 </div>
 
@@ -3008,7 +3008,7 @@
       <div class="main-nav-item" data-page="grades" style="display:none;">
         <span class="main-nav-icon">🎓</span>진로진학 <span style="font-size:11px;opacity:.6;">(테스트)</span>
       </div>
-    <div class="nav-version">ver4.82</div>
+    <div class="nav-version">ver4.83</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5524,9 +5524,17 @@ onAuthStateChanged(fbAuth, async (user) => {
       const adminBtnD = document.getElementById('homeAISummaryAdminBtnD');
       if (adminBtn)  adminBtn.style.display  = 'block';
       if (adminBtnD) adminBtnD.style.display = 'block';
-      // 성적조회 테스트 탭 (관리자 전용)
-      document.querySelectorAll('[data-page="grades"]').forEach(el => { el.style.display = ''; });
       // 관리자 페이지(admin.html)는 사이드바에 노출하지 않음 — 주소 직접 입력으로만 접근
+    }
+    // 진로진학 테스트 탭 노출: 관리자 + 지정 테스터 (이름 기준 — 이메일은 로그인 시 자동 수집됨)
+    {
+      const GRADES_TEST_TEACHERS = ['장조은'];
+      const _norm = s => (s || '').replace(/\s/g, '');
+      const _myName = _norm(TEACHERS.find(t => t.email === user.email)?.name)
+        || _norm(stripTeacherSuffix(user.displayName));
+      if (!isViewAs() && (user.email === ADMIN_EMAIL || GRADES_TEST_TEACHERS.some(n => _norm(n) === _myName))) {
+        document.querySelectorAll('[data-page="grades"]').forEach(el => { el.style.display = ''; });
+      }
     }
     // 로그인한 선생님 이메일 자동 수집
     collectTeacherEmail(user);
