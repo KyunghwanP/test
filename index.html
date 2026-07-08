@@ -1009,12 +1009,32 @@
   }
   .pts-suggestion-name{ font-weight:700;white-space:nowrap; }
 
-  /* 통합 학생 검색 (스포트라이트) */
-  .spot-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9000;display:none;align-items:flex-start;justify-content:center;padding:8vh 16px 16px;}
-  .spot-overlay.open{display:flex;}
-  .spot-box{background:#fff;width:100%;max-width:560px;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;display:flex;flex-direction:column;max-height:80vh;}
-  .spot-input{border:0;outline:0;padding:16px 18px;font-size:16px;font-family:inherit;flex:1;background:transparent;color:var(--ink);}
-  .spot-body{overflow-y:auto;}
+  /* 학생 종합검색 탭 (구 스포트라이트 모달, ver4.89 탭 승격) */
+  .s360-layout{flex:1;display:flex;overflow:hidden;min-height:0;}
+  .s360-side{width:340px;flex-shrink:0;border-right:1px solid var(--rule);background:var(--paper);display:flex;flex-direction:column;min-height:0;}
+  .s360-search{padding:12px;border-bottom:1px solid var(--rule);flex-shrink:0;}
+  .s360-search input{width:100%;box-sizing:border-box;padding:10px 14px;border:1.5px solid var(--rule);border-radius:8px;font-family:inherit;font-size:16px;background:var(--paper);color:var(--ink);outline:none;}
+  .s360-search input:focus{border-color:var(--mon);}
+  .s360-list{flex:1;overflow-y:auto;}
+  .s360-list .spot-row.sel{background:rgba(59,130,246,.12);}
+  .s360-main{flex:1;overflow-y:auto;background:var(--bg-base);padding:20px;min-height:0;}
+  .s360-card{max-width:820px;margin:0 auto;background:var(--paper);border-radius:14px;box-shadow:0 4px 20px -8px rgba(0,0,0,.15);padding:20px;}
+  .s360-records{max-height:220px;overflow-y:auto;border:1px solid var(--rule);border-radius:8px;padding:6px 10px;background:var(--paper-soft);}
+  .s360-table-wrap{overflow-x:auto;border:1px solid var(--rule);border-radius:8px;}
+  .s360-table{border-collapse:collapse;width:100%;font-size:12px;white-space:nowrap;}
+  .s360-table th{background:var(--paper-soft);color:var(--ink-soft);font-weight:800;padding:7px 10px;border-bottom:1px solid var(--rule);text-align:center;}
+  .s360-table td{padding:6px 10px;border-bottom:1px solid var(--rule);text-align:center;font-family:'IBM Plex Mono';font-weight:600;color:var(--ink);}
+  .s360-table tr:last-child td{border-bottom:none;}
+  .s360-table td:first-child{font-family:'Pretendard','Noto Sans KR';font-weight:700;}
+  .s360-back{display:none;background:none;border:0;color:var(--ink-soft);font-weight:700;cursor:pointer;padding:0 0 10px;font-size:13px;font-family:inherit;}
+  .s360-back:hover{color:var(--ink);}
+  @media(max-width:768px){
+    .s360-side{width:100%;border-right:0;}
+    .s360-main{display:none;padding:12px;}
+    .s360-layout.detail .s360-side{display:none;}
+    .s360-layout.detail .s360-main{display:block;}
+    .s360-back{display:inline-block;}
+  }
   .spot-row{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--rule);}
   .spot-row:hover{background:rgba(30,58,138,.06);}
   .spot-grn{font-family:'IBM Plex Mono';font-size:12px;font-weight:700;color:var(--ink-soft);min-width:56px;}
@@ -1024,11 +1044,8 @@
   .spot-badge.neg{background:#fee2e2;color:#b91c1c;}
   .spot-badge.pos{background:#dcfce7;color:#15803d;}
   .spot-empty{padding:28px;text-align:center;color:var(--ink-soft);font-size:14px;}
-  .spot-detail{padding:16px 18px;}
   .spot-sec{margin-bottom:14px;}
   .spot-sec-title{font-size:12px;font-weight:900;color:var(--ink-soft);letter-spacing:.06em;margin-bottom:6px;}
-  .spot-back{background:none;border:0;color:var(--ink-soft);font-weight:700;cursor:pointer;padding:10px 16px;text-align:left;font-size:13px;border-bottom:1px solid var(--rule);font-family:inherit;width:100%;}
-  .spot-back:hover{color:var(--ink);}
 
   /* 상벌점 조회·입력/조회 탭 */
   .pts-mode-tabs{
@@ -2911,7 +2928,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.88</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver4.89</div>
   </div>
 </div>
 
@@ -2924,7 +2941,7 @@
     </button>
     <div class="app-header-title" onclick="navigateTo('home')" style="cursor:pointer;"><img src="icon-180.png" style="height:38px;vertical-align:middle;margin-right:10px;">영남고등학교</div>
     <div style="display:flex;align-items:center;gap:8px;">
-      <button class="app-logout-btn" id="spotlightBtn" style="display:none;" title="학생 통합 검색 (연락처·상벌점·성적)">🔍 학생검색</button>
+      <button class="app-logout-btn" id="spotlightBtn" style="display:none;" title="학생 종합검색 탭 열기 (연락처·상벌점·성적)">🔍 학생검색</button>
       <button class="app-logout-btn" id="logoutBtn" style="display:none;">로그아웃</button>
     </div>
   </header>
@@ -2983,6 +3000,9 @@
     <div class="tab-item" data-page="grades" style="display:none;">
       <span class="tab-item-icon">🎓</span>진로진학
     </div>
+    <div class="tab-item" data-page="search" style="display:none;">
+      <span class="tab-item-icon">🔍</span>학생 종합검색
+    </div>
   </div>
   </div>
 
@@ -3030,7 +3050,10 @@
       <div class="main-nav-item" data-page="grades" style="display:none;">
         <span class="main-nav-icon">🎓</span>진로진학 <span style="font-size:11px;opacity:.6;">(테스트)</span>
       </div>
-    <div class="nav-version">ver4.88</div>
+      <div class="main-nav-item" data-page="search" style="display:none;">
+        <span class="main-nav-icon">🔍</span>학생 종합검색 <span style="font-size:11px;opacity:.6;">(테스트)</span>
+      </div>
+    <div class="nav-version">ver4.89</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3642,6 +3665,21 @@
         <iframe id="gradesFrame" data-src="career.html" title="진로진학 상담" style="flex:1;width:100%;border:0;background:#f1f5f9;"></iframe>
       </div>
 
+      <!-- 학생 종합검색 페이지 (테스터 전용) -->
+      <div class="page-view" id="searchPage">
+        <div class="s360-layout" id="s360Layout">
+          <aside class="s360-side">
+            <div class="s360-search">
+              <input id="s360Input" type="text" placeholder="🔍 학생 이름 · 반(2-3) 검색" autocomplete="off">
+            </div>
+            <div class="s360-list" id="s360List"></div>
+          </aside>
+          <section class="s360-main" id="s360Main">
+            <div class="spot-empty">학생을 검색한 뒤 선택하세요</div>
+          </section>
+        </div>
+      </div>
+
       <!-- 업무자료 페이지 -->
       <div class="page-view" id="docsPage">
         <div class="docs-layout" id="docsLayout">
@@ -3904,17 +3942,6 @@
         <button onclick="saveGroupEditor()" style="padding:12px 22px;border-radius:10px;border:none;background:var(--mon);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">저장</button>
       </div>
     </div>
-  </div>
-</div>
-
-<!-- 통합 학생 검색 (스포트라이트) 모달 -->
-<div class="spot-overlay" id="spotOverlay">
-  <div class="spot-box">
-    <div style="display:flex;align-items:center;border-bottom:1px solid var(--rule);">
-      <input class="spot-input" id="spotInput" type="text" placeholder="🔍 학생 이름 · 반(2-3) 검색..." autocomplete="off">
-      <button id="spotCloseBtn" style="background:none;border:0;font-size:22px;color:var(--ink-soft);cursor:pointer;padding:0 16px;font-family:inherit;">×</button>
-    </div>
-    <div class="spot-body" id="spotBody"></div>
   </div>
 </div>
 
@@ -5213,6 +5240,14 @@ window.addEventListener('popstate', (e)=>{
     return;
   }
 
+  // 4.6. 학생 종합검색 상세 보고 있으면 → 검색 목록 (모바일 드릴다운)
+  if (document.getElementById('searchPage')?.classList.contains('active')
+      && window.innerWidth <= 768
+      && document.getElementById('s360Layout')?.classList.contains('detail')) {
+    document.getElementById('s360Layout').classList.remove('detail');
+    return;
+  }
+
   // 5. 현황판이 아니면 → 현황판으로
   if (!document.getElementById('homePage')?.classList.contains('active')) {
     navigateTo('home');
@@ -5569,8 +5604,8 @@ onAuthStateChanged(fbAuth, async (user) => {
         : (_norm(TEACHERS.find(t => t.email === user.email)?.name) || _norm(stripTeacherSuffix(user.displayName)));
       const _isTester = GRADES_TEST_TEACHERS.some(n => _norm(n) === _name);
       if ((!isViewAs() && user.email === ADMIN_EMAIL) || _isTester) {
-        document.querySelectorAll('[data-page="grades"]').forEach(el => { el.style.display = ''; });
-        // 통합 학생 검색도 같은 대상에게 노출 (성적 데이터 포함)
+        // 학생 종합검색 탭도 같은 대상에게 노출 (성적 데이터 포함)
+        document.querySelectorAll('[data-page="grades"], [data-page="search"]').forEach(el => { el.style.display = ''; });
         const sb = document.getElementById('spotlightBtn');
         if (sb) sb.style.display = '';
       }
@@ -6737,7 +6772,7 @@ document.getElementById('studentsSearch').addEventListener('input', function() {
 
 
 // ══════════════════════════════════════════
-// 통합 학생 검색 (스포트라이트) — 연락처 + 상벌점 + 내신/모의고사 요약 (ver4.88)
+// 학생 종합검색 탭 — 연락처 + 상벌점 전체 이력 + 내신/모의고사 전체 회차 (ver4.89, 모달→탭 승격)
 // 노출 대상: 진로진학 테스트 탭과 동일 (성적 데이터 포함이므로)
 // ══════════════════════════════════════════
 let spotLoading = null;
@@ -6767,49 +6802,59 @@ function spotLoadData(){
   return spotLoading;
 }
 
-function openSpotlight(){
-  document.getElementById('spotOverlay').classList.add('open');
-  const inp = document.getElementById('spotInput');
-  inp.value = spotLastQuery = '';
-  renderSpotResults('');
-  setTimeout(() => inp.focus(), 60);
-  spotLoadData().then(() => renderSpotResults(spotLastQuery))
-    .catch(e => { document.getElementById('spotBody').innerHTML = `<div class="spot-empty">불러오기 실패: ${e.message}</div>`; });
-}
-function closeSpotlight(){ document.getElementById('spotOverlay').classList.remove('open'); }
+let s360Init = false;
+let s360SelKey = null;
 
-function renderSpotResults(q){
+function initSearchPage(){
+  const inp = document.getElementById('s360Input');
+  if (!s360Init){
+    s360Init = true;
+    inp.addEventListener('input', () => s360RenderList(inp.value.trim()));
+    s360RenderList('');
+    spotLoadData().then(() => s360RenderList(inp.value.trim()))
+      .catch(e => { document.getElementById('s360List').innerHTML = `<div class="spot-empty">불러오기 실패: ${e.message}</div>`; });
+  }
+  // 데스크톱은 목록·상세 동시 표시 — 진입 즉시 검색 가능하게
+  if (window.innerWidth > 768) setTimeout(() => inp.focus(), 60);
+}
+
+function s360RenderList(q){
   spotLastQuery = q;
-  const body = document.getElementById('spotBody');
-  if (!spotLoaded){ body.innerHTML = '<div class="spot-empty">학생 데이터를 불러오는 중...</div>'; return; }
-  if (!allStudents.length){ body.innerHTML = '<div class="spot-empty">학생 연락망 데이터가 없습니다.</div>'; return; }
-  if (!q){ body.innerHTML = '<div class="spot-empty">이름 또는 반(예: 2-3)으로 검색하세요</div>'; return; }
+  const list = document.getElementById('s360List');
+  if (!spotLoaded){ list.innerHTML = '<div class="spot-empty">학생 데이터를 불러오는 중...</div>'; return; }
+  if (!allStudents.length){ list.innerHTML = '<div class="spot-empty">학생 연락망 데이터가 없습니다.</div>'; return; }
+  if (!q){ list.innerHTML = '<div class="spot-empty">이름 또는 반(예: 2-3)으로 검색하세요</div>'; return; }
   const ql = q.toLowerCase().replace(/\s/g, '');
   const matched = allStudents.filter(s =>
     (s.name || '').toLowerCase().includes(ql)
     || `${s.grade}-${s.room}` === ql
   ).sort((a, b) =>
     (parseInt(a.grade)||0)-(parseInt(b.grade)||0) || (parseInt(a.room)||0)-(parseInt(b.room)||0) || (parseInt(a.num)||0)-(parseInt(b.num)||0)
-  ).slice(0, 40);
-  if (!matched.length){ body.innerHTML = '<div class="spot-empty">검색 결과 없음</div>'; return; }
-  body.innerHTML = matched.map((s, i) => {
-    const p = spotPts.get(spotKey(s));
+  ).slice(0, 60);
+  if (!matched.length){ list.innerHTML = '<div class="spot-empty">검색 결과 없음</div>'; return; }
+  list.innerHTML = matched.map((s, i) => {
+    const k = spotKey(s);
+    const p = spotPts.get(k);
     const ptsBadge = p ? `<span class="spot-badge ${Number(p.total) < 0 ? 'neg' : 'pos'}">상벌점 ${p.total}</span>` : '';
-    return `<div class="spot-row" data-i="${i}">
+    return `<div class="spot-row ${k === s360SelKey ? 'sel' : ''}" data-i="${i}">
       <span class="spot-grn">${s.grade}-${s.room}-${String(s.num||'').padStart(2,'0')}</span>
       <span class="spot-name">${escapeHtml(s.name||'')}</span>
       ${s.club ? `<span class="spot-badge">🎯 ${escapeHtml(s.club)}</span>` : ''}
       <span class="spot-badges">${ptsBadge}</span>
     </div>`;
   }).join('');
-  body.querySelectorAll('.spot-row').forEach(row => {
-    row.addEventListener('click', () => showSpotDetail(matched[parseInt(row.dataset.i)]));
+  list.querySelectorAll('.spot-row').forEach(row => {
+    row.addEventListener('click', () => s360ShowDetail(matched[parseInt(row.dataset.i)]));
   });
 }
 
-async function showSpotDetail(s){
-  const body = document.getElementById('spotBody');
-  const p = spotPts.get(spotKey(s));
+async function s360ShowDetail(s){
+  s360SelKey = spotKey(s);
+  const list = document.getElementById('s360List');
+  list.querySelectorAll('.spot-row').forEach(r => r.classList.remove('sel'));
+  document.getElementById('s360Layout').classList.add('detail'); // 모바일: 상세 화면 전환
+  const main = document.getElementById('s360Main');
+  const p = spotPts.get(s360SelKey);
 
   const phoneRow = (label, v) => v ? `
     <div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
@@ -6821,40 +6866,40 @@ async function showSpotDetail(s){
 
   let ptsHtml = '<div style="font-size:13px;color:var(--ink-soft);">상벌점 데이터 없음</div>';
   if (p) {
-    const recent = (p.records || []).slice(-3).reverse()
-      .map(r => `<div style="font-size:12px;color:var(--ink-soft);padding:2px 0;">· ${r.date} ${escapeHtml(r.detail)}</div>`).join('');
+    const records = (p.records || []).slice().reverse()
+      .map(r => `<div style="font-size:12px;color:var(--ink-soft);padding:3px 0;">· ${r.date} ${escapeHtml(r.detail)}</div>`).join('');
     ptsHtml = `
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
         <span class="spot-badge ${Number(p.total)<0?'neg':'pos'}">합계 ${p.total}</span>
         <span class="spot-badge pos">상점 ${p.merit}</span>
         <span class="spot-badge neg">벌점 ${p.demerit}</span>
         <span class="spot-badge">감점 ${p.deducted}</span>
-      </div>${recent}`;
+      </div>
+      ${records ? `<div class="s360-records">${records}</div>` : ''}`;
   }
 
-  body.innerHTML = `
-    <button class="spot-back" id="spotBackBtn">← 검색 결과로</button>
-    <div class="spot-detail">
-      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
-        <span style="font-size:20px;font-weight:900;color:var(--ink);">${escapeHtml(s.name||'')}</span>
+  main.innerHTML = `
+    <button class="s360-back" id="s360BackBtn">← 검색 목록으로</button>
+    <div class="s360-card">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+        <span style="font-size:22px;font-weight:900;color:var(--ink);">${escapeHtml(s.name||'')}</span>
         <span style="font-family:'IBM Plex Mono';font-size:13px;color:var(--ink-soft);font-weight:700;">${s.grade}학년 ${s.room}반 ${s.num}번</span>
         ${s.club ? `<span class="spot-badge">🎯 ${escapeHtml(s.club)}</span>` : ''}
       </div>
       <div class="spot-sec"><div class="spot-sec-title">연락처</div>
         ${(phoneRow('학생', s.phone) + phoneRow('부', s.fatherPhone) + phoneRow('모', s.motherPhone)) || '<div style="font-size:13px;color:var(--ink-soft);">등록된 연락처 없음</div>'}
       </div>
-      <div class="spot-sec"><div class="spot-sec-title">상벌점</div>${ptsHtml}</div>
-      <div class="spot-sec"><div class="spot-sec-title">성적 (내신 · 모의고사)</div>
-        <div id="spotGrades" style="font-size:13px;color:var(--ink-soft);">불러오는 중...</div>
+      <div class="spot-sec"><div class="spot-sec-title">상벌점 (전체 이력)</div>${ptsHtml}</div>
+      <div class="spot-sec" style="margin-bottom:0;"><div class="spot-sec-title">성적 (내신 · 모의고사 전체 회차)</div>
+        <div id="s360Grades" style="font-size:13px;color:var(--ink-soft);">불러오는 중...</div>
       </div>
     </div>`;
-  document.getElementById('spotBackBtn').addEventListener('click', () => {
-    document.getElementById('spotInput').value = spotLastQuery;
-    renderSpotResults(spotLastQuery);
+  document.getElementById('s360BackBtn').addEventListener('click', () => {
+    document.getElementById('s360Layout').classList.remove('detail');
   });
 
   // 성적: 해당 반 gradesMock 문서만 지연 로드
-  const gEl = document.getElementById('spotGrades');
+  const gEl = document.getElementById('s360Grades');
   try {
     const key = `${parseInt(s.grade)}-${parseInt(s.room)}`;
     if (!spotGradeCls[key]) {
@@ -6867,19 +6912,37 @@ async function showSpotDetail(s){
       st.gpa9 && st.gpa9 !== '-' ? `<span class="spot-badge" style="background:#fef3c7;color:#92400e;">내신 5등급제 ${st.gpa9}</span>` : '',
       st.gpa5 && st.gpa5 !== '-' ? `<span class="spot-badge neg">내신 9등급제 ${st.gpa5}</span>` : ''
     ].join('');
-    const recent = (st.history || []).slice(-2).reverse().map(h => `
-      <div style="font-size:12px;color:var(--ink-soft);padding:2px 0;">· ${escapeHtml(h.examDate)} — 백분위 ${h.avgP || '-'} / 평균등급 ${h.avgG || '-'}</div>`).join('');
-    gEl.innerHTML = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">${gpa || '<span style="font-size:13px;">내신 정보 없음</span>'}</div>${recent || '<div style="font-size:12px;">모의고사 기록 없음</div>'}`;
+    // 등급 셀: "등급 / 백분위" (영어·한국사는 등급만 제공)
+    const gc = o => (o && (o.g || o.p)) ? `${o.g || '-'}<span style="color:var(--ink-soft);font-size:11px;"> /${o.p || '-'}</span>` : '-';
+    const rows = (st.history || []).slice().reverse().map(h => `
+      <tr>
+        <td>${escapeHtml(h.examDate || '-')}</td>
+        <td>${gc(h.kor)}</td>
+        <td>${gc(h.math)}</td>
+        <td>${h.eng || '-'}</td>
+        <td>${h.hist || '-'}</td>
+        <td>${gc(h.tam1)}</td>
+        <td>${gc(h.tam2)}</td>
+        <td>${h.avgP || '-'}</td>
+        <td>${h.avgG || '-'}</td>
+      </tr>`).join('');
+    const table = rows ? `
+      <div class="s360-table-wrap"><table class="s360-table">
+        <thead><tr><th>시험일</th><th>국어</th><th>수학</th><th>영어</th><th>한국사</th><th>탐구1</th><th>탐구2</th><th>평균백분위</th><th>평균등급</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <div style="font-size:11px;color:var(--ink-soft);margin-top:5px;">국어·수학·탐구는 등급 /백분위 표기</div>` : '<div style="font-size:12px;">모의고사 기록 없음</div>';
+    gEl.innerHTML = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">${gpa || '<span style="font-size:13px;">내신 정보 없음</span>'}</div>${table}`;
   } catch(e) {
     gEl.textContent = '성적 로드 실패: ' + e.message;
   }
+
+  // 목록 하이라이트 (재검색 없이 선택만 바뀐 경우)
+  s360RenderList(spotLastQuery);
 }
 
-document.getElementById('spotlightBtn').addEventListener('click', openSpotlight);
-document.getElementById('spotInput').addEventListener('input', function(){ renderSpotResults(this.value.trim()); });
-document.getElementById('spotCloseBtn').addEventListener('click', closeSpotlight);
-document.getElementById('spotOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeSpotlight(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSpotlight(); });
+// 헤더 🔍 버튼: 탭으로 이동 (구 스포트라이트 모달 대체)
+document.getElementById('spotlightBtn').addEventListener('click', () => navigateTo('search'));
 
 // ---- 학사일정 ----
 let scheduleInitialized = false;
@@ -7874,7 +7937,7 @@ function navigateTo(page) {
   // 탭 전환
   document.querySelectorAll('.main-nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
   document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(t => t.classList.toggle('active', t.dataset.page === page));
-  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult','docs','grades'].forEach(p => {
+  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult','docs','grades','search'].forEach(p => {
     const el = document.getElementById(p + 'Page');
     if(el) el.classList.toggle('active', p === page);
   });
@@ -7898,6 +7961,7 @@ function navigateTo(page) {
     const gf = document.getElementById('gradesFrame');
     if(gf && !gf.src) gf.src = gf.dataset.src;
   }
+  if(page === 'search') initSearchPage();
   if(page === 'mytask') {
     const mytaskPage = document.getElementById('mytaskPage');
     if(mytaskPage) mytaskPage.classList.add('active');
