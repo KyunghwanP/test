@@ -1034,6 +1034,9 @@
   .s360-range-btn{border:1px solid var(--rule);background:var(--paper-soft);color:var(--ink-soft);
     font-size:12.5px;font-weight:800;padding:3px 10px;border-radius:20px;cursor:pointer;font-family:'IBM Plex Mono';}
   .s360-range-btn.on{background:var(--ink);color:var(--paper,#fff);border-color:var(--ink);}
+  .s360-susi-goto-btn{border:1px solid var(--mon);background:var(--paper);color:var(--mon);
+    font-size:12.5px;font-weight:800;padding:3px 10px;border-radius:20px;cursor:pointer;font-family:'Pretendard','Noto Sans KR';}
+  .s360-susi-goto-btn:hover{background:var(--mon);color:var(--paper,#fff);}
   .s360-back{display:inline-block;background:none;border:0;color:var(--ink-soft);font-weight:700;cursor:pointer;padding:0 0 10px;font-size:14px;font-family:inherit;}
   .s360-back:hover{color:var(--ink);}
   .s360-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin-bottom:12px;}
@@ -2935,7 +2938,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.12</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.13</div>
   </div>
 </div>
 
@@ -3059,7 +3062,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver5.12</div>
+    <div class="nav-version">ver5.13</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -6861,12 +6864,18 @@ async function s360RenderSusiMatch(st){
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
             <span style="font-size:14px;font-weight:800;color:var(--ink);">🎓 이 내신으로 합격한 선배들</span>
             ${chips}
+            <button class="s360-susi-goto-btn" id="s360SusiGotoBtn">진로진학 상담에서 전체 조회 →</button>
             <span style="font-weight:700;color:var(--ink-soft);font-size:12.5px;">내신 ${gLabel} ±${RANGE} · 수시 최종합격 ${hits.length}건${hits.length > MAX_SHOW ? ` 중 ${srt ? '' : '가까운 순 '}${MAX_SHOW}건` : ''}</span>
           </div>
           ${body}
         </div>`;
       el.querySelectorAll('.s360-range-btn').forEach(b =>
         b.addEventListener('click', () => { s360SusiRange = parseFloat(b.dataset.r); draw(); }));
+      document.getElementById('s360SusiGotoBtn')?.addEventListener('click', () => {
+        navigateTo('grades');
+        const gf = document.getElementById('gradesFrame');
+        if (gf) gf.src = 'susi.html';
+      });
       // 열 제목 클릭: 오름차순 → 내림차순 → 기본(가까운 순) 순환
       el.querySelectorAll('th[data-f]').forEach(th =>
         th.addEventListener('click', () => {
