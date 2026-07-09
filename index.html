@@ -1022,9 +1022,9 @@
   .s360-list-head{max-width:900px;margin:0 auto;}
   .s360-card{max-width:1400px;margin:0 auto;background:var(--paper);border-radius:14px;box-shadow:0 4px 20px -8px rgba(0,0,0,.15);padding:24px 28px;}
   .s360-records{max-height:260px;overflow-y:auto;border:1px solid var(--rule);border-radius:8px;padding:8px 12px;background:var(--paper-soft);}
-  .s360-records > div{font-size:13.5px !important;}
+  .s360-records > div{font-size:15px !important;}
   .s360-table-wrap{overflow-x:auto;border:1px solid var(--rule);border-radius:8px;}
-  .s360-table{border-collapse:collapse;width:100%;font-size:14px;white-space:nowrap;}
+  .s360-table{border-collapse:collapse;width:100%;font-size:15px;white-space:nowrap;}
   .s360-table th{background:var(--paper-soft);color:var(--ink-soft);font-weight:800;padding:9px 12px;border-bottom:1px solid var(--rule);text-align:center;}
   .s360-table td{padding:8px 12px;border-bottom:1px solid var(--rule);text-align:center;font-family:'IBM Plex Mono';font-weight:600;color:var(--ink);}
   .s360-table tr:last-child td{border-bottom:none;}
@@ -1049,12 +1049,12 @@
   .spot-grn{font-family:'IBM Plex Mono';font-size:13px;font-weight:700;color:var(--ink-soft);min-width:60px;}
   .spot-name{font-weight:800;font-size:16px;color:var(--ink);}
   .spot-badges{margin-left:auto;display:flex;gap:6px;}
-  .spot-badge{padding:3px 9px;border-radius:12px;background:#f1f5f9;color:#475569;white-space:nowrap;font-size:12.5px;font-weight:700;}
+  .spot-badge{padding:5px 12px;border-radius:14px;background:#f1f5f9;color:#475569;white-space:nowrap;font-size:14.5px;font-weight:700;}
   .spot-badge.neg{background:#fee2e2;color:#b91c1c;}
   .spot-badge.pos{background:#dcfce7;color:#15803d;}
   .spot-empty{padding:28px;text-align:center;color:var(--ink-soft);font-size:15px;}
-  .spot-sec{margin-bottom:16px;}
-  .spot-sec-title{font-size:13px;font-weight:900;color:var(--ink-soft);letter-spacing:.06em;margin-bottom:7px;}
+  .spot-sec{margin-bottom:18px;}
+  .spot-sec-title{font-size:15.5px;font-weight:900;color:var(--ink-soft);letter-spacing:.04em;margin-bottom:9px;}
 
   /* 상벌점 조회·입력/조회 탭 */
   .pts-mode-tabs{
@@ -2937,7 +2937,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.08</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.09</div>
   </div>
 </div>
 
@@ -3061,7 +3061,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver5.08</div>
+    <div class="nav-version">ver5.09</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7178,13 +7178,13 @@ async function s360LoadElectives(s){
     }
     const st = spotElectiveCls[key].students?.[String(parseInt(s.num))];
     if (!st || (!st.current?.length && !st.prevGrade?.length)) {
-      el.innerHTML = '<div style="font-size:14px;color:var(--ink-soft);">등록된 선택과목 데이터 없음</div>';
+      el.innerHTML = '<div style="font-size:15px;color:var(--ink-soft);">등록된 선택과목 데이터 없음</div>';
       return;
     }
     const badges = list => list.map(name => `<span class="spot-badge">${escapeHtml(name)}</span>`).join('');
     el.innerHTML = `
-      ${st.current?.length ? `<div style="margin-bottom:6px;"><div style="font-size:12.5px;font-weight:800;color:var(--ink-soft);margin-bottom:4px;">이번학년</div><div style="display:flex;gap:6px;flex-wrap:wrap;">${badges(st.current)}</div></div>` : ''}
-      ${st.prevGrade?.length ? `<div><div style="font-size:12.5px;font-weight:800;color:var(--ink-soft);margin-bottom:4px;">직전학년</div><div style="display:flex;gap:6px;flex-wrap:wrap;">${badges(st.prevGrade)}</div></div>` : ''}`;
+      ${st.current?.length ? `<div style="margin-bottom:8px;"><div style="font-size:13.5px;font-weight:800;color:var(--ink-soft);margin-bottom:6px;">이번학년</div><div style="display:flex;gap:7px;flex-wrap:wrap;">${badges(st.current)}</div></div>` : ''}
+      ${st.prevGrade?.length ? `<div><div style="font-size:13.5px;font-weight:800;color:var(--ink-soft);margin-bottom:6px;">직전학년</div><div style="display:flex;gap:7px;flex-wrap:wrap;">${badges(st.prevGrade)}</div></div>` : ''}`;
   } catch(e) {
     if (e.code === 'permission-denied') { const sec = el.closest('.spot-sec'); if (sec) sec.style.display = 'none'; else el.innerHTML = ''; }
     else el.textContent = '선택과목 로드 실패: ' + e.message;
@@ -7197,7 +7197,7 @@ async function s360ShowDetail(s){
   main.scrollTop = 0;
   const p = spotPts.get(spotKey(s));
 
-  let ptsHtml = '<div style="font-size:14px;color:var(--ink-soft);">상벌점 데이터 없음</div>';
+  let ptsHtml = '<div style="font-size:15px;color:var(--ink-soft);">상벌점 데이터 없음</div>';
   if (p) {
     const records = (p.records || []).slice().reverse()
       .map(r => `<div style="color:var(--ink-soft);padding:3px 0;">· ${r.date} ${escapeHtml(r.detail)}</div>`).join('');
@@ -7222,10 +7222,10 @@ async function s360ShowDetail(s){
       </div>
       <div class="spot-sec"><div class="spot-sec-title">상벌점 (전체 이력)</div>${ptsHtml}</div>
       <div class="spot-sec"><div class="spot-sec-title">선택과목</div>
-        <div id="s360Electives" style="font-size:14px;color:var(--ink-soft);">불러오는 중...</div>
+        <div id="s360Electives" style="font-size:15px;color:var(--ink-soft);">불러오는 중...</div>
       </div>
       <div class="spot-sec" style="margin-bottom:0;"><div class="spot-sec-title">성적 (내신 · 모의고사 전체 회차)</div>
-        <div id="s360Grades" style="font-size:14px;color:var(--ink-soft);">불러오는 중...</div>
+        <div id="s360Grades" style="font-size:15px;color:var(--ink-soft);">불러오는 중...</div>
       </div>
     </div>`;
   document.getElementById('s360BackBtn').addEventListener('click', () => s360Back());
@@ -7249,8 +7249,8 @@ async function s360ShowDetail(s){
     // 등급 셀: 선택과목명(위) + "등급 / 백분위" (영어·한국사는 등급만 제공)
     const gc = o => {
       if (!o || (!o.g && !o.p)) return '-';
-      const sub = o.sub ? `<div style="font-size:11px;font-weight:700;color:var(--ink-soft);white-space:nowrap;">${escapeHtml(o.sub)}</div>` : '';
-      return `${sub}${o.g || '-'}<span style="color:var(--ink-soft);font-size:12.5px;"> /${o.p || '-'}</span>`;
+      const sub = o.sub ? `<div style="font-size:12.5px;font-weight:700;color:var(--ink-soft);white-space:nowrap;">${escapeHtml(o.sub)}</div>` : '';
+      return `${sub}${o.g || '-'}<span style="color:var(--ink-soft);font-size:14px;"> /${o.p || '-'}</span>`;
     };
     const rows = (st.history || []).slice().reverse().map(h => `
       <tr>
@@ -7269,8 +7269,8 @@ async function s360ShowDetail(s){
         <thead><tr><th>시험일</th><th>국어</th><th>수학</th><th>영어</th><th>한국사</th><th>탐구1</th><th>탐구2</th><th>평균백분위</th><th>평균등급</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
-      <div style="font-size:12.5px;color:var(--ink-soft);margin-top:6px;">국어·수학·탐구는 등급 /백분위 표기</div>` : '<div style="font-size:14px;">모의고사 기록 없음</div>';
-    gEl.innerHTML = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">${gpa || '<span style="font-size:14px;">내신 정보 없음</span>'}</div>${s360ChartsHtml(st.history)}${table}<div id="s360SusiMatch"></div>`;
+      <div style="font-size:14px;color:var(--ink-soft);margin-top:6px;">국어·수학·탐구는 등급 /백분위 표기</div>` : '<div style="font-size:15px;">모의고사 기록 없음</div>';
+    gEl.innerHTML = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">${gpa || '<span style="font-size:15px;">내신 정보 없음</span>'}</div>${s360ChartsHtml(st.history)}${table}<div id="s360SusiMatch"></div>`;
     s360RenderSusiMatch(st); // 내신 기반 졸업생 합격 사례 — 비동기로 뒤에 채움
     // 차트 라이브러리(vendor 셀프호스팅) 지연 로드 후 렌더 — 실패해도 표는 그대로 표시
     if (gEl.querySelector('.s360-charts')) {

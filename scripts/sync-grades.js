@@ -305,7 +305,7 @@ const normName = s => String(s || '').replace(/\s/g, '');
     const tab = `${grade}학년`;
     let rows;
     try {
-      rows = await readRange(`${tab}!A1:CZ`, ELECTIVE_SHEET_ID);
+      rows = await readRange(`${tab}!A1:ZZ`, ELECTIVE_SHEET_ID); // CZ(104열)까지만 읽으면 3학년 ED열(134열)에서 잘림 — 넉넉히 확장
     } catch (e) {
       console.warn(`  ⚠️ '${tab}' 탭을 읽지 못함 — 건너뜀 (${e.response?.data?.error?.message || e.message})`);
       continue;
