@@ -2935,7 +2935,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.10</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.11</div>
   </div>
 </div>
 
@@ -3059,7 +3059,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver5.10</div>
+    <div class="nav-version">ver5.11</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4802,7 +4802,14 @@ function findSwapCandidates(teacherObj, day, period, cls){
       candidates.push({teacher:entry.teacher, day:day2, period:entry.period, subject:entry.subject});
     });
   });
-  candidates.sort((a,b)=> DAYS.indexOf(a.day)-DAYS.indexOf(b.day) || a.period-b.period);
+  // 정렬: 오늘 요일부터 시작해서 한 바퀴(목→금→월→화→수 식) — 각 요일 안에서는 빠른 교시부터.
+  // 주말 등 todayDay가 없으면 기존처럼 월~금 순서.
+  const dayRank = d => {
+    const i = DAYS.indexOf(d);
+    if (todayDay == null) return i;
+    return (i - DAYS.indexOf(todayDay) + DAYS.length) % DAYS.length;
+  };
+  candidates.sort((a,b)=> dayRank(a.day)-dayRank(b.day) || a.period-b.period);
   return candidates;
 }
 
