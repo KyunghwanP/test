@@ -84,6 +84,9 @@
   /* 다크모드: 주간교육활동 본문 — 인라인 색상을 색조 유지한 다크 등가색으로 매핑 (JS가 --wk-* 변수 세팅) */
   html.dark .weekly-html-content [data-wk-c]{color:var(--wk-c-dark) !important;}
   html.dark .weekly-html-content [data-wk-bg]{background-color:var(--wk-bg-dark) !important;}
+  /* sticky 소제목(h2): 인라인 투명 배경이 덮어써서 스크롤 시 겹쳐 보이는 것 방지 — 불투명 배경 강제
+     (색 배경이 있는 h2는 위 [data-wk-bg] 규칙이 특이도가 높아 매핑색 유지) */
+  html.dark .weekly-html-content h2{background:var(--paper) !important;}
   html.dark .weekly-html-content table,
   html.dark .weekly-html-content td,
   html.dark .weekly-html-content th{border-color:var(--rule) !important;}
@@ -2991,7 +2994,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.16</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.17</div>
   </div>
 </div>
 
@@ -3115,7 +3118,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver5.16</div>
+    <div class="nav-version" title="Made by 박경환">ver5.17</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
