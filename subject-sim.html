@@ -23,7 +23,8 @@
         body { background-color: var(--bg-main); color: var(--text-main); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         header {
             background-color: var(--navy-header); color: white; padding: 13px 30px; display: flex;
-            justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 10;
+            justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            position: relative; z-index: 100; /* 이름 검색 드롭다운이 아래 탭바에 가리지 않도록 */
         }
         header .title-area h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.5px; }
         header .title-area p { font-size: 0.85rem; color: #94a3b8; margin-top: 2px; }
@@ -1566,6 +1567,21 @@
             wrap.prepend(div);
         }
 
+        // 2025학년도 입학생(현재 2학년) 2학년 선택과목 카탈로그 — docs/curriculum.pdf 편제표 기준
+        // 선택군Ⅰ(수학·영어): 학기당 택3, 과목당 4학점 / 선택군Ⅱ(국어·탐구·생활): 학기당 택5, 과목당 3학점
+        const TAKEN2_CAT = [
+            { t: '국어', credit: 3, list: ['화법과 언어', '문학', '독서 토론과 글쓰기', '매체 의사소통'] },
+            { t: '수학', credit: 4, list: ['대수', '미적분Ⅰ', '미적분Ⅱ', '확률과 통계', '기하', '경제 수학'] },
+            { t: '영어', credit: 4, list: ['영어Ⅰ', '영어Ⅱ', '영어 독해와 작문', '실생활 영어 회화', '세계 문화와 영어'] },
+            { t: '탐구<br>(사회·과학)', credit: 3, list: [
+                '세계시민과 지리', '세계사', '사회와 문화', '현대사회와 윤리', '한국지리 탐구',
+                '동아시아 역사 기행', '정치', '법과 사회', '윤리와 사상',
+                '물리학', '화학', '생명과학', '지구과학', '역학과 에너지', '전자기와 양자',
+                '물질과 에너지', '화학 반응의 세계', '세포와 물질대사', '생물의 유전',
+                '지구시스템과학', '행성우주과학', '과학과제 연구'] },
+            { t: '기술·가정<br>~교양', credit: 3, list: ['기술·가정', '정보', '일본어', '중국어', '일본 문화', '중국 문화', '생활과학 탐구'] }
+        ];
+
         // 현재 2학년 표(이수 현황)를 실제 이수 과목으로 재구성 — 1학년 시나리오의 2학년 표와 같은 형태
         function buildTakenT2(orig) {
             if (!takenList.length) return orig;
@@ -1579,17 +1595,37 @@
                 });
                 return { ...orig, title: '2학년 이수 현황 (실제 선택과목 반영)', rows };
             }
-            // 일반과정: '개인별 선택 이수 중' 행들을 실제 과목명 목록으로 교체 (두 과목씩 한 행)
-            const names = takenList;
-            const half = Math.ceil(names.length / 2);
+            // 일반과정: 이수 과목을 교과군별로 분류해 두 과목씩 좌우(1·2학기) 배치
             const rows = [];
-            for (let i = 0; i < names.length; i += 2) {
-                const row = { c1: { f: names[i], c: '' }, c2: names[i + 1] ? { f: names[i + 1], c: '' } : { e: 1 } };
-                if (i === 0) { row.cat = { t: '개인별 선택<br>(이수 중)', span: half }; row.sum = { v: '54 학점', span: half }; }
-                rows.push(row);
-            }
+            const used = new Set();
+            const pushGroup = (label, subs, credit) => {
+                if (!subs.length) return;
+                const half = Math.ceil(subs.length / 2);
+                for (let i = 0; i < subs.length; i += 2) {
+                    const row = {
+                        c1: { f: subs[i], c: credit },
+                        c2: subs[i + 1] ? { f: subs[i + 1], c: credit } : { e: 1 }
+                    };
+                    if (i === 0) {
+                        row.cat = { t: label, span: half };
+                        row.sum = { v: (credit ? subs.length * credit + ' 학점' : '-'), span: half };
+                    }
+                    rows.push(row);
+                }
+            };
+            TAKEN2_CAT.forEach(g => {
+                const subs = takenList.filter(n => g.list.includes(n));
+                subs.forEach(n => used.add(n));
+                pushGroup(g.t, subs, g.credit);
+            });
+            pushGroup('기타 선택', takenList.filter(n => !used.has(n)), 0);
             rows.push({ cat: { t: '체육' }, c1: { f: '스포츠 생활1', c: 2 }, c2: { f: '스포츠 생활2', c: 2 }, sum: { v: '4 학점' } });
-            return { ...orig, title: '2학년 이수 현황 (실제 선택과목 반영)', rows };
+            return {
+                ...orig,
+                title: '2학년 이수 현황 (실제 선택과목 반영)',
+                sub: orig.sub + ' · 1/2학기 배치는 실제와 다를 수 있음',
+                rows
+            };
         }
         function applyAutoSelect() {
             if (!autoSel || !autoSel.names.length) return;
