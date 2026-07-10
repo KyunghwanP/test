@@ -1579,6 +1579,88 @@
             }
         }
 
+        /* ==================== 학생 명렬 연동: 반·번호 드롭다운 + 이름 검색 매칭 ====================
+           교사 로그인 세션(같은 도메인)이 있으면 Firestore 명렬을 불러와 드롭다운으로 전환.
+           로그인이 없으면(학생 개인 사용 등) 기존 수동 입력 그대로 동작. */
+        let roster = [];
+        let prefill = null; // URL로 넘어온 반/번호 (명렬 로드 후 드롭다운에 재적용)
+        function simGrade() { return document.getElementById('selYear').value; }
+        function rosterOf(grade) { return roster.filter(s => String(parseInt(s.grade)) === String(grade)); }
+
+        function buildRosterUI() {
+            if (!roster.length) return;
+            ['studentClass', 'studentNumber'].forEach(id => {
+                const old = document.getElementById(id);
+                if (old.tagName === 'SELECT') return;
+                const sel = document.createElement('select');
+                sel.id = id;
+                old.replaceWith(sel);
+            });
+            document.getElementById('studentClass').onchange = () => { fillNumOptions(); matchName(); updateDisplay(); };
+            document.getElementById('studentNumber').onchange = () => { matchName(); updateDisplay(); };
+            document.getElementById('selYear').addEventListener('change', () => {
+                if (roster.length) { fillClassOptions(); fillNumOptions(); document.getElementById('studentName').value = ''; updateDisplay(); }
+            });
+            fillClassOptions();
+            fillNumOptions();
+            // 이름 검색 제안 (상벌점 조회와 동일한 UX)
+            const nameEl = document.getElementById('studentName');
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'position:relative;display:inline-block;';
+            nameEl.replaceWith(wrap); wrap.appendChild(nameEl);
+            const sug = document.createElement('div');
+            sug.id = 'nameSug';
+            sug.style.cssText = 'display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:230px;max-height:280px;overflow-y:auto;background:white;color:#1e293b;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 10px 24px rgba(0,0,0,0.3);z-index:100;';
+            wrap.appendChild(sug);
+            nameEl.autocomplete = 'off';
+            nameEl.placeholder = '이름 검색';
+            nameEl.oninput = onNameSearch;
+            nameEl.onblur = () => setTimeout(() => { sug.style.display = 'none'; }, 200);
+        }
+        function fillClassOptions() {
+            const rooms = [...new Set(rosterOf(simGrade()).map(s => parseInt(s.room)))].sort((a, b) => a - b);
+            const el = document.getElementById('studentClass');
+            el.innerHTML = '<option value="">반</option>' + rooms.map(r => `<option value="${r}">${r}반</option>`).join('');
+        }
+        function fillNumOptions() {
+            const room = document.getElementById('studentClass').value;
+            const el = document.getElementById('studentNumber');
+            const list = rosterOf(simGrade()).filter(s => String(parseInt(s.room)) === String(room))
+                .sort((a, b) => parseInt(a.num) - parseInt(b.num));
+            el.innerHTML = '<option value="">번호</option>' + list.map(s => `<option value="${parseInt(s.num)}">${parseInt(s.num)}번 ${s.name}</option>`).join('');
+        }
+        function matchName() {
+            const r = document.getElementById('studentClass').value, n = document.getElementById('studentNumber').value;
+            const f = rosterOf(simGrade()).find(s => String(parseInt(s.room)) === String(r) && String(parseInt(s.num)) === String(n));
+            if (f) document.getElementById('studentName').value = f.name;
+        }
+        function onNameSearch() {
+            const q = document.getElementById('studentName').value.trim();
+            const sug = document.getElementById('nameSug');
+            if (!q || !roster.length) { sug.style.display = 'none'; return; }
+            const hits = rosterOf(simGrade()).filter(s => s.name && s.name.includes(q)).slice(0, 12);
+            if (!hits.length) { sug.style.display = 'none'; return; }
+            sug.innerHTML = hits.map(s =>
+                `<div data-r="${parseInt(s.room)}" data-n="${parseInt(s.num)}" data-name="${s.name}" style="padding:8px 12px;cursor:pointer;font-size:0.88rem;border-bottom:1px solid #f1f5f9;display:flex;gap:8px;align-items:center;">
+                   <span style="background:#eff6ff;color:#1d4ed8;font-weight:700;font-size:0.72rem;padding:1px 7px;border-radius:9px;white-space:nowrap;">${parseInt(s.grade)}-${parseInt(s.room)} ${parseInt(s.num)}번</span><b>${s.name}</b></div>`).join('');
+            sug.style.display = 'block';
+            sug.querySelectorAll('[data-name]').forEach(d => d.onmousedown = () => {
+                document.getElementById('studentClass').value = d.dataset.r;
+                fillNumOptions();
+                document.getElementById('studentNumber').value = d.dataset.n;
+                document.getElementById('studentName').value = d.dataset.name;
+                sug.style.display = 'none';
+                updateDisplay();
+            });
+        }
+        function applyRosterPrefill() {
+            if (!prefill) return;
+            if (prefill.cls) { document.getElementById('studentClass').value = String(parseInt(prefill.cls)); fillNumOptions(); }
+            if (prefill.num) document.getElementById('studentNumber').value = String(parseInt(prefill.num));
+            matchName();
+            updateDisplay();
+        }
+
         /* ==================== 초기화 ==================== */
         window.onload = function () {
             // 종합검색에서 넘어온 학생 정보 (?year=&class=&num=&name=&subjects=과목1,과목2)
@@ -1588,6 +1670,7 @@
                 if (qp.get('class')) document.getElementById('studentClass').value = qp.get('class');
                 if (qp.get('num')) document.getElementById('studentNumber').value = qp.get('num');
                 if (qp.get('name')) document.getElementById('studentName').value = qp.get('name');
+                prefill = { cls: qp.get('class'), num: qp.get('num') };
                 const names = (qp.get('subjects') || '').split(',').map(s => s.trim()).filter(Boolean);
                 if (names.length) autoSel = { names, label: qp.get('name') || '조회 학생' };
             } catch (e) {}
@@ -1596,6 +1679,32 @@
             window.addEventListener('resize', updateStacks);
             applyAutoSelect();
         };
+    </script>
+    <script type="module">
+        // 학생 명렬 로드 — 본체와 같은 Firebase 프로젝트, 교사 로그인 세션 공유 (비로그인 시 조용히 수동 입력 유지)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
+        const app = initializeApp({
+            apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
+            authDomain: "ynhs-7b5ba.firebaseapp.com",
+            projectId: "ynhs-7b5ba",
+            storageBucket: "ynhs-7b5ba.firebasestorage.app",
+            messagingSenderId: "1031618043470",
+            appId: "1:1031618043470:web:edb5b8d1f98db029916d1f"
+        });
+        onAuthStateChanged(getAuth(app), async user => {
+            if (!user || roster.length) return;
+            try {
+                const snap = await getDoc(doc(getFirestore(app), 'students', 'main'));
+                if (snap.exists()) {
+                    roster = snap.data().students || [];
+                    buildRosterUI();
+                    applyRosterPrefill();
+                }
+            } catch (e) { /* 권한 없음 등 — 수동 입력 유지 */ }
+        });
     </script>
 </body>
 </html>
