@@ -3005,7 +3005,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.34</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.35</div>
   </div>
 </div>
 
@@ -3129,7 +3129,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver5.34</div>
+    <div class="nav-version" title="Made by 박경환">ver5.35</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3736,7 +3736,8 @@
            데이터: GitHub Actions(sync-grades.js)가 성적 시트를 Firestore gradesMock에 동기화 -->
       <div class="page-view" id="gradesPage">
         <div id="gradesPageHead" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;">
-          <span style="font-family:'Pretendard','Noto Sans KR';font-weight:900;font-size:16px;color:var(--ink);">🎓 진로진학 상담</span>
+          <span id="gradesPageTitle" style="font-family:'Pretendard','Noto Sans KR';font-weight:900;font-size:16px;color:var(--ink);">🎓 진로진학 상담</span>
+          <button class="sg-back-btn" id="gradesHomeBtn" style="display:none;" onclick="document.getElementById('gradesFrame').src='career.html'">← 진로진학 상담 홈으로 돌아가기</button>
         </div>
         <iframe id="gradesFrame" data-src="career.html" title="진로진학 상담" style="flex:1;width:100%;border:0;background:#f1f5f9;"></iframe>
       </div>
@@ -6657,9 +6658,14 @@ function isSciStudent(s) {
 const SCI_BADGE = '<span class="spot-badge" style="background:#ede9fe;color:#6d28d9;">⚗️ 과학중점과정</span>';
 
 // 시뮬레이터 전체화면 안전장치: iframe이 시뮬레이터 외 페이지로 이동하면 복귀 버튼이 없으므로 해제
+// + 시뮬레이터가 떠 있을 때는 페이지 제목 대신 '진로진학 상담 홈으로 돌아가기' 버튼 표시
 document.getElementById('gradesFrame')?.addEventListener('load', function() {
   try {
-    if (!this.contentWindow.location.pathname.includes('subject-sim')) document.body.classList.remove('sim-full');
+    const isSim = this.contentWindow.location.pathname.includes('subject-sim');
+    if (!isSim) document.body.classList.remove('sim-full');
+    const title = document.getElementById('gradesPageTitle'), homeBtn = document.getElementById('gradesHomeBtn');
+    if (title) title.style.display = isSim ? 'none' : '';
+    if (homeBtn) homeBtn.style.display = isSim ? 'inline-flex' : 'none';
   } catch(e) {}
 });
 
