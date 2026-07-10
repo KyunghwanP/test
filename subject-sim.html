@@ -168,7 +168,7 @@
             #studentClass { grid-column: 1 / 2; }
             #studentNumber { grid-column: 2 / 3; }
             #studentName { grid-column: 3 / 4; }
-            #studentDept { grid-column: 1 / 4; }
+            #btnSimFull { grid-column: 1 / 4; }
             .tab-bar { padding-left: 5px; padding-right: 5px; }
             #sub-grade-tab-bar { padding-left: 5px; }
             .tab-bar, #sub-grade-tab-bar { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
@@ -214,10 +214,10 @@
                 <option value="general">일반과정</option>
                 <option value="science">과학중점과정</option>
             </select>
-            <input type="number" id="studentClass" placeholder="반" min="1" max="15" oninput="updateDisplay()">
+            <input type="number" id="studentClass" placeholder="반" min="1" max="15" oninput="updateDisplay(); maybeSciClass();">
             <input type="number" id="studentNumber" placeholder="번호" min="1" max="40" oninput="updateDisplay()">
             <input type="text" id="studentName" placeholder="이름" oninput="updateDisplay()">
-            <select id="studentDept" onchange="updateDisplay()"><option value="">희망 학과 계열 선택</option><option value="인문사회계열">인문사회계열</option><option value="상경계열">상경계열</option><option value="자연과학계열">자연과학계열</option><option value="공학계열">공학계열</option><option value="의학생명계열">의학생명계열</option><option value="교육계열">교육계열</option><option value="예체능계열">예체능계열</option></select>
+            <button id="btnSimFull" onclick="toggleSimFull()" style="display:none;background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:6px 12px;font-size:0.85rem;font-weight:700;cursor:pointer;white-space:nowrap;">⛶ 전체화면</button>
         </div>
     </header>
     <div class="tab-bar">
@@ -972,10 +972,40 @@
             const cls = document.getElementById('studentClass').value || '0';
             const num = document.getElementById('studentNumber').value || '0';
             const name = document.getElementById('studentName').value || '미입력';
-            const dept = document.getElementById('studentDept').value || '미선택';
             const track = document.getElementById('selTrack').value === 'science' ? '과학중점과정' : '일반과정';
             document.getElementById('studentCardDisplay').innerText =
-                `${yr}학년 ${cls}반 ${num}번 ${name} | ${track} | 희망 계열: ${dept}`;
+                `${yr}학년 ${cls}반 ${num}번 ${name} | ${track}`;
+        }
+
+        /* ==================== 전체화면 (부모 앱의 사이드바·상단바 숨김) ==================== */
+        function toggleSimFull(on) {
+            try {
+                const pb = window.parent.document.body;
+                const now = (on === undefined) ? !pb.classList.contains('sim-full') : on;
+                pb.classList.toggle('sim-full', now);
+                const btn = document.getElementById('btnSimFull');
+                if (btn) btn.innerText = now ? '↙ 원래대로' : '⛶ 전체화면';
+            } catch (e) {}
+        }
+        function initSimFullBtn() {
+            try {
+                if (window.parent === window) return; // 단독 탭으로 열린 경우 버튼 불필요
+                if (!window.parent.document.querySelector('.app-shell')) return;
+                const btn = document.getElementById('btnSimFull');
+                btn.style.display = 'inline-block';
+                if (window.parent.document.body.classList.contains('sim-full')) btn.innerText = '↙ 원래대로';
+            } catch (e) {}
+        }
+
+        /* ==================== 과학중점과정 자동 인식 ==================== */
+        // 2학년(2025 입학)은 12·13반이 과학중점, 1학년은 교육과정 시트 비고란(sci 플래그) 기준
+        function isSciClass(yr, cls) { return String(yr) === '2' && [12, 13].includes(parseInt(cls)); }
+        function maybeSciClass() {
+            if (!isSciClass(simGrade(), document.getElementById('studentClass').value)) return;
+            if (document.getElementById('selTrack').value === 'science') return;
+            document.getElementById('selTrack').value = 'science';
+            initScenario();
+            showBanner('⚗️ 2학년 12·13반은 <b>과학중점과정</b>입니다 — 과정이 자동 전환되었습니다.');
         }
 
         /* ==================== 탭 · 모바일 뷰 ==================== */
@@ -1692,7 +1722,7 @@
                 sel.id = id;
                 old.replaceWith(sel);
             });
-            document.getElementById('studentClass').onchange = () => { fillNumOptions(); matchName(); updateDisplay(); };
+            document.getElementById('studentClass').onchange = () => { fillNumOptions(); matchName(); updateDisplay(); maybeSciClass(); };
             document.getElementById('studentNumber').onchange = () => { matchName(); updateDisplay(); onStudentPicked(); };
             document.getElementById('selYear').addEventListener('change', () => {
                 if (roster.length) { fillClassOptions(); fillNumOptions(); document.getElementById('studentName').value = ''; updateDisplay(); }
@@ -1734,13 +1764,18 @@
             const q = document.getElementById('studentName').value.trim();
             const sug = document.getElementById('nameSug');
             if (!q || !roster.length) { sug.style.display = 'none'; return; }
-            const hits = rosterOf(simGrade()).filter(s => s.name && s.name.includes(q)).slice(0, 12);
+            // 학년 무관 검색 (시뮬레이터가 지원하는 1·2학년 전체) — 고르면 학년까지 자동 전환
+            const hits = roster.filter(s => ['1', '2'].includes(String(parseInt(s.grade))) && s.name && s.name.includes(q)).slice(0, 12);
             if (!hits.length) { sug.style.display = 'none'; return; }
             sug.innerHTML = hits.map(s =>
-                `<div data-r="${parseInt(s.room)}" data-n="${parseInt(s.num)}" data-name="${s.name}" style="padding:8px 12px;cursor:pointer;font-size:0.88rem;border-bottom:1px solid #f1f5f9;display:flex;gap:8px;align-items:center;">
+                `<div data-g="${parseInt(s.grade)}" data-r="${parseInt(s.room)}" data-n="${parseInt(s.num)}" data-name="${s.name}" style="padding:8px 12px;cursor:pointer;font-size:0.88rem;border-bottom:1px solid #f1f5f9;display:flex;gap:8px;align-items:center;">
                    <span style="background:#eff6ff;color:#1d4ed8;font-weight:700;font-size:0.72rem;padding:1px 7px;border-radius:9px;white-space:nowrap;">${parseInt(s.grade)}-${parseInt(s.room)} ${parseInt(s.num)}번</span><b>${s.name}</b></div>`).join('');
             sug.style.display = 'block';
             sug.querySelectorAll('[data-name]').forEach(d => d.onmousedown = () => {
+                if (simGrade() !== d.dataset.g) {
+                    document.getElementById('selYear').value = d.dataset.g;
+                    fillClassOptions();
+                }
                 document.getElementById('studentClass').value = d.dataset.r;
                 fillNumOptions();
                 document.getElementById('studentNumber').value = d.dataset.n;
@@ -1775,8 +1810,14 @@
                 takenList = [];
                 autoSel = clean.length ? { names: clean, label: nameNow } : null;
             }
+            // 과학중점 자동 전환: 2학년은 12·13반, 1학년은 교육과정 시트 비고란(sci 플래그)
+            const sci = isSciClass(g, r) || !!(data && data.sci);
+            const trackSel = document.getElementById('selTrack');
+            const sciSwitched = (trackSel.value === 'science') !== sci;
+            trackSel.value = sci ? 'science' : 'general';
             initScenario();
             applyAutoSelect();
+            if (sci && sciSwitched) showBanner(`⚗️ <b>${nameNow}</b> 학생은 <b>과학중점과정</b>입니다 — 과정이 자동 전환되었습니다.`);
             if (g === '2') {
                 if (takenList.length) showBanner(`📋 <b>${nameNow}</b> 학생이 이수 중인 2학년 선택과목 <b>${takenList.length}과목</b>이 계획표에 반영되었습니다.`);
                 else showBanner(`ℹ️ <b>${nameNow}</b> 학생의 등록된 선택과목 데이터가 없습니다.`);
@@ -1796,9 +1837,14 @@
                 const names = (qp.get('subjects') || '').split(',').map(s => s.trim()).filter(Boolean);
                 if (names.length) autoSel = { names, label: qp.get('name') || '조회 학생' };
                 takenList = (qp.get('taken') || '').split(',').map(s => s.trim()).filter(n => n && !TAKEN_JUNK.includes(n));
+                // 과학중점 자동 전환: 종합검색에서 넘어온 track 파라미터 또는 2학년 12·13반
+                if (qp.get('track') === 'science' || isSciClass(qp.get('year'), qp.get('class'))) {
+                    document.getElementById('selTrack').value = 'science';
+                }
             } catch (e) {}
             initScenario();
             initDeptSelector();
+            initSimFullBtn();
             window.addEventListener('resize', updateStacks);
             applyAutoSelect();
             if (takenList.length) {

@@ -299,7 +299,8 @@ const normName = s => String(s || '').replace(/\s/g, '');
   console.log('📚 선택과목 시트 읽는 중...');
   const ELECTIVE_GRADES = [1, 2, 3];
   const elTree = {};
-  const elClasses = {}; // "학년-반" → { 번호: { name, current:[...], prevGrade:[...] } }
+  const elClasses = {}; // "학년-반" → { 번호: { name, current:[...], prevGrade:[...], sci?:1 } }
+  const elSci = {};     // "학년-반" → [번호...] — 비고란에 '과학중점' 표기된 학생 (1학년 과학중점과정 표시용)
 
   for (const grade of ELECTIVE_GRADES) {
     const tab = `${grade}학년`;
@@ -339,12 +340,15 @@ const normName = s => String(s || '').replace(/\s/g, '');
     const roomCol = findCol('신반', 0);
     const seatCol = findCol('신번호', 1);
     const nameCol = findCol('성명', 4);
-    console.log(`  ${tab}: 헤더 ${headerRowIdx + 1}행에서 발견 (신반=열${roomCol + 1}, 신번호=열${seatCol + 1}, 성명=열${nameCol + 1}, 주소=열${addrIdx + 1})`);
+    // 비고 열: '과학중점' 표기 감지용 (없는 탭이면 -1 — 그냥 건너뜀)
+    const bigoCol = header.findIndex(h => hcell(h) === '비고');
+    console.log(`  ${tab}: 헤더 ${headerRowIdx + 1}행에서 발견 (신반=열${roomCol + 1}, 신번호=열${seatCol + 1}, 성명=열${nameCol + 1}, 주소=열${addrIdx + 1}, 비고=${bigoCol === -1 ? '없음' : '열' + (bigoCol + 1)})`);
 
     // 헤더를 스캔해 이번학년/직전학년 과목 열을 동적으로 분리
     const block1 = [], block2 = [];
     let state = 'block1'; // block1 → afterUnit(구분용 빈열 대기) → block2
     for (let c = addrIdx + 1; c < header.length; c++) {
+      if (c === bigoCol) continue; // 비고 열은 과목이 아님
       const h = hcell(header[c]);
       if (state === 'block1') {
         if (h === '단위수') { state = 'afterUnit'; continue; }
@@ -373,19 +377,22 @@ const normName = s => String(s || '').replace(/\s/g, '');
 
       const current = [...new Set(block1.filter(sc => cell(row, sc.col)).map(sc => sc.name))];
       const prevGrade = [...new Set(block2.filter(sc => cell(row, sc.col)).map(sc => sc.name))];
+      const sci = bigoCol !== -1 && String(cell(row, bigoCol) ?? '').includes('과학중점');
 
       (elTree[grade] ??= {});
       (elTree[grade][room] ??= {});
       elTree[grade][room][seat] = name;
-      (elClasses[grade + '-' + room] ??= {})[seat] = { name, current, prevGrade };
+      (elClasses[grade + '-' + room] ??= {})[seat] = { name, current, prevGrade, ...(sci ? { sci: 1 } : {}) };
+      if (sci) (elSci[grade + '-' + room] ??= []).push(seat);
       studentCount++;
     }
-    console.log(`  ${tab}: 학생 ${studentCount}명 처리`);
+    const sciCount = Object.entries(elSci).filter(([k]) => k.startsWith(grade + '-')).reduce((a, [, v]) => a + v.length, 0);
+    console.log(`  ${tab}: 학생 ${studentCount}명 처리${sciCount ? ` (과학중점 ${sciCount}명)` : ''}`);
   }
 
   const elClassIds = Object.keys(elClasses);
   if (elClassIds.length) {
-    const elBatchOps = [{ set: 'electives/index', data: { t, tree: elTree } }];
+    const elBatchOps = [{ set: 'electives/index', data: { t, tree: elTree, sci: elSci } }];
     elClassIds.forEach(id => elBatchOps.push({ set: 'electives/' + id, data: { t, students: elClasses[id] } }));
     const elExisting = await db.collection('electives').listDocuments();
     elExisting.forEach(ref => {

@@ -79,6 +79,11 @@
   html.dark .consult-auto-btn{background:var(--today-tint);color:var(--mon);}
   html.dark .consult-auto-btn:active{background:#1E3A5F;}
   html.dark #gradesFrame{background:var(--bg-base) !important;}
+  /* 과목선택 시뮬레이터 전체화면 — iframe(subject-sim.html)의 버튼이 body에 sim-full을 토글 */
+  body.sim-full .app-header{display:none !important;}
+  body.sim-full .main-nav{display:none !important;}
+  body.sim-full #gradesPageHead{display:none !important;}
+  body.sim-full #mytaskFAB{display:none !important;}
   html.dark .pts-score-sel{background:var(--paper-soft) !important;}
   html.dark .consult-form-grid input:focus,
   html.dark .consult-form-grid select:focus{background:var(--paper-soft);}
@@ -3000,7 +3005,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.30</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.31</div>
   </div>
 </div>
 
@@ -3124,7 +3129,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver5.30</div>
+    <div class="nav-version" title="Made by 박경환">ver5.31</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3730,7 +3735,7 @@
            career.html(메뉴 허브) → grades.html(모의고사 분석), 이동은 iframe 안에서 이뤄짐
            데이터: GitHub Actions(sync-grades.js)가 성적 시트를 Firestore gradesMock에 동기화 -->
       <div class="page-view" id="gradesPage">
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;">
+        <div id="gradesPageHead" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;">
           <span style="font-family:'Pretendard','Noto Sans KR';font-weight:900;font-size:16px;color:var(--ink);">🎓 진로진학 상담</span>
         </div>
         <iframe id="gradesFrame" data-src="career.html" title="진로진학 상담" style="flex:1;width:100%;border:0;background:#f1f5f9;"></iframe>
@@ -6633,17 +6638,44 @@ let allStudents = [];
 let studentsViewMode = 'group';   // group | class | club | search
 let studentsCurrentGroup = null;  // { type:'class'|'club', key, label }
 
+// ── 과학중점과정 판별 ──
+// 2학년(2025 입학)은 12·13반 고정, 1학년은 교육과정 시트 비고란 → electives/index의 sci 맵 { "1-반": [번호...] }
+let sciMap = null;
+async function loadSciMap() {
+  if (sciMap) return sciMap;
+  try {
+    const snap = await getDoc(doc(fbDb, 'electives', 'index'));
+    sciMap = snap.exists() ? (snap.data().sci || {}) : {};
+  } catch(e) { sciMap = {}; } // 권한 없음 등 — 2학년 12·13반 규칙만 적용
+  return sciMap;
+}
+function isSciStudent(s) {
+  const g = parseInt(s.grade), r = parseInt(s.room), n = parseInt(s.num);
+  if (g === 2 && (r === 12 || r === 13)) return true;
+  return !!(sciMap && sciMap[`${g}-${r}`]?.includes(n));
+}
+const SCI_BADGE = '<span class="spot-badge" style="background:#ede9fe;color:#6d28d9;">⚗️ 과학중점과정</span>';
+
+// 시뮬레이터 전체화면 안전장치: iframe이 시뮬레이터 외 페이지로 이동하면 복귀 버튼이 없으므로 해제
+document.getElementById('gradesFrame')?.addEventListener('load', function() {
+  try {
+    if (!this.contentWindow.location.pathname.includes('subject-sim')) document.body.classList.remove('sim-full');
+  } catch(e) {}
+});
+
 async function initStudentsPage() {
   studentsInitialized = true;
   const list = document.getElementById('studentsList');
   list.innerHTML = '<div class="contacts-loading">불러오는 중...</div>';
   try {
+    const sciP = loadSciMap();
     const snap = await getDoc(doc(fbDb, 'students', 'main'));
     if (!snap.exists() || !snap.data().students?.length) {
       list.innerHTML = '<div class="contacts-empty">등록된 학생 연락망이 없습니다.</div>';
       return;
     }
     allStudents = snap.data().students || [];
+    await sciP;
     renderStudentsGroupList();
   } catch(e) {
     list.innerHTML = `<div class="contacts-empty">불러오기 실패: ${e.message}</div>`;
@@ -6769,7 +6801,7 @@ function renderStudentsInGroup(group) {
         <div class="student-num">${group.type==='club' ? (s.grade+'-'+s.room) : String(s.num||'').padStart(2,'0')}<br>${group.type==='club' ? String(s.num||'').padStart(2,'0')+'번' : ''}</div>
         <div class="student-info">
           <div class="student-name">${escapeHtml(s.name||'')}</div>
-          <div class="student-meta">${group.type==='club' ? '' : (s.club ? '🎯 '+s.club : '')}</div>
+          <div class="student-meta">${group.type==='club' ? '' : (s.club ? '🎯 '+s.club+' ' : '')}${isSciStudent(s) ? '<span style="color:#6d28d9;font-weight:700;">⚗️ 과학중점과정</span>' : ''}</div>
         </div>
       </div>`;
     }).join('')}`;
@@ -6800,6 +6832,7 @@ function showStudentDetail(s) {
     ['학번', studentId],
     ['생년월일', birthFormatted],
     ['동아리', s.club],
+    ['과정', isSciStudent(s) ? '⚗️ 과학중점과정' : ''],
   ].filter(r => r[1]).map(([label, val]) => `
     <div class="cd-row">
       <span class="cd-label">${label}</span>
@@ -7048,6 +7081,7 @@ function initSearchPage(){
     // 로드 완료 후 갱신 — 단, 사용자가 이미 상세를 열었다면 덮어쓰지 않음
     spotLoadData().then(() => { if (s360View !== 'detail') s360Render(); })
       .catch(e => { document.getElementById('s360Body').innerHTML = `<div class="spot-empty">불러오기 실패: ${e.message}</div>`; });
+    loadSciMap().then(() => { if (s360View === 'list') s360Render(); }); // 과학중점 배지 늦게 도착 시 목록 갱신
   }
   if (window.innerWidth > 768) setTimeout(() => inp.focus(), 60);
 }
@@ -7137,6 +7171,7 @@ function s360RenderRows(students, headLabel){
     return `<div class="spot-row" data-i="${i}">
       <span class="spot-grn">${s.grade}-${s.room}-${String(s.num||'').padStart(2,'0')}</span>
       <span class="spot-name">${escapeHtml(s.name||'')}</span>
+      ${isSciStudent(s) ? SCI_BADGE : ''}
       ${s.club ? `<span class="spot-badge">🎯 ${escapeHtml(s.club)}</span>` : ''}
       <span class="spot-badges">${ptsBadge}</span>
     </div>`;
@@ -7331,6 +7366,7 @@ async function s360LoadElectives(s){
       ${simBtn}`;
     document.getElementById('s360SimBtn')?.addEventListener('click', () => {
       const qs = [`year=${yr}`, `class=${parseInt(s.room)}`, `num=${parseInt(s.num)}`, `name=${encodeURIComponent(s.name || '')}`];
+      if (isSciStudent(s)) qs.push('track=science'); // 과학중점과정 자동 전환
       if (yr === 2) {
         // 2학년: 이수 중인 과목 → 시뮬레이터 오른쪽 계획표(2학년 이수 현황)에 표시
         qs.push(`taken=${encodeURIComponent((st.current || []).join(','))}`);
@@ -7352,6 +7388,7 @@ async function s360ShowDetail(s){
   s360View = 'detail';
   const main = document.getElementById('s360Body');
   main.scrollTop = 0;
+  await loadSciMap(); // 과학중점 배지용 (1학년 비고란 데이터)
   const p = spotPts.get(spotKey(s));
 
   let ptsHtml = '<div style="font-size:15px;color:var(--ink-soft);">상벌점 데이터 없음</div>';
@@ -7374,6 +7411,7 @@ async function s360ShowDetail(s){
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
         <span style="font-size:24px;font-weight:900;color:var(--ink);">${escapeHtml(s.name||'')}</span>
         <span style="font-family:'IBM Plex Mono';font-size:14.5px;color:var(--ink-soft);font-weight:700;">${s.grade}학년 ${s.room}반 ${s.num}번</span>
+        ${isSciStudent(s) ? SCI_BADGE : ''}
         ${s.club ? `<span class="spot-badge">🎯 ${escapeHtml(s.club)}</span>` : ''}
         <button id="s360ContactBtn" class="spot-badge" style="border:none;cursor:pointer;font-family:inherit;">📞 연락처 보기</button>
       </div>
@@ -8479,6 +8517,9 @@ function navigateTo(page) {
     // 첫 진입 때만 iframe 로드
     const gf = document.getElementById('gradesFrame');
     if(gf && !gf.src) gf.src = gf.dataset.src;
+  } else {
+    // 시뮬레이터 전체화면 상태로 다른 페이지에 오면 상단바·사이드바 복원
+    document.body.classList.remove('sim-full');
   }
   if(page === 'search') initSearchPage();
   if(page === 'mytask') {
