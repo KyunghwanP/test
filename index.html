@@ -81,6 +81,16 @@
   html.dark .consult-form-grid select:focus{background:var(--paper-soft);}
   html.dark .cm-edit input:focus{background:var(--paper-soft);}
 
+  /* 다크모드: 주간교육활동 본문 — 외부 HTML의 인라인 색상 강제 보정 */
+  html.dark .weekly-html-content :is(p,div,span,li,td,th,font,em,i,u,strong,b,h2,h3,h4,h5,h6):not(.weekly-forced-title):not(.weekly-forced-title *){
+    color:var(--ink) !important;
+    background:transparent !important;
+  }
+  html.dark .weekly-html-content a:not(.weekly-title-btn){color:var(--wed) !important;}
+  html.dark .weekly-html-content table,
+  html.dark .weekly-html-content td,
+  html.dark .weekly-html-content th{border-color:var(--rule) !important;}
+
   /* ══════════════════════════════════════════
      앱 셸 레이아웃
   ══════════════════════════════════════════ */
@@ -2984,7 +2994,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.14</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.15</div>
   </div>
 </div>
 
@@ -3108,7 +3118,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="made by 박경환">ver5.14</div>
+    <div class="nav-version" title="made by 박경환">ver5.15</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
