@@ -12,6 +12,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="영남고등학교">
+<script>
+  // 다크모드: 저장된 설정을 스타일 로드 전에 적용 (깜빡임 방지)
+  try{ if(localStorage.getItem('ynhs-dark')==='1') document.documentElement.classList.add('dark'); }catch(e){}
+</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
   @import url('https://cdn.jsdelivr.net/npm/pretendard@latest/dist/web/static/pretendard.css');
@@ -34,6 +38,48 @@
     --gold:#F59E0B;
     --today-tint:#EFF6FF;
   }
+
+  /* 다크모드 팔레트 — 날씨 헤더 5번 클릭 이스터 에그로 토글 */
+  html.dark{
+    --bg-base:#0B1220;
+    --bg-base-soft:#111A2C;
+    --paper:#151F33;
+    --paper-soft:#1D2A44;
+    --ink:#E2E8F0;
+    --ink-soft:#8FA3BD;
+    --rule:#26354F;
+    --today-tint:#16263F;
+    color-scheme:dark;
+  }
+  html.dark body{background:var(--bg-base);}
+
+  /* 다크모드: 하드코딩된 밝은 배경 보정 */
+  html.dark .gt-cell,
+  html.dark .gt-lunch-cell,
+  html.dark .google-login-btn,
+  html.dark .copy-req-btn{background:var(--paper);}
+  html.dark .gt-cell.now,
+  html.dark .gt-lunch-cell.now{background:#33290F;}
+  html.dark .gt-cell.locked{background:#101828;}
+  html.dark .cell-empty{color:#3D4A63;}
+  html.dark .now-badge{color:#E8A93A;}
+  html.dark .swap-cand:hover{background:var(--paper-soft);}
+  html.dark .mytask-cal-cell,
+  html.dark .panel-cal-cell{background:var(--paper-soft);}
+  html.dark .mytask-cal-cell:hover{box-shadow:inset 0 0 0 1.5px #47587A;}
+  html.dark .panel-cal-cell:hover{box-shadow:inset 0 0 0 1.5px #47587A;}
+  html.dark .mytask-cal-cell.today,
+  html.dark .panel-cal-cell.today{background:var(--today-tint);box-shadow:inset 0 0 0 1.5px var(--mon);}
+  html.dark .sc-cal-cell.today,
+  html.dark .sl-item.today{background:#33290F;}
+  html.dark .home-consult-item.booked,
+  html.dark .consult-slot.booked,
+  html.dark .cslot.booked{background:#0F2A20;}
+  html.dark .ca-row.checked{background:var(--today-tint);}
+  html.dark .pts-score-sel{background:var(--paper-soft) !important;}
+  html.dark .consult-form-grid input:focus,
+  html.dark .consult-form-grid select:focus{background:var(--paper-soft);}
+  html.dark .cm-edit input:focus{background:var(--paper-soft);}
 
   /* ══════════════════════════════════════════
      앱 셸 레이아웃
@@ -2938,7 +2984,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.13</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.14</div>
   </div>
 </div>
 
@@ -3062,7 +3108,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version">ver5.13</div>
+    <div class="nav-version" title="made by 박경환">ver5.14</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7690,6 +7736,22 @@ async function initHomePage() {
   document.querySelector('#homeTaskSection .home-nav-header')?.addEventListener('click', () => navigateTo('mytask'));
   document.querySelector('#homeConsultSection .home-nav-header')?.addEventListener('click', () => navigateTo('consult'));
   loadHomeConsult();
+
+  // 🥚 이스터 에그: 날씨 헤더를 1.5초 안에 5번 클릭하면 다크모드 토글
+  document.querySelectorAll('#homeWeatherSection .home-section-header, #homeWeatherSectionD .home-section-header').forEach(h => {
+    if (h.dataset.darkEgg) return;
+    h.dataset.darkEgg = '1';
+    let clicks = 0, timer = null;
+    h.addEventListener('click', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => clicks = 0, 1500);
+      if (++clicks >= 5) {
+        clicks = 0;
+        const on = document.documentElement.classList.toggle('dark');
+        try{ localStorage.setItem('ynhs-dark', on ? '1' : '0'); }catch(e){}
+      }
+    });
+  });
 
   // AI 요약 로드
   try {
