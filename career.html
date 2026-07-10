@@ -222,7 +222,8 @@
         </div>
       </div>
 
-      <div class="col-xl-3 col-md-6 col-sm-6 col-12">
+      <!-- 관리자 전용 카드 (로그인 후 관리자 계정이면 JS로 표시) -->
+      <div class="col-xl-3 col-md-6 col-sm-6 col-12" id="cardSim" style="display:none;">
         <div class="home-card card-sim" onclick="location.href='subject-sim.html'">
           <div class="icon-circle">🧭</div>
           <h3><span class="text-success fw-bold">과목선택</span> 시뮬레이터</h3>
@@ -253,6 +254,10 @@
     });
     onAuthStateChanged(getAuth(app), (user) => {
       document.getElementById('user_email').textContent = user ? user.email : '로그인 필요';
+      // 과목선택 시뮬레이터: 관리자 전용 노출
+      if (user && user.email === 'pkh910518@yeungnam.hs.kr') {
+        document.getElementById('cardSim').style.display = '';
+      }
     });
   </script>
 </body>
