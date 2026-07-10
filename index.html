@@ -3000,7 +3000,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.23</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.24</div>
   </div>
 </div>
 
@@ -3124,7 +3124,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver5.23</div>
+    <div class="nav-version" title="Made by 박경환">ver5.24</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7321,9 +7321,20 @@ async function s360LoadElectives(s){
       return;
     }
     const badges = list => list.map(name => `<span class="spot-badge">${escapeHtml(name)}</span>`).join('');
+    // 과목선택 시뮬레이터 연동: 1·2학년만 (시뮬레이터가 2026·2025 입학생 편제표 기준)
+    const yr = parseInt(s.grade);
+    const simBtn = (yr === 1 || yr === 2)
+      ? `<div style="margin-top:10px;"><button class="s360-susi-goto-btn" id="s360SimBtn">🧭 시뮬레이터에 자동 반영해서 열기 →</button></div>` : '';
     el.innerHTML = `
       ${st.current?.length ? `<div style="margin-bottom:8px;"><div style="font-size:13.5px;font-weight:800;color:var(--ink-soft);margin-bottom:6px;">이번학년</div><div style="display:flex;gap:7px;flex-wrap:wrap;">${badges(st.current)}</div></div>` : ''}
-      ${st.prevGrade?.length ? `<div><div style="font-size:13.5px;font-weight:800;color:var(--ink-soft);margin-bottom:6px;">직전학년</div><div style="display:flex;gap:7px;flex-wrap:wrap;">${badges(st.prevGrade)}</div></div>` : ''}`;
+      ${st.prevGrade?.length ? `<div><div style="font-size:13.5px;font-weight:800;color:var(--ink-soft);margin-bottom:6px;">직전학년</div><div style="display:flex;gap:7px;flex-wrap:wrap;">${badges(st.prevGrade)}</div></div>` : ''}
+      ${simBtn}`;
+    document.getElementById('s360SimBtn')?.addEventListener('click', () => {
+      const subj = [...(st.current || []), ...(st.prevGrade || [])];
+      navigateTo('grades');
+      const gf = document.getElementById('gradesFrame');
+      if (gf) gf.src = `subject-sim.html?year=${yr}&class=${parseInt(s.room)}&num=${parseInt(s.num)}&name=${encodeURIComponent(s.name || '')}&subjects=${encodeURIComponent(subj.join(','))}`;
+    });
   } catch(e) {
     if (e.code === 'permission-denied') { const sec = el.closest('.spot-sec'); if (sec) sec.style.display = 'none'; else el.innerHTML = ''; }
     else el.textContent = '선택과목 로드 실패: ' + e.message;

@@ -87,6 +87,10 @@
       box-shadow: 0 20px 35px rgba(106, 27, 154, 0.25);
       border-color: #6a1b9a;
     }
+    .card-sim:hover {
+      box-shadow: 0 20px 35px rgba(16, 185, 129, 0.25);
+      border-color: #10b981;
+    }
 
     .icon-circle {
       width: 90px;
@@ -105,6 +109,7 @@
     .card-grad .icon-circle { background: linear-gradient(135deg, #005088 0%, #3b82f6 100%); color: #ffffff; }
     .card-trend .icon-circle { background: linear-gradient(135deg, #f59e0b 0%, #d4a017 100%); color: #ffffff; }
     .card-csat .icon-circle { background: linear-gradient(135deg, #8b5cf6 0%, #6a1b9a 100%); color: #ffffff; }
+    .card-sim .icon-circle { background: linear-gradient(135deg, #10b981 0%, #34d399 100%); color: #ffffff; }
 
     .home-card:hover .icon-circle {
       transform: scale(1.1) rotate(-8deg);
@@ -125,6 +130,7 @@
     .card-grad .card-deco { background: linear-gradient(90deg, #dc3545, #ff6b6b); }
     .card-trend .card-deco { background: linear-gradient(90deg, #f59e0b, #d4a017); }
     .card-csat .card-deco { background: linear-gradient(90deg, #8b5cf6, #6a1b9a); }
+    .card-sim .card-deco { background: linear-gradient(90deg, #10b981, #34d399); }
 
     /* 아직 이식 전인 메뉴 — 비활성 표시 (새 탭 열림 방지) */
     .card-disabled {
@@ -212,6 +218,15 @@
           <div class="icon-circle">🎯</div>
           <h3><span class="text-primary fw-bold">정시</span> 입결 조회</h3>
           <p style="color: #000;">수능 점수 기반 지원 가능 대학 및 정시 지원 희망 확인</p>
+          <div class="card-deco"></div>
+        </div>
+      </div>
+
+      <div class="col-xl-3 col-md-6 col-sm-6 col-12">
+        <div class="home-card card-sim" onclick="location.href='subject-sim.html'">
+          <div class="icon-circle">🧭</div>
+          <h3><span class="text-success fw-bold">과목선택</span> 시뮬레이터</h3>
+          <p style="color: #000;">2022 개정 교육과정 선택과목 이수 설계 연습 및 학과별 권장 과목 안내</p>
           <div class="card-deco"></div>
         </div>
       </div>

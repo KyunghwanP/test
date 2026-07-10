@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2026 영남고등학교 과목 선택 시뮬레이터</title>
+    <!-- 학교망 CDN 차단 대비 셀프호스팅 (chart.js와 동일) -->
+    <script src="vendor/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --bg-main: #ebf1f6;
+            --navy-header: #0d2e5c;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --card-bg: #ffffff;
+            --accent-orange: #f59e0b;
+            --btn-green: #10b981;
+            --border-light: #e2e8f0;
+            --dept-theme: #0284c7;
+            --dept-bg: #f0f9ff;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, 'Malgun Gothic', sans-serif; }
+        body { background-color: var(--bg-main); color: var(--text-main); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        header {
+            background-color: var(--navy-header); color: white; padding: 13px 30px; display: flex;
+            justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 10;
+        }
+        header .title-area h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.5px; }
+        header .title-area p { font-size: 0.85rem; color: #94a3b8; margin-top: 2px; }
+        .header-inputs { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .header-inputs select, .header-inputs input {
+            background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+            color: white; padding: 8px 10px; border-radius: 6px; font-size: 0.88rem; outline: none; transition: all 0.2s;
+        }
+        .header-inputs select option { color: black; }
+        .header-inputs input::placeholder { color: #94a3b8; }
+        #selYear, #selTrack { background: rgba(245,158,11,0.25); border-color: rgba(245,158,11,0.6); font-weight: 700; }
+        #iphone-safari-guide {
+            display: none; background: #fff7ed; color: #c2410c; padding: 12px 20px;
+            font-size: 0.88rem; font-weight: bold; border-bottom: 2px solid #fed7aa;
+            justify-content: space-between; align-items: center; z-index: 11;
+        }
+        .tab-bar { background: white; border-bottom: 1px solid var(--border-light); display: flex; padding-left: 30px; gap: 10px; z-index: 10; }
+        .tab-btn {
+            border: none; background: none; padding: 14px 22px; font-size: 0.95rem;
+            font-weight: 700; color: var(--text-muted); cursor: pointer; transition: all 0.2s; position: relative;
+        }
+        .tab-btn.active { color: var(--navy-header); }
+        .tab-btn.active::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 3px; background: var(--navy-header); }
+        #sub-grade-tab-bar { background: #f8fafc; padding-left: 40px; }
+        #sub-grade-tab-bar .tab-btn { font-size: 0.85rem; padding: 10px 15px; }
+        .mobile-view-toggle { display: none; background: #fff; border-bottom: 1px solid var(--border-light); padding: 10px 20px; gap: 10px; }
+        .view-toggle-btn { flex: 1; padding: 10px; border: 1px solid var(--border-light); background: #f8fafc; border-radius: 6px; font-weight: bold; font-size: 0.85rem; cursor: pointer; text-align: center; }
+        .view-toggle-btn.active { background: var(--navy-header); color: white; border-color: var(--navy-header); }
+        main { display: flex; flex: 1; overflow: hidden; padding: 20px 30px; gap: 25px; }
+        .selection-panel { width: 45%; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; padding-right: 10px; }
+        .scenario-notice {
+            background: #eef6ff; border: 1px solid #bfdbfe; color: #1e40af; border-radius: 10px;
+            padding: 12px 15px; font-size: 0.85rem; line-height: 1.5; font-weight: 500;
+        }
+        .group-container { background: var(--card-bg); border-radius: 12px; padding: 20px; margin-bottom: 4px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.02); }
+        .group-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 8px; }
+        .group-title { font-size: 1.02rem; font-weight: 700; color: #0f172a; }
+        .group-desc { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 10px; }
+        .group-status-badge { background: #fffbeb; color: #b45309; font-size: 0.8rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; border: 1px solid #fde68a; white-space: nowrap; }
+        .group-status-badge.done { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+        .subject-card {
+            background: white; border: 1px solid var(--border-light); border-radius: 10px;
+            padding: 13px 18px; margin-bottom: 8px; display: flex; justify-content: space-between;
+            align-items: center; cursor: pointer; transition: transform 0.15s, border-color 0.15s;
+        }
+        .subject-card:hover { transform: translateY(-2px); border-color: #cbd5e1; }
+        .subject-card.selected { border-color: #3b82f6; background: #f0f6ff; }
+        .subject-card.locked { background-color: #f8fafc; opacity: 0.5; cursor: not-allowed; border-style: dashed; }
+        .subject-card.locked:hover { transform: none; border-color: var(--border-light); }
+        .pre-hint { color: #b45309; font-weight: 600; }
+        .tag-g5 { display: inline-block; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 0.68rem; font-weight: 700; padding: 1px 7px; border-radius: 9px; vertical-align: middle; margin-left: 5px; }
+        .tag-p { display: inline-block; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; font-size: 0.68rem; font-weight: 700; padding: 1px 7px; border-radius: 9px; vertical-align: middle; margin-left: 5px; }
+        .btn-next-grade {
+            width: 100%; padding: 15px; margin-top: 8px; border: none; border-radius: 10px;
+            background: var(--navy-header); color: white; font-weight: 700; font-size: 1rem;
+            cursor: pointer; box-shadow: 0 3px 8px rgba(13,46,92,0.25); transition: transform 0.15s;
+        }
+        .btn-next-grade:hover { transform: translateY(-2px); }
+        .subject-divider { display: flex; align-items: center; gap: 10px; margin: 14px 2px 8px; color: #64748b; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.5px; }
+        .subject-divider::before { content: ''; width: 4px; height: 14px; background: var(--navy-header); border-radius: 2px; }
+        .subject-divider::after { content: ''; flex: 1; height: 1px; background: #dbe3ec; }
+        .sub-name { font-size: 0.98rem; font-weight: 700; color: #1e293b; margin-bottom: 2px; }
+        .sub-details { font-size: 0.78rem; color: var(--text-muted); }
+        .circle-indicator { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #cbd5e1; position: relative; background: white; flex-shrink: 0; }
+        .subject-card.selected .circle-indicator { border-color: #3b82f6; background: #3b82f6; }
+        .subject-card.selected .circle-indicator::after {
+            content: ''; position: absolute; width: 6px; height: 10px; border: solid white; border-width: 0 2px 2px 0; top: 3px; left: 6px; transform: rotate(45deg);
+        }
+        /* 학과별 권장 과목 안내 */
+        .dept-guide-container { display: flex; flex-direction: column; gap: 20px; width: 100%; }
+        .dept-select-box { background: white; padding: 15px; border-radius: 12px; border: 1px solid var(--border-light); display: flex; gap: 15px; align-items: center; }
+        .dept-select-box select { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 1rem; font-weight: bold; outline: none; }
+        .dept-report-card { background: white; border-radius: 12px; border: 2px solid var(--dept-theme); padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: none; }
+        .dept-report-header { display: flex; gap: 20px; align-items: center; border-bottom: 2px solid var(--dept-theme); padding-bottom: 15px; margin-bottom: 20px; }
+        .dept-icon-box { background: var(--dept-bg); border: 2px solid var(--dept-theme); border-radius: 12px; padding: 12px; width: 95px; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        .dept-icon-box span { font-size: 0.72rem; font-weight: bold; color: var(--dept-theme); white-space: nowrap; }
+        .dept-header-text h2 { font-size: 1.5rem; color: #000; font-weight: bold; }
+        .dept-header-text p { font-size: 0.88rem; color: #475569; margin-top: 4px; line-height: 1.45; }
+        .dept-info-row { margin-bottom: 15px; }
+        .dept-info-title { font-weight: bold; font-size: 0.95rem; color: #fff; background: var(--dept-theme); display: inline-block; padding: 4px 12px; border-radius: 4px; margin-bottom: 8px; }
+        .dept-info-content { font-size: 0.88rem; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 6px; line-height: 1.5; color: #334155; text-align: justify; }
+        .dept-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; text-align: left; }
+        .dept-table th, .dept-table td { border: 1px solid #cbd5e1; padding: 10px; }
+        .dept-table th { background: #f0f9ff; color: #0369a1; font-weight: bold; width: 20%; text-align: center; }
+        .dept-table td ul { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; }
+        .dept-table td ul li { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 3px 8px; border-radius: 4px; font-weight: 500; font-size: 0.8rem; }
+        /* 우측 이수계획 리포트 */
+        .preview-panel { width: 55%; display: flex; flex-direction: column; gap: 15px; height: 100%; }
+        .capture-scroll-wrapper { overflow-y: auto; flex: 1; border-radius: 12px; border: 1px solid var(--border-light); }
+        #capture-area { background: #f8fafc; padding: 20px; display: flex; flex-direction: column; gap: 15px; min-height: 100%; }
+        .dashboard { background: white; border-radius: 12px; padding: 15px 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+        .dashboard-left { display: flex; align-items: center; gap: 15px; }
+        .progress-circle { width: 54px; height: 54px; border-radius: 50%; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95rem; color: #0f172a; border: 3px solid #e2e8f0; flex-shrink: 0; }
+        .progress-circle.done { border-color: var(--btn-green); background: #ecfdf5; color: #047857; }
+        .dash-text .title { font-weight: 700; font-size: 1rem; }
+        .dash-text .desc { font-size: 0.85rem; color: var(--text-muted); }
+        .life-chip { font-size: 0.78rem; font-weight: 700; padding: 6px 12px; border-radius: 20px; border: 1px solid #fde68a; background: #fffbeb; color: #b45309; }
+        .life-chip.ok { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+        .life-chip.bad { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+        .action-bar { display: flex; gap: 10px; }
+        .btn-submit { flex: 1; background-color: var(--btn-green); color: white; border: none; padding: 12px 22px; border-radius: 8px; font-weight: 700; font-size: 0.95rem; cursor: pointer; box-shadow: 0 2px 4px rgba(16,185,129,0.2); }
+        .btn-reset { background: white; color: #b91c1c; border: 1px solid #fca5a5; padding: 12px 18px; border-radius: 8px; font-weight: 700; font-size: 0.95rem; cursor: pointer; white-space: nowrap; }
+        .btn-reset:hover { background: #fef2f2; }
+        .plan-section { background: white; border-radius: 12px; padding: 18px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 10px; }
+        .plan-section-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 12px; display: flex; justify-content: space-between; color: #0f172a; gap: 8px; flex-wrap: wrap; align-items: center; }
+        /* 네이티브 스티키 헤더 (누적 오프셋으로 쌓임) */
+        .sticky-stack { position: sticky; top: -1px; z-index: 30; }
+        #right-sticky { background: #f8fafc; padding-bottom: 4px; }
+        .stack-head {
+            position: sticky; z-index: 20; background: #ffffff;
+            border: 1px solid var(--border-light); border-radius: 10px;
+            padding: 10px 14px; margin-bottom: 6px !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        }
+        .plan-section-title span.sub { font-size: 0.75rem; color: var(--text-muted); }
+        .pst-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; margin-left: auto; }
+        .gsum { font-size: 0.75rem; font-weight: 700; padding: 3px 10px; border-radius: 12px; background: #fffbeb; color: #b45309; border: 1px solid #fde68a; white-space: nowrap; }
+        .gsum.ok { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.8rem; table-layout: fixed; }
+        th, td { border: 1px solid #cbd5e1; padding: 8px 4px; word-break: keep-all; }
+        th { background: #f8fafc; color: #475569; font-weight: 600; font-size: 0.75rem; }
+        td.slot-empty { color: #a1a1aa; font-style: italic; background-color: #ffffff; border: 1px dashed #cbd5e1; }
+        td.slot-filled { color: #1e293b; font-weight: 700; background-color: #f0f6ff !important; border: 1px solid #bfdbfe; }
+        td.fixed-cell { background-color: #f8fafc; color: #334155; }
+        td.note-cell { background-color: #f1f5f9; color: #64748b; font-style: italic; }
+        td.dash-cell { background: #fafafa; color: #cbd5e1; }
+        /* 생활·교양 16학점 미달 시 교양 행 강조 */
+        #capture-area.life-short tr.life-row td { background-color: #fef2f2 !important; color: #b91c1c !important; border-color: #fca5a5 !important; }
+        #capture-area.life-short tr.life-row td.slot-filled { background-color: #fee2e2 !important; font-weight: 700; }
+        #capture-area.life-short td.life-cell { background-color: #fef2f2 !important; color: #b91c1c !important; border-color: #fca5a5 !important; }
+        .alert-footer { font-size: 0.75rem; text-align: center; color: var(--text-muted); margin-top: 5px; font-weight: 500; line-height: 1.6; }
+        @media (max-width: 900px) {
+            body { height: 100dvh; }
+            header { padding: 8px 10px; flex-direction: column; align-items: flex-start; gap: 6px; }
+            header .title-area h1 { font-size: 1rem; letter-spacing: -0.5px; margin: 0; }
+            header .title-area p { display: none; }
+            .header-inputs { width: 100%; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+            .header-inputs select, .header-inputs input { width: 100%; padding: 4px 6px; font-size: 0.8rem; height: 30px; }
+            #selYear { grid-column: 1 / 2; }
+            #selTrack { grid-column: 2 / 4; }
+            #studentClass { grid-column: 1 / 2; }
+            #studentNumber { grid-column: 2 / 3; }
+            #studentName { grid-column: 3 / 4; }
+            #studentDept { grid-column: 1 / 4; }
+            .tab-bar { padding-left: 5px; padding-right: 5px; }
+            #sub-grade-tab-bar { padding-left: 5px; }
+            .tab-bar, #sub-grade-tab-bar { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+            .tab-bar::-webkit-scrollbar { display: none; }
+            .tab-btn { padding: 8px 10px; font-size: 0.85rem; }
+            #sub-grade-tab-bar .tab-btn { padding: 6px 10px; font-size: 0.8rem; }
+            .mobile-view-toggle { display: flex; padding: 5px 10px; gap: 5px; border-bottom: none; }
+            .view-toggle-btn { padding: 6px; font-size: 0.8rem; }
+            main { padding: 5px 10px; gap: 0; flex-direction: column; overflow-y: auto; padding-bottom: calc(30px + env(safe-area-inset-bottom)); }
+            .selection-panel { width: 100%; padding-right: 0; display: none; height: auto; }
+            .preview-panel { width: 100%; display: none; height: auto; }
+            body.show-selector .selection-panel { display: flex; }
+            body.show-preview .preview-panel { display: flex; }
+            .dashboard { flex-direction: column; gap: 8px; padding: 10px; text-align: center; }
+            .dashboard-left { flex-direction: column; justify-content: center; gap: 8px; }
+            .btn-submit { width: 100%; padding: 10px; font-size: 0.95rem; }
+            .plan-section { overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 10px 5px; margin-bottom: 8px; }
+            .dept-info-row { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            table { min-width: 500px; }
+            th, td { padding: 6px 4px; font-size: 0.75rem; }
+            .group-container { padding: 12px 10px; margin-bottom: 8px; }
+            .group-title { font-size: 0.95rem; }
+            .subject-card { padding: 10px 12px; margin-bottom: 6px; }
+            .sub-name { font-size: 0.95rem; }
+        }
+    </style>
+</head>
+<body class="show-selector">
+    <div id="iphone-safari-guide">
+        <span>⚠️ 아이폰 필수: 우측 하단 🧭(나침반) 아이콘을 눌러 Safari 브라우저로 전환해야 사진 저장이 가능합니다.</span>
+    </div>
+    <header>
+        <div class="title-area">
+            <h1>2026 영남고등학교 과목 선택 시뮬레이터</h1>
+            <p>2022 개정 교육과정 · 학생 맞춤형 교육과정 이수 설계 실습 도구</p>
+        </div>
+        <div class="header-inputs">
+            <select id="selYear" onchange="onScenarioChange()">
+                <option value="1">현재 1학년 (2026 입학)</option>
+                <option value="2">현재 2학년 (2025 입학)</option>
+            </select>
+            <select id="selTrack" onchange="onScenarioChange()">
+                <option value="general">일반과정</option>
+                <option value="science">과학중점과정</option>
+            </select>
+            <input type="number" id="studentClass" placeholder="반" min="1" max="15" oninput="updateDisplay()">
+            <input type="number" id="studentNumber" placeholder="번호" min="1" max="40" oninput="updateDisplay()">
+            <input type="text" id="studentName" placeholder="이름" oninput="updateDisplay()">
+            <select id="studentDept" onchange="updateDisplay()"><option value="">희망 학과 계열 선택</option><option value="인문사회계열">인문사회계열</option><option value="상경계열">상경계열</option><option value="자연과학계열">자연과학계열</option><option value="공학계열">공학계열</option><option value="의학생명계열">의학생명계열</option><option value="교육계열">교육계열</option><option value="예체능계열">예체능계열</option></select>
+        </div>
+    </header>
+    <div class="tab-bar">
+        <button class="tab-btn active" id="main-tab-select" onclick="switchMainTab('select')">✍ 과목 선택 연습</button>
+        <button class="tab-btn" id="main-tab-guide" onclick="switchMainTab('guide')">📚 학과별 권장 선택 과목 안내</button>
+    </div>
+    <div class="tab-bar" id="sub-grade-tab-bar"></div>
+    <div class="mobile-view-toggle">
+        <div class="view-toggle-btn active" id="toggle-select-btn" onclick="switchMobileView('select')">✍ 화면 입력하기</div>
+        <div class="view-toggle-btn" id="toggle-preview-btn" onclick="switchMobileView('preview')">📋 내 계획표 확인</div>
+    </div>
+    <main>
+        <div class="selection-panel">
+            <div id="main-select-content" style="display: flex; flex-direction: column; width: 100%;"></div>
+            <div id="main-guide-content" class="dept-guide-container" style="display: none;">
+                <div class="dept-select-box">
+                    <label style="font-weight: bold; color: var(--navy-header);">계열별 탐색 학과 선택 : </label>
+                    <select id="deptSelector" onchange="renderDeptReport()">
+                        <option value="">-- 안내받을 학과를 선택해 주세요 --</option>
+                    </select>
+                </div>
+                <div class="dept-report-card" id="deptReportCard">
+                    <div class="dept-report-header">
+                        <div class="dept-icon-box">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                            <span id="view-dept-cluster">계열명</span>
+                        </div>
+                        <div class="dept-header-text">
+                            <h2 id="view-dept-name">학과명</h2>
+                            <p id="view-dept-desc">정의 로딩중...</p>
+                        </div>
+                    </div>
+                    <div class="dept-info-row">
+                        <div class="dept-info-title">전공 관련 기초 교양 과목</div>
+                        <div class="dept-info-content" id="view-dept-basic">내용</div>
+                    </div>
+                    <div class="dept-info-row">
+                        <div class="dept-info-title">대학 전공 필수 / 선택 과목 조합</div>
+                        <div class="dept-info-content" id="view-dept-major">내용</div>
+                    </div>
+                    <div class="dept-info-row">
+                        <div class="dept-info-title">고등학교 추천 선택 과목 일람 가이드</div>
+                        <table class="dept-table">
+                            <thead>
+                                <tr><th>구분</th><th>일반 선택</th><th>진로 선택</th><th>융합 선택</th></tr>
+                            </thead>
+                            <tbody id="view-dept-table-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="dept-info-row">
+                        <div class="dept-info-title">유사 관련 학과 명단</div>
+                        <div class="dept-info-content" id="view-dept-similar">내용</div>
+                    </div>
+                    <div class="dept-info-row">
+                        <div class="dept-info-title">졸업 후 진로 및 주요 진출 분야</div>
+                        <div class="dept-info-content" id="view-dept-career">내용</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="preview-panel">
+            <div class="action-bar">
+                <button class="btn-submit" onclick="captureReport()">✓ 설계 완료 및 스크린샷 저장</button>
+                <button class="btn-reset" onclick="resetSelections()">↺ 선택 초기화</button>
+            </div>
+            <div class="capture-scroll-wrapper" id="scroll-wrapper">
+                <div id="capture-area">
+                    <div class="sticky-stack" id="right-sticky">
+                        <div class="dashboard">
+                            <div class="dashboard-left">
+                                <div class="progress-circle" id="circleView">0%</div>
+                                <div class="dash-text">
+                                    <div class="title">과목 설계 완료도</div>
+                                    <div class="desc">교과 이수 학점: <span id="totalDisplay" style="font-weight:bold; color:#1e3a8a;">0</span> / 174 학점 <span style="color:#94a3b8;">(+창의적 체험활동 18학점 = 총 192학점)</span></div>
+                                </div>
+                            </div>
+                            <div class="life-chip" id="lifeChip" style="display:none;">생활·교양 0 / 16학점</div>
+                        </div>
+                    </div>
+                    <div id="studentCardDisplay" style="font-weight:bold; font-size:1rem; padding: 2px 0 5px 2px; color:var(--navy-header);"></div>
+                    <div id="plan-tables"></div>
+                    <div class="alert-footer">
+                        ▲ 3년간 교과 174학점 + 창의적 체험활동 18학점 = 총 192학점을 이수해야 졸업이 가능합니다.<br>
+                        ▲ 국어·수학·영어 교과 이수 학점 합계는 3년간 81학점을 초과할 수 없으며, 기술·가정/정보/제2외국어/한문/교양 교과(군)는 16학점 이상 이수해야 합니다.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script>
+        var userAgent = navigator.userAgent.toLowerCase();
+        if (userAgent.match(/kakaotalk/i) && userAgent.match(/iphone|ipad|ipod/i)) {
+            document.getElementById('iphone-safari-guide').style.display = 'flex';
+        }
+
+        /* ==================== 과목 데이터 (2026학년도 영남고 편제표 기준) ==================== */
+        // 권장 선행 과목 (소프트 경고용)
+        const PRE_MAP = {
+            '역학과 에너지': '물리학', '물질과 에너지': '화학', '세포와 물질대사': '생명과학', '지구시스템과학': '지구과학',
+            '전자기와 양자': '물리학', '화학 반응의 세계': '화학', '생물의 유전': '생명과학', '행성우주과학': '지구과학',
+            '일본 문화': '일본어', '일본어 회화': '일본어', '중국어 회화': '중국어'
+        };
+
+        // 과목 풀 (n:과목명, t:교과·유형, life:생활교양군 여부)
+        const OPT = {
+            // 현재 1학년(2026 입학) 일반과정 · 2학년 선택
+            math_e: [
+                { n: '미적분Ⅱ', t: '수학 · 진로 선택' },
+                { n: '경제 수학', t: '수학 · 진로 선택' }
+            ],
+            y1exp1a: [
+                { n: '세계시민과 지리', t: '사회 · 일반 선택' }, { n: '세계사', t: '사회 · 일반 선택' },
+                { n: '사회와 문화', t: '사회 · 일반 선택' }, { n: '현대사회와 윤리', t: '사회 · 일반 선택' },
+                { n: '물리학', t: '과학 · 일반 선택' }, { n: '화학', t: '과학 · 일반 선택' },
+                { n: '생명과학', t: '과학 · 일반 선택' }, { n: '지구과학', t: '과학 · 일반 선택' }
+            ],
+            y1exp1b: [
+                { n: '인공지능 기초', t: '정보 · 진로 선택', life: 1 }, { n: '일본어', t: '제2외국어 · 일반 선택', life: 1 }
+            ],
+            y1exp2a: [
+                { n: '한국지리 탐구', t: '사회 · 진로 선택' }, { n: '동아시아 역사 기행', t: '사회 · 진로 선택' },
+                { n: '정치', t: '사회 · 진로 선택' }, { n: '법과 사회', t: '사회 · 진로 선택' },
+                { n: '윤리와 사상', t: '사회 · 진로 선택' },
+                { n: '역학과 에너지', t: '과학 · 진로 선택' }, { n: '물질과 에너지', t: '과학 · 진로 선택' },
+                { n: '세포와 물질대사', t: '과학 · 진로 선택' }, { n: '지구시스템과학', t: '과학 · 진로 선택' },
+                { n: '과학과제 연구', t: '과학 · 진로 선택' }
+            ],
+            y1exp2b: [
+                { n: '일본 문화', t: '제2외국어 · 융합 선택', life: 1 }
+            ],
+            // 과학중점 · 2학년 2학기 과학 진로 택3
+            sci23: [
+                { n: '역학과 에너지', t: '과학 · 진로 선택' }, { n: '물질과 에너지', t: '과학 · 진로 선택' },
+                { n: '세포와 물질대사', t: '과학 · 진로 선택' }, { n: '지구시스템과학', t: '과학 · 진로 선택' }
+            ],
+            // 3학년 1학기 탐구 (일반과정 박람회 기준)
+            exp31a: [
+                { n: '도시의 미래 탐구', t: '사회 · 진로 선택' }, { n: '경제', t: '사회 · 진로 선택' },
+                { n: '인문학과 윤리', t: '사회 · 진로 선택' }, { n: '국제 관계의 이해', t: '사회 · 진로 선택' },
+                { n: '전자기와 양자', t: '과학 · 진로 선택' }, { n: '화학 반응의 세계', t: '과학 · 진로 선택' },
+                { n: '생물의 유전', t: '과학 · 진로 선택' }, { n: '행성우주과학', t: '과학 · 진로 선택' }
+            ],
+            // 3학년 1학기 기술·가정~교양 (일반과정 박람회 기준)
+            exp31b: [
+                { n: '창의 공학 설계', t: '기술·가정 · 융합 선택', life: 1 },
+                { n: '일본어 회화', t: '제2외국어 · 진로 선택', life: 1 },
+                { n: '생태와 환경', t: '교양 · 일반 선택', life: 1, p: 1 }, { n: '인간과 경제활동', t: '교양 · 융합 선택', life: 1, p: 1 },
+                { n: '논술', t: '교양 · 융합 선택', life: 1, p: 1 }
+            ],
+            // 3학년 2학기 탐구 (일반과정 박람회 기준)
+            exp32a: [
+                { n: '여행지리', t: '사회 · 융합 선택', g5: 1 }, { n: '역사로 탐구하는 현대 세계', t: '사회 · 융합 선택', g5: 1 },
+                { n: '금융과 경제생활', t: '사회 · 융합 선택', g5: 1 }, { n: '윤리문제 탐구', t: '사회 · 융합 선택', g5: 1 },
+                { n: '기후변화와 지속가능한 세계', t: '사회 · 융합 선택', g5: 1 },
+                { n: '과학의 역사와 문화', t: '과학 · 융합 선택', g5: 1 }, { n: '기후변화와 환경생태', t: '과학 · 융합 선택', g5: 1 }
+            ],
+            // 3학년 2학기 기술·가정~교양 (일반과정 박람회 기준)
+            exp32b: [
+                { n: '소프트웨어와 생활', t: '정보 · 융합 선택', life: 1 },
+                { n: '논리와 사고', t: '교양 · 진로 선택', life: 1, p: 1 }, { n: '인간과 심리', t: '교양 · 진로 선택', life: 1, p: 1 },
+                { n: '과학토론', t: '교양 · 고시 외 과목', life: 1, p: 1 }
+            ],
+            // 현재 2학년 과학중점 · 3학년 선택
+            p25: [
+                { n: '전자기와 양자', t: '과학 · 진로 선택' }, { n: '화학 반응의 세계', t: '과학 · 진로 선택' },
+                { n: '생물의 유전', t: '과학 · 진로 선택' }, { n: '행성우주과학', t: '과학 · 진로 선택' }
+            ],
+            q1: [
+                { n: '창의 공학 설계', t: '기술·가정 · 융합 선택', life: 1 }, { n: '생태와 환경', t: '교양 · 일반 선택', life: 1, p: 1 },
+                { n: '인간과 경제활동', t: '교양 · 융합 선택', life: 1, p: 1 }, { n: '논술', t: '교양 · 융합 선택', life: 1, p: 1 }
+            ],
+            q2: [
+                { n: '소프트웨어와 생활', t: '정보 · 융합 선택', life: 1 }, { n: '논리와 사고', t: '교양 · 진로 선택', life: 1, p: 1 },
+                { n: '인간과 심리', t: '교양 · 진로 선택', life: 1, p: 1 }, { n: '과학토론', t: '교양 · 고시 외 과목', life: 1, p: 1 }
+            ]
+        };
+
+        /* ==================== 1학년(공통) 테이블 ==================== */
+        const G1_2026 = { title: '1학년 이수 현황 (학교 지정)', sub: '기준: 1학기 30 / 2학기 31 / 계 61학점', fixed: 61, keys: [], target: 61, rows: [
+            { cat: { t: '국어' }, c1: { f: '공통국어1', c: 4 }, c2: { f: '공통국어2', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '수학' }, c1: { f: '공통수학1', c: 4 }, c2: { f: '공통수학2', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '영어' }, c1: { f: '공통영어1', c: 4 }, c2: { f: '공통영어2', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '한국사' }, c1: { f: '한국사1', c: 3 }, c2: { f: '한국사2', c: 3 }, sum: { v: '6 학점' } },
+            { cat: { t: '사회' }, c1: { f: '통합사회1', c: 4 }, c2: { f: '통합사회2', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '과학' }, c1: { f: '통합과학1 · 과학탐구실험1', c: 5 }, c2: { f: '통합과학2 · 과학탐구실험2', c: 5 }, sum: { v: '10 학점' } },
+            { cat: { t: '체육' }, c1: { f: '체육1', c: 2 }, c2: { f: '체육2', c: 2 }, sum: { v: '4 학점' } },
+            { cat: { t: '예술' }, c1: { f: '음악 (미술)', c: 2 }, c2: { f: '미술 (음악)', c: 2 }, sum: { v: '4 학점' } },
+            { cat: { t: '정보·교양' }, c1: { f: '인간과 철학', c: 2 }, c2: { f: '정보', c: 3 }, sum: { v: '5 학점' }, life: 1 }
+        ]};
+        const G1_2025 = { title: '1학년 이수 현황 (학교 지정 · 이수 완료)', sub: '기준: 1학기 30 / 2학기 30 / 계 60학점', fixed: 60, keys: [], target: 60, rows: [
+            { cat: { t: '국어' }, c1: { f: '공통국어1', c: 4 }, c2: { f: '공통국어2', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '수학' }, c1: { f: '공통수학1', c: 4 }, c2: { f: '공통수학2', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '영어' }, c1: { f: '공통영어1', c: 4 }, c2: { f: '공통영어2', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '한국사' }, c1: { f: '한국사1', c: 3 }, c2: { f: '한국사2', c: 3 }, sum: { v: '6 학점' } },
+            { cat: { t: '사회' }, c1: { f: '통합사회1', c: 4 }, c2: { f: '통합사회2', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '과학' }, c1: { f: '통합과학1 · 과학탐구실험1', c: 5 }, c2: { f: '통합과학2 · 과학탐구실험2', c: 5 }, sum: { v: '10 학점' } },
+            { cat: { t: '체육' }, c1: { f: '체육1', c: 2 }, c2: { f: '체육2', c: 2 }, sum: { v: '4 학점' } },
+            { cat: { t: '예술', span: 2 }, c1: { f: '음악 (교차 운영)', c: 2 }, c2: { f: '미술 (교차 운영)', c: 2 }, sum: { v: '6 학점', span: 2 } },
+            { c1: { e: 1 }, c2: { f: '미술 감상과 비평 (교차 운영)', c: 2 } },
+            { cat: { t: '교양' }, c1: { f: '인간과 철학 (교차 운영)', c: 2 }, c2: { e: 1 }, sum: { v: '2 학점' }, life: 1 }
+        ]};
+
+        /* ==================== 2·3학년 테이블 (시나리오별) ==================== */
+        // 현재 1학년 · 일반과정 2학년
+        const T2_1G = { title: '2학년 이수 계획 (지정 + 선택)', sub: '기준: 1학기 29 / 2학기 29 / 계 58학점', fixed: 30, keys: ['m1', 'e1', 'e2'], target: 58, rows: [
+            { cat: { t: '국어' }, c1: { f: '문학', c: 3 }, c2: { f: '화법과 언어', c: 3 }, sum: { v: '6 학점' } },
+            { cat: { t: '수학', span: 2 }, c1: { f: '대수', c: 4 }, c2: { f: '확률과 통계', c: 4 }, sum: { S: ['m1'], add: 12, span: 2 } },
+            { c1: { f: '미적분Ⅰ', c: 4 }, c2: { s: 'm1_0' } },
+            { cat: { t: '영어' }, c1: { f: '영어Ⅰ', c: 4 }, c2: { f: '영어Ⅱ', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '체육' }, c1: { f: '스포츠 생활1', c: 2 }, c2: { f: '스포츠 생활2', c: 2 }, sum: { v: '4 학점' } },
+            { dynSplit: { k1: 'e1', k2: 'e2', label: '[택4 / 택4]' } }
+        ]};
+        // 현재 1학년 · 과학중점 2학년
+        const T2_1S = { title: '2학년 이수 계획 (지정 + 선택)', sub: '기준: 1학기 29 / 2학기 29 / 계 58학점', fixed: 49, keys: ['s1'], target: 58, rows: [
+            { cat: { t: '국어' }, c1: { f: '문학', c: 3 }, c2: { f: '화법과 언어', c: 3 }, sum: { v: '6 학점' } },
+            { cat: { t: '수학', span: 2 }, c1: { f: '대수', c: 4 }, c2: { f: '확률과 통계', c: 4 }, sum: { v: '16 학점', span: 2 } },
+            { c1: { f: '미적분Ⅰ', c: 4 }, c2: { f: '미적분Ⅱ', c: 4 } },
+            { cat: { t: '영어' }, c1: { f: '영어Ⅰ', c: 4 }, c2: { f: '영어Ⅱ', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '과학<br>[2학기 택3]', span: 4 }, c1: { f: '물리학', c: 3 }, c2: { f: '과학과제 연구', c: 3 }, sum: { S: ['s1'], add: 15, span: 4 } },
+            { c1: { f: '화학', c: 3 }, c2: { s: 's1_0' } },
+            { c1: { f: '생명과학', c: 3 }, c2: { s: 's1_1' } },
+            { c1: { f: '지구과학', c: 3 }, c2: { s: 's1_2' } },
+            { cat: { t: '체육' }, c1: { f: '스포츠 생활1', c: 2 }, c2: { f: '스포츠 생활2', c: 2 }, sum: { v: '4 학점' } }
+        ]};
+        // 현재 1학년 · 일반과정 3학년 (국수영 지정 + 탐구·생활 택5/택2)
+        const T3_1G = { title: '3학년 이수 계획 (지정 + 선택)', sub: '기준: 1학기 28 / 2학기 27 / 계 55학점', fixed: 34, keys: ['x1', 'x2'], target: 55, rows: [
+            { cat: { t: '국어' }, c1: { f: '독서와 작문', c: 4 }, c2: { e: 1 }, sum: { v: '4 학점' } },
+            { cat: { t: '수학' }, c1: { f: '기하 / 실용 통계', c: 4 }, c2: { f: '전문 수학', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '영어' }, c1: { f: '심화 영어Ⅰ', c: 4 }, c2: { f: '심화 영어Ⅱ', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '사회' }, c1: { e: 1 }, c2: { f: '사회문제 탐구', c: 3 }, sum: { v: '3 학점' } },
+            { cat: { t: '과학' }, c1: { e: 1 }, c2: { f: '융합과학 탐구', c: 3 }, sum: { v: '3 학점' } },
+            { dynSplit: { k1: 'x1', k2: 'x2', label: '[택5 / 택2]' } },
+            { cat: { t: '예술', span: 2 }, c1: { e: 1 }, c2: { f: '문학과 매체', c: 4 }, sum: { v: '6 학점', span: 2 } },
+            { c1: { e: 1 }, c2: { f: '미술 감상과 비평', c: 2 } },
+            { cat: { t: '체육' }, c1: { f: '스포츠 문화', c: 1 }, c2: { f: '스포츠 과학', c: 1 }, sum: { v: '2 학점' } }
+        ]};
+        // 현재 1학년 · 과학중점 3학년 (국수영 지정 + 과학 택3 + 생활·교양 택2/택2)
+        const T3_1S = { title: '3학년 이수 계획 (지정 + 선택)', sub: '기준: 1학기 28 / 2학기 27 / 계 55학점', fixed: 34, keys: ['p1', 'q1', 'q2'], target: 55, rows: [
+            { cat: { t: '국어' }, c1: { f: '독서와 작문', c: 4 }, c2: { e: 1 }, sum: { v: '4 학점' } },
+            { cat: { t: '수학' }, c1: { f: '기하', c: 4 }, c2: { f: '전문 수학', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '영어' }, c1: { f: '심화 영어', c: 4 }, c2: { f: '심화 영어 독해와 작문', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '사회' }, c1: { e: 1 }, c2: { f: '사회문제 탐구', c: 3 }, sum: { v: '3 학점' } },
+            { cat: { t: '과학<br>[1학기 택3]', span: 3 }, c1: { s: 'p1_0' }, c2: { f: '융합과학 탐구', c: 3 }, sum: { S: ['p1'], add: 3, span: 3 } },
+            { c1: { s: 'p1_1' }, c2: { e: 1 } },
+            { c1: { s: 'p1_2' }, c2: { e: 1 } },
+            { cat: { t: '생활·교양<br>[택2 / 택2]', span: 2 }, c1: { s: 'q1_0' }, c2: { s: 'q2_0' }, sum: { S: ['q1', 'q2'], span: 2 }, life: 1 },
+            { c1: { s: 'q1_1' }, c2: { s: 'q2_1' }, life: 1 },
+            { cat: { t: '예술', span: 2 }, c1: { e: 1 }, c2: { f: '문학과 매체', c: 4 }, sum: { v: '6 학점', span: 2 } },
+            { c1: { e: 1 }, c2: { f: '미술 감상과 비평', c: 2 } },
+            { cat: { t: '체육' }, c1: { f: '스포츠 문화', c: 1 }, c2: { f: '스포츠 과학', c: 1 }, sum: { v: '2 학점' } }
+        ]};
+        // 현재 2학년 · 일반과정 2학년 (이수 중 표시)
+        const T2_2G = { title: '2학년 이수 현황 (현재 이수 중)', sub: '기준: 1학기 29 / 2학기 29 / 계 58학점', fixed: 58, keys: [], target: 58, rows: [
+            { cat: { t: '수학·영어<br>선택' }, c1: { nt: '개인별 선택 이수 중 (3과목)', c: 12 }, c2: { nt: '개인별 선택 이수 중 (3과목)', c: 12 }, sum: { v: '24 학점' } },
+            { cat: { t: '국어·탐구<br>·생활 선택' }, c1: { nt: '개인별 선택 이수 중 (5과목)', c: 15 }, c2: { nt: '개인별 선택 이수 중 (5과목)', c: 15 }, sum: { v: '30 학점' } },
+            { cat: { t: '체육' }, c1: { f: '스포츠 생활1', c: 2 }, c2: { f: '스포츠 생활2', c: 2 }, sum: { v: '4 학점' } }
+        ]};
+        // 현재 2학년 · 과학중점 2학년 (이수 중 표시)
+        const T2_2S = { title: '2학년 이수 현황 (현재 이수 중)', sub: '기준: 1학기 29 / 2학기 29 / 계 58학점', fixed: 58, keys: [], target: 58, rows: [
+            { cat: { t: '국어' }, c1: { f: '문학', c: 3 }, c2: { f: '화법과 언어', c: 3 }, sum: { v: '6 학점' } },
+            { cat: { t: '수학', span: 2 }, c1: { f: '대수', c: 4 }, c2: { f: '확률과 통계', c: 4 }, sum: { v: '16 학점', span: 2 } },
+            { c1: { f: '미적분Ⅰ', c: 4 }, c2: { f: '미적분Ⅱ', c: 4 } },
+            { cat: { t: '영어' }, c1: { f: '영어Ⅰ', c: 4 }, c2: { f: '영어Ⅱ', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '과학', span: 4 }, c1: { f: '물리학', c: 3 }, c2: { f: '과학과제 연구', c: 3 }, sum: { v: '24 학점', span: 4 } },
+            { c1: { f: '화학', c: 3 }, c2: { nt: '과학 진로 ① (이수 중)', c: 3 } },
+            { c1: { f: '생명과학', c: 3 }, c2: { nt: '과학 진로 ② (이수 중)', c: 3 } },
+            { c1: { f: '지구과학', c: 3 }, c2: { nt: '과학 진로 ③ (이수 중)', c: 3 } },
+            { cat: { t: '체육' }, c1: { f: '스포츠 생활1', c: 2 }, c2: { f: '스포츠 생활2', c: 2 }, sum: { v: '4 학점' } }
+        ]};
+        // 현재 2학년 · 일반과정 3학년 (박람회: 국수영 지정 + 탐구·생활 택5/택3)
+        const T3_2G = { title: '3학년 이수 계획 (지정 + 선택)', sub: '기준: 1학기 28 / 2학기 28 / 계 56학점', fixed: 32, keys: ['x1', 'x2'], target: 56, rows: [
+            { cat: { t: '국어' }, c1: { f: '독서와 작문', c: 4 }, c2: { e: 1 }, sum: { v: '4 학점' } },
+            { cat: { t: '수학' }, c1: { f: '기하 / 실용 통계', c: 4 }, c2: { f: '전문 수학', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '영어' }, c1: { f: '심화 영어Ⅰ', c: 4 }, c2: { f: '심화 영어Ⅱ', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '사회' }, c1: { e: 1 }, c2: { f: '사회문제 탐구', c: 3 }, sum: { v: '3 학점' } },
+            { cat: { t: '과학' }, c1: { e: 1 }, c2: { f: '융합과학 탐구', c: 3 }, sum: { v: '3 학점' } },
+            { dynSplit: { k1: 'x1', k2: 'x2', label: '[택5 / 택3]' } },
+            { cat: { t: '예술' }, c1: { e: 1 }, c2: { f: '문학과 매체', c: 4 }, sum: { v: '4 학점' } },
+            { cat: { t: '체육' }, c1: { f: '스포츠 문화', c: 1 }, c2: { f: '스포츠 과학', c: 1 }, sum: { v: '2 학점' } }
+        ]};
+        // 현재 2학년 · 과학중점 3학년
+        const T3_2S = { title: '3학년 이수 계획 (지정 + 선택)', sub: '기준: 1학기 28 / 2학기 28 / 계 56학점', fixed: 32, keys: ['p1', 'q1', 'q2'], target: 56, rows: [
+            { cat: { t: '국어' }, c1: { f: '독서와 작문', c: 4 }, c2: { e: 1 }, sum: { v: '4 학점' } },
+            { cat: { t: '수학' }, c1: { f: '기하', c: 4 }, c2: { f: '전문 수학', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '영어' }, c1: { f: '심화 영어', c: 4 }, c2: { f: '심화 영어 독해와 작문', c: 4 }, sum: { v: '8 학점' } },
+            { cat: { t: '사회' }, c1: { e: 1 }, c2: { f: '사회문제 탐구', c: 3 }, sum: { v: '3 학점' } },
+            { cat: { t: '과학<br>[1학기 택3]', span: 3 }, c1: { s: 'p1_0' }, c2: { f: '융합과학 탐구', c: 3 }, sum: { S: ['p1'], add: 3, span: 3 } },
+            { c1: { s: 'p1_1' }, c2: { e: 1 } },
+            { c1: { s: 'p1_2' }, c2: { e: 1 } },
+            { cat: { t: '생활·교양<br>[택2 / 택3]', span: 3 }, c1: { s: 'q1_0' }, c2: { s: 'q2_0' }, sum: { S: ['q1', 'q2'], span: 3 }, life: 1 },
+            { c1: { s: 'q1_1' }, c2: { s: 'q2_1' }, life: 1 },
+            { c1: { e: 1 }, c2: { s: 'q2_2' }, life: 1 },
+            { cat: { t: '예술' }, c1: { e: 1 }, c2: { f: '문학과 매체', c: 4 }, sum: { v: '4 학점' } },
+            { cat: { t: '체육' }, c1: { f: '스포츠 문화', c: 1 }, c2: { f: '스포츠 과학', c: 1 }, sum: { v: '2 학점' } }
+        ]};
+
+        /* ==================== 시나리오 정의 ==================== */
+        const SCENARIOS = {
+            '1-general': {
+                label: '현재 1학년 · 일반과정',
+                notice: '📌 <b>현재 1학년(2026학년도 입학) · 일반과정</b> 편제표 기준입니다.<br>2학년 선택(수학 택1 + 학기별 택4)과 3학년 선택(1학기 택5 / 2학기 택2)을 설계해 보세요. 탐구와 기술·가정~교양은 합쳐서 개수를 채우며, 3학년 국·수·영은 학교 지정 과목입니다.',
+                base: 125, implicit: [], life: true, lifeBase: 5,
+                tables: [G1_2026, T2_1G, T3_1G],
+                groups: [
+                    { id: 'e1', grade: 2, title: '① 2학년 1학기 선택과목 [택4]', desc: '사회·과학·정보·제2외국어에서 총 4과목을 선택합니다. (과목당 3학점)', max: 4, credit: 3, options: OPT.y1exp1a.concat(OPT.y1exp1b) },
+                    { id: 'm1', grade: 2, title: '② 2학년 2학기 수학 [택1]', desc: '미적분Ⅰ에 이어서 배울 수학 과목을 선택합니다. (4학점)', max: 1, credit: 4, options: OPT.math_e },
+                    { id: 'e2', grade: 2, title: '③ 2학년 2학기 선택과목 [택4]', desc: '사회·과학·제2외국어에서 총 4과목을 선택합니다. 과학 진로 과목은 1학기 일반 과목과 연계됩니다. (과목당 3학점)', max: 4, credit: 3, options: OPT.y1exp2a.concat(OPT.y1exp2b) },
+                    { id: 'x1', grade: 3, title: '④ 3학년 1학기 선택과목 [택5]', desc: '사회·과학·기술·가정~교양에서 총 5과목을 선택합니다. (과목당 3학점)', max: 5, credit: 3, options: OPT.exp31a.concat(OPT.exp31b) },
+                    { id: 'x2', grade: 3, title: '⑤ 3학년 2학기 선택과목 [택2]', desc: '사회·과학·기술·가정~교양에서 총 2과목을 선택합니다. 사회문제 탐구·융합과학 탐구는 지정 이수입니다. (과목당 3학점)', max: 2, credit: 3, options: OPT.exp32a.concat(OPT.exp32b) }
+                ]
+            },
+            '1-science': {
+                label: '현재 1학년 · 과학중점과정',
+                notice: '📌 <b>현재 1학년(2026학년도 입학) · 과학중점과정</b> 편제표 기준입니다.<br>2학년은 물리학·화학·생명과학·지구과학을 모두 이수하며, 2학기 과학 진로 택3과 3학년 선택(과학 택3 + 생활·교양 택2/택2)을 설계해 보세요. 3학년 국·수·영은 학교 지정 과목입니다.',
+                base: 144, implicit: ['물리학', '화학', '생명과학', '지구과학'], life: true, lifeBase: 5,
+                tables: [G1_2026, T2_1S, T3_1S],
+                groups: [
+                    { id: 's1', grade: 2, title: '① 2학년 2학기 과학 진로 [택3]', desc: '4개 과학 진로 과목 중 3과목을 선택합니다. (과목당 3학점)', max: 3, credit: 3, options: OPT.sci23 },
+                    { id: 'p1', grade: 3, title: '② 3학년 1학기 과학 진로 [택3]', desc: '4개 과학 진로 과목 중 3과목을 선택합니다. (과목당 3학점)', max: 3, credit: 3, options: OPT.p25 },
+                    { id: 'q1', grade: 3, title: '③ 3학년 1학기 생활·교양 [택2]', desc: '4과목 중 2과목을 선택합니다. (과목당 3학점)', max: 2, credit: 3, options: OPT.q1 },
+                    { id: 'q2', grade: 3, title: '④ 3학년 2학기 생활·교양 [택2]', desc: '4과목 중 2과목을 선택합니다. (과목당 3학점)', max: 2, credit: 3, options: OPT.q2 }
+                ]
+            },
+            '2-general': {
+                label: '현재 2학년 · 일반과정',
+                notice: '📌 <b>현재 2학년(2025학년도 입학) · 일반과정</b> 박람회 자료 기준입니다.<br>2학년 과목은 이미 이수 중이고 3학년 국·수·영은 학교 지정이므로, <b>1학기 택5 + 2학기 택3</b>(탐구 + 기술·가정~교양 통합)만 선택합니다.',
+                base: 150, implicit: null, life: true, lifeBase: 2, lifeAsk: true,
+                tables: [G1_2025, T2_2G, T3_2G],
+                groups: [
+                    { id: 'x1', grade: 3, title: '① 3학년 1학기 선택과목 [택5]', desc: '사회·과학·기술·가정~교양에서 총 5과목을 선택합니다. (과목당 3학점)<br>⚠ 과학 진로 과목·일본어 회화는 2학년 때 이수한 선행 과목(위계)과 연계하여 선택하세요.', max: 5, credit: 3, options: OPT.exp31a.concat(OPT.exp31b) },
+                    { id: 'x2', grade: 3, title: '② 3학년 2학기 선택과목 [택3]', desc: '사회·과학·기술·가정~교양에서 총 3과목을 선택합니다. 사회문제 탐구·융합과학 탐구는 지정 이수입니다. (과목당 3학점)', max: 3, credit: 3, options: OPT.exp32a.concat(OPT.exp32b) }
+                ]
+            },
+            '2-science': {
+                label: '현재 2학년 · 과학중점과정',
+                notice: '📌 <b>현재 2학년(2025학년도 입학) · 과학중점과정</b> 편제표 기준입니다.<br>독서와 작문·기하·전문 수학·심화 영어 등은 지정 과목이며, <b>과학 진로 택3 + 생활·교양 택2(1학기)/택3(2학기)</b>를 선택합니다.',
+                base: 150, implicit: ['물리학', '화학', '생명과학', '지구과학'], life: true, lifeBase: 2,
+                tables: [G1_2025, T2_2S, T3_2S],
+                groups: [
+                    { id: 'p1', grade: 3, title: '① 3학년 1학기 과학 진로 [택3]', desc: '4개 과학 진로 과목 중 3과목을 선택합니다. (과목당 3학점)', max: 3, credit: 3, options: OPT.p25, preCheck: true },
+                    { id: 'q1', grade: 3, title: '② 3학년 1학기 생활·교양 [택2]', desc: '4과목 중 2과목을 선택합니다. (과목당 3학점)', max: 2, credit: 3, options: OPT.q1 },
+                    { id: 'q2', grade: 3, title: '③ 3학년 2학기 생활·교양 [택3]', desc: '4과목 중 3과목을 선택합니다. (과목당 3학점)', max: 3, credit: 3, options: OPT.q2 }
+                ]
+            }
+        };
+
+        /* ==================== 상태 ==================== */
+        let cfg = null;          // 현재 시나리오
+        let selections = {};     // groupId -> [{n, t, life}]
+        let sumSpecs = [];       // 합계 셀 정의
+        let lifeTotalNow = 0;    // 생활·교양 현재 이수 학점
+
+        // 공유 선택군(탐구 + 기술·가정~교양이 개수를 합쳐 쓰는 묶음) 도우미
+        function shareKeyOf(g) { return g.share || g.id; }
+        function shareMaxOf(key) {
+            const m = cfg.groups.find(g => shareKeyOf(g) === key);
+            return m.shareMax || m.max;
+        }
+        function combinedSel(key) {
+            const arr = [];
+            cfg.groups.filter(g => shareKeyOf(g) === key).forEach(g => selections[g.id].forEach(o => arr.push(o)));
+            return arr;
+        }
+
+        function scenarioKey() {
+            return document.getElementById('selYear').value + '-' + document.getElementById('selTrack').value;
+        }
+        function totalPicked() {
+            return Object.values(selections).reduce((a, l) => a + l.length, 0);
+        }
+        function onScenarioChange() {
+            if (totalPicked() > 0 && !confirm('학년 또는 과정을 변경하면 지금까지 선택한 과목이 초기화됩니다.\n계속할까요?')) {
+                // 되돌리기: 현재 cfg 기준으로 셀렉트 복원
+                const parts = cfg._key.split('-');
+                document.getElementById('selYear').value = parts[0];
+                document.getElementById('selTrack').value = parts[1];
+                return;
+            }
+            initScenario();
+        }
+        function initScenario() {
+            const key = scenarioKey();
+            cfg = SCENARIOS[key];
+            cfg._key = key;
+            selections = {};
+            cfg.groups.forEach(g => selections[g.id] = []);
+            renderGradeTabs();
+            renderGroups();
+            renderPlanTables();
+            updateAll();
+            updateDisplay();
+        }
+
+        /* ==================== 좌측: 선택 그룹 렌더링 ==================== */
+        function renderGradeTabs() {
+            const bar = document.getElementById('sub-grade-tab-bar');
+            const grades = [...new Set(cfg.groups.map(g => g.grade))];
+            bar.innerHTML = grades.map((gr, i) =>
+                `<button class="tab-btn ${i === 0 ? 'active' : ''}" id="gtab_${gr}" onclick="switchGradeTab(${gr})">${gr === 2 ? '🎓 2학년 선택과목' : '🏛 3학년 선택과목'}</button>`
+            ).join('');
+            bar.style.display = document.getElementById('main-tab-guide').classList.contains('active') ? 'none' : 'flex';
+        }
+        function switchGradeTab(grade) {
+            cfg.groups.map(g => g.grade).forEach(gr => {
+                const b = document.getElementById('gtab_' + gr);
+                if (b) b.classList.toggle('active', gr === grade);
+            });
+            document.querySelectorAll('.grade-block').forEach(el => {
+                el.style.display = (el.dataset.grade == grade) ? 'block' : 'none';
+            });
+            if (typeof updateStacks === 'function') updateStacks();
+        }
+        // 과목의 교과군 (구분선 라벨용) — 기술·가정/정보/제2외국어는 교양으로 묶음
+        function catOf(o) {
+            const c = o.t.split(' ')[0];
+            if (c === '기술·가정' || c === '정보' || c === '제2외국어') return '교양';
+            return c;
+        }
+        function renderGroups() {
+            const wrap = document.getElementById('main-select-content');
+            let html = `<div class="scenario-notice">${cfg.notice}</div>`;
+            if (cfg.lifeAsk) {
+                html += `<div class="scenario-notice" style="background:#fffbeb; border-color:#fde68a; color:#92400e; margin-top:10px;">
+                    🧮 2학년에서 이수 중인 <b>기술·가정 / 정보 / 제2외국어 / 한문 과목 수</b>:
+                    <select id="lifeExtra" onchange="updateAll()" style="font-weight:bold; padding:3px 8px; border-radius:5px; border:1px solid #d6b35c; margin:0 4px;">
+                        <option value="0">0과목</option><option value="1">1과목</option><option value="2">2과목</option>
+                        <option value="3">3과목</option><option value="4">4과목</option><option value="5">5과목</option>
+                    </select> (과목당 3학점 · 생활·교양 16학점 계산에 반영)</div>`;
+            }
+            // 평가 방식 범례 (해당 과목이 있는 경우에만)
+            if (cfg.groups.some(g => g.options.some(o => o.g5 || o.p))) {
+                html += `<div class="scenario-notice" style="background:#f8fafc; border-color:#e2e8f0; color:#475569; margin-top:10px; font-size:0.8rem;">
+                    🏷 평가 방식 안내: <span class="tag-g5" style="margin-left:0;">성취도만</span> 석차등급 없이 성취도(5단계)만 산출 ·
+                    <span class="tag-p" style="margin-left:0;">이수/미이수</span> 등급·성취도 없이 이수 여부만 기록<br>
+                    표시가 없는 과목은 성취도(5단계) + 석차등급(5등급)이 산출됩니다.</div>`;
+            }
+            const grades = [...new Set(cfg.groups.map(g => g.grade))];
+            grades.forEach((gr, gi) => {
+                html += `<div class="grade-block" data-grade="${gr}" style="display:${gi === 0 ? 'block' : 'none'}; margin-top:12px;">`;
+                cfg.groups.filter(g => g.grade === gr).forEach(g => {
+                    html += `<div class="group-info stack-head"><div class="group-title">${g.title}</div><div class="group-status-badge" id="badge_${g.id}">0 / ${g.shareMax || g.max} 선택</div></div>
+                    <div class="group-container" id="grp_${g.id}">
+                        <div class="group-desc">${g.desc}</div>
+                        <div class="subject-list">`;
+                    const cats = new Set(g.options.map(catOf));
+                    let lastCat = null;
+                    g.options.forEach((o, i) => {
+                        const c = catOf(o);
+                        if (cats.size > 1 && c !== lastCat) {
+                            html += `<div class="subject-divider">${c}</div>`;
+                            lastCat = c;
+                        }
+                        const pre = PRE_MAP[o.n];
+                        const preTxt = pre ? ` | <span class="pre-hint">위계 선행: ${pre}</span>` : '';
+                        const gradeTag = o.g5 ? '<span class="tag-g5">성취도만</span>' : (o.p ? '<span class="tag-p">이수/미이수</span>' : '');
+                        html += `<div class="subject-card" id="card_${g.id}_${i}" onclick="toggleSubject('${g.id}',${i})">
+                            <div><div class="sub-name">${o.n}${gradeTag}</div><div class="sub-details">${o.t} | ${g.credit}학점${preTxt}</div></div>
+                            <div class="circle-indicator"></div></div>`;
+                    });
+                    html += `</div></div>`;
+                });
+                // 다음 학년으로 넘어가는 버튼
+                if (gi < grades.length - 1) {
+                    html += `<button class="btn-next-grade" onclick="goNextGrade(${grades[gi + 1]})">다음 ▶ ${grades[gi + 1]}학년 선택과목으로 이동</button>`;
+                }
+                html += `</div>`;
+            });
+            wrap.innerHTML = html;
+        }
+        /* ==================== 네이티브 스티키 헤더 오프셋 계산 (쌓임 효과) ==================== */
+        function updateStacks() {
+            // 오른쪽: 대시보드 아래로 표 제목들이 누적 오프셋으로 쌓임
+            const rs = document.getElementById('right-sticky');
+            let top = (rs ? rs.offsetHeight : 0) - 1;
+            document.querySelectorAll('#plan-tables .stack-head').forEach(h => {
+                h.style.top = top + 'px';
+                top += h.offsetHeight + 6;
+            });
+            // 왼쪽: 현재 보이는 학년 블록 안에서 선택군 헤더들이 쌓임
+            document.querySelectorAll('#main-select-content .grade-block').forEach(blk => {
+                if (!(blk.offsetWidth || blk.offsetHeight)) return;
+                let t = -1;
+                blk.querySelectorAll('.stack-head').forEach(h => {
+                    h.style.top = t + 'px';
+                    t += h.offsetHeight + 6;
+                });
+            });
+        }
+        function resetSelections() {
+            if (totalPicked() > 0 || document.getElementById('lifeExtra')) {
+                if (!confirm('선택한 과목을 모두 초기화할까요?\n(반·번호·이름·희망 계열은 그대로 유지됩니다)')) return;
+            }
+            initScenario();
+        }
+        function goNextGrade(grade) {
+            switchGradeTab(grade);
+            const sp = document.querySelector('.selection-panel');
+            if (sp) sp.scrollTop = 0;
+            const m = document.querySelector('main');
+            if (m) m.scrollTop = 0;
+            window.scrollTo(0, 0);
+        }
+
+        /* ==================== 선택 로직 ==================== */
+        function selectedNamesAll() {
+            const s = new Set();
+            Object.values(selections).forEach(l => l.forEach(o => s.add(o.n)));
+            return s;
+        }
+        // 과목 위계(선행 과목) 충족 여부
+        function preSatisfied(name) {
+            const pre = PRE_MAP[name];
+            if (!pre) return true;
+            if (cfg.implicit === null) return true; // 현재 2학년 일반: 2학년 이수 내역을 알 수 없어 소프트 확인으로 처리
+            return cfg.implicit.includes(pre) || selectedNamesAll().has(pre);
+        }
+        // 위계 잠금 갱신: 선행 과목 미선택 시 잠그고, 이미 선택돼 있던 후속 과목은 자동 해제
+        function updateLockStates() {
+            if (!cfg || cfg.implicit === null) return;
+            cfg.groups.forEach(g => {
+                g.options.forEach((o, i) => {
+                    if (!PRE_MAP[o.n]) return;
+                    const card = document.getElementById(`card_${g.id}_${i}`);
+                    if (!card) return;
+                    const ok = preSatisfied(o.n);
+                    card.classList.toggle('locked', !ok);
+                    if (!ok) {
+                        const pos = selections[g.id].findIndex(x => x.n === o.n);
+                        if (pos > -1) {
+                            selections[g.id].splice(pos, 1);
+                            card.classList.remove('selected');
+                        }
+                    }
+                });
+            });
+        }
+        function toggleSubject(gid, idx) {
+            const g = cfg.groups.find(x => x.id === gid);
+            const o = g.options[idx];
+            const list = selections[gid];
+            const card = document.getElementById(`card_${gid}_${idx}`);
+            // 위계 잠금 과목 클릭 차단
+            if (card.classList.contains('locked')) {
+                alert(`이 과목은 과목 위계(선행 과목) 규정이 적용됩니다.\n[${PRE_MAP[o.n]}] 과목을 먼저 선택해야 합니다.`);
+                return;
+            }
+            const pos = list.findIndex(x => x.n === o.n);
+            if (pos > -1) {
+                list.splice(pos, 1);
+                card.classList.remove('selected');
+            } else {
+                const maxAllowed = g.shareMax || g.max;
+                const curCount = g.share ? combinedSel(g.share).length : list.length;
+                if (curCount >= maxAllowed) {
+                    alert(`이 선택군은 ${g.share ? '탐구와 기술·가정~교양을 합쳐 ' : ''}최대 ${maxAllowed}과목까지만 선택할 수 있습니다.\n다른 과목을 선택하려면 기존 과목을 먼저 해제해 주세요.`);
+                    return;
+                }
+                // 같은 과목 학기 중복 방지
+                if (g.pair && selections[g.pair] && selections[g.pair].some(x => x.n === o.n)) {
+                    alert(`'${o.n}' 과목은 이미 다른 학기에 선택되어 있습니다.\n같은 과목을 두 학기에 중복 이수할 수 없습니다.`);
+                    return;
+                }
+                // 현재 2학년 일반과정: 2학년 이수 내역을 알 수 없으므로 카드의 '위계 선행' 표시로만 안내 (경고창 없음)
+                list.push({ n: o.n, t: o.t, life: o.life || 0, credit: g.credit });
+                card.classList.add('selected');
+            }
+            updateAll();
+        }
+
+        /* ==================== 우측: 계획표 렌더링 ==================== */
+        function cellHtml(c) {
+            if (!c) return '';
+            if (c.f !== undefined) return `<td class="fixed-cell${c.life ? ' life-cell' : ''}">${c.f}</td><td${c.life ? ' class="life-cell"' : ''}>${c.c}</td>`;
+            if (c.s !== undefined) return `<td class="slot-empty" id="cell_${c.s}">미선택</td><td id="cr_${c.s}">-</td>`;
+            if (c.nt !== undefined) return `<td class="note-cell">${c.nt}</td><td>${c.c}</td>`;
+            return `<td class="dash-cell">–</td><td class="dash-cell">–</td>`;
+        }
+        // 탐구 / 기술·가정~교양 분리 블록 (선택 결과에 따라 동적으로 그려짐)
+        function dynCellHtml(o) {
+            if (o) return `<td class="slot-filled">${o.n}</td><td>${o.credit}</td>`;
+            return `<td class="dash-cell">–</td><td class="dash-cell">–</td>`;
+        }
+        function dynBlockHtml(label, l1, l2, isLife) {
+            const n = Math.max(l1.length, l2.length, 1);
+            const total = l1.concat(l2).reduce((a, o) => a + o.credit, 0);
+            let h = '';
+            for (let i = 0; i < n; i++) {
+                h += isLife ? '<tr class="life-row">' : '<tr>';
+                if (i === 0) h += `<td rowspan="${n}" class="fixed-cell" style="font-weight:600;">${label}</td>`;
+                h += dynCellHtml(l1[i]) + dynCellHtml(l2[i]);
+                if (i === 0) h += `<td rowspan="${n}" style="font-weight:600;">${total > 0 ? total + ' 학점' : '-'}</td>`;
+                h += '</tr>';
+            }
+            return h;
+        }
+        function dynSplitHtml(spec) {
+            const s1 = combinedSel(spec.k1), s2 = combinedSel(spec.k2);
+            const a1 = s1.filter(o => !o.life), a2 = s2.filter(o => !o.life);
+            const b1 = s1.filter(o => o.life), b2 = s2.filter(o => o.life);
+            const rem1 = shareMaxOf(spec.k1) - s1.length;
+            const rem2 = shareMaxOf(spec.k2) - s2.length;
+            let h = dynBlockHtml(`탐구<br>(사회·과학)`, a1, a2, false);
+            h += dynBlockHtml(`기술·가정<br>~교양`, b1, b2, true);
+            if (rem1 > 0 || rem2 > 0) {
+                h += `<tr><td class="fixed-cell" style="font-weight:600;">남은 선택<br>${spec.label}</td>`
+                    + (rem1 > 0 ? `<td class="slot-empty">미선택 ${rem1}과목</td><td>-</td>` : `<td class="dash-cell">–</td><td class="dash-cell">–</td>`)
+                    + (rem2 > 0 ? `<td class="slot-empty">미선택 ${rem2}과목</td><td>-</td>` : `<td class="dash-cell">–</td><td class="dash-cell">–</td>`)
+                    + `<td>-</td></tr>`;
+            }
+            return h;
+        }
+        function renderPlanTables() {
+            sumSpecs = [];
+            let sc = 0;
+            const html = cfg.tables.map(tbl => {
+                // 학년별 현재 이수 학점 (지정 + 지금까지 선택한 학점) vs 기준 학점
+                const cur = (tbl.fixed || 0) + (tbl.keys || []).reduce((a, k) => a + combinedSel(k).reduce((s, o) => s + o.credit, 0), 0);
+                const done = cur >= tbl.target;
+                const badge = `<span class="gsum${done ? ' ok' : ''}">${done ? '✓ ' : ''}현재 이수 ${cur}학점</span>`;
+                let h = `<div class="plan-section-title stack-head">${tbl.title} <span class="pst-right"><span class="sub">${tbl.sub}</span>${badge}</span></div>
+                    <div class="plan-section">
+                    <table><thead><tr><th style="width:16%">교과(군)</th><th>1학기 과목명</th><th style="width:9%">학점</th><th>2학기 과목명</th><th style="width:9%">학점</th><th style="width:13%">합계</th></tr></thead><tbody>`;
+                tbl.rows.forEach(r => {
+                    if (r.dynSplit) { h += dynSplitHtml(r.dynSplit); return; }
+                    h += r.life ? '<tr class="life-row">' : '<tr>';
+                    if (r.cat) h += `<td rowspan="${r.cat.span || 1}" class="fixed-cell" style="font-weight:600;">${r.cat.t}</td>`;
+                    h += cellHtml(r.c1) + cellHtml(r.c2);
+                    if (r.sum) {
+                        if (r.sum.v !== undefined) {
+                            h += `<td rowspan="${r.sum.span || 1}" style="font-weight:600;">${r.sum.v}</td>`;
+                        } else {
+                            const sid = 'sum_' + (sc++);
+                            sumSpecs.push({ id: sid, groups: r.sum.S, add: r.sum.add || 0 });
+                            h += `<td rowspan="${r.sum.span || 1}" id="${sid}" style="font-weight:600;">-</td>`;
+                        }
+                    }
+                    h += '</tr>';
+                });
+                h += `</tbody></table></div>`;
+                return h;
+            }).join('');
+            document.getElementById('plan-tables').innerHTML = html;
+        }
+
+        /* ==================== 계산·표시 갱신 ==================== */
+        function updateAll() {
+            // 과목 위계 잠금 갱신 (선행 과목 해제 시 후속 과목 연쇄 해제)
+            updateLockStates();
+            // 계획표 재생성 (탐구/기술·가정~교양 분리 블록이 선택에 따라 변하므로)
+            renderPlanTables();
+            const keys = [...new Set(cfg.groups.map(shareKeyOf))];
+            // 그룹 배지 (공유 선택군은 합산 표시)
+            cfg.groups.forEach(g => {
+                const b = document.getElementById('badge_' + g.id);
+                if (!b) return;
+                if (g.share) {
+                    const n = combinedSel(g.share).length;
+                    b.innerText = `통합 ${n} / ${g.shareMax} 선택`;
+                    b.classList.toggle('done', n >= g.shareMax);
+                } else {
+                    b.innerText = `${selections[g.id].length} / ${g.max} 선택`;
+                    b.classList.toggle('done', selections[g.id].length >= g.max);
+                }
+            });
+            // 슬롯 채우기 (공유 선택군은 합쳐서 선택 순서대로)
+            keys.forEach(key => {
+                const sel = combinedSel(key);
+                const maxSlots = shareMaxOf(key);
+                for (let i = 0; i < maxSlots; i++) {
+                    const cell = document.getElementById(`cell_${key}_${i}`);
+                    if (!cell) continue;
+                    const cr = document.getElementById(`cr_${key}_${i}`);
+                    if (sel[i]) {
+                        cell.innerText = sel[i].n; cell.className = 'slot-filled';
+                        if (cr) cr.innerText = sel[i].credit;
+                    } else {
+                        cell.innerText = '미선택'; cell.className = 'slot-empty';
+                        if (cr) cr.innerText = '-';
+                    }
+                }
+            });
+            // 합계 셀
+            sumSpecs.forEach(sp => {
+                const el = document.getElementById(sp.id);
+                if (!el) return;
+                let sum = sp.add;
+                sp.groups.forEach(key => combinedSel(key).forEach(o => sum += o.credit));
+                el.innerText = sum > 0 ? sum + ' 학점' : '-';
+            });
+            // 대시보드
+            let selCredits = 0, picked = 0, required = 0, lifeCredits = 0;
+            keys.forEach(key => required += shareMaxOf(key));
+            cfg.groups.forEach(g => {
+                picked += selections[g.id].length;
+                selections[g.id].forEach(o => { selCredits += o.credit; if (o.life) lifeCredits += o.credit; });
+            });
+            document.getElementById('totalDisplay').innerText = cfg.base + selCredits;
+            const pct = required > 0 ? Math.round(picked / required * 100) : 0;
+            const circle = document.getElementById('circleView');
+            circle.innerText = pct + '%';
+            circle.classList.toggle('done', pct >= 100);
+            // 생활·교양(기가/정보/제2외/한문/교양) 16학점 기준 체크
+            const chip = document.getElementById('lifeChip');
+            if (cfg.life) {
+                const extraSel = document.getElementById('lifeExtra');
+                const extra = extraSel ? parseInt(extraSel.value || '0') * 3 : 0;
+                const total = cfg.lifeBase + extra + lifeCredits;
+                lifeTotalNow = total;
+                // 남은 선택을 전부 생활·교양으로 채웠을 때 도달 가능한 최대치
+                let maxPossible = total;
+                keys.forEach(key => {
+                    const members = cfg.groups.filter(g => shareKeyOf(g) === key);
+                    const remaining = shareMaxOf(key) - combinedSel(key).length;
+                    let lifeLeft = 0;
+                    members.forEach(g => {
+                        lifeLeft += g.options.filter(o => o.life && preSatisfied(o.n) && !selections[g.id].some(x => x.n === o.n)).length;
+                    });
+                    maxPossible += Math.min(remaining, lifeLeft) * members[0].credit;
+                });
+                // 미달 시 계획표의 교양 행 전체를 붉게 강조
+                document.getElementById('capture-area').classList.toggle('life-short', total < 16);
+                chip.style.display = 'inline-block';
+                chip.classList.remove('ok', 'bad');
+                if (total >= 16) {
+                    chip.classList.add('ok');
+                    chip.innerText = `✓ 생활·교양(기가/정보/제2외/한문/교양) ${total} / 16학점 충족`;
+                } else if (maxPossible < 16) {
+                    chip.classList.add('bad');
+                    chip.innerText = `⚠ 생활·교양 ${total} / 16학점 — 남은 선택으로 기준 충족 불가! 선택 변경 필요`;
+                } else {
+                    chip.innerText = `생활·교양(기가/정보/제2외/한문/교양) ${total} / 16학점`;
+                }
+            } else {
+                chip.style.display = 'none';
+                document.getElementById('capture-area').classList.remove('life-short');
+            }
+            updateStacks();
+        }
+        function updateDisplay() {
+            const yr = document.getElementById('selYear').value;
+            const cls = document.getElementById('studentClass').value || '0';
+            const num = document.getElementById('studentNumber').value || '0';
+            const name = document.getElementById('studentName').value || '미입력';
+            const dept = document.getElementById('studentDept').value || '미선택';
+            const track = document.getElementById('selTrack').value === 'science' ? '과학중점과정' : '일반과정';
+            document.getElementById('studentCardDisplay').innerText =
+                `${yr}학년 ${cls}반 ${num}번 ${name} | ${track} | 희망 계열: ${dept}`;
+        }
+
+        /* ==================== 탭 · 모바일 뷰 ==================== */
+        function switchMainTab(mode) {
+            document.getElementById('main-tab-select').classList.toggle('active', mode === 'select');
+            document.getElementById('main-tab-guide').classList.toggle('active', mode === 'guide');
+            document.getElementById('main-select-content').style.display = (mode === 'select') ? 'flex' : 'none';
+            document.getElementById('sub-grade-tab-bar').style.display = (mode === 'select') ? 'flex' : 'none';
+            document.getElementById('main-guide-content').style.display = (mode === 'guide') ? 'flex' : 'none';
+        }
+        function switchMobileView(viewMode) {
+            document.getElementById('toggle-select-btn').classList.toggle('active', viewMode === 'select');
+            document.getElementById('toggle-preview-btn').classList.toggle('active', viewMode === 'preview');
+            document.body.classList.toggle('show-selector', viewMode === 'select');
+            document.body.classList.toggle('show-preview', viewMode === 'preview');
+        }
+
+        /* ==================== 스크린샷 저장 ==================== */
+        function captureReport() {
+            if (cfg.life && lifeTotalNow < 16) {
+                if (!confirm(`⚠ 생활·교양(기술·가정/정보/제2외국어/한문/교양) 이수 학점이 현재 ${lifeTotalNow}학점으로,\n졸업 기준(3년간 16학점 이상)에 미달합니다.\n\n그래도 저장할까요?`)) return;
+            }
+            const wrapper = document.getElementById('scroll-wrapper');
+            const target = document.getElementById('capture-area');
+            const originalHeight = wrapper.style.height; const originalOverflow = wrapper.style.overflowY;
+            // 캡처 동안 스티키 해제 (이미지에서 제자리 배치되도록)
+            const stickies = document.querySelectorAll('#capture-area .stack-head, #capture-area .sticky-stack');
+            stickies.forEach(el => el.style.position = 'static');
+            wrapper.style.height = 'auto'; wrapper.style.overflowY = 'visible';
+            setTimeout(() => {
+                html2canvas(target, { scale: 2, backgroundColor: '#ebf1f6', useCORS: true, windowHeight: target.scrollHeight }).then(canvas => {
+                    const link = document.createElement('a'); link.href = canvas.toDataURL('image/png');
+                    link.download = `2026_영남고_과목선택결과_${document.getElementById('studentName').value || '학생'}.png`; link.click();
+                    wrapper.style.height = originalHeight; wrapper.style.overflowY = originalOverflow;
+                    stickies.forEach(el => el.style.position = '');
+                });
+            }, 300);
+        }
+
+        /* ==================== 학과별 권장 선택 과목 안내 ==================== */
+        const deptsDatabase = {
+            "경영학과": { cluster: "경상 계열", desc: "기업뿐 아니라 다양한 조직의 경영 현상을 관찰해 그곳에 존재하는 법칙을 밝혀내고, 이를 실천적 목적에 따라 적용하는 학문", basic: "경영학원론, 경제학원론, 경영통계, 회계원리, 마케팅, 조직행동 등", major: "재무관리, 생산관리, 인적자원관리, 경영전략, 경영정보시스템 등", similar: "경영정보학과, 관광경영학과, 국제경영학과, 글로벌경영학과 등", career: "경영컨설턴트, 공인노무사, 세무사, 공인회계사, 관세사, 금융기관 전문가 등", subjects: [
+                { category: "국어", general: ["화법과 언어", "독서와 작문", "문학"], jinro: [], yonghab: [] },
+                { category: "수학", general: ["대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅱ", "경제 수학"], yonghab: ["실용 통계", "수학과제 탐구"] },
+                { category: "영어", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["영어 발표와 토론"], yonghab: ["실생활 영어 회화"] },
+                { category: "사회", general: ["사회와 문화", "세계시민과 지리", "현대사회와 윤리"], jinro: ["경제", "정치", "법과 사회", "국제 관계의 이해", "한국지리 탐구", "도시의 미래 탐구"], yonghab: ["금융과 경제생활", "사회문제 탐구"] },
+                { category: "정보/교양", general: ["정보"], jinro: [], yonghab: ["인간과 경제활동"] }
+            ]},
+            "화학과": { cluster: "자연과학 계열", desc: "물질을 구성하고 있는 기본 성분과 성질 구조를 이해하고, 상호작용 반응 프로세스를 탐구하는 기초 학과", basic: "화학 및 실험, 물리학 및 실험, 미적분학 및 연습, 생물학 및 실험 등", major: "물리화학, 분석화학, 유기화학, 기기분석, 무기화학실험, 생화학, 환경화학 등", similar: "생화학과, 응용화학과, 정밀화학과, 화장품공학과, 화학과 등", career: "과학교사, 자연과학시험원, 화학연구원, 친환경제품인증심사원, 재료공학기술자 등", subjects: [
+                { category: "국어", general: ["화법과 언어", "독서와 작문", "문학"], jinro: ["주제탐구독서"], yonghab: ["독서 토론과 글쓰기"] },
+                { category: "수학/영어", general: ["대수", "미적분 Ⅰ", "확률과 통계", "영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["기하", "미적분 Ⅱ", "인공지능 수학", "영어 발표와 토론"], yonghab: [] },
+                { category: "과학", general: [], jinro: ["역학과 에너지", "전자기와 양자", "물질과 에너지", "화학 반응의 세계"], yonghab: ["융합과학 탐구"] },
+                { category: "정보/교양", general: ["기술·가정", "정보"], jinro: ["로봇과 공학세계", "인공지능 기초", "생활과학 탐구", "데이터 과학", "인간과 철학"], yonghab: ["지식 재산 일반"] }
+            ]},
+            "경제학과": { cluster: "경상 계열", desc: "한정된 자원 속에서 최대의 효율을 얻기 위한 법칙을 도출하고 의사결정 프로세스를 예측하는 학과", basic: "경제학원론, 경제수학, 미시경제, 거시경제, 계량경제, 경제사 등", major: "조세론, 재정학, 후생경제, 금융경제, 노동경제, 경제성장론, 국제무역 등", similar: "경제금융물류학부, 경제금융학과, 경제통상학부, 국제무역학과, 금융경제학과 등", career: "경제학연구원, 금융관리자, 세무사, 은행원, 증권중개인, 공인회계사 등", subjects: [
+                { category: "국어", general: ["화법과 언어", "독서와 작문", "문학"], jinro: [], yonghab: [] },
+                { category: "수학/영어", general: ["대수", "미적분 Ⅰ", "확률과 통계", "영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["미적분 Ⅱ", "경제 수학", "영어 발표와 토론"], yonghab: ["실용 통계", "수학과제 탐구", "실생활 영어 회화"] },
+                { category: "사회", general: ["사회와 문화", "세계시민과 지리", "현대사회와 윤리"], jinro: ["경제", "정치", "법과 사회", "국제 관계의 이해", "한국지리 탐구", "도시의 미래 탐구"], yonghab: ["금융과 경제생활", "사회문제 탐구"] },
+                { category: "정보/교양", general: ["정보"], jinro: [], yonghab: ["인간과 경제활동"] }
+            ]},
+            "관광경영학과": { cluster: "경상 계열", desc: "여가와 관광 현상을 체계적으로 연구하고 전문 경영인과 민간외교관을 양성하는 학과", basic: "관광학원론, 관광경제론, 관광조사방법론, 호텔경영학개론 등", major: "관광자원론, 관광서비스론, 여가산업론, 호텔회계론, 호텔서비스행동론 등", similar: "문화관광학과, 외식경영학과, 호텔관광경영학과, 호텔컨벤션학전공 등", career: "국제회의전문가, 여행안내원, 카지노딜러, 호텔지배인, 관광통역안내사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["문학과 영상", "경제 수학"], yonghab: ["독서 토론과 글쓰기", "실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "세계시민과 지리", "현대사회와 윤리"], jinro: ["영어 발표와 토론", "경제", "법과 사회", "한국지리 탐구", "도시의 미래 탐구"], yonghab: ["실생활 영어 회화", "미디어 영어", "여행지리", "사회문제 탐구"] },
+                { category: "기타", general: ["정보", "제2외국어"], jinro: ["제2외국어 회화", "심화 제2외국어", "인간과 심리"], yonghab: ["제2외국어 문화", "인간과 경제활동"] }
+            ]},
+            "광고홍보학과": { cluster: "경상 계열", desc: "현대 커뮤니케이션 현상을 탐구하며 과학적인 판매 및 이미지 설득 캠페인을 홍보하는 학과", basic: "광고학개론, 홍보학개론, 광고연구방법, 커뮤니케이션이론, 광고심리학 등", major: "광고조사론, 광고기획론, 광고매체론, 기업홍보론, 카피라이팅실습 등", similar: "광고홍보언론학과, 미디어광고학과, 미디어커뮤니케이션학과, 언론홍보학과 등", career: "광고기획자, 마케팅전문가, 카피라이터, 이벤트기획자, 홍보전문가 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["문학과 영상", "경제 수학"], yonghab: ["매체 의사소통", "실용 통계", "수학과 문화", "수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "세계시민과 지리"], jinro: ["영어 발표와 토론", "한국지리 탐구", "정치", "법과 사회", "도시의 미래 탐구"], yonghab: ["미디어 영어", "여행지리", "사회문제 탐구"] },
+                { category: "정보/교양", general: ["정보"], jinro: ["데이터 과학", "인간과 심리"], yonghab: ["인간과 경제활동"] }
+            ]},
+            "국제통상학과": { cluster: "경상 계열", desc: "국제무역, 국제금융, 통상, 무역 상무 및 전자 무역에 관한 인재를 양성하는 학과", basic: "물류관리론, 경영학원론, 경제학원론, 비즈니스커뮤니케이션 등", major: "국제상거래법, 해상운송론, 국제복합운송, 국제물류전략, 국제마케팅 등", similar: "무역학과, 유통경영학과, 국제무역학과, 국제물류학과 등", career: "경영컨설턴트, 관세사, 물류관리사, 외교관, 외환딜러, 국제무역사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅱ", "경제 수학"], yonghab: ["독서 토론과 글쓰기", "실용 통계", "수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "세계시민과 지리"], jinro: ["영어 발표와 토론", "경제", "정치", "법과 사회", "국제 관계의 이해"], yonghab: ["실생활 영어 회화", "세계 문화와 영어", "사회문제 탐구"] },
+                { category: "기타", general: ["정보", "제2외국어"], jinro: ["제2외국어 회화", "심화 제2외국어"], yonghab: ["제2외국어 문화", "인간과 경제활동"] }
+            ]},
+            "부동산학과": { cluster: "경상 계열", desc: "부동산 경제, 경영, 개발, 법률, 기술 분야를 체계적으로 연구하여 전문 인력을 양성하는 학과", basic: "도시계획이론, 도시설계론, 도시지방행정론, GIS개론 등", major: "부동산금융론, 부동산개발론, 부동산공법, 감정평가론, 토지정책론 등", similar: "도시계획부동산학과, 도시계획학과, 부동산지역학과, 도시사회학과 등", career: "감정평가사, 부동산중개인, 애널리스트, 금융자산운용가, 부동산컨설턴트 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅱ", "경제 수학", "인공지능 수학"], yonghab: ["독서 토론과 글쓰기", "실용 통계", "수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "세계시민과 지리"], jinro: ["영어 발표와 토론", "경제", "법과 사회", "한국지리 탐구", "도시의 미래 탐구"], yonghab: ["실생활 영어 회화", "여행지리", "금융과 경제생활", "사회문제 탐구"] },
+                { category: "정보/교양", general: ["정보"], jinro: ["인간과 심리"], yonghab: ["인간과 경제활동"] }
+            ]},
+            "세무학과": { cluster: "경상 계열", desc: "회계학적 사고와 세법 이론을 바탕으로 합리적인 세무 회계 솔루션을 산출하는 학과", basic: "경영학원론, 경제학원론, 세무학개론, 경영통계, 회계원리 등", major: "세법총론, 세무회계, 재무회계, 고급회계, 회계감사, 재무제표분석 등", similar: "회계세무전공, 세무·회계학전공, 부동산·세무경영학과, 회계세무학과 등", career: "감정평가사, 경영컨설턴트, 세무사, 신용분석가, 조세행정사무원, 공인회계사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅱ", "경제 수학"], yonghab: ["실용 통계", "수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "세계시민과 지리"], jinro: ["영어 발표와 토론", "경제", "법과 사회"], yonghab: ["실생활 영어 회화", "금융과 경제생활", "사회문제 탐구"] },
+                { category: "정보", general: ["정보"], jinro: [], yonghab: [] }
+            ]},
+            "회계학과": { cluster: "경상 계열", desc: "한정된 자원 내에서 합리적 자원 배분을 지원하는 경영 회계 재무 지표를 연구하는 학과", basic: "경영학원론, 경제학원론, 경영통계, 회계원리 등", major: "재무회계, 관리회계, 원가회계, 재무관리, 회계정보시스템, 회계감사 등", similar: "금융회계학과, 경영회계학과, IT금융경영학과, 파이낸스·회계학부 등", career: "손해사정사, 외환딜러, 증권중개인, 금융자산운용가, 보험계리사, 은행원 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅱ", "경제 수학"], yonghab: ["실용 통계", "수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "세계시민과 지리"], jinro: ["영어 발표와 토론", "경제", "법과 사회"], yonghab: ["실생활 영어 회화", "금융과 경제생활", "사회문제 탐구"] },
+                { category: "정보", general: ["정보"], jinro: [], yonghab: [] }
+            ]},
+            "건축공학과": { cluster: "공학 계열", desc: "건축물의 설계 시공 및 역학적 안전 설비 관리 공법을 구축 조명하는 학과", basic: "건축공학개론, 기초공학 설계, 기초물리학, 구조역학, 재료역학 등", major: "건축공학설계, 건축환경계획, 건설사업관리, 철근콘크리트설계, 건축설비 등", similar: "건축디자인학과, 건축학부, 건축공학부, 실내건축디자인과, 실내건축학과 등", career: "건축설계 기술자, 건축감리 기술자, 공무원, 인테리어디자이너, BMI 디자이너 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: ["수학과 문화", "수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리"], jinro: ["한국지리 탐구", "도시의 미래 탐구"], yonghab: ["여행지리", "사회문제 탐구", "기후변화와 지속가능한 세계"] },
+                { category: "과학", general: [], jinro: ["물리학", "화학", "지구과학", "지구시스템과학", "화학 반응의 세계", "역학과 에너지", "물질과 에너지"], yonghab: ["융합과학 탐구", "기후변화와 환경생태"] },
+                { category: "기타", general: ["미술", "기술·가정", "정보"], jinro: ["미술 창작", "미술 감상과 비평", "로봇과 공학세계"], yonghab: ["미술과 매체", "창의 공학 설계"] }
+            ]},
+            "건축설비공학과": { cluster: "공학 계열", desc: "건축 유용성에 기반이 되는 열역학 유체역학 자동화 빌딩 자동제어공학 과목 학과", basic: "열역학, 재료역학, 유체역학, 건축설비관계법규, 도면작성 등", major: "설비열역학, 시퀀스제어공학, 공기조화설비, 소방설비, 냉동설비, 배관 등", similar: "설비플랜트·소방방재공학과, 건설방재공학, 건축안전공학과 등", career: "건설견적원, 건설자재시험원, 건축감리 기술자, 건축설비기술자 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: ["수학과 문화", "수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리"], jinro: ["한국지리 탐구", "도시의 미래 탐구"], yonghab: ["여행지리", "사회문제 탐구", "기후변화와 지속가능한 세계"] },
+                { category: "과학", general: [], jinro: ["물리학", "화학", "지구과학", "지구시스템과학", "화학 반응의 세계", "역학과 에너지", "물질과 에너지"], yonghab: ["융합과학 탐구", "기후변화와 환경생태"] },
+                { category: "기타", general: ["미술", "기술·가정", "정보"], jinro: ["미술 창작", "미술 감상과 비평", "로봇과 공학세계"], yonghab: ["미술과 매체", "창의 공학 설계"] }
+            ]},
+            "건축학과": { cluster: "공학 계열", desc: "도면 실무 조형 환경계획론을 토대로 편리한 주거 공간 구조를 설계하는 학과", basic: "건축학개론, 건축이론, 건축사, 건축설계, 건축구조의 이해 등", major: "건축구조, 건축재료, 건축법규, 건축CAD, 조경설계, 생태건축, 친환경건축 등", similar: "건축학과, 건축과, 실내건축학과, 친환경건축학과, 건축디자인전공 등", career: "건축설계 기술자, 건축감리 기술자, 공무원, 인테리어디자이너, BMI 디자이너 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: ["수학과 문화", "수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리"], jinro: ["한국지리 탐구", "도시의 미래 탐구"], yonghab: ["여행지리", "사회문제 탐구", "기후변화와 지속가능한 세계"] },
+                { category: "과학/예술", general: ["미술"], jinro: ["물리학", "화학", "지구과학", "지구시스템과학", "화학 반응의 세계", "역학과 에너지", "물질과 에너지", "미술 창작", "미술 감상과 비평"], yonghab: ["융합과학 탐구", "기후변화와 환경생태", "미술과 매체"] },
+                { category: "정보/기타", general: ["기술·가정", "정보"], jinro: ["로봇과 공학세계"], yonghab: ["창의 공학 설계"] }
+            ]},
+            "기계공학과": { cluster: "공학 계열", desc: "4대 역학 해석 및 로봇공학, 나노공학, 제어공학 실무 요소를 실험 응용 연구 학과", basic: "고체역학, 열역학, 동역학, 유체역학, 재료역학, 기계설계, 공학물리 등", major: "에너지공학, 열전달, 유체기계, 로봇공학, 자동차공학, CAD, 자동제어 등", similar: "기계공학과, 기계설계공학과, 기계융합공학과, 자동화시스템과, 지능로봇과 등", career: "기계공학기술자, 로봇공학 기술자, 반도체장비 기술자, 자동차공학 기술자 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: ["수학과제 탐구"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "화학", "역학과 에너지", "전자기와 양자", "물질과 에너지", "화학 반응의 세계"], yonghab: ["과학의 역사와 문화", "융합과학 탐구"] },
+                { category: "정보/기타", general: ["기술·가정", "정보", "제2외국어"], jinro: ["로봇과 공학세계", "인공지능 기초"], yonghab: ["창의 공학 설계", "지식 재산 일반"] }
+            ]},
+            "도시공학과": { cluster: "공학 계열", desc: "도시 계획 디자인 공간정보학 법규 조경을 연구하는 다중 계획 학과", basic: "도시계획, 도시발달사, 도시개발, 도시설계, 교통계획, 지역계획 등", major: "도시환경, 조경계획, 도시경제, 물류시스템, 도시법규, 공간정보학 등", similar: "도시공학과, 도시건설과, 도시정보공학전공, 도시계획공학과 등", career: "감정평가사, 공무원, 교통계획 및 설계가, 도시계획 및 설계가, 도시재생전문가 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: ["수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리"], jinro: ["한국지리 탐구", "도시의 미래 탐구"], yonghab: ["여행지리", "기후변화와 지속가능한 세계"] },
+                { category: "과학/기타", general: ["기술·가정", "제2외국어"], jinro: ["물리학", "화학", "지구과학", "역학과 에너지", "지구시스템과학"], yonghab: ["융합과학 탐구", "기후변화와 환경생태", "지식 재산 일반", "창의 공학 설계"] }
+            ]},
+            "멀티미디어학과": { cluster: "공학 계열", desc: "정보기술 가상현실 소프트웨어 그래픽 융복합 미디어를 개척 연구 학과", basic: "창의적공학설계, 기초프로그래밍 실습 등", major: "멀티미디어 프로그래밍, 컴퓨터 프로그래밍, 모바일 프로그래밍, 콘텐츠 제작 등", similar: "디지털콘텐츠학과, 미디어소프트웨어학과, 응용컴퓨터공학과, IT공학과 등", career: "콘텐츠 제작 회사, 애니메이션 제작사, 게임 개발 기획사, 디지털 콘텐츠 관련 기업", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ", "인공지능 수학"], yonghab: ["수학과 문화"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: ["영어 발표와 토론", "심화영어 독해와 작문", "정치"], yonghab: ["윤리문제 탐구", "사회문제 탐구"] },
+                { category: "과학/정보", general: ["정보", "제2외국어"], jinro: ["물리학", "화학", "역학과 에너지", "물질과 에너지", "로봇과 공학세계", "데이터 과학", "인공지능 기초"], yonghab: ["융합과학 탐구", "과학의 역사와 문화", "창의공학 설계", "지식 재산 일반", "소프트웨어와 생활"] }
+            ]},
+            "메카트로닉스공학과": { cluster: "공학 계열", desc: "정밀공학 계측 로봇 및 공장 자동화 신호처리 공학을 연찬하는 학과", basic: "수치해석, 동역학, 정역학, 기구학, 고체역학, 전기회로, 전자회로 등", major: "마이크로컴퓨터응용, 계측공학, 제어공학, 로봇공학, 자동화시스템, CAD/CAM 등", similar: "메카트로닉스공학과, 로봇공학과, 스마트팩토리과, 기계메카트로닉스공학과 등", career: "로봇 개발, 서비스 로봇, 자율주행, 전장제어, 자동화 설비, 제어시스템 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ", "인공지능 수학"], yonghab: ["수학과 문화"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "화학", "역학과 에너지", "전자기와 양자", "물질과 에너지", "화학반응의 세계"], yonghab: ["영어 발표와 토론", "심화영어 독해와 작문", "융합과학 탐구", "과학의 역사와 문화"] },
+                { category: "정보/기타", general: ["정보", "제2외국어"], jinro: ["로봇과 공학세계", "인공지능 기초", "데이터 과학"], yonghab: ["창의공학 설계", "지식 재산 일반", "소프트웨어와 생활"] }
+            ]},
+            "반도체공학과": { cluster: "공학 계열", desc: "집적회로 고주파 광전 소자 반도체 나노 공정 시스템을 연구하는 학과", basic: "전자기학, 반도체물리학, 양자물리학, 회로이론, 전자물성론, 전기수학 등", major: "전기전자재료, 무선통신, 고주파소자, 디지털시스템설계, 반도체공정 등", similar: "반도체공학과, 반도체디스플레이학과, 반도체장비공학과, 세라믹공학과 등", career: "반도체 기업, 반도체 장비회사, 소자/설계 전문 기업, 한국전자기술연구원", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: ["수학과제 탐구"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "화학", "역학과 에너지", "전자기와 양자", "물질과 에너지", "화학 반응의 세계"], yonghab: ["과학의 역사와 문화", "융합과학 탐구"] },
+                { category: "정보/기타", general: ["기술·가정", "정보", "제2외국어"], jinro: ["로봇과 공학세계", "인공지능 기초", "데이터 과학"], yonghab: ["창의 공학 설계", "지식 재산 일반", "소프트웨어와 생활"] }
+            ]},
+            "산업공학과": { cluster: "공학 계열", desc: "품질 시뮬레이션 데이터베이스 최적 공정 안전 시스템 공학 학과", basic: "제품개발공학, OR 및 수리통계, 생산관리, 품질경영, 인간공학 등", major: "물류관리, 기술경영, 시뮬레이션, 로봇공학, 데이터베이스, 빅데이터활용 등", similar: "산업공학과, 산업경영공학과, 산업시스템공학과, 산업정보공학과 등", career: "경영정보시스템 개발자, 경영컨설턴트, 물류관리전문가, 품질관리사무원 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["경제"], yonghab: ["사회문제 탐구"] },
+                { category: "정보/기타", general: ["기술·가정", "정보", "제2외국어"], jinro: ["로봇과 공학세계", "인공지능 기초", "데이터 과학"], yonghab: ["창의 공학 설계", "지식 재산 일반"] }
+            ]},
+            "생명공학과": { cluster: "공학 계열", desc: "세포 생물정보 유전체 바이러스 분자생물학 의료 응용 연구 학과", basic: "물리화학, 유기화학, 미생물학, 세포생물학, 유전학, (동물)생리학 등", major: "분석화학, 식품생명공학, 분자생물학, 생물정보학, 세포와 조직공학 등", similar: "생명과학과, 생물학과, 바이오메디컬공학과, 의공학과, 제약공학과 등", career: "나노공학기술자, 바이오에너지연구자, 생명과학연구원, 생물학연구원 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: [], yonghab: ["기후변화와 지속가능한 세계"] },
+                { category: "과학/정보", general: ["기술·가정", "정보", "제2외국어"], jinro: ["화학", "생명과학", "물질과 에너지", "화학 반응의 세계", "세포와 물질대사", "생물의 유전", "로봇과 공학세계", "인공지능 기초"], yonghab: ["과학의 역사와 문화", "기후변화와 환경생태", "창의 공학 설계"] }
+            ]},
+            "소프트웨어공학과": { cluster: "공학 계열", desc: "프로그래밍 모바일 웹 컴파일러 IoT 보안 데이터베이스 구축 학과", basic: "컴퓨터구조론, 데이터구조론, 프로그래밍언어, 운영체제, 자료구조 등", major: "소프트웨어공학, C프로그래밍, 디지털신호처리, 웹프로그래밍, 데이터베이스 등", similar: "디지털콘텐츠과, 소프트웨어공학과, 스마트소프트웨어과, 융합소프트웨어학과 등", career: "가상현실전문자, 게임프로그래머, 네트워크 관리자, 데이터베이스개발자 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ", "인공지능 수학"], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "현대사회와 윤리"], jinro: [], yonghab: [] },
+                { category: "과학/정보", general: ["기술·가정", "정보", "제2외국어"], jinro: ["물리학", "화학", "전자기와 양자", "물질과 에너지", "로봇과 공학세계", "인공지능 기초", "데이터 과학"], yonghab: ["융합과학 탐구", "창의 공학 설계", "소프트웨어와 생활"] }
+            ]},
+            "신소재공학과": { cluster: "공학 계열", desc: "결정구조 세라믹 나노소재 바이오 나노입자 디스플레이재료 연구 학과", basic: "소재기초과학, 소재열역학, 결정구조와 결함, 신소재공학실험 등", major: "금속소재개론, 세라믹소재개론, 나노과학과 기술, 결정구조분석, 재료역학 등", similar: "신소재공학과, 나노신소재공학과, 신소재응용과, 융합소재공학과 등", career: "금속재료공학시험원, 나노공학기술자, 반도체품질관리시험원, 재료공학기술자 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: [] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "화학", "생명과학", "역학과 에너지", "전자기와 양자", "물질과 에너지", "화학반응의 세계"], yonghab: ["융합과학 탐구", "과학의 역사와 문화"] },
+                { category: "정보/기타", general: ["기술·가정", "정보", "제2외국어"], jinro: ["인공지능 기초", "로봇과 공학세계"], yonghab: ["창의 공학 설계"] }
+            ]},
+            "에너지공학과": { cluster: "공학 계열", desc: "원자력 핵공학 신재생 고분자물성 전지공학 나노 자원처리 연구 학과", basic: "자원처리공학, 암석역학, 지질공학, 원자력입문, 핵공학설계, 신재생에너지 등", major: "에너지환경공학, 에너지경제학, 고분자화학, 기기분석, 에너지열역학 등", similar: "에너지자원공학과, 원자력공학과, 미래에너지공학과, 바이오에너지공학과 등", career: "바이오에너지연구원, 비파괴검사원, 산업안전원, 에너지공학기술자 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: ["수학과제 탐구"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "화학", "지구과학", "지구시스템과학", "화학 반응의 세계", "역학과 에너지", "물질과 에너지"], yonghab: ["융합과학 탐구"] },
+                { category: "정보/기타", general: ["기술·가정", "정보", "제2외국어"], jinro: ["로봇과 공학세계"], yonghab: ["창의 공학 설계"] }
+            ]},
+            "자동차공학과": { cluster: "공학 계열", desc: "연소 기관 차체제어 구조해석 전장모듈 인프라를 공부하는 학과", basic: "열역학, 동역학, 유체역학, 재료역학, 자동차재료, 전기전자공학 등", major: "자동차역학, 용접공학, 로봇공학, 연소공학, 기계진동학, 차체설계 등", similar: "자동차공학과, 미래자동차공학과, 스마트자동차공학과, 자동차튜닝과 등", career: "기계공학기술자, 레이싱 미캐닉, 메카트로닉스공학기술자, 자동차공학기술자", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: ["수학과제 탐구"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "화학", "물질과 에너지", "화학 반응의 세계", "역학과 에너지", "전자기와 양자"], yonghab: ["융합과학 탐구", "과학의 역사와 문화"] },
+                { category: "정보/기타", general: ["기술·가정", "정보", "제2외국어"], jinro: ["인공지능 기초", "로봇과 공학세계"], yonghab: ["지식 재산 일반", "창의 공학 설계"] }
+            ]},
+            "재료공학과": { cluster: "공학 계열", desc: "결정조직 유기재료 세라믹 신소재 반도체 가공 이론 실험 학과", basic: "소재기초과학, 소재열역학, 무기화학, 재료공학실험, 세라믹공정 등", major: "재료설계학, 재료선택 및 활용, 재료소성론, 재료기기분석, 고체물리학 등", similar: "기계금속재료전공, 신소재공학부, 유기재료공학과, 재료융합공학부 등", career: "금속공학기술자, 나노공학기술자, 반도체공학기술자, 재료공학기술자 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: [] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "화학", "물질과 에너지", "화학반응의 세계", "역학과 에너지", "전자기와 양자"], yonghab: ["융합과학 탐구"] },
+                { category: "정보/기타", general: ["기술·가정", "정보", "제2외국어"], jinro: ["로봇과 공학세계"], yonghab: ["지식 재산 일반", "창의 공학 설계"] }
+            ]},
+            "전기공학과": { cluster: "공학 계열", desc: "전력계통 전력전자 배전 운용 및 스마트 로봇 제어 시스템 공학 학과", basic: "전기회로, 회로이론, 전자기학, 자동제어, 배전계통운용, 전력공학 등", major: "반도체공학, 전기에너지공학, 로봇공학, 전기설비, 전력전자공학 등", similar: "전지전자공학부, 스마트전기전자공학부, 에너지전기공학과, 전기정보공학부 등", career: "기계공학기술자, 내선전공, 발전설비기술자, 송배전설비기술자, 외선전공 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["인공지능 수학", "기하", "미적분 Ⅱ"], yonghab: ["수학과 문화"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "화학", "물질과 에너지", "인공지능 기초", "화학반응의 세계", "로봇과 공학세계", "역학과 에너지", "전자기와 양자"], yonghab: ["융합과학 탐구", "과학의 역사와 문화"] },
+                { category: "정보/기타", general: ["정보", "기술·가정"], jinro: ["데이터 과학"], yonghab: ["창의공학 설계", "지식 재산 일반", "소프트웨어와 생활"] }
+            ]},
+            "전자공학과": { cluster: "공학 계열", desc: "광전자 집적회로 센서 회로 무선 디스플레이 하드웨어를 다루는 학과", basic: "회로이론, 전자기학, 전자회로, 전자장, 디지털신호처리, 제어공학 등", major: "반도체소자공학, 센서공학, 통신공학, 무선공학, 집적회로, 컴퓨터구조 등", similar: "IT전자융합공학과, 나노광전자학과, 전자·전기공학부, 디스플레이공학과 등", career: "전자공학 기술 및 연구자, 데이터베이스개발자, 로봇공학기술자 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ", "인공지능 수학"], yonghab: ["수학과 문화"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "화학", "물질과 에너지", "화학반응의 세계", "역학과 에너지", "전자기와 양자"], yonghab: ["융합과학 탐구", "과학의 역사와 문화"] },
+                { category: "정보/기타", general: ["정보", "제2외국어"], jinro: ["인공지능 기초", "로봇과 공학세계", "데이터 과학"], yonghab: ["창의공학 설계", "지식 재산 일반", "소프트웨어와 생활"] }
+            ]},
+            "정보·통신공학과": { cluster: "공학 계열", desc: "초고속 이동 위성 광통신 정보이론 서버 데이터 통신 구조 학과", basic: "회로이론, 마이크로프로세서, 정보통신개론, 디지털시스템, 디지털통신 등", major: "프로그래밍언어, 고급논리회로, 컴퓨터구조, 컴퓨터네트워크, 디지털신호처리 등", similar: "전자·정보·통신공학부, 전파정보통신공학과, ICT융합학과, IT정보제어공학부 등", career: "응용소프트웨어 개발자, 정보시스템 운영자, 웹개발자, 네트워크엔지니어 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["인공지능 수학", "기하", "미적분 Ⅱ"], yonghab: ["수학과 문화"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "화학", "물질과 에너지", "화학반응의 세계", "역학과 에너지", "전자기와 양자"], yonghab: ["영어 발표와 토론", "심화영어 독해와 작문", "융합과학 탐구", "과학의 역사와 문화"] },
+                { category: "정보/기타", general: ["정보", "제2외국어"], jinro: ["로봇과 공학세계", "데이터 과학", "인공지능 기초"], yonghab: ["창의공학 설계", "지식 재산 일반", "소프트웨어와 생활"] }
+            ]},
+            "제어계측공학과": { cluster: "공학 계열", desc: "자동제어 센서 전기전자 계측 메카트로닉스 하드웨어 모듈 학과", basic: "디지털공학 및 실험, 응용수학, 회로이론, 전기전자계측 및 실험 등", major: "반도체 공학, 스위칭 및 펄스회로 시스템공학, 컴퓨터공학, 로보틱스 등", similar: "IT정보제어공학부, 디지털제어공학전공, 전기제어공학과 등", career: "기계공학기술자, 전자공학기술자, 기계·로봇공학시험원, 전기공학 기술자 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: ["수학과제 탐구"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "역학과 에너지", "전자기와 양자"], yonghab: ["융합과학 탐구"] },
+                { category: "정보/기타", general: ["기술·가정", "정보", "제2외국어"], jinro: ["로봇과 공학세계", "인공지능 기초", "데이터 과학"], yonghab: ["창의 공학 설계", "소프트웨어와 생활"] }
+            ]},
+            "지상교통공학과": { cluster: "공학 계열", desc: "도시철도시스템 대중교통 수요 분석 지상 물류공학 기획 연구 학과", basic: "교통학개론, 교통안전공학, 교통수요분석, 도로설계, 공학수학 등", major: "교통공학론, 교통통계학, 대중교통, 물류정보시스템, 교통정책, 교통법규 등", similar: "교통공학과, 철도운전시스템과, 교통시스템공학과, 물류시스템공학전공 등", career: "공무원, 교통계획 및 설계가, 교통안전연구원, 교통영향평가원, 도시계획가 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: ["수학과 문화", "수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리"], jinro: ["한국지리 탐구", "도시의 미래 탐구"], yonghab: ["여행지리", "사회문제 탐구", "기후변화와 지속가능한 세계"] },
+                { category: "과학/정보", general: ["기술·가정"], jinro: ["물리학", "지구과학", "역학과 에너지", "지구시스템과학"], yonghab: ["기후변화와 환경생태", "융합과학 탐구", "창의 공학 설계"] }
+            ]},
+            "토목공학과": { cluster: "공학 계열", desc: "사회간접자본 기반 교량 상하수도 댐 토질 방재 인프라를 건설하는 학과", basic: "공학수학, 수리학, 토질역학, 구조공학, 철근콘크리트공학, 토목시공학 등", major: "건설시공 및 설계, 교통공학, 댐공학, 상하수도공학, 교량공학, 하천공학 등", similar: "건설시스템공학과, 건설환경공학과, 철도건설과, 토목과, 토목조경과 등", career: "건설연구원, 토목공학기술자, 측량·지리정보전문가, 건축공학기술자 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: ["수학과 문화", "수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리"], jinro: ["한국지리 탐구", "도시의 미래 탐구"], yonghab: ["여행지리", "사회문제 탐구", "기후변화와 지속가능한 세계"] },
+                { category: "과학/예술", general: ["미술"], jinro: ["물리학", "화학", "지구과학", "역학과 에너지", "물질과 에너지", "화학 반응의 세계", "지구시스템과학", "미술 창작", "미술 감상과 비평"], yonghab: ["기후변화와 환경생태", "융합과학 탐구"] },
+                { category: "정보/기타", general: ["기술·가정", "정보", "제2외국어"], jinro: ["로봇과 공학세계"], yonghab: ["창의 공학 설계", "지식 재산 일반"] }
+            ]},
+            "항공학과": { cluster: "공학 계열", desc: "비행역학 우주역학 헬리콥터 로케트 항공기체 정비 구조를 탐구하는 학과", basic: "항공우주공학개론, 열역학, 고체역학, 구조역학, 재료역학, 동역학 등", major: "자동제어, 비행역학, 항공기진동, 헬리콥터공학, 우주역학, 로케트공학 등", similar: "항공우주공학과, 항공시스템공학과, 항공정비학과, 무인항공(드론)학과 등", career: "기계공학기술자, 발사체기술연구원, 기계·로봇공학기술자, 항공공학기술자 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: ["수학과제 탐구"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "화학", "지구과학", "역학과 에너지", "전자기와 양자", "물질과 에너지", "화학 반응의 세계", "지구시스템과학", "행성우주과학"], yonghab: ["융합과학 탐구"] },
+                { category: "정보/기타", general: ["기술·가정", "정보", "제2외국어"], jinro: ["로봇과 공학세계", "인공지능 기초"], yonghab: ["지식 재산 일반", "창의 공학 설계"] }
+            ]},
+            "해양공학과": { cluster: "공학 계열", desc: "해양 플랜트 선박 계산 구조 상세 설계 모델링 성능 실험 학과", basic: "선박유체역학, 조선해양공학계획, 기초구조동역학, 용접구조설계 등", major: "해양공학실험, 선박운항제어론, 전산선박설계, 컴퓨터프로그래밍 등", similar: "선박해양공학과, 조선해양공학과, 조선해양플랜트과, 조선기계과 등", career: "도선사, 산업잠수사, 생물학연구원, 선박교통관제사, 선박기관사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: [] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "화학", "지구과학", "역학과 에너지", "전자기와 양자", "물질과 에너지", "지구시스템과학"], yonghab: ["융합과학 탐구"] },
+                { category: "정보/기타", general: ["기술·가정", "정보", "제2외국어"], jinro: ["로봇과 공학세계"], yonghab: ["창의 공학 설계"] }
+            ]},
+            "화학공학과": { cluster: "공학 계열", desc: "공정 제어 설계 화공열역학 촉매 고분자 화학 분석 제품 생산을 배우는 학과", basic: "물리화학, 유기화학, 화학생명공학, 화공기초실험, 계측실험 등", major: "공정설계, 공정제어, 공정자동화, 재료화학공학, 화공열역학 등", similar: "고분자공학과, 생명화학공학과, 화공생명학과, 나노화학공학과 등", career: "화학공학 기술자, 화학제품제조원, 환경공학기술자, 수질환경기술자 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: [] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "화학", "생명과학", "역학과 에너지", "전자기와 양자", "물질과 에너지", "화학반응의 세계"], yonghab: ["과학의 역사와 문화", "융합과학 탐구"] },
+                { category: "정보/기타", general: ["기술·가정", "정보", "제2외국어"], jinro: ["로봇과 공학세계", "인공지능 기초"], yonghab: ["창의 공학 설계"] }
+            ]},
+            "환경공학과": { cluster: "공학 계열", desc: "수처리 대기 오염 제어 폐기물 관리 토양 정화 실습을 다루는 환경 복지 학과", basic: "환경과학개론, 환경생물학, 생태학개론, 지구환경입문, 공업수학 등", major: "환경관리학, 환경정책학, 대기화학, 수질분석, 대기오염관리, 폐기물관리 등", similar: "지구환경과학과, 환경보건학과, 환경생명공학과, 환경시스템공학과 등", career: "환경공학기술자, 기후변화전문가, 대기환경기술자, 도시재생전문가 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리"], jinro: ["한국지리 탐구", "도시의 미래 탐구"], yonghab: ["여행지리", "기후변화와 지속가능한 세계"] },
+                { category: "과학/기타", general: ["기술·가정", "정보", "제2외국어"], jinro: ["물리학", "화학", "지구과학", "지구시스템과학", "화학반응의 세계", "역학과 에너지", "물질과 에너지"], yonghab: ["기후변화와 환경생태", "로봇과 공학세계", "창의 공학 설계"] }
+            ]},
+            "농수산학과": { cluster: "농생명과학 계열", desc: "식량 자원 관리 어류생태 스마트팜 양식 가공 유통 복합 생산 학과", basic: "환경과 생태, 기초 생물학, 농업의 이해, 수산업의 이해 등", major: "작물생산학, 어류생태학, 농업경제학, 수산자원학, 농수산 경영학 등", similar: "과수학과, 농학과, 농생명바이오시스템과, 농수산융합학부 등", career: "기술직 공무원, 연구원, 농업 및 스마트팜 기업, 양식 및 수산물 가공기업 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅱ", "인공지능 수학"], yonghab: ["실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["한국지리 탐구"], yonghab: [] },
+                { category: "과학/기타", general: ["정보", "기술·가정", "제2외국어"], jinro: ["물리학", "화학", "생명과학", "물질과 에너지", "지구시스템 과학", "화학 반응의 세계", "세포와 물질대사", "생물의 유전", "생활과학 탐구", "로봇과 공학세계", "인공지능 기초"], yonghab: ["융합과학 탐구", "기후변화와 환경생태", "지식 재산 일반"] },
+                { category: "교양", general: [], jinro: ["생태와 환경"], yonghab: [] }
+            ]},
+            "농업경제학과": { cluster: "농생명과학 계열", desc: "농촌 경제 구조 농산물 유통 국제 식량 환경 경제 융합 정책 학과", basic: "경제학의 이해, 농업과 사회, 기초 통계학 등", major: "미시경제학, 거시경제학, 농업경영학, 농업정책학, 농산물유통론 등", similar: "농경제사회학부, 농경제유통학부(농업경제학), 농산업학과 등", career: "농림축산식품부, 공공기관, 금융기관, 농산물 유통 및 수출입 기업 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ", "경제 수학"], yonghab: ["실용 통계", "수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "세계시민과 지리"], jinro: ["영어 발표와 토론", "법과 사회", "경제", "윤리와 사상", "국제관계의 이해"], yonghab: ["실생활 영어 회화", "세계 문화와 영어", "사회문제 탐구", "금융과 경제생활"] },
+                { category: "정보/교양", general: ["정보", "기술·가정"], jinro: ["생활과학 탐구", "인공지능 기초", "데이터 과학", "생태와 환경"], yonghab: ["인간과 경제활동", "사회문제 탐구"] }
+            ]},
+            "동물자원학과": { cluster: "농생명과학 계열", desc: "가축 반려동물 사양 번식 유전 스마트 위생 가공 바이오 학과", basic: "동물과 사회, 기초 생물학, 유전학의 기초 등", major: "동물생리학, 가축사양학, 동물번식학, 동물유전학, 축산환경 및 위생학 등", similar: "동물바이오시스템과학과, 동물산업융합학과, 동물생명산업학과 등", career: "농·축산직 공무원, 연구원, 방역사, 사료 및 동물의약품 기업 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅱ", "인공지능 수학"], yonghab: ["실용 통계"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["화학", "생명과학", "지구과학", "생물의 유전", "물질과 에너지", "지구시스템 과학", "세포와 물질대사", "화학 반응의 세계"], yonghab: ["융합과학 탐구", "기후변화와 환경생태"] },
+                { category: "정보/교양", general: ["정보", "기술·가정"], jinro: ["인공지능 기초", "생활과학 탐구", "로봇과 공학세계", "생태와 환경", "보건"], yonghab: ["지식 재산 일반"] }
+            ]},
+            "반려동물과": { cluster: "농생명과학 계열", desc: "강아지 고양이 특수동물 질병 복지 상담 매개치료 케어 가이드 학과", basic: "반려동물학 개론, 기초 생명과학, 동물복지와 윤리 등", major: "반려동물 사육 및 관리, 반려동물 질병과 예방, 동물행동학, 반려동물영양학 등", similar: "반려동물전공, 동물간호전공, 동물매개케어학과, 동물보건복지학과 등", career: "반려동물 병원, 애견미용사, 애견훈련사, 동물보건사, 반려동물 상담사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅰ", "인공지능 수학"], yonghab: ["실용 통계"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["화학", "생명과학", "지구과학", "물질과 에너지", "지구시스템 과학", "화학 반응의 세계", "세포와 물질대사", "생물의 유전"], yonghab: ["융합과학 탐구", "기후변화와 환경생태"] },
+                { category: "정보/교양", general: ["정보", "기술·가정"], jinro: ["생활과학 탐구", "인공지능 기초", "보건"], yonghab: ["지식 재산 일반"] }
+            ]},
+            "생물산업기계공학과": { cluster: "농생명과학 계열", desc: "농업용 로봇 자동화 계측 트랙터 이앙기 기계 제어 시스템 공학과", basic: "일반물리학, 공학수학, 기초기계제도 등", major: "농업기계학, 생물산업기계설계, 유체역학 및 열역학, 자동제어공학 등", similar: "농업토목, 생물산업공학부 생물산업기계공학전공, 생물산업기계공학과 등", career: "농림축산식품부, 공공기관, 농협, 농업기계 생산 회사, 엔지니어링 기업 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: ["실용 통계", "수학과제 탐구"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "화학", "생명과학", "역학과 에너지", "물질과 에너지", "화학 반응의 세계", "전자기와 양자"], yonghab: ["기후변화와 환경생태", "융합과학 탐구"] },
+                { category: "정보/교양", general: ["정보", "기술·가정"], jinro: ["생활과학 탐구", "로봇과 공학세계", "인공지능 기초", "데이터 과학", "생태와 환경"], yonghab: ["창의 공학 설계", "소프트웨어와 생활"] }
+            ]},
+            "식물자원학과": { cluster: "농생명과학 계열", desc: "식물 유전자원 약용 특용 균이 재배 유전 식물육종학 바이오 농업 학과", basic: "생명과학의 이해, 농업과 환경, 기초 화학 등", major: "작물학, 식물생리학, 토양학, 병해충관리학, 유전학 및 식물육종학 등", similar: "농업식물과학과, 생물자원공학전공, 식물생산과학부, 식물의학전공 등", career: "기술직 공무원, 농업기술원 공공기관, 종자회사, 농약·비료 관련 기업 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅰ", "인공지능 수학"], yonghab: ["실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["한국지리 탐구"], yonghab: [] },
+                { category: "과학/정보", general: ["화학", "생명과학", "지구과학", "정보", "기술·가정"], jinro: ["물질과 에너지", "지구시스템 과학", "화학 반응의 세계", "세포와 물질대사", "생물의 유전", "생활과학 탐구", "로봇과 공학세계", "인공지능 기초", "생태와 환경"], yonghab: ["융합과학 탐구", "기후변화와 환경생태", "지식 재산 일반"] }
+            ]},
+            "식품공학과": { cluster: "농생명과학 계열", desc: "동물식품 응용 바이오헬스 바이오식품 가공 미생물 품질 규격을 배우는 학과", basic: "일반화학, 생명과학, 미생물학 등", major: "식품화학, 식품미생물학, 식품가공학, 식품위생학, 식품공정공학 등", similar: "농화학식품공학과, 바이오기능성식품학과, 바이오식품공학과 등", career: "식품 제조·가공업체 연구원, HACCP 인증기관, 식품 품질관리 전문가 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: ["실용 통계"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "화학", "생명과학", "물질과 에너지", "화학 반응의 세계", "세포와 물질대사", "생물의 유전"], yonghab: ["융합과학 탐구", "기후변화와 환경생태"] },
+                { category: "정보/교양", general: ["정보", "기술·가정"], jinro: ["생활과학 탐구", "인공지능 기초", "생태와 환경", "보건"], yonghab: ["지식 재산 일반"] }
+            ]},
+            "식품영양학과": { cluster: "농생명과학 계열", desc: "위생 조리원리 단체급식 임상 영양 분석 국민 보건 증진 학과", basic: "기초 영양학, 생명과학, 화학의 기초, 식품과 건강 등", major: "영양학, 생화학, 식품위생학, 생리학, 조리원리, 단체급식 및 영양관리 등", similar: "건강기능식품학과, 바이오식품영양학부, 식품영양과학부, 외식조리영양학부 등", career: "영양사, 공무원, 식품·영양 관련 연구원, 영양교사, 임상영양사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅱ"], yonghab: ["실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화"], jinro: ["경제"], yonghab: [] },
+                { category: "과학/정보", general: ["화학", "생명과학", "정보", "기술·가정"], jinro: ["물질과 에너지", "화학 반응의 세계", "세포와 물질대사", "생물의 유전", "생활과학 탐구", "인공지능 기초", "생태와 환경", "보건"], yonghab: ["융합과학 탐구", "기후변화와 환경생태"] }
+            ]},
+            "식품조리학과": { cluster: "농생명과학 계열", desc: "푸드 스타일링 메뉴개발 외식산업 제과제빵 전문 기술 실무 학과", basic: "조리학개론, 식품과 건강, 위생학 개론 등", major: "한식·양식·중식 일식 조리실습, 제과·제빵 실습, 식품재료학 등", similar: "K-푸드과, 관광외식조리과, 글로벌명품조리과, 글로벌조리과 등", career: "한식·양식 중식 일식 조리사, 제과제빵사, 바리스타, 조리직 공무원 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅱ"], yonghab: ["실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화"], jinro: ["경제"], yonghab: [] },
+                { category: "과학/정보", general: ["화학", "생명과학", "정보", "기술·가정"], jinro: ["물질과 에너지", "화학 반응의 세계", "세포와 물질대사", "생물의 유전", "생활과학 탐구", "인공지능 기초", "생태와 환경", "보건"], yonghab: ["융합과학 탐구", "기후변화와 환경생태"] }
+            ]},
+            "원예학과": { cluster: "농생명과학 계열", desc: "채소 과수 화훼 번식 시설 유기 재배 기술 및 유전 육종학 원예학과", basic: "식물의 이해, 원예학개론, 생명과학 등", major: "채소학, 과수학, 화훼학, 식물생리학, 원예유전학 및 육종학 등", similar: "산림생태보호학과, 산림조경원예학과, 산림과학전공 등", career: "기술직 공무원, 농촌진흥청 공공기관, 스마트팜 및 원예작물 재배 농장 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅱ", "인공지능 수학"], yonghab: ["실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["한국지리 탐구"], yonghab: [] },
+                { category: "과학/정보", general: ["화학", "생명과학", "지구과학", "정보", "기술·가정"], jinro: ["물질과 에너지", "세포와 물질대사", "화학 반응의 세계", "생물의 유전", "지구시스템 과학", "인공지능 기초", "생활과학 탐구", "로봇과 공학세계", "생태와 환경"], yonghab: ["융합과학 탐구", "기후변화와 환경생태", "지식 재산 일반"] }
+            ]},
+            "조경학과": { cluster: "농생명과학 계열", desc: "정원 예술 환경 복원 시공 수목학 생태 경관 배치를 설계하는 학과", basic: "조경의 이해, 디자인 기초, 환경생태학 등", major: "조경계획학, 조경설계학, 식재설계 및 식물재료학, 조경사 및 조경이론 등", similar: "녹지조경학과, 도시계획학과, 도시환경예술디자인전공, 산림과학 등", career: "기술직 공무원, 공원 및 도시개발 관련 공공기관, 한국임업진흥원 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅱ", "인공지능 수학"], yonghab: ["실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["한국지리 탐구", "도시의 미래 탐구"], yonghab: ["기후변화와 환경생태"] },
+                { category: "과학/정보", general: ["화학", "생명과학", "지구과학", "정보", "기술·가정"], jinro: ["화학 반응의 세계", "물질과 에너지", "세포와 물질대사", "생물의 유전", "지구시스템 과학", "생활과학 탐구", "인공지능 기초"], yonghab: ["지식 재산 일반"] }
+            ]},
+            "축산학과": { cluster: "농생명과학 계열", desc: "가축 육종 영양 번식 유통 위생 스마트 목장 시스템 공학 학과", basic: "동물과 인간, 기초생물학, 축산학개론 등", major: "가축번식학, 사료학 및 동물영양학, 가축육종학, 축산환경위생학 등", similar: "동물사육학전공, 말산업학과, 식품생명·축산과학부, 축산과학부 등", career: "동물산업 공공기관, 국립축산과학원 연구원, 방역사, 축산물등급판정사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅱ", "인공지능 수학"], yonghab: ["실용 통계"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["화학", "생명과학", "지구과학", "생물의 유전", "물질과 에너지", "지구시스템 과학", "세포와 물질대사", "화학 반응의 세계"], yonghab: ["융합과학 탐구", "기후변화와 환경생태"] },
+                { category: "정보/교양", general: ["정보", "기술·가정"], jinro: ["인공지능 기초", "생활과학 탐구", "로봇과 공학세계", "생태와 환경", "보건"], yonghab: ["지식 재산 일반"] }
+            ]},
+            "가정교육과": { cluster: "사범 계열", desc: "교직이론 바탕의 기술가정 중고교 중등 정교사 임용 양성 학과", basic: "가정교육학개론, 교직이론(교육과정, 교육심리, 교육 방법 및 교육공학 등)", major: "영양학, 식품화학, 의류재료학, 피복관리학, 주거학, 아동학, 가족학 등", similar: "기술교육과, 소비자학과, 아동가족학과, 식품영양학과, 주거환경학과 등", career: "중·고등학교 가정 교사, 교육청·교육연구기관 교육전문직, 소비자상담사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "기가/교양", general: ["기술·가정"], jinro: ["생활과학 탐구", "교육의 이해", "아동발달과 부모"], yonghab: ["논술"] }
+            ]},
+            "경영금융교육과": { cluster: "사범 계열", desc: "상업 상법 전사적자원관리 마케팅 상업정교사 임용 양성 학과", basic: "교직이론(교육과정, 교육심리, 교육 방법 등), 무역학개론, 세무회계 등", major: "경제 경영학원론, 상업교육론, 광고학개론, 재무회계, 마케팅조사론 등", similar: "경영/경제학과, 통계학과, 마케팅과", career: "경영·금융 상업 교사, 기업 회계·재무·세무 관련 전문가 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["경제 수학"], yonghab: ["실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: ["경제", "법과 사회"], yonghab: ["사회문제 탐구", "금융과 경제생활", "윤리문제 탐구"] },
+                { category: "정보/교양", general: ["기술·가정", "정보"], jinro: ["인공지능 기초", "데이터 과학", "교육의 이해"], yonghab: ["소프트웨어와 생활", "논술"] }
+            ]},
+            "교육학과": { cluster: "사범 계열", desc: "교육사상 교수방법 행정 철학 평생교육 전문가 교원 양성 학과", basic: "교직이론(교육과정, 교육심리, 교육 방법 및 교육공학, 교육평가 등)", major: "교육과정, 교수학습방법론, 교육평가론, 교육사상사, 교육정책, 평생교육론", similar: "교육학과, 교육공학과, 교육심리학과, 교육행정학과 등", career: "교육청·교육연구기관 연구직, 교사, 교육행정직, 교육컨설턴트 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "현대사회와 윤리"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "교양", general: [], jinro: ["교육의 이해"], yonghab: ["논술"] }
+            ]},
+            "국어교육과": { cluster: "사범 계열", desc: "국어학 고전문학 화법 작문 지도 중등 2급 정교사 임용 양성 학과", basic: "국어교육학개론, 문학교육원론, 교직이론(교육심리, 방법, 공학 등)", major: "독서교육론, 작문교육론, 화법교육론, 국어교수학습론", similar: "국어국문학과, 언어교육학과, 문예창작과, 문헌정보학과", career: "교사(중등), 교육행정기관, 언론기관, 한국어 강사 등", subjects: [
+                { category: "국어", general: ["화법과 언어", "독서와 작문", "문학"], jinro: ["주제 탐구 독서", "문학과 영상"], yonghab: ["독서 토론과 글쓰기", "직무 의사소통", "매체 의사소통", "언어생활 탐구"] },
+                { category: "수학/영어", general: ["대수", "미적분 Ⅰ", "확률과 통계", "영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: [], yonghab: [] },
+                { category: "사회/교양", general: ["현대사회와 윤리", "사회와 문화"], jinro: ["교육의 이해"], yonghab: ["사회문제 탐구", "윤리문제 탐구", "논술"] }
+            ]},
+            "기계/재료공학교육과": { cluster: "사범 계열", desc: "공업수학 고체 열역학 가공 기술 공업계 고교 정교사 양성 학과", basic: "교직이론(교육과정, 교육심리, 교육 방법 등), 기계공학개론 등", major: "재료공학개론, 공업수학, 열역학, 재료역학, 기계 설계학 등", similar: "기계공학과, 재료공학과, 기계재료공학과, 금속공학과 등", career: "중·고등학교 기계재료공학 교사, 기계 및 재료 관련 연구소 연구원 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "과학/기타", general: ["물리학", "화학", "기술·가정"], jinro: ["역학과 에너지", "전자기와 양자", "물질과 에너지", "화학 반응의 세계", "로봇과 공학세계", "교육의 이해"], yonghab: ["논술"] }
+            ]},
+            "기술교육과": { cluster: "사범 계열", desc: "수송 제조 건설 공업역학 정보시스템 중등 기술 교원 양성 학과", basic: "기술교육론, 교직이론(교육과정, 교육심리, 교육 방법 및 교육공학 등)", major: "에너지 기술, 건축기술, 기계기술, 토목기술, 정보통신기술, 공업역학", similar: "가정교육과, 공학 계열 교육과", career: "중·고등학교 기술·가정 교사, 교육청·교육연구기관 연구직 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "기가/교양", general: ["기술·가정"], jinro: ["로봇과 공학세계", "교육의 이해"], yonghab: ["창의 공학 설계", "지식 재산 일반", "논술"] }
+            ]},
+            "농림/축산교육과": { cluster: "사범 계열", desc: "식물 유전 토양 병해충 농생명 스마트팩토리 고교 교사 양성 학과", basic: "교직이론(교육과정, 교육심리, 교육 방법 등), 농업생물학 등", major: "농업화학, 작물학, 토양학, 축산학, 농업경영학, 농업교육론", similar: "농업교육과, 농업생명과학과, 축산학과, 동물과학과 등", career: "농업경영컨설턴트, 스마트 팜 컨설턴트, 농림어업 시험원 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "과학/기타", general: ["화학", "생명과학", "기술·가정"], jinro: ["세포와 물질대사", "생물의 유전", "교육의 이해"], yonghab: ["논술"] }
+            ]},
+            "물리교육과": { cluster: "사범 계열", desc: "전자기 광학 열물리 현대물리학 중등 과학 물리 교사 양성 학과", basic: "과학교육론, 일반물리학 및 실험, 교직이론(교육과정, 교육심리 등)", major: "물리교육론, 역학, 전자기학, 양자역학, 현대물리학, 열역학 등", similar: "물리학과, 과학교육과", career: "중등학교 과학 교사, 교육기관, 연구 및 개발원, 과학 커뮤니케이션 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ", "인공지능 수학"], yonghab: ["수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "과학/교양", general: [], jinro: ["물리학", "화학", "생명과학", "지구과학", "역학과 에너지", "전자기와 양자", "물질과 에너지", "화학 반응의 세계", "교육의 이해"], yonghab: ["과학의 역사와 문화", "기후변화와 환경생태", "융합과학 탐구", "논술"] }
+            ]},
+            "생물교육과": { cluster: "사범 계열", desc: "분자 생리 유전 생태 진화학 과학교재 연구 정교사 양성 학과", basic: "일반생물학, 교직이론(교육과정, 교육심리, 교육 방법 등)", major: "유전학, 생태학, 식물학, 진화학, 분자생물학, 생화학, 생물교육론", similar: "생물학과, 생명과학과, 생명공학과, 과학교육과", career: "중등학교 과학교사, 병원 연구실, 제약회사, 바이오산업계 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ", "인공지능 수학"], yonghab: ["수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "과학/교양", general: [], jinro: ["물리학", "화학", "생명과학", "지구과학", "물질과 에너지", "화학 반응의 세계", "세포와 물질대사", "생물의 유전", "지구시스템과학", "행성우주과학", "교육의 이해"], yonghab: ["과학의 역사와 문화", "기후변화와 환경생태", "융합과학 탐구", "논술"] }
+            ]},
+            "수산/해양교육과": { cluster: "사범 계열", desc: "해양생태 선박운항 어업 환경 수산 고교 전문 임용 정교사 학과", basic: "교직이론(교육과정, 교육심리, 교육 방법 등), 해양학개론 등", major: "해양학개론, 수산학개론, 수산자원학, 승선실습, 해양생태학, 선박조종론 등", similar: "해양학과, 수산학과, 해양생물학과, 해양환경학과 등", career: "양식 기술 관리자, 수산 질병 관리사, 선박 항해사, 해양경찰 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ"], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "과학/기타", general: ["물리학", "생명과학", "지구과학", "기술·가정"], jinro: ["역학과 에너지", "생물의 유전", "세포와 물질대사", "지구시스템 과학", "로봇과 공학세계", "교육의 이해"], yonghab: ["논술"] }
+            ]},
+            "수학교육과": { cluster: "사범 계열", desc: "대수 해석 현대 기하 이산 정수론 중등 수학교사 임용 학과", basic: "교직이론(교육과정, 교육심리, 교육 방법 등), 미적분학 등", major: "해석학, 현대대수학, 위상수학, 이산수학, 미분기하학, 정수론, 수학교육론", similar: "수학과, 통계학과, 응용수학과, 데이터사이언스학과", career: "중등학교 수학 교사, 교육 관련 기관, 산업체 연구소, 교수", subjects: [
+                { category: "국어", general: ["화법과 언어", "독서와 작문", "문학"], jinro: [], yonghab: [] },
+                { category: "수학", general: ["대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ", "경제 수학", "인공지능 수학", "직무 수학"], yonghab: ["수학과 문화", "실용 통계", "수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "교양", general: [], jinro: ["교육의 이해"], yonghab: ["논술"] }
+            ]},
+            "역사교육과": { cluster: "사범 계열", desc: "동아시아 역사 기행, 사학 방법 역사관 중등 역사 교사 학과", basic: "역사교육학개론, 교직이론(교육과정, 교육심리, 교육평가 등)", major: "역사학개론, 한국사개론, 역사교육론, 역사교육방법론, 서양중세사 등", similar: "역사학과, 사학과, 국사학과, 동양사학과, 역사문화학과", career: "중·고등학교 역사 교사, 교육청 연구직, 박물관 학예사, 교수", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리", "세계사", "사회와 문화", "현대사회와 윤리"], jinro: ["동아시아 역사 기행"], yonghab: ["역사로 탐구하는 현대 세계", "사회문제 탐구", "윤리문제 탐구"] },
+                { category: "교양", general: [], jinro: ["교육의 이해"], yonghab: ["논술"] }
+            ]},
+            "영어교육과": { cluster: "사범 계열", desc: "영문법 어학 독해 작문 말하기 청해 중등 영어교사 양성 학과", basic: "영어학개론, 영어교육론, 교직이론(교육과정, 교육심리, 교육평가 등)", major: "영어문법론, 영어교육론, 영미문학개론, 멀티미디어 영어교육 등", similar: "영어영문학과, 영어통번역학과, 영어학과", career: "중등학교 교사, 교육 연구원, 콘텐츠 개발 기업, 교수", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["영미 문학 읽기", "영어 발표와 토론", "심화 영어", "심화 영어 독해와 작문", "직무 영어"], yonghab: ["실생활 영어 회화", "미디어 영어", "세계 문화와 영어"] },
+                { category: "사회/교양", general: ["현대사회와 윤리", "사회와 문화"], jinro: ["교육의 이해"], yonghab: ["사회문제 탐구", "윤리문제 탐구", "논술"] }
+            ]},
+            "유아교육과": { cluster: "사범 계열", desc: "아동 복지 심리 건강 아동발달 부모 교육 놀이지도 교사 학과", basic: "교직이론(교육과정, 교육심리, 교육 방법 및 교육공학 등)", major: "유아교육학개론, 아동발달학, 유아교육과정론, 유아교수방법론, 부모교육론", similar: "아동학과, 아동복지학과, 아동심리학과, 보육학과, 가정교육학과", career: "유치원 교사, 어린이집 보육교사, 아동교육 관련 기관 전문원", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "기타/교양", general: ["기술·가정"], jinro: ["생활과학 탐구", "교육의 이해"], yonghab: ["생애 설계와 자립", "아동발달과 부모", "논술"] }
+            ]},
+            "윤리교육과": { cluster: "사범 계열", desc: "인성 도덕 가치판단 동서양 윤리 사상사 도덕 윤리 교사 학과", basic: "윤리교육학개론, 교직이론(교육과정, 교육심리, 교육평가 등)", major: "사회교육론, 도덕적 사고와 윤리교육, 인성교육론, 시민윤리 교육론 등", similar: "윤리교육과, 철학과, 인문학부", career: "중·고등학교 일반사회 교사, 교육청 교육전문직, 행정 공무원 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리", "세계사", "사회와 문화", "현대사회와 윤리"], jinro: ["인문학과 윤리", "윤리와 사상", "정치"], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "외국어/교양", general: ["제2외국어"], jinro: ["한문 고전 읽기", "교육의 이해"], yonghab: ["언어생활과 한자", "논술"] }
+            ]},
+            "음악/미술교육과": { cluster: "사범 계열", desc: "드로잉 색채 화성학 전공실기 합창 합주 미술 감상 실기교사 학과", basic: "음악/미술 교육학, 교직이론(교육과정, 교육심리, 교육평가 등)", major: "음악철학, 가창지도법, 합창지도법, 미술 교수법, 미술 이론, 회화, 조소", similar: "작곡과, 성악과, 기악과 / 회화과, 조소과, 시각디자인과 등", career: "중·고등학교 음악/미술 교사, 공연기획, 전시기획자·큐레이터 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "예술/교양", general: ["음악", "미술"], jinro: ["미술 감상과 비평", "음악 연주와 창작", "음악 감상과 비평", "미술 창작", "교육의 이해"], yonghab: ["음악과 미디어", "미술과 매체", "논술"] }
+            ]},
+            "일반사회교육과": { cluster: "사범 계열", desc: "정치 경제 법 사회학 방법론 통합 일반사회 정교사 임용 학과", basic: "사회교육학개론, 교직이론(교육과정, 교육심리, 교육평가 등)", major: "사회교육론, 정치학, 법학, 경제학, 사회학, 철학 및 윤리", similar: "사회교육과, 정치외교학과, 법학과, 행정학과, 경제학과, 사회학과 등", career: "중·고등학교 일반사회 교사, 교육청·교육연구기관 교육전문직 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["경제 수학"], yonghab: ["실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리", "세계사", "사회와 문화", "현대사회와 윤리"], jinro: ["정치", "법과 사회", "경제", "국제 관계의 이해"], yonghab: ["사회문제 탐구", "금융과 경제생활", "윤리문제 탐구"] },
+                { category: "교양", general: [], jinro: ["교육의 이해"], yonghab: ["논술"] }
+            ]},
+            "전기/전자교육과": { cluster: "사범 계열", desc: "회로 실험 전력 전자 제어 신호 마이스터고 정교사 양성 학과", basic: "교직이론(교육과정, 교육심리, 교육 방법 및 교육공학 등)", major: "전기전자 교수법, 반도체 공학, 회로 이론, 전자기학, 미적분학 등", similar: "전기공학과, 전자공학과, 정보통신공학과, 제어계측공학과 등", career: "중등 정교사 2급(전기·전자), 공기업 소장, 전기안전관리자 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "과학/기타", general: ["물리학", "화학", "기술·가정", "정보"], jinro: ["역학과 에너지", "전자기와 양자", "물질과 에너지", "화학 반응의 세계", "인공지능 기초", "데이터 과학", "로봇과 공학세계", "교육의 이해"], yonghab: ["소프트웨어와 생활", "논술"] }
+            ]},
+            "정보통신교육과": { cluster: "사범 계열", desc: "디지털 신호 처리 통신 프로토콜 소프트웨어 정보 교사 학과", basic: "교직이론(교육과정, 교육심리, 교육 방법 및 교육공학 등)", major: "디지털 통신, 데이터 통신, 전자파이론, 센서제어, 공업물리, 공업수학", similar: "정보통신공학과, 전기전자공학과, 컴퓨터공학과, 소프트웨어공학과 등", career: "네트워크 엔지니어, IT 시스템 운영자, 임베디드 SW 개발자 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "과학/정보", general: ["물리학", "정보"], jinro: ["역학과 에너지", "전자기와 양자", "인공지능 기초", "데이터 과학", "교육의 이해"], yonghab: ["소프트웨어와 생활", "논술"] }
+            ]},
+            "제2외국어/한문교육과": { cluster: "사범 계열", desc: "외국학 고전번역 한문고전 문법 제2외국어 교원 학과", basic: "교직이론(교육과정, 교육심리, 교육평가, 교육행정, 교육사회 등)", major: "제2외국어학개론, 문법론, 교육론, 한문학개론, 한문 문법론, 교육론 등", similar: "영어교육과, 외국어계열학과, 한문학과, 중국학과, 동양학과 등", career: "중·고등학교 제2외국어 교사, 중·고등학교 한문 교사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: ["영미 문학 읽기", "영어 발표와 토론", "심화 영어", "심화 영어 독해와 작문", "직무 영어"], yonghab: ["실생활 영어 회화", "미디어 영어", "세계 문화와 영어", "사회문제 탐구", "윤리문제 탐구"] },
+                { category: "기타", general: ["제2외국어", "한문"], jinro: ["제2외국어 회화", "심화 제2외국어", "한문 고전 읽기", "교육의 이해"], yonghab: ["제2외국어 문화", "언어생활과 한자", "논술"] }
+            ]},
+            "지구과학교육과": { cluster: "사범 계열", desc: "지층 해양 기상 천문 행성 우주 과학 정교사 임용 학과", basic: "일반지구과학, 교직이론(교육과정, 교육심리, 교육평가 등)", major: "천문학, 대기과학, 암석학, 해양학지질학, 고생물학, 지구물리학 등", similar: "지구과학과, 천문우주과학과, 해양학과, 기상과학과, 대기과학과 등", career: "중·고등학교 지구과학 교사, 교육청 연구원, 기상청 공무원 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ", "인공지능 수학"], yonghab: ["수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "과학/교양", general: [], jinro: ["물리학", "화학", "생명과학", "지구과학", "역학과 에너지", "전자기와 양자", "지구시스템과학", "행성우주과학", "교육의 이해"], yonghab: ["과학의 역사와 문화", "기후변화와 환경생태", "융합과학 탐구", "논술"] }
+            ]},
+            "지리교육과": { cluster: "사범 계열", desc: "자연 인문 한국 지리 공간분석 지도학 지리교사 임용 학과", basic: "지리학개론, 교직이론(교육과정, 교육심리, 교육평가 등)", major: "지리교육론, 지역지리학, 환경지리학, 도시지리학, 경제지리학, 한국지리 등", similar: "지리학과, 지역개발학과, 공간정보학과, 도시계획학과, 관광학과 등", career: "중·고등학교 지리 교사, 교육청·연구기관 교육연구직, 국토연구원 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "현대사회와 윤리", "세계시민과 지리", "세계사"], jinro: ["한국지리 탐구", "도시의 미래 탐구"], yonghab: ["여행지리", "사회문제 탐구", "윤리문제 탐구", "기후변화와 지속가능한 세계"] },
+                { category: "교양", general: [], jinro: ["교육의 이해"], yonghab: ["논술"] }
+            ]},
+            "체육교육과": { cluster: "사범 계열", desc: "운동생리 역학 심리 종목 지도법 중등 체육 정교사 양성 학과", basic: "체육교육학개론, 교직이론(교육과정, 교육심리, 교육평가 등)", major: "체육교육학, 체육사, 운동생리학, 체육교과교육론, 체육실기", similar: "체육학과, 스포츠과학과, 운동건강학과, 생활체육학과 등", career: "중·고등학교 체육 교사, 교육청·체육 관련 연구기관 연구직 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "체육/교양", general: ["체육1", "체육2"], jinro: ["운동과 건강", "스포츠 문화", "스포츠 과학", "교육의 이해"], yonghab: ["스포츠 생활1", "스포츠 생활2", "논술"] }
+            ]},
+            "초등교육과": { cluster: "사범 계열", desc: "초등 아동발달 전과목 교과교육 전담 초등 정교사 양성 학과", basic: "교직이론(교육과정, 교육심리, 교육 방법 및 교육공학 등)", major: "초등교육학개론, 아동발달학, 초등학교 교육과정론, 교육평가론 등", similar: "교육학과, 아동교육학과, 유아교육학과, 사회복지학과, 아동학과", career: "초등학교 교사, 방과후학교 교사, 학원 강사, 교육청 연구직 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "교양", general: [], jinro: ["교육의 이해"], yonghab: ["논술"] }
+            ]},
+            "컴퓨터교육과": { cluster: "사범 계열", desc: "프로그래밍 정보 알고리즘 구조 컴퓨터 교사 임용 양성 학과", basic: "교직이론(교육과정, 교육심리, 교육 방법 및 교육공학 등)", major: "컴퓨터과학개론, 프로그래밍 언어, 컴퓨터 교육론", similar: "소프트웨어교육과, 정보교육과, 컴퓨터공학과, 소프트웨어학과 등", career: "소프트웨어 개발자 프로그래머, IT 기업, 에듀테크 기업 등", subjects: [
+                { category: "국어", general: ["화법과 언어", "독서와 작문", "문학"], jinro: [], yonghab: [] },
+                { category: "수학", general: ["대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ", "인공지능 수학"], yonghab: ["실용 통계", "수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "정보/교양", general: ["정보"], jinro: ["인공지능 기초", "데이터 과학", "교육의 이해"], yonghab: ["소프트웨어와 생활", "논술"] }
+            ]},
+            "특수교육과": { cluster: "사범 계열", desc: "장애이해 개별화 장애유형별 진단 특수 교사 임용 양성 학과", basic: "특수교육학개론, 교직이론(교육과정, 교육심리, 교육평가 등)", major: "아동발달 및 특수아동발달, 장애이해 및 분류, 특수교육과정 등", similar: "유아 및 초등 특수교육과, 장애인복지학과, 심리학과 등", career: "중·고등학교 특수교사, 특수학교 교사, 특수교육지원센터 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "교양", general: [], jinro: ["교육의 이해"], yonghab: ["논술"] }
+            ]},
+            "화학교육과": { cluster: "사범 계열", desc: "유기 무기 분석 생화학 실험 중등 화학교사 임용 학과", basic: "일반화학, 교직이론(교육과정, 교육심리, 교육평가 등)", major: "유기화학, 무기화학, 물리화학, 분석화학, 화학교육론, 생화학 등", similar: "화학과, 화학공학과, 응용화학과, 생화학과, 나노화학과 등", career: "중등학교 과학교사, 화학 기반 기업 연구, 교육 공무원 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["기하", "미적분 Ⅱ", "인공지능 수학"], yonghab: ["수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: [], yonghab: [] },
+                { category: "과학/교양", general: [], jinro: ["물리학", "화학", "생명과학", "지구과학", "역학과 에너지", "전자기와 양자", "물질과 에너지", "화학 반응의 세계", "교육의 이해"], yonghab: ["과학의 역사와 문화", "기후변화와 환경생태", "융합과학 탐구", "논술"] }
+            ]},
+            "경찰행정학과": { cluster: "사회 계열", desc: "형사소송법 범죄예방론 범죄수사 대테러리즘 치안 학과", basic: "경찰학개론, 경찰행정학과, 체포술, 범죄심리학, 형사소송법 등", major: "무술, 경찰과 사회, 범죄예방론, 범죄수사론, 경찰행정법 등", similar: "경찰학과, 경찰안보학과, 경찰소방행정학과, 국방경찰행정학부 등", career: "경찰관, 경호원, 교도관, 검찰수사관, 경비업체종사자, 공무원 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["경제 수학", "직무 수학"], yonghab: ["실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "세계시민과 지리", "현대사회와 윤리"], jinro: ["법과 사회", "경제", "한국지리 탐구", "정치", "국제관계의 이해", "윤리와 사상"], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "교양", general: [], jinro: ["논리와 사고", "인간과 심리", "인간과 철학"], yonghab: [] }
+            ]},
+            "국제학과": { cluster: "사회 계열", desc: "세계정치 외교 협상 현대중국정치론 교류 전문 학과", basic: "국제관계이론, 정치학개론, 다문화사회론, 세계정치론, 외교정책론 등", major: "국제정치경제, 국제협상, 에너지와 국제관계, 외교사, 외교정책 등", similar: "국제학부, 국제관계학과, 글로벌경제학과 등", career: "번역가, 외교관, 해외영업원, 행사기획자, 언론계 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["경제 수학", "직무 수학"], yonghab: ["실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리", "세계사", "사회와 문화"], jinro: ["영미 문학 읽기", "영어 발표와 토론", "심화 영어", "심화 영어 독해와 작문", "동아시아 역사 기행", "정치", "법과 사회", "경제", "국제 관계의 이해"], yonghab: ["세계 문화와 영어", "여행지리", "기후변화와 지속가능한 세계", "역사로 탐구하는 현대 세계", "사회문제 탐구"] },
+                { category: "외국어", general: ["제2외국어"], jinro: ["제2외국어 회화", "심화제2외국어"], yonghab: ["제2외국어 문화"] }
+            ]},
+            "군사학과": { cluster: "사회 계열", desc: "국가안보 군사이론 북한학 국방운영분석 장교 임용 학과", basic: "군사학개론, 국가안보론, 군사이론, 북한학, 군사영어 등", major: "전쟁법, 국방경제론, 국방운영분석, 군사체육, 안보현장실습 등", similar: "사이버국방학과, 국방시스템공학과, 국방공무원학과 등", career: "군인, 군무원, 국방연구원, 국방 관련 기업체 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["경제수학", "직무수학"], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "현대사회와 윤리", "세계시민과 지리"], jinro: ["법과 사회", "경제", "국제관계의 이해"], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "교양", general: [], jinro: ["논리와 사고", "인간과 심리", "인간과 철학"], yonghab: [] }
+            ]},
+            "법학과": { cluster: "사회 계열", desc: "민소법 형소법 채권 상법 법철학 경제법 실무 사법 학과", basic: "법학개론, 헌법, 민법총칙, 형법총론, 채권총론, 상법총칙 등", major: "채권각론, 형법각론, 민사소송법, 형사소송법, 행정법, 경제법 등", similar: "경찰법학전공, 공법학전공, 법률실무과, 사법학전공, 지식재산학과 등", career: "감사사무원, 감정평가사, 검사, 경찰관리자, 관세사, 노무사, 법무사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["경제 수학"], yonghab: ["독서 토론과 글쓰기", "실용 통계", "수학과제 탐구"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "현대사회와 윤리"], jinro: ["국제 관계의 이해", "정치", "법과 사회", "경제"], yonghab: ["사회문제 탐구", "금융과 경제생활"] },
+                { category: "기타", general: ["제2외국어"], jinro: ["한문", "논리와 사고"], yonghab: ["논술"] }
+            ]},
+            "보건행정학과": { cluster: "사회 계열", desc: "의료제도 병원경영 정책 자산 조세 조율 데이터베이스 학과", basic: "보건행정학, 보건의료제도론, 보건사업계획, 병원행정, 병원경영 등", major: "건강증진학, 보건경제학, 보건정책학, 의료재무관리, 보건데이터베이스 등", similar: "의료경영과, 의무행정과, 의료정보시스템전공, 보건의료정보과 등", career: "관리비서, 관세행정사무원, 병원행정사무원, 보험사무원, 의무기록사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["경제 수학", "직무 수학"], yonghab: ["실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "현대사회와 윤리"], jinro: ["정치", "법과 사회", "경제", "인문학과 윤리"], yonghab: ["사회문제 탐구", "금융과 경제생활", "윤리문제 탐구"] },
+                { category: "과학/교양", general: [], jinro: ["생명과학", "보건"], yonghab: [] }
+            ]},
+            "사회복지학과": { cluster: "사회 계열", desc: "사회보장정책 행정론 아동 노인 실천 복지국가 학과", basic: "사회복지개론, 사회복지실천론, 사회복지조사방법론, 사회복지발달사 등", major: "사회복지정책론, 사회보장법제, 사회복지행정, 사회문제론, 노인복지론 등", similar: "불교사회복지학과, 사회복지경영학부, 사회복지행정학과 등", career: "상담전문가, 임상심리사, 사회복지사, 직업상담사, 청소년상담사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["경제 수학", "직무 수학"], yonghab: ["실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "현대사회와 윤리"], jinro: ["정치", "법과 사회", "경제"], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "기가/교양", general: ["기술·가정"], jinro: ["생활과학 탐구", "보건"], yonghab: ["생애 설계와 자립", "아동발달과 부모"] }
+            ]},
+            "사회학과": { cluster: "사회 계열", desc: "변동론 문화 교육 정치 계층구조 다차원 현상학 학과", basic: "사회학개론, 사회학사, 사회사상사, 사회학방법론, 사회통계학 등", major: "사회변동론, 사회발전론, 정치사회학, 경제사회학, 문화사회학 등", similar: "사회생활과, 도시사회학과, 정보사회학과, 사회언론정보학부 등", career: "국회의원, 정부공공기관, 여론조사 및 시장 조사기업, 방송사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["경제 수학", "직무 수학"], yonghab: ["실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리", "사회와 문화", "현대사회와 윤리"], jinro: ["도시의 미래 탐구", "정치", "법과 사회", "경제", "윤리와 사상", "국제 관계의 이해"], yonghab: ["사회문제 탐구", "기후변화와 지속가능한 세계"] }
+            ]},
+            "신문방송학과": { cluster: "사회 계열", desc: "뉴미디어 대중문화 저널리즘 기획 연출 스펙트럼 학과", basic: "커뮤니케이션의 이해, 한국언론사, 신문론, 방송론, 영화론, 광고론 등", major: "커뮤니케이션연구방법론, 뉴미디어론, 대중문화론, 언론법제론 등", similar: "언론학전공, 언론학과, 언론정보학과, 저널리즘전공 등", career: "방송광고공사, 언론사, 방송국, 신문사, 잡지사, 광고기획사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["문학과 영상", "경제 수학", "직무 수학"], yonghab: ["매체 의사소통", "실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "현대사회와 윤리"], jinro: ["정치", "법과 사회", "국제 관계의 이해"], yonghab: ["미디어 영어", "세계 문화와 영어", "윤리문제 탐구", "사회문제 탐구"] },
+                { category: "교양", general: [], jinro: ["인간과 심리"], yonghab: [] }
+            ]},
+            "심리학과": { cluster: "사회 계열", desc: "사회 발달 인지 학습 성격 상담치료 기제 분석 학과", basic: "심리학의 기초, 심리학개론, 심리통계 등", major: "발달심리학, 성격심리학, 사회심리학, 학습심리학, 인지심리학 등", similar: "상담심리학과, 사회심리학과, 산업심리학과, 심리상담학과 등", career: "대학교수, 상담교사, 임상심리사, 놀이치료사, 미술치료사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["경제 수학", "직무 수학"], yonghab: ["실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "현대사회와 윤리"], jinro: ["경제", "정치", "윤리와 사상"], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "과학/교양", general: [], jinro: ["생명과학", "인간과 심리"], yonghab: [] }
+            ]},
+            "아동복지학과": { cluster: "사회 계열", desc: "아동 청소년 상담 예방 교정 정신건강 보장학 과목 학과", basic: "사회복지개론, 사회복지실천론, 사회복지조사방법론, 사회복지발달사 등", major: "정신건강론, 아동복지론, 재활치료, 상담심리, 가족관계와 가족상담 등", similar: "아동복지학전공, 아동청소년복지학과, 청소년복지학과 등", career: "보육교사, 사회복지사, 상담전문가, 유치원교사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["경제 수학", "직무 수학"], yonghab: ["실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "현대사회와 윤리"], jinro: ["정치", "법과 사회", "경제"], yonghab: ["윤리문제 탐구", "사회문제 탐구"] },
+                { category: "기타", general: ["기술·가정"], jinro: ["생활과학 탐구"], yonghab: ["생애 설계와 자립", "아동발달과 부모"] }
+            ]},
+            "정치외교학과": { cluster: "사회 계열", desc: "정치 사상 비교정치 외교사 안보론 전략을 탐구 연구 학과", basic: "정치학개론, 국제정치학개론, 외교론, 국제관계론, 비교정치론 등", major: "정치학방법론, 한국정치사상, 국제정치사상, 동양정치사상 등", similar: "정치외교학부, 국제학과, 외교학과, 정치행정학과 등", career: "중앙정부 공무원, 언론사, 방송사, 신문사, 정치문화연구소 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["경제 수학", "직무 수학"], yonghab: ["매체 의사소통", "실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리", "세계사", "사회와 문화", "현대사회와 윤리"], jinro: ["도시의 미래 탐구", "한국지리 탐구", "정치", "법과 사회", "경제", "국제 관계의 이해", "윤리와 사상", "인문학과 윤리"], yonghab: ["미디어 영어", "세계 문화와 영어", "기후변화와 지속가능한 세계", "사회문제 탐구", "윤리문제 탐구"] }
+            ]},
+            "지리학과": { cluster: "사회 계열", desc: "인문 지형 국토주택 컴퓨터 지도 조형 정보 공학 학과", basic: "지형학, 한국지역연구, 경제지리학, 세계지역 연구, 지리정보시스템 등", major: "자연지리학개론, 인문지리학개론, 도시지리학, 토지주택론 등", similar: "지리교육과 등", career: "GIS 전문가, 지리학연구원, 측량사, 지리교사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["경제 수학", "직무 수학", "기하"], yonghab: ["실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리", "사회와 문화"], jinro: ["한국지리 탐구", "도시의 미래 탐구", "경제", "국제 관계의 이해"], yonghab: ["세계 문화와 영어", "여행지리", "기후변화와 지속가능한 세계", "사회문제 탐구"] },
+                { category: "과학/교양", general: [], jinro: ["생명과학", "지구과학", "지구시스템과학", "생태와 환경"], yonghab: ["기후변화와 환경생태"] }
+            ]},
+            "항공서비스학과": { cluster: "사회 계열", desc: "객실음료 기내안전 예절 발권 매너 승무 인재를 배양하는 학과", basic: "항공업무개론, 서비스예절, 관광학원론, 항공서비스영어 등", major: "항공객실업무, 기내서비스업무, 기내음료서비스, 항공발권실무 등", similar: "항공승무원서비스전공, 항공운항서비스학과, 관광항공경영학과 등", career: "비행기승무원, 국제크루즈승무원, 항공사지상직근무요원 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["경제 수학", "직무 수학"], yonghab: ["직무 의사소통", "실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리", "사회와 문화", "현대사회와 윤리"], jinro: ["영미 문학 읽기", "직무 영어", "정치", "법과 사회", "경제", "국제관계의 이해"], yonghab: ["세계 문화와 영어", "실생활 영어 회화", "여행지리", "사회문제 탐구", "금융과 경제생활", "윤리문제 탐구"] },
+                { category: "외국어", general: ["제2외국어"], jinro: ["심화 제2외국어", "제2외국어 회화"], yonghab: ["제2외국어 문화"] }
+            ]},
+            "행정학과": { cluster: "사회 계열", desc: "정책 철학 조직론 인사 행정계측 통계 조사를 연찬하는 학과", basic: "행정학개론, 행정사, 행정철학, 조직론, 정책학, 행정조사방법론 등", major: "국제행정, 노동행정, 도시행정, 보건행정, 복지행정, 인사행정 등", similar: "공공정책학부, 공공인재학부, 법행정학부, 소방학과 등", career: "일반행정직, 소방서, 경찰서 공무원, 연구원, 언론사 전문가 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["경제 수학", "직무 수학"], yonghab: ["직무 의사소통", "실용 통계"] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리", "사회와 문화", "현대사회와 윤리"], jinro: ["한국지리 탐구", "도시의 미래 탐구", "정치", "법과 사회", "경제", "국제 관계의 이해"], yonghab: ["사회문제 탐구", "윤리문제 탐구"] },
+                { category: "기타", general: ["한문"], jinro: ["인간과 심리", "인간과 철학", "논리와 사고"], yonghab: ["논술"] }
+            ]},
+            "디자인과": { cluster: "예체능 계열", desc: "드로잉 시각 디자인실습 모션그래픽 공예 조형을 다루는 학과", basic: "드로잉, 색채학, 디자인 실습, 모션 그래픽, 디자인 역사 등", major: "시지각과 조형, 시간과 공간, 형태와 구조, 디자인 심화 등", similar: "패션디자인학과, 산업디자인학과, 시각디자인학과, 공예학과 등", career: "산업 디자이너, 영상 디자이너, UX/UI 디자이너, 패션 디자이너 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리", "세계사", "사회와 문화", "현대사회와 윤리"], jinro: [], yonghab: [] },
+                { category: "예술", general: ["미술"], jinro: ["미술 창작", "미술 감상과 비평", "미술 이론", "드로잉", "미술사", "미술 전공 실기", "조형 탐구"], yonghab: ["미술과 매체", "미술 매체 탐구", "미술과 사회"] }
+            ]},
+            "미술학과": { cluster: "예체능 계열", desc: "회화 조소 미술사 조형의 기초를 심화 실기 기획 연구 학과", basic: "미술 이론, 미술사", major: "회화, 조소, 디자인, 색채학, 형태학, 조형의 기초 등", similar: "시각디자인학과, 산업디자인학과, 패션디자인학과, 조소학과 등", career: "작가, 전시 기획자, 미술교육자, 그래픽 디자이너, 산업 디자이너 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리", "세계사", "사회와 문화", "현대사회와 윤리"], jinro: [], yonghab: [] },
+                { category: "예술", general: ["미술"], jinro: ["미술 창작", "미술 감상과 비평", "미술 이론", "드로잉", "미술사", "미술 전공 실기", "조형 탐구"], yonghab: ["미술과 매체", "미술 매체 탐구", "미술과 사회"] }
+            ]},
+            "연극영화과": { cluster: "예체능 계열", desc: "시나리오 무대 연출 연기 기초 극작 사운드 영상 제작 학과", basic: "방송 제작 이론, 영상 촬영 및 편집, 시나리오 개발, 연기의 이해 등", major: "연극 이론, 영화 이론, 연기 기초, 무대 연출, 편집 기법, 촬영기법 등", similar: "영화학과, 실용음악과, 뮤지컬학과, 미디어영상학과, 한류예술과 등", career: "앵커, 리포터, 프로그램 진행자, 배우, 작가, 제작자, 감독 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리", "세계사", "사회와 문화", "현대사회와 윤리"], jinro: [], yonghab: ["연극과 삶", "영화와 삶"] },
+                { category: "예술", general: ["연극"], jinro: ["연극 제작 실습", "연극 감상과 비평", "무대 미술과 기술", "영화의 이해", "촬영·조명", "연극과 몸", "연극과 말 연기", "편집·사운드", "영화 제작 실습", "영화 감상과 비평"], yonghab: [] }
+            ]},
+            "음악학과": { cluster: "예체능 계열", desc: "악기론 작곡 성악 합창 합주 시창 청음 전문 실기 학과", basic: "화성학, 대위법, 음악 분석, 음악사, 시창·청음 등", major: "전공 실기(작곡, 기악, 성악), 합창·합주, 악기론, 디지털 음악 등", similar: "작곡과, 기악과, 성악과, 음향학과, 공연예술학과 등", career: "작곡가, 편곡가, 연주자, 성악가, 지휘자, 악기제작자, 조율사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리", "세계사", "사회와 문화", "현대사회와 윤리"], jinro: [], yonghab: [] },
+                { category: "예술", general: ["음악"], jinro: ["음악 연주와 창작", "음악 감상과 비평", "음악 이론", "음악사", "시창·청음", "음악 전공 실기", "합창·합주", "음악 공연 실습"], yonghab: ["음악과 미디어", "음악과 문화"] }
+            ]},
+            "체육학과": { cluster: "예체능 계열", desc: "스포츠 과학 사회학 심리학 전공 실기를 융합한 지도 학과", basic: "운동생리학, 체육 철학, 스포츠 개론, 체육사", major: "체육 전공 실기, 스포츠 사회학, 체육 지도법, 인체 구조와 기능 등", similar: "스포츠과학과, 운동처방학과, 사회체육학과, 생활체육학과 등", career: "스포츠 지도자, 운동 처방사, 체육 교사, 스포츠 과학 연구원 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "세계시민과 지리", "세계사", "사회와 문화", "현대사회와 윤리"], jinro: [], yonghab: [] },
+                { category: "과학/체육", general: ["체육1", "체육2"], jinro: ["물리학", "생명과학", "역학과 에너지", "세포와 물질대사", "운동과 건강", "스포츠 문화", "스포츠 과학"], yonghab: ["융합과학 탐구", "스포츠 생활1", "스포츠 생활2"] }
+            ]},
+            "ICT융합 학과": { cluster: "융합미래 계열", desc: "임베디드 시퀀스 제어 자동화 로보틱스 회로이론 연찬 학과", basic: "디지털 공학 및 실험, 응용수학, 회로이론, 전기전자계측 및 실험 등", major: "반도체 공학, 스위칭 및 펄스회로 시스템공학, 로보틱스, 전력전송공학 등", similar: "IT정보제어공학부, 전기제어계측공학부, 전기제어공학과 등", career: "로봇공학기술자, 로봇연구원, 메카트로닉스공학기술자, 발전설비기술자 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅱ", "기하", "인공지능수학"], yonghab: ["수학과제 탐구"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "역학과 에너지", "전자기와 양자"], yonghab: [] },
+                { category: "정보/기타", general: ["정보", "기술·가정"], jinro: ["인공지능 기초", "데이터 과학", "로봇과 공학세계"], yonghab: ["소프트웨어와 생활", "창의 공학 설계"] }
+            ]},
+            "데이터관련 학과": { cluster: "융합미래 계열", desc: "통계 데이터 구조 알고리즘 이산 구조 인공지능 엔지니어 학과", basic: "컴퓨터프로그래밍, 통계계산, 전산수학, 행렬이론, 기초통계학, 통계수학", major: "이산수학, 자료구조, 알고리즘, 컴퓨터 구조, 컴퓨터네트워크, 인공지능 등", similar: "AI빅데이터융합경영학과, 금융빅데이터부, 데이터계산과학과 등", career: "SW 관련 기업, SW 전문지식을 바탕으로 한 연구원, 변리사, 법조인 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅱ", "기하", "인공지능수학"], yonghab: ["수학과제 탐구"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "역학과 에너지", "전자기와 양자"], yonghab: [] },
+                { category: "정보", general: ["정보"], jinro: ["인공지능 기초", "데이터 과학"], yonghab: ["소프트웨어와 생활"] }
+            ]},
+            "미래자동차학과": { cluster: "융합미래 계열", desc: "자율주행 제어 플랫폼 임베디드 통신 융합 스마트 모빌리티 학과", basic: "대학수학, 일반물리학, 기계공학, 전기·전자공학, 논리 회로 등", major: "디지털논리설계, 운영체제, 임베디드시스템, 자동제어, 자율시스템플랫폼 등", similar: "스마트운행체공학과, 스마트ICT융합공학, 지능형드론융합 등", career: "자동차 관련 기업, 벤처기업, 전문행정직 공무원, 기계·전기전자 관련 기업", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["인공지능수학", "미적분Ⅱ", "기하"], yonghab: ["수학과제 탐구"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "화학", "역학과 에너지", "전자기와 양자", "물질과 에너지", "화학 반응의 세계"], yonghab: [] },
+                { category: "사회/정보", general: ["정보", "기술·가정"], jinro: ["한국지리 탐구", "인공지능 기초", "데이터 과학", "로봇과 공학세계"], yonghab: ["창의 공학 설계", "소프트웨어와 생활"] }
+            ]},
+            "인공지능(공)학과": { cluster: "융합미래 계열", desc: "머신러닝 블록체인 딥러닝 고등 알고리즘 융복합 정보학 과목 학과", basic: "컴퓨터프로그래밍, 컴퓨팅개론, 확률통계, 이산구조, 자료구조, 선형대수", major: "인공지능, 컴퓨터아키텍쳐, 기계학습, AI블록체인, 빅데이터 등", similar: "컴퓨터공학과, 데이터분석관련학과, AI융합학과 등", career: "IT관련 기업, AI 모델 개발 기업, 반도체 분야, 인공지능연구원 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅱ", "기하", "인공지능수학"], yonghab: ["수학과제 탐구"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "역학과 에너지", "전자기와 양자"], yonghab: [] },
+                { category: "정보", general: ["정보"], jinro: ["인공지능 기초", "데이터 과학"], yonghab: ["소프트웨어와 생활"] }
+            ]},
+            "정보보안관련 학과": { cluster: "융합미래 계열", desc: "디도스 방어 해킹 관리 클라우드 서버 정보 보호 규정 학과", basic: "미적분학, 선형대수, 이산수학, 사이버보안, 프로그래밍, 자료구조 등", major: "데이터 베이스, 클라우드서비스 보안, 정보보호 법규 및 관리, 정보 수학", similar: "컴퓨터공학과, 데이터분석관련학과, AI소프트웨어전공 등", career: "정보보안 전문가, 모의 해킹 전문가, 암호 소스 코드 분석 엔지니어 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: ["미적분 Ⅱ", "기하", "인공지능수학"], yonghab: ["수학과제탐구", "실용 통계"] },
+                { category: "영어/과학", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문"], jinro: ["물리학", "역학과 에너지", "전자기와 양자"], yonghab: [] },
+                { category: "정보", general: ["정보"], jinro: ["인공지능 기초", "데이터 과학"], yonghab: ["소프트웨어와 생활"] }
+            ]},
+            "간호학과": { cluster: "의료보건 계열", desc: "병원 미생물 병태 생리 아동 모성 성인 간호 실습 전문 보건 학과", basic: "생물학, 생물학 실험, 심리학 개론, 화학, 화학 실험, 생명의료 윤리 등", major: "간호학개론, 인간과 건강, 병원미생물학, 병태생리학, 간호통계학 등", similar: "가족건강관리학, 건강기능식품학과, 임상간호학과 등", career: "가정전문간호사, 간호사, 감염관리전문간호사, 보건교사, 산업간호사 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "현대사회와 윤리", "사회와 문화"], jinro: ["정치", "법과 사회"], yonghab: ["윤리문제 탐구", "사회문제 탐구"] },
+                { category: "과학", general: [], jinro: ["화학", "생명과학", "물질과 에너지", "화학 반응의 세계", "세포와 물질대사", "생물의 유전"], yonghab: ["융합과학 탐구", "화학 실험", "생명과학 실험"] },
+                { category: "교양", general: [], jinro: [], yonghab: ["인간과 철학", "인간과 심리", "보건"] }
+            ]},
+            "물리치료학과": { cluster: "의료보건 계열", desc: "기능해부 생리 근골격 임상 신경 물리치료 재활 운동처방 학과", basic: "물리치료학 개론, 해부학, 기능해부학, 생리학, 병리학, 신경과학 등", major: "근골격물리치료학, 신경물리치료학, 아동물리치료학, 임상실습 등", similar: "물리치료학과, 물리치료과 등", career: "종합병원 물리치료사, 스포츠트레이너, 스포츠재활센터 코치 등", subjects: [
+                { category: "국어/수학", general: ["화법과 언어", "독서와 작문", "문학", "대수", "미적분 Ⅰ", "확률과 통계"], jinro: [], yonghab: [] },
+                { category: "영어/사회", general: ["영어 Ⅰ", "영어 Ⅱ", "영어 독해와 작문", "사회와 문화", "현대사회와 윤리"], jinro: [], yonghab: [] },
+                { category: "과학/기타", general: [], jinro: ["화학", "생명과학", "물리학", "물질과 에너지", "화학 반응의 세계", "세포와 물질대사", "생물의 유전", "운동과 건강", "보건"], yonghab: ["융합과학 탐구"] }
+            ]}
+/*__DEPT_END__*/
+        };
+        function initDeptSelector() {
+            const selector = document.getElementById('deptSelector');
+            Object.keys(deptsDatabase).forEach(dept => {
+                const opt = document.createElement('option');
+                opt.value = dept;
+                opt.innerText = `${dept} (${deptsDatabase[dept].cluster})`;
+                selector.appendChild(opt);
+            });
+        }
+        function renderDeptReport() {
+            const selector = document.getElementById('deptSelector');
+            const targetKey = selector.value;
+            const card = document.getElementById('deptReportCard');
+            if (!targetKey) { card.style.display = 'none'; return; }
+            const data = deptsDatabase[targetKey];
+            document.getElementById('view-dept-cluster').innerText = data.cluster;
+            document.getElementById('view-dept-name').innerText = targetKey;
+            document.getElementById('view-dept-desc').innerText = data.desc;
+            document.getElementById('view-dept-basic').innerText = data.basic;
+            document.getElementById('view-dept-major').innerText = data.major;
+            document.getElementById('view-dept-similar').innerText = data.similar;
+            document.getElementById('view-dept-career').innerText = data.career;
+            const tbody = document.getElementById('view-dept-table-body');
+            tbody.innerHTML = '';
+            data.subjects.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-weight:bold; text-align:center; background:#f8fafc;">${row.category}</td>
+                    <td><ul>${row.general.map(s => `<li>${s}</li>`).join('')}</ul></td>
+                    <td><ul>${row.jinro.map(s => `<li>${s}</li>`).join('')}</ul></td>
+                    <td><ul>${row.yonghab.map(s => `<li>${s}</li>`).join('')}</ul></td>`;
+                tbody.appendChild(tr);
+            });
+            card.style.display = 'block';
+        }
+
+        /* ==================== 종합검색 연동: 학생 실제 선택과목 자동 반영 ==================== */
+        let autoSel = null; // URL로 넘어온 학생 정보 { names:[과목명], label:이름 }
+        function applyAutoSelect() {
+            if (!autoSel || !autoSel.names.length) return;
+            let hit = 0;
+            cfg.groups.forEach(g => {
+                g.options.forEach((o, i) => {
+                    if (!autoSel.names.includes(o.n)) return;
+                    if (selections[g.id].some(x => x.n === o.n)) return;
+                    // 시뮬레이터 규칙(정원·학기 중복)은 지키되, 위계 잠금은 실제 이수 데이터이므로 통과
+                    const maxAllowed = g.shareMax || g.max;
+                    const curCount = g.share ? combinedSel(g.share).length : selections[g.id].length;
+                    if (curCount >= maxAllowed) return;
+                    if (g.pair && selections[g.pair] && selections[g.pair].some(x => x.n === o.n)) return;
+                    selections[g.id].push({ n: o.n, t: o.t, life: o.life || 0, credit: g.credit });
+                    const card = document.getElementById(`card_${g.id}_${i}`);
+                    if (card) card.classList.add('selected');
+                    hit++;
+                });
+            });
+            if (hit) {
+                updateAll();
+                const wrap = document.getElementById('main-select-content');
+                const div = document.createElement('div');
+                div.className = 'scenario-notice';
+                div.style.cssText = 'background:#ecfdf5;border-color:#a7f3d0;color:#047857;margin-bottom:10px;';
+                div.innerHTML = `✅ <b>${autoSel.label}</b> 학생의 선택과목 <b>${hit}과목</b>이 자동 반영되었습니다. 카드를 눌러 자유롭게 바꿔볼 수 있습니다.`;
+                wrap.prepend(div);
+            }
+        }
+
+        /* ==================== 초기화 ==================== */
+        window.onload = function () {
+            // 종합검색에서 넘어온 학생 정보 (?year=&class=&num=&name=&subjects=과목1,과목2)
+            try {
+                const qp = new URLSearchParams(location.search);
+                if (['1', '2'].includes(qp.get('year'))) document.getElementById('selYear').value = qp.get('year');
+                if (qp.get('class')) document.getElementById('studentClass').value = qp.get('class');
+                if (qp.get('num')) document.getElementById('studentNumber').value = qp.get('num');
+                if (qp.get('name')) document.getElementById('studentName').value = qp.get('name');
+                const names = (qp.get('subjects') || '').split(',').map(s => s.trim()).filter(Boolean);
+                if (names.length) autoSel = { names, label: qp.get('name') || '조회 학생' };
+            } catch (e) {}
+            initScenario();
+            initDeptSelector();
+            window.addEventListener('resize', updateStacks);
+            applyAutoSelect();
+        };
+    </script>
+</body>
+</html>
