@@ -1003,8 +1003,8 @@
         /* ==================== 학생 종합검색 바로가기 (부모 앱 검색 상세로 이동) ==================== */
         function gotoStudent360() {
             try {
+                // 학생이 선택돼 있으면 해당 학생 상세로, 아니면 종합검색 메인으로
                 const r = document.getElementById('studentClass').value, n = document.getElementById('studentNumber').value;
-                if (!r || !n) { alert('반·번호를 먼저 선택해 주세요.'); return; }
                 window.parent.openStudent360(simGrade(), r, n);
             } catch (e) {}
         }
@@ -1013,8 +1013,7 @@
             if (!btn) return;
             let ok = false;
             try {
-                ok = window.parent !== window && typeof window.parent.openStudent360 === 'function'
-                    && !!document.getElementById('studentClass').value && !!document.getElementById('studentNumber').value;
+                ok = window.parent !== window && typeof window.parent.openStudent360 === 'function';
             } catch (e) {}
             btn.style.display = ok ? 'inline-block' : 'none';
         }
