@@ -1112,23 +1112,24 @@
   @media(max-width:768px){
     .s360-body{padding:12px;}
   }
-  .spot-row{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--rule);}
+  /* 명단 행: 고정 열 그리드 — 배지(과학중점·동아리·상벌점)가 오른쪽에 세로로 열 맞춰 정렬 */
+  .spot-row{display:grid;grid-template-columns:64px minmax(0,1fr) 7.5em 10em 4.2em;gap:10px;align-items:center;padding:10px 16px;min-height:51px;box-sizing:border-box;cursor:pointer;border-bottom:1px solid var(--rule);}
   .spot-row:hover{background:rgba(30,58,138,.06);}
-  .spot-grn{font-family:'IBM Plex Mono';font-size:13px;font-weight:700;color:var(--ink-soft);min-width:60px;}
-  .spot-name{font-weight:800;font-size:16px;color:var(--ink);}
-  .spot-badges{margin-left:auto;display:flex;gap:6px;}
+  .spot-grn{font-family:'IBM Plex Mono';font-size:13px;font-weight:700;color:var(--ink-soft);}
+  .spot-name{font-weight:800;font-size:16px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .spot-cell{display:flex;justify-content:center;min-width:0;}
+  .spot-cell-pts{justify-content:flex-end;}
+  .spot-cell-pts .spot-badge{min-width:2.4em;text-align:center;}
+  .spot-cell .spot-badge{max-width:100%;overflow:hidden;text-overflow:ellipsis;}
   .spot-badge{padding:5px 12px;border-radius:14px;background:#f1f5f9;color:#475569;white-space:nowrap;font-size:14.5px;font-weight:700;}
   .spot-badge.neg{background:#fee2e2;color:#b91c1c;}
   .spot-badge.pos{background:#dcfce7;color:#15803d;}
   .spot-badge.sci{background:#ede9fe;color:#6d28d9;}
-  /* 좁은 화면: 명단 행이 두 줄로 깨지지 않게 — 배지 라벨은 숨기고 색·숫자·아이콘만, 동아리명은 말줄임 */
+  /* 좁은 화면: 열 폭 축소 — 배지 라벨은 숨기고 색·숫자·아이콘만, 동아리명은 말줄임 */
   @media(max-width:640px){
-    .spot-row{gap:7px;padding:10px 12px;}
-    .spot-grn{min-width:0;}
-    .spot-name{white-space:nowrap;flex-shrink:0;}
+    .spot-row{grid-template-columns:56px minmax(0,1fr) 2.6em 6em 3.4em;gap:6px;padding:10px 12px;min-height:46px;}
     .spot-badge{padding:4px 9px;font-size:13px;}
     .spot-badge .spot-badge-lbl{display:none;}
-    .spot-badge.club{max-width:6em;overflow:hidden;text-overflow:ellipsis;}
   }
   .spot-empty{padding:28px;text-align:center;color:var(--ink-soft);font-size:15px;}
   .spot-sec{margin-bottom:18px;}
@@ -3020,13 +3021,8 @@
       style="margin-top:8px;background:transparent;border:1.5px solid var(--rule);color:var(--ink-soft);font-size:13px;">
       다른 계정으로 로그인
     </button>
-    <!-- 학생·학부모용 공개 메뉴: 로그인 없이 이용 가능 -->
-    <a href="subject-sim.html" class="google-login-btn"
-      style="display:block;box-sizing:border-box;margin-top:14px;background:transparent;border:1.5px solid var(--mon);color:var(--mon);font-size:13.5px;text-decoration:none;text-align:center;">
-      🧪 과목 선택 시뮬레이터 <span style="font-weight:500;opacity:0.75;">— 로그인 없이 이용</span>
-    </a>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.38</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.39</div>
   </div>
 </div>
 
@@ -3150,7 +3146,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver5.38</div>
+    <div class="nav-version" title="Made by 박경환">ver5.39</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7224,9 +7220,9 @@ function s360RenderRows(students, headLabel){
     return `<div class="spot-row" data-i="${i}">
       <span class="spot-grn">${s.grade}-${s.room}-${String(s.num||'').padStart(2,'0')}</span>
       <span class="spot-name">${escapeHtml(s.name||'')}</span>
-      ${isSciStudent(s) ? '<span class="spot-badge sci">⚗️<span class="spot-badge-lbl"> 과학중점</span></span>' : ''}
-      ${s.club ? `<span class="spot-badge club">🎯 ${escapeHtml(s.club)}</span>` : ''}
-      <span class="spot-badges">${ptsBadge}</span>
+      <span class="spot-cell">${isSciStudent(s) ? '<span class="spot-badge sci">⚗️<span class="spot-badge-lbl"> 과학중점</span></span>' : ''}</span>
+      <span class="spot-cell">${s.club ? `<span class="spot-badge club">🎯 ${escapeHtml(s.club)}</span>` : ''}</span>
+      <span class="spot-cell spot-cell-pts">${ptsBadge}</span>
     </div>`;
   }).join('');
   body.innerHTML = `
