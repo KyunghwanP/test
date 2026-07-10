@@ -361,7 +361,7 @@
                 { n: '전자기와 양자', t: '과학 · 진로 선택' }, { n: '화학 반응의 세계', t: '과학 · 진로 선택' },
                 { n: '생물의 유전', t: '과학 · 진로 선택' }, { n: '행성우주과학', t: '과학 · 진로 선택' }
             ],
-            // 3학년 1학기 기술·가정~교양 (일반과정 박람회 기준)
+            // 3학년 1학기 기술·가정/제2외국어/한문/교양 (일반과정 박람회 기준)
             exp31b: [
                 { n: '창의 공학 설계', t: '기술·가정 · 융합 선택', life: 1 },
                 { n: '일본어 회화', t: '제2외국어 · 진로 선택', life: 1 },
@@ -375,7 +375,7 @@
                 { n: '기후변화와 지속가능한 세계', t: '사회 · 융합 선택', g5: 1 },
                 { n: '과학의 역사와 문화', t: '과학 · 융합 선택', g5: 1 }, { n: '기후변화와 환경생태', t: '과학 · 융합 선택', g5: 1 }
             ],
-            // 3학년 2학기 기술·가정~교양 (일반과정 박람회 기준)
+            // 3학년 2학기 기술·가정/제2외국어/한문/교양 (일반과정 박람회 기준)
             exp32b: [
                 { n: '소프트웨어와 생활', t: '정보 · 융합 선택', life: 1 },
                 { n: '논리와 사고', t: '교양 · 진로 선택', life: 1, p: 1 }, { n: '인간과 심리', t: '교양 · 진로 선택', life: 1, p: 1 },
@@ -515,15 +515,15 @@
         const SCENARIOS = {
             '1-general': {
                 label: '현재 1학년 · 일반과정',
-                notice: '📌 <b>현재 1학년(2026학년도 입학) · 일반과정</b> 편제표 기준입니다.<br>2학년 선택(수학 택1 + 학기별 택4)과 3학년 선택(1학기 택5 / 2학기 택2)을 설계해 보세요. 탐구와 기술·가정~교양은 합쳐서 개수를 채우며, 3학년 국·수·영은 학교 지정 과목입니다.',
+                notice: '📌 <b>현재 1학년(2026학년도 입학) · 일반과정</b> 편제표 기준입니다.<br>2학년 선택(수학 택1 + 학기별 택4)과 3학년 선택(1학기 택5 / 2학기 택2)을 설계해 보세요. 탐구와 기술·가정/제2외국어/한문/교양은 합쳐서 개수를 채우며, 3학년 국·수·영은 학교 지정 과목입니다.',
                 base: 125, implicit: [], life: true, lifeBase: 5,
                 tables: [G1_2026, T2_1G, T3_1G],
                 groups: [
                     { id: 'e1', grade: 2, title: '① 2학년 1학기 선택과목 [택4]', desc: '사회·과학·정보·제2외국어에서 총 4과목을 선택합니다. (과목당 3학점)', max: 4, credit: 3, options: OPT.y1exp1a.concat(OPT.y1exp1b) },
                     { id: 'm1', grade: 2, title: '② 2학년 2학기 수학 [택1]', desc: '미적분Ⅰ에 이어서 배울 수학 과목을 선택합니다. (4학점)', max: 1, credit: 4, options: OPT.math_e },
                     { id: 'e2', grade: 2, title: '③ 2학년 2학기 선택과목 [택4]', desc: '사회·과학·제2외국어에서 총 4과목을 선택합니다. 과학 진로 과목은 1학기 일반 과목과 연계됩니다. (과목당 3학점)', max: 4, credit: 3, options: OPT.y1exp2a.concat(OPT.y1exp2b) },
-                    { id: 'x1', grade: 3, title: '④ 3학년 1학기 선택과목 [택5]', desc: '사회·과학·기술·가정~교양에서 총 5과목을 선택합니다. (과목당 3학점)', max: 5, credit: 3, options: OPT.exp31a.concat(OPT.exp31b) },
-                    { id: 'x2', grade: 3, title: '⑤ 3학년 2학기 선택과목 [택2]', desc: '사회·과학·기술·가정~교양에서 총 2과목을 선택합니다. 사회문제 탐구·융합과학 탐구는 지정 이수입니다. (과목당 3학점)', max: 2, credit: 3, options: OPT.exp32a.concat(OPT.exp32b) }
+                    { id: 'x1', grade: 3, title: '④ 3학년 1학기 선택과목 [택5]', desc: '사회·과학·기술·가정/제2외국어/한문/교양에서 총 5과목을 선택합니다. (과목당 3학점)', max: 5, credit: 3, options: OPT.exp31a.concat(OPT.exp31b) },
+                    { id: 'x2', grade: 3, title: '⑤ 3학년 2학기 선택과목 [택2]', desc: '사회·과학·기술·가정/제2외국어/한문/교양에서 총 2과목을 선택합니다. 사회문제 탐구·융합과학 탐구는 지정 이수입니다. (과목당 3학점)', max: 2, credit: 3, options: OPT.exp32a.concat(OPT.exp32b) }
                 ]
             },
             '1-science': {
@@ -540,12 +540,12 @@
             },
             '2-general': {
                 label: '현재 2학년 · 일반과정',
-                notice: '📌 <b>현재 2학년(2025학년도 입학) · 일반과정</b> 박람회 자료 기준입니다.<br>2학년 과목은 이미 이수 중이고 3학년 국·수·영은 학교 지정이므로, <b>1학기 택5 + 2학기 택3</b>(탐구 + 기술·가정~교양 통합)만 선택합니다.',
+                notice: '📌 <b>현재 2학년(2025학년도 입학) · 일반과정</b> 박람회 자료 기준입니다.<br>2학년 과목은 이미 이수 중이고 3학년 국·수·영은 학교 지정이므로, <b>1학기 택5 + 2학기 택3</b>(탐구 + 기술·가정/제2외국어/한문/교양 통합)만 선택합니다.',
                 base: 150, implicit: null, life: true, lifeBase: 2, lifeAsk: true,
                 tables: [G1_2025, T2_2G, T3_2G],
                 groups: [
-                    { id: 'x1', grade: 3, title: '① 3학년 1학기 선택과목 [택5]', desc: '사회·과학·기술·가정~교양에서 총 5과목을 선택합니다. (과목당 3학점)<br>⚠ 과학 진로 과목·일본어 회화는 2학년 때 이수한 선행 과목(위계)과 연계하여 선택하세요.', max: 5, credit: 3, options: OPT.exp31a.concat(OPT.exp31b) },
-                    { id: 'x2', grade: 3, title: '② 3학년 2학기 선택과목 [택3]', desc: '사회·과학·기술·가정~교양에서 총 3과목을 선택합니다. 사회문제 탐구·융합과학 탐구는 지정 이수입니다. (과목당 3학점)', max: 3, credit: 3, options: OPT.exp32a.concat(OPT.exp32b) }
+                    { id: 'x1', grade: 3, title: '① 3학년 1학기 선택과목 [택5]', desc: '사회·과학·기술·가정/제2외국어/한문/교양에서 총 5과목을 선택합니다. (과목당 3학점)<br>⚠ 과학 진로 과목·일본어 회화는 2학년 때 이수한 선행 과목(위계)과 연계하여 선택하세요.', max: 5, credit: 3, options: OPT.exp31a.concat(OPT.exp31b) },
+                    { id: 'x2', grade: 3, title: '② 3학년 2학기 선택과목 [택3]', desc: '사회·과학·기술·가정/제2외국어/한문/교양에서 총 3과목을 선택합니다. 사회문제 탐구·융합과학 탐구는 지정 이수입니다. (과목당 3학점)', max: 3, credit: 3, options: OPT.exp32a.concat(OPT.exp32b) }
                 ]
             },
             '2-science': {
@@ -567,7 +567,7 @@
         let sumSpecs = [];       // 합계 셀 정의
         let lifeTotalNow = 0;    // 생활·교양 현재 이수 학점
 
-        // 공유 선택군(탐구 + 기술·가정~교양이 개수를 합쳐 쓰는 묶음) 도우미
+        // 공유 선택군(탐구 + 기술·가정/제2외국어/한문/교양이 개수를 합쳐 쓰는 묶음) 도우미
         function shareKeyOf(g) { return g.share || g.id; }
         function shareMaxOf(key) {
             const m = cfg.groups.find(g => shareKeyOf(g) === key);
@@ -732,12 +732,13 @@
         function preSatisfied(name) {
             const pre = PRE_MAP[name];
             if (!pre) return true;
-            if (cfg.implicit === null) return true; // 현재 2학년 일반: 2학년 이수 내역을 알 수 없어 소프트 확인으로 처리
+            // 현재 2학년 일반: 실제 이수 과목(takenList)을 알면 그것으로 판정, 모르면 소프트 확인으로 처리
+            if (cfg.implicit === null) return takenList.length ? takenList.includes(pre) : true;
             return cfg.implicit.includes(pre) || selectedNamesAll().has(pre);
         }
         // 위계 잠금 갱신: 선행 과목 미선택 시 잠그고, 이미 선택돼 있던 후속 과목은 자동 해제
         function updateLockStates() {
-            if (!cfg || cfg.implicit === null) return;
+            if (!cfg || (cfg.implicit === null && !takenList.length)) return;
             cfg.groups.forEach(g => {
                 g.options.forEach((o, i) => {
                     if (!PRE_MAP[o.n]) return;
@@ -762,7 +763,9 @@
             const card = document.getElementById(`card_${gid}_${idx}`);
             // 위계 잠금 과목 클릭 차단
             if (card.classList.contains('locked')) {
-                alert(`이 과목은 과목 위계(선행 과목) 규정이 적용됩니다.\n[${PRE_MAP[o.n]}] 과목을 먼저 선택해야 합니다.`);
+                alert(cfg.implicit === null
+                    ? `이 과목은 과목 위계(선행 과목) 규정이 적용됩니다.\n2학년에서 [${PRE_MAP[o.n]}] 과목을 이수 중인 학생만 선택할 수 있습니다.`
+                    : `이 과목은 과목 위계(선행 과목) 규정이 적용됩니다.\n[${PRE_MAP[o.n]}] 과목을 먼저 선택해야 합니다.`);
                 return;
             }
             const pos = list.findIndex(x => x.n === o.n);
@@ -773,7 +776,7 @@
                 const maxAllowed = g.shareMax || g.max;
                 const curCount = g.share ? combinedSel(g.share).length : list.length;
                 if (curCount >= maxAllowed) {
-                    alert(`이 선택군은 ${g.share ? '탐구와 기술·가정~교양을 합쳐 ' : ''}최대 ${maxAllowed}과목까지만 선택할 수 있습니다.\n다른 과목을 선택하려면 기존 과목을 먼저 해제해 주세요.`);
+                    alert(`이 선택군은 ${g.share ? '탐구와 기술·가정/제2외국어/한문/교양을 합쳐 ' : ''}최대 ${maxAllowed}과목까지만 선택할 수 있습니다.\n다른 과목을 선택하려면 기존 과목을 먼저 해제해 주세요.`);
                     return;
                 }
                 // 같은 과목 학기 중복 방지
@@ -796,7 +799,7 @@
             if (c.nt !== undefined) return `<td class="note-cell">${c.nt}</td><td>${c.c}</td>`;
             return `<td class="dash-cell">–</td><td class="dash-cell">–</td>`;
         }
-        // 탐구 / 기술·가정~교양 분리 블록 (선택 결과에 따라 동적으로 그려짐)
+        // 탐구 / 기술·가정/제2외국어/한문/교양 분리 블록 (선택 결과에 따라 동적으로 그려짐)
         function dynCellHtml(o) {
             if (o && o.fx) return `<td class="fixed-cell">${o.n}</td><td>${o.credit}</td>`;
             if (o) return `<td class="slot-filled">${o.n}</td><td>${o.credit}</td>`;
@@ -823,7 +826,7 @@
             const rem1 = shareMaxOf(spec.k1) - s1.length;
             const rem2 = shareMaxOf(spec.k2) - s2.length;
             let h = dynBlockHtml(`탐구<br>(사회·과학)`, a1, a2, false);
-            h += dynBlockHtml(`기술·가정<br>~교양`, b1, b2, true);
+            h += dynBlockHtml(`기술·가정<br>/제2외국어<br>/한문/교양`, b1, b2, true);
             if (rem1 > 0 || rem2 > 0) {
                 h += `<tr><td class="fixed-cell" style="font-weight:600;">남은 선택<br>${spec.label}</td>`
                     + (rem1 > 0 ? `<td class="slot-empty">미선택 ${rem1}과목</td><td>-</td>` : `<td class="dash-cell">–</td><td class="dash-cell">–</td>`)
@@ -869,7 +872,7 @@
         function updateAll() {
             // 과목 위계 잠금 갱신 (선행 과목 해제 시 후속 과목 연쇄 해제)
             updateLockStates();
-            // 계획표 재생성 (탐구/기술·가정~교양 분리 블록이 선택에 따라 변하므로)
+            // 계획표 재생성 (탐구/기술·가정/제2외국어/한문/교양 분리 블록이 선택에 따라 변하므로)
             renderPlanTables();
             const keys = [...new Set(cfg.groups.map(shareKeyOf))];
             // 그룹 배지 (공유 선택군은 합산 표시)
@@ -1635,14 +1638,14 @@
               s2: ['한국지리 탐구', '동아시아 역사 기행', '정치', '법과 사회', '윤리와 사상',
                    '역학과 에너지', '전자기와 양자', '물질과 에너지', '화학 반응의 세계',
                    '세포와 물질대사', '생물의 유전', '지구시스템과학', '행성우주과학', '과학과제 연구'] },
-            { t: '기술·가정<br>~교양', credit: 3, s1: ['기술·가정', '정보', '일본어', '중국어'], s2: ['일본 문화', '중국 문화', '생활과학 탐구'] }
+            { t: '기술·가정<br>/제2외국어<br>/한문/교양', credit: 3, s1: ['기술·가정', '정보', '일본어', '중국어'], s2: ['일본 문화', '중국 문화', '생활과학 탐구'] }
         ];
         // 시트에서 과목이 아닌 값(합계 열, 지정 체육 등) 제거용
         const TAKEN_JUNK = ['계', '합계', '소계', '총계', '단위수', '스포츠 생활1', '스포츠 생활2', '스포츠생활1', '스포츠생활2'];
 
         // 이수 중인 과목 중 기술·가정/정보/제2외국어/한문 계열 개수 — 생활·교양 16학점 자동 반영용
         function takenLifeCount() {
-            const g = TAKEN2_CAT[TAKEN2_CAT.length - 1]; // '기술·가정~교양' 카탈로그
+            const g = TAKEN2_CAT[TAKEN2_CAT.length - 1]; // '기술·가정/제2외국어/한문/교양' 카탈로그
             const set = g.s1.concat(g.s2);
             return takenList.filter(n => set.includes(n) || n.includes('한문')).length;
         }
