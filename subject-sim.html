@@ -643,7 +643,7 @@
         function renderGroups() {
             const wrap = document.getElementById('main-select-content');
             let html = `<div class="scenario-notice">${cfg.notice}</div>`;
-            if (cfg.lifeAsk) {
+            if (cfg.lifeAsk && !takenList.length) {
                 html += `<div class="scenario-notice" style="background:#fffbeb; border-color:#fde68a; color:#92400e; margin-top:10px;">
                     🧮 2학년에서 이수 중인 <b>기술·가정 / 정보 / 제2외국어 / 한문 과목 수</b>:
                     <select id="lifeExtra" onchange="updateAll()" style="font-weight:bold; padding:3px 8px; border-radius:5px; border:1px solid #d6b35c; margin:0 4px;">
@@ -926,8 +926,15 @@
             // 생활·교양(기가/정보/제2외/한문/교양) 16학점 기준 체크
             const chip = document.getElementById('lifeChip');
             if (cfg.life) {
-                const extraSel = document.getElementById('lifeExtra');
-                const extra = extraSel ? parseInt(extraSel.value || '0') * 3 : 0;
+                let extra = 0;
+                if (cfg.lifeAsk) {
+                    if (takenList.length) {
+                        extra = takenLifeCount() * 3; // 실제 이수 과목에서 자동 산출
+                    } else {
+                        const extraSel = document.getElementById('lifeExtra');
+                        extra = extraSel ? parseInt(extraSel.value || '0') * 3 : 0;
+                    }
+                }
                 const total = cfg.lifeBase + extra + lifeCredits;
                 lifeTotalNow = total;
                 // 남은 선택을 전부 생활·교양으로 채웠을 때 도달 가능한 최대치
@@ -1583,6 +1590,13 @@
         ];
         // 시트에서 과목이 아닌 값(합계 열, 지정 체육 등) 제거용
         const TAKEN_JUNK = ['계', '합계', '소계', '총계', '단위수', '스포츠 생활1', '스포츠 생활2', '스포츠생활1', '스포츠생활2'];
+
+        // 이수 중인 과목 중 기술·가정/정보/제2외국어/한문 계열 개수 — 생활·교양 16학점 자동 반영용
+        function takenLifeCount() {
+            const g = TAKEN2_CAT[TAKEN2_CAT.length - 1]; // '기술·가정~교양' 카탈로그
+            const set = g.s1.concat(g.s2);
+            return takenList.filter(n => set.includes(n) || n.includes('한문')).length;
+        }
 
         // 현재 2학년 표(이수 현황)를 실제 이수 과목으로 재구성 — 1학년 시나리오의 2학년 표와 같은 형태
         function buildTakenT2(orig) {
