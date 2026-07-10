@@ -81,12 +81,9 @@
   html.dark .consult-form-grid select:focus{background:var(--paper-soft);}
   html.dark .cm-edit input:focus{background:var(--paper-soft);}
 
-  /* 다크모드: 주간교육활동 본문 — 외부 HTML의 인라인 색상 강제 보정 */
-  html.dark .weekly-html-content :is(p,div,span,li,td,th,font,em,i,u,strong,b,h2,h3,h4,h5,h6):not(.weekly-forced-title):not(.weekly-forced-title *){
-    color:var(--ink) !important;
-    background:transparent !important;
-  }
-  html.dark .weekly-html-content a:not(.weekly-title-btn){color:var(--wed) !important;}
+  /* 다크모드: 주간교육활동 본문 — 인라인 색상을 색조 유지한 다크 등가색으로 매핑 (JS가 --wk-* 변수 세팅) */
+  html.dark .weekly-html-content [data-wk-c]{color:var(--wk-c-dark) !important;}
+  html.dark .weekly-html-content [data-wk-bg]{background-color:var(--wk-bg-dark) !important;}
   html.dark .weekly-html-content table,
   html.dark .weekly-html-content td,
   html.dark .weekly-html-content th{border-color:var(--rule) !important;}
@@ -2994,7 +2991,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.15</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.16</div>
   </div>
 </div>
 
@@ -3118,7 +3115,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="made by 박경환">ver5.15</div>
+    <div class="nav-version" title="Made by 박경환">ver5.16</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5998,6 +5995,53 @@ function renderWeekChipsFromFirestore(weeks){
   });
 }
 
+// ── 다크모드 색상 매핑: 색조·채도는 유지하고 명도만 반전 (일반적인 다크모드 방식) ──
+const _wkColorCtx = document.createElement('canvas').getContext('2d');
+function wkParseColor(v){
+  if(!v) return null;
+  _wkColorCtx.fillStyle = '#000';
+  try{ _wkColorCtx.fillStyle = v; }catch(e){ return null; }
+  const s = _wkColorCtx.fillStyle;
+  if(s[0] === '#') return [parseInt(s.slice(1,3),16), parseInt(s.slice(3,5),16), parseInt(s.slice(5,7),16)];
+  const m = s.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?/);
+  if(!m || (m[4] !== undefined && +m[4] === 0)) return null; // 완전 투명 무시
+  return [+m[1], +m[2], +m[3]];
+}
+function wkRgbToHsl(r,g,b){
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b), l=(max+min)/2;
+  if(max===min) return [0,0,l];
+  const d=max-min;
+  const s = l>0.5 ? d/(2-max-min) : d/(max+min);
+  let h;
+  if(max===r) h=(g-b)/d+(g<b?6:0);
+  else if(max===g) h=(b-r)/d+2;
+  else h=(r-g)/d+4;
+  return [h*60, s, l];
+}
+// 주간 본문의 인라인 색상마다 다크 등가색을 CSS 변수로 저장 → 다크모드에서만 CSS가 적용
+function applyWeeklyDarkColors(root){
+  root.querySelectorAll('[style], font[color]').forEach(el => {
+    if(el.closest('.weekly-forced-title') || el.classList.contains('weekly-title-btn')) return;
+    // 글자색: 어두운 색 → 색조 유지한 밝은 색 (검정→흰색, 진빨강→밝은 빨강)
+    const c = wkParseColor(el.style.color || el.getAttribute('color'));
+    if(c){
+      const [h,s,l] = wkRgbToHsl(c[0],c[1],c[2]);
+      const nl = l >= 0.6 ? l : Math.min(0.9, Math.max(0.68, 1-l));
+      el.dataset.wkC = '1';
+      el.style.setProperty('--wk-c-dark', `hsl(${h.toFixed(0)},${(s*100).toFixed(0)}%,${(nl*100).toFixed(0)}%)`);
+    }
+    // 배경색(형광펜 등): 밝은 색 → 색조 유지한 어두운 색 (노랑 형광펜→어두운 황갈색)
+    const bg = wkParseColor(el.style.backgroundColor);
+    if(bg){
+      const [h,s,l] = wkRgbToHsl(bg[0],bg[1],bg[2]);
+      const nl = l <= 0.45 ? l : Math.max(0.16, Math.min(0.3, 1.12-l));
+      el.dataset.wkBg = '1';
+      el.style.setProperty('--wk-bg-dark', `hsl(${h.toFixed(0)},${(s*100).toFixed(0)}%,${(nl*100).toFixed(0)}%)`);
+    }
+  });
+}
+
 function renderWeeklyHtml(title, html){
   const wrap = document.createElement('div');
   wrap.className = 'weekly-html-content';
@@ -6021,6 +6065,7 @@ function renderWeeklyHtml(title, html){
   // 본문 HTML 삽입
   const body = document.createElement('div');
   body.innerHTML = html;
+  applyWeeklyDarkColors(body);
   wrap.appendChild(body);
 
   weeklyPageContent.innerHTML = '';
@@ -6076,6 +6121,7 @@ function renderSections(title, sections){
     });
   });
 
+  applyWeeklyDarkColors(div);
   weeklyPageContent.innerHTML = '';
   weeklyPageContent.appendChild(div);
   setTimeout(updateWeeklyTopOffset, 50);
@@ -6226,6 +6272,7 @@ function renderContent(html){
     titleEl.appendChild(btn);
   }
 
+  applyWeeklyDarkColors(div);
   weeklyPageContent.innerHTML = '';
   weeklyPageContent.appendChild(div);
 }
