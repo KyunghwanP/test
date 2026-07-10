@@ -1079,7 +1079,7 @@
   .s360-top .students-tab-row{flex-shrink:0;}
   .s360-top input:focus{border-color:var(--mon);}
   .s360-body{flex:1;overflow-y:auto;background:var(--bg-base);padding:16px;min-height:0;}
-  .s360-groups{max-width:1100px;margin:0 auto;}
+  .s360-groups{margin:0 auto;} /* 학생연락망과 동일하게 꽉 차게 (max-width 제한 없음) */
   .s360-body .sg-section-label{color:var(--ink-soft);opacity:1;}
   .s360-body .sg-current-label{color:var(--ink);}
   .s360-list-box{max-width:900px;margin:0 auto;background:var(--paper);border-radius:12px;border:1px solid var(--rule);overflow:hidden;}
@@ -1120,6 +1120,16 @@
   .spot-badge{padding:5px 12px;border-radius:14px;background:#f1f5f9;color:#475569;white-space:nowrap;font-size:14.5px;font-weight:700;}
   .spot-badge.neg{background:#fee2e2;color:#b91c1c;}
   .spot-badge.pos{background:#dcfce7;color:#15803d;}
+  .spot-badge.sci{background:#ede9fe;color:#6d28d9;}
+  /* 좁은 화면: 명단 행이 두 줄로 깨지지 않게 — 배지 라벨은 숨기고 색·숫자·아이콘만, 동아리명은 말줄임 */
+  @media(max-width:640px){
+    .spot-row{gap:7px;padding:10px 12px;}
+    .spot-grn{min-width:0;}
+    .spot-name{white-space:nowrap;flex-shrink:0;}
+    .spot-badge{padding:4px 9px;font-size:13px;}
+    .spot-badge .spot-badge-lbl{display:none;}
+    .spot-badge.club{max-width:6em;overflow:hidden;text-overflow:ellipsis;}
+  }
   .spot-empty{padding:28px;text-align:center;color:var(--ink-soft);font-size:15px;}
   .spot-sec{margin-bottom:18px;}
   .spot-sec-title{font-size:15.5px;font-weight:900;color:var(--ink-soft);letter-spacing:.04em;margin-bottom:9px;}
@@ -2316,6 +2326,12 @@
   .sg-group-name{font-family:'Noto Sans KR';font-weight:700;font-size:16px;color:var(--ink);}
   .sg-group-card.active-card .sg-group-name{color:#fff;}
   .sg-group-sub, .sg-group-count{font-family:'Noto Sans KR';font-size:13px;color:var(--ink-soft);font-weight:500;}
+  .sci-group-chip{background:#ede9fe;color:#6d28d9;font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:9px;white-space:nowrap;flex-shrink:0;}
+  /* 좁은 화면: 그룹 카드가 잘리지 않게 과학중점 칩은 아이콘만 */
+  @media(max-width:640px){
+    .sci-group-chip{padding:2px 6px;}
+    .sci-group-chip .sci-chip-txt{display:none;}
+  }
   .sg-group-card.active-card .sg-group-sub,
   .sg-group-card.active-card .sg-group-count{color:rgba(255,255,255,0.75);}
   .sg-arrow{display:none;}
@@ -3005,7 +3021,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.36</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.37</div>
   </div>
 </div>
 
@@ -3129,7 +3145,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver5.36</div>
+    <div class="nav-version" title="Made by 박경환">ver5.37</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -6668,7 +6684,7 @@ function sciCountOf(grade, room) {
 function sciGroupChip(grade, room) {
   const n = sciCountOf(grade, room);
   if (n === 0) return '';
-  return `<span style="display:inline-block;background:#ede9fe;color:#6d28d9;font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:9px;white-space:nowrap;">⚗️ ${n === -1 ? '과학중점' : '과학중점 ' + n + '명'}</span>`;
+  return `<span class="sci-group-chip">⚗️<span class="sci-chip-txt"> ${n === -1 ? '과학중점' : '과학중점 ' + n + '명'}</span></span>`;
 }
 
 // 시뮬레이터 전체화면 안전장치: iframe이 시뮬레이터 외 페이지로 이동하면 복귀 버튼이 없으므로 해제
@@ -7199,12 +7215,12 @@ function s360RenderRows(students, headLabel){
   const body = document.getElementById('s360Body');
   const rows = students.map((s, i) => {
     const p = spotPts.get(spotKey(s));
-    const ptsBadge = p ? `<span class="spot-badge ${Number(p.total) < 0 ? 'neg' : 'pos'}">상벌점 ${p.total}</span>` : '';
+    const ptsBadge = p ? `<span class="spot-badge ${Number(p.total) < 0 ? 'neg' : 'pos'}"><span class="spot-badge-lbl">상벌점 </span>${p.total}</span>` : '';
     return `<div class="spot-row" data-i="${i}">
       <span class="spot-grn">${s.grade}-${s.room}-${String(s.num||'').padStart(2,'0')}</span>
       <span class="spot-name">${escapeHtml(s.name||'')}</span>
-      ${isSciStudent(s) ? SCI_BADGE : ''}
-      ${s.club ? `<span class="spot-badge">🎯 ${escapeHtml(s.club)}</span>` : ''}
+      ${isSciStudent(s) ? '<span class="spot-badge sci">⚗️<span class="spot-badge-lbl"> 과학중점</span></span>' : ''}
+      ${s.club ? `<span class="spot-badge club">🎯 ${escapeHtml(s.club)}</span>` : ''}
       <span class="spot-badges">${ptsBadge}</span>
     </div>`;
   }).join('');
