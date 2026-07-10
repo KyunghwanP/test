@@ -513,16 +513,22 @@
             bodyFont: { size: 14, weight: 'bold' }
           },
           datalabels: {
-            // 겹침 방지: 점 간격이 좁으면 선별 표시 (마지막 회차는 항상 표시)
+            // 겹침 방지 3단계: 간격 넉넉(40px+)=전부 위 표시(기존 그대로) →
+            // 좁음=지그재그 → 아주 좁음(20px 미만)=선별 표시(마지막 회차는 항상 표시)
             display: function(context) {
               const n = context.chart.data.labels.length;
               const per = context.chart.width / Math.max(n, 1);
-              if (per >= 36) return true;
-              const step = per >= 20 ? 2 : 3;
+              if (per >= 20) return true;
+              const step = per >= 10 ? 2 : 3;
               return context.dataIndex % step === (n - 1) % step;
             },
-            // 겹침 방지: 홀짝 지그재그 배치 (위/아래 교차)
-            align: function(context) { return context.dataIndex % 2 ? 'bottom' : 'top'; },
+            align: function(context) {
+              const n = context.chart.data.labels.length;
+              const per = context.chart.width / Math.max(n, 1);
+              if (per >= 40) return 'top';
+              const step = per >= 20 ? 1 : (per >= 10 ? 2 : 3);
+              return Math.floor(context.dataIndex / step) % 2 ? 'bottom' : 'top';
+            },
             anchor: 'end',
             offset: 4,
             color: function(context) { return context.dataset.borderColor; },
