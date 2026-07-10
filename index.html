@@ -1113,7 +1113,7 @@
     .s360-body{padding:12px;}
   }
   /* 명단 행: 고정 열 그리드 — 배지(과학중점·동아리·상벌점)가 오른쪽에 세로로 열 맞춰 정렬 */
-  .spot-row{display:grid;grid-template-columns:64px minmax(0,1fr) 7.5em 10em 4.2em;gap:10px;align-items:center;padding:10px 16px;min-height:51px;box-sizing:border-box;cursor:pointer;border-bottom:1px solid var(--rule);}
+  .spot-row{display:grid;grid-template-columns:64px minmax(0,1fr) 7.5em 10em 8em;gap:10px;align-items:center;padding:10px 16px;min-height:51px;box-sizing:border-box;cursor:pointer;border-bottom:1px solid var(--rule);}
   .spot-row:hover{background:rgba(30,58,138,.06);}
   .spot-grn{font-family:'IBM Plex Mono';font-size:13px;font-weight:700;color:var(--ink-soft);}
   .spot-name{font-weight:800;font-size:16px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -3022,7 +3022,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.39</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.40</div>
   </div>
 </div>
 
@@ -3146,7 +3146,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver5.39</div>
+    <div class="nav-version" title="Made by 박경환">ver5.40</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -8534,12 +8534,51 @@ window.dpPick = dpPick;
 window.dpToday = dpToday;
 window.navigateTo = navigateTo; // 인라인 onclick(상단바 로고 등)에서 호출 가능하도록 전역 노출
 
-function navigateTo(page) {
-  // 현재 페이지와 다를 때만 히스토리 추가
-  const currentPage = document.querySelector('.page-view.active')?.id?.replace('Page','') || 'home';
-  if (currentPage !== page) {
-    history.pushState({ page }, '');
+// 이미 보고 있는 탭을 사이드바·탭바에서 다시 누르면 그 탭의 첫 화면으로 리셋
+// (드릴다운·검색어·iframe 내부 이동을 초기 상태로 되돌림)
+function resetPageView(page){
+  switch(page){
+    case 'search': // 학생 종합검색 → 학급별 그룹 목록
+      if (s360Init){
+        s360Mode = 'class'; s360Group = null;
+        document.querySelectorAll('#s360Tabs .students-tab').forEach(b => b.classList.toggle('active', b.dataset.mode === 'class'));
+        const inp = document.getElementById('s360Input'); if (inp) inp.value = '';
+        s360Render();
+      }
+      break;
+    case 'grades': { // 진로진학 상담 → 허브(career.html) 첫 화면
+      const gf = document.getElementById('gradesFrame');
+      if (gf && gf.src) gf.src = gf.dataset.src;
+      document.body.classList.remove('sim-full');
+      break;
+    }
+    case 'docs': // 업무자료 → 목록
+      if (typeof showDocsList === 'function') showDocsList();
+      break;
+    case 'students': // 학생연락망 → 그룹 목록
+      if (studentsInitialized){
+        const si = document.getElementById('studentsSearch'); if (si) si.value = '';
+        renderStudentsGroupList();
+      }
+      break;
+    case 'contacts': // 교원연락망 → 전체 목록
+      if (contactsInitialized && Array.isArray(allContacts) && allContacts.length){
+        const ci = document.getElementById('contactsSearch'); if (ci) ci.value = '';
+        renderContacts(allContacts);
+      }
+      break;
+    // 그 외 탭(현황판·시간표·상벌점·업무캘린더 등)은 첫 화면이 곧 현재 화면이거나
+    // 입력 중인 내용이 지워질 수 있어 상태는 건드리지 않고 스크롤만 위로
   }
+  const el = document.getElementById(page + 'Page');
+  if (el){ el.scrollTop = 0; el.querySelectorAll('.s360-body,.docs-content-body').forEach(n => n.scrollTop = 0); }
+  window.scrollTo({ top: 0 });
+}
+
+function navigateTo(page) {
+  const currentPage = document.querySelector('.page-view.active')?.id?.replace('Page','') || 'home';
+  if (currentPage === page) { resetPageView(page); return; } // 같은 탭 재클릭 → 첫 화면
+  history.pushState({ page }, '');
   // 탭 전환
   document.querySelectorAll('.main-nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
   document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(t => t.classList.toggle('active', t.dataset.page === page));
