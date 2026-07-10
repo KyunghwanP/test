@@ -168,7 +168,7 @@
             #studentClass { grid-column: 1 / 2; }
             #studentNumber { grid-column: 2 / 3; }
             #studentName { grid-column: 3 / 4; }
-            #btnSimFull { grid-column: 1 / 4; }
+            #btnGoto360, #btnSimFull { grid-column: 1 / 4; }
             .tab-bar { padding-left: 5px; padding-right: 5px; }
             #sub-grade-tab-bar { padding-left: 5px; }
             .tab-bar, #sub-grade-tab-bar { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
@@ -217,6 +217,7 @@
             <input type="number" id="studentClass" placeholder="반" min="1" max="15" oninput="updateDisplay(); maybeSciClass();">
             <input type="number" id="studentNumber" placeholder="번호" min="1" max="40" oninput="updateDisplay()">
             <input type="text" id="studentName" placeholder="이름" oninput="updateDisplay()">
+            <button id="btnGoto360" onclick="gotoStudent360()" style="display:none;background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:6px 12px;font-size:0.85rem;font-weight:700;cursor:pointer;white-space:nowrap;">🔍 종합검색</button>
             <button id="btnSimFull" onclick="toggleSimFull()" style="display:none;background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:6px 12px;font-size:0.85rem;font-weight:700;cursor:pointer;white-space:nowrap;">⛶ 전체화면</button>
         </div>
     </header>
@@ -447,9 +448,7 @@
             { cat: { t: '국어' }, c1: { f: '독서와 작문', c: 4 }, c2: { e: 1 }, sum: { v: '4 학점' } },
             { cat: { t: '수학' }, c1: { f: '기하 / 실용 통계', c: 4 }, c2: { f: '전문 수학', c: 4 }, sum: { v: '8 학점' } },
             { cat: { t: '영어' }, c1: { f: '심화 영어Ⅰ', c: 4 }, c2: { f: '심화 영어Ⅱ', c: 4 }, sum: { v: '8 학점' } },
-            { cat: { t: '사회' }, c1: { e: 1 }, c2: { f: '사회문제 탐구', c: 3 }, sum: { v: '3 학점' } },
-            { cat: { t: '과학' }, c1: { e: 1 }, c2: { f: '융합과학 탐구', c: 3 }, sum: { v: '3 학점' } },
-            { dynSplit: { k1: 'x1', k2: 'x2', label: '[택5 / 택2]' } },
+            { dynSplit: { k1: 'x1', k2: 'x2', label: '[택5 / 택2]', f2: [{ n: '사회문제 탐구', credit: 3, fx: 1 }, { n: '융합과학 탐구', credit: 3, fx: 1 }] } },
             { cat: { t: '예술', span: 2 }, c1: { e: 1 }, c2: { f: '문학과 매체', c: 4 }, sum: { v: '6 학점', span: 2 } },
             { c1: { e: 1 }, c2: { f: '미술 감상과 비평', c: 2 } },
             { cat: { t: '체육' }, c1: { f: '스포츠 문화', c: 1 }, c2: { f: '스포츠 과학', c: 1 }, sum: { v: '2 학점' } }
@@ -492,9 +491,7 @@
             { cat: { t: '국어' }, c1: { f: '독서와 작문', c: 4 }, c2: { e: 1 }, sum: { v: '4 학점' } },
             { cat: { t: '수학' }, c1: { f: '기하 / 실용 통계', c: 4 }, c2: { f: '전문 수학', c: 4 }, sum: { v: '8 학점' } },
             { cat: { t: '영어' }, c1: { f: '심화 영어Ⅰ', c: 4 }, c2: { f: '심화 영어Ⅱ', c: 4 }, sum: { v: '8 학점' } },
-            { cat: { t: '사회' }, c1: { e: 1 }, c2: { f: '사회문제 탐구', c: 3 }, sum: { v: '3 학점' } },
-            { cat: { t: '과학' }, c1: { e: 1 }, c2: { f: '융합과학 탐구', c: 3 }, sum: { v: '3 학점' } },
-            { dynSplit: { k1: 'x1', k2: 'x2', label: '[택5 / 택3]' } },
+            { dynSplit: { k1: 'x1', k2: 'x2', label: '[택5 / 택3]', f2: [{ n: '사회문제 탐구', credit: 3, fx: 1 }, { n: '융합과학 탐구', credit: 3, fx: 1 }] } },
             { cat: { t: '예술' }, c1: { e: 1 }, c2: { f: '문학과 매체', c: 4 }, sum: { v: '4 학점' } },
             { cat: { t: '체육' }, c1: { f: '스포츠 문화', c: 1 }, c2: { f: '스포츠 과학', c: 1 }, sum: { v: '2 학점' } }
         ]};
@@ -801,6 +798,7 @@
         }
         // 탐구 / 기술·가정~교양 분리 블록 (선택 결과에 따라 동적으로 그려짐)
         function dynCellHtml(o) {
+            if (o && o.fx) return `<td class="fixed-cell">${o.n}</td><td>${o.credit}</td>`;
             if (o) return `<td class="slot-filled">${o.n}</td><td>${o.credit}</td>`;
             return `<td class="dash-cell">–</td><td class="dash-cell">–</td>`;
         }
@@ -819,7 +817,8 @@
         }
         function dynSplitHtml(spec) {
             const s1 = combinedSel(spec.k1), s2 = combinedSel(spec.k2);
-            const a1 = s1.filter(o => !o.life), a2 = s2.filter(o => !o.life);
+            // f1/f2: 학기별 지정 이수 과목(사회문제 탐구·융합과학 탐구 등) — 탐구 블록에 함께 표시
+            const a1 = (spec.f1 || []).concat(s1.filter(o => !o.life)), a2 = (spec.f2 || []).concat(s2.filter(o => !o.life));
             const b1 = s1.filter(o => o.life), b2 = s2.filter(o => o.life);
             const rem1 = shareMaxOf(spec.k1) - s1.length;
             const rem2 = shareMaxOf(spec.k2) - s2.length;
@@ -975,6 +974,7 @@
             const track = document.getElementById('selTrack').value === 'science' ? '과학중점과정' : '일반과정';
             document.getElementById('studentCardDisplay').innerText =
                 `${yr}학년 ${cls}반 ${num}번 ${name} | ${track}`;
+            updateGoto360();
         }
 
         /* ==================== 전체화면 (부모 앱의 사이드바·상단바 숨김) ==================== */
@@ -995,6 +995,25 @@
                 btn.style.display = 'inline-block';
                 if (window.parent.document.body.classList.contains('sim-full')) btn.innerText = '↙ 원래대로';
             } catch (e) {}
+        }
+
+        /* ==================== 학생 종합검색 바로가기 (부모 앱 검색 상세로 이동) ==================== */
+        function gotoStudent360() {
+            try {
+                const r = document.getElementById('studentClass').value, n = document.getElementById('studentNumber').value;
+                if (!r || !n) { alert('반·번호를 먼저 선택해 주세요.'); return; }
+                window.parent.openStudent360(simGrade(), r, n);
+            } catch (e) {}
+        }
+        function updateGoto360() {
+            const btn = document.getElementById('btnGoto360');
+            if (!btn) return;
+            let ok = false;
+            try {
+                ok = window.parent !== window && typeof window.parent.openStudent360 === 'function'
+                    && !!document.getElementById('studentClass').value && !!document.getElementById('studentNumber').value;
+            } catch (e) {}
+            btn.style.display = ok ? 'inline-block' : 'none';
         }
 
         /* ==================== 과학중점과정 자동 인식 ==================== */

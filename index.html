@@ -3005,7 +3005,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.31</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.32</div>
   </div>
 </div>
 
@@ -3129,7 +3129,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver5.31</div>
+    <div class="nav-version" title="Made by 박경환">ver5.32</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -6662,6 +6662,16 @@ document.getElementById('gradesFrame')?.addEventListener('load', function() {
     if (!this.contentWindow.location.pathname.includes('subject-sim')) document.body.classList.remove('sim-full');
   } catch(e) {}
 });
+
+// 시뮬레이터 등 iframe에서 학생 종합검색 상세로 바로 이동
+window.openStudent360 = async (grade, room, num) => {
+  document.body.classList.remove('sim-full');
+  navigateTo('search');
+  try { await spotLoadData(); } catch(e) { return; }
+  const s = allStudents.find(x =>
+    parseInt(x.grade) === parseInt(grade) && parseInt(x.room) === parseInt(room) && parseInt(x.num) === parseInt(num));
+  if (s) { history.pushState({ page: 'search' }, ''); s360ShowDetail(s); }
+};
 
 async function initStudentsPage() {
   studentsInitialized = true;
