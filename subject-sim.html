@@ -600,6 +600,10 @@
         function initScenario() {
             const key = scenarioKey();
             cfg = SCENARIOS[key];
+            // 현재 2학년 + 실제 이수 과목 데이터가 있으면 2학년 표를 실제 과목으로 재구성
+            if (key.startsWith('2') && takenList.length) {
+                cfg = { ...cfg, tables: cfg.tables.map(t => (t === T2_2G || t === T2_2S) ? buildTakenT2(t) : t) };
+            }
             cfg._key = key;
             selections = {};
             cfg.groups.forEach(g => selections[g.id] = []);
@@ -1550,6 +1554,43 @@
 
         /* ==================== 종합검색 연동: 학생 실제 선택과목 자동 반영 ==================== */
         let autoSel = null; // URL로 넘어온 학생 정보 { names:[과목명], label:이름 }
+        let takenList = []; // 현재 2학년 학생이 이수 중인 2학년 선택과목 → 오른쪽 계획표에 표시
+
+        // 자동 반영 안내 배너
+        function showBanner(html) {
+            const wrap = document.getElementById('main-select-content');
+            const div = document.createElement('div');
+            div.className = 'scenario-notice';
+            div.style.cssText = 'background:#ecfdf5;border-color:#a7f3d0;color:#047857;margin-bottom:10px;';
+            div.innerHTML = html;
+            wrap.prepend(div);
+        }
+
+        // 현재 2학년 표(이수 현황)를 실제 이수 과목으로 재구성 — 1학년 시나리오의 2학년 표와 같은 형태
+        function buildTakenT2(orig) {
+            if (!takenList.length) return orig;
+            if (orig === T2_2S) {
+                // 과학중점: '과학 진로 ①~③ (이수 중)' 칸에 실제 과목명 반영
+                const sci = takenList.filter(n => OPT.sci23.some(o => o.n === n));
+                const rows = orig.rows.map(r => JSON.parse(JSON.stringify(r)));
+                let k = 0;
+                rows.forEach(r => {
+                    if (r.c2 && r.c2.nt && r.c2.nt.startsWith('과학 진로') && sci[k]) { r.c2 = { f: sci[k], c: 3 }; k++; }
+                });
+                return { ...orig, title: '2학년 이수 현황 (실제 선택과목 반영)', rows };
+            }
+            // 일반과정: '개인별 선택 이수 중' 행들을 실제 과목명 목록으로 교체 (두 과목씩 한 행)
+            const names = takenList;
+            const half = Math.ceil(names.length / 2);
+            const rows = [];
+            for (let i = 0; i < names.length; i += 2) {
+                const row = { c1: { f: names[i], c: '' }, c2: names[i + 1] ? { f: names[i + 1], c: '' } : { e: 1 } };
+                if (i === 0) { row.cat = { t: '개인별 선택<br>(이수 중)', span: half }; row.sum = { v: '54 학점', span: half }; }
+                rows.push(row);
+            }
+            rows.push({ cat: { t: '체육' }, c1: { f: '스포츠 생활1', c: 2 }, c2: { f: '스포츠 생활2', c: 2 }, sum: { v: '4 학점' } });
+            return { ...orig, title: '2학년 이수 현황 (실제 선택과목 반영)', rows };
+        }
         function applyAutoSelect() {
             if (!autoSel || !autoSel.names.length) return;
             let hit = 0;
@@ -1570,12 +1611,7 @@
             });
             if (hit) {
                 updateAll();
-                const wrap = document.getElementById('main-select-content');
-                const div = document.createElement('div');
-                div.className = 'scenario-notice';
-                div.style.cssText = 'background:#ecfdf5;border-color:#a7f3d0;color:#047857;margin-bottom:10px;';
-                div.innerHTML = `✅ <b>${autoSel.label}</b> 학생의 선택과목 <b>${hit}과목</b>이 자동 반영되었습니다. 카드를 눌러 자유롭게 바꿔볼 수 있습니다.`;
-                wrap.prepend(div);
+                showBanner(`✅ <b>${autoSel.label}</b> 학생의 선택과목 <b>${hit}과목</b>이 자동 반영되었습니다. 카드를 눌러 자유롭게 바꿔볼 수 있습니다.`);
             }
         }
 
@@ -1673,11 +1709,15 @@
                 prefill = { cls: qp.get('class'), num: qp.get('num') };
                 const names = (qp.get('subjects') || '').split(',').map(s => s.trim()).filter(Boolean);
                 if (names.length) autoSel = { names, label: qp.get('name') || '조회 학생' };
+                takenList = (qp.get('taken') || '').split(',').map(s => s.trim()).filter(Boolean);
             } catch (e) {}
             initScenario();
             initDeptSelector();
             window.addEventListener('resize', updateStacks);
             applyAutoSelect();
+            if (takenList.length) {
+                showBanner(`📋 이수 중인 2학년 선택과목 <b>${takenList.length}과목</b>이 오른쪽 계획표(2학년 이수 현황)에 반영되었습니다.`);
+            }
         };
     </script>
     <script type="module">

@@ -3000,7 +3000,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.25</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.26</div>
   </div>
 </div>
 
@@ -3124,7 +3124,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver5.25</div>
+    <div class="nav-version" title="Made by 박경환">ver5.26</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7330,10 +7330,17 @@ async function s360LoadElectives(s){
       ${st.prevGrade?.length ? `<div><div style="font-size:13.5px;font-weight:800;color:var(--ink-soft);margin-bottom:6px;">직전학년</div><div style="display:flex;gap:7px;flex-wrap:wrap;">${badges(st.prevGrade)}</div></div>` : ''}
       ${simBtn}`;
     document.getElementById('s360SimBtn')?.addEventListener('click', () => {
-      const subj = [...(st.current || []), ...(st.prevGrade || [])];
+      const qs = [`year=${yr}`, `class=${parseInt(s.room)}`, `num=${parseInt(s.num)}`, `name=${encodeURIComponent(s.name || '')}`];
+      if (yr === 2) {
+        // 2학년: 이수 중인 과목 → 시뮬레이터 오른쪽 계획표(2학년 이수 현황)에 표시
+        qs.push(`taken=${encodeURIComponent((st.current || []).join(','))}`);
+      } else {
+        // 1학년: 등록된 선택(신청)과목 → 선택군에 자동 체크
+        qs.push(`subjects=${encodeURIComponent([...(st.current || []), ...(st.prevGrade || [])].join(','))}`);
+      }
       navigateTo('grades');
       const gf = document.getElementById('gradesFrame');
-      if (gf) gf.src = `subject-sim.html?year=${yr}&class=${parseInt(s.room)}&num=${parseInt(s.num)}&name=${encodeURIComponent(s.name || '')}&subjects=${encodeURIComponent(subj.join(','))}`;
+      if (gf) gf.src = `subject-sim.html?${qs.join('&')}`;
     });
   } catch(e) {
     if (e.code === 'permission-denied') { const sec = el.closest('.spot-sec'); if (sec) sec.style.display = 'none'; else el.innerHTML = ''; }
