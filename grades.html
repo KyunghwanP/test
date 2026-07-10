@@ -4,6 +4,18 @@
   <meta charset="utf-8">
   <title>개별 모의고사 성적 분석</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    // 다크모드: 본체(index.html)의 이스터 에그 설정을 공유 + 토글 시 실시간 동기화
+    (function(){
+      const apply = on => {
+        document.documentElement.classList.toggle('dark', on);
+        if(on) document.documentElement.setAttribute('data-bs-theme','dark');
+        else document.documentElement.removeAttribute('data-bs-theme');
+      };
+      try{ apply(localStorage.getItem('ynhs-dark')==='1'); }catch(e){}
+      window.addEventListener('storage', e => { if(e.key==='ynhs-dark') apply(e.newValue==='1'); });
+    })();
+  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
 
   <!-- Chart.js 셀프호스팅: 학교망에서 cdn.jsdelivr.net 차단 시 그래프가 안 뜨는 문제 대응 -->
@@ -177,6 +189,24 @@
       .table-compact th { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
     .print-title { display: none; }
+
+    /* 다크모드 (본체 날씨 이스터 에그와 연동) — 인쇄에는 미적용 */
+    @media screen {
+      html.dark body{background-color:#0B1220;}
+      html.dark [style*="background-color: #f8f9fa"]{background-color:#151F33 !important;border-color:#26354F !important;color:#8FA3BD !important;}
+      html.dark .sticky-top-menu{background:rgba(21,31,51,0.95) !important;}
+      html.dark .counseling-card{background:#151F33;}
+      html.dark .chart-container{background:#151F33;border-color:#26354F;}
+      html.dark .chart-title{color:#E2E8F0;}
+      html.dark .section-title{color:#F06CA2;}
+      html.dark .table-compact{background:rgba(21,31,51,0.4);}
+      html.dark .table-compact th, html.dark .table-compact td{border-color:#26354F;}
+      html.dark .table-compact th{background-color:rgba(29,42,68,0.65);color:#CBD5E1;}
+      html.dark .val-grade{color:#F28B82;}
+      html.dark #initial_loading{background:#0B1220;}
+      html.dark #initial_loading .text-dark{color:#E2E8F0 !important;}
+      html.dark #fetch_loading{background:rgba(11,18,32,0.8);}
+    }
   </style>
 </head>
 <body>
@@ -495,16 +525,17 @@
       Chart.defaults.font.size = 14;
       Chart.defaults.color = '#64748b';
 
+      const isDark = document.documentElement.classList.contains('dark');
       const commonOptions = {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            titleColor: '#1e293b',
-            bodyColor: '#1e293b',
-            borderColor: '#e2e8f0',
+            backgroundColor: isDark ? 'rgba(21, 31, 51, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+            titleColor: isDark ? '#e2e8f0' : '#1e293b',
+            bodyColor: isDark ? '#e2e8f0' : '#1e293b',
+            borderColor: isDark ? '#26354F' : '#e2e8f0',
             borderWidth: 1,
             padding: 12,
             boxPadding: 6,
@@ -539,7 +570,7 @@
         interaction: { mode: 'index', intersect: false },
         scales: {
           x: { grid: { display: false }, offset: true, ticks: { autoSkip: true, maxRotation: 0, autoSkipPadding: 6 } },
-          y: { grid: { color: '#f1f5f9' }, border: { dash: [4, 4] } }
+          y: { grid: { color: isDark ? '#1D2A44' : '#f1f5f9' }, border: { dash: [4, 4] } }
         },
         layout: { padding: { top: 30, bottom: 8 } }
       };

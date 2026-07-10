@@ -4,6 +4,18 @@
   <meta charset="utf-8">
   <title>영남고등학교 진로진학 상담 시스템</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    // 다크모드: 본체(index.html)의 이스터 에그 설정을 공유 + 토글 시 실시간 동기화
+    (function(){
+      const apply = on => {
+        document.documentElement.classList.toggle('dark', on);
+        if(on) document.documentElement.setAttribute('data-bs-theme','dark');
+        else document.documentElement.removeAttribute('data-bs-theme');
+      };
+      try{ apply(localStorage.getItem('ynhs-dark')==='1'); }catch(e){}
+      window.addEventListener('storage', e => { if(e.key==='ynhs-dark') apply(e.newValue==='1'); });
+    })();
+  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
 
   <!--
@@ -135,6 +147,18 @@
     }
 
     .header-panel { background: #005088; color: white; border-radius: 15px; padding: 20px; margin-bottom: 25px; }
+
+    /* 다크모드 (본체 날씨 이스터 에그와 연동) */
+    @media screen {
+      html.dark body{background-color:#0B1220;}
+      html.dark .home-card{background:#151F33;border-color:#26354F;box-shadow:0 4px 20px rgba(0,0,0,0.35);}
+      html.dark .home-card h3{color:#E2E8F0;}
+      html.dark .home-card p{color:#8FA3BD !important;}
+      html.dark .prep-badge{background:#26354F;color:#8FA3BD;}
+      html.dark .card-disabled:hover{border-color:#26354F !important;}
+      html.dark [style*="background-color: #f8f9fa"]{background-color:#151F33 !important;border-color:#26354F !important;color:#8FA3BD !important;}
+      html.dark #user_email{color:#5EB3F6 !important;}
+    }
   </style>
 </head>
 <body>
