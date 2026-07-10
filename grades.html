@@ -513,8 +513,16 @@
             bodyFont: { size: 14, weight: 'bold' }
           },
           datalabels: {
-            display: true,
-            align: 'top',
+            // 겹침 방지: 점 간격이 좁으면 선별 표시 (마지막 회차는 항상 표시)
+            display: function(context) {
+              const n = context.chart.data.labels.length;
+              const per = context.chart.width / Math.max(n, 1);
+              if (per >= 36) return true;
+              const step = per >= 20 ? 2 : 3;
+              return context.dataIndex % step === (n - 1) % step;
+            },
+            // 겹침 방지: 홀짝 지그재그 배치 (위/아래 교차)
+            align: function(context) { return context.dataIndex % 2 ? 'bottom' : 'top'; },
             anchor: 'end',
             offset: 4,
             color: function(context) { return context.dataset.borderColor; },
@@ -524,10 +532,10 @@
         },
         interaction: { mode: 'index', intersect: false },
         scales: {
-          x: { grid: { display: false }, offset: true },
+          x: { grid: { display: false }, offset: true, ticks: { autoSkip: true, maxRotation: 0, autoSkipPadding: 6 } },
           y: { grid: { color: '#f1f5f9' }, border: { dash: [4, 4] } }
         },
-        layout: { padding: { top: 30 } }
+        layout: { padding: { top: 30, bottom: 8 } }
       };
 
       function getGradient(ctx, colorStart, colorEnd) {
