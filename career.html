@@ -237,8 +237,8 @@
         </div>
       </div>
 
-      <!-- 관리자 전용 카드 (테스트 중 — 로그인 후 관리자 계정이면 JS로 표시) -->
-      <div class="col-xl-3 col-md-6 col-sm-6 col-12" id="cardJindan" style="display:none;">
+      <!-- 입시 진단 카드 (전체 공개 — 공개 입결 데이터 기반이라 성적 권한 불필요) -->
+      <div class="col-xl-3 col-md-6 col-sm-6 col-12" id="cardJindan">
         <div class="home-card card-jindan" onclick="location.href='jindan.html'">
           <div class="icon-circle">🩺</div>
           <h3><span class="fw-bold" style="color:#4f46e5;">입시 진단</span> 리포트</h3>
@@ -269,10 +269,6 @@
     });
     onAuthStateChanged(getAuth(app), (user) => {
       document.getElementById('user_email').textContent = user ? user.email : '로그인 필요';
-      // 입시 진단: 관리자 전용 노출 (테스트 중)
-      if (user && user.email === 'pkh910518@yeungnam.hs.kr') {
-        document.getElementById('cardJindan').style.display = '';
-      }
     });
   </script>
 </body>
