@@ -54,10 +54,6 @@
         .input-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
         .input-head h2 { font-size: 34px; }
         .input-head .desc { font-size: 13px; color: var(--slate-500); font-weight: 500; margin-top: 6px; }
-        .calc-cta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .calc-hint { font-size: 11px; font-weight: 700; color: var(--indigo); background: var(--indigo-50); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--indigo-100); }
-        .calc-btn { display: flex; align-items: center; gap: 6px; padding: 9px 16px; background: var(--slate-900); color: #fff; border: none; border-radius: 999px; font-size: 12px; font-weight: 800; transition: transform .15s; box-shadow: 0 10px 20px rgba(148,163,184,.3); }
-        .calc-btn:hover { transform: scale(1.05); }
 
         .gpa-label { font-size: 10px; font-weight: 900; color: var(--slate-400); text-transform: uppercase; letter-spacing: .2em; }
         .gpa-row { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
@@ -75,17 +71,6 @@
         .slider-ticks .bar { height: 4px; border-radius: 999px; background: var(--slate-100); margin-bottom: 4px; transition: background .2s; }
         .slider-ticks .bar.on { background: var(--indigo); }
         .slider-ticks span { font-size: 10px; font-weight: 900; color: var(--slate-400); }
-
-        /* 등급 계산기 */
-        #calc-panel { background: var(--slate-50); padding: 28px; border-radius: 1.5rem; border: 1px solid var(--slate-200); display: none; }
-        #calc-panel.open { display: block; }
-        #calc-panel h4 { font-size: 13px; font-weight: 900; color: var(--slate-800); text-transform: uppercase; margin-bottom: 20px; }
-        .calc-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
-        .calc-grid label { display: block; font-size: 10px; font-weight: 900; color: var(--slate-500); text-align: center; text-transform: uppercase; letter-spacing: .15em; margin-bottom: 8px; }
-        .calc-grid input { width: 100%; padding: 12px 8px; border-radius: 1rem; border: 1px solid var(--slate-200); text-align: center; font-size: 17px; font-weight: 700; outline: none; transition: all .2s; }
-        .calc-grid input:focus { border-color: var(--indigo); box-shadow: 0 0 0 4px rgba(99,102,241,.1); }
-        .calc-apply { width: 100%; background: var(--indigo); color: #fff; padding: 15px 0; border: none; border-radius: 1rem; font-size: 13px; font-weight: 900; box-shadow: 0 15px 30px rgba(224,231,255,.9); }
-        .calc-apply:hover { background: var(--indigo-dark); }
 
         /* 환산 기준 카드 */
         .version-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
@@ -248,10 +233,6 @@
                     <h2 class="serif">성적 입력</h2>
                     <p class="desc">5등급제 내신을 입력하면 9등급제로 자동 환산됩니다.</p>
                 </div>
-                <div class="calc-cta">
-                    <span class="calc-hint">내 등급을 모를 경우 👉</span>
-                    <button class="calc-btn" onclick="toggleCalculator()">🧮 등급 계산기</button>
-                </div>
             </div>
 
             <div>
@@ -267,12 +248,6 @@
             <div>
                 <input type="range" id="gpa-slider" min="1" max="5" step="0.01" value="2.00">
                 <div class="slider-ticks" id="slider-ticks"></div>
-            </div>
-
-            <div id="calc-panel">
-                <h4>🧮 성적 상세 입력 (등급별 과목 수)</h4>
-                <div class="calc-grid" id="calc-grid"></div>
-                <button class="calc-apply" onclick="applyCalculator()">계산 결과 적용하기</button>
             </div>
 
             <div class="version-grid" id="version-grid"></div>
@@ -574,18 +549,6 @@
             document.getElementById('ambitious-toggle').checked = true;
             render();
         }
-        function toggleCalculator() { document.getElementById('calc-panel').classList.toggle('open'); }
-        function applyCalculator() {
-            let total = 0, weighted = 0;
-            for (let g = 1; g <= 5; g++) {
-                const cnt = parseInt(document.getElementById(`calc-g${g}`).value) || 0;
-                total += cnt; weighted += g * cnt;
-            }
-            if (total === 0) return;
-            setGpa5(weighted / total, false);
-            document.getElementById('calc-panel').classList.remove('open');
-        }
-
         // 숫자 클릭 → 직접 입력 (GPA / 9등급 환산값 공용)
         function bindClickEdit(displayId, editId, applyFn) {
             const display = document.getElementById(displayId);
@@ -692,9 +655,6 @@
 
         // ─── 초기화 ───
         window.addEventListener('DOMContentLoaded', async () => {
-            document.getElementById('calc-grid').innerHTML = [1, 2, 3, 4, 5].map(g =>
-                `<div><label>${g}등급</label><input type="number" id="calc-g${g}" min="0" value="0"></div>`
-            ).join('');
             document.getElementById('gpa-slider').addEventListener('input', e => setGpa5(e.target.value, true));
             document.getElementById('search-input').addEventListener('input', e => { searchQuery = e.target.value; render(); });
             document.getElementById('uni-select').addEventListener('change', e => { selectedUniversity = e.target.value; render(); });
