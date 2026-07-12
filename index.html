@@ -3055,7 +3055,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.44</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.45</div>
   </div>
 </div>
 
@@ -3179,7 +3179,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver5.44</div>
+    <div class="nav-version" title="Made by 박경환">ver5.45</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7475,12 +7475,13 @@ async function s360LoadElectives(s){
     const badges = list => list.map(name => `<span class="spot-badge ${subjSubjectArea(name)}">${escapeHtml(name)}</span>`).join('');
     // 과목선택 시뮬레이터 연동: 관리자 전용 + 1·2학년만 (시뮬레이터가 2026·2025 입학생 편제표 기준)
     const yr = parseInt(s.grade);
-    const simBtn = (_IS_ADMIN() && (yr === 1 || yr === 2))
-      ? `<div style="margin-top:10px;"><button class="s360-susi-goto-btn" id="s360SimBtn">🧭 시뮬레이터에 자동 반영해서 열기 →</button></div>` : '';
     el.innerHTML = `
       ${st.current?.length ? `<div style="margin-bottom:8px;"><div style="font-size:13.5px;font-weight:800;color:var(--ink-soft);margin-bottom:6px;">이번학년</div><div style="display:flex;gap:7px;flex-wrap:wrap;">${badges(st.current)}</div></div>` : ''}
-      ${st.prevGrade?.length ? `<div><div style="font-size:13.5px;font-weight:800;color:var(--ink-soft);margin-bottom:6px;">직전학년</div><div style="display:flex;gap:7px;flex-wrap:wrap;">${badges(st.prevGrade)}</div></div>` : ''}
-      ${simBtn}`;
+      ${st.prevGrade?.length ? `<div><div style="font-size:13.5px;font-weight:800;color:var(--ink-soft);margin-bottom:6px;">직전학년</div><div style="display:flex;gap:7px;flex-wrap:wrap;">${badges(st.prevGrade)}</div></div>` : ''}`;
+    const simSlot = document.getElementById('s360SimSlot');
+    if (simSlot && _IS_ADMIN() && (yr === 1 || yr === 2)) {
+      simSlot.innerHTML = `<button class="s360-susi-goto-btn" id="s360SimBtn">🧭 선택과목 시뮬레이터 열기 →</button>`;
+    }
     document.getElementById('s360SimBtn')?.addEventListener('click', () => {
       const qs = [`year=${yr}`, `class=${parseInt(s.room)}`, `num=${parseInt(s.num)}`, `name=${encodeURIComponent(s.name || '')}`];
       if (isSciStudent(s)) qs.push('track=science'); // 과학중점과정 자동 전환
@@ -7533,7 +7534,7 @@ async function s360ShowDetail(s){
         <button id="s360ContactBtn" class="spot-badge" style="border:none;cursor:pointer;font-family:inherit;">📞 연락처 보기</button>
       </div>
       <div class="spot-sec"><div class="spot-sec-title">상벌점 (전체 이력)</div>${ptsHtml}</div>
-      <div class="spot-sec"><div class="spot-sec-title">선택과목</div>
+      <div class="spot-sec"><div class="spot-sec-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">선택과목<span id="s360SimSlot"></span></div>
         <div id="s360Electives" style="font-size:15px;color:var(--ink-soft);">불러오는 중...</div>
       </div>
       <div class="spot-sec" style="margin-bottom:0;"><div class="spot-sec-title">성적 (내신 · 모의고사 전체 회차)</div>
