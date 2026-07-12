@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>입시 진단</title>
+    <!--
+      이식: 업로드본 '입시 진단' PWA → 진로진학 허브 하위 페이지 (관리자 전용 테스트)
+      - tailwind CDN·font-awesome·구글폰트 제거 → 학교망 CDN 차단 대비 순수 CSS로 재작성 (앱 정책)
+      - 데이터: jindan-data.csv — 2025학년도 수시 입결, 원 출처 github.com/kangseok-hub/converter (MIT)
+      - 등급 환산: 경기진학지도협의회·부산/광주교육청 2025 분석자료 보간 (원본 로직 그대로)
+    -->
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+            letter-spacing: -0.02em; background-color: #f8fafc; color: #1e293b;
+            -webkit-font-smoothing: antialiased;
+        }
+        #app { max-width: 32rem; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; padding-bottom: 8rem; }
+        .no-scrollbar { scrollbar-width: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        /* 로더 */
+        #initial-loader { position: fixed; inset: 0; z-index: 100; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity .5s; }
+        #initial-loader.hide { opacity: 0; pointer-events: none; }
+        .loader { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top-color: #4f46e5; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 24px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #initial-loader p { font-size: 13px; font-weight: 900; color: #64748b; animation: pulse 1.5s ease-in-out infinite; }
+        @keyframes pulse { 50% { opacity: .4; } }
+
+        /* 헤더 */
+        header { padding: 26px 20px 8px; }
+        .top-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .brand { display: flex; align-items: center; gap: 12px; }
+        .brand-badge { width: 44px; height: 44px; background: #4f46e5; border-radius: 16px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 900; font-size: 15px; box-shadow: 0 8px 18px rgba(79,70,229,.3); }
+        .brand h1 { font-size: 19px; font-weight: 900; color: #0f172a; }
+        .back-link { font-size: 12px; font-weight: 800; color: #64748b; text-decoration: none; background: #fff; border: 1px solid #e2e8f0; padding: 7px 12px; border-radius: 12px; }
+        #db-count { font-size: 10px; font-weight: 900; color: #4f46e5; background: #eef2ff; padding: 6px 12px; border-radius: 999px; border: 1px solid #e0e7ff; }
+
+        .hero { background: #0f172a; border-radius: 2rem; padding: 28px; color: #fff; box-shadow: 0 25px 50px rgba(15,23,42,.25); position: relative; overflow: hidden; margin-bottom: 4px; }
+        .hero-row { display: flex; justify-content: space-between; align-items: flex-end; position: relative; z-index: 1; }
+        .hero-label { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 8px; opacity: .8; }
+        .hero-grade { display: flex; align-items: baseline; gap: 6px; }
+        #my-grade { font-size: 48px; font-weight: 900; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+        .hero-grade span:last-child { font-size: 14px; font-weight: 700; color: #818cf8; }
+        .hero-alpha { text-align: right; }
+        .hero-alpha p { font-size: 10px; font-weight: 700; color: #64748b; margin-bottom: 6px; }
+        #alpha-val { display: inline-block; background: rgba(255,255,255,.1); padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: 900; color: #a5b4fc; }
+        #conv-reason { position: relative; z-index: 1; margin-top: 16px; font-size: 10px; line-height: 1.6; color: #94a3b8; font-weight: 500; }
+        .hero-glow { position: absolute; right: -48px; top: -48px; width: 192px; height: 192px; background: rgba(99,102,241,.2); border-radius: 50%; filter: blur(60px); }
+
+        /* 본문 카드 */
+        #main-ui { padding: 0 20px; display: flex; flex-direction: column; gap: 20px; opacity: 0; transition: opacity .5s; }
+        #main-ui.show { opacity: 1; }
+        .card { background: #fff; border-radius: 2rem; padding: 24px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+        .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .card-head h2 { font-size: 12px; font-weight: 900; color: #1e293b; letter-spacing: -.03em; text-transform: uppercase; }
+        .grade-input-wrap { display: flex; align-items: center; gap: 8px; }
+        .grade-input { width: 70px; padding: 8px 0; border: 2px solid #e2e8f0; border-radius: 12px; font-weight: 800; text-align: center; color: #4f46e5; outline: none; font-size: 15px; font-family: inherit; transition: border-color .2s; }
+        .grade-input:focus { border-color: #4f46e5; }
+        .grade-input-wrap span { font-size: 14px; font-weight: 700; color: #94a3b8; }
+
+        input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; background: #e2e8f0; border-radius: 12px; outline: none; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; background: #fff; border: 6px solid #4f46e5; border-radius: 50%; box-shadow: 0 3px 8px rgba(79,70,229,.3); cursor: pointer; }
+        input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; background: #fff; border: 6px solid #4f46e5; border-radius: 50%; box-shadow: 0 3px 8px rgba(79,70,229,.3); cursor: pointer; }
+        .slider-scale { display: flex; justify-content: space-between; margin-top: 8px; font-size: 10px; font-weight: 700; color: #94a3b8; }
+
+        .conv-label { font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: .1em; margin: 20px 0 8px; }
+        .conv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .conv-btn { padding: 9px 0; border: 2px solid #e2e8f0; border-radius: 12px; font-weight: 800; font-size: 12px; color: #64748b; background: #fff; transition: all .15s; cursor: pointer; font-family: inherit; }
+        .conv-btn.active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+
+        .filter-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+        .filter-btn { flex-shrink: 0; padding: 10px 20px; border-radius: 12px; font-size: 12px; font-weight: 700; border: 1px solid #f1f5f9; background: #f8fafc; color: #64748b; cursor: pointer; font-family: inherit; }
+        .filter-btn.active { background: #1e293b; color: #fff; border-color: #1e293b; }
+        .alpha-row { display: flex; gap: 10px; margin-top: 20px; }
+        .alpha-btn { flex: 1; padding: 12px 0; border-radius: 12px; font-size: 12px; font-weight: 900; border: 1px solid #f1f5f9; background: #f8fafc; color: #94a3b8; cursor: pointer; font-family: inherit; }
+        .alpha-btn.active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+
+        /* 검색 */
+        .search-wrap { position: relative; }
+        .search-icon { position: absolute; left: 20px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 15px; }
+        #search-input { display: block; width: 100%; padding: 20px 24px 20px 48px; background: #fff; border: 1px solid #e2e8f0; border-radius: 1.5rem; font-size: 16px; font-weight: 700; color: #1e293b; outline: none; font-family: inherit; transition: all .2s; }
+        #search-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 4px rgba(99,102,241,.06); }
+        .result-row { display: flex; align-items: center; justify-content: space-between; padding: 0 8px; margin-top: 12px; }
+        .result-row .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #6366f1; margin-right: 6px; vertical-align: middle; }
+        .result-row p { font-size: 11px; font-weight: 900; color: #94a3b8; }
+        #result-count { color: #4f46e5; }
+        #filter-status { font-size: 10px; font-weight: 700; color: #cbd5e1; }
+
+        /* 결과 카드 */
+        #data-list { display: flex; flex-direction: column; gap: 16px; padding-top: 8px; }
+        .uni-card { background: #fff; border-radius: 1.5rem; border: 1px solid #e2e8f0; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.04); animation: fadeInUp .4s ease-out both; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .uni-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 12px; }
+        .uni-info { flex: 1; min-width: 0; }
+        .uni-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+        .uni-name-row h3 { font-size: 18px; font-weight: 900; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .campus-badge { flex-shrink: 0; padding: 2px 8px; border-radius: 8px; font-size: 10px; font-weight: 900; background: #fff7ed; color: #ea580c; border: 1px solid #ffedd5; }
+        .uni-major-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+        .cat-badge { flex-shrink: 0; padding: 2px 8px; border-radius: 6px; font-size: 9px; font-weight: 900; }
+        .uni-major-row p { font-size: 11px; font-weight: 700; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .status-badge { flex-shrink: 0; padding: 6px 12px; border-radius: 12px; font-size: 11px; font-weight: 900; border: 1px solid; white-space: nowrap; }
+        .uni-bottom { display: flex; align-items: center; justify-content: space-between; padding-top: 16px; border-top: 1px solid #f8fafc; }
+        .type-badge { padding: 4px 10px; border-radius: 8px; font-size: 10px; font-weight: 700; background: #f8fafc; color: #94a3b8; }
+        .avg-wrap { text-align: right; }
+        .avg-wrap p { font-size: 9px; font-weight: 700; color: #cbd5e1; }
+        .avg-wrap span { font-size: 20px; font-weight: 900; color: #1e293b; }
+        .empty-msg { padding: 80px 0; text-align: center; opacity: .4; font-weight: 700; }
+
+        /* 카테고리 색 */
+        .cat-med { background: #fff1f2; color: #e11d48; } .cat-eng { background: #eef2ff; color: #4f46e5; }
+        .cat-nat { background: #ecfdf5; color: #059669; } .cat-soc { background: #fffbeb; color: #d97706; }
+        .cat-hum { background: #faf5ff; color: #9333ea; } .cat-edu { background: #eff6ff; color: #2563eb; }
+        .cat-etc { background: #f1f5f9; color: #64748b; }
+        /* 판정 색 */
+        .st-safe { color: #059669; background: #ecfdf5; border-color: #a7f3d0; }
+        .st-fit  { color: #4f46e5; background: #eef2ff; border-color: #c7d2fe; }
+        .st-reach{ color: #d97706; background: #fffbeb; border-color: #fde68a; }
+
+        .disclaimer { max-width: 32rem; margin: 0 auto; padding: 8px 16px 112px; font-size: 10px; line-height: 1.7; color: #94a3b8; text-align: center; }
+
+        /* 하단 페이지 내비 */
+        #nav-footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 50; background: rgba(255,255,255,.85); backdrop-filter: blur(16px); border-top: 1px solid #f1f5f9; padding: 16px; opacity: 0; transition: opacity .5s; }
+        #nav-footer.show { opacity: 1; }
+        .nav-inner { max-width: 32rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; }
+        .nav-inner button { width: 48px; height: 48px; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; font-size: 17px; color: #475569; cursor: pointer; }
+        .nav-inner button:disabled { opacity: .3; cursor: default; }
+        .page-pill { padding: 10px 24px; background: #0f172a; border-radius: 16px; box-shadow: 0 10px 20px rgba(15,23,42,.2); }
+        .page-pill span { font-size: 12px; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="initial-loader">
+            <div class="loader"></div>
+            <p>데이터를 불러오고 있습니다...</p>
+        </div>
+        <header>
+            <div class="top-row">
+                <div class="brand">
+                    <div class="brand-badge">PRO</div>
+                    <h1>맞춤 진단 리포트</h1>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <div id="db-count">연결 중</div>
+                    <a class="back-link" href="career.html">← 홈</a>
+                </div>
+            </div>
+            <div class="hero">
+                <div class="hero-row">
+                    <div>
+                        <p class="hero-label">9등급제 환산 성적</p>
+                        <div class="hero-grade">
+                            <span id="my-grade">1.70</span>
+                            <span>등급</span>
+                        </div>
+                    </div>
+                    <div class="hero-alpha">
+                        <p>보정</p>
+                        <span id="alpha-val">±0.0</span>
+                    </div>
+                </div>
+                <p id="conv-reason"></p>
+                <div class="hero-glow"></div>
+            </div>
+        </header>
+        <section id="main-ui">
+            <div class="card">
+                <div class="card-head">
+                    <h2>GPA (5등급제 기준)</h2>
+                    <div class="grade-input-wrap">
+                        <input type="number" id="grade-num-input" min="1.0" max="5.0" step="0.01" value="1.00" class="grade-input" oninput="syncFromNumber(this.value)">
+                        <span>등급</span>
+                    </div>
+                </div>
+                <input type="range" id="unified-slider" min="1.0" max="5.0" step="0.01" value="1.0" oninput="syncFromSlider(this.value)">
+                <div class="conv-label">환산 기준</div>
+                <div class="conv-grid">
+                    <button class="conv-btn active" data-v="mixed" onclick="setConvVersion('mixed')">혼합</button>
+                    <button class="conv-btn" data-v="gyeonggi" onclick="setConvVersion('gyeonggi')">경기</button>
+                    <button class="conv-btn" data-v="busan" onclick="setConvVersion('busan')">부산</button>
+                    <button class="conv-btn" data-v="gwangju" onclick="setConvVersion('gwangju')">광주</button>
+                </div>
+                <div class="slider-scale">
+                    <span>1.0등급</span><span>3.0등급</span><span>5.0등급</span>
+                </div>
+            </div>
+            <div class="card">
+                <div class="filter-scroll no-scrollbar">
+                    <button onclick="setCategory('전체')" class="filter-btn active">전체</button>
+                    <button onclick="setCategory('의학')" class="filter-btn">의학</button>
+                    <button onclick="setCategory('공학')" class="filter-btn">공학</button>
+                    <button onclick="setCategory('자연')" class="filter-btn">자연</button>
+                    <button onclick="setCategory('사회')" class="filter-btn">사회</button>
+                    <button onclick="setCategory('인문')" class="filter-btn">인문</button>
+                    <button onclick="setCategory('교육')" class="filter-btn">교육</button>
+                    <button onclick="setCategory('기타')" class="filter-btn">기타</button>
+                </div>
+                <div class="alpha-row">
+                    <button onclick="updateAlpha(0.1)" class="alpha-btn">±0.1</button>
+                    <button onclick="updateAlpha(0.3)" class="alpha-btn">±0.3</button>
+                    <button onclick="updateAlpha(0.5)" class="alpha-btn">±0.5</button>
+                    <button onclick="updateAlpha(0)" class="alpha-btn active">OFF</button>
+                </div>
+            </div>
+            <div>
+                <div class="search-wrap">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="search-input" placeholder="대학 또는 학과 검색">
+                </div>
+                <div class="result-row">
+                    <p><span class="dot"></span>검색 결과 <span id="result-count">0</span>건</p>
+                    <p id="filter-status">전체 학과</p>
+                </div>
+            </div>
+            <div id="data-list"></div>
+        </section>
+        <div class="disclaimer">
+            본 도구는 2025학년도 수시 입결 자료 기반의 <b>참고용</b>이며, 실제 지원 판단은 반드시 담임·진학 상담과 병행하세요.<br>
+            등급 환산: 경기진학지도협의회·부산/광주교육청 2025 분석자료 · 데이터 원 출처: kangseok-hub/converter (MIT)
+        </div>
+        <footer id="nav-footer">
+            <div class="nav-inner">
+                <button id="prev-btn">←</button>
+                <div class="page-pill"><span id="page-num">0 / 0</span></div>
+                <button id="next-btn">→</button>
+            </div>
+        </footer>
+    </div>
+    <script>
+        const DATA_URL = "./jindan-data.csv";  // 2025학년도 수시 입결 (원 출처: github.com/kangseok-hub/converter, MIT)
+        let allData = [], filteredData = [], userFiveGrade = 1.0, alpha = 0, currentCategory = "전체", currentPage = 1;
+        const itemsPerPage = 20;
+        const gyeonggiData = [
+  { grade5: 1.000, grade9: 1.39 },
+  { grade5: 1.083, grade9: 1.53 },
+  { grade5: 1.167, grade9: 1.73 },
+  { grade5: 1.250, grade9: 1.87 },
+  { grade5: 1.333, grade9: 2.03 },
+  { grade5: 1.417, grade9: 2.18 },
+  { grade5: 1.500, grade9: 2.31 },
+  { grade5: 1.583, grade9: 2.45 },
+  { grade5: 1.667, grade9: 2.61 },
+  { grade5: 1.750, grade9: 2.73 },
+  { grade5: 1.833, grade9: 2.88 },
+  { grade5: 1.917, grade9: 3.00 },
+  { grade5: 2.000, grade9: 3.16 },
+  { grade5: 2.083, grade9: 3.28 },
+  { grade5: 2.167, grade9: 3.41 },
+  { grade5: 2.250, grade9: 3.54 },
+  { grade5: 2.333, grade9: 3.68 },
+  { grade5: 2.417, grade9: 3.80 },
+  { grade5: 2.500, grade9: 3.95 },
+  { grade5: 2.583, grade9: 4.08 },
+  { grade5: 2.667, grade9: 4.21 },
+  { grade5: 2.750, grade9: 4.34 },
+  { grade5: 2.833, grade9: 4.48 },
+  { grade5: 2.917, grade9: 4.61 },
+  { grade5: 3.000, grade9: 4.75 },
+  { grade5: 3.083, grade9: 4.87 },
+  { grade5: 3.167, grade9: 5.00 },
+  { grade5: 3.250, grade9: 5.12 },
+  { grade5: 3.333, grade9: 5.24 },
+  { grade5: 3.417, grade9: 5.33 },
+  { grade5: 3.500, grade9: 5.47 },
+  { grade5: 3.583, grade9: 5.59 },
+  { grade5: 3.667, grade9: 5.71 },
+  { grade5: 3.750, grade9: 5.83 },
+  { grade5: 3.833, grade9: 5.98 },
+  { grade5: 3.917, grade9: 6.09 },
+  { grade5: 4.000, grade9: 6.25 },
+  { grade5: 4.083, grade9: 6.36 },
+  { grade5: 4.167, grade9: 6.50 },
+  { grade5: 4.250, grade9: 6.61 },
+  { grade5: 4.333, grade9: 6.72 },
+  { grade5: 4.417, grade9: 6.81 },
+  { grade5: 4.500, grade9: 6.94 },
+  { grade5: 4.583, grade9: 7.05 },
+  { grade5: 4.667, grade9: 7.18 },
+  { grade5: 4.750, grade9: 7.30 },
+  { grade5: 4.833, grade9: 7.45 },
+  { grade5: 4.917, grade9: 7.62 },
+  { grade5: 5.000, grade9: 8.97 },
+];
+        const busanData = [
+  { grade5: 1.00, grade9: 1.45 },
+  { grade5: 1.08, grade9: 1.59 },
+  { grade5: 1.16, grade9: 1.78 },
+  { grade5: 1.24, grade9: 1.98 },
+  { grade5: 1.33, grade9: 2.14 },
+  { grade5: 1.42, grade9: 2.32 },
+  { grade5: 1.50, grade9: 2.45 },
+  { grade5: 1.66, grade9: 2.72 },
+  { grade5: 1.83, grade9: 3.03 },
+  { grade5: 2.00, grade9: 3.35 },
+  { grade5: 2.16, grade9: 3.60 },
+  { grade5: 2.33, grade9: 3.91 },
+  { grade5: 2.50, grade9: 4.20 },
+  { grade5: 2.66, grade9: 4.46 },
+  { grade5: 2.83, grade9: 4.73 },
+  { grade5: 3.00, grade9: 5.03 },
+  { grade5: 3.16, grade9: 5.28 },
+  { grade5: 3.33, grade9: 5.58 },
+  { grade5: 3.50, grade9: 5.86 },
+  { grade5: 3.66, grade9: 6.08 },
+  { grade5: 3.83, grade9: 6.37 },
+  { grade5: 4.00, grade9: 6.67 },
+  { grade5: 4.16, grade9: 6.93 },
+  { grade5: 4.33, grade9: 7.20 },
+  { grade5: 4.50, grade9: 7.48 },
+  { grade5: 4.66, grade9: 7.71 },
+  { grade5: 4.83, grade9: 8.00 },
+  { grade5: 5.00, grade9: 9.00 },
+];
+        const gwangjuData = [
+  { grade5: 1.00, grade9: 1.51 },
+  { grade5: 1.15, grade9: 1.78 },
+  { grade5: 1.30, grade9: 2.10 },
+  { grade5: 1.45, grade9: 2.38 },
+  { grade5: 1.60, grade9: 2.63 },
+  { grade5: 1.75, grade9: 2.89 },
+  { grade5: 1.90, grade9: 3.16 },
+  { grade5: 2.05, grade9: 3.45 },
+  { grade5: 2.20, grade9: 3.73 },
+  { grade5: 2.35, grade9: 3.97 },
+  { grade5: 2.50, grade9: 4.18 },
+  { grade5: 2.65, grade9: 4.42 },
+  { grade5: 2.80, grade9: 4.66 },
+  { grade5: 2.95, grade9: 4.95 },
+  { grade5: 3.10, grade9: 5.22 },
+  { grade5: 3.25, grade9: 5.44 },
+  { grade5: 3.40, grade9: 5.68 },
+  { grade5: 3.55, grade9: 5.92 },
+  { grade5: 3.70, grade9: 6.15 },
+  { grade5: 3.85, grade9: 6.38 },
+  { grade5: 4.00, grade9: 6.59 },
+  { grade5: 4.15, grade9: 6.87 },
+  { grade5: 4.30, grade9: 7.12 },
+  { grade5: 4.45, grade9: 7.44 },
+  { grade5: 4.60, grade9: 7.73 },
+  { grade5: 5.00, grade9: 9.00 },
+];
+        let convVersion = 'mixed';   // mixed | gyeonggi | busan | gwangju
+        // React판(kangseok-hub/converter) convertGrade 이식 — 시도교육청 2025 분석자료 기반 보간
+        function convertGrade(grade5, version) {
+            const interpolate = (val, data) => {
+                if (val <= data[0].grade5) return data[0].grade9;
+                if (val >= data[data.length - 1].grade5) return data[data.length - 1].grade9;
+                for (let i = 0; i < data.length - 1; i++) {
+                    if (val >= data[i].grade5 && val <= data[i + 1].grade5) {
+                        const t = (val - data[i].grade5) / (data[i + 1].grade5 - data[i].grade5);
+                        return data[i].grade9 + t * (data[i + 1].grade9 - data[i].grade9);
+                    }
+                }
+                return val;
+            };
+            const g9 = interpolate(grade5, gyeonggiData);
+            const b9 = interpolate(grade5, busanData);
+            const gj9 = interpolate(grade5, gwangjuData);
+            let grade9, reason;
+            if (version === 'gyeonggi') {
+                grade9 = g9;
+                reason = `경기진학지도협의회 '2025학년도 1학년 성적 분석 자료' 기준 약 ${g9.toFixed(2)}등급으로 추정됩니다.`;
+            } else if (version === 'busan') {
+                grade9 = b9;
+                reason = `부산시교육청 '2025학년도 고1 1~2학기 등급평균 분석 자료' 기준 약 ${b9.toFixed(2)}등급으로 추정됩니다.`;
+            } else if (version === 'gwangju') {
+                grade9 = gj9;
+                reason = `광주시교육청 '2025학년도 고1 등급평균 분석 자료' 기준 약 ${gj9.toFixed(2)}등급으로 추정됩니다.`;
+            } else {
+                grade9 = (g9 + b9 + gj9) / 3;
+                reason = `경기진협(${g9.toFixed(2)}) · 부산교육청(${b9.toFixed(2)}) · 광주교육청(${gj9.toFixed(2)}) 2025 분석자료를 평균한 추정치입니다.`;
+            }
+            return { grade9: Number(grade9.toFixed(2)), reason };
+        }
+        function setConvVersion(v) {
+            convVersion = v;
+            document.querySelectorAll('.conv-btn').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+            render();
+        }
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch(DATA_URL);
+                if (!response.ok) throw new Error("Data fetch error");
+                processCSV(await response.text());
+                document.getElementById('initial-loader').classList.add('hide');
+                setTimeout(() => {
+                    document.getElementById('initial-loader').remove();
+                    document.getElementById('main-ui').classList.add('show');
+                    document.getElementById('nav-footer').classList.add('show');
+                }, 500);
+            } catch (error) {
+                console.error(error);
+                document.getElementById('initial-loader').innerHTML = `<p style="color:#f43f5e;font-weight:700;">데이터를 불러올 수 없습니다.</p>`;
+            }
+        });
+        function processCSV(csv) {
+            const lines = csv.trim().split('\n');
+            allData = lines.slice(1).map(line => {
+                const cols = line.split(',');
+                if (cols.length < 5) return null;
+                let univName = cols[0].trim();
+                let campusName = cols[1].trim();
+                if (univName.includes('(')) {
+                    const match = univName.match(/(.+)\((.+)\)/);
+                    if (match) { univName = match[1]; campusName = match[2]; }
+                }
+                const avg = parseFloat(cols[4]);
+                if (isNaN(avg)) return null;
+                return { univ: univName, campus: campusName, type: cols[2].trim(), major: cols[3].trim(), category: classifyMajor(cols[3].trim()), avg: avg };
+            }).filter(d => d !== null);
+            allData.sort((a, b) => a.avg - b.avg);
+            document.getElementById('db-count').textContent = `${allData.length.toLocaleString()} 건 로드됨`;
+            render();
+        }
+        function classifyMajor(major) {
+            const m = major.replace(/\s/g, '');
+            if (/의예|의학|치의|한의|수의|약학|제약|간호|보건|방사선|물리치료/.test(m)) return "의학";
+            if (/공학|소프트|컴퓨터|정보|전기|전자|기계|반도체|인공지능|데이터|시스템|IT|건축공/.test(m)) return "공학";
+            if (/수학|물리|화학|생명|환경|바이오|과학|융합과학|산림|건축학/.test(m)) return "자연";
+            if (/경영|경제|사회|행정|정치|외교|미디어|심리|복지|광고|언론|미래/.test(m)) return "사회";
+            if (/교육|초등|윤리|사범|유아|교직/.test(m)) return "교육";
+            if (/국어|영어|독어|프랑스|일어|중어|어문|역사|철학|어학|인문/.test(m)) return "인문";
+            return "기타";
+        }
+        function syncFromSlider(val) { userFiveGrade = parseFloat(val); document.getElementById('grade-num-input').value = userFiveGrade.toFixed(2); render(); }
+        function syncFromNumber(val) { let num = parseFloat(val); if (isNaN(num)) return; if (num < 1.0) num = 1.0; if (num > 5.0) num = 5.0; userFiveGrade = num; document.getElementById('unified-slider').value = num; render(); }
+        function updateAlpha(val) {
+            alpha = val;
+            document.getElementById('alpha-val').textContent = val === 0 ? "±0.0" : `±${val.toFixed(1)}`;
+            document.querySelectorAll('.alpha-btn').forEach(btn => { const t = btn.textContent; btn.classList.toggle('active', (val===0.1&&t.includes('0.1'))||(val===0.3&&t.includes('0.3'))||(val===0.5&&t.includes('0.5'))||(val===0&&t.includes('OFF'))); });
+            render();
+        }
+        function setCategory(cat) {
+            currentCategory = cat;
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.toggle('active', btn.textContent === cat));
+            document.getElementById('filter-status').textContent = cat === "전체" ? "전체 학과" : `${cat} 관련 학과`;
+            currentPage = 1; render();
+        }
+        const CAT_CLASS = { "의학":"cat-med","공학":"cat-eng","자연":"cat-nat","사회":"cat-soc","인문":"cat-hum","교육":"cat-edu","기타":"cat-etc" };
+        function render() {
+            if (allData.length === 0) return;
+            const conv = convertGrade(userFiveGrade, convVersion);
+            const finalNine = conv.grade9;
+            document.getElementById('my-grade').textContent = finalNine.toFixed(2);
+            const reasonEl = document.getElementById('conv-reason');
+            if (reasonEl) reasonEl.textContent = conv.reason;
+            const search = document.getElementById('search-input').value.toLowerCase();
+            filteredData = allData.filter(d => {
+                const matchesSearch = d.univ.toLowerCase().includes(search) || d.major.toLowerCase().includes(search) || d.campus.toLowerCase().includes(search);
+                const matchesCategory = currentCategory === "전체" || d.category === currentCategory;
+                return matchesSearch && matchesCategory && (finalNine - d.avg) <= (1.0 + alpha);
+            });
+            document.getElementById('result-count').textContent = filteredData.length.toLocaleString();
+            const totalPages = Math.max(1, Math.ceil(filteredData.length / itemsPerPage));
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+            const currentItems = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+            const container = document.getElementById('data-list');
+            container.innerHTML = currentItems.length ? currentItems.map((item, idx) => {
+                const diff = finalNine - item.avg;
+                let status = { label:"🔥 소신", cls:"st-reach" };
+                if (diff <= (-0.3 - alpha)) status = { label:"✅ 안정", cls:"st-safe" };
+                else if (diff <= (0.3 + alpha)) status = { label:"🎯 적정", cls:"st-fit" };
+                const isMain = item.campus === "본교" || item.campus === "";
+                const campusBadge = isMain ? "" : `<span class="campus-badge">${item.campus}</span>`;
+                return `<div class="uni-card" style="animation-delay:${idx*0.05}s">
+                    <div class="uni-top">
+                        <div class="uni-info">
+                            <div class="uni-name-row"><h3>${item.univ}</h3>${campusBadge}</div>
+                            <div class="uni-major-row"><span class="cat-badge ${CAT_CLASS[item.category]||'cat-etc'}">${item.category}</span><p>${item.major}</p></div>
+                        </div>
+                        <span class="status-badge ${status.cls}">${status.label}</span>
+                    </div>
+                    <div class="uni-bottom">
+                        <span class="type-badge">${item.type}</span>
+                        <div class="avg-wrap"><p>평균</p><span>${item.avg.toFixed(2)}</span></div>
+                    </div>
+                </div>`;
+            }).join('') : `<div class="empty-msg">진단 결과가 없습니다.</div>`;
+            document.getElementById('page-num').textContent = `${currentPage} / ${totalPages}`;
+            document.getElementById('prev-btn').disabled = currentPage <= 1;
+            document.getElementById('next-btn').disabled = currentPage >= totalPages;
+        }
+        document.getElementById('search-input').oninput = () => { currentPage = 1; render(); };
+        document.getElementById('prev-btn').onclick = () => { if (currentPage > 1) { currentPage--; render(); window.scrollTo(0,0); } };
+        document.getElementById('next-btn').onclick = () => { if (currentPage < Math.ceil(filteredData.length / itemsPerPage)) { currentPage++; render(); window.scrollTo(0,0); } };
+    </script>
+</body>
+</html>
