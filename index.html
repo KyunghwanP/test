@@ -1125,6 +1125,13 @@
   .spot-badge.neg{background:#fee2e2;color:#b91c1c;}
   .spot-badge.pos{background:#dcfce7;color:#15803d;}
   .spot-badge.sci{background:#ede9fe;color:#6d28d9;}
+  /* 선택과목 영역별 색상 (국어/수학/영어/탐구/예술·체육/교양) */
+  .spot-badge.subj-kor{background:#ffe4e6;color:#be123c;}
+  .spot-badge.subj-math{background:#dbeafe;color:#1d4ed8;}
+  .spot-badge.subj-eng{background:#fef3c7;color:#b45309;}
+  .spot-badge.subj-inquiry{background:#ccfbf1;color:#0f766e;}
+  .spot-badge.subj-arts{background:#ffedd5;color:#c2410c;}
+  .spot-badge.subj-liberal{background:#e2e8f0;color:#334155;}
   /* 좁은 화면: 열 폭 축소 — 배지 라벨은 숨기고 색·숫자·아이콘만, 동아리명은 말줄임 */
   @media(max-width:640px){
     .spot-row{grid-template-columns:56px minmax(0,1fr) 2.6em 6em 3.4em;gap:6px;padding:10px 12px;min-height:46px;}
@@ -3022,7 +3029,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.40</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.41</div>
   </div>
 </div>
 
@@ -3146,7 +3153,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver5.40</div>
+    <div class="nav-version" title="Made by 박경환">ver5.41</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7389,6 +7396,19 @@ function s360RenderCharts(history){
   mk('s360ChartG', '평균 등급', gData, '#d93025', '217, 48, 37', { reverse: true, suggestedMin: 1, suggestedMax: 9 });
 }
 
+// 선택과목명 → 교과 영역 분류 (국어/수학/영어/탐구/예술·체육/교양)
+function subjSubjectArea(name){
+  const n = String(name || '').replace(/\s/g, '');
+  if (/(체육|스포츠)/.test(n))                      return 'subj-arts';
+  if (/(음악|미술|연극|영화|감상과비평)/.test(n))     return 'subj-arts';
+  if (/국어|화법|언어와|독서|문학|작문|매체/.test(n)) return 'subj-kor';
+  if (/수학|대수|미적분|기하|통계|해석/.test(n))      return 'subj-math';
+  if (/영어/.test(n))                               return 'subj-eng';
+  if (/(일본|중국|프랑스|독일|스페인|러시아|베트남|아랍|한문)/.test(n)) return 'subj-liberal';
+  if (/(사회|한국사|역사|지리|윤리|정치|법과|경제|문화|세계시민|탐구|과학|물리|화학|생명|지구)/.test(n)) return 'subj-inquiry';
+  return 'subj-liberal';
+}
+
 // 선택과목: 해당 반 electives 문서만 지연 로드 (교육과정 현황 시트 → sync-grades.js)
 async function s360LoadElectives(s){
   const el = document.getElementById('s360Electives');
@@ -7404,7 +7424,7 @@ async function s360LoadElectives(s){
       el.innerHTML = '<div style="font-size:15px;color:var(--ink-soft);">등록된 선택과목 데이터 없음</div>';
       return;
     }
-    const badges = list => list.map(name => `<span class="spot-badge">${escapeHtml(name)}</span>`).join('');
+    const badges = list => list.map(name => `<span class="spot-badge ${subjSubjectArea(name)}">${escapeHtml(name)}</span>`).join('');
     // 과목선택 시뮬레이터 연동: 관리자 전용 + 1·2학년만 (시뮬레이터가 2026·2025 입학생 편제표 기준)
     const yr = parseInt(s.grade);
     const simBtn = (_IS_ADMIN() && (yr === 1 || yr === 2))
