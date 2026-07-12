@@ -655,6 +655,12 @@
 
         // ─── 초기화 ───
         window.addEventListener('DOMContentLoaded', async () => {
+            // 학생 종합검색 등에서 ?gpa5=2.35 형태로 진입 시 5등급제 등급 프리필
+            const paramGpa = parseFloat(new URLSearchParams(location.search).get('gpa5'));
+            if (!isNaN(paramGpa)) {
+                gpa5 = Math.min(5, Math.max(1, paramGpa));
+                document.getElementById('gpa-slider').value = gpa5;
+            }
             document.getElementById('gpa-slider').addEventListener('input', e => setGpa5(e.target.value, true));
             document.getElementById('search-input').addEventListener('input', e => { searchQuery = e.target.value; render(); });
             document.getElementById('uni-select').addEventListener('change', e => { selectedUniversity = e.target.value; render(); });
