@@ -7506,9 +7506,13 @@ async function s360ShowDetail(s){
     }
     const st = spotGradeCls[key].students?.[String(parseInt(s.num))];
     if (!st) { gEl.textContent = '등록된 성적 데이터 없음'; return; }
+    // 1·2학년(5등급제 세대)만: 5등급제 내신을 적정 대학 진단(jindan.html)에 프리필해서 열기
+    const jindanGpa = parseFloat(st.gpa9);
+    const showJindan = [1, 2].includes(parseInt(s.grade)) && !isNaN(jindanGpa);
     const gpa = [
       st.gpa9 && st.gpa9 !== '-' ? `<span class="spot-badge" style="background:#fef3c7;color:#92400e;">내신 5등급제 ${st.gpa9}</span>` : '',
-      st.gpa5 && st.gpa5 !== '-' ? `<span class="spot-badge neg">내신 9등급제 ${st.gpa5}</span>` : ''
+      st.gpa5 && st.gpa5 !== '-' ? `<span class="spot-badge neg">내신 9등급제 ${st.gpa5}</span>` : '',
+      showJindan ? `<button id="s360JindanBtn" class="spot-badge" style="background:#eef2ff;color:#4f46e5;border:none;cursor:pointer;font-family:inherit;">🎯 적정 대학 진단 →</button>` : ''
     ].join('');
     // 등급 셀: 선택과목명(위) + "등급 / 백분위" (영어·한국사는 등급만 제공)
     const gc = o => {
@@ -7535,6 +7539,12 @@ async function s360ShowDetail(s){
       </table></div>
       <div style="font-size:14px;color:var(--ink-soft);margin-top:6px;">국어·수학·탐구는 등급 /백분위 표기</div>` : '<div style="font-size:15px;">모의고사 기록 없음</div>';
     gEl.innerHTML = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">${gpa || '<span style="font-size:15px;">내신 정보 없음</span>'}</div>${s360ChartsHtml(st.history)}${table}<div id="s360SusiMatch"></div>`;
+    const jBtn = document.getElementById('s360JindanBtn');
+    if (jBtn) jBtn.addEventListener('click', () => {
+      navigateTo('grades');
+      const gf = document.getElementById('gradesFrame');
+      if (gf) gf.src = `jindan.html?gpa5=${jindanGpa}`;
+    });
     s360RenderSusiMatch(st); // 내신 기반 졸업생 합격 사례 — 비동기로 뒤에 채움
     // 차트 라이브러리(vendor 셀프호스팅) 지연 로드 후 렌더 — 실패해도 표는 그대로 표시
     if (gEl.querySelector('.s360-charts')) {
