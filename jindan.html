@@ -135,12 +135,15 @@
         .list-controls { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
         @media (min-width: 768px) { .list-controls { align-items: flex-end; } }
         .control-row { display: flex; align-items: center; gap: 16px; }
-        .toggle-label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .toggle-label { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 9px 16px; border: 2px solid var(--slate-200); border-radius: 999px; background: #fff; transition: border-color .2s, background .2s, box-shadow .2s; }
+        .toggle-label.on { border-color: var(--indigo); background: var(--indigo-50); box-shadow: 0 3px 10px rgba(79,70,229,.18); }
         .toggle-track { position: relative; width: 40px; height: 20px; border-radius: 999px; background: var(--slate-200); transition: background .2s; }
         .toggle-track.on { background: var(--indigo); }
         .toggle-knob { position: absolute; top: 4px; left: 4px; width: 12px; height: 12px; background: #fff; border-radius: 50%; transition: transform .2s; }
         .toggle-track.on .toggle-knob { transform: translateX(20px); }
-        .toggle-label span, .reset-btn { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .15em; color: var(--slate-500); }
+        .toggle-label span { font-size: 12.5px; font-weight: 900; letter-spacing: .04em; color: var(--slate-500); }
+        .toggle-label.on span { color: var(--indigo-dark); }
+        .reset-btn { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .15em; color: var(--slate-500); }
         .reset-btn { background: none; border: none; color: var(--slate-400); }
         .reset-btn:hover, .toggle-label:hover span { color: var(--indigo); }
         .range-tabs { display: flex; background: var(--slate-100); padding: 4px; border-radius: 12px; }
@@ -305,7 +308,7 @@
                 </div>
                 <div class="list-controls">
                     <div class="control-row">
-                        <label class="toggle-label" for="ambitious-toggle">
+                        <label class="toggle-label on" for="ambitious-toggle" id="ambitious-label">
                             <input type="checkbox" id="ambitious-toggle" checked style="position:absolute;opacity:0;">
                             <div class="toggle-track on" id="ambitious-track"><div class="toggle-knob"></div></div>
                             <span>소신 지원 포함</span>
@@ -501,8 +504,11 @@
         function getTargetGrade() {
             return manualGrade9 !== null ? manualGrade9 : convertGrade(gpa5, conversionVersion).grade9;
         }
+        // 소신 지원 ON일 때 상향(하한) 확장 폭: 검색 범위별 고정값
+        const AMBITIOUS_EXTEND = { 0.1: 0.5, 0.3: 0.7, 0.5: 1.0 };
         function getBounds(target) {
-            const lower = showAmbitious ? Math.max(1.0, target - searchRange * 5.0) : target - searchRange;
+            const extend = AMBITIOUS_EXTEND[searchRange] || searchRange;
+            const lower = showAmbitious ? Math.max(1.0, target - extend) : target - searchRange;
             const upper = target + searchRange;
             return { lower, upper };
         }
@@ -620,12 +626,13 @@
             document.getElementById('target-label').textContent = target.toFixed(2);
             document.getElementById('bounds-label').textContent = `${bounds.lower.toFixed(2)} ~ ${bounds.upper.toFixed(2)}`;
             document.getElementById('ambitious-track').classList.toggle('on', showAmbitious);
+            document.getElementById('ambitious-label').classList.toggle('on', showAmbitious);
             document.getElementById('ambitious-hint').style.display = (target < 2.0 && !showAmbitious) ? 'flex' : 'none';
 
             // 결과 목록
             const filtered = baseFiltered
                 .filter(r => selectedCategory === '전체' || r.category === selectedCategory)
-                .sort((a, b) => a.averageGrade - b.averageGrade);
+                .sort((a, b) => b.averageGrade - a.averageGrade);
             document.getElementById('result-count').textContent = filtered.length.toLocaleString();
 
             const emptyState = document.getElementById('empty-state');
