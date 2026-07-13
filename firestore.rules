@@ -95,6 +95,12 @@ service cloud.firestore {
     match /consultations/{classKey} {
       allow read, write: if isYnhsTeacher();
     }
+    // ── 특별실 사용 예약 ──
+    // _config(특별실 목록)·{roomId}_{주} 예약 문서. 교사만 접근.
+    // (취소 권한 등 세부 제어는 클라이언트에서 처리 — 상담 예약과 동일한 신뢰 모델)
+    match /roomBookings/{docId} {
+      allow read, write: if isYnhsTeacher();
+    }
     // ── 공통 함수 ──
     function isYnhsTeacher() {
       return request.auth != null
