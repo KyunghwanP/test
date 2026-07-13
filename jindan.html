@@ -144,6 +144,12 @@
         .toggle-track.on .toggle-knob { transform: translateX(20px); }
         .toggle-label span { font-size: 12.5px; font-weight: 900; letter-spacing: .04em; color: var(--slate-500); }
         .toggle-label.on span { color: var(--indigo-dark); }
+        /* 교과/종합 전환 스위치 */
+        .kind-switch { position: relative; display: flex; background: var(--slate-100); padding: 4px; border-radius: 12px; border: 2px solid var(--slate-200); }
+        .kind-switch .kind-opt { position: relative; z-index: 1; padding: 7px 18px; font-size: 12.5px; font-weight: 900; color: var(--slate-400); transition: color .2s; }
+        .kind-switch .kind-opt.active { color: var(--indigo); }
+        .kind-switch .kind-thumb { position: absolute; z-index: 0; top: 4px; left: 4px; width: calc(50% - 6px); height: calc(100% - 8px); background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); transition: transform .25s cubic-bezier(.4,0,.2,1); }
+        .kind-switch.jonghap .kind-thumb { transform: translateX(calc(100% + 4px)); }
         .reset-btn { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .15em; color: var(--slate-500); }
         .reset-btn { background: none; border: none; color: var(--slate-400); }
         .reset-btn:hover, .toggle-label:hover span { color: var(--indigo); }
@@ -331,6 +337,11 @@
                 </div>
                 <div class="list-controls">
                     <div class="control-row">
+                        <button type="button" class="kind-switch" id="kind-switch" onclick="toggleKind()" title="클릭하면 교과 ↔ 종합 전환">
+                            <span class="kind-opt active" id="kind-opt-gyogwa">교과</span>
+                            <span class="kind-opt" id="kind-opt-jonghap">종합</span>
+                            <span class="kind-thumb"></span>
+                        </button>
                         <label class="toggle-label on" for="ambitious-toggle" id="ambitious-label">
                             <input type="checkbox" id="ambitious-toggle" checked style="position:absolute;opacity:0;">
                             <div class="toggle-track on" id="ambitious-track"><div class="toggle-knob"></div></div>
@@ -460,6 +471,7 @@
         let searchQuery = '';
         let searchRange = 0.1;
         let showAmbitious = true;
+        let admissionKind = '교과';           // 학생부 전형 구분: '교과' | '종합' (스위치 토글)
         let currentFiltered = [];              // 현재 필터 결과 (모달·더 보기에서 참조)
         let visibleCount = 150;
         const PAGE_SIZE = 150;
@@ -560,6 +572,7 @@
                 records.push({
                     university, campus, department, averageGrade,
                     admissionName: cols[3], category: categorizeDepartment(department),
+                    kind: cols[3].includes('교과') ? '교과' : (cols[3].includes('종합') ? '종합' : '기타'),
                     year: cols[0], uniCode: cols[2], type: cols[4],
                     quotaInitial: cols[6], quotaCarry: cols[7], quotaTotal: cols[8],
                     competition: cols[9], waitlist: cols[10],
@@ -583,12 +596,13 @@
         }
         function baseFilter(record, bounds) {
             const gradeMatch = record.averageGrade >= bounds.lower && record.averageGrade <= bounds.upper;
+            const kindMatch = record.kind === '기타' || record.kind === admissionKind;
             const uniMatch = selectedUniversity === '전체' || record.university === selectedUniversity;
             const q = searchQuery.toLowerCase();
             const searchMatch = record.university.toLowerCase().includes(q) ||
                                 record.department.toLowerCase().includes(q) ||
                                 record.admissionName.toLowerCase().includes(q);
-            return gradeMatch && uniMatch && searchMatch;
+            return gradeMatch && kindMatch && uniMatch && searchMatch;
         }
         function getDifficulty(avgGrade, myGrade) {
             const diff = avgGrade - myGrade;
@@ -618,9 +632,10 @@
         function clearManualGrade9() { manualGrade9 = null; render(); }
         function setCategory(cat) { selectedCategory = cat; render(); }
         function setRange(r) { searchRange = r; render(); }
+        function toggleKind() { admissionKind = admissionKind === '교과' ? '종합' : '교과'; render(); }
         function resetFilters() {
             selectedUniversity = '전체'; selectedCategory = '전체'; searchQuery = '';
-            searchRange = 0.3; showAmbitious = true;
+            searchRange = 0.3; showAmbitious = true; admissionKind = '교과';
             document.getElementById('search-input').value = '';
             document.getElementById('uni-select').value = '전체';
             document.getElementById('ambitious-toggle').checked = true;
@@ -697,6 +712,9 @@
             document.getElementById('bounds-label').textContent = `${bounds.lower.toFixed(2)} ~ ${bounds.upper.toFixed(2)}`;
             document.getElementById('ambitious-track').classList.toggle('on', showAmbitious);
             document.getElementById('ambitious-label').classList.toggle('on', showAmbitious);
+            document.getElementById('kind-switch').classList.toggle('jonghap', admissionKind === '종합');
+            document.getElementById('kind-opt-gyogwa').classList.toggle('active', admissionKind === '교과');
+            document.getElementById('kind-opt-jonghap').classList.toggle('active', admissionKind === '종합');
             document.getElementById('ambitious-hint').style.display = (target < 2.0 && !showAmbitious) ? 'flex' : 'none';
 
             // 결과 목록 (데이터가 1.7만 건이라 일정 개수씩 나눠 렌더링)
