@@ -2729,22 +2729,28 @@
   .room-cal-hint{font-size:10.5px;color:var(--ink-soft);text-align:center;padding:0 0 10px;}
   .home-mini-cal-day.sel{box-shadow:inset 0 0 0 2px var(--mon);}
   .room-grid-wrap{background:var(--paper);border:1px solid var(--rule);border-radius:12px;overflow-x:auto;}
-  .room-grid{width:100%;border-collapse:collapse;min-width:640px;}
-  .room-grid th{padding:9px 6px;font-size:12.5px;font-weight:800;color:var(--ink-soft);border-bottom:2px solid var(--rule);border-right:1px solid var(--rule);background:var(--paper-soft);white-space:nowrap;}
-  .room-grid th:last-child, .room-grid td:last-child{border-right:none;}
-  .room-grid th.today-col{color:var(--mon);}
-  .room-grid td{border-bottom:1px solid var(--rule);border-right:1px solid var(--rule);padding:3px;height:44px;vertical-align:middle;}
-  .room-grid tr:last-child td{border-bottom:none;}
-  .room-grid .slot-name{font-size:12px;font-weight:800;color:var(--ink);text-align:center;white-space:nowrap;padding:0 8px;}
-  .room-grid .slot-name .t{display:block;font-size:9.5px;font-weight:600;color:var(--ink-soft);font-family:'IBM Plex Mono';}
-  .room-cell-inner{display:flex;flex-direction:column;gap:3px;min-height:38px;}
-  .room-cell-empty{flex:1;min-height:38px;border:none;background:none;border-radius:8px;cursor:pointer;color:transparent;font-size:16px;font-weight:700;}
-  .room-cell-empty:hover{background:var(--paper-soft);color:var(--mon);}
-  /* 예약 칩: [장소] 예약자 */
-  .room-evt{border:none;border-radius:7px;padding:3px 6px;font-size:11px;font-weight:700;background:var(--paper-soft);color:var(--ink);cursor:pointer;text-align:left;font-family:'Pretendard','Noto Sans KR';overflow:hidden;}
-  .room-evt .rm{display:block;font-size:9.5px;font-weight:800;color:var(--mon);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* 타임라인 뷰: 왼쪽 시간·교시 축 + 요일 컬럼, 예약은 시간 위치·길이대로 블록 배치 */
+  .room-tl{min-width:640px;}
+  .room-tl-head{display:flex;border-bottom:2px solid var(--rule);background:var(--paper-soft);border-radius:12px 12px 0 0;}
+  .room-tl-head .gcorner{width:64px;flex-shrink:0;}
+  .room-tl-head .dhead{flex:1;min-width:0;text-align:center;padding:9px 4px;font-size:12.5px;font-weight:800;color:var(--ink-soft);border-left:1px solid var(--rule);}
+  .room-tl-head .dhead.today-col{color:var(--mon);}
+  .room-tl-body{display:flex;position:relative;}
+  .room-tl-gutter{width:64px;flex-shrink:0;position:relative;}
+  .room-tl-band{position:absolute;left:0;right:0;border-top:1px dashed var(--rule);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;}
+  .room-tl-band .bn{font-size:11px;font-weight:800;color:var(--ink);}
+  .room-tl-band .bt{font-size:8.5px;font-weight:600;color:var(--ink-soft);font-family:'IBM Plex Mono';}
+  .room-tl-band.gap .bn{color:var(--ink-soft);font-weight:600;font-size:10px;}
+  .room-tl-day{flex:1;min-width:0;position:relative;border-left:1px solid var(--rule);}
+  .room-tl-slotzone{position:absolute;left:0;right:0;border-top:1px dashed var(--rule);cursor:pointer;}
+  .room-tl-slotzone:hover{background:var(--paper-soft);}
+  .room-tl-slotzone.gap{cursor:default;background:repeating-linear-gradient(45deg,transparent,transparent 6px,var(--paper-soft) 6px,var(--paper-soft) 7px);}
+  .room-tl-slotzone.gap:hover{background:repeating-linear-gradient(45deg,transparent,transparent 6px,var(--paper-soft) 6px,var(--paper-soft) 7px);}
+  /* 예약 블록 */
+  .room-evt{position:absolute;border:none;border-radius:7px;padding:2px 5px;font-size:10px;font-weight:700;background:var(--paper-soft);color:var(--ink);cursor:pointer;text-align:left;font-family:'Pretendard','Noto Sans KR';overflow:hidden;box-sizing:border-box;border-left:3px solid var(--mon);box-shadow:0 1px 3px rgba(0,0,0,.12);z-index:2;}
+  .room-evt .rm{display:block;font-size:9px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.85;}
   .room-evt .who{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .room-evt.mine{background:var(--mon);color:#fff;}
+  .room-evt.mine{background:var(--mon);color:#fff;border-left-color:#1D4ED8;}
   .room-evt.mine .rm{color:rgba(255,255,255,.85);}
   .room-evt:hover{opacity:.85;}
   .room-hint{font-size:11.5px;color:var(--ink-soft);padding:0 4px;}
@@ -3174,7 +3180,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.65</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.66</div>
   </div>
 </div>
 
@@ -3304,7 +3310,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver5.65</div>
+    <div class="nav-version" title="Made by 박경환">ver5.66</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3503,7 +3509,7 @@
               </div>
               <div class="room-main">
                 <div class="room-grid-wrap">
-                  <table class="room-grid" id="roomGrid"></table>
+                  <div id="roomGrid"></div>
                 </div>
               </div>
             </div>
@@ -8567,6 +8573,7 @@ let roomCfgUnsub = null;      // 특별실 목록 구독 해제
 let roomWeekData = { bookings: [] };
 let roomSelectedYmd = null;   // 보조 달력에서 선택한 날짜
 let roomCalBase = null;       // 보조 달력 표시 월 {y,m}
+let roomDeptList = [];        // 부서 드롭다운 목록 (교원연락망 기반)
 
 function _roomYmd(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -8598,6 +8605,11 @@ function initRoomPage() {
   const now = new Date();
   roomCalBase = { y: now.getFullYear(), m: now.getMonth() + 1 };
   renderRoomMiniCal();
+  // 부서 드롭다운 목록: 교원연락망(contacts/main)의 부서를 순서대로 중복 제거
+  getDoc(doc(fbDb, 'contacts', 'main')).then(snap => {
+    if (!snap.exists()) return;
+    roomDeptList = [...new Set((snap.data().staff || []).map(c => (c.dept || '').trim()).filter(Boolean))];
+  }).catch(() => {});
   // 특별실 목록 실시간 구독 (관리자가 수정하면 모든 클라이언트 갱신)
   roomCfgUnsub = onSnapshot(doc(fbDb, 'roomBookings', '_config'), snap => {
     roomList = snap.exists() ? (snap.data().rooms || []) : [];
@@ -8681,9 +8693,14 @@ function _roomCanCancel(b) {
 function _roomName(roomId) {
   return roomList.find(r => r.id === roomId)?.name || '(삭제된 특별실)';
 }
+// ── 타임라인 뷰 ──
+const TL_START = 8 * 60;    // 08:00
+const TL_END = 22 * 60;     // 22:00
+const TL_PX = 0.8;          // 1분당 px
+function _tlY(min) { return (min - TL_START) * TL_PX; }
 function renderRoomGrid() {
-  const table = document.getElementById('roomGrid');
-  if (!table) return;
+  const root = document.getElementById('roomGrid');
+  if (!root) return;
   const mon = roomMonday(roomWeekOffset);
   const todayYmd = _roomYmd(new Date());
   const days = [];
@@ -8693,33 +8710,66 @@ function renderRoomGrid() {
     days.push({ ymd: _roomYmd(d), label: `${WD[i]} ${d.getMonth()+1}/${d.getDate()}` });
   }
   const bookings = roomWeekData.bookings || [];
-  const chip = b => {
-    const mine = b.uid === fbAuth.currentUser?.uid;
-    return `<button class="room-evt${mine ? ' mine' : ''}" onclick="openRoomDetailModal('${b.id}')"
-      title="${escapeHtml(_roomName(b.room))} · ${b.start}~${b.end} · ${escapeHtml(b.teacher)} · ${escapeHtml(b.purpose || '')}">
-      <span class="rm">${escapeHtml(_roomName(b.room))} ${b.start}~${b.end}</span>
-      <span class="who">${escapeHtml(b.teacher)}${b.purpose ? ` · ${escapeHtml(b.purpose)}` : ''}</span>
-    </button>`;
-  };
-  let html = `<thead><tr><th style="width:76px;">교시</th>${days.map(d =>
-    `<th${d.ymd === todayYmd ? ' class="today-col"' : ''}>${d.label}</th>`).join('')}</tr></thead><tbody>`;
+  const bodyH = _tlY(TL_END);
+
+  // 교시 밴드 + 사이 빈 시간(쉬는시간·점심) 세그먼트
+  const segs = [];
+  let cur = TL_START;
   for (const s of ROOM_SLOTS) {
-    const slotRange = { start: s.start, end: s.end };
-    html += `<tr><td class="slot-name">${s.name}<span class="t">${s.start}~${s.end}</span></td>`;
-    for (const d of days) {
-      // 이 교시 시간대와 겹치는 모든 예약 (특별실 무관하게 나란히 표시)
-      const list = bookings.filter(b => b.date === d.ymd
-        && toMinutes(b.start) < toMinutes(slotRange.end) && toMinutes(slotRange.start) < toMinutes(b.end))
-        .sort((a, b2) => a.start.localeCompare(b2.start) || _roomName(a.room).localeCompare(_roomName(b2.room)));
-      html += `<td><div class="room-cell-inner">
-        ${list.map(chip).join('')}
-        <button class="room-cell-empty" onclick="openRoomFormModal('${d.ymd}','${s.id}')" title="이 시간에 예약 추가">＋</button>
-      </div></td>`;
-    }
-    html += '</tr>';
+    const st = toMinutes(s.start), en = toMinutes(s.end);
+    if (st > cur) segs.push({ gap: true, start: cur, end: st, name: (st - cur >= 40 ? '점심' : '') });
+    segs.push({ gap: false, start: st, end: en, name: s.name, time: `${s.start}~${s.end}`, id: s.id });
+    cur = en;
   }
-  html += '</tbody>';
-  table.innerHTML = html;
+  if (cur < TL_END) segs.push({ gap: true, start: cur, end: TL_END, name: '' });
+
+  const gutter = segs.map(sg =>
+    `<div class="room-tl-band${sg.gap ? ' gap' : ''}" style="top:${_tlY(sg.start)}px;height:${(sg.end - sg.start) * TL_PX}px;">
+      ${sg.name ? `<span class="bn">${sg.name}</span>` : ''}${sg.time ? `<span class="bt">${sg.time}</span>` : ''}
+    </div>`).join('');
+
+  // 요일 컬럼: 교시 클릭 영역 + 예약 블록 (겹치면 레인 분할)
+  const dayCol = d => {
+    const zones = segs.map(sg =>
+      `<div class="room-tl-slotzone${sg.gap ? ' gap' : ''}" style="top:${_tlY(sg.start)}px;height:${(sg.end - sg.start) * TL_PX}px;"
+        ${sg.gap ? '' : `onclick="openRoomFormModal('${d.ymd}','${sg.id}')" title="${sg.name} 예약 추가"`}></div>`).join('');
+    const evs = bookings.filter(b => b.date === d.ymd)
+      .map(b => ({ ...b, _s: Math.max(toMinutes(b.start), TL_START), _e: Math.min(toMinutes(b.end), TL_END) }))
+      .filter(b => b._s < b._e)
+      .sort((a, b) => a._s - b._s || a._e - b._e);
+    // 겹침 클러스터별 레인 배정 — 겹치지 않는 예약은 전체 폭 사용
+    let laneEnds = [], cluster = [];
+    const flushCluster = () => { cluster.forEach(e => e._lanes = laneEnds.length); laneEnds = []; cluster = []; };
+    evs.forEach(ev => {
+      if (cluster.length && laneEnds.every(end => end <= ev._s)) flushCluster();
+      let lane = laneEnds.findIndex(end => end <= ev._s);
+      if (lane === -1) { laneEnds.push(0); lane = laneEnds.length - 1; }
+      laneEnds[lane] = ev._e;
+      ev._lane = lane;
+      cluster.push(ev);
+    });
+    flushCluster();
+    const blocks = evs.map(ev => {
+      const mine = ev.uid === fbAuth.currentUser?.uid;
+      const color = avatarColor(_roomName(ev.room));
+      return `<button class="room-evt${mine ? ' mine' : ''}" onclick="openRoomDetailModal('${ev.id}')"
+        style="top:${_tlY(ev._s)}px;height:${Math.max((ev._e - ev._s) * TL_PX, 18)}px;left:${(100 / ev._lanes) * ev._lane}%;width:${100 / ev._lanes}%;${mine ? '' : `border-left-color:${color};`}"
+        title="${escapeHtml(_roomName(ev.room))} · ${ev.start}~${ev.end} · ${escapeHtml(ev.teacher)} · ${escapeHtml(ev.purpose || '')}">
+        <span class="rm">${escapeHtml(_roomName(ev.room))} ${ev.start}~${ev.end}</span>
+        <span class="who">${escapeHtml(ev.teacher)}${ev.purpose ? ` · ${escapeHtml(ev.purpose)}` : ''}</span>
+      </button>`;
+    }).join('');
+    return `<div class="room-tl-day" style="height:${bodyH}px;">${zones}${blocks}</div>`;
+  };
+
+  root.innerHTML = `<div class="room-tl">
+    <div class="room-tl-head"><div class="gcorner"></div>${days.map(d =>
+      `<div class="dhead${d.ymd === todayYmd ? ' today-col' : ''}">${d.label}</div>`).join('')}</div>
+    <div class="room-tl-body">
+      <div class="room-tl-gutter" style="height:${bodyH}px;">${gutter}</div>
+      ${days.map(dayCol).join('')}
+    </div>
+  </div>`;
 }
 
 // ── 예약/취소 ──
@@ -8749,7 +8799,14 @@ function openRoomFormModal(dateYmd, slotId) {
     <div><label>장소 (특별실)</label>
       <select id="rmRoom" style="width:100%;padding:9px 12px;border:1.5px solid var(--rule);border-radius:9px;font-size:14px;background:var(--paper);color:var(--ink);font-family:'Pretendard','Noto Sans KR';">${roomOpts}</select></div>
     <div><label>부서</label>
-      <input type="text" id="rmDept" maxlength="20" placeholder="예: 과학과, 교무기획부"></div>
+      ${roomDeptList.length ? `
+      <select id="rmDept" onchange="rmDeptChange()" style="width:100%;padding:9px 12px;border:1.5px solid var(--rule);border-radius:9px;font-size:14px;background:var(--paper);color:var(--ink);font-family:'Pretendard','Noto Sans KR';">
+        <option value="">선택 안 함</option>
+        ${roomDeptList.map(dp => `<option value="${escapeHtml(dp)}">${escapeHtml(dp)}</option>`).join('')}
+        <option value="__custom">직접 입력…</option>
+      </select>
+      <input type="text" id="rmDeptCustom" maxlength="20" placeholder="부서명 직접 입력" style="display:none;margin-top:6px;">`
+      : `<input type="text" id="rmDept" maxlength="20" placeholder="예: 과학과, 교무기획부">`}</div>
     <div><label>행사 내용</label>
       <input type="text" id="rmPurpose" maxlength="60" placeholder="예: 2-3 과학 수업, 동아리 발표회"></div>
     <div><label>일자</label>
@@ -8768,6 +8825,14 @@ function openRoomFormModal(dateYmd, slotId) {
       <button class="rm-save" onclick="saveRoomBooking()">예약 등록</button>
     </div>`);
   setTimeout(() => document.getElementById('rmTeacher')?.focus(), 50);
+}
+// 부서 드롭다운에서 '직접 입력…' 선택 시 텍스트 입력 표시
+function rmDeptChange() {
+  const custom = document.getElementById('rmDeptCustom');
+  if (!custom) return;
+  const isCustom = document.getElementById('rmDept')?.value === '__custom';
+  custom.style.display = isCustom ? '' : 'none';
+  if (isCustom) custom.focus();
 }
 // 교시 버튼 토글 → 선택된 교시들의 최소 시작~최대 종료로 시간 자동 입력
 function rmToggleSlot(slotId) {
@@ -8814,7 +8879,10 @@ async function saveRoomBooking() {
     start: document.getElementById('rmStart')?.value,
     end: document.getElementById('rmEnd')?.value,
     teacher: document.getElementById('rmTeacher')?.value.trim() || u.displayName || u.email.split('@')[0],
-    dept: document.getElementById('rmDept')?.value.trim() || '',
+    dept: (() => {
+      const v = document.getElementById('rmDept')?.value ?? '';
+      return (v === '__custom' ? document.getElementById('rmDeptCustom')?.value : v).trim();
+    })(),
     purpose: document.getElementById('rmPurpose')?.value.trim() || '',
     email: u.email, uid: u.uid,
     createdAt: Date.now(),
@@ -8910,7 +8978,10 @@ window.moveRoomCalMonth = moveRoomCalMonth;
 window.roomSelectDate = roomSelectDate;
 window.openRoomFormModal = openRoomFormModal;
 window.rmToggleSlot = rmToggleSlot;
+window.rmDeptChange = rmDeptChange;
 window.openRoomDetailModal = openRoomDetailModal;
+// 로컬 표시 디버그용 (쓰기 없음): 주간 데이터를 주입해 타임라인 렌더 확인
+window._roomDebugSet = d => { roomWeekData = d; renderRoomGrid(); renderRoomMiniCal(); };
 window.closeRoomModal = closeRoomModal;
 window.saveRoomBooking = saveRoomBooking;
 window.cancelRoomBooking = cancelRoomBooking;
