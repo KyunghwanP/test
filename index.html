@@ -2682,8 +2682,12 @@
   }
   .home-mini-cal-day.sun{color:#EF4444;}
   .home-mini-cal-day.sat{color:#3B82F6;}
-  .home-mini-cal-day.has-ev{cursor:pointer;background:var(--paper-soft);font-weight:800;}
-  .home-mini-cal-day.has-ev:hover{background:var(--rule);}
+  .home-mini-cal-day.has-ev{background:var(--paper-soft);font-weight:800;}
+  .home-mini-cal-day.clickable{cursor:pointer;}
+  .home-mini-cal-day.clickable:hover{background:var(--rule);}
+  /* 달력 날짜 클릭 시 해당 업무 행 깜빡임 */
+  @keyframes calRowBlink{50%{background:rgba(245,158,11,.28);}}
+  .cal-blink{animation:calRowBlink .5s ease-in-out 3;border-radius:6px;}
   /* 종류별 점: 학사일정(파랑)·업무(주황)·상담(초록) */
   .home-mini-cal-dots{position:absolute;bottom:3px;left:0;right:0;display:flex;justify-content:center;gap:2.5px;}
   .home-mini-cal-dot{width:4px;height:4px;border-radius:50%;display:inline-block;flex-shrink:0;}
@@ -3092,7 +3096,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.58</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.63</div>
   </div>
 </div>
 
@@ -3216,7 +3220,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver5.58</div>
+    <div class="nav-version" title="Made by 박경환">ver5.63</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -8310,10 +8314,10 @@ function renderHomeMiniCal(y, m, events, isThisMonth, todayD) {
     if (dow === 0) cls.push('sun');
     if (dow === 6) cls.push('sat');
     if (evDays.has(d)) cls.push('has-ev');
+    if (marks.length) cls.push('clickable');
     if (isThisMonth && d === todayD) cls.push('today');
     const dots = marks.length ? `<span class="home-mini-cal-dots">${marks.map(([c]) => `<i class="home-mini-cal-dot ${c}"></i>`).join('')}</span>` : '';
-    const attrs = (evDays.has(d) ? ` onclick="scrollHomeScheduleTo(${d})"` : ' tabindex="-1"')
-      + (marks.length ? ` title="${marks.map(([, n]) => n).join(' · ')}"` : '');
+    const attrs = (marks.length ? ` onclick="onCalDayClick(${d})" title="${marks.map(([, n]) => n).join(' · ')}"` : ' tabindex="-1"');
     html += `<button class="${cls.join(' ')}"${attrs}>${d}${dots}</button>`;
   }
   html += '</div>';
@@ -8362,6 +8366,25 @@ function scrollHomeScheduleTo(day) {
   setTimeout(() => { item.style.transition = 'background 1s'; item.style.background = ''; }, 400);
 }
 window.scrollHomeScheduleTo = scrollHomeScheduleTo;
+
+// 달력 날짜 클릭: 학사일정 목록 스크롤 + 해당 날짜가 기간에 포함된 진행중 업무 행 깜빡임
+function onCalDayClick(day) {
+  scrollHomeScheduleTo(day);
+  const { y, m } = _calSchedArgs || {};
+  if (!y) return;
+  const key = `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  let first = null;
+  document.querySelectorAll('#homeTaskList [data-task-start]').forEach(row => {
+    if (row.dataset.taskStart <= key && key <= row.dataset.taskEnd) {
+      row.classList.remove('cal-blink');
+      void row.offsetWidth; // 재클릭 시 애니메이션 재시작
+      row.classList.add('cal-blink');
+      if (!first) first = row;
+    }
+  });
+  if (first) first.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+window.onCalDayClick = onCalDayClick;
 
 function moveScheduleMonth(dir) {
   loadHomeSchedule(_scheduleOffset + dir);
@@ -10267,7 +10290,7 @@ function _makeHomeTaskRow(t, todayStr, statusColor) {
     ? `<span style="font-size:11px;background:#EF4444;color:#fff;border-radius:4px;padding:1px 5px;font-weight:700;">D-day</span>`
     : `<span style="font-size:11px;background:${diff<=3?'#FEF3C7':'var(--paper-soft)'};color:${diff<=3?'#D97706':'var(--ink-soft)'};border-radius:4px;padding:1px 5px;font-weight:700;">D-${diff}</span>`;
   const dotColor = t.status==='done' ? '#10B981' : (statusColor[t.status]||'#6366F1');
-  return `<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--rule);">
+  return `<div data-task-start="${t.startDate}" data-task-end="${t.endDate}" style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--rule);">
     <div style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;"></div>
     <div onclick="openMytaskModal('${t.id}','${t.ownerUid||''}')" style="flex:1;min-width:0;cursor:pointer;">
       <div style="font-size:14px;font-weight:600;color:${isPast&&t.status!=='done'?'#EF4444':'var(--ink)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(t.title)}">
