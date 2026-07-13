@@ -169,9 +169,8 @@
         .filter-grid label { display: block; font-size: 10px; font-weight: 900; color: var(--slate-400); text-transform: uppercase; letter-spacing: .15em; margin: 0 0 8px 16px; }
         .filter-field { position: relative; }
         .filter-field .icon { position: absolute; left: 22px; top: 50%; transform: translateY(-50%); font-size: 16px; }
-        #uni-select, #search-input { display: block; width: 100%; padding: 18px 24px 18px 52px; background: #fff; border: 1px solid var(--slate-100); border-radius: 2rem; font-size: 14px; font-weight: 700; color: var(--slate-800); outline: none; box-shadow: 0 1px 3px rgba(0,0,0,.04); transition: all .2s; appearance: none; }
-        #uni-select:focus, #search-input:focus { border-color: var(--indigo); box-shadow: 0 0 0 8px rgba(99,102,241,.05); }
-        #uni-select { cursor: pointer; }
+        #uni-input, #search-input { display: block; width: 100%; padding: 18px 24px 18px 52px; background: #fff; border: 1px solid var(--slate-100); border-radius: 2rem; font-size: 14px; font-weight: 700; color: var(--slate-800); outline: none; box-shadow: 0 1px 3px rgba(0,0,0,.04); transition: all .2s; appearance: none; }
+        #uni-input:focus, #search-input:focus { border-color: var(--indigo); box-shadow: 0 0 0 8px rgba(99,102,241,.05); }
         .select-arrow { position: absolute; right: 24px; top: 50%; transform: translateY(-50%); color: var(--slate-300); font-size: 12px; pointer-events: none; }
 
         /* 결과 카드 그리드 */
@@ -367,8 +366,8 @@
                     <label>University Filter</label>
                     <div class="filter-field">
                         <span class="icon">🏫</span>
-                        <select id="uni-select"></select>
-                        <span class="select-arrow">▼</span>
+                        <input type="text" id="uni-input" list="uni-datalist" placeholder="대학명을 입력하세요... (비우면 전체)">
+                        <datalist id="uni-datalist"></datalist>
                     </div>
                 </div>
                 <div>
@@ -467,7 +466,7 @@
         let conversionVersion = 'mixed';       // gyeonggi | busan | gwangju | mixed
         let manualGrade9 = null;               // 환산값 직접 입력 시 사용 (슬라이더/버전 변경 시 해제)
         let selectedCategory = '전체';
-        let selectedUniversity = '전체';
+        let selectedUniversity = '';           // 대학명 직접 입력 필터 (빈 값이면 전체)
         let searchQuery = '';
         let searchRange = 0.1;
         let showAmbitious = true;
@@ -597,7 +596,8 @@
         function baseFilter(record, bounds) {
             const gradeMatch = record.averageGrade >= bounds.lower && record.averageGrade <= bounds.upper;
             const kindMatch = record.kind === '기타' || record.kind === admissionKind;
-            const uniMatch = selectedUniversity === '전체' || record.university === selectedUniversity;
+            const uq = selectedUniversity.trim().toLowerCase();
+            const uniMatch = !uq || record.university.toLowerCase().includes(uq);
             const q = searchQuery.toLowerCase();
             const searchMatch = record.university.toLowerCase().includes(q) ||
                                 record.department.toLowerCase().includes(q) ||
@@ -634,10 +634,10 @@
         function setRange(r) { searchRange = r; render(); }
         function toggleKind() { admissionKind = admissionKind === '교과' ? '종합' : '교과'; render(); }
         function resetFilters() {
-            selectedUniversity = '전체'; selectedCategory = '전체'; searchQuery = '';
+            selectedUniversity = ''; selectedCategory = '전체'; searchQuery = '';
             searchRange = 0.3; showAmbitious = true; admissionKind = '교과';
             document.getElementById('search-input').value = '';
-            document.getElementById('uni-select').value = '전체';
+            document.getElementById('uni-input').value = '';
             document.getElementById('ambitious-toggle').checked = true;
             render();
         }
@@ -808,7 +808,7 @@
             }
             document.getElementById('gpa-slider').addEventListener('input', e => setGpa5(e.target.value, true));
             document.getElementById('search-input').addEventListener('input', e => { searchQuery = e.target.value; render(); });
-            document.getElementById('uni-select').addEventListener('change', e => { selectedUniversity = e.target.value; render(); });
+            document.getElementById('uni-input').addEventListener('input', e => { selectedUniversity = e.target.value; render(); });
             document.getElementById('ambitious-toggle').addEventListener('change', e => { showAmbitious = e.target.checked; render(); });
             bindClickEdit('gpa-display', 'gpa-edit', v => setGpa5(v, false));
             bindClickEdit('grade9-display', 'grade9-edit', setManualGrade9);
@@ -822,10 +822,8 @@
                 if (!response.ok) throw new Error("Data fetch error");
                 allRecords = parseCSV(await response.text());
                 document.getElementById('db-count').textContent = `${allRecords.length.toLocaleString()} 건 로드됨`;
-                const unis = ['전체', ...Array.from(new Set(allRecords.map(r => r.university))).sort()];
-                document.getElementById('uni-select').innerHTML = unis.map(u =>
-                    `<option value="${u}">${u === '전체' ? '모든 대학교 탐색' : u}</option>`
-                ).join('');
+                const unis = Array.from(new Set(allRecords.map(r => r.university))).sort();
+                document.getElementById('uni-datalist').innerHTML = unis.map(u => `<option value="${u}">`).join('');
                 render();
                 document.getElementById('initial-loader').classList.add('hide');
                 setTimeout(() => {
