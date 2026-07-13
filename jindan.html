@@ -7,7 +7,8 @@
     <!--
       이식: kangseok-hub/converter (MIT) React 앱 → 진로진학 허브 하위 페이지 (전체 공개 — 공개 입결 데이터만 사용)
       - 원본 디자인·로직을 순수 HTML/CSS/JS로 재작성 (학교망 CDN 차단 대비, 앱 정책)
-      - 데이터: jindan-data.csv — 2025 어디가(adiga) 입결 자료
+      - 데이터: 2026_adiga_univ_results.csv — 2026 어디가(adiga) 수시 입결 자료 (환산등급_70 기준 필터링)
+      - 카드 클릭 시 경쟁률·모집인원·충원·환산점수(50/70) 전체 상세 모달 표시
       - 등급 환산: 경기진학지도협의회·부산/광주교육청 2025 분석자료 보간 (원본 로직 그대로)
       - 추가: GPA 숫자·9등급 환산값 클릭 시 직접 입력 가능
     -->
@@ -171,7 +172,7 @@
         #data-list { display: grid; grid-template-columns: 1fr; gap: 20px; }
         @media (min-width: 640px) { #data-list { grid-template-columns: repeat(2, 1fr); } }
         @media (min-width: 960px) { #data-list { grid-template-columns: repeat(3, 1fr); } }
-        .uni-card { background: #fff; padding: 24px; border-radius: 2rem; border: 1px solid var(--slate-100); box-shadow: 0 1px 3px rgba(0,0,0,.04); transition: all .25s; animation: fadeInUp .35s ease-out both; }
+        .uni-card { background: #fff; padding: 24px; border-radius: 2rem; border: 1px solid var(--slate-100); box-shadow: 0 1px 3px rgba(0,0,0,.04); transition: all .25s; animation: fadeInUp .35s ease-out both; cursor: pointer; }
         .uni-card:hover { transform: translateY(-4px); box-shadow: 0 25px 50px rgba(224,231,255,.5); }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .uni-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 20px; }
@@ -192,6 +193,27 @@
         .dept-name { font-size: 14px; font-weight: 900; color: var(--slate-800); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .adm-name { font-size: 10px; font-weight: 700; color: var(--slate-400); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 4px; }
 
+        /* 상세 모달 */
+        #detail-overlay { position: fixed; inset: 0; z-index: 50; background: rgba(15,23,42,.55); backdrop-filter: blur(4px); display: none; align-items: flex-end; justify-content: center; padding: 16px; }
+        #detail-overlay.open { display: flex; }
+        @media (min-width: 640px) { #detail-overlay { align-items: center; } }
+        .detail-modal { background: #fff; width: 100%; max-width: 34rem; max-height: 85vh; overflow-y: auto; border-radius: 2rem; padding: 28px 28px 24px; animation: fadeInUp .25s ease-out; box-shadow: 0 40px 80px rgba(15,23,42,.35); }
+        .detail-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+        .detail-close { flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--slate-200); background: #fff; color: var(--slate-500); font-size: 14px; font-weight: 900; line-height: 1; }
+        .detail-close:hover { background: var(--slate-50); color: var(--slate-900); }
+        .detail-modal h3 { font-size: 24px; line-height: 1.2; }
+        .detail-dept { font-size: 15px; font-weight: 900; color: var(--slate-800); margin-top: 14px; }
+        .detail-adm { font-size: 11px; font-weight: 700; color: var(--slate-400); margin-top: 4px; }
+        .detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 20px; }
+        .d-tile { background: var(--slate-50); border: 1px solid var(--slate-100); border-radius: 1rem; padding: 13px 16px; }
+        .d-tile .k { font-size: 9px; font-weight: 900; color: var(--slate-400); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 5px; }
+        .d-tile .v { font-size: 17px; font-weight: 900; color: var(--slate-800); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+        .d-tile .s { font-size: 10px; font-weight: 700; color: var(--slate-400); margin-top: 3px; }
+        .d-tile.hl { background: var(--indigo-50); border-color: var(--indigo-100); }
+        .d-tile.hl .v { color: var(--indigo); }
+        .d-tile.wide { grid-column: 1 / -1; }
+        .detail-note { font-size: 10px; color: var(--slate-400); font-weight: 700; line-height: 1.7; margin-top: 18px; }
+
         /* 빈 결과 */
         #empty-state { display: none; grid-column: 1 / -1; padding: 100px 0; text-align: center; }
         #empty-state .circle { width: 96px; height: 96px; background: var(--slate-50); border: 1px solid var(--slate-100); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 36px; margin: 0 auto 24px; }
@@ -211,7 +233,7 @@
 <body>
     <div id="initial-loader">
         <div class="loader"></div>
-        <p>2025 어디가 입결 데이터를 불러오고 있습니다...</p>
+        <p>2026 어디가 입결 데이터를 불러오고 있습니다...</p>
     </div>
 
     <header class="site-header">
@@ -220,7 +242,7 @@
                 <div class="brand-badge">🎓</div>
                 <div>
                     <h1 class="serif">9등급 환산 적정 대학 찾기</h1>
-                    <p class="sub">2025 어디가 입결 자료</p>
+                    <p class="sub">2026 어디가 입결 자료</p>
                 </div>
             </div>
             <div class="header-right">
@@ -301,7 +323,7 @@
                         <div class="list-icon">🏫</div>
                         <h2 class="serif">적정 대학 리스트</h2>
                     </div>
-                    <p class="source-tag">출처 : 2025 어디가 입결 자료</p>
+                    <p class="source-tag">출처 : 2026 어디가 입결 자료 (환산등급 70% 컷 기준)</p>
                     <div class="stat-pills">
                         <div class="stat-pill"><span class="k">Target</span><span class="v"><span id="target-label">3.16</span> 등급</span></div>
                         <div class="stat-pill"><span class="k">Range</span><span class="v" id="bounds-label">3.06 ~ 3.26</span></div>
@@ -358,15 +380,31 @@
         </section>
     </main>
 
+    <!-- 대학 상세 모달 -->
+    <div id="detail-overlay">
+        <div class="detail-modal" role="dialog" aria-modal="true">
+            <div class="detail-top">
+                <div class="badge-row" id="dm-badges"></div>
+                <button class="detail-close" onclick="closeDetail()" aria-label="닫기">✕</button>
+            </div>
+            <h3 class="serif" id="dm-uni"></h3>
+            <p class="campus-txt" id="dm-campus"></p>
+            <p class="detail-dept" id="dm-dept"></p>
+            <p class="detail-adm" id="dm-adm"></p>
+            <div class="detail-grid" id="dm-grid"></div>
+            <p class="detail-note">출처 : 2026 어디가 입결 자료 · 환산점수/등급은 각 대학 환산 기준의 50%·70% 컷입니다. 리스트 탐색은 <b>환산등급 70% 컷</b> 기준입니다.</p>
+        </div>
+    </div>
+
     <footer class="site-footer">
         <div class="brand-line"><span>🎓</span><span>9등급 환산 적정 대학 찾기 (경기, 부산, 광주 자료)</span></div>
         <p>등급 환산 : 경기진학지도협의회 · 부산시교육청 · 광주시교육청 2025 분석자료</p>
-        <p class="fine">DATA SOURCE : 2025 ADIGA(어디가) · BUSAN OFFICE OF EDUCATION · GYEONGGI JINHAK · GWANGJU OFFICE OF EDUCATION</p>
-        <p class="disclaimer">본 도구는 2025학년도 어디가 수시 입결 자료 기반의 <b>참고용</b>이며, 실제 지원 판단은 반드시 담임·진학 상담과 병행하세요.<br>원본 앱: kangseok-hub/converter (MIT)</p>
+        <p class="fine">DATA SOURCE : 2026 ADIGA(어디가) · BUSAN OFFICE OF EDUCATION · GYEONGGI JINHAK · GWANGJU OFFICE OF EDUCATION</p>
+        <p class="disclaimer">본 도구는 2026학년도 어디가 수시 입결 자료(환산등급 70% 컷) 기반의 <b>참고용</b>이며, 실제 지원 판단은 반드시 담임·진학 상담과 병행하세요.<br>원본 앱: kangseok-hub/converter (MIT)</p>
     </footer>
 
     <script>
-        const DATA_URL = "./jindan-data.csv";  // 2025 어디가 입결 자료 (원 출처: github.com/kangseok-hub/converter, MIT)
+        const DATA_URL = "./2026_adiga_univ_results.csv";  // 2026 어디가 수시 입결 자료 (환산등급_70 기준)
 
         // ─── 환산표: 경기진협·부산/광주교육청 2025 분석자료 (원본 conversionData.ts 그대로) ───
         const gyeonggiData = [
@@ -422,6 +460,9 @@
         let searchQuery = '';
         let searchRange = 0.1;
         let showAmbitious = true;
+        let currentFiltered = [];              // 현재 필터 결과 (모달·더 보기에서 참조)
+        let visibleCount = 150;
+        const PAGE_SIZE = 150;
 
         const VERSIONS = [
             { id: 'gyeonggi', name: '경기 진협 분석 자료', desc: '경기진협 버전' },
@@ -484,19 +525,46 @@
             return '기타';
         }
 
+        // 따옴표 필드 지원 CSV 한 줄 파서 ("미제출 사유 : 통합모집, ..." 처럼 쉼표 포함 필드 대응)
+        function parseCSVLine(line) {
+            const cols = []; let cur = ''; let inQ = false;
+            for (let i = 0; i < line.length; i++) {
+                const ch = line[i];
+                if (inQ) {
+                    if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else inQ = false; }
+                    else cur += ch;
+                } else if (ch === '"') inQ = true;
+                else if (ch === ',') { cols.push(cur); cur = ''; }
+                else cur += ch;
+            }
+            cols.push(cur);
+            return cols;
+        }
+
+        // 컬럼: 조회연도,대학명,대학코드,전형명,구분,모집단위,모집인원_최초,모집인원_이월,모집인원_총,경쟁률,충원인원,환산점수_50,환산점수_70,환산등급_50,환산등급_70
         function parseCSV(csv) {
             const lines = csv.trim().split('\n');
             const records = [];
             for (let i = 1; i < lines.length; i++) {
-                const cols = lines[i].split(',');
-                if (cols.length < 5) continue;
-                const university = cols[0].trim();
-                const campus = cols[1].trim();
-                const admissionName = cols[2].trim();
-                const department = cols[3].trim();
-                const averageGrade = parseFloat(cols[4].trim());
-                if (!university || !department || isNaN(averageGrade)) continue;
-                records.push({ university, campus, admissionName, department, averageGrade, category: categorizeDepartment(department) });
+                const cols = parseCSVLine(lines[i]).map(c => c.trim());
+                if (cols.length < 15) continue;
+                if (cols[4] !== '수시') continue;              // 정시 제외 — 수시 입결만 탐색
+                const averageGrade = parseFloat(cols[14]);     // 환산등급_70 기준 필터링
+                if (isNaN(averageGrade)) continue;             // 미제출·입결 미존재 행 제외
+                const rawName = cols[1];
+                const m = rawName.match(/^(.*?)\[(.+)\]$/);    // "가야대학교[본교]" → 대학명/캠퍼스 분리
+                const university = m ? m[1].trim() : rawName;
+                const campus = m ? m[2] : '본교';
+                const department = cols[5];
+                if (!university || !department) continue;
+                records.push({
+                    university, campus, department, averageGrade,
+                    admissionName: cols[3], category: categorizeDepartment(department),
+                    year: cols[0], uniCode: cols[2], type: cols[4],
+                    quotaInitial: cols[6], quotaCarry: cols[7], quotaTotal: cols[8],
+                    competition: cols[9], waitlist: cols[10],
+                    score50: cols[11], score70: cols[12], grade50: cols[13], grade70: cols[14],
+                });
             }
             return records;
         }
@@ -631,19 +699,23 @@
             document.getElementById('ambitious-label').classList.toggle('on', showAmbitious);
             document.getElementById('ambitious-hint').style.display = (target < 2.0 && !showAmbitious) ? 'flex' : 'none';
 
-            // 결과 목록
-            const filtered = baseFiltered
+            // 결과 목록 (데이터가 1.7만 건이라 일정 개수씩 나눠 렌더링)
+            currentFiltered = baseFiltered
                 .filter(r => selectedCategory === '전체' || r.category === selectedCategory)
                 .sort((a, b) => b.averageGrade - a.averageGrade);
-            document.getElementById('result-count').textContent = filtered.length.toLocaleString();
+            document.getElementById('result-count').textContent = currentFiltered.length.toLocaleString();
+            visibleCount = PAGE_SIZE;
+            renderList(target);
+        }
 
+        function renderList(target) {
             const emptyState = document.getElementById('empty-state');
             const list = document.getElementById('data-list');
-            list.querySelectorAll('.uni-card').forEach(el => el.remove());
-            emptyState.style.display = filtered.length ? 'none' : 'block';
-            list.insertAdjacentHTML('afterbegin', filtered.map((r, idx) => {
+            list.querySelectorAll('.uni-card, #load-more-wrap').forEach(el => el.remove());
+            emptyState.style.display = currentFiltered.length ? 'none' : 'block';
+            list.insertAdjacentHTML('afterbegin', currentFiltered.slice(0, visibleCount).map((r, idx) => {
                 const diff = getDifficulty(r.averageGrade, target);
-                return `<div class="uni-card" style="animation-delay:${Math.min(idx * 0.03, 0.3)}s">
+                return `<div class="uni-card" style="animation-delay:${Math.min((idx % PAGE_SIZE) * 0.03, 0.3)}s" onclick="openDetail(${idx})">
                     <div class="uni-card-top">
                         <div style="min-width:0;">
                             <div class="badge-row">
@@ -661,6 +733,45 @@
                     </div>
                 </div>`;
             }).join(''));
+            if (currentFiltered.length > visibleCount) {
+                list.insertAdjacentHTML('beforeend', `<div id="load-more-wrap" style="grid-column:1/-1;text-align:center;padding:8px 0;">
+                    <button class="expand-btn" onclick="loadMore()">결과 더 보기 (${(currentFiltered.length - visibleCount).toLocaleString()}건 남음)</button>
+                </div>`);
+            }
+        }
+        function loadMore() { visibleCount += PAGE_SIZE; renderList(getTargetGrade()); }
+
+        // ─── 대학 상세 모달 ───
+        const fmt = v => (v === undefined || v === null || v === '') ? '—' : v;
+        function openDetail(idx) {
+            const r = currentFiltered[idx];
+            if (!r) return;
+            const diff = getDifficulty(r.averageGrade, getTargetGrade());
+            document.getElementById('dm-badges').innerHTML =
+                `<span class="cat-badge">${r.category}</span>
+                 <span class="cat-badge">${r.type}</span>
+                 <span class="diff-badge ${diff.cls}">${diff.label}</span>`;
+            document.getElementById('dm-uni').textContent = r.university;
+            document.getElementById('dm-campus').textContent = r.campus;
+            document.getElementById('dm-dept').textContent = r.department;
+            document.getElementById('dm-adm').textContent = r.admissionName;
+            const quotaSub = `최초 ${fmt(r.quotaInitial)} · 이월 ${fmt(r.quotaCarry)}`;
+            document.getElementById('dm-grid').innerHTML = `
+                <div class="d-tile hl"><p class="k">환산등급 70% 컷</p><p class="v">${fmt(r.grade70)}</p><p class="s">리스트 탐색 기준</p></div>
+                <div class="d-tile"><p class="k">환산등급 50% 컷</p><p class="v">${fmt(r.grade50)}</p></div>
+                <div class="d-tile"><p class="k">환산점수 70% 컷</p><p class="v">${fmt(r.score70)}</p></div>
+                <div class="d-tile"><p class="k">환산점수 50% 컷</p><p class="v">${fmt(r.score50)}</p></div>
+                <div class="d-tile"><p class="k">경쟁률</p><p class="v">${r.competition ? r.competition + ' : 1' : '—'}</p></div>
+                <div class="d-tile"><p class="k">충원인원 (추합)</p><p class="v">${fmt(r.waitlist)}${r.waitlist ? '명' : ''}</p></div>
+                <div class="d-tile wide"><p class="k">모집인원 (총)</p><p class="v">${fmt(r.quotaTotal)}${r.quotaTotal ? '명' : ''}</p><p class="s">${quotaSub}</p></div>
+                <div class="d-tile"><p class="k">조회연도</p><p class="v">${fmt(r.year)}</p></div>
+                <div class="d-tile"><p class="k">대학코드</p><p class="v">${fmt(r.uniCode)}</p></div>`;
+            document.getElementById('detail-overlay').classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeDetail() {
+            document.getElementById('detail-overlay').classList.remove('open');
+            document.body.style.overflow = '';
         }
 
         // ─── 초기화 ───
@@ -683,6 +794,10 @@
             document.getElementById('ambitious-toggle').addEventListener('change', e => { showAmbitious = e.target.checked; render(); });
             bindClickEdit('gpa-display', 'gpa-edit', v => setGpa5(v, false));
             bindClickEdit('grade9-display', 'grade9-edit', setManualGrade9);
+            document.getElementById('detail-overlay').addEventListener('click', e => {
+                if (e.target === e.currentTarget) closeDetail();
+            });
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
 
             try {
                 const response = await fetch(DATA_URL);
