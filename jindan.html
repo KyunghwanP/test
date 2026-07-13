@@ -319,7 +319,7 @@
                     </div>
                     <div class="range-pill">
                         <div class="dot"></div>
-                        <span>검색 범위: ±<span id="range-label">0.10</span></span>
+                        <span>검색 범위: <span id="range-label">±0.10</span></span>
                     </div>
                 </div>
                 <div class="cat-grid" id="cat-grid"></div>
@@ -389,7 +389,7 @@
                 <div id="empty-state">
                     <div class="circle">🔍</div>
                     <h3>검색 결과가 없습니다</h3>
-                    <p>현재 설정된 범위(±<span id="empty-range">0.10</span>) 내에<br>일치하는 대학이 없습니다.</p>
+                    <p>현재 설정된 범위(<span id="empty-range">±0.10</span>) 내에<br>일치하는 대학이 없습니다.</p>
                     <button class="expand-btn" onclick="setRange(0.3)">검색 범위 ±0.3으로 확대하기</button>
                 </div>
             </div>
@@ -594,6 +594,7 @@
         // 소신 지원 ON일 때 상향(하한) 확장 폭: 검색 범위별 고정값
         const AMBITIOUS_EXTEND = { 0.1: 0.5, 0.3: 0.7, 0.5: 1.0 };
         function getBounds(target) {
+            if (searchRange === 'all') return { lower: 0, upper: 9 };   // 전체: 등급 범위 제한 없음
             const extend = AMBITIOUS_EXTEND[searchRange] || searchRange;
             const lower = showAmbitious ? Math.max(1.0, target - extend) : target - searchRange;
             const upper = target + searchRange;
@@ -709,13 +710,14 @@
             }).join('');
 
             // 범위 탭 / 라벨
-            document.getElementById('range-label').textContent = searchRange.toFixed(2);
-            document.getElementById('empty-range').textContent = searchRange.toFixed(2);
-            document.getElementById('range-tabs').innerHTML = [0.1, 0.3, 0.5].map(r =>
-                `<button class="range-tab ${searchRange === r ? 'active' : ''}" onclick="setRange(${r})">±${r}</button>`
+            const rangeText = searchRange === 'all' ? '전체' : '±' + searchRange.toFixed(2);
+            document.getElementById('range-label').textContent = rangeText;
+            document.getElementById('empty-range').textContent = rangeText;
+            document.getElementById('range-tabs').innerHTML = [0.1, 0.3, 0.5, 'all'].map(r =>
+                `<button class="range-tab ${searchRange === r ? 'active' : ''}" onclick="setRange(${typeof r === 'number' ? r : `'${r}'`})">${r === 'all' ? '전체' : '±' + r}</button>`
             ).join('');
             document.getElementById('target-label').textContent = target.toFixed(2);
-            document.getElementById('bounds-label').textContent = `${bounds.lower.toFixed(2)} ~ ${bounds.upper.toFixed(2)}`;
+            document.getElementById('bounds-label').textContent = searchRange === 'all' ? '전체 등급' : `${bounds.lower.toFixed(2)} ~ ${bounds.upper.toFixed(2)}`;
             document.getElementById('ambitious-track').classList.toggle('on', showAmbitious);
             document.getElementById('ambitious-label').classList.toggle('on', showAmbitious);
             document.getElementById('kind-switch').classList.toggle('jonghap', admissionKind === '종합');
