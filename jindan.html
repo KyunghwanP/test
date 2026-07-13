@@ -269,12 +269,17 @@
             <div class="input-head">
                 <div>
                     <h2 class="serif">성적 입력</h2>
-                    <p class="desc">5등급제 내신을 입력하면 9등급제로 자동 환산됩니다.</p>
+                    <p class="desc" id="input-desc">5등급제 내신을 입력하면 9등급제로 자동 환산됩니다.</p>
                 </div>
+                <button type="button" class="kind-switch" id="mode-switch" onclick="toggleGradeMode()" title="클릭하면 학년 전환">
+                    <span class="kind-opt active" id="mode-opt-12">1·2학년 (5등급제)</span>
+                    <span class="kind-opt" id="mode-opt-3">3학년 (9등급제)</span>
+                    <span class="kind-thumb"></span>
+                </button>
             </div>
 
             <div>
-                <p class="gpa-label">Current GPA (5-Grade)</p>
+                <p class="gpa-label" id="gpa-label">Current GPA (5-Grade)</p>
                 <div class="gpa-row">
                     <span id="gpa-display" title="클릭하여 직접 입력">2.00</span>
                     <input type="number" id="gpa-edit" class="num-edit" min="1" max="5" step="0.01" style="display:none">
@@ -292,7 +297,7 @@
 
             <div class="result-panel">
                 <div class="result-info">
-                    <span class="result-tag">9-Grade Conversion Result</span>
+                    <span class="result-tag" id="result-tag">9-Grade Conversion Result</span>
                     <p id="conv-reason"></p>
                     <p id="low-grade-hint">💡 5등급제 1.0은 9등급제 기준 약 1.4등급으로 환산됩니다. (2025 분석 자료 기준)<br>1.0~1.3 구간의 대학을 보려면 '소신 지원 포함'을 켜주세요.</p>
                     <div id="manual-note">
@@ -469,6 +474,8 @@
         // ─── 상태 ───
         let allRecords = [];
         let gpa5 = 2.0;
+        let gpa9 = 4.0;                        // 3학년 모드: 9등급제 내신 직접 입력값
+        let gradeMode = (function(){ try { return localStorage.getItem('jindan-grade-mode') === '3' ? '3' : '12'; } catch(e) { return '12'; } })(); // '12' 1·2학년(5등급제) | '3' 3학년(9등급제)
         let conversionVersion = 'mixed';       // gyeonggi | busan | gwangju | mixed
         let manualGrade9 = null;               // 환산값 직접 입력 시 사용 (슬라이더/버전 변경 시 해제)
         let selectedCategory = '전체';
@@ -589,6 +596,7 @@
 
         // ─── 파생 값 ───
         function getTargetGrade() {
+            if (gradeMode === '3') return gpa9;    // 3학년: 9등급제 내신 그대로
             return manualGrade9 !== null ? manualGrade9 : convertGrade(gpa5, conversionVersion).grade9;
         }
         // 소신 지원 ON일 때 상향(하한) 확장 폭: 검색 범위별 고정값
@@ -620,20 +628,52 @@
         }
 
         // ─── 이벤트 핸들러 ───
-        function setGpa5(val, fromSlider) {
+        function setGpaInput(val, fromSlider) {
             let num = parseFloat(val);
             if (isNaN(num)) return;
-            num = Math.min(5, Math.max(1, num));
-            gpa5 = num;
-            manualGrade9 = null;
+            if (gradeMode === '3') {
+                gpa9 = Math.min(9, Math.max(1, num));
+            } else {
+                gpa5 = Math.min(5, Math.max(1, num));
+                manualGrade9 = null;
+            }
             if (!fromSlider) document.getElementById('gpa-slider').value = num;
             render();
+        }
+        function toggleGradeMode() {
+            gradeMode = gradeMode === '12' ? '3' : '12';
+            try { localStorage.setItem('jindan-grade-mode', gradeMode); } catch(e) {}
+            syncModeUI();
+            render();
+        }
+        // 학년 모드에 따라 입력 카드 UI 전환 (슬라이더 범위·환산 기준 카드·문구)
+        function syncModeUI() {
+            const m3 = gradeMode === '3';
+            const slider = document.getElementById('gpa-slider');
+            slider.max = m3 ? 9 : 5;
+            slider.value = m3 ? gpa9 : gpa5;
+            document.getElementById('gpa-edit').max = m3 ? 9 : 5;
+            document.getElementById('version-grid').style.display = m3 ? 'none' : '';
+            document.getElementById('mode-switch').classList.toggle('jonghap', m3);
+            document.getElementById('mode-opt-12').classList.toggle('active', !m3);
+            document.getElementById('mode-opt-3').classList.toggle('active', m3);
+            document.getElementById('gpa-label').textContent = m3 ? 'Current GPA (9-Grade)' : 'Current GPA (5-Grade)';
+            document.getElementById('result-tag').textContent = m3 ? 'My 9-Grade GPA' : '9-Grade Conversion Result';
+            document.getElementById('input-desc').textContent = m3
+                ? '3학년(2015 개정)은 9등급제 내신을 환산 없이 그대로 사용합니다.'
+                : '5등급제 내신을 입력하면 9등급제로 자동 환산됩니다.';
         }
         function setConversionVersion(v) { conversionVersion = v; manualGrade9 = null; render(); }
         function setManualGrade9(val) {
             let num = parseFloat(val);
             if (isNaN(num)) return;
-            manualGrade9 = Math.min(9, Math.max(1, Math.round(num * 100) / 100));
+            num = Math.min(9, Math.max(1, Math.round(num * 100) / 100));
+            if (gradeMode === '3') {           // 3학년 모드: 결과 패널 수정도 내신 입력과 동일
+                gpa9 = num;
+                document.getElementById('gpa-slider').value = num;
+            } else {
+                manualGrade9 = num;
+            }
             render();
         }
         function clearManualGrade9() { manualGrade9 = null; render(); }
@@ -677,17 +717,23 @@
             const bounds = getBounds(target);
 
             // GPA / 환산 결과
-            document.getElementById('gpa-display').textContent = gpa5.toFixed(2);
+            const m3 = gradeMode === '3';
+            document.getElementById('gpa-display').textContent = (m3 ? gpa9 : gpa5).toFixed(2);
             document.getElementById('grade9-display').textContent = target.toFixed(2);
-            document.getElementById('conv-reason').textContent = manualGrade9 !== null
-                ? `직접 입력한 9등급 평균 ${target.toFixed(2)} 등급을 기준으로 탐색합니다. 슬라이더를 움직이거나 환산 기준을 바꾸면 자동 환산으로 돌아갑니다.`
-                : conversion.reason;
-            document.getElementById('manual-note').style.display = manualGrade9 !== null ? 'flex' : 'none';
-            document.getElementById('low-grade-hint').style.display = (manualGrade9 === null && gpa5 <= 1.5) ? 'block' : 'none';
+            document.getElementById('conv-reason').textContent = m3
+                ? `3학년은 9등급제 내신을 환산 없이 그대로 사용합니다. 입력한 ${target.toFixed(2)} 등급을 기준으로 탐색합니다.`
+                : (manualGrade9 !== null
+                    ? `직접 입력한 9등급 평균 ${target.toFixed(2)} 등급을 기준으로 탐색합니다. 슬라이더를 움직이거나 환산 기준을 바꾸면 자동 환산으로 돌아갑니다.`
+                    : conversion.reason);
+            document.getElementById('manual-note').style.display = (!m3 && manualGrade9 !== null) ? 'flex' : 'none';
+            document.getElementById('low-grade-hint').style.display = (!m3 && manualGrade9 === null && gpa5 <= 1.5) ? 'block' : 'none';
 
-            // 슬라이더 눈금
-            document.getElementById('slider-ticks').innerHTML = [1, 2, 3, 4, 5].map(v =>
-                `<div class="tick"><div class="bar ${gpa5 >= v - 0.5 && gpa5 <= v + 0.5 ? 'on' : ''}"></div><span>${v}.0</span></div>`
+            // 슬라이더 눈금 (1·2학년: 1~5 / 3학년: 1~9)
+            const ticks = m3 ? [1, 3, 5, 7, 9] : [1, 2, 3, 4, 5];
+            const cur = m3 ? gpa9 : gpa5;
+            const half = m3 ? 1 : 0.5;
+            document.getElementById('slider-ticks').innerHTML = ticks.map(v =>
+                `<div class="tick"><div class="bar ${cur >= v - half && cur <= v + half ? 'on' : ''}"></div><span>${v}.0</span></div>`
             ).join('');
 
             // 환산 기준 버튼
@@ -813,13 +859,19 @@
             const paramGpa = parseFloat(params.get('gpa5'));
             if (!isNaN(paramGpa)) {
                 gpa5 = Math.min(5, Math.max(1, paramGpa));
-                document.getElementById('gpa-slider').value = gpa5;
+                gradeMode = '12';
             }
-            document.getElementById('gpa-slider').addEventListener('input', e => setGpa5(e.target.value, true));
+            const paramGpa9 = parseFloat(params.get('grade9'));   // 3학년: ?grade9=3.4 로 진입 시 9등급제 모드 프리필
+            if (!isNaN(paramGpa9)) {
+                gpa9 = Math.min(9, Math.max(1, paramGpa9));
+                gradeMode = '3';
+            }
+            syncModeUI();
+            document.getElementById('gpa-slider').addEventListener('input', e => setGpaInput(e.target.value, true));
             document.getElementById('search-input').addEventListener('input', e => { searchQuery = e.target.value; render(); });
             document.getElementById('uni-input').addEventListener('input', e => { selectedUniversity = e.target.value; render(); });
             document.getElementById('ambitious-toggle').addEventListener('change', e => { showAmbitious = e.target.checked; render(); });
-            bindClickEdit('gpa-display', 'gpa-edit', v => setGpa5(v, false));
+            bindClickEdit('gpa-display', 'gpa-edit', v => setGpaInput(v, false));
             bindClickEdit('grade9-display', 'grade9-edit', setManualGrade9);
             document.getElementById('detail-overlay').addEventListener('click', e => {
                 if (e.target === e.currentTarget) closeDetail();
