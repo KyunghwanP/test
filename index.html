@@ -2639,7 +2639,7 @@
   .home-half{flex:1;min-width:0;}
 
   /* 학사일정 미니 */
-  .home-schedule-list{padding:8px 12px 10px;display:flex;flex-direction:column;gap:4px;}
+  .home-schedule-list{padding:8px 12px 10px;display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;}
   .home-schedule-item{
     display:flex;gap:8px;align-items:baseline;font-size:12px;
   }
@@ -2658,6 +2658,33 @@
   .home-schedule-today-marker::after{
     content:'';flex:1;height:1px;background:var(--mon);opacity:.35;
   }
+  /* 현황판 미니 달력 — 넓은 화면(850px+)에서 왼쪽 달력 카드 + 오른쪽(업무·학사일정) 배치 */
+  .home-cal-row{display:flex;flex-direction:column;gap:10px;}
+  .home-cal-col{display:flex;flex-direction:column;gap:10px;min-width:0;}
+  .home-cal-card{display:none;}
+  @media(min-width:850px){
+    .home-cal-row{display:grid;grid-template-columns:300px minmax(0,1fr);gap:10px;align-items:start;}
+    .home-cal-card{display:block;}
+    #homeScheduleList{max-height:264px;}
+  }
+  .home-mini-cal{padding:10px 14px 12px;}
+  .home-mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+  .home-mini-cal-dow{font-size:10.5px;font-weight:800;color:var(--ink-soft);text-align:center;padding:2px 0 4px;}
+  .home-mini-cal-day{
+    position:relative;height:34px;border-radius:8px;border:none;background:none;padding:0;
+    font-family:'IBM Plex Mono';font-size:12.5px;font-weight:600;color:var(--ink);
+    display:flex;align-items:center;justify-content:center;cursor:default;
+  }
+  .home-mini-cal-day.sun{color:#EF4444;}
+  .home-mini-cal-day.sat{color:#3B82F6;}
+  .home-mini-cal-day.has-ev{cursor:pointer;background:var(--paper-soft);font-weight:800;}
+  .home-mini-cal-day.has-ev:hover{background:var(--rule);}
+  .home-mini-cal-day.has-ev::after{
+    content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);
+    width:4px;height:4px;border-radius:50%;background:var(--mon);
+  }
+  .home-mini-cal-day.today{background:var(--mon);color:#fff !important;font-weight:800;}
+  .home-mini-cal-day.today::after{background:#fff;}
   /* 업무자료 탭 */
   #docsPage.active{overflow:hidden;}
   .docs-layout{
@@ -3244,6 +3271,17 @@
                 <div class="home-my-tt" id="homeClassTt"></div>
               </div>
             </div>
+            <!-- 미니 달력(왼쪽) + 진행중인 업무·상담·학사일정(오른쪽) -->
+            <div class="home-cal-row">
+            <div class="home-section home-cal-card" id="homeCalSection">
+              <div class="home-section-header" style="cursor:default;">
+                <button onclick="event.stopPropagation();moveScheduleMonth(-1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">‹</button>
+                <span class="home-section-title" id="homeCalTitle" style="flex:1;text-align:center;">🗓 달력</span>
+                <button onclick="event.stopPropagation();moveScheduleMonth(1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">›</button>
+              </div>
+              <div class="home-mini-cal" id="homeMiniCal"></div>
+            </div>
+            <div class="home-cal-col">
             <!-- 진행중인 업무 -->
             <div class="home-section" id="homeTaskSection" style="display:none;">
               <div class="home-section-header home-nav-header" data-goto="mytask" id="homeTaskHeader">
@@ -3278,8 +3316,10 @@
                 <button onclick="event.stopPropagation();moveScheduleMonth(1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">›</button>
                 <span class="home-section-arrow" onclick="navigateTo('schedule')" style="cursor:pointer;">›</span>
               </div>
-              <div class="home-schedule-list" id="homeScheduleList" style="max-height:200px;overflow-y:auto;"></div>
+              <div class="home-schedule-list" id="homeScheduleList"></div>
             </div>
+            </div><!-- home-cal-col 끝 -->
+            </div><!-- home-cal-row 끝 -->
             <!-- 주간교육활동 요약(모바일) -->
             <div class="home-section home-ai-summary-wrap" id="homeAISummarySection">
               <div class="home-section-header home-nav-header" data-goto="weekly">
@@ -8170,6 +8210,8 @@ async function loadHomeSchedule(offset) {
   const labelEl = document.getElementById('homeScheduleMonthLabel');
   if (titleEl) titleEl.textContent = offset === 0 ? '📆 이번달 학사일정' : '📆 학사일정';
   if (labelEl) labelEl.textContent = `${m}월`;
+  const calTitleEl = document.getElementById('homeCalTitle');
+  if (calTitleEl) calTitleEl.textContent = `🗓 ${y}년 ${m}월`;
 
   const listEl = document.getElementById('homeScheduleList');
   if (!listEl) return;
@@ -8188,6 +8230,7 @@ async function loadHomeSchedule(offset) {
         </div>`;
     const hasToday = isThisMonth && events.some(e => e.date === todayD);
     const markerHtml = `<div class="home-schedule-today-marker" data-day="${todayD}">오늘 · ${m}월 ${todayD}일</div>`;
+    renderHomeMiniCal(y, m, events, isThisMonth, todayD);
     let html;
     if (!events.length) {
       html = '<div class="home-schedule-empty">학사일정 없음</div>';
@@ -8223,8 +8266,46 @@ async function loadHomeSchedule(offset) {
     }
   } catch(e) {
     listEl.innerHTML = '<div class="home-schedule-empty">불러오기 실패</div>';
+    const now = new Date();
+    renderHomeMiniCal(y, m, [], y === now.getFullYear() && m === now.getMonth()+1, now.getDate());
   }
 }
+
+// 미니 달력 (넓은 화면에서 학사일정 옆) — 일정 있는 날 점 표시, 클릭 시 목록 해당 날짜로 스크롤
+function renderHomeMiniCal(y, m, events, isThisMonth, todayD) {
+  const el = document.getElementById('homeMiniCal');
+  if (!el) return;
+  const evDays = new Set(events.map(e => Number(e.date)).filter(d => !isNaN(d)));
+  const firstDow = new Date(y, m - 1, 1).getDay();
+  const lastDate = new Date(y, m, 0).getDate();
+  let html = '<div class="home-mini-cal-grid">';
+  html += ['일','월','화','수','목','금','토'].map((d, i) =>
+    `<div class="home-mini-cal-dow${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}">${d}</div>`).join('');
+  html += '<div></div>'.repeat(firstDow);
+  for (let d = 1; d <= lastDate; d++) {
+    const dow = (firstDow + d - 1) % 7;
+    const cls = ['home-mini-cal-day'];
+    if (dow === 0) cls.push('sun');
+    if (dow === 6) cls.push('sat');
+    if (evDays.has(d)) cls.push('has-ev');
+    if (isThisMonth && d === todayD) cls.push('today');
+    html += `<button class="${cls.join(' ')}"${evDays.has(d) ? ` onclick="scrollHomeScheduleTo(${d})" title="일정 보기"` : ' tabindex="-1"'}>${d}</button>`;
+  }
+  el.innerHTML = html + '</div>';
+}
+
+function scrollHomeScheduleTo(day) {
+  const listEl = document.getElementById('homeScheduleList');
+  const item = listEl?.querySelector(`.home-schedule-item[data-day="${day}"]`);
+  if (!item) return;
+  const lr = listEl.getBoundingClientRect(), tr = item.getBoundingClientRect();
+  listEl.scrollTop += (tr.top - lr.top) - (lr.height / 2 - tr.height / 2);
+  item.style.transition = 'none';
+  item.style.background = 'var(--paper-soft)';
+  item.style.borderRadius = '6px';
+  setTimeout(() => { item.style.transition = 'background 1s'; item.style.background = ''; }, 400);
+}
+window.scrollHomeScheduleTo = scrollHomeScheduleTo;
 
 function moveScheduleMonth(dir) {
   loadHomeSchedule(_scheduleOffset + dir);
