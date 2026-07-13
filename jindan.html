@@ -524,7 +524,7 @@
         }
         function getDifficulty(avgGrade, myGrade) {
             const diff = avgGrade - myGrade;
-            if (diff <= -0.5) return { label: '상향', cls: 'diff-up' };
+            if (diff <= -0.4995) return { label: '상향', cls: 'diff-up' }; // 0.5 이상 차이 (부동소수점 오차 방어)
             if (diff < -0.15) return { label: '소신', cls: 'diff-reach' };
             if (diff > 0.15) return { label: '안정', cls: 'diff-safe' };
             return { label: '적정', cls: 'diff-fit' };
