@@ -2658,14 +2658,19 @@
   .home-schedule-today-marker::after{
     content:'';flex:1;height:1px;background:var(--mon);opacity:.35;
   }
-  /* 현황판 미니 달력 — 넓은 화면(850px+)에서 왼쪽 달력 카드 + 오른쪽(업무·학사일정) 배치 */
+  /* 현황판 미니 달력 — 넓은 화면(850px+)에서 왼쪽 달력 : 오른쪽(업무·학사일정) 절반 분할, 높이 일치 */
   .home-cal-row{display:flex;flex-direction:column;gap:10px;}
-  .home-cal-col{display:flex;flex-direction:column;gap:10px;min-width:0;}
+  .home-cal-col{display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0;}
   .home-cal-card{display:none;}
   @media(min-width:850px){
-    .home-cal-row{display:grid;grid-template-columns:300px minmax(0,1fr);gap:10px;align-items:start;}
-    .home-cal-card{display:block;}
-    #homeScheduleList{max-height:264px;}
+    .home-cal-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:stretch;}
+    .home-cal-card{display:flex;flex-direction:column;}
+    .home-mini-cal{flex:1;display:flex;flex-direction:column;}
+    .home-mini-cal-grid{flex:1;grid-template-rows:auto;grid-auto-rows:1fr;}
+    .home-mini-cal-day{height:auto;min-height:34px;}
+    /* 학사일정이 남는 높이를 채워 달력 카드와 아래 끝선 일치 (flex-basis 0으로 목록 내용이 행 높이를 키우지 않게) */
+    #homeScheduleSection{flex:1;display:flex;flex-direction:column;min-height:0;}
+    #homeScheduleList{flex:1 1 0;min-height:200px;max-height:none;}
   }
   .home-mini-cal{padding:10px 14px 12px;}
   .home-mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
@@ -2679,12 +2684,17 @@
   .home-mini-cal-day.sat{color:#3B82F6;}
   .home-mini-cal-day.has-ev{cursor:pointer;background:var(--paper-soft);font-weight:800;}
   .home-mini-cal-day.has-ev:hover{background:var(--rule);}
-  .home-mini-cal-day.has-ev::after{
-    content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);
-    width:4px;height:4px;border-radius:50%;background:var(--mon);
-  }
+  /* 종류별 점: 학사일정(파랑)·업무(주황)·상담(초록) */
+  .home-mini-cal-dots{position:absolute;bottom:3px;left:0;right:0;display:flex;justify-content:center;gap:2.5px;}
+  .home-mini-cal-dot{width:4px;height:4px;border-radius:50%;display:inline-block;flex-shrink:0;}
+  .home-mini-cal-dot.ev{background:var(--mon);}
+  .home-mini-cal-dot.task{background:#F59E0B;}
+  .home-mini-cal-dot.consult{background:#10B981;}
   .home-mini-cal-day.today{background:var(--mon);color:#fff !important;font-weight:800;}
-  .home-mini-cal-day.today::after{background:#fff;}
+  .home-mini-cal-day.today .home-mini-cal-dot{background:#fff;}
+  .home-mini-cal-legend{display:flex;justify-content:center;gap:12px;padding:8px 0 0;border-top:1px solid var(--rule);margin-top:8px;}
+  .home-mini-cal-legend span{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:var(--ink-soft);}
+  .home-mini-cal-legend .home-mini-cal-dot{width:5px;height:5px;}
   /* 업무자료 탭 */
   #docsPage.active{overflow:hidden;}
   .docs-layout{
@@ -7887,7 +7897,7 @@ async function loadHomeConsult(slotsOverride){
   // 담임 학급 (관리자 테스트는 1-1 폴백. 보기 모드는 대상 교사 기준)
   let classKey = getMyHomeroom();
   if(!classKey && !isViewAs() && fbAuth.currentUser?.email === ADMIN_EMAIL) classKey = '1-1';
-  if(!classKey){ section.style.display = 'none'; return; }
+  if(!classKey){ section.style.display = 'none'; updateCalConsultDates([]); return; }
 
   let slots = [];
   if(Array.isArray(slotsOverride)){
@@ -7896,7 +7906,7 @@ async function loadHomeConsult(slotsOverride){
     try {
       const snap = await getDoc(doc(fbDb, 'consultations', classKey));
       slots = snap.exists() ? (snap.data().slots || []) : [];
-    } catch(e){ section.style.display = 'none'; return; }
+    } catch(e){ section.style.display = 'none'; updateCalConsultDates([]); return; }
   }
 
   // 오늘 이후, 오늘이면 지난 시각 제외
@@ -7910,6 +7920,8 @@ async function loadHomeConsult(slotsOverride){
     return true;
   }).map(s => ({ ...s, _past: s.date === todayStr && s.time <= nowHM }))
     .sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
+
+  updateCalConsultDates(future); // 현황판 미니 달력에 상담 날짜 반영
 
   if(future.length === 0){ section.style.display = 'none'; return; }
   section.style.display = '';
@@ -8271,8 +8283,13 @@ async function loadHomeSchedule(offset) {
   }
 }
 
-// 미니 달력 (넓은 화면에서 학사일정 옆) — 일정 있는 날 점 표시, 클릭 시 목록 해당 날짜로 스크롤
+// 미니 달력 — 학사일정(파랑)·진행중 업무(주황)·예약 상담(초록) 점 표시, 학사일정 날짜 클릭 시 목록 스크롤
+let _calSchedArgs = null;         // 마지막 학사일정 렌더 인자 (업무·상담 갱신 시 재렌더용)
+let _calTaskDates = new Set();    // 진행중 업무 날짜 (YYYY-MM-DD, 시작~종료 기간 전개)
+let _calConsultDates = new Set(); // 예약된 상담 날짜 (YYYY-MM-DD)
+
 function renderHomeMiniCal(y, m, events, isThisMonth, todayD) {
+  _calSchedArgs = { y, m, events, isThisMonth, todayD };
   const el = document.getElementById('homeMiniCal');
   if (!el) return;
   const evDays = new Set(events.map(e => Number(e.date)).filter(d => !isNaN(d)));
@@ -8284,15 +8301,54 @@ function renderHomeMiniCal(y, m, events, isThisMonth, todayD) {
   html += '<div></div>'.repeat(firstDow);
   for (let d = 1; d <= lastDate; d++) {
     const dow = (firstDow + d - 1) % 7;
+    const key = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const marks = [];
+    if (evDays.has(d)) marks.push(['ev', '학사일정']);
+    if (_calTaskDates.has(key)) marks.push(['task', '업무']);
+    if (_calConsultDates.has(key)) marks.push(['consult', '상담']);
     const cls = ['home-mini-cal-day'];
     if (dow === 0) cls.push('sun');
     if (dow === 6) cls.push('sat');
     if (evDays.has(d)) cls.push('has-ev');
     if (isThisMonth && d === todayD) cls.push('today');
-    html += `<button class="${cls.join(' ')}"${evDays.has(d) ? ` onclick="scrollHomeScheduleTo(${d})" title="일정 보기"` : ' tabindex="-1"'}>${d}</button>`;
+    const dots = marks.length ? `<span class="home-mini-cal-dots">${marks.map(([c]) => `<i class="home-mini-cal-dot ${c}"></i>`).join('')}</span>` : '';
+    const attrs = (evDays.has(d) ? ` onclick="scrollHomeScheduleTo(${d})"` : ' tabindex="-1"')
+      + (marks.length ? ` title="${marks.map(([, n]) => n).join(' · ')}"` : '');
+    html += `<button class="${cls.join(' ')}"${attrs}>${d}${dots}</button>`;
   }
-  el.innerHTML = html + '</div>';
+  html += '</div>';
+  html += `<div class="home-mini-cal-legend">
+    <span><i class="home-mini-cal-dot ev"></i>학사일정</span>
+    <span><i class="home-mini-cal-dot task"></i>업무</span>
+    <span><i class="home-mini-cal-dot consult"></i>상담</span>
+  </div>`;
+  el.innerHTML = html;
 }
+
+function _rerenderMiniCal() {
+  if (_calSchedArgs) renderHomeMiniCal(_calSchedArgs.y, _calSchedArgs.m, _calSchedArgs.events, _calSchedArgs.isThisMonth, _calSchedArgs.todayD);
+}
+
+// 진행중 업무 목록 → 달력 표시용 날짜 집합 (기간 최대 62일 전개)
+function updateCalTaskDates(activeTasks) {
+  _calTaskDates = new Set();
+  (activeTasks || []).forEach(t => {
+    if (!t.startDate || !t.endDate) return;
+    const d = new Date(t.startDate + 'T00:00:00');
+    const end = new Date(t.endDate + 'T00:00:00');
+    for (let i = 0; d <= end && i < 62; i++, d.setDate(d.getDate() + 1)) {
+      _calTaskDates.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+    }
+  });
+  _rerenderMiniCal();
+}
+
+function updateCalConsultDates(bookedSlots) {
+  _calConsultDates = new Set((bookedSlots || []).map(s => s.date));
+  _rerenderMiniCal();
+}
+window.updateCalTaskDates = updateCalTaskDates;
+window.updateCalConsultDates = updateCalConsultDates;
 
 function scrollHomeScheduleTo(day) {
   const listEl = document.getElementById('homeScheduleList');
@@ -10244,6 +10300,8 @@ function renderHomeTaskSection() {
   const statusColor= { todo:'#6366F1', doing:'#F59E0B' };
   const activeTasks= mytaskTasks.filter(t => t.status !== 'done').sort((a,b) => a.startDate.localeCompare(b.startDate));
   const doneTasks  = mytaskTasks.filter(t => t.status === 'done').sort((a,b) => b.startDate.localeCompare(a.startDate));
+
+  updateCalTaskDates(activeTasks); // 현황판 미니 달력에 업무 날짜 반영
 
   section.style.display = '';
 
