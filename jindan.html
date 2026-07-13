@@ -174,9 +174,10 @@
         .select-arrow { position: absolute; right: 24px; top: 50%; transform: translateY(-50%); color: var(--slate-300); font-size: 12px; pointer-events: none; }
 
         /* 결과 카드 그리드 */
-        #data-list { display: grid; grid-template-columns: 1fr; gap: 20px; }
-        @media (min-width: 640px) { #data-list { grid-template-columns: repeat(2, 1fr); } }
-        @media (min-width: 960px) { #data-list { grid-template-columns: repeat(3, 1fr); } }
+        /* minmax(0,1fr): 긴 학과명이 열 폭을 밀어내지 않게 — 모든 열 균등 고정 */
+        #data-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+        @media (min-width: 640px) { #data-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (min-width: 960px) { #data-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
         .uni-card { background: #fff; padding: 24px; border-radius: 2rem; border: 1px solid var(--slate-100); box-shadow: 0 1px 3px rgba(0,0,0,.04); transition: all .25s; animation: fadeInUp .35s ease-out both; cursor: pointer; }
         .uni-card:hover { transform: translateY(-4px); box-shadow: 0 25px 50px rgba(224,231,255,.5); }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -197,6 +198,11 @@
         .uni-card-bottom { padding-top: 20px; border-top: 1px solid var(--slate-50); }
         .dept-name { font-size: 16px; font-weight: 900; color: var(--slate-800); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .adm-name { display: inline-block; max-width: 100%; font-size: 13px; font-weight: 800; color: var(--indigo-dark); background: var(--indigo-50); border: 1px solid var(--indigo-100); border-radius: 8px; padding: 3px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 8px; }
+        /* 카드 호버 시 왼쪽 하단에 나타나는 상세 보기 힌트 */
+        .view-more { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 900; color: #8b5cf6; text-transform: uppercase; letter-spacing: .18em; margin-top: 14px; opacity: 0; transform: translateY(4px); transition: opacity .25s, transform .25s; }
+        .view-more .arrow { transition: transform .25s; }
+        .uni-card:hover .view-more { opacity: 1; transform: translateY(0); }
+        .uni-card:hover .view-more .arrow { transform: translateX(4px); }
 
         /* 상세 모달 */
         #detail-overlay { position: fixed; inset: 0; z-index: 50; background: rgba(15,23,42,.55); backdrop-filter: blur(4px); display: none; align-items: flex-end; justify-content: center; padding: 16px; }
@@ -748,6 +754,7 @@
                     <div class="uni-card-bottom">
                         <p class="dept-name">${r.department}</p>
                         <p class="adm-name">${r.admissionName}</p>
+                        <p class="view-more">View More <span class="arrow">→</span></p>
                     </div>
                 </div>`;
             }).join(''));
