@@ -178,6 +178,7 @@
         .badge-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
         .cat-badge { padding: 4px 8px; background: var(--slate-100); color: var(--slate-500); font-size: 9px; font-weight: 900; border-radius: 8px; text-transform: uppercase; letter-spacing: .1em; }
         .diff-badge { padding: 4px 8px; font-size: 9px; font-weight: 900; border-radius: 8px; border: 1px solid; text-transform: uppercase; letter-spacing: .1em; }
+        .diff-up    { background: #e11d48; color: #fff; border-color: #e11d48; }
         .diff-reach { background: #fff1f2; color: #e11d48; border-color: #fecdd3; }
         .diff-safe  { background: #ecfdf5; color: #059669; border-color: #a7f3d0; }
         .diff-fit   { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
@@ -523,6 +524,7 @@
         }
         function getDifficulty(avgGrade, myGrade) {
             const diff = avgGrade - myGrade;
+            if (diff <= -0.5) return { label: '상향', cls: 'diff-up' };
             if (diff < -0.15) return { label: '소신', cls: 'diff-reach' };
             if (diff > 0.15) return { label: '안정', cls: 'diff-safe' };
             return { label: '적정', cls: 'diff-fit' };
