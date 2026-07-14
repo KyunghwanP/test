@@ -111,16 +111,18 @@
         }
 
         /* ── 넓은 화면: 왼쪽(선택창+전체 목록) / 오른쪽(PDF 뷰어, 상단 정렬) ── */
+        /* 페이지 전체는 스크롤하지 않고, 목록·PDF 각 영역이 내부 스크롤 */
         @media (min-width: 1024px) {
-            main { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 18px; align-items: start; max-width: 82rem; }
-            .picker { display: flex; flex-direction: column; position: sticky; top: 20px; max-height: calc(100vh - 40px); }
+            body { overflow: hidden; }
+            main { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 18px; align-items: stretch; max-width: 82rem; min-height: 0; overflow: hidden; }
+            .picker { display: flex; flex-direction: column; min-height: 0; }
             /* .combo(중간 래퍼)도 flex 컬럼이어야 목록 높이가 전달돼 스크롤됨 */
             .combo { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
-            /* 드롭다운을 항상 보이는 정적 목록으로 (검색 입력이 필터) */
+            /* 드롭다운을 항상 보이는 정적 목록으로 (검색 입력이 필터) — 넘치면 목록만 스크롤 */
             .combo-list { position: static; display: block !important; top: auto; left: auto; right: auto; margin-top: 10px; box-shadow: none; max-height: none; flex: 1 1 auto; min-height: 140px; }
             .picker-hint { display: none; }
-            /* 미선택 상태에서도 뷰어 자리를 보여주고 상단에 붙임 */
-            .viewer, .viewer[hidden] { display: flex !important; min-height: calc(100vh - 40px); }
+            /* 뷰어는 grid 셀 높이에 맞추고 내부 #pdfContainer만 스크롤 */
+            .viewer, .viewer[hidden] { display: flex !important; min-height: 0; overflow: hidden; }
         }
     </style>
 </head>
