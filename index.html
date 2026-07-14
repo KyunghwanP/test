@@ -1065,7 +1065,8 @@
     display:flex;align-items:center;gap:8px;
   }
   .pts-suggestion-item:last-child{ border-bottom:none; }
-  .pts-suggestion-item:hover{ background:var(--paper-soft); }
+  .pts-suggestion-item:hover,
+  .pts-suggestion-item.active{ background:rgba(59,130,246,.12); }
   .pts-suggestion-tag{
     font-family:'IBM Plex Mono';font-size:11px;font-weight:700;
     background:var(--mon);color:#fff;
@@ -3200,7 +3201,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.76</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.77</div>
   </div>
 </div>
 
@@ -3330,7 +3331,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver5.76</div>
+    <div class="nav-version" title="Made by 박경환">ver5.77</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -7386,6 +7387,10 @@ function initSearchPage(){
   if (!s360Init){
     s360Init = true;
     inp.addEventListener('input', () => { s360Group = null; s360Render(); });
+    // Enter → 첫 번째 검색 결과 바로 열기
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { const first = document.querySelector('#s360Body .spot-row'); if (first) { e.preventDefault(); first.click(); } }
+    });
     document.getElementById('s360Tabs').addEventListener('click', e => {
       const btn = e.target.closest('.students-tab');
       if (!btn) return;
@@ -9703,6 +9708,7 @@ function renderStudentRows() {
         <input class="points-input pts-name-input ${s.name ? 'pts-name-found' : ''}"
           type="text" placeholder="이름 검색" value="${escapeHtml(s.name)}"
           oninput="onStudentNameInput(${idx},this.value)"
+          onkeydown="onStudentNameKey(${idx},event)"
           onblur="hideSuggestions(${idx})"
           autocomplete="off"
           id="ptsNameEl_${idx}"
@@ -9889,14 +9895,39 @@ function onStudentNameInput(idx, value) {
     return;
   }
 
-  // 목록 표시
-  sugEl.innerHTML = matches.slice(0, 10).map(st =>
-    `<div class="pts-suggestion-item" onmousedown="applyStudent(${idx}, {grade:'${st.grade}',room:'${st.room}',num:'${st.num}',name:'${st.name}'})">
+  // 목록 표시 (키보드 이동을 위해 표시 목록을 상태에 저장)
+  const shown = matches.slice(0, 10);
+  ptsSugState[idx] = { items: shown, active: -1 };
+  sugEl.innerHTML = shown.map((st, i) =>
+    `<div class="pts-suggestion-item" data-i="${i}" onmousedown="applyStudent(${idx}, {grade:'${st.grade}',room:'${st.room}',num:'${st.num}',name:'${st.name}'})">
       <span class="pts-suggestion-tag">${st.grade}학년 ${st.room}반 ${st.num}번</span>
       <span class="pts-suggestion-name">${st.name}</span>
     </div>`
   ).join('');
   sugEl.classList.add('show');
+}
+
+// 상벌점 이름 자동완성: 키보드 이동(↑/↓) + Enter 선택
+const ptsSugState = {};
+function onStudentNameKey(idx, e) {
+  const sugEl = document.getElementById(`ptsSug_${idx}`);
+  const state = ptsSugState[idx];
+  const open = sugEl && sugEl.classList.contains('show') && state && state.items.length;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (!open) return;
+    e.preventDefault();
+    state.active = (state.active + (e.key === 'ArrowDown' ? 1 : -1) + state.items.length) % state.items.length;
+    const rows = sugEl.querySelectorAll('.pts-suggestion-item');
+    rows.forEach((r, i) => r.classList.toggle('active', i === state.active));
+    if (rows[state.active]) rows[state.active].scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') {
+    if (!open) return;
+    e.preventDefault();
+    const pick = state.items[state.active >= 0 ? state.active : 0];
+    if (pick) applyStudent(idx, pick);
+  } else if (e.key === 'Escape') {
+    if (sugEl) { sugEl.classList.remove('show'); }
+  }
 }
 
 function applyStudent(idx, st) {
@@ -10181,6 +10212,7 @@ window.onStudentNameInput   = onStudentNameInput;
 window.onStudentScoreInput  = onStudentScoreInput;
 window.applyStudent         = applyStudent;
 window.hideSuggestions      = hideSuggestions;
+window.onStudentNameKey     = onStudentNameKey;
 window.onStudentDetailSelect = onStudentDetailSelect;
 window.onStudentSubType      = onStudentSubType;
 window.toggleStudentCustom  = toggleStudentCustom;
