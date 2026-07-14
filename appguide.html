@@ -69,6 +69,14 @@
         .vt-title { font-size: 15px; font-weight: 900; color: var(--slate-900); display: flex; align-items: center; gap: 8px; min-width: 0; }
         .vt-title .yr { font-size: 10.5px; font-weight: 900; color: var(--indigo); background: var(--indigo-50); border: 1px solid var(--indigo-100); padding: 3px 8px; border-radius: 999px; flex-shrink: 0; }
         .vt-title .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* 페이지 이동 (##/##) — 대학명과 검색 사이 */
+        .pdf-pagenav { display: flex; align-items: center; gap: 5px; margin-left: 4px; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 6px 11px; font-size: 13px; font-weight: 800; color: var(--slate-500); }
+        .pdf-pagenav[hidden] { display: none; }
+        .pdf-pagenav.focus { border-color: var(--indigo); box-shadow: 0 0 0 5px rgba(99,102,241,.08); }
+        .pdf-pagenav input { width: 34px; border: none; outline: none; background: transparent; text-align: right; font-size: 13px; font-weight: 800; color: var(--slate-800); font-variant-numeric: tabular-nums; }
+        .pdf-pagenav input:disabled { color: var(--slate-300); }
+        .pdf-pagenav .pp-sep { color: var(--slate-300); }
+        .pdf-pagenav #pdfPageTotal { min-width: 14px; color: var(--slate-500); font-variant-numeric: tabular-nums; }
         .pdf-search { display: flex; align-items: center; gap: 6px; margin-left: auto; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 4px 6px 4px 12px; }
         .pdf-search.focus { border-color: var(--indigo); box-shadow: 0 0 0 5px rgba(99,102,241,.08); }
         .pdf-search input { border: none; outline: none; background: transparent; font-size: 14px; font-weight: 700; color: var(--slate-800); width: 190px; max-width: 42vw; }
@@ -160,6 +168,11 @@
         <section class="viewer" id="viewer" hidden>
             <div class="viewer-toolbar">
                 <div class="vt-title"><span class="yr" id="vtYear">2027</span><span class="nm" id="vtName">대학명</span></div>
+                <div class="pdf-pagenav" id="pdfPageNav" hidden>
+                    <input type="text" id="pdfPageInput" inputmode="numeric" value="1" title="페이지 번호 입력 후 Enter" disabled>
+                    <span class="pp-sep">/</span>
+                    <span id="pdfPageTotal">–</span>
+                </div>
                 <div class="pdf-search" id="pdfSearchBox">
                     <input type="text" id="pdfSearch" placeholder="🔍 문서 내 검색" autocomplete="off" disabled>
                     <span class="ps-count" id="pdfCount"></span>
@@ -319,6 +332,9 @@
         const countEl = document.getElementById('pdfCount');
         const prevBtn = document.getElementById('pdfPrev');
         const nextBtn = document.getElementById('pdfNext');
+        const pageNav = document.getElementById('pdfPageNav');
+        const pageInput = document.getElementById('pdfPageInput');
+        const pageTotalEl = document.getElementById('pdfPageTotal');
 
         let pdfDoc = null;
         let pages = [];              // { div, rendered, rendering, textDivs } per page
@@ -347,8 +363,38 @@
                 if (r.bottom >= cr.top - margin && r.top <= cr.bottom + margin) renderPage(i);
             }
         }
-        container.addEventListener('scroll', () => { if (scrollThrottle) return; scrollThrottle = setTimeout(() => { scrollThrottle = null; renderVisible(); }, 120); });
+        container.addEventListener('scroll', () => { if (scrollThrottle) return; scrollThrottle = setTimeout(() => { scrollThrottle = null; renderVisible(); updatePageIndicator(); }, 120); });
         window.addEventListener('resize', () => { clearTimeout(scrollThrottle); scrollThrottle = setTimeout(() => { scrollThrottle = null; renderVisible(); }, 200); });
+
+        // ── 페이지 이동 (##/##) ──
+        // 컨테이너 상단에 걸친 페이지 번호(1-based)
+        function currentPageByScroll() {
+            if (!pages.length) return 1;
+            const probe = container.getBoundingClientRect().top + 60;
+            for (let i = 0; i < pages.length; i++) {
+                if (pages[i].div.getBoundingClientRect().bottom >= probe) return i + 1;
+            }
+            return pages.length;
+        }
+        function updatePageIndicator() {
+            if (!pages.length || document.activeElement === pageInput) return;  // 편집 중엔 덮어쓰지 않음
+            pageInput.value = currentPageByScroll();
+        }
+        function gotoPage(n) {
+            if (!pages.length) return;
+            n = Math.max(1, Math.min(pages.length, parseInt(n, 10) || 1));
+            pageInput.value = n;
+            const pg = pages[n - 1];
+            pg.div.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            if (!pg.rendered) renderPage(n - 1);
+            pg.div.classList.remove('flash'); void pg.div.offsetWidth; pg.div.classList.add('flash');
+        }
+        pageInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); gotoPage(pageInput.value); pageInput.blur(); }
+            else if (e.key === 'Escape') { updatePageIndicator(); pageInput.blur(); }
+        });
+        pageInput.addEventListener('focus', () => { pageNav.classList.add('focus'); pageInput.select(); });
+        pageInput.addEventListener('blur', () => { pageNav.classList.remove('focus'); updatePageIndicator(); });
 
         async function loadPdf(u) {
             const token = ++loadToken;
@@ -356,6 +402,7 @@
             if (pdfDoc) { try { pdfDoc.destroy(); } catch (e) {} }
             pdfDoc = null; pages = []; pageItems = []; occ = []; curOcc = -1; query = '';
             resetSearchUI(); searchInput.disabled = true;
+            pageNav.hidden = true; pageInput.disabled = true; pageInput.value = '1'; pageTotalEl.textContent = '–';
             container.innerHTML = '';
             viewer.hidden = false;
             currentUniv = u;
@@ -386,6 +433,7 @@
                 container.appendChild(frag);
                 hideStatus();
                 renderVisible();               // 첫 화면 페이지 렌더
+                pageNav.hidden = false; pageInput.disabled = false; pageInput.value = '1'; pageTotalEl.textContent = doc.numPages;
                 searchInput.disabled = false;
                 buildTextIndex(doc, token, phH);
             } catch (err) {
