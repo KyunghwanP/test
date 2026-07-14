@@ -151,7 +151,7 @@
                     <button class="ps-btn" id="pdfPrev" title="이전 (Shift+Enter)" disabled>▲</button>
                     <button class="ps-btn" id="pdfNext" title="다음 (Enter)" disabled>▼</button>
                 </div>
-                <a class="vt-dl" id="pdfDownload" target="_blank" rel="noopener">원본 PDF ↗</a>
+                <a class="vt-dl" id="pdfDownload" target="_blank" rel="noopener">⬇ 다운로드</a>
             </div>
             <div class="pdf-status" id="pdfStatus"></div>
             <div id="pdfContainer">
@@ -376,7 +376,7 @@
             } catch (err) {
                 if (token !== loadToken) return;
                 console.error(err);
-                container.innerHTML = `<div class="viewer-empty"><div class="big">⚠️</div><h3>문서를 불러올 수 없습니다</h3><p>잠시 후 다시 시도하거나 '원본 PDF'로 열어 주세요.<br>(프록시 서버 응답 없음)</p></div>`;
+                container.innerHTML = `<div class="viewer-empty"><div class="big">⚠️</div><h3>문서를 불러올 수 없습니다</h3><p>잠시 후 다시 시도하거나 '⬇ 다운로드'로 받아 주세요.<br>(프록시 서버 응답 없음)</p></div>`;
                 hideStatus();
             }
         }
