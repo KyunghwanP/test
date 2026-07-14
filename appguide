@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>대학 수시 모집요강 조회기</title>
+    <!-- pdf.js 로드 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+</head>
+<body>
+    <h1>대학 모집요강 조회</h1>
+    <select id="univSelect"><option>대학을 선택하세요</option></select>
+    <div id="pdfContainer" style="margin-top:20px; border:1px solid #ccc; height:800px;"></div>
+
+    <script>
+        const PROXY_URL = "https://adiga-pdf-proxy.pkh910518.workers.dev/?url=";
+        const select = document.getElementById('univSelect');
+
+        // 1. CSV 로드
+        fetch('data.csv')
+            .then(res => res.text())
+            .then(csv => {
+                const rows = csv.split('\n').slice(1); // 헤더 제외
+                rows.forEach(row => {
+                    const [year, name, code, type, link] = row.split(',');
+                    if (link && link.includes('http')) {
+                        const opt = document.createElement('option');
+                        opt.value = link.replace(/"/g, ''); // 따옴표 제거
+                        opt.textContent = name.replace(/"/g, '');
+                        select.appendChild(opt);
+                    }
+                });
+            });
+
+        // 2. 대학 선택 시 PDF 렌더링
+        select.addEventListener('change', (e) => {
+            const rawLink = e.target.value;
+            const container = document.getElementById('pdfContainer');
+            container.innerHTML = "로딩 중...";
+
+            const safeUrl = PROXY_URL + encodeURIComponent(rawLink);
+            
+            pdfjsLib.getDocument(safeUrl).promise.then(pdf => {
+                container.innerHTML = ""; // 이전 내용 초기화
+                pdf.getPage(1).then(page => {
+                    const canvas = document.createElement('canvas');
+                    container.appendChild(canvas);
+                    const context = canvas.getContext('2d');
+                    const viewport = page.getViewport({scale: 1.5});
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    page.render({canvasContext: context, viewport: viewport});
+                });
+            }).catch(err => container.innerHTML = "파일 로드 실패");
+        });
+    </script>
+</body>
+</html>
