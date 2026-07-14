@@ -109,6 +109,19 @@
             .pdf-search input { width: 100%; max-width: none; flex: 1; }
             .vt-dl { order: 2; }
         }
+
+        /* ── 넓은 화면: 왼쪽(선택창+전체 목록) / 오른쪽(PDF 뷰어, 상단 정렬) ── */
+        @media (min-width: 1024px) {
+            main { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 18px; align-items: start; max-width: 82rem; }
+            .picker { display: flex; flex-direction: column; position: sticky; top: 20px; max-height: calc(100vh - 40px); }
+            /* .combo(중간 래퍼)도 flex 컬럼이어야 목록 높이가 전달돼 스크롤됨 */
+            .combo { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+            /* 드롭다운을 항상 보이는 정적 목록으로 (검색 입력이 필터) */
+            .combo-list { position: static; display: block !important; top: auto; left: auto; right: auto; margin-top: 10px; box-shadow: none; max-height: none; flex: 1 1 auto; min-height: 140px; }
+            .picker-hint { display: none; }
+            /* 미선택 상태에서도 뷰어 자리를 보여주고 상단에 붙임 */
+            .viewer, .viewer[hidden] { display: flex !important; min-height: calc(100vh - 40px); }
+        }
     </style>
 </head>
 <body>
