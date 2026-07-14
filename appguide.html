@@ -16,7 +16,7 @@
         const select = document.getElementById('univSelect');
 
         // 1. CSV 로드
-        fetch('data.csv')
+        fetch('appguide.csv')
             .then(res => res.text())
             .then(csv => {
                 const rows = csv.split('\n').slice(1); // 헤더 제외
