@@ -187,6 +187,42 @@
         // ── 상태 ──
         let univs = [];              // { name, base, campus, code, link, year }
         let activeIdx = -1;          // 콤보 리스트 키보드 활성 항목
+        let currentUniv = null;      // 현재 뷰어에 열린 대학 (원본 PDF 저장용)
+
+        // 파일명에 못 쓰는 문자 제거
+        function safeFileName(s) { return String(s).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim(); }
+        // '원본 PDF' 클릭 → 서버가 filedown.do로 내려주는 무확장자 파일 대신
+        // 이미 로드된 PDF 바이트를 '연도_대학명(캠퍼스) 수시 모집요강.pdf'로 저장
+        async function downloadOriginalPdf(e) {
+            if (e) e.preventDefault();
+            const u = currentUniv;
+            if (!u) return;
+            const fname = `${u.year}_${safeFileName(u.base)}${u.campus ? '(' + safeFileName(u.campus) + ')' : ''} 수시 모집요강.pdf`;
+            const btn = document.getElementById('pdfDownload');
+            const label = btn.textContent;
+            btn.textContent = '내려받는 중…';
+            try {
+                let blob;
+                if (pdfDoc) {
+                    const data = await pdfDoc.getData();          // 렌더링에 쓴 PDF 바이트 재사용 (재다운로드 없음)
+                    blob = new Blob([data], { type: 'application/pdf' });
+                } else {
+                    const res = await fetch(PROXY_URL + encodeURIComponent(u.link));  // 아직 안 열렸으면 프록시로 받기
+                    if (!res.ok) throw new Error('proxy ' + res.status);
+                    blob = await res.blob();
+                }
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = fname;
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+            } catch (err) {
+                console.error(err);
+                window.open(u.link, '_blank', 'noopener');        // 실패 시 원본 링크로 폴백
+            } finally {
+                btn.textContent = label;
+            }
+        }
 
         // ── 대학 목록 로드 ──
         fetch('appguide.csv')
@@ -257,6 +293,7 @@
             searchEl.value = u.name; clearBtn.style.display = 'block'; closeList();
             loadPdf(u);
         }
+        document.getElementById('pdfDownload').addEventListener('click', downloadOriginalPdf);
 
         // ── PDF 뷰어 / 지연 렌더링 ──
         const viewer = document.getElementById('viewer');
@@ -306,9 +343,10 @@
             resetSearchUI(); searchInput.disabled = true;
             container.innerHTML = '';
             viewer.hidden = false;
+            currentUniv = u;
             document.getElementById('vtYear').textContent = u.year;
             document.getElementById('vtName').textContent = u.base + (u.campus ? ` (${u.campus})` : '');
-            document.getElementById('pdfDownload').href = u.link;
+            document.getElementById('pdfDownload').href = u.link;   // JS 실패 시 폴백용
             setStatus('모집요강 PDF를 불러오는 중입니다…', true, false);
             viewer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
