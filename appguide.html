@@ -269,6 +269,7 @@
                 document.getElementById('db-count').textContent = `${univs.length}개 대학`;
                 if (univs[0]) { document.getElementById('brandSub').textContent = `${univs[0].year} 수시`; document.getElementById('vtYear').textContent = univs[0].year; }
                 renderList('');
+                autoSelectFromParams();
             })
             .catch(() => { document.getElementById('db-count').textContent = '목록 오류'; });
 
@@ -320,6 +321,20 @@
             const u = univs[i]; if (!u) return;
             searchEl.value = u.name; clearBtn.style.display = 'block'; closeList();
             loadPdf(u);
+        }
+        // 외부(진단 모달 iframe 등)에서 ?code=대학코드 / ?uni=대학명&campus=본교 로 진입 시 자동 선택
+        // embed=1 이면 iframe 안이므로 '← 홈' 링크 숨김
+        function autoSelectFromParams() {
+            const p = new URLSearchParams(location.search);
+            if (p.get('embed')) { const b = document.querySelector('.back-link'); if (b) b.style.display = 'none'; }
+            const code = p.get('code'), uni = p.get('uni'), campus = p.get('campus');
+            let idx = -1;
+            if (code) { const n = parseInt(code, 10); if (!isNaN(n)) idx = univs.findIndex(u => parseInt(u.code, 10) === n); }
+            if (idx < 0 && uni) {
+                idx = univs.findIndex(u => u.base === uni && (!campus || u.campus === campus));
+                if (idx < 0) idx = univs.findIndex(u => u.base.includes(uni));
+            }
+            if (idx >= 0) selectUniv(idx);
         }
         document.getElementById('pdfDownload').addEventListener('click', downloadOriginalPdf);
 

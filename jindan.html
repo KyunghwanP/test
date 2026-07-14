@@ -191,7 +191,7 @@
         .diff-fit   { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
         .uni-card h3 { font-size: 20px; line-height: 1.2; color: var(--slate-900); }
         .uni-card:hover h3 { color: var(--indigo); }
-        .campus-txt { font-size: 11.5px; font-weight: 700; color: var(--slate-400); text-transform: uppercase; letter-spacing: .15em; margin-top: 6px; }
+        .campus-txt { display: inline-block; font-size: 12px; font-weight: 800; color: var(--slate-500); background: var(--slate-100); padding: 2px 10px; border-radius: 999px; letter-spacing: 0; margin-top: 7px; }
         .avg-box { text-align: right; flex-shrink: 0; }
         .avg-box .k { font-size: 10.5px; font-weight: 900; color: var(--slate-400); text-transform: uppercase; letter-spacing: .15em; margin-bottom: 4px; }
         .avg-box .v { font-size: 24px; font-weight: 900; color: var(--indigo); font-variant-numeric: tabular-nums; }
@@ -224,6 +224,19 @@
         .d-tile.hl .v { color: var(--indigo); }
         .d-tile.wide { grid-column: 1 / -1; }
         .detail-note { font-size: 12px; color: var(--slate-400); font-weight: 700; line-height: 1.7; margin-top: 18px; }
+        /* 수시 모집요강 보기 버튼 */
+        .dm-guide-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 20px; padding: 15px; border: none; border-radius: 1rem; background: var(--indigo); color: #fff; font-size: 15px; font-weight: 900; cursor: pointer; box-shadow: 0 10px 24px rgba(79,70,229,.3); transition: transform .15s, background .15s; }
+        .dm-guide-btn:hover { transform: translateY(-1px); background: var(--indigo-dark); }
+        .dm-guide-btn:disabled { background: var(--slate-200); color: var(--slate-400); cursor: default; box-shadow: none; }
+
+        /* 수시 모집요강 뷰어 — 상세 모달 위에 뜨는 더 큰 모달 (모달 인 모달) */
+        #guide-overlay { position: fixed; inset: 0; z-index: 70; background: rgba(15,23,42,.65); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: 16px; }
+        #guide-overlay.open { display: flex; }
+        .guide-modal { background: #fff; width: 100%; max-width: 62rem; height: 92vh; border-radius: 1.5rem; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 40px 90px rgba(15,23,42,.45); animation: fadeInUp .25s ease-out; }
+        .guide-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--slate-200); background: var(--slate-50); flex-shrink: 0; }
+        .guide-title { font-size: 15.5px; font-weight: 900; color: var(--slate-900); display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .guide-frame { flex: 1; width: 100%; border: none; min-height: 0; }
+        @media (max-width: 640px) { .guide-modal { height: 100%; max-width: 100%; border-radius: 0; } #guide-overlay { padding: 0; } }
 
         /* 빈 결과 */
         #empty-state { display: none; grid-column: 1 / -1; padding: 100px 0; text-align: center; }
@@ -413,7 +426,19 @@
             <p class="detail-dept" id="dm-dept"></p>
             <p class="detail-adm" id="dm-adm"></p>
             <div class="detail-grid" id="dm-grid"></div>
+            <button class="dm-guide-btn" id="dm-guide-btn" onclick="openGuide()">📑 이 대학 수시 모집요강 보기</button>
             <p class="detail-note">출처 : 2026 어디가 입결 자료 · 환산점수/등급은 각 대학 환산 기준의 50%·70% 컷입니다. 리스트 탐색은 <b>환산등급 70% 컷</b> 기준입니다.</p>
+        </div>
+    </div>
+
+    <!-- 수시 모집요강 뷰어 (상세 모달 위 더 큰 모달) -->
+    <div id="guide-overlay">
+        <div class="guide-modal" role="dialog" aria-modal="true">
+            <div class="guide-top">
+                <span class="guide-title" id="guide-title">📑 수시 모집요강</span>
+                <button class="detail-close" onclick="closeGuide()" aria-label="닫기">✕</button>
+            </div>
+            <iframe class="guide-frame" id="guide-frame" title="수시 모집요강"></iframe>
         </div>
     </div>
 
@@ -816,9 +841,11 @@
 
         // ─── 대학 상세 모달 ───
         const fmt = v => (v === undefined || v === null || v === '') ? '—' : v;
+        let _guideRec = null;   // 현재 상세 모달의 대학 (수시 모집요강 연동용)
         function openDetail(idx) {
             const r = currentFiltered[idx];
             if (!r) return;
+            _guideRec = r;
             const diff = getDifficulty(r.averageGrade, getTargetGrade());
             document.getElementById('dm-badges').innerHTML =
                 `<span class="cat-badge">${r.category}</span>
@@ -845,6 +872,20 @@
         function closeDetail() {
             document.getElementById('detail-overlay').classList.remove('open');
             document.body.style.overflow = '';
+        }
+        // 수시 모집요강 뷰어 (appguide.html을 iframe으로 — 대학코드로 자동 선택)
+        function openGuide() {
+            const r = _guideRec;
+            if (!r) return;
+            document.getElementById('guide-title').textContent =
+                `📑 ${r.university}${r.campus && r.campus !== '본교' ? ' (' + r.campus + ')' : ''} 수시 모집요강`;
+            const qs = `code=${encodeURIComponent(r.uniCode || '')}&uni=${encodeURIComponent(r.university || '')}&campus=${encodeURIComponent(r.campus || '')}&embed=1`;
+            document.getElementById('guide-frame').src = `appguide.html?${qs}`;
+            document.getElementById('guide-overlay').classList.add('open');
+        }
+        function closeGuide() {
+            document.getElementById('guide-overlay').classList.remove('open');
+            document.getElementById('guide-frame').src = 'about:blank';   // iframe 메모리 해제
         }
 
         // ─── 초기화 ───
@@ -876,7 +917,15 @@
             document.getElementById('detail-overlay').addEventListener('click', e => {
                 if (e.target === e.currentTarget) closeDetail();
             });
-            document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+            document.getElementById('guide-overlay').addEventListener('click', e => {
+                if (e.target === e.currentTarget) closeGuide();
+            });
+            // ESC: 요강 뷰어가 열려 있으면 그것부터, 아니면 상세 모달 닫기
+            document.addEventListener('keydown', e => {
+                if (e.key !== 'Escape') return;
+                if (document.getElementById('guide-overlay').classList.contains('open')) closeGuide();
+                else closeDetail();
+            });
 
             try {
                 const response = await fetch(DATA_URL);
