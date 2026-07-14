@@ -2753,6 +2753,10 @@
   .room-tl-slotzone:not(.gap):hover::after{content:'＋ 예약';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--mon);pointer-events:none;}
   .room-tl-slotzone.gap{cursor:default;background:var(--paper-soft);opacity:.55;border-top-color:transparent;}
   .room-tl-slotzone.gap:hover{background:var(--paper-soft);}
+  /* 아침·점심·석식: 시간 직접 입력으로 예약 가능 */
+  .room-tl-slotzone.gap.bookable{cursor:pointer;}
+  .room-tl-slotzone.gap.bookable:hover{opacity:1;background:color-mix(in srgb, var(--mon) 7%, transparent);}
+  .room-tl-slotzone.gap.bookable:hover::after{content:'＋ 예약';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--mon);pointer-events:none;}
   /* 현재 시각 표시선 (오늘 컬럼) */
   .room-tl-now{position:absolute;left:0;right:0;height:2px;background:#EF4444;z-index:3;pointer-events:none;box-shadow:0 0 4px rgba(239,68,68,.5);}
   .room-tl-now::before{content:'';position:absolute;left:-3px;top:-3px;width:8px;height:8px;border-radius:50%;background:#EF4444;}
@@ -3190,7 +3194,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.68</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.69</div>
   </div>
 </div>
 
@@ -3320,7 +3324,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver5.68</div>
+    <div class="nav-version" title="Made by 박경환">ver5.69</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -8708,7 +8712,7 @@ function _roomName(roomId) {
   return roomList.find(r => r.id === roomId)?.name || '(삭제된 특별실)';
 }
 // ── 타임라인 뷰 ──
-const TL_START = 8 * 60;    // 08:00
+const TL_START = 6 * 60;    // 06:00 (조례 전 아침 시간대 포함)
 const TL_END = 22 * 60;     // 22:00
 const TL_PX = 1.0;          // 1분당 px (기본 스케일)
 const TL_SEG_MAX = 80;      // 교시 밴드 최대 높이 — 야간처럼 긴 구간은 압축 표시
@@ -8731,7 +8735,7 @@ function renderRoomGrid() {
   let cur = TL_START;
   for (const s of ROOM_SLOTS) {
     const st = toMinutes(s.start), en = toMinutes(s.end);
-    if (st > cur) segs.push({ gap: true, start: cur, end: st, name: (st - cur >= 40 ? (cur >= 17 * 60 ? '석식' : '점심') : '') });
+    if (st > cur) segs.push({ gap: true, start: cur, end: st, name: (st - cur >= 40 ? (cur >= 17 * 60 ? '석식' : (cur < 12 * 60 ? '아침' : '점심')) : '') });
     segs.push({ gap: false, start: st, end: en, name: s.name, time: `${s.start}~${s.end}`, id: s.id });
     cur = en;
   }
@@ -8760,9 +8764,11 @@ function renderRoomGrid() {
   // 요일 컬럼: 교시 클릭 영역 + 예약 블록 (겹치면 레인 분할)
   const dayCol = d => {
     const isToday = d.ymd === todayYmd;
+    // 교시 칸은 시간 프리필, 아침·점심·석식 같은 이름 있는 빈 구간은 날짜만 프리필해서 예약 가능
     const zones = segs.map(sg =>
-      `<div class="room-tl-slotzone${sg.gap ? ' gap' : ''}" style="top:${sg.y0}px;height:${sg.dispH}px;"
-        ${sg.gap ? '' : `onclick="openRoomFormModal('${d.ymd}','${sg.id}')" title="${sg.name} 예약 추가"`}></div>`).join('');
+      `<div class="room-tl-slotzone${sg.gap ? ' gap' : ''}${sg.gap && sg.name ? ' bookable' : ''}" style="top:${sg.y0}px;height:${sg.dispH}px;"
+        ${!sg.gap ? `onclick="openRoomFormModal('${d.ymd}','${sg.id}')" title="${sg.name} 예약 추가"`
+          : (sg.name ? `onclick="openRoomFormModal('${d.ymd}')" title="${sg.name} 예약 추가 — 시간 직접 입력"` : '')}></div>`).join('');
     // 오늘 컬럼: 현재 시각 위치에 빨간 선
     const nowLine = (isToday && nowMin > TL_START && nowMin < TL_END)
       ? `<div class="room-tl-now" style="top:${tlY(nowMin)}px;"></div>` : '';
