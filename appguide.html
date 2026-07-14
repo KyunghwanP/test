@@ -57,8 +57,8 @@
         .combo-list.open { display: block; }
         .combo-opt { padding: 11px 14px; border-radius: 10px; cursor: pointer; font-size: 14.5px; font-weight: 700; color: var(--slate-800); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
         .combo-opt:hover, .combo-opt.active { background: var(--indigo-50); color: var(--indigo-dark); }
-        .combo-opt .campus { font-size: 12px; font-weight: 800; color: var(--slate-400); }
-        .combo-opt.active .campus { color: var(--indigo); }
+        .combo-opt .campus { flex-shrink: 0; font-size: 12.5px; font-weight: 900; color: #fff; background: var(--indigo); padding: 3px 11px; border-radius: 999px; letter-spacing: .01em; }
+        .combo-opt.active .campus { background: var(--indigo-dark); }
         .combo-empty { padding: 16px; text-align: center; font-size: 13.5px; font-weight: 700; color: var(--slate-400); }
         .picker-hint { font-size: 12px; color: var(--slate-400); font-weight: 600; margin: 11px 0 0 4px; }
 
@@ -229,15 +229,21 @@
 
         searchEl.addEventListener('focus', () => { renderList(searchEl.value); openList(); });
         searchEl.addEventListener('input', () => { renderList(searchEl.value); openList(); clearBtn.style.display = searchEl.value ? 'block' : 'none'; });
-        searchEl.addEventListener('keydown', e => {
+        function setActive(idx) {
             const opts = [...listEl.querySelectorAll('.combo-opt')];
+            if (!opts.length) return;
+            activeIdx = (idx + opts.length) % opts.length;
+            opts.forEach((o, i) => o.classList.toggle('active', i === activeIdx));
+            opts[activeIdx].scrollIntoView({ block: 'nearest' });
+        }
+        searchEl.addEventListener('keydown', e => {
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                e.preventDefault(); if (!opts.length) return;
-                activeIdx += (e.key === 'ArrowDown' ? 1 : -1);
-                if (activeIdx < 0) activeIdx = opts.length - 1; if (activeIdx >= opts.length) activeIdx = 0;
-                opts.forEach((o, i) => o.classList.toggle('active', i === activeIdx));
-                opts[activeIdx].scrollIntoView({ block: 'nearest' });
+                e.preventDefault();
+                if (!listEl.classList.contains('open')) { renderList(searchEl.value); openList(); }
+                setActive(activeIdx + (e.key === 'ArrowDown' ? 1 : -1));
             } else if (e.key === 'Enter') {
+                e.preventDefault();
+                const opts = [...listEl.querySelectorAll('.combo-opt')];
                 const pick = activeIdx >= 0 ? opts[activeIdx] : opts[0];
                 if (pick) selectUniv(+pick.dataset.i);
             } else if (e.key === 'Escape') closeList();

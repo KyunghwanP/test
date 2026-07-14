@@ -95,6 +95,10 @@
       box-shadow: 0 20px 35px rgba(79, 70, 229, 0.25);
       border-color: #4f46e5;
     }
+    .card-guide:hover {
+      box-shadow: 0 20px 35px rgba(8, 145, 178, 0.25);
+      border-color: #0891b2;
+    }
 
     .icon-circle {
       width: 90px;
@@ -115,6 +119,7 @@
     .card-csat .icon-circle { background: linear-gradient(135deg, #8b5cf6 0%, #6a1b9a 100%); color: #ffffff; }
     .card-sim .icon-circle { background: linear-gradient(135deg, #10b981 0%, #34d399 100%); color: #ffffff; }
     .card-jindan .icon-circle { background: linear-gradient(135deg, #4f46e5 0%, #818cf8 100%); color: #ffffff; }
+    .card-guide .icon-circle { background: linear-gradient(135deg, #0891b2 0%, #22d3ee 100%); color: #ffffff; }
 
     .home-card:hover .icon-circle {
       transform: scale(1.1) rotate(-8deg);
@@ -137,6 +142,7 @@
     .card-csat .card-deco { background: linear-gradient(90deg, #8b5cf6, #6a1b9a); }
     .card-sim .card-deco { background: linear-gradient(90deg, #10b981, #34d399); }
     .card-jindan .card-deco { background: linear-gradient(90deg, #4f46e5, #818cf8); }
+    .card-guide .card-deco { background: linear-gradient(90deg, #0891b2, #22d3ee); }
 
     /* 아직 이식 전인 메뉴 — 비활성 표시 (새 탭 열림 방지) */
     .card-disabled {
@@ -243,6 +249,16 @@
           <div class="icon-circle">🩺</div>
           <h3><span class="fw-bold" style="color:#4f46e5;">입시 진단</span> 리포트</h3>
           <p style="color: #000;">5등급제 내신을 9등급 환산하여 2025 수시 입결 기반 안정·적정·소신 진단</p>
+          <div class="card-deco"></div>
+        </div>
+      </div>
+
+      <!-- 수시 모집요강 검색 카드 (전체 공개 — adiga 공개 PDF) -->
+      <div class="col-xl-3 col-md-6 col-sm-6 col-12" id="cardGuide">
+        <div class="home-card card-guide" onclick="location.href='appguide.html'">
+          <div class="icon-circle">📑</div>
+          <h3><span class="fw-bold" style="color:#0891b2;">2027 수시</span> 모집요강 검색</h3>
+          <p style="color: #000;">전국 대학 수시 모집요강 원문을 대학별로 조회하고 문서 내 키워드 검색</p>
           <div class="card-deco"></div>
         </div>
       </div>
