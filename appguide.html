@@ -1,56 +1,65 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-    <title>대학 수시 모집요강 조회기</title>
-    <!-- pdf.js 로드 -->
+    <meta charset="UTF-8">
+    <title>대학 모집요강 조회기 (성능 최적화)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+    <style>
+        #pdfContainer { width: 100%; height: 80vh; overflow-y: auto; border: 1px solid #ccc; background: #ddd; }
+        .page-canvas { display: block; margin: 10px auto; box-shadow: 0 0 5px rgba(0,0,0,0.3); background: white; }
+    </style>
 </head>
 <body>
     <h1>대학 모집요강 조회</h1>
     <select id="univSelect"><option>대학을 선택하세요</option></select>
-    <div id="pdfContainer" style="margin-top:20px; border:1px solid #ccc; height:800px;"></div>
+    <div id="pdfContainer"></div>
 
     <script>
         const PROXY_URL = "https://adiga-pdf-proxy.pkh910518.workers.dev/?url=";
         const select = document.getElementById('univSelect');
+        const container = document.getElementById('pdfContainer');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         // 1. CSV 로드
-        fetch('appguide.csv')
+        fetch('data.csv')
             .then(res => res.text())
             .then(csv => {
-                const rows = csv.split('\n').slice(1); // 헤더 제외
+                const rows = csv.split('\n').slice(1);
                 rows.forEach(row => {
                     const [year, name, code, type, link] = row.split(',');
                     if (link && link.includes('http')) {
                         const opt = document.createElement('option');
-                        opt.value = link.replace(/"/g, ''); // 따옴표 제거
+                        opt.value = link.replace(/"/g, '');
                         opt.textContent = name.replace(/"/g, '');
                         select.appendChild(opt);
                     }
                 });
             });
 
-        // 2. 대학 선택 시 PDF 렌더링
-        select.addEventListener('change', (e) => {
-            const rawLink = e.target.value;
-            const container = document.getElementById('pdfContainer');
+        // 2. 대학 선택 시 렌더링 최적화
+        select.addEventListener('change', async (e) => {
+            const safeUrl = PROXY_URL + encodeURIComponent(e.target.value);
             container.innerHTML = "로딩 중...";
-
-            const safeUrl = PROXY_URL + encodeURIComponent(rawLink);
             
-            pdfjsLib.getDocument(safeUrl).promise.then(pdf => {
-                container.innerHTML = ""; // 이전 내용 초기화
-                pdf.getPage(1).then(page => {
+            try {
+                const pdf = await pdfjsLib.getDocument(safeUrl).promise;
+                container.innerHTML = "";
+                
+                // 루프 대신 페이지별 비동기 렌더링 처리
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
                     const canvas = document.createElement('canvas');
+                    canvas.className = 'page-canvas';
                     container.appendChild(canvas);
-                    const context = canvas.getContext('2d');
-                    const viewport = page.getViewport({scale: 1.5});
+                    
+                    const viewport = page.getViewport({ scale: 1.0 }); // 스케일을 1.0으로 낮춰 속도 향상
                     canvas.height = viewport.height;
                     canvas.width = viewport.width;
-                    page.render({canvasContext: context, viewport: viewport});
-                });
-            }).catch(err => container.innerHTML = "파일 로드 실패");
+                    await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
+                }
+            } catch (err) {
+                container.innerHTML = "로드 실패 (프록시 서버 확인 필요)";
+            }
         });
     </script>
 </body>
