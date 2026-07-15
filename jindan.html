@@ -199,6 +199,16 @@
         .uni-card-bottom { padding-top: 12px; border-top: 1px solid var(--slate-50); }
         .dept-name { font-size: 16px; font-weight: 900; color: var(--slate-800); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .adm-name { display: inline-block; max-width: 100%; font-size: 13px; font-weight: 800; color: var(--indigo-dark); background: var(--indigo-50); border: 1px solid var(--indigo-100); border-radius: 8px; padding: 3px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 8px; }
+        /* 3개년 컷 스트립 */
+        .year-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+        .ys-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; background: var(--slate-50); border: 1px solid var(--slate-100); border-radius: 9px; padding: 5px 2px; }
+        .ys-y { font-size: 9.5px; font-weight: 900; color: var(--slate-400); font-family: 'IBM Plex Mono', monospace; letter-spacing: .02em; }
+        .ys-v { font-size: 14px; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: -.02em; display: inline-flex; align-items: center; gap: 2px; }
+        .ys-v.none { color: var(--slate-300); }
+        .ys-v .ys-a { font-size: 8px; }
+        .ys-v.gap-up { color: #e11d48; }
+        .ys-v.gap-down { color: #2563eb; }
+        .ys-v.gap-even { color: var(--slate-500); }
         /* 카드 호버 시 오른쪽 하단에 나타나는 상세 보기 힌트 — absolute라 카드 여백을 차지하지 않음 */
         .view-more { position: absolute; right: 20px; bottom: 14px; display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 900; color: #8b5cf6; text-transform: uppercase; letter-spacing: .18em; background: linear-gradient(90deg, transparent, #fff 28%); padding-left: 28px; opacity: 0; transform: translateY(4px); transition: opacity .25s, transform .25s; pointer-events: none; }
         .view-more .arrow { transition: transform .25s; }
@@ -224,6 +234,19 @@
         .d-tile.hl { background: var(--indigo-50); border-color: var(--indigo-100); }
         .d-tile.hl .v { color: var(--indigo); }
         .d-tile.wide { grid-column: 1 / -1; }
+        /* 상세 모달 3개년 비교표 */
+        .dm-year-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .dm-year-table th, .dm-year-table td { padding: 7px 8px; text-align: center; border-bottom: 1px solid var(--slate-100); font-variant-numeric: tabular-nums; }
+        .dm-year-table thead th { font-size: 12px; font-weight: 900; color: var(--slate-600); background: var(--slate-50); border-radius: 6px 6px 0 0; }
+        .dm-year-table thead th .yy { display: block; font-size: 8.5px; font-weight: 700; color: var(--slate-400); }
+        .dm-year-table .rl { text-align: left; font-size: 11.5px; font-weight: 800; color: var(--slate-500); white-space: nowrap; }
+        .dm-year-table tbody tr:last-child td, .dm-year-table tbody tr:last-child th { border-bottom: none; }
+        .dm-year-table tr.hl td { font-weight: 900; font-size: 15.5px; }
+        .dm-year-table td.gap-up { color: #e11d48; }
+        .dm-year-table td.gap-down { color: #2563eb; }
+        .dm-year-table td.gap-even { color: var(--slate-700); }
+        .dm-year-table td.none { color: var(--slate-300); }
+        .dm-year-table .ys-a { font-size: 9px; }
         .detail-note { font-size: 12px; color: var(--slate-400); font-weight: 700; line-height: 1.7; margin-top: 18px; }
         /* 수시 모집요강 보기 버튼 */
         .dm-guide-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 20px; padding: 15px; border: none; border-radius: 1rem; background: var(--indigo); color: #fff; font-size: 15px; font-weight: 900; cursor: pointer; box-shadow: 0 10px 24px rgba(79,70,229,.3); transition: transform .15s, background .15s; }
@@ -267,7 +290,7 @@
                 <div class="brand-badge">🎓</div>
                 <div>
                     <h1 class="serif">9등급 환산 적정 대학 찾기</h1>
-                    <p class="sub">2026 어디가 입결 자료</p>
+                    <p class="sub">최근 3개년 어디가 입결</p>
                 </div>
             </div>
             <div class="header-right">
@@ -353,7 +376,7 @@
                         <div class="list-icon">🏫</div>
                         <h2 class="serif">적정 대학 리스트</h2>
                     </div>
-                    <p class="source-tag">출처 : 2026 어디가 입결 자료 (환산등급 70% 컷 기준)</p>
+                    <p class="source-tag">출처 : 2024~2026학년도 어디가 입결 (3개년 평균 70%컷 기준)</p>
                     <div class="stat-pills">
                         <div class="stat-pill"><span class="k">Target</span><span class="v"><span id="target-label">3.16</span> 등급</span></div>
                         <div class="stat-pill"><span class="k">Range</span><span class="v" id="bounds-label">3.06 ~ 3.26</span></div>
@@ -428,7 +451,7 @@
             <p class="detail-adm" id="dm-adm"></p>
             <div class="detail-grid" id="dm-grid"></div>
             <button class="dm-guide-btn" id="dm-guide-btn" onclick="openGuide()">📑 이 대학 수시 모집요강 보기</button>
-            <p class="detail-note">출처 : 2026 어디가 입결 자료 · 환산점수/등급은 각 대학 환산 기준의 50%·70% 컷입니다. 리스트 탐색은 <b>환산등급 70% 컷</b> 기준입니다.</p>
+            <p class="detail-note">출처 : 2024~2026학년도 어디가 입결 · 환산점수/등급은 각 대학 환산 기준의 50%·70% 컷입니다. 리스트 탐색·정렬은 <b>3개년 환산등급 70%컷 평균</b> 기준입니다.</p>
         </div>
     </div>
 
@@ -496,6 +519,10 @@
             { grade5: 4.15, grade9: 6.87 }, { grade5: 4.30, grade9: 7.12 }, { grade5: 4.45, grade9: 7.44 },
             { grade5: 4.60, grade9: 7.73 }, { grade5: 5.00, grade9: 9.00 },
         ];
+
+        // 조회연도(오름차순). 학년도 = 조회연도 − 1 (예: 조회 2027 = 2026학년도 입시결과)
+        const SURVEY_YEARS = ['2025', '2026', '2027'];
+        const schoolYearShort = y => String((parseInt(y, 10) - 1) % 100).padStart(2, '0');  // '24','25','26'
 
         // ─── 상태 ───
         let allRecords = [];
@@ -592,30 +619,50 @@
         }
 
         // 컬럼: 조회연도,대학명,대학코드,전형명,구분,모집단위,모집인원_최초,모집인원_이월,모집인원_총,경쟁률,충원인원,환산점수_50,환산점수_70,환산등급_50,환산등급_70
+        // 같은 학과(대학코드|전형명|모집단위)를 3개 조회연도에 걸쳐 하나로 묶는다.
+        // averageGrade = 사용 가능한 연도들의 환산등급_70 평균 (필터·정렬·차이표시 기준)
         function parseCSV(csv) {
             const lines = csv.trim().split('\n');
-            const records = [];
+            const groups = new Map();
             for (let i = 1; i < lines.length; i++) {
                 const cols = parseCSVLine(lines[i]).map(c => c.trim());
                 if (cols.length < 15) continue;
                 if (cols[4] !== '수시') continue;              // 정시 제외 — 수시 입결만 탐색
-                const averageGrade = parseFloat(cols[14]);     // 환산등급_70 기준 필터링
-                if (isNaN(averageGrade)) continue;             // 미제출·입결 미존재 행 제외
                 const rawName = cols[1];
                 const m = rawName.match(/^(.*?)\[(.+)\]$/);    // "가야대학교[본교]" → 대학명/캠퍼스 분리
                 const university = m ? m[1].trim() : rawName;
                 const campus = m ? m[2] : '본교';
                 const department = cols[5];
                 if (!university || !department) continue;
-                records.push({
-                    university, campus, department, averageGrade,
-                    admissionName: cols[3], category: categorizeDepartment(department),
-                    kind: cols[3].includes('교과') ? '교과' : (cols[3].includes('종합') ? '종합' : '기타'),
-                    year: cols[0], uniCode: cols[2], type: cols[4],
-                    quotaInitial: cols[6], quotaCarry: cols[7], quotaTotal: cols[8],
+                const year = cols[0];
+                const grade70 = parseFloat(cols[14]);
+                const key = `${cols[2]}|${cols[3]}|${department}`;   // 대학코드|전형명|모집단위
+                let rec = groups.get(key);
+                if (!rec) {
+                    rec = {
+                        university, campus, department,
+                        admissionName: cols[3], category: categorizeDepartment(department),
+                        kind: cols[3].includes('교과') ? '교과' : (cols[3].includes('종합') ? '종합' : '기타'),
+                        uniCode: cols[2], type: cols[4], years: {},
+                    };
+                    groups.set(key, rec);
+                }
+                const yv = {
+                    grade70: isNaN(grade70) ? null : grade70,
+                    grade50: cols[13], score70: cols[12], score50: cols[11],
                     competition: cols[9], waitlist: cols[10],
-                    score50: cols[11], score70: cols[12], grade50: cols[13], grade70: cols[14],
-                });
+                    quotaTotal: cols[8], quotaInitial: cols[6], quotaCarry: cols[7],
+                };
+                // 같은 연도 중복행이면 유효 등급이 있는 쪽을 우선
+                if (!rec.years[year] || (rec.years[year].grade70 == null && yv.grade70 != null)) rec.years[year] = yv;
+            }
+            const records = [];
+            for (const rec of groups.values()) {
+                const vals = SURVEY_YEARS.map(y => rec.years[y] && rec.years[y].grade70).filter(v => v != null && !isNaN(v));
+                if (!vals.length) continue;    // 3년 모두 미제출·입결없음 → 제외
+                rec.averageGrade = vals.reduce((a, b) => a + b, 0) / vals.length;
+                rec.yearCount = vals.length;
+                records.push(rec);
             }
             return records;
         }
@@ -654,6 +701,17 @@
             if (mag < 0.005) return { arrow: '−', cls: 'gap-even', text: '0.00' };
             if (d < 0)       return { arrow: '▲', cls: 'gap-up',   text: mag.toFixed(2) };
             return             { arrow: '▼', cls: 'gap-down', text: mag.toFixed(2) };
+        }
+
+        // 카드 하단 3개년 컷 스트립 — 학년도별 70%컷 + 내 등급 대비 화살표(빨강▲/파랑▼), 미제출은 –
+        function yearStripHtml(rec, myGrade) {
+            return SURVEY_YEARS.map(y => {
+                const v = rec.years[y] && rec.years[y].grade70;
+                const lbl = `'${schoolYearShort(y)}`;
+                if (v == null || isNaN(v)) return `<div class="ys-cell"><span class="ys-y">${lbl}</span><span class="ys-v none">–</span></div>`;
+                const g = gradeGap(v, myGrade);
+                return `<div class="ys-cell"><span class="ys-y">${lbl}</span><span class="ys-v ${g.cls}">${v.toFixed(2)}<i class="ys-a">${g.arrow}</i></span></div>`;
+            }).join('');
         }
 
         // ─── 이벤트 핸들러 ───
@@ -825,11 +883,12 @@
                             <h3 class="serif">${r.university}</h3>
                             <p class="campus-txt">${r.campus}</p>
                         </div>
-                        <div class="avg-box"><p class="k">70% Grade</p><p class="v">${r.averageGrade.toFixed(2)}</p><div class="gap-box ${gap.cls}"><span class="arr">${gap.arrow}</span>${gap.text}</div></div>
+                        <div class="avg-box"><p class="k">${r.yearCount}년 평균 70%컷</p><p class="v">${r.averageGrade.toFixed(2)}</p><div class="gap-box ${gap.cls}"><span class="arr">${gap.arrow}</span>${gap.text}</div></div>
                     </div>
                     <div class="uni-card-bottom">
                         <p class="dept-name">${r.department}</p>
                         <p class="adm-name">${r.admissionName}</p>
+                        <div class="year-strip">${yearStripHtml(r, target)}</div>
                         <p class="view-more">View More <span class="arrow">→</span></p>
                     </div>
                 </div>`;
@@ -857,16 +916,32 @@
             document.getElementById('dm-campus').textContent = r.campus;
             document.getElementById('dm-dept').textContent = r.department;
             document.getElementById('dm-adm').textContent = r.admissionName;
-            const quotaSub = `최초 ${fmt(r.quotaInitial)} · 이월 ${fmt(r.quotaCarry)}`;
+            const myG = getTargetGrade();
+            // 환산등급 70%컷 행: 값 + 내 등급 대비 화살표(색)
+            const cell70 = y => {
+                const v = y && y.grade70;
+                if (v == null || isNaN(v)) return '<td class="none">–</td>';
+                const g = gradeGap(v, myG);
+                return `<td class="${g.cls}">${v.toFixed(2)} <i class="ys-a">${g.arrow}</i></td>`;
+            };
+            const cell = fn => y => `<td>${fmt(fn(y))}</td>`;
+            const rows = [
+                ['환산등급 70%컷', null, true],
+                ['환산등급 50%컷', y => y && y.grade50],
+                ['환산점수 70%컷', y => y && y.score70],
+                ['환산점수 50%컷', y => y && y.score50],
+                ['경쟁률', y => (y && y.competition) ? y.competition + ' : 1' : null],
+                ['충원 (추합)', y => y && y.waitlist],
+                ['모집인원 (총)', y => y && y.quotaTotal],
+            ];
+            const head = `<tr><th></th>${SURVEY_YEARS.map(y => `<th>'${schoolYearShort(y)}<span class="yy">학년도</span></th>`).join('')}</tr>`;
+            const body = rows.map(([label, fn, hl]) =>
+                `<tr${hl ? ' class="hl"' : ''}><th class="rl">${label}</th>${SURVEY_YEARS.map(y => (hl ? cell70 : cell(fn))(r.years[y])).join('')}</tr>`
+            ).join('');
             document.getElementById('dm-grid').innerHTML = `
-                <div class="d-tile hl"><p class="k">환산등급 70% 컷</p><p class="v">${fmt(r.grade70)}</p><p class="gap-box ${gap.cls}" style="justify-content:flex-start;margin-top:3px;font-size:11.5px;">내 등급 대비 <span class="arr">${gap.arrow}</span>${gap.text}</p></div>
-                <div class="d-tile"><p class="k">환산등급 50% 컷</p><p class="v">${fmt(r.grade50)}</p></div>
-                <div class="d-tile"><p class="k">환산점수 70% 컷</p><p class="v">${fmt(r.score70)}</p></div>
-                <div class="d-tile"><p class="k">환산점수 50% 컷</p><p class="v">${fmt(r.score50)}</p></div>
-                <div class="d-tile"><p class="k">경쟁률</p><p class="v">${r.competition ? r.competition + ' : 1' : '—'}</p></div>
-                <div class="d-tile"><p class="k">충원인원 (추합)</p><p class="v">${fmt(r.waitlist)}${r.waitlist ? '명' : ''}</p></div>
-                <div class="d-tile wide"><p class="k">모집인원 (총)</p><p class="v">${fmt(r.quotaTotal)}${r.quotaTotal ? '명' : ''}</p><p class="s">${quotaSub}</p></div>
-                <div class="d-tile"><p class="k">조회연도</p><p class="v">${fmt(r.year)}</p></div>
+                <div class="d-tile hl" style="grid-column:1/-1;"><p class="k">${r.yearCount}개년 평균 환산등급 70%컷</p><p class="v">${r.averageGrade.toFixed(2)}</p><p class="gap-box ${gap.cls}" style="justify-content:flex-start;margin-top:3px;font-size:11.5px;">내 등급 대비 <span class="arr">${gap.arrow}</span>${gap.text}</p></div>
+                <div style="grid-column:1/-1;overflow-x:auto;"><table class="dm-year-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>
+                <div class="d-tile"><p class="k">계열 / 전형유형</p><p class="v" style="font-size:14px;">${r.category} · ${r.kind}</p></div>
                 <div class="d-tile"><p class="k">대학코드</p><p class="v">${fmt(r.uniCode)}</p></div>`;
             document.getElementById('detail-overlay').classList.add('open');
             document.body.style.overflow = 'hidden';
@@ -933,7 +1008,7 @@
                 const response = await fetch(DATA_URL);
                 if (!response.ok) throw new Error("Data fetch error");
                 allRecords = parseCSV(await response.text());
-                document.getElementById('db-count').textContent = `${allRecords.length.toLocaleString()} 건 로드됨`;
+                document.getElementById('db-count').textContent = `${allRecords.length.toLocaleString()}개 학과·전형`;
                 const unis = Array.from(new Set(allRecords.map(r => r.university))).sort();
                 document.getElementById('uni-datalist').innerHTML = unis.map(u => `<option value="${u}">`).join('');
                 render();
