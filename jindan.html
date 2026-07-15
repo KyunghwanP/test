@@ -242,7 +242,6 @@
         .d-tile.hl { background: var(--indigo-50); border-color: var(--indigo-100); }
         .d-tile.hl .v { color: var(--indigo); }
         .d-tile.wide { grid-column: 1 / -1; }
-        .dm-chart { background: var(--slate-50); border: 1px solid var(--slate-100); border-radius: 1rem; padding: 10px 8px 6px; }
         /* 상세 모달 3개년 비교표 */
         .dm-year-table { width: 100%; border-collapse: collapse; font-size: 13px; }
         .dm-year-table th, .dm-year-table td { padding: 7px 8px; text-align: center; border-bottom: 1px solid var(--slate-100); font-variant-numeric: tabular-nums; }
@@ -667,6 +666,7 @@
             }
             const records = [];
             for (const rec of groups.values()) {
+                if (!rec.years['2027']) continue;   // 최신(2027) 데이터 없으면 폐지 추정 → 제외
                 const vals = SURVEY_YEARS.map(y => rec.years[y] && rec.years[y].grade70).filter(v => v != null && !isNaN(v));
                 if (!vals.length) continue;    // 3년 모두 미제출·입결없음 → 제외
                 rec.averageGrade = vals.reduce((a, b) => a + b, 0) / vals.length;
@@ -721,54 +721,6 @@
                 const g = gradeGap(v, myGrade);
                 return `<div class="ys-cell"><span class="ys-y">${lbl}</span><span class="ys-cut">${v.toFixed(2)}</span><span class="ys-gap ${g.cls}"><i class="ys-a">${g.arrow}</i>${g.text}</span></div>`;
             }).join('');
-        }
-
-        // 상세 모달용 이중축 그래프 — 왼쪽축 70%컷(등급, 로즈 선), 오른쪽축 경쟁률(인디고 막대)
-        function dmChartSvg(rec) {
-            const W = 340, H = 200, padL = 30, padR = 34, padT = 24, padB = 30;
-            const iw = W - padL - padR, ih = H - padT - padB, base = padT + ih;
-            const n = SURVEY_YEARS.length;
-            const xAt = i => padL + (n === 1 ? iw / 2 : iw * i / (n - 1));
-            const grades = SURVEY_YEARS.map(y => { const v = rec.years[y] && rec.years[y].grade70; return (v == null || isNaN(v)) ? null : v; });
-            const comps  = SURVEY_YEARS.map(y => { const v = parseFloat(rec.years[y] && rec.years[y].competition); return isNaN(v) ? null : v; });
-            const gV = grades.filter(v => v != null), cV = comps.filter(v => v != null);
-            if (!gV.length && !cV.length) return '<p style="font-size:12px;color:var(--slate-400);text-align:center;padding:24px;">그래프로 표시할 데이터가 없습니다.</p>';
-            // 등급 도메인: 값이 클수록 아래(=낮은 등급이 위) — 경쟁률과 함께 '위=치열'로 읽히게
-            let gMin = Math.min(...gV), gMax = Math.max(...gV);
-            if (gMin === gMax) { gMin -= 0.5; gMax += 0.5; } else { const p = (gMax - gMin) * 0.4 + 0.1; gMin -= p; gMax += p; }
-            const yG = v => padT + ih * (v - gMin) / (gMax - gMin);
-            const cMax = cV.length ? Math.max(...cV) * 1.25 : 1;
-            const yC = v => base - ih * (v / cMax);
-            const barW = Math.min(26, iw / n * 0.42);
-            const ROSE = '#e11d48', INDIGO = '#6366f1', INDIGO_L = '#c7d2fe';
-
-            let bars = '', clabels = '';
-            comps.forEach((v, i) => {
-                if (v == null) return;
-                const x = xAt(i), y = yC(v);
-                bars += `<rect x="${(x - barW / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${(base - y).toFixed(1)}" rx="3" fill="${INDIGO_L}"/>`;
-                clabels += `<text x="${x.toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="800" fill="${INDIGO}">${v.toFixed(1)}</text>`;
-            });
-            // 등급 선 (있는 점만 연결)
-            const pts = grades.map((v, i) => v == null ? null : [xAt(i), yG(v)]).filter(Boolean);
-            let line = '';
-            if (pts.length >= 2) line = `<polyline points="${pts.map(p => p.map(n2 => n2.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="${ROSE}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
-            let dots = '';
-            grades.forEach((v, i) => {
-                if (v == null) return;
-                const x = xAt(i), y = yG(v);
-                dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="#fff" stroke="${ROSE}" stroke-width="2.5"/>`;
-                dots += `<text x="${x.toFixed(1)}" y="${(y - 8).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="900" fill="${ROSE}">${v.toFixed(2)}</text>`;
-            });
-            const xlabels = SURVEY_YEARS.map((y, i) => `<text x="${xAt(i).toFixed(1)}" y="${(base + 16).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="800" fill="#64748b" font-family="'IBM Plex Mono',monospace">'${schoolYearShort(y)}</text>`).join('');
-            return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">
-                <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${base}" stroke="${ROSE}" stroke-width="1.5" opacity=".5"/>
-                <line x1="${W - padR}" y1="${padT}" x2="${W - padR}" y2="${base}" stroke="${INDIGO}" stroke-width="1.5" opacity=".5"/>
-                <line x1="${padL}" y1="${base}" x2="${W - padR}" y2="${base}" stroke="#cbd5e1" stroke-width="1.5"/>
-                <text x="${padL}" y="${padT - 9}" text-anchor="middle" font-size="10" font-weight="900" fill="${ROSE}">등급</text>
-                <text x="${W - padR}" y="${padT - 9}" text-anchor="middle" font-size="10" font-weight="900" fill="${INDIGO}">경쟁률</text>
-                ${bars}${line}${dots}${clabels}${xlabels}
-            </svg>`;
         }
 
         // ─── 이벤트 핸들러 ───
@@ -997,7 +949,6 @@
             ).join('');
             document.getElementById('dm-grid').innerHTML = `
                 <div class="d-tile hl" style="grid-column:1/-1;"><p class="k">${r.yearCount}개년 평균 환산등급 70%컷</p><p class="v">${r.averageGrade.toFixed(2)}</p><p class="gap-box ${gap.cls}" style="justify-content:flex-start;margin-top:3px;font-size:11.5px;">내 등급 대비 <span class="arr">${gap.arrow}</span>${gap.text}</p></div>
-                <div class="dm-chart" style="grid-column:1/-1;">${dmChartSvg(r)}</div>
                 <div style="grid-column:1/-1;overflow-x:auto;"><table class="dm-year-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>
                 <div class="d-tile"><p class="k">계열 / 전형유형</p><p class="v" style="font-size:14px;">${r.category} · ${r.kind}</p></div>
                 <div class="d-tile"><p class="k">대학코드</p><p class="v">${fmt(r.uniCode)}</p></div>`;
