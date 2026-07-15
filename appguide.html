@@ -420,13 +420,21 @@
         }
         container.addEventListener('scroll', () => { if (scrollThrottle) return; scrollThrottle = setTimeout(() => { scrollThrottle = null; renderVisible(); updatePageIndicator(); }, 120); });
 
-        // 폰 임베드: PDF를 내리면 툴바(제목·검색 포함)를 접어 화면 전체를 PDF에 — 위로 올리면 다시 표시
+        // 폰 임베드: PDF를 내리면 툴바(제목·검색 포함)와 본체 상단바·탭바·페이지 제목까지
+        // 모두 접어 화면 전체를 PDF에 — 위로 올리면 다시 표시.
+        // 본체 숨김은 시뮬레이터 전체화면과 같은 sim-full 클래스를 재사용(같은 도메인 iframe).
+        function setParentChrome(hide) {
+            try {
+                if (window.self === window.top) return;
+                window.parent.document.body.classList.toggle('sim-full', hide);
+            } catch (e) {}
+        }
         let tbLastY = 0;
         container.addEventListener('scroll', () => {
             if (!(document.documentElement.classList.contains('embed') && window.matchMedia('(max-width: 1023px)').matches)) return;
             const y = container.scrollTop;
-            if (y > tbLastY + 6 && y > 60) viewer.classList.add('tb-hide');
-            else if (y < tbLastY - 6) viewer.classList.remove('tb-hide');
+            if (y > tbLastY + 6 && y > 60) { viewer.classList.add('tb-hide'); setParentChrome(true); }
+            else if (y < tbLastY - 6) { viewer.classList.remove('tb-hide'); setParentChrome(false); }
             tbLastY = y;
         }, { passive: true });
         window.addEventListener('resize', () => { clearTimeout(scrollThrottle); scrollThrottle = setTimeout(() => { scrollThrottle = null; renderVisible(); }, 200); });
@@ -508,7 +516,7 @@
             pageNav.hidden = true; pageInput.disabled = true; pageInput.value = '1'; pageTotalEl.textContent = '–';
             container.innerHTML = '';
             viewer.hidden = false;
-            viewer.classList.remove('tb-hide'); tbLastY = 0;   // 새 문서: 접힌 툴바 복원
+            viewer.classList.remove('tb-hide'); tbLastY = 0; setParentChrome(false);   // 새 문서: 접힌 툴바·본체 상단 복원
             currentUniv = u;
             document.getElementById('vtYear').textContent = u.year;
             document.getElementById('vtName').textContent = u.base + (u.campus ? ` (${u.campus})` : '');
