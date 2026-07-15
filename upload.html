@@ -355,8 +355,9 @@ if ('serviceWorker' in navigator) {
         <code>C: 지도교사</code> &nbsp;
         <code>D: 전공</code> &nbsp;
         <code>E: 동아리교실</code> &nbsp;
-        <code>F: 인원</code> &nbsp;
-        <code>G: 학년</code>
+        <code>F: 인원(저장 안 함)</code> &nbsp;
+        <code>G: 학년</code><br>
+        <span style="color:var(--ink-soft);">※ 인원(F열)은 변동이 잦아 저장하지 않고, 앱에서 <b>학생 수로 자동 계산</b>합니다. (F열은 비워도 됨)</span>
       </div>
       <div class="dropzone" id="clDropzone">
         <div class="dropzone-icon">📂</div>
@@ -367,7 +368,7 @@ if ('serviceWorker' in navigator) {
         <div class="stat-chips" id="clStats"></div>
         <div class="preview-wrap">
           <table class="preview-table">
-            <thead><tr><th>동아리명</th><th>지도교사</th><th>전공</th><th>교실</th><th>인원</th><th>학년</th></tr></thead>
+            <thead><tr><th>동아리명</th><th>지도교사</th><th>전공</th><th>교실</th><th>학년</th></tr></thead>
             <tbody id="clPreviewBody"></tbody>
           </table>
         </div>
@@ -798,12 +799,11 @@ async function processClubFile(file) {
     clParsedData = rows.slice(1)
       .filter(r => r[1] && String(r[1]).trim())   // 동아리명(B) 있는 행만
       .map(r => ({
-        name:     String(r[1]||'').trim(),
-        teacher:  String(r[2]||'').trim(),
-        major:    String(r[3]||'').trim(),
-        room:     String(r[4]||'').trim(),
-        capacity: String(r[5]||'').trim(),
-        grade:    String(r[6]||'').trim(),
+        name:    String(r[1]||'').trim(),
+        teacher: String(r[2]||'').trim(),
+        major:   String(r[3]||'').trim(),
+        room:    String(r[4]||'').trim(),
+        grade:   String(r[6]||'').trim(),   // 인원(F열)은 변동돼서 저장 안 함 — 앱에서 학생 수로 자동 계산
       }));
 
     if (!clParsedData.length) {
@@ -830,7 +830,6 @@ function renderClubPreview(clubs) {
       <td>${c.teacher}</td>
       <td>${c.major}</td>
       <td>${c.room}</td>
-      <td>${c.capacity}</td>
       <td>${c.grade}</td>
     </tr>
   `).join('');
@@ -908,7 +907,7 @@ document.getElementById('clDownloadBtn').addEventListener('click', () => {
   const clubs = window._dbClubs;
   if (!clubs?.length) { alert('데이터가 없습니다.'); return; }
   const ws = XLSX.utils.json_to_sheet(clubs.map((c, i) => ({
-    연번: i+1, 동아리명: c.name, 지도교사: c.teacher, 전공: c.major, 동아리교실: c.room, 인원: c.capacity, 학년: c.grade
+    연번: i+1, 동아리명: c.name, 지도교사: c.teacher, 전공: c.major, 동아리교실: c.room, 학년: c.grade
   })));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '동아리');
