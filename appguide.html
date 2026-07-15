@@ -139,9 +139,13 @@
             html.embed .site-header { display: none; }
             html.embed main { padding-top: 10px; }
             html.embed .viewer { height: calc(100vh - 12px); height: calc(100dvh - 12px); scroll-margin-top: 6px; }
-            /* 툴바 세로 압축 — PDF 영역 최대화 */
+            /* 툴바 세로 압축 — PDF 영역 최대화. 임베드에선 대학명 타이틀도 숨김(선택창에 이미 표시) */
             .viewer-toolbar { padding: 8px 10px; gap: 8px; }
             #pdfContainer { padding: 8px 0 16px; }
+            html.embed .vt-title { display: none; }
+            /* PDF 스크롤 내리면 툴바 접힘 (JS가 tb-hide 토글) */
+            .viewer-toolbar { transition: max-height .25s ease, padding .25s ease; max-height: 220px; overflow: hidden; }
+            .viewer.tb-hide .viewer-toolbar { max-height: 0; padding-top: 0; padding-bottom: 0; border-bottom-width: 0; }
         }
 
         /* ── 넓은 화면: 왼쪽(선택창+전체 목록) / 오른쪽(PDF 뷰어, 상단 정렬) ── */
@@ -415,6 +419,16 @@
             }
         }
         container.addEventListener('scroll', () => { if (scrollThrottle) return; scrollThrottle = setTimeout(() => { scrollThrottle = null; renderVisible(); updatePageIndicator(); }, 120); });
+
+        // 폰 임베드: PDF를 내리면 툴바(제목·검색 포함)를 접어 화면 전체를 PDF에 — 위로 올리면 다시 표시
+        let tbLastY = 0;
+        container.addEventListener('scroll', () => {
+            if (!(document.documentElement.classList.contains('embed') && window.matchMedia('(max-width: 1023px)').matches)) return;
+            const y = container.scrollTop;
+            if (y > tbLastY + 6 && y > 60) viewer.classList.add('tb-hide');
+            else if (y < tbLastY - 6) viewer.classList.remove('tb-hide');
+            tbLastY = y;
+        }, { passive: true });
         window.addEventListener('resize', () => { clearTimeout(scrollThrottle); scrollThrottle = setTimeout(() => { scrollThrottle = null; renderVisible(); }, 200); });
 
         // ── 페이지 이동 (##/##) ──
@@ -494,6 +508,7 @@
             pageNav.hidden = true; pageInput.disabled = true; pageInput.value = '1'; pageTotalEl.textContent = '–';
             container.innerHTML = '';
             viewer.hidden = false;
+            viewer.classList.remove('tb-hide'); tbLastY = 0;   // 새 문서: 접힌 툴바 복원
             currentUniv = u;
             document.getElementById('vtYear').textContent = u.year;
             document.getElementById('vtName').textContent = u.base + (u.campus ? ` (${u.campus})` : '');
