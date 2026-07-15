@@ -2524,7 +2524,7 @@
     -webkit-overflow-scrolling:touch;
   }
   .home-inner{
-    max-width:1100px;margin:0 auto;
+    max-width:1560px;margin:0 auto;
     padding:10px 12px 80px;
     display:flex;flex-direction:column;gap:10px;
   }
@@ -2667,7 +2667,9 @@
   .home-cal-col{display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0;}
   .home-cal-card{display:none;}
   @media(min-width:850px){
-    .home-cal-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:stretch;}
+    /* 왼쪽 달력은 적정 폭(최대 480px)까지만, 오른쪽 업무·학사일정이 남는 폭을 채움
+       (넓은 화면에서 달력이 과하게 커지지 않게 — 좁은 화면에선 사실상 반반) */
+    .home-cal-row{display:grid;grid-template-columns:minmax(0,480px) minmax(0,1fr);gap:10px;align-items:stretch;}
     .home-cal-card{display:flex;flex-direction:column;}
     .home-mini-cal{flex:1;display:flex;flex-direction:column;}
     .home-mini-cal-grid{flex:1;grid-template-rows:auto;grid-auto-rows:1fr;}
@@ -3201,7 +3203,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.89</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver5.90</div>
   </div>
 </div>
 
@@ -3331,7 +3333,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver5.89</div>
+    <div class="nav-version" title="Made by 박경환">ver5.90</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
