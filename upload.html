@@ -206,6 +206,7 @@ if ('serviceWorker' in navigator) {
   <button class="tab-nav-btn active" data-tab="timetable">📅 시간표 업로드</button>
   <button class="tab-nav-btn" data-tab="contacts">📞 비상연락망 업로드</button>
   <button class="tab-nav-btn" data-tab="students">🎒 학생연락망 업로드</button>
+  <button class="tab-nav-btn" data-tab="clubs">🎪 동아리 업로드</button>
 </div>
 
 <div class="container">
@@ -341,6 +342,54 @@ if ('serviceWorker' in navigator) {
     </div>
 
   </div>
+
+  <!-- ══ 동아리 탭 ══ -->
+  <div class="tab-panel" id="tab-clubs">
+    <div class="section">
+      <div class="section-title">🎪 동아리 업로드</div>
+      <div class="section-desc">엑셀(.xlsx) 또는 CSV를 올리면 Firestore의 <code>clubs/main</code>에 저장됩니다. 기존 데이터는 덮어씁니다.<br>학생연락망·종합검색의 <b>동아리별</b> 그룹칩에 지도교사·전공·교실·학년이 표시됩니다.</div>
+      <div class="format-box">
+        <b>엑셀 형식 안내</b> — 1행은 헤더, 2행부터 데이터<br>
+        <code>A: 연번</code> &nbsp;
+        <code>B: 동아리명</code> &nbsp;
+        <code>C: 지도교사</code> &nbsp;
+        <code>D: 전공</code> &nbsp;
+        <code>E: 동아리교실</code> &nbsp;
+        <code>F: 인원</code> &nbsp;
+        <code>G: 학년</code>
+      </div>
+      <div class="dropzone" id="clDropzone">
+        <div class="dropzone-icon">📂</div>
+        <div class="dropzone-text"><b>파일을 드래그하거나 클릭</b><br>xlsx, csv 지원</div>
+        <input type="file" id="clFileInput" accept=".xlsx,.csv" style="display:none;">
+      </div>
+      <div id="clPreviewWrap" style="display:none;">
+        <div class="stat-chips" id="clStats"></div>
+        <div class="preview-wrap">
+          <table class="preview-table">
+            <thead><tr><th>동아리명</th><th>지도교사</th><th>전공</th><th>교실</th><th>인원</th><th>학년</th></tr></thead>
+            <tbody id="clPreviewBody"></tbody>
+          </table>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="clUploadBtn">☁️ Firestore에 저장</button>
+          <button class="btn btn-secondary" id="clClearBtn">취소</button>
+        </div>
+      </div>
+      <div class="status" id="clStatus"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">📋 현재 저장된 동아리</div>
+      <div class="section-desc">Firestore에 저장된 동아리 목록입니다.</div>
+      <div class="stat-chips" id="clDbStats"></div>
+      <div class="db-list" id="clDbList"><div style="color:var(--ink-soft);font-size:13px;">불러오는 중...</div></div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="clRefreshDbBtn">🔄 새로고침</button>
+        <button class="btn btn-secondary" id="clDownloadBtn">⬇️ 엑셀 다운로드</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -385,6 +434,7 @@ document.querySelectorAll('.tab-nav-btn').forEach(btn => {
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'contacts') loadDbContacts();
     if (btn.dataset.tab === 'students') loadDbStudents();
+    if (btn.dataset.tab === 'clubs') loadDbClubs();
   });
 });
 
@@ -715,6 +765,154 @@ document.getElementById('downloadCsvBtn').addEventListener('click', () => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '비상연락망');
   XLSX.writeFile(wb, `영남고_비상연락망_${new Date().toLocaleDateString('ko-KR').replace(/\.\s/g,'-')}.xlsx`);
+});
+
+// ════════════════════════════════════
+// ── 동아리 업로드 ──
+// ════════════════════════════════════
+// 컬럼: A:연번 B:동아리명 C:지도교사 D:전공 E:교실 F:인원 G:학년
+const clDropzone  = document.getElementById('clDropzone');
+const clFileInput = document.getElementById('clFileInput');
+let clParsedData  = [];
+
+clDropzone.addEventListener('click', () => clFileInput.click());
+clDropzone.addEventListener('dragover', e => { e.preventDefault(); clDropzone.classList.add('drag-over'); });
+clDropzone.addEventListener('dragleave', () => clDropzone.classList.remove('drag-over'));
+clDropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  clDropzone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) processClubFile(e.dataTransfer.files[0]);
+});
+clFileInput.addEventListener('change', () => {
+  if (clFileInput.files[0]) processClubFile(clFileInput.files[0]);
+});
+
+async function processClubFile(file) {
+  setStatus('clStatus', '📂 파일 읽는 중...', 'loading');
+  try {
+    const data = await file.arrayBuffer();
+    const wb   = XLSX.read(data, {type:'array'});
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+    clParsedData = rows.slice(1)
+      .filter(r => r[1] && String(r[1]).trim())   // 동아리명(B) 있는 행만
+      .map(r => ({
+        name:     String(r[1]||'').trim(),
+        teacher:  String(r[2]||'').trim(),
+        major:    String(r[3]||'').trim(),
+        room:     String(r[4]||'').trim(),
+        capacity: String(r[5]||'').trim(),
+        grade:    String(r[6]||'').trim(),
+      }));
+
+    if (!clParsedData.length) {
+      setStatus('clStatus', '데이터가 없습니다. 파일 형식을 확인해주세요. (B열=동아리명)', 'err');
+      return;
+    }
+    renderClubPreview(clParsedData);
+    clearStatus('clStatus');
+  } catch(e) {
+    setStatus('clStatus', '파일 읽기 실패: ' + e.message, 'err');
+  }
+}
+
+function renderClubPreview(clubs) {
+  const g3 = clubs.filter(c => c.grade.replace(/\s/g,'') === '3학년').length;
+  document.getElementById('clStats').innerHTML = `
+    <div class="stat-chip">총 <b>${clubs.length}</b>개</div>
+    <div class="stat-chip">3학년 <b>${g3}</b>개</div>
+  `;
+  const tbody = document.getElementById('clPreviewBody');
+  tbody.innerHTML = clubs.map(c => `
+    <tr>
+      <td class="name">${c.name}</td>
+      <td>${c.teacher}</td>
+      <td>${c.major}</td>
+      <td>${c.room}</td>
+      <td>${c.capacity}</td>
+      <td>${c.grade}</td>
+    </tr>
+  `).join('');
+  document.getElementById('clPreviewWrap').style.display = '';
+}
+
+document.getElementById('clUploadBtn').addEventListener('click', async () => {
+  if (!clParsedData.length) return;
+  const btn = document.getElementById('clUploadBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>저장 중...';
+  setStatus('clStatus', '☁️ Firestore에 저장하는 중...', 'loading');
+  try {
+    await setDoc(doc(db, 'clubs', 'main'), {
+      clubs: clParsedData,
+      updatedAt: new Date().toISOString(),
+      updatedBy: auth.currentUser?.email || '',
+      count: clParsedData.length,
+    });
+    setStatus('clStatus', `✅ ${clParsedData.length}개 동아리 저장 완료!`, 'ok');
+    loadDbClubs();
+  } catch(e) {
+    setStatus('clStatus', '저장 실패: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '☁️ Firestore에 저장';
+  }
+});
+
+document.getElementById('clClearBtn').addEventListener('click', () => {
+  clParsedData = [];
+  document.getElementById('clPreviewWrap').style.display = 'none';
+  clFileInput.value = '';
+  clearStatus('clStatus');
+});
+
+async function loadDbClubs() {
+  const list  = document.getElementById('clDbList');
+  const stats = document.getElementById('clDbStats');
+  list.innerHTML = '<div style="color:var(--ink-soft);font-size:13px;">불러오는 중...</div>';
+  try {
+    const snap = await getDoc(doc(db, 'clubs', 'main'));
+    if (!snap.exists()) {
+      list.innerHTML = '<div style="color:var(--ink-soft);font-size:13px;">저장된 데이터가 없습니다.</div>';
+      stats.innerHTML = '';
+      return;
+    }
+    const data  = snap.data();
+    const clubs = data.clubs || [];
+    const g3    = clubs.filter(c => String(c.grade||'').replace(/\s/g,'') === '3학년').length;
+    const upd   = data.updatedAt ? new Date(data.updatedAt).toLocaleString('ko-KR') : '-';
+    stats.innerHTML = `
+      <div class="stat-chip">총 <b>${clubs.length}</b>개</div>
+      <div class="stat-chip">3학년 <b>${g3}</b>개</div>
+      <div class="stat-chip">마지막 업데이트 <b>${upd}</b></div>
+    `;
+    list.innerHTML = clubs.map(c => `
+      <div class="db-item">
+        <span class="name">${c.name}</span>
+        <span class="dept">${c.teacher||'-'}</span>
+        <span class="phone">${c.major||'-'}</span>
+        <span class="phone">${c.room||'-'}</span>
+        <span class="ext">${c.grade||''}</span>
+      </div>
+    `).join('') || '<div style="color:var(--ink-soft);font-size:13px;">데이터 없음</div>';
+    window._dbClubs = clubs;
+  } catch(e) {
+    list.innerHTML = `<div style="color:#B71C1C;font-size:13px;">불러오기 실패: ${e.message}</div>`;
+  }
+}
+
+document.getElementById('clRefreshDbBtn').addEventListener('click', loadDbClubs);
+
+document.getElementById('clDownloadBtn').addEventListener('click', () => {
+  const clubs = window._dbClubs;
+  if (!clubs?.length) { alert('데이터가 없습니다.'); return; }
+  const ws = XLSX.utils.json_to_sheet(clubs.map((c, i) => ({
+    연번: i+1, 동아리명: c.name, 지도교사: c.teacher, 전공: c.major, 동아리교실: c.room, 인원: c.capacity, 학년: c.grade
+  })));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '동아리');
+  XLSX.writeFile(wb, `영남고_동아리_${new Date().toLocaleDateString('ko-KR').replace(/\.\s/g,'-')}.xlsx`);
 });
 
 // ════════════════════════════════════

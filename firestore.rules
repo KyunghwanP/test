@@ -25,6 +25,13 @@ service cloud.firestore {
                         && !request.auth.token.email.matches('^[0-9]{7}@yeungnam[.]hs[.]kr$')
                         && request.auth.token.email_verified == true;
     }
+    // 동아리 메타데이터 (지도교사·전공·교실·정원·학년) — 교사 읽기/쓰기
+    match /clubs/{docId} {
+      allow read, write: if request.auth != null
+                        && request.auth.token.email.matches('.*@yeungnam[.]hs[.]kr$')
+                        && !request.auth.token.email.matches('^[0-9]{7}@yeungnam[.]hs[.]kr$')
+                        && request.auth.token.email_verified == true;
+    }
     match /schedule/{docId} {
       allow read: if request.auth != null
                  && request.auth.token.email.matches('.*@yeungnam[.]hs[.]kr$')
