@@ -123,6 +123,15 @@
             .vt-dl { order: 2; }
         }
 
+        /* ── 좁은 화면(폰·태블릿 세로): 뷰어를 화면 높이만큼 확보 ──
+           flex 배분에 맡기면 헤더·검색창을 뺀 자투리(≈420px)만 차지해
+           폭 맞춤 시 페이지 세로가 잘려 보임 → 화면 높이 기준으로 고정.
+           88px = 상단 고정 헤더(62px) + 여백. dvh를 지원하면 주소창
+           변화까지 반영(iOS 사파리에서 100vh 하단 잘림 방지). */
+        @media (max-width: 1023px) {
+            .viewer { height: calc(100vh - 88px); height: calc(100dvh - 88px); min-height: 420px; flex: none; scroll-margin-top: 74px; }
+        }
+
         /* ── 넓은 화면: 왼쪽(선택창+전체 목록) / 오른쪽(PDF 뷰어, 상단 정렬) ── */
         /* 페이지 전체는 스크롤하지 않고, 목록·PDF 각 영역이 내부 스크롤 */
         @media (min-width: 1024px) {
