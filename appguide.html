@@ -84,6 +84,11 @@
         .ps-btn { border: none; background: var(--slate-100); color: var(--slate-600); width: 30px; height: 30px; border-radius: 8px; font-size: 13px; font-weight: 900; cursor: pointer; }
         .ps-btn:hover:not(:disabled) { background: var(--indigo); color: #fff; }
         .ps-btn:disabled { opacity: .4; cursor: default; }
+        /* 확대/축소 */
+        .pdf-zoom { display: flex; align-items: center; gap: 4px; }
+        .pdf-zoom[hidden] { display: none; }
+        .pz-val { font-size: 12px; font-weight: 800; color: var(--slate-500); min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
+        .pz-fit { width: auto; padding: 0 10px; font-size: 11.5px; }
         .vt-dl { font-size: 12.5px; font-weight: 800; color: var(--slate-500); text-decoration: none; border: 1px solid var(--slate-200); padding: 7px 12px; border-radius: 10px; white-space: nowrap; }
         .vt-dl:hover { border-color: var(--indigo); color: var(--indigo); }
 
@@ -92,7 +97,7 @@
         .pdf-status .spin { width: 14px; height: 14px; border: 2px solid var(--slate-200); border-top-color: var(--indigo); border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        #pdfContainer { flex: 1; overflow-y: auto; background: var(--slate-100); padding: 16px 0 32px; -webkit-overflow-scrolling: touch; }
+        #pdfContainer { flex: 1; overflow-y: auto; overflow-x: auto; background: var(--slate-100); padding: 16px 0 32px; -webkit-overflow-scrolling: touch; }
         .pdf-page { position: relative; margin: 0 auto 14px; background: #fff; box-shadow: 0 2px 10px rgba(15,23,42,.14); border-radius: 3px; overflow: hidden; }
         .pdf-page canvas { display: block; }
         .pdf-page .ph { display: flex; align-items: center; justify-content: center; color: var(--slate-300); font-size: 12px; font-weight: 800; height: 100%; }
@@ -173,6 +178,12 @@
                     <span class="pp-sep">/</span>
                     <span id="pdfPageTotal">–</span>
                 </div>
+                <div class="pdf-zoom" id="pdfZoom" hidden>
+                    <button class="ps-btn" id="zoomOut" title="축소">−</button>
+                    <span class="pz-val" id="zoomVal">130%</span>
+                    <button class="ps-btn" id="zoomIn" title="확대">＋</button>
+                    <button class="ps-btn pz-fit" id="zoomFit" title="화면 폭에 맞춤">맞춤</button>
+                </div>
                 <div class="pdf-search" id="pdfSearchBox">
                     <input type="text" id="pdfSearch" placeholder="🔍 문서 내 검색" autocomplete="off" disabled>
                     <span class="ps-count" id="pdfCount"></span>
@@ -195,7 +206,11 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         const PROXY_URL = "https://adiga-pdf-proxy.pkh910518.workers.dev/?url=";
-        const CSS_SCALE = 1.3;   // PDF 렌더 배율 (CSS px 기준)
+        const BASE_SCALE = 1.3;  // 데스크톱 기본 렌더 배율 (CSS px 기준)
+        let cssScale = BASE_SCALE;   // 현재 배율 (확대/축소·화면 맞춤으로 변경)
+        let userZoomed = false;      // 수동 조절 후에는 자동 맞춤이 덮어쓰지 않음
+        let renderGen = 0;           // 배율 변경 시 진행 중이던 렌더 무효화
+        let baseW1 = 0;              // 1페이지 scale=1 폭 (맞춤 배율 계산용)
 
         // ── CSV 파싱 (따옴표 필드 대응) ──
         function parseCSVLine(line) {
@@ -411,6 +426,44 @@
         pageInput.addEventListener('focus', () => { pageNav.classList.add('focus'); pageInput.select(); });
         pageInput.addEventListener('blur', () => { pageNav.classList.remove('focus'); updatePageIndicator(); });
 
+        // ── 확대/축소 · 화면 폭 맞춤 ──
+        const zoomValEl = document.getElementById('zoomVal');
+        // 컨테이너 폭에 맞는 배율 (넓은 화면에서는 기본 배율 상한)
+        function fitScale() {
+            const avail = Math.max(container.clientWidth - 20, 200);
+            if (!baseW1) return BASE_SCALE;
+            return Math.min(BASE_SCALE, avail / baseW1);
+        }
+        function updateZoomVal() { zoomValEl.textContent = Math.round(cssScale * 100) + '%'; }
+        function setZoom(newScale, manual) {
+            newScale = Math.max(0.4, Math.min(3, newScale));
+            if (!pdfDoc || !pages.length || Math.abs(newScale - cssScale) < 0.001) { updateZoomVal(); return; }
+            if (manual) userZoomed = true;
+            const cur = currentPageByScroll();
+            const ratio = newScale / cssScale;
+            cssScale = newScale;
+            renderGen++;   // 진행 중이던 이전 배율 렌더 무효화
+            for (const pg of pages) {
+                pg.div.style.width = (parseFloat(pg.div.style.width) * ratio) + 'px';
+                pg.div.style.height = (parseFloat(pg.div.style.height) * ratio) + 'px';
+                pg.div.innerHTML = `<div class="ph">${pg.div.dataset.p} 쪽</div>`;
+                pg.rendered = false; pg.rendering = false; pg.textDivs = null;
+            }
+            updateZoomVal();
+            const pg = pages[cur - 1];
+            if (pg) pg.div.scrollIntoView({ block: 'start' });   // 보던 페이지 유지
+            renderVisible();
+        }
+        document.getElementById('zoomIn').addEventListener('click', () => setZoom(cssScale * 1.2, true));
+        document.getElementById('zoomOut').addEventListener('click', () => setZoom(cssScale / 1.2, true));
+        document.getElementById('zoomFit').addEventListener('click', () => { userZoomed = false; setZoom(fitScale(), false); });
+        // 창 크기 변경: 수동 조절 전이면 폭 맞춤 유지
+        window.addEventListener('resize', () => {
+            if (userZoomed || !pdfDoc) return;
+            const f = fitScale();
+            if (Math.abs(f - cssScale) > 0.02) setZoom(f, false);
+        });
+
         async function loadPdf(u) {
             const token = ++loadToken;
             // 초기화
@@ -433,7 +486,11 @@
                 pdfDoc = doc;
                 // 1페이지 크기로 모든 페이지 자리표시자 높이 추정
                 const p1 = await doc.getPage(1);
-                const vp1 = p1.getViewport({ scale: CSS_SCALE });
+                baseW1 = p1.getViewport({ scale: 1 }).width;
+                if (!userZoomed) cssScale = fitScale();   // 좁은 화면: 컨테이너 폭에 맞춤 (넓으면 기본 배율)
+                updateZoomVal();
+                document.getElementById('pdfZoom').hidden = false;
+                const vp1 = p1.getViewport({ scale: cssScale });
                 const phW = Math.round(vp1.width), phH = Math.round(vp1.height);
                 const frag = document.createDocumentFragment();
                 for (let i = 1; i <= doc.numPages; i++) {
@@ -463,11 +520,11 @@
             const pg = pages[idx];
             if (!pg || pg.rendered || pg.rendering || !pdfDoc) return;
             pg.rendering = true;
-            const token = loadToken;
+            const token = loadToken, gen = renderGen;
             try {
                 const page = await pdfDoc.getPage(idx + 1);
-                if (token !== loadToken) return;
-                const viewport = page.getViewport({ scale: CSS_SCALE });
+                if (token !== loadToken || gen !== renderGen) return;
+                const viewport = page.getViewport({ scale: cssScale });
                 const dpr = Math.min(window.devicePixelRatio || 1, 2);
                 const canvas = document.createElement('canvas');
                 canvas.width = Math.floor(viewport.width * dpr);
@@ -479,30 +536,30 @@
                 pg.div.innerHTML = '';
                 pg.div.appendChild(canvas);
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null }).promise;
-                if (token !== loadToken) return;
+                if (token !== loadToken || gen !== renderGen) return;
                 pg.rendered = true;                 // 캔버스가 보이면 렌더 완료로 간주 (검색 이동 가능)
                 renderVisible();                    // 이어지는 다음 페이지 채우기
-                renderTextLayerSafe(pg, page, viewport, idx, token);   // 텍스트 레이어는 비차단 best-effort
+                renderTextLayerSafe(pg, page, viewport, idx, token, gen);   // 텍스트 레이어는 비차단 best-effort
             } catch (e) {
                 if (token === loadToken) console.warn('page render fail', idx + 1, e);
             } finally { pg.rendering = false; }
         }
 
         // 텍스트 레이어(검색 하이라이트용)는 실패/지연되어도 페이지 표시를 막지 않도록 분리
-        async function renderTextLayerSafe(pg, page, viewport, idx, token) {
+        async function renderTextLayerSafe(pg, page, viewport, idx, token, gen) {
             try {
                 const tl = document.createElement('div');
                 tl.className = 'textLayer';
                 tl.style.width = Math.floor(viewport.width) + 'px';
                 tl.style.height = Math.floor(viewport.height) + 'px';
-                tl.style.setProperty('--scale-factor', CSS_SCALE);
+                tl.style.setProperty('--scale-factor', cssScale);
                 pg.div.appendChild(tl);
                 const tc = await page.getTextContent();
-                if (token !== loadToken) { tl.remove(); return; }
+                if (token !== loadToken || gen !== renderGen) { tl.remove(); return; }
                 const textDivs = [];
                 const task = pdfjsLib.renderTextLayer({ textContentSource: tc, container: tl, viewport, textDivs });
                 await Promise.race([ task.promise, new Promise((_, rej) => setTimeout(() => rej(new Error('textlayer-timeout')), 6000)) ]);
-                if (token !== loadToken) { tl.remove(); return; }
+                if (token !== loadToken || gen !== renderGen) { tl.remove(); return; }
                 pg.textDivs = textDivs;
                 if (query) highlightPage(idx);
             } catch (e) { /* 하이라이트 없이 진행 (검색 시 페이지 이동·플래시로 안내) */ }
