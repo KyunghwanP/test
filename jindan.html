@@ -48,29 +48,33 @@
         #db-count { font-size: 11.5px; font-weight: 900; color: var(--indigo); background: var(--indigo-50); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--indigo-100); }
         .back-link { font-size: 12px; font-weight: 800; color: var(--slate-500); text-decoration: none; background: #fff; border: 1px solid var(--slate-200); padding: 7px 12px; border-radius: 12px; }
 
-        main { max-width: 108rem; margin: 0 auto; padding: 40px 24px; display: flex; flex-direction: column; gap: 48px; opacity: 0; transition: opacity .5s; }
+        main { max-width: 108rem; margin: 0 auto; padding: 22px 24px 40px; display: flex; flex-direction: column; gap: 26px; opacity: 0; transition: opacity .5s; }
         /* 성적 입력·계열 탐색 카드는 읽기 좋은 폭으로 가운데, 대학 리스트만 넓게 채움 */
         .input-card { align-self: center; width: 100%; max-width: 64rem; }
         main.show { opacity: 1; }
 
-        /* 성적 입력 카드 */
-        .input-card { position: relative; background: #fff; padding: 40px 32px; border-radius: 2.5rem; box-shadow: 0 20px 40px rgba(148,163,184,.15); border: 1px solid var(--slate-100); display: flex; flex-direction: column; gap: 36px; }
+        /* 성적 입력 카드 (세로 압축: 입력·환산 결과 2단 배치) */
+        .input-card { position: relative; background: #fff; padding: 26px 28px; border-radius: 2rem; box-shadow: 0 20px 40px rgba(148,163,184,.15); border: 1px solid var(--slate-100); display: flex; flex-direction: column; gap: 20px; }
         .input-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
-        .input-head h2 { font-size: 34px; }
-        .input-head .desc { font-size: 13px; color: var(--slate-500); font-weight: 500; margin-top: 6px; }
+        .input-head h2 { font-size: 25px; }
+        .input-head .desc { font-size: 13px; color: var(--slate-500); font-weight: 500; margin-top: 4px; }
+        /* 왼쪽(입력)·오른쪽(환산 결과) 2단 — 모바일은 세로 */
+        .input-cols { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: stretch; }
+        @media (min-width: 880px) { .input-cols { grid-template-columns: minmax(0, 1fr) 320px; gap: 22px; } }
+        .input-left { display: flex; flex-direction: column; gap: 18px; min-width: 0; justify-content: space-between; }
 
         .gpa-label { font-size: 11.5px; font-weight: 900; color: var(--slate-400); text-transform: uppercase; letter-spacing: .2em; }
         .gpa-row { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
-        #gpa-display { font-size: 56px; font-weight: 900; color: var(--indigo); font-variant-numeric: tabular-nums; letter-spacing: -.04em; cursor: pointer; border-bottom: 3px dashed transparent; transition: border-color .2s; }
+        #gpa-display { font-size: 42px; font-weight: 900; color: var(--indigo); font-variant-numeric: tabular-nums; letter-spacing: -.04em; cursor: pointer; border-bottom: 3px dashed transparent; transition: border-color .2s; }
         #gpa-display:hover { border-bottom-color: var(--indigo-100); }
         .gpa-row .unit { font-size: 20px; font-weight: 700; color: var(--slate-300); }
         .edit-tip { font-size: 11.5px; font-weight: 700; color: var(--slate-400); }
-        .num-edit { width: 130px; font-size: 40px; font-weight: 900; color: var(--indigo); border: none; border-bottom: 3px solid var(--indigo); outline: none; background: transparent; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+        .num-edit { width: 110px; font-size: 34px; font-weight: 900; color: var(--indigo); border: none; border-bottom: 3px solid var(--indigo); outline: none; background: transparent; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
 
         input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 14px; background: var(--slate-100); border-radius: 999px; outline: none; }
         input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; background: #fff; border: 8px solid var(--indigo); border-radius: 50%; box-shadow: 0 3px 8px rgba(79,70,229,.3); cursor: pointer; }
         input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; background: #fff; border: 8px solid var(--indigo); border-radius: 50%; box-shadow: 0 3px 8px rgba(79,70,229,.3); cursor: pointer; }
-        .slider-ticks { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-top: 12px; }
+        .slider-ticks { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-top: 8px; }
         .slider-ticks .tick { text-align: center; }
         .slider-ticks .bar { height: 4px; border-radius: 999px; background: var(--slate-100); margin-bottom: 4px; transition: background .2s; }
         .slider-ticks .bar.on { background: var(--indigo); }
@@ -79,43 +83,40 @@
         /* 환산 기준 카드 */
         .version-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
         @media (min-width: 768px) { .version-grid { grid-template-columns: repeat(4, 1fr); } }
-        .version-btn { padding: 16px; border-radius: 1rem; border: 2px solid var(--slate-100); background: #fff; color: var(--slate-500); text-align: left; transition: all .2s; }
+        .version-btn { padding: 11px 13px; border-radius: 1rem; border: 2px solid var(--slate-100); background: #fff; color: var(--slate-500); text-align: left; transition: all .2s; }
         .version-btn:hover { border-color: var(--slate-200); }
         .version-btn.active { background: var(--slate-900); border-color: var(--slate-900); color: #fff; box-shadow: 0 15px 30px rgba(148,163,184,.35); }
         .version-btn .v-desc { font-size: 10.5px; font-weight: 900; text-transform: uppercase; letter-spacing: .15em; opacity: .6; margin-bottom: 4px; }
         .version-btn .v-name { font-size: 13px; font-weight: 900; }
 
-        /* 환산 결과 다크 패널 */
-        .result-panel { background: var(--slate-900); padding: 36px 32px; border-radius: 2.5rem; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 28px; box-shadow: 0 30px 60px rgba(203,213,225,.7); text-align: center; }
-        @media (min-width: 768px) { .result-panel { flex-direction: row; justify-content: space-between; text-align: left; } }
-        .result-info { display: flex; flex-direction: column; gap: 14px; }
-        .result-tag { display: inline-block; align-self: center; padding: 5px 12px; background: #6366f1; border-radius: 999px; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .2em; }
-        @media (min-width: 768px) { .result-tag { align-self: flex-start; } }
-        #conv-reason { font-size: 15px; font-weight: 700; color: var(--slate-300); max-width: 28rem; line-height: 1.5; }
-        #low-grade-hint { display: none; font-size: 12.5px; color: #a5b4fc; font-weight: 500; line-height: 1.6; }
-        #manual-note { display: none; align-items: center; gap: 8px; justify-content: center; }
-        @media (min-width: 768px) { #manual-note { justify-content: flex-start; } }
-        #manual-note span { font-size: 11.5px; font-weight: 900; color: #fbbf24; text-transform: uppercase; letter-spacing: .1em; }
-        #manual-reset { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: #fff; font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: 999px; }
-        .result-box { flex-shrink: 0; background: rgba(255,255,255,.1); padding: 24px 28px; border-radius: 1.5rem; border: 1px solid rgba(255,255,255,.1); backdrop-filter: blur(4px); }
+        /* 환산 결과 다크 패널 — 오른쪽 좁은 세로형 컴팩트 카드 */
+        .result-panel { background: var(--slate-900); padding: 20px 18px; border-radius: 1.5rem; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; box-shadow: 0 20px 40px rgba(203,213,225,.6); text-align: center; }
+        .result-info { display: flex; flex-direction: column; align-items: center; gap: 10px; order: 2; }
+        .result-tag { display: inline-block; align-self: center; padding: 4px 11px; background: #6366f1; border-radius: 999px; font-size: 10.5px; font-weight: 900; text-transform: uppercase; letter-spacing: .18em; }
+        #conv-reason { font-size: 12.5px; font-weight: 600; color: var(--slate-300); line-height: 1.55; }
+        #low-grade-hint { display: none; font-size: 12px; color: #a5b4fc; font-weight: 500; line-height: 1.55; }
+        #manual-note { display: none; align-items: center; gap: 8px; justify-content: center; flex-wrap: wrap; }
+        #manual-note span { font-size: 11px; font-weight: 900; color: #fbbf24; text-transform: uppercase; letter-spacing: .1em; }
+        #manual-reset { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: #fff; font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: 999px; cursor: pointer; }
+        .result-box { flex-shrink: 0; background: rgba(255,255,255,.1); padding: 12px 24px; border-radius: 1.2rem; border: 1px solid rgba(255,255,255,.1); backdrop-filter: blur(4px); order: 1; }
         .result-box .row { display: flex; align-items: baseline; gap: 8px; justify-content: center; }
-        #grade9-display { font-size: 64px; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: -.05em; color: #818cf8; cursor: pointer; border-bottom: 3px dashed transparent; transition: border-color .2s; }
+        #grade9-display { font-size: 46px; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: -.05em; color: #818cf8; cursor: pointer; border-bottom: 3px dashed transparent; transition: border-color .2s; }
         #grade9-display:hover { border-bottom-color: rgba(129,140,248,.4); }
-        .result-box .unit { font-size: 20px; font-weight: 700; color: var(--slate-400); }
-        .result-box .edit-tip { color: var(--slate-500); text-align: center; display: block; margin-top: 4px; }
-        #grade9-edit { width: 160px; font-size: 48px; color: #818cf8; border-bottom-color: #818cf8; }
+        .result-box .unit { font-size: 16px; font-weight: 700; color: var(--slate-400); }
+        .result-box .edit-tip { color: var(--slate-500); text-align: center; display: block; margin-top: 2px; font-size: 10.5px; }
+        #grade9-edit { width: 120px; font-size: 38px; color: #818cf8; border-bottom-color: #818cf8; }
 
         /* 계열별 탐색 */
-        .cat-section { padding-top: 32px; border-top: 1px solid var(--slate-100); display: flex; flex-direction: column; gap: 28px; }
+        .cat-section { padding-top: 18px; border-top: 1px solid var(--slate-100); display: flex; flex-direction: column; gap: 14px; }
         .cat-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
-        .cat-head h3 { font-size: 22px; }
+        .cat-head h3 { font-size: 19px; }
         .cat-head .sub { font-size: 11.5px; color: var(--slate-400); font-weight: 900; text-transform: uppercase; letter-spacing: .2em; margin-top: 4px; }
         .range-pill { display: flex; align-items: center; gap: 8px; background: var(--indigo-50); padding: 8px 16px; border-radius: 1rem; border: 1px solid var(--indigo-100); }
         .range-pill .dot { width: 8px; height: 8px; background: var(--indigo); border-radius: 50%; animation: pulse 1.5s ease-in-out infinite; }
         .range-pill span { font-size: 11.5px; font-weight: 900; color: var(--indigo-dark); text-transform: uppercase; letter-spacing: .15em; }
         .cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
         @media (min-width: 640px) { .cat-grid { grid-template-columns: repeat(7, 1fr); } }
-        .cat-chip { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 4px; border-radius: 1.5rem; border: 2px solid var(--slate-100); background: #fff; color: var(--slate-500); transition: all .2s; }
+        .cat-chip { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 11px 4px; border-radius: 1.2rem; border: 2px solid var(--slate-100); background: #fff; color: var(--slate-500); transition: all .2s; }
         .cat-chip:hover { border-color: var(--slate-200); background: var(--slate-50); }
         .cat-chip .emoji { font-size: 24px; transition: transform .2s; }
         .cat-chip:hover .emoji { transform: scale(1.1); }
@@ -323,26 +324,30 @@
                 </button>
             </div>
 
-            <div>
-                <p class="gpa-label" id="gpa-label">Current GPA (5-Grade)</p>
-                <div class="gpa-row">
-                    <span id="gpa-display" title="클릭하여 직접 입력">2.00</span>
-                    <input type="number" id="gpa-edit" class="num-edit" min="1" max="5" step="0.01" style="display:none">
-                    <span class="unit">등급</span>
-                    <span class="edit-tip">✏️ 숫자를 클릭하면 직접 입력</span>
+            <!-- 데스크톱: 왼쪽 입력 영역 + 오른쪽 환산 결과 패널 2단 배치 (세로 압축) -->
+            <div class="input-cols">
+                <div class="input-left">
+                    <div>
+                        <p class="gpa-label" id="gpa-label">Current GPA (5-Grade)</p>
+                        <div class="gpa-row">
+                            <span id="gpa-display" title="클릭하여 직접 입력">2.00</span>
+                            <input type="number" id="gpa-edit" class="num-edit" min="1" max="5" step="0.01" style="display:none">
+                            <span class="unit">등급</span>
+                            <span class="edit-tip">✏️ 숫자를 클릭하면 직접 입력</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <input type="range" id="gpa-slider" min="1" max="5" step="0.01" value="2.00">
+                        <div class="slider-ticks" id="slider-ticks"></div>
+                    </div>
+
+                    <div class="version-grid" id="version-grid"></div>
                 </div>
-            </div>
 
-            <div>
-                <input type="range" id="gpa-slider" min="1" max="5" step="0.01" value="2.00">
-                <div class="slider-ticks" id="slider-ticks"></div>
-            </div>
-
-            <div class="version-grid" id="version-grid"></div>
-
-            <div class="result-panel">
+                <div class="result-panel">
+                <span class="result-tag" id="result-tag">9-Grade Conversion Result</span>
                 <div class="result-info">
-                    <span class="result-tag" id="result-tag">9-Grade Conversion Result</span>
                     <p id="conv-reason"></p>
                     <p id="low-grade-hint">💡 5등급제 1.0은 9등급제 기준 약 1.4등급으로 환산됩니다. (2025 분석 자료 기준)<br>1.0~1.3 구간의 대학을 보려면 '소신 지원 포함'을 켜주세요.</p>
                     <div id="manual-note">
@@ -357,6 +362,7 @@
                         <span class="unit">등급</span>
                     </div>
                     <span class="edit-tip">✏️ 클릭하여 직접 설정</span>
+                </div>
                 </div>
             </div>
 
