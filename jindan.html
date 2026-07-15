@@ -661,9 +661,11 @@
                     };
                     groups.set(key, rec);
                 }
+                // 등급·점수 컷이 0이면 미제출/데이터 없음으로 간주 (원문 표기는 유지)
+                const posVal = v => { const n = parseFloat(v); return (isNaN(n) || n <= 0) ? null : v; };
                 const yv = {
-                    grade70: isNaN(grade70) ? null : grade70,
-                    grade50: cols[13], score70: cols[12], score50: cols[11],
+                    grade70: (isNaN(grade70) || grade70 <= 0) ? null : grade70,
+                    grade50: posVal(cols[13]), score70: posVal(cols[12]), score50: posVal(cols[11]),
                     competition: cols[9], waitlist: cols[10],
                     quotaTotal: cols[8], quotaInitial: cols[6], quotaCarry: cols[7],
                 };
