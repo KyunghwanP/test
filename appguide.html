@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>대학 수시 모집요강 조회</title>
+    <script>
+      // 본체(index.html) iframe 안에서 열리면 embed 모드 — 자체 헤더를 숨기고 뷰어를 화면에 꽉 채움
+      if (window.self !== window.top) document.documentElement.classList.add('embed');
+    </script>
     <!--
       대학 수시 모집요강(adiga 공개 PDF) 조회기 — 진로진학 허브 하위 페이지
       - 데이터: appguide.csv (조회연도, 대학명, 대학코드, 문서종류, 다운로드링크)
@@ -130,6 +134,14 @@
            변화까지 반영(iOS 사파리에서 100vh 하단 잘림 방지). */
         @media (max-width: 1023px) {
             .viewer { height: calc(100vh - 88px); height: calc(100dvh - 88px); min-height: 420px; flex: none; scroll-margin-top: 74px; }
+            /* 본체 iframe 안(embed): 제목은 본체 상단바가 이미 보여주므로 자체 헤더를 숨기고
+               뷰어를 화면 높이 거의 전부로 — 스크롤을 끝까지 내리면 PDF가 화면을 꽉 채움 */
+            html.embed .site-header { display: none; }
+            html.embed main { padding-top: 10px; }
+            html.embed .viewer { height: calc(100vh - 12px); height: calc(100dvh - 12px); scroll-margin-top: 6px; }
+            /* 툴바 세로 압축 — PDF 영역 최대화 */
+            .viewer-toolbar { padding: 8px 10px; gap: 8px; }
+            #pdfContainer { padding: 8px 0 16px; }
         }
 
         /* ── 넓은 화면: 왼쪽(선택창+전체 목록) / 오른쪽(PDF 뷰어, 상단 정렬) ── */
