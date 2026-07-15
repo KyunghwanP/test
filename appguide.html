@@ -146,6 +146,9 @@
             /* PDF 스크롤 내리면 툴바 접힘 (JS가 tb-hide 토글) */
             .viewer-toolbar { transition: max-height .25s ease, padding .25s ease; max-height: 220px; overflow: hidden; }
             .viewer.tb-hide .viewer-toolbar { max-height: 0; padding-top: 0; padding-bottom: 0; border-bottom-width: 0; }
+            /* 대학 선택 카드도 함께 접힘 — PDF는 내부 스크롤이라 페이지 스크롤로는 안 밀려남 */
+            html.embed .picker { transition: max-height .25s ease, opacity .2s ease, padding .25s ease, margin .25s ease; max-height: 420px; overflow: hidden; }
+            html.embed body.pdf-full .picker { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; margin: 0; border-width: 0; }
         }
 
         /* ── 넓은 화면: 왼쪽(선택창+전체 목록) / 오른쪽(PDF 뷰어, 상단 정렬) ── */
@@ -429,12 +432,18 @@
                 window.parent.document.body.classList.toggle('sim-full', hide);
             } catch (e) {}
         }
+        // 몰입 모드: 뷰어 툴바 + 대학 선택 카드 + 본체 상단바·탭바를 한꺼번에 접었다 폈다
+        function setImmersive(on) {
+            viewer.classList.toggle('tb-hide', on);
+            document.body.classList.toggle('pdf-full', on);
+            setParentChrome(on);
+        }
         let tbLastY = 0;
         container.addEventListener('scroll', () => {
             if (!(document.documentElement.classList.contains('embed') && window.matchMedia('(max-width: 1023px)').matches)) return;
             const y = container.scrollTop;
-            if (y > tbLastY + 6 && y > 60) { viewer.classList.add('tb-hide'); setParentChrome(true); }
-            else if (y < tbLastY - 6) { viewer.classList.remove('tb-hide'); setParentChrome(false); }
+            if (y > tbLastY + 6 && y > 60) setImmersive(true);
+            else if (y < tbLastY - 6) setImmersive(false);
             tbLastY = y;
         }, { passive: true });
         window.addEventListener('resize', () => { clearTimeout(scrollThrottle); scrollThrottle = setTimeout(() => { scrollThrottle = null; renderVisible(); }, 200); });
@@ -516,7 +525,7 @@
             pageNav.hidden = true; pageInput.disabled = true; pageInput.value = '1'; pageTotalEl.textContent = '–';
             container.innerHTML = '';
             viewer.hidden = false;
-            viewer.classList.remove('tb-hide'); tbLastY = 0; setParentChrome(false);   // 새 문서: 접힌 툴바·본체 상단 복원
+            setImmersive(false); tbLastY = 0;   // 새 문서: 접힌 툴바·선택 카드·본체 상단 복원
             currentUniv = u;
             document.getElementById('vtYear').textContent = u.year;
             document.getElementById('vtName').textContent = u.base + (u.campus ? ` (${u.campus})` : '');
