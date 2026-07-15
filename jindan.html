@@ -39,7 +39,7 @@
 
         /* 헤더 */
         .site-header { background: #fff; border-bottom: 1px solid var(--slate-200); position: sticky; top: 0; z-index: 10; }
-        .site-header-inner { max-width: 64rem; margin: 0 auto; padding: 0 16px; min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
+        .site-header-inner { max-width: 108rem; margin: 0 auto; padding: 0 24px; min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
         .brand { display: flex; align-items: center; gap: 10px; }
         .brand-badge { background: var(--indigo); padding: 8px; border-radius: 10px; font-size: 20px; line-height: 1; }
         .brand h1 { font-size: 18px; line-height: 1.1; text-transform: uppercase; }
@@ -48,7 +48,9 @@
         #db-count { font-size: 11.5px; font-weight: 900; color: var(--indigo); background: var(--indigo-50); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--indigo-100); }
         .back-link { font-size: 12px; font-weight: 800; color: var(--slate-500); text-decoration: none; background: #fff; border: 1px solid var(--slate-200); padding: 7px 12px; border-radius: 12px; }
 
-        main { max-width: 64rem; margin: 0 auto; padding: 40px 16px; display: flex; flex-direction: column; gap: 48px; opacity: 0; transition: opacity .5s; }
+        main { max-width: 108rem; margin: 0 auto; padding: 40px 24px; display: flex; flex-direction: column; gap: 48px; opacity: 0; transition: opacity .5s; }
+        /* 성적 입력·계열 탐색 카드는 읽기 좋은 폭으로 가운데, 대학 리스트만 넓게 채움 */
+        .input-card { align-self: center; width: 100%; max-width: 64rem; }
         main.show { opacity: 1; }
 
         /* 성적 입력 카드 */
@@ -176,8 +178,10 @@
         /* 결과 카드 그리드 */
         /* minmax(0,1fr): 긴 학과명이 열 폭을 밀어내지 않게 — 모든 열 균등 고정 */
         #data-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
-        @media (min-width: 640px) { #data-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-        @media (min-width: 960px) { #data-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (min-width: 640px)  { #data-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (min-width: 960px)  { #data-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (min-width: 1320px) { #data-list { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+        @media (min-width: 1680px) { #data-list { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
         .uni-card { position: relative; background: #fff; padding: 22px 24px 18px; border-radius: 2rem; border: 1px solid var(--slate-100); box-shadow: 0 1px 3px rgba(0,0,0,.04); transition: all .25s; animation: fadeInUp .35s ease-out both; cursor: pointer; }
         .uni-card:hover { transform: translateY(-4px); box-shadow: 0 25px 50px rgba(224,231,255,.5); }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -201,11 +205,15 @@
         .adm-name { display: inline-block; max-width: 100%; font-size: 13px; font-weight: 800; color: var(--indigo-dark); background: var(--indigo-50); border: 1px solid var(--indigo-100); border-radius: 8px; padding: 3px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 8px; }
         /* 3개년 컷 스트립 */
         .year-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
-        .ys-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; background: var(--slate-50); border: 1px solid var(--slate-100); border-radius: 9px; padding: 6px 2px; }
-        .ys-y { font-size: 12px; font-weight: 900; color: var(--slate-500); font-family: 'IBM Plex Mono', monospace; letter-spacing: .02em; }
-        .ys-v { font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: -.02em; display: inline-flex; align-items: center; gap: 2px; }
-        .ys-v.none { color: var(--slate-300); }
-        .ys-v .ys-a { font-size: 10px; }
+        .ys-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; background: var(--slate-50); border: 1px solid var(--slate-100); border-radius: 10px; padding: 7px 2px; }
+        .ys-y { font-size: 11.5px; font-weight: 900; color: var(--slate-500); font-family: 'IBM Plex Mono', monospace; letter-spacing: .02em; }
+        .ys-cut { font-size: 19px; font-weight: 900; color: var(--slate-800); font-variant-numeric: tabular-nums; letter-spacing: -.03em; line-height: 1.1; }
+        .ys-cut.none { color: var(--slate-300); }
+        .ys-gap { font-size: 11.5px; font-weight: 900; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 1px; }
+        .ys-gap .ys-a { font-size: 8px; }
+        .ys-gap.gap-up { color: #e11d48; }
+        .ys-gap.gap-down { color: #2563eb; }
+        .ys-gap.gap-even { color: var(--slate-400); }
         .ys-v.gap-up { color: #e11d48; }
         .ys-v.gap-down { color: #2563eb; }
         .ys-v.gap-even { color: var(--slate-500); }
@@ -704,14 +712,14 @@
             return             { arrow: '▼', cls: 'gap-down', text: mag.toFixed(2) };
         }
 
-        // 카드 하단 3개년 컷 스트립 — 학년도별 70%컷 + 내 등급 대비 화살표(빨강▲/파랑▼), 미제출은 –
+        // 카드 하단 3개년 스트립 — 학년도별 70%컷(큰 숫자) + 내 등급 대비 편차(빨강▲/파랑▼), 미제출은 –
         function yearStripHtml(rec, myGrade) {
             return SURVEY_YEARS.map(y => {
                 const v = rec.years[y] && rec.years[y].grade70;
                 const lbl = `'${schoolYearShort(y)}`;
-                if (v == null || isNaN(v)) return `<div class="ys-cell"><span class="ys-y">${lbl}</span><span class="ys-v none">–</span></div>`;
+                if (v == null || isNaN(v)) return `<div class="ys-cell"><span class="ys-y">${lbl}</span><span class="ys-cut none">–</span><span class="ys-gap gap-even">·</span></div>`;
                 const g = gradeGap(v, myGrade);
-                return `<div class="ys-cell"><span class="ys-y">${lbl}</span><span class="ys-v ${g.cls}">${v.toFixed(2)}<i class="ys-a">${g.arrow}</i></span></div>`;
+                return `<div class="ys-cell"><span class="ys-y">${lbl}</span><span class="ys-cut">${v.toFixed(2)}</span><span class="ys-gap ${g.cls}"><i class="ys-a">${g.arrow}</i>${g.text}</span></div>`;
             }).join('');
         }
 
