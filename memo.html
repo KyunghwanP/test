@@ -15,11 +15,14 @@
       })();
     </script>
     <!--
-      개인 메모 (Editor.js) — 단독 테스트 버전 (탭·현황판 연동 전)
-      - 에디터: vendor/editorjs/ 셀프호스팅 (학교망 CDN 차단 대비, 앱 정책)
-      - 저장: 교사 로그인 시 Firestore memos/{uid} 문서에 자동저장(디바운스),
-              비로그인 시 이 기기 localStorage에만 임시 저장
-      - embed 모드(iframe)·다크모드(ynhs-dark) 지원 — 이후 현황판/탭 연동 대비
+      개인 메모 (Editor.js) — 노션식 "페이지 안의 페이지" 구조
+      - 빈 블록에서 "/" 또는 + 버튼 → "하위 페이지" 블록 삽입 → 클릭으로 진입,
+        상단 브레드크럼으로 복귀. 페이지마다 Firestore 문서 하나.
+      - 저장: 교사 로그인 시 memos/{uid}/pages/{pageId} 자동저장(디바운스),
+        비로그인 시 localStorage(ynhs-memo-pages) 임시 저장
+      - 구버전(단일 memos/{uid} 문서·ynhs-memo-draft) 데이터는 루트 페이지로 자동 이전
+      - 하위 페이지 블록을 지워도 그 페이지 문서는 남는다(고아 문서) — 용량 미미, 감수
+      - vendor/editorjs/ 셀프호스팅 (학교망 CDN 차단 대비, 앱 정책)
     -->
     <script src="vendor/editorjs/editorjs.min.js"></script>
     <script src="vendor/editorjs/header.min.js"></script>
@@ -27,6 +30,7 @@
     <script src="vendor/editorjs/checklist.min.js"></script>
     <script src="vendor/editorjs/delimiter.min.js"></script>
     <script src="vendor/editorjs/marker.min.js"></script>
+    <script src="vendor/editorjs/dragdrop.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
@@ -60,7 +64,7 @@
         .back-link { font-size: 12.5px; font-weight: 800; color: var(--ink-soft); text-decoration: none; background: var(--paper); border: 1px solid var(--rule); padding: 7px 13px; border-radius: 11px; }
         .back-link:hover { border-color: var(--indigo); color: var(--indigo); }
 
-        main { flex: 1; width: 100%; max-width: 56rem; margin: 0 auto; padding: 18px 14px 60px; display: flex; flex-direction: column; gap: 12px; }
+        main { flex: 1; width: 100%; max-width: 56rem; margin: 0 auto; padding: 18px 14px 60px; display: flex; flex-direction: column; gap: 10px; }
 
         /* ── 상태 바 ── */
         .memo-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
@@ -75,10 +79,29 @@
         html.dark .memo-local-note { background: #2d2410; border-color: #5c4a1a; color: #fbbf24; }
         .memo-local-note.show { display: block; }
 
+        /* ── 브레드크럼 ── */
+        .crumbs { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; font-size: 13.5px; font-weight: 800; min-height: 28px; }
+        .crumb { color: var(--ink-soft); cursor: pointer; padding: 4px 8px; border-radius: 8px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .crumb:hover { background: var(--rule); color: var(--ink); }
+        .crumb.here { color: var(--ink); cursor: default; }
+        .crumb.here:hover { background: transparent; }
+        .crumb-sep { color: var(--slate-400); font-weight: 400; font-size: 12px; padding: 0 1px; }
+
         /* ── 에디터 카드 ── */
         .memo-card { background: var(--paper); border: 1px solid var(--rule); border-radius: 18px; box-shadow: 0 4px 20px rgba(148,163,184,.10); padding: 18px 14px 30px; min-height: 62vh; }
         html.dark .memo-card { box-shadow: 0 4px 20px rgba(0,0,0,.35); }
         #editorjs { min-height: 55vh; }
+
+        /* ── 하위 페이지 블록 ── */
+        .subpage-block { display: flex; align-items: center; gap: 9px; padding: 8px 10px; margin: 2px 0; border-radius: 10px; cursor: pointer; border: 1px solid transparent; transition: background .12s; }
+        .subpage-block:hover { background: var(--indigo-50); border-color: var(--indigo-100); }
+        .subpage-block .sp-icon { font-size: 17px; flex-shrink: 0; }
+        .subpage-block .sp-title { font-weight: 800; color: var(--ink); border-bottom: 1.5px solid var(--slate-300); padding-bottom: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .subpage-block .sp-arrow { margin-left: auto; font-size: 12px; color: var(--slate-400); opacity: 0; transition: opacity .12s; flex-shrink: 0; }
+        .subpage-block:hover .sp-arrow { opacity: 1; }
+        .subpage-block input { border: none; outline: none; background: transparent; font: inherit; font-weight: 800; color: var(--ink); flex: 1; min-width: 0; }
+        .subpage-block input::placeholder { color: var(--slate-400); font-weight: 600; }
+        .subpage-block.editing { cursor: text; background: var(--indigo-50); border-color: var(--indigo-100); }
 
         /* Editor.js 톤 맞춤 + 다크모드 */
         .ce-block__content, .ce-toolbar__content { max-width: 100%; }
@@ -88,7 +111,6 @@
         .cdx-checklist__item-text, .cdx-list__item { color: var(--ink); }
         .cdx-marker { background: rgba(245,158,11,.45); padding: 0 1px; border-radius: 2px; }
         ::selection { background: rgba(99,102,241,.25); }
-        /* 툴바 아이콘·팝오버 다크 대응 */
         html.dark .ce-toolbar__plus, html.dark .ce-toolbar__settings-btn { color: var(--ink-soft); }
         html.dark .ce-toolbar__plus:hover, html.dark .ce-toolbar__settings-btn:hover { background: var(--rule); color: var(--ink); }
         html.dark .ce-popover { --color-background: #1b2740; --color-text-primary: #E2E8F0; --color-text-secondary: #8FA3BD; --color-border: #26354F; --color-background-item-hover: #26354F; --color-background-item-focus: rgba(99,102,241,.25); }
@@ -98,7 +120,7 @@
         html.dark .cdx-checklist__item-checkbox-check { background: var(--paper); border-color: var(--rule); }
         html.dark .ce-block--selected .ce-block__content { background: rgba(99,102,241,.18); }
 
-        /* 로그인 대기 로더 */
+        /* 로더 */
         #boot { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 60px 0; color: var(--ink-soft); font-size: 13.5px; font-weight: 700; }
         #boot .spin { width: 16px; height: 16px; border: 2.5px solid var(--rule); border-top-color: var(--indigo); border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -126,6 +148,7 @@
             <span id="save-status">—</span>
         </div>
         <p class="memo-local-note" id="local-note">🔒 로그인되지 않아 <b>이 기기(브라우저)에만 임시 저장</b>됩니다. 본체 앱에 로그인하면 계정에 저장돼 어디서든 볼 수 있어요.</p>
+        <nav class="crumbs" id="crumbs" aria-label="페이지 경로"></nav>
         <div class="memo-card">
             <div id="boot"><span class="spin"></span>메모를 불러오는 중…</div>
             <div id="editorjs" style="display:none;"></div>
@@ -148,22 +171,41 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        const LOCAL_KEY = 'ynhs-memo-draft';
+        const LOCAL_PAGES = 'ynhs-memo-pages';   // 비로그인: { pageId: {title, data} }
+        const LOCAL_LEGACY = 'ynhs-memo-draft';  // 구버전 단일 메모
+        const PATH_KEY = 'ynhs-memo-path';       // 마지막에 보던 페이지 경로
+        const ROOT = { id: 'root', title: '내 메모' };
+
         const statusEl = document.getElementById('save-status');
         const whoEl = document.getElementById('memo-who');
         const whoText = document.getElementById('who-text');
         const localNote = document.getElementById('local-note');
+        const bootEl = document.getElementById('boot');
+        const editorEl = document.getElementById('editorjs');
+        const crumbsEl = document.getElementById('crumbs');
 
         let editor = null;
-        let uid = null;              // 로그인 uid (없으면 localStorage 모드)
+        let editorReady = false;        // onReady 후에만 저장 허용
+        let uid = null;                 // 로그인 uid (없으면 localStorage 모드)
+        let path = [{ ...ROOT }];       // 브레드크럼 경로 [{id,title},...] — 마지막이 현재 페이지
         let saveTimer = null;
-        let dirty = false;           // 마지막 저장 이후 변경 있음
-        let saving = false;
+        let dirty = false;
+        let savePromise = Promise.resolve();  // 저장 직렬화 체인 — 동시 저장 방지
+        let switching = false;          // 페이지 전환 중 중복 진입 방지
 
         const isTeacher = u => u && /@yeungnam\.hs\.kr$/.test(u.email || '') && !/^[0-9]{7}@/.test(u.email || '');
-
+        const curPage = () => path[path.length - 1];
         function setStatus(cls, text) { statusEl.className = cls; statusEl.textContent = text; }
         const hhmm = () => { const d = new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+        const newPageId = () => (crypto.randomUUID ? crypto.randomUUID() : 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8));
+
+        // ── 비로그인 localStorage 저장소 ──
+        function localPages() { try { return JSON.parse(localStorage.getItem(LOCAL_PAGES) || '{}'); } catch (e) { return {}; } }
+        function localSavePage(pageId, patch) {
+            const all = localPages();
+            all[pageId] = { ...(all[pageId] || {}), ...patch };
+            localStorage.setItem(LOCAL_PAGES, JSON.stringify(all));
+        }
 
         // ── 저장 (디바운스 1.5초) ──
         function scheduleSave() {
@@ -172,17 +214,24 @@
             clearTimeout(saveTimer);
             saveTimer = setTimeout(saveNow, 1500);
         }
-        async function saveNow() {
-            if (!editor || !dirty || saving) return;
-            saving = true;
+        // 저장은 항상 체인 뒤에 붙어 순차 실행된다. 페이지 전환 flush가
+        // 진행 중인 저장을 기다린 뒤 실행되므로, 늦게 끝난 저장이 최신
+        // 내용을 덮어쓰는 경합이 없다. (덮어써도 체인 마지막이 최신 상태)
+        function saveNow() {
+            savePromise = savePromise.then(doSave).catch(() => {});
+            return savePromise;
+        }
+        async function doSave() {
+            if (!editor || !editorReady || !dirty) return;
+            const myEditor = editor, pid = curPage().id, title = curPage().title;  // 시작 시점 기준 고정
+            dirty = false;   // 지금부터의 변경은 다음 저장 몫 — 저장 중 커밋된 변경이 유실되지 않게 선클리어
             setStatus('saving', '저장 중…');
             try {
-                const data = await editor.save();
-                dirty = false;
+                const data = await myEditor.save();
                 if (uid) {
-                    await setDoc(doc(db, 'memos', uid), { data, updatedAt: serverTimestamp() });
+                    await setDoc(doc(db, 'memos', uid, 'pages', pid), { title, data, updatedAt: serverTimestamp() });
                 } else {
-                    localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
+                    localSavePage(pid, { title, data });
                 }
                 setStatus('saved', `✓ 저장됨 ${hhmm()}`);
             } catch (e) {
@@ -191,23 +240,172 @@
                 setStatus('error', '저장 실패 — 잠시 후 재시도');
                 clearTimeout(saveTimer);
                 saveTimer = setTimeout(saveNow, 4000);
-            } finally { saving = false; }
+            }
         }
-        // 탭 전환·닫기 직전에 미저장분 즉시 저장 시도
         document.addEventListener('visibilitychange', () => { if (document.hidden && dirty) { clearTimeout(saveTimer); saveNow(); } });
         window.addEventListener('beforeunload', () => { if (dirty) { clearTimeout(saveTimer); saveNow(); } });
+
+        // ── 페이지 제목 변경 (하위 페이지 블록에서 이름 바꾸기) ──
+        function renamePage(pageId, title) {
+            if (uid) setDoc(doc(db, 'memos', uid, 'pages', pageId), { title }, { merge: true }).catch(console.error);
+            else localSavePage(pageId, { title });
+        }
+
+        // ── 하위 페이지 커스텀 블록 ──
+        class SubPageTool {
+            static get toolbox() { return { title: '하위 페이지', icon: '📄' }; }
+            constructor({ data, config, block }) {
+                this.config = config || {};
+                this.block = block;
+                this.data = { pageId: (data && data.pageId) || null, title: (data && data.title) || '' };
+                this.isNew = !this.data.pageId;
+                if (!this.data.pageId) this.data.pageId = newPageId();
+            }
+            render() {
+                this.wrap = document.createElement('div');
+                this.wrap.className = 'subpage-block';
+                if (this.isNew) this.renderInput(); else this.renderRow();
+                return this.wrap;
+            }
+            renderInput() {
+                this.wrap.classList.add('editing');
+                this.wrap.innerHTML = '<span class="sp-icon">📄</span>';
+                const input = document.createElement('input');
+                input.placeholder = '페이지 제목 입력 후 Enter';
+                input.value = this.data.title;
+                // Editor.js가 Enter를 새 블록 생성으로 가로채지 않게 차단
+                input.addEventListener('keydown', e => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') { e.preventDefault(); this.commit(true); }
+                    else if (e.key === 'Escape') { e.preventDefault(); this.commit(false); }
+                });
+                input.addEventListener('blur', () => { if (this.wrap.classList.contains('editing')) this.commit(false); });
+                this.wrap.appendChild(input);
+                setTimeout(() => input.focus(), 50);
+            }
+            commit(openAfter) {
+                const input = this.wrap.querySelector('input');
+                this.data.title = (input ? input.value.trim() : '') || '제목 없음';
+                this.isNew = false;
+                this.wrap.classList.remove('editing');
+                this.renderRow();
+                renamePage(this.data.pageId, this.data.title);
+                // dispatchChange의 onChange는 비동기라 진입 flush보다 늦을 수 있다
+                // → dirty를 동기로 세워 flush가 커밋된 제목을 반드시 저장하게
+                dirty = true;
+                try { this.block.dispatchChange(); } catch (e) { scheduleSave(); }
+                if (openAfter && this.config.onOpen) {
+                    // 부모 저장(디바운스)이 걸린 상태로 진입 — openPage가 먼저 flush한다
+                    this.config.onOpen({ ...this.data });
+                }
+            }
+            renderRow() {
+                this.wrap.innerHTML = `<span class="sp-icon">📄</span><span class="sp-title"></span><span class="sp-arrow">열기 ›</span>`;
+                this.wrap.querySelector('.sp-title').textContent = this.data.title || '제목 없음';
+                this.wrap.onclick = () => { if (this.config.onOpen) this.config.onOpen({ ...this.data }); };
+            }
+            renderSettings() {
+                return [{
+                    icon: '✏️', label: '이름 바꾸기', closeOnActivate: true,
+                    onActivate: () => { this.isNew = false; this.wrap.onclick = null; this.renderInput(); }
+                }];
+            }
+            save() { return { pageId: this.data.pageId, title: this.data.title }; }
+        }
+
+        // ── 페이지 데이터 로드 (+ 구버전 자동 이전) ──
+        async function loadPageData(pageId) {
+            if (uid) {
+                const snap = await getDoc(doc(db, 'memos', uid, 'pages', pageId));
+                if (snap.exists()) return snap.data().data || null;
+                if (pageId === 'root') {
+                    // 구버전 단일 문서 → 루트 페이지로
+                    const legacy = await getDoc(doc(db, 'memos', uid));
+                    if (legacy.exists() && legacy.data().data) return legacy.data().data;
+                }
+                return null;
+            } else {
+                const all = localPages();
+                if (all[pageId] && all[pageId].data) return all[pageId].data;
+                if (pageId === 'root') {
+                    try { return JSON.parse(localStorage.getItem(LOCAL_LEGACY) || 'null'); } catch (e) { return null; }
+                }
+                return null;
+            }
+        }
+
+        // ── 브레드크럼 ──
+        function renderCrumbs() {
+            crumbsEl.innerHTML = '';
+            path.forEach((p, i) => {
+                if (i > 0) {
+                    const sep = document.createElement('span');
+                    sep.className = 'crumb-sep'; sep.textContent = '›';
+                    crumbsEl.appendChild(sep);
+                }
+                const c = document.createElement('span');
+                c.className = 'crumb' + (i === path.length - 1 ? ' here' : '');
+                c.textContent = (i === 0 ? '📝 ' : '') + p.title;
+                if (i < path.length - 1) c.onclick = () => goToCrumb(i);
+                crumbsEl.appendChild(c);
+            });
+        }
+        function persistPath() { try { localStorage.setItem(PATH_KEY, JSON.stringify(path)); } catch (e) {} }
+        function restorePath() {
+            try {
+                const p = JSON.parse(localStorage.getItem(PATH_KEY) || 'null');
+                if (Array.isArray(p) && p.length && p[0].id === 'root' && p.every(x => x.id && x.title)) path = p;
+            } catch (e) {}
+        }
+
+        // ── 페이지 전환 ──
+        async function showPage() {
+            persistPath();
+            renderCrumbs();
+            bootEl.style.display = 'flex';
+            editorEl.style.display = 'none';
+            editorReady = false;
+            if (editor) { try { await editor.isReady; editor.destroy(); } catch (e) {} editor = null; }
+            let data = null;
+            try { data = await loadPageData(curPage().id); }
+            catch (e) { console.error(e); setStatus('error', '불러오기 실패'); }
+            dirty = false;   // 이전 페이지의 잔여 변경 표시는 flush가 이미 처리했다
+            initEditor(data);
+            setStatus('', data ? '' : '새 페이지');
+        }
+        async function openPage(d) {   // d = {pageId, title}
+            if (switching) return;
+            switching = true;
+            try {
+                clearTimeout(saveTimer);
+                await saveNow();   // 진행 중 저장까지 체인으로 대기 (dirty 여부와 무관)
+                path.push({ id: d.pageId, title: d.title || '제목 없음' });
+                await showPage();
+            } finally { switching = false; }
+        }
+        async function goToCrumb(i) {
+            if (switching || i >= path.length - 1) return;
+            switching = true;
+            try {
+                clearTimeout(saveTimer);
+                await saveNow();   // 진행 중 저장까지 체인으로 대기 (dirty 여부와 무관)
+                path = path.slice(0, i + 1);
+                await showPage();
+            } finally { switching = false; }
+        }
 
         // ── 에디터 초기화 ──
         function initEditor(savedData) {
             const ListTool = window.EditorjsList || window.List;
             editor = new EditorJS({
                 holder: 'editorjs',
-                placeholder: '메모를 입력하세요. + 버튼이나 탭 키로 블록을 추가할 수 있어요.',
+                placeholder: '메모를 입력하세요. "/" 를 입력하면 블록 메뉴가 열려요.',
                 data: savedData || undefined,
                 tools: {
                     header: { class: window.Header, inlineToolbar: ['marker'], config: { levels: [2, 3], defaultLevel: 2, placeholder: '제목' } },
                     list: { class: ListTool, inlineToolbar: true },
                     checklist: { class: window.Checklist, inlineToolbar: true },
+                    page: { class: SubPageTool, config: { onOpen: openPage } },
                     delimiter: window.Delimiter,
                     marker: window.Marker,
                 },
@@ -228,37 +426,30 @@
                 },
                 onChange: scheduleSave,
                 onReady: () => {
-                    document.getElementById('boot').style.display = 'none';
-                    document.getElementById('editorjs').style.display = '';
+                    editorReady = true;
+                    bootEl.style.display = 'none';
+                    editorEl.style.display = '';
+                    if (window.DragDrop) { try { new DragDrop(editor); } catch (e) {} }
                 }
             });
         }
 
-        // ── 시작: 로그인 확인 → 저장분 로드 ──
+        // ── 시작 ──
         let booted = false;
         onAuthStateChanged(auth, async user => {
             if (booted) return;   // 최초 1회만 (세션 갱신에 에디터 재생성 방지)
             booted = true;
-            let savedData = null;
             if (isTeacher(user)) {
                 uid = user.uid;
                 whoEl.classList.add('on');
                 whoText.textContent = `${user.displayName || user.email} · 계정에 저장됨`;
-                try {
-                    const snap = await getDoc(doc(db, 'memos', uid));
-                    if (snap.exists()) savedData = snap.data().data || null;
-                } catch (e) {
-                    console.error(e);
-                    setStatus('error', '불러오기 실패');
-                }
             } else {
                 uid = null;
                 whoText.textContent = '비로그인 — 임시 저장 모드';
                 localNote.classList.add('show');
-                try { savedData = JSON.parse(localStorage.getItem(LOCAL_KEY) || 'null'); } catch (e) {}
             }
-            setStatus('', savedData ? '저장된 메모 불러옴' : '새 메모');
-            initEditor(savedData);
+            restorePath();
+            await showPage();
         });
     </script>
 </body>

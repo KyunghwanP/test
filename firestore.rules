@@ -109,7 +109,8 @@ service cloud.firestore {
       allow read, write: if isYnhsTeacher();
     }
     // ── 개인 메모 (memo.html) — 본인 것만 읽기/쓰기 ──
-    match /memos/{userId} {
+    // 루트 문서(구버전 단일 메모) + pages 하위 컬렉션(노션식 페이지) 모두 포함
+    match /memos/{userId}/{document=**} {
       allow read, write: if isYnhsTeacher() && request.auth.uid == userId;
     }
     // ── 공통 함수 ──
