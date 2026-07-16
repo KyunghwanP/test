@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>개인 메모</title>
+    <script>
+      // 본체(index.html) iframe 안에서 열리면 embed 모드 — 자체 헤더를 숨김
+      if (window.self !== window.top) document.documentElement.classList.add('embed');
+      // 다크모드: 본체 이스터 에그 설정 공유 + 토글 시 실시간 동기화
+      (function(){
+        const apply = on => document.documentElement.classList.toggle('dark', on);
+        try { apply(localStorage.getItem('ynhs-dark') === '1'); } catch(e) {}
+        window.addEventListener('storage', e => { if (e.key === 'ynhs-dark') apply(e.newValue === '1'); });
+      })();
+    </script>
+    <!--
+      개인 메모 (Editor.js) — 단독 테스트 버전 (탭·현황판 연동 전)
+      - 에디터: vendor/editorjs/ 셀프호스팅 (학교망 CDN 차단 대비, 앱 정책)
+      - 저장: 교사 로그인 시 Firestore memos/{uid} 문서에 자동저장(디바운스),
+              비로그인 시 이 기기 localStorage에만 임시 저장
+      - embed 모드(iframe)·다크모드(ynhs-dark) 지원 — 이후 현황판/탭 연동 대비
+    -->
+    <script src="vendor/editorjs/editorjs.min.js"></script>
+    <script src="vendor/editorjs/header.min.js"></script>
+    <script src="vendor/editorjs/list.min.js"></script>
+    <script src="vendor/editorjs/checklist.min.js"></script>
+    <script src="vendor/editorjs/delimiter.min.js"></script>
+    <script src="vendor/editorjs/marker.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --indigo: #4f46e5; --indigo-dark: #4338ca; --indigo-50: #eef2ff; --indigo-100: #e0e7ff;
+            --slate-900: #0f172a; --slate-800: #1e293b; --slate-500: #64748b; --slate-400: #94a3b8;
+            --slate-300: #cbd5e1; --slate-200: #e2e8f0; --slate-100: #f1f5f9; --slate-50: #f8fafc;
+            --paper: #ffffff; --ink: #0f172a; --ink-soft: #64748b; --bg: #f8fafc; --rule: #e2e8f0;
+        }
+        html.dark {
+            --paper: #151F33; --ink: #E2E8F0; --ink-soft: #8FA3BD; --bg: #0B1220; --rule: #26354F;
+            --indigo-50: #1e2742; --indigo-100: #2b3760;
+        }
+        html, body { height: 100%; }
+        body {
+            font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+            letter-spacing: -0.02em; background: var(--bg); color: var(--ink);
+            -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; min-height: 100%;
+        }
+        button, input { font-family: inherit; }
+
+        /* ── 헤더 ── */
+        .site-header { background: var(--paper); border-bottom: 1px solid var(--rule); position: sticky; top: 0; z-index: 30; }
+        html.embed .site-header { display: none; }
+        .site-header-inner { max-width: 56rem; margin: 0 auto; padding: 10px 16px; min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .brand { display: flex; align-items: center; gap: 11px; }
+        .brand-badge { background: var(--indigo); padding: 9px; border-radius: 11px; font-size: 19px; line-height: 1; }
+        .brand h1 { font-size: 17px; line-height: 1.15; font-weight: 900; letter-spacing: -.04em; }
+        .brand .sub { font-size: 10.5px; color: var(--indigo); font-weight: 900; letter-spacing: .2em; text-transform: uppercase; margin-top: 3px; }
+        html.dark .brand .sub { color: #818cf8; }
+        .header-right { display: flex; align-items: center; gap: 8px; }
+        .back-link { font-size: 12.5px; font-weight: 800; color: var(--ink-soft); text-decoration: none; background: var(--paper); border: 1px solid var(--rule); padding: 7px 13px; border-radius: 11px; }
+        .back-link:hover { border-color: var(--indigo); color: var(--indigo); }
+
+        main { flex: 1; width: 100%; max-width: 56rem; margin: 0 auto; padding: 18px 14px 60px; display: flex; flex-direction: column; gap: 12px; }
+
+        /* ── 상태 바 ── */
+        .memo-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        .memo-who { font-size: 12.5px; font-weight: 700; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; min-width: 0; }
+        .memo-who .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--slate-300); flex-shrink: 0; }
+        .memo-who.on .dot { background: #10b981; }
+        #save-status { font-size: 12px; font-weight: 800; color: var(--ink-soft); background: var(--paper); border: 1px solid var(--rule); padding: 5px 12px; border-radius: 999px; white-space: nowrap; transition: color .2s, border-color .2s; }
+        #save-status.saving { color: var(--indigo); border-color: var(--indigo-100); }
+        #save-status.saved { color: #10b981; }
+        #save-status.error { color: #ef4444; border-color: #fecaca; }
+        .memo-local-note { display: none; font-size: 12px; font-weight: 700; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; padding: 9px 14px; border-radius: 12px; line-height: 1.5; }
+        html.dark .memo-local-note { background: #2d2410; border-color: #5c4a1a; color: #fbbf24; }
+        .memo-local-note.show { display: block; }
+
+        /* ── 에디터 카드 ── */
+        .memo-card { background: var(--paper); border: 1px solid var(--rule); border-radius: 18px; box-shadow: 0 4px 20px rgba(148,163,184,.10); padding: 18px 14px 30px; min-height: 62vh; }
+        html.dark .memo-card { box-shadow: 0 4px 20px rgba(0,0,0,.35); }
+        #editorjs { min-height: 55vh; }
+
+        /* Editor.js 톤 맞춤 + 다크모드 */
+        .ce-block__content, .ce-toolbar__content { max-width: 100%; }
+        .codex-editor__redactor { padding-bottom: 120px !important; }
+        .ce-paragraph, .ce-header { color: var(--ink); }
+        .ce-header { font-weight: 900; letter-spacing: -.03em; }
+        .cdx-checklist__item-text, .cdx-list__item { color: var(--ink); }
+        .cdx-marker { background: rgba(245,158,11,.45); padding: 0 1px; border-radius: 2px; }
+        ::selection { background: rgba(99,102,241,.25); }
+        /* 툴바 아이콘·팝오버 다크 대응 */
+        html.dark .ce-toolbar__plus, html.dark .ce-toolbar__settings-btn { color: var(--ink-soft); }
+        html.dark .ce-toolbar__plus:hover, html.dark .ce-toolbar__settings-btn:hover { background: var(--rule); color: var(--ink); }
+        html.dark .ce-popover { --color-background: #1b2740; --color-text-primary: #E2E8F0; --color-text-secondary: #8FA3BD; --color-border: #26354F; --color-background-item-hover: #26354F; --color-background-item-focus: rgba(99,102,241,.25); }
+        html.dark .ce-inline-toolbar, html.dark .ce-conversion-toolbar { background: #1b2740; border-color: #26354F; color: #E2E8F0; }
+        html.dark .ce-inline-tool, html.dark .ce-conversion-tool { color: #E2E8F0; }
+        html.dark .ce-inline-tool:hover, html.dark .ce-conversion-tool:hover { background: #26354F; }
+        html.dark .cdx-checklist__item-checkbox-check { background: var(--paper); border-color: var(--rule); }
+        html.dark .ce-block--selected .ce-block__content { background: rgba(99,102,241,.18); }
+
+        /* 로그인 대기 로더 */
+        #boot { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 60px 0; color: var(--ink-soft); font-size: 13.5px; font-weight: 700; }
+        #boot .spin { width: 16px; height: 16px; border: 2.5px solid var(--rule); border-top-color: var(--indigo); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="site-header-inner">
+            <div class="brand">
+                <div class="brand-badge">📝</div>
+                <div>
+                    <h1>개인 메모</h1>
+                    <p class="sub">My Notes</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <a class="back-link" href="index.html">← 홈</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="memo-bar">
+            <span class="memo-who" id="memo-who"><span class="dot"></span><span id="who-text">로그인 확인 중…</span></span>
+            <span id="save-status">—</span>
+        </div>
+        <p class="memo-local-note" id="local-note">🔒 로그인되지 않아 <b>이 기기(브라우저)에만 임시 저장</b>됩니다. 본체 앱에 로그인하면 계정에 저장돼 어디서든 볼 수 있어요.</p>
+        <div class="memo-card">
+            <div id="boot"><span class="spin"></span>메모를 불러오는 중…</div>
+            <div id="editorjs" style="display:none;"></div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
+        const app = initializeApp({
+            apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
+            authDomain: "ynhs-7b5ba.firebaseapp.com",
+            projectId: "ynhs-7b5ba",
+            storageBucket: "ynhs-7b5ba.firebasestorage.app",
+            messagingSenderId: "1031618043470",
+            appId: "1:1031618043470:web:edb5b8d1f98db029916d1f"
+        });
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const LOCAL_KEY = 'ynhs-memo-draft';
+        const statusEl = document.getElementById('save-status');
+        const whoEl = document.getElementById('memo-who');
+        const whoText = document.getElementById('who-text');
+        const localNote = document.getElementById('local-note');
+
+        let editor = null;
+        let uid = null;              // 로그인 uid (없으면 localStorage 모드)
+        let saveTimer = null;
+        let dirty = false;           // 마지막 저장 이후 변경 있음
+        let saving = false;
+
+        const isTeacher = u => u && /@yeungnam\.hs\.kr$/.test(u.email || '') && !/^[0-9]{7}@/.test(u.email || '');
+
+        function setStatus(cls, text) { statusEl.className = cls; statusEl.textContent = text; }
+        const hhmm = () => { const d = new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+
+        // ── 저장 (디바운스 1.5초) ──
+        function scheduleSave() {
+            dirty = true;
+            setStatus('saving', '입력 중…');
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(saveNow, 1500);
+        }
+        async function saveNow() {
+            if (!editor || !dirty || saving) return;
+            saving = true;
+            setStatus('saving', '저장 중…');
+            try {
+                const data = await editor.save();
+                dirty = false;
+                if (uid) {
+                    await setDoc(doc(db, 'memos', uid), { data, updatedAt: serverTimestamp() });
+                } else {
+                    localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
+                }
+                setStatus('saved', `✓ 저장됨 ${hhmm()}`);
+            } catch (e) {
+                console.error(e);
+                dirty = true;
+                setStatus('error', '저장 실패 — 잠시 후 재시도');
+                clearTimeout(saveTimer);
+                saveTimer = setTimeout(saveNow, 4000);
+            } finally { saving = false; }
+        }
+        // 탭 전환·닫기 직전에 미저장분 즉시 저장 시도
+        document.addEventListener('visibilitychange', () => { if (document.hidden && dirty) { clearTimeout(saveTimer); saveNow(); } });
+        window.addEventListener('beforeunload', () => { if (dirty) { clearTimeout(saveTimer); saveNow(); } });
+
+        // ── 에디터 초기화 ──
+        function initEditor(savedData) {
+            const ListTool = window.EditorjsList || window.List;
+            editor = new EditorJS({
+                holder: 'editorjs',
+                placeholder: '메모를 입력하세요. + 버튼이나 탭 키로 블록을 추가할 수 있어요.',
+                data: savedData || undefined,
+                tools: {
+                    header: { class: window.Header, inlineToolbar: ['marker'], config: { levels: [2, 3], defaultLevel: 2, placeholder: '제목' } },
+                    list: { class: ListTool, inlineToolbar: true },
+                    checklist: { class: window.Checklist, inlineToolbar: true },
+                    delimiter: window.Delimiter,
+                    marker: window.Marker,
+                },
+                i18n: {
+                    messages: {
+                        toolNames: { 'Text': '텍스트', 'Heading': '제목', 'List': '목록', 'Unordered List': '목록', 'Ordered List': '번호 목록', 'Checklist': '체크리스트', 'Delimiter': '구분선', 'Marker': '형광펜', 'Bold': '굵게', 'Italic': '기울임', 'Link': '링크' },
+                        ui: {
+                            'blockTunes': { 'toggler': { 'Click to tune': '블록 설정', 'or drag to move': '드래그로 이동' } },
+                            'toolbar': { 'toolbox': { 'Add': '블록 추가' } },
+                            'popover': { 'Filter': '검색', 'Nothing found': '결과 없음', 'Convert to': '변환' }
+                        },
+                        blockTunes: {
+                            'delete': { 'Delete': '삭제', 'Click to delete': '한 번 더 누르면 삭제' },
+                            'moveUp': { 'Move up': '위로' },
+                            'moveDown': { 'Move down': '아래로' }
+                        }
+                    }
+                },
+                onChange: scheduleSave,
+                onReady: () => {
+                    document.getElementById('boot').style.display = 'none';
+                    document.getElementById('editorjs').style.display = '';
+                }
+            });
+        }
+
+        // ── 시작: 로그인 확인 → 저장분 로드 ──
+        let booted = false;
+        onAuthStateChanged(auth, async user => {
+            if (booted) return;   // 최초 1회만 (세션 갱신에 에디터 재생성 방지)
+            booted = true;
+            let savedData = null;
+            if (isTeacher(user)) {
+                uid = user.uid;
+                whoEl.classList.add('on');
+                whoText.textContent = `${user.displayName || user.email} · 계정에 저장됨`;
+                try {
+                    const snap = await getDoc(doc(db, 'memos', uid));
+                    if (snap.exists()) savedData = snap.data().data || null;
+                } catch (e) {
+                    console.error(e);
+                    setStatus('error', '불러오기 실패');
+                }
+            } else {
+                uid = null;
+                whoText.textContent = '비로그인 — 임시 저장 모드';
+                localNote.classList.add('show');
+                try { savedData = JSON.parse(localStorage.getItem(LOCAL_KEY) || 'null'); } catch (e) {}
+            }
+            setStatus('', savedData ? '저장된 메모 불러옴' : '새 메모');
+            initEditor(savedData);
+        });
+    </script>
+</body>
+</html>

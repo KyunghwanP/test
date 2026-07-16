@@ -108,6 +108,10 @@ service cloud.firestore {
     match /roomBookings/{docId} {
       allow read, write: if isYnhsTeacher();
     }
+    // ── 개인 메모 (memo.html) — 본인 것만 읽기/쓰기 ──
+    match /memos/{userId} {
+      allow read, write: if isYnhsTeacher() && request.auth.uid == userId;
+    }
     // ── 공통 함수 ──
     function isYnhsTeacher() {
       return request.auth != null
