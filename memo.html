@@ -92,7 +92,9 @@
         .subpage-block { display: flex; align-items: center; gap: 9px; padding: 7px 10px; margin: 2px 0; border-radius: 10px; cursor: pointer; border: 1px solid transparent; transition: background .12s; min-height: 40px; }
         .subpage-block:hover { background: var(--indigo-50); border-color: var(--indigo-100); }
         .subpage-block .sp-icon { font-size: 17px; flex-shrink: 0; }
-        .subpage-block .sp-title { font-weight: 800; color: var(--ink); border-bottom: 1.5px solid var(--slate-300); padding-bottom: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* 글자 영역(좌우 패딩 넉넉히) 클릭 = 제목 수정, 그 외 행 클릭 = 페이지 열기 */
+        .subpage-block .sp-title { font-weight: 800; color: var(--ink); text-decoration: underline; text-decoration-color: var(--slate-300); text-decoration-thickness: 1.5px; text-underline-offset: 3px; padding: 6px 18px; margin: -6px -8px; border-radius: 8px; cursor: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .subpage-block .sp-title:hover { background: rgba(99,102,241,.10); }
         .subpage-block .sp-title.untitled { color: var(--slate-400); font-weight: 600; }
         .subpage-block .sp-open { margin-left: auto; flex-shrink: 0; font-size: 11.5px; font-weight: 800; color: var(--indigo); background: var(--paper); border: 1px solid var(--indigo-100); border-radius: 8px; padding: 4px 10px; cursor: pointer; opacity: 0; transition: opacity .12s; }
         html.dark .subpage-block .sp-open { color: #818cf8; }
@@ -131,6 +133,9 @@
         .codex-editor__redactor { padding-bottom: 120px !important; }
         .ce-paragraph, .ce-header { color: var(--ink); }
         .ce-header { font-weight: 900; letter-spacing: -.03em; }
+        h2.ce-header { font-size: 23px; }
+        h3.ce-header { font-size: 19px; }
+        h4.ce-header { font-size: 16px; }
         .cdx-checklist__item-text, .cdx-list__item { color: var(--ink); }
         .toggle-block__selector { color: var(--ink); }
         .toggle-block__input { color: var(--ink); font-weight: 700; }
@@ -307,6 +312,8 @@
         // 삽입 즉시 페이지 생성(제목 입력 대기), 클릭 = 제목 수정, [열기] 버튼 = 모달
         class SubPageTool {
             static get toolbox() { return { title: '하위 페이지', icon: '📄' }; }
+            // 변환 메뉴 지원: 문단으로 적어둔 텍스트 → "하위 페이지"로 전환 시 제목이 됨
+            static get conversionConfig() { return { import: 'title', export: data => data.title || '' }; }
             constructor({ data, block }) {
                 this.block = block;
                 this.data = { pageId: (data && data.pageId) || null, title: (data && data.title) || '' };
@@ -319,7 +326,16 @@
             render() {
                 this.wrap = document.createElement('div');
                 this.wrap.className = 'subpage-block';
-                if (this.isNew) { this.isNew = false; this.renderInput(); }  // 새 블록은 바로 제목 입력 모드
+                if (this.isNew && this.data.title) {
+                    // 변환으로 생성 (문단 텍스트 → 제목) — 바로 행으로
+                    this.isNew = false;
+                    // 변환 시 인라인 태그가 섞여올 수 있어 텍스트만 남긴다
+                    const tmp = document.createElement('div'); tmp.innerHTML = this.data.title;
+                    this.data.title = tmp.textContent.trim();
+                    renamePage(this.data.pageId, this.data.title);
+                    scheduleSave();
+                    this.renderRow();
+                } else if (this.isNew) { this.isNew = false; this.renderInput(); }  // 새 블록은 제목 입력 모드
                 else this.renderRow();
                 return this.wrap;
             }
@@ -351,13 +367,13 @@
             }
             renderRow() {
                 const title = this.data.title;
-                this.wrap.innerHTML = `<span class="sp-icon">📄</span><span class="sp-title${title ? '' : ' untitled'}"></span><button class="sp-open" type="button">열기 ›</button>`;
+                this.wrap.innerHTML = `<span class="sp-icon">📄</span><span class="sp-title${title ? '' : ' untitled'}"></span><span class="sp-open">열기 ›</span>`;
                 this.wrap.querySelector('.sp-title').textContent = title || '제목 없음';
-                // 행 클릭 = 제목 수정, [열기] = 모달로 페이지 열기
-                this.wrap.onclick = () => this.renderInput();
-                this.wrap.querySelector('.sp-open').addEventListener('click', e => {
+                // 글자 영역 클릭 = 제목 수정, 그 외 행 어디든 = 페이지 열기
+                this.wrap.onclick = () => openPageModal({ ...this.data });
+                this.wrap.querySelector('.sp-title').addEventListener('click', e => {
                     e.stopPropagation();
-                    openPageModal({ ...this.data });
+                    this.renderInput();
                 });
             }
             setTitle(title) {   // renamePage → 다른 곳에서 바뀐 제목 반영
@@ -400,7 +416,7 @@
                 data: savedData || undefined,
                 tools: {
                     page: { class: SubPageTool },
-                    header: { class: window.Header, inlineToolbar: ['marker'], config: { levels: [2, 3], defaultLevel: 2, placeholder: '제목' } },
+                    header: { class: window.Header, inlineToolbar: ['marker'], config: { levels: [2, 3, 4], defaultLevel: 2, placeholder: '제목' } },
                     list: { class: ListTool, inlineToolbar: true },
                     checklist: { class: window.Checklist, inlineToolbar: true },
                     toggle: { class: window.ToggleBlock, inlineToolbar: true },
@@ -446,6 +462,34 @@
                         mo.observe(zone, { childList: true, subtree: true, characterData: true, attributes: true });
                         ed.__memoObserver = mo;
                     }
+                    // 노션식 마크다운 단축 입력: 빈 문단에 기호만 친 뒤 스페이스 → 블록 변환
+                    // (#=제목1, ##=제목2, ###=제목3, >=토글, -=불렛, 1.=번호, []=체크리스트)
+                    const MD_MAP = {
+                        '#':   ['header', { level: 2 }],
+                        '##':  ['header', { level: 3 }],
+                        '###': ['header', { level: 4 }],
+                        '>':   ['toggle', { text: '', status: 'open' }],
+                        '-':   ['list', { style: 'unordered', items: [{ content: '', meta: {}, items: [] }] }],
+                        '1.':  ['list', { style: 'ordered', items: [{ content: '', meta: {}, items: [] }] }],
+                        '[]':  ['checklist', { items: [{ text: '', checked: false }] }]
+                    };
+                    const holderEl = document.getElementById(holderId);
+                    holderEl.addEventListener('keydown', e => {
+                        if (e.key !== ' ') return;
+                        const sel = getSelection();
+                        if (!sel || !sel.anchorNode) return;
+                        const el = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
+                        const para = el && el.closest && el.closest('.ce-paragraph');
+                        if (!para || !holderEl.contains(para)) return;   // 문단 블록에서만
+                        const trigger = para.textContent.trim();
+                        if (!MD_MAP[trigger]) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const idx = ed.blocks.getCurrentBlockIndex();
+                        if (idx < 0) return;
+                        const [type, data] = MD_MAP[trigger];
+                        ed.blocks.insert(type, JSON.parse(JSON.stringify(data)), undefined, idx, true, true);   // 현재 블록 대체
+                    });
                 }
             });
             ctx.editor = ed;
