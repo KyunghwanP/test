@@ -34,6 +34,7 @@
     <script src="vendor/editorjs/delimiter.min.js"></script>
     <script src="vendor/editorjs/marker.min.js"></script>
     <script src="vendor/editorjs/dragdrop.min.js"></script>
+    <script src="vendor/editorjs/toggle.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
@@ -131,6 +132,10 @@
         .ce-paragraph, .ce-header { color: var(--ink); }
         .ce-header { font-weight: 900; letter-spacing: -.03em; }
         .cdx-checklist__item-text, .cdx-list__item { color: var(--ink); }
+        .toggle-block__selector { color: var(--ink); }
+        .toggle-block__input { color: var(--ink); font-weight: 700; }
+        .toggle-block__input:empty::before { color: var(--slate-400); }
+        .toggle-block__icon svg { fill: var(--ink-soft); }
         .cdx-marker { background: rgba(245,158,11,.45); padding: 0 1px; border-radius: 2px; }
         ::selection { background: rgba(99,102,241,.25); }
         html.dark .ce-toolbar__plus, html.dark .ce-toolbar__settings-btn { color: var(--ink-soft); }
@@ -398,12 +403,13 @@
                     header: { class: window.Header, inlineToolbar: ['marker'], config: { levels: [2, 3], defaultLevel: 2, placeholder: '제목' } },
                     list: { class: ListTool, inlineToolbar: true },
                     checklist: { class: window.Checklist, inlineToolbar: true },
+                    toggle: { class: window.ToggleBlock, inlineToolbar: true },
                     delimiter: window.Delimiter,
                     marker: window.Marker,
                 },
                 i18n: {
                     messages: {
-                        toolNames: { 'Text': '텍스트', 'Heading': '제목', 'List': '목록', 'Unordered List': '목록', 'Ordered List': '번호 목록', 'Checklist': '체크리스트', 'Delimiter': '구분선', 'Marker': '형광펜', 'Bold': '굵게', 'Italic': '기울임', 'Link': '링크' },
+                        toolNames: { 'Text': '텍스트', 'Heading': '제목', 'List': '목록', 'Unordered List': '목록', 'Ordered List': '번호 목록', 'Checklist': '체크리스트', 'Toggle': '토글 (접기/펼치기)', 'Delimiter': '구분선', 'Marker': '형광펜', 'Bold': '굵게', 'Italic': '기울임', 'Link': '링크' },
                         ui: {
                             'blockTunes': { 'toggler': { 'Click to tune': '블록 설정', 'or drag to move': '드래그로 이동' } },
                             'toolbar': { 'toolbox': { 'Add': '블록 추가' } },
