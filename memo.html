@@ -488,7 +488,24 @@
                         const idx = ed.blocks.getCurrentBlockIndex();
                         if (idx < 0) return;
                         const [type, data] = MD_MAP[trigger];
-                        ed.blocks.insert(type, JSON.parse(JSON.stringify(data)), undefined, idx, true, true);   // 현재 블록 대체
+                        ed.blocks.insert(type, JSON.parse(JSON.stringify(data)), undefined, idx, false, true);   // 현재 블록 대체 (포커스는 아래에서 직접 처리)
+                        // 새 블록의 편집 요소에 커서를 직접 놓아 이어서 바로 입력 가능하게
+                        // (needToFocus·caret.setToBlock은 체크리스트/리스트 등에서 비동기 렌더와 타이밍이 안 맞아 포커스가 풀림)
+                        // 새 블록의 편집 요소에 커서를 직접 안착 — Editor가 첫 프레임 이후 포커스를 덮어쓰므로
+                        // rAF + 짧은 setTimeout으로 여러 번 시도해 최종적으로 커서가 새 블록에 놓이게 한다.
+                        const focusNewBlock = () => {
+                            const blockEl = holderEl.querySelectorAll('.ce-block')[idx];
+                            const editable = blockEl && blockEl.querySelector('[contenteditable="true"], [contenteditable=""]');
+                            if (!editable) return;
+                            editable.focus();
+                            const range = document.createRange();
+                            range.selectNodeContents(editable);
+                            range.collapse(true);
+                            const s = getSelection(); s.removeAllRanges(); s.addRange(range);
+                        };
+                        requestAnimationFrame(focusNewBlock);
+                        setTimeout(focusNewBlock, 30);
+                        setTimeout(focusNewBlock, 90);
                     });
                 }
             });
