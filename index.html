@@ -2887,6 +2887,15 @@
   }
   .docs-note-row td{background:var(--paper-soft);color:var(--ink-soft);font-size:12px;line-height:1.5;}
   .docs-note-hint{color:var(--mon);font-size:12px;}
+  /* 업무자료: 엑셀 뷰어 (Firestore docsSheets — 교사 전용, 파일은 저장소에 없음) */
+  .docs-xlsx-bar{display:flex;gap:6px;align-items:center;flex-shrink:0;padding:8px 10px;border-bottom:1px solid var(--rule);background:var(--paper);}
+  .docs-xlsx-bar .docs-search{margin-bottom:0;flex:1;min-width:120px;}
+  .docs-xlsx-tabs{display:flex;gap:4px;overflow-x:auto;flex-shrink:0;padding:8px 10px 0;background:var(--paper);border-bottom:1px solid var(--rule);}
+  .docs-xlsx-tab{border:1px solid var(--rule);border-bottom:none;background:var(--paper-soft);color:var(--ink-soft);font-weight:700;font-size:12.5px;padding:7px 12px;border-radius:8px 8px 0 0;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:inherit;}
+  .docs-xlsx-tab.active{background:var(--paper);color:var(--mon);border-color:var(--mon);}
+  .docs-xlsx-wrap{flex:1;min-height:0;overflow:auto;}
+  .docs-xlsx-table{border-collapse:collapse;font-size:12.5px;margin:0;}
+  .docs-xlsx-table td{border:1px solid var(--rule);padding:4px 8px;white-space:nowrap;color:var(--ink);max-width:340px;overflow:hidden;text-overflow:ellipsis;}
   @media(min-width:900px){
     .docs-note-row{display:none !important;}
     .docs-note-hint{display:none;}
@@ -3217,7 +3226,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.15</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.16</div>
   </div>
 </div>
 
@@ -3347,7 +3356,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.15</div>
+    <div class="nav-version" title="Made by 박경환">ver6.16</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -9285,6 +9294,9 @@ const DOCS_ITEMS = [
   { id:'schoolregs', type:'pdf',   title:'📜 교칙', desc:'학교 규칙 (PDF)', src:'docs/schoolregulations.pdf' },
   { id:'attendance', type:'pdf',   title:'🕐 출결 규정', desc:'출결 처리 규정 (PDF)', src:'docs/attendancepolicy.pdf' },
   { id:'conduct',    type:'pdf',   title:'🎓 학생생활규정', desc:'학생 생활 규정 (PDF)', src:'docs/codeofconduct.pdf' },
+  // 엑셀 자료: 파일을 저장소(docs/)에 올리지 않는다! (퍼블릭 저장소 — 개인정보 유출)
+  // 데이터는 Firestore docsSheets 컬렉션(교사 전용 규칙)에 저장 — 뷰어에서 [⬆ 갱신]으로 업로드
+  { id:'list2026',   type:'xlsx',  title:'📊 2026학년도 편성·명렬표', desc:'교육과정·학급·선택과목·학생 명렬 (교사 전용)', fsId:'list2026' },
 ];
 
 let docsInitialized = false;
@@ -9339,6 +9351,19 @@ function openDocsItem(id){
         <span id="docsPdfMatch" class="docs-pdf-match"></span>
       </div>
       <iframe id="docsPdfFrame" src="pdfjs/web/viewer.html?file=${encodeURIComponent('../../' + item.src)}" title="${item.title}" onload="bindDocsPdfFind()"></iframe>`;
+  } else if(item.type === 'xlsx'){
+    // 엑셀 뷰어 — 데이터는 Firestore docsSheets(교사 전용)에서 로드, .pdf 클래스로 세로 flex 레이아웃 재사용
+    body.classList.add('pdf');
+    body.innerHTML = `
+      <div class="docs-xlsx-bar">
+        <input class="docs-search" type="search" placeholder="🔍 표 내용 검색 (이름·과목 등)" oninput="docsXlsxSearch(this.value)">
+        <button class="docs-pdf-nav" onclick="docsXlsxUploadClick()" title="엑셀 파일로 데이터 갱신 (교사 전용)">⬆ 갱신</button>
+        <span id="docsXlsxStatus" class="docs-pdf-match" style="min-width:0;"></span>
+      </div>
+      <div class="docs-xlsx-tabs" id="docsXlsxTabs"></div>
+      <div class="docs-xlsx-wrap" id="docsXlsxWrap"><div class="docs-empty">불러오는 중…</div></div>
+      <input type="file" id="docsXlsxFile" accept=".xlsx,.xls" style="display:none;" onchange="docsXlsxUpload(this.files[0])">`;
+    initDocsXlsx(item);
   }
   document.getElementById('docsLayout')?.classList.add('detail');
 }
@@ -9412,10 +9437,188 @@ function bindDocsPdfFind(){
   });
 }
 
+// ── 엑셀 자료 뷰어 (Firestore docsSheets — 교사 전용) ──
+// 원본 xlsx는 개인정보(학생 명렬) 때문에 퍼블릭 저장소에 올릴 수 없다.
+// 대신 교사가 뷰어의 [⬆ 갱신]으로 파일을 고르면 브라우저에서 SheetJS로 파싱해
+// Firestore에 저장하고(교사 전용 규칙), 뷰어는 그 데이터를 읽어 표로 그린다.
+// Firestore 제약: 중첩 배열 금지 + 문서 1MB 제한 → 시트 행들을 JSON 문자열로
+// 직렬화해 70만 자 단위 청크(docsSheets/{id}_s{시트}_c{청크})로 나눠 저장.
+let docsXlsxItem = null;      // 현재 열린 xlsx 항목 (DOCS_ITEMS)
+let docsXlsxMeta = null;      // 메타 문서 { sheetNames, sheetChunks, sheetRows, updatedAt }
+let docsXlsxSheets = {};      // 시트 인덱스 → rows[][] 캐시
+let docsXlsxCur = 0;
+let docsXlsxQuery = '';
+let docsXlsxShowAllRows = false;
+let docsXlsxSearchTimer = null;
+const DOCS_XLSX_ROW_CAP = 300;   // 첫 렌더 행 수 제한 (명렬 시트가 커서 DOM 보호)
+
+function docsXlsxEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+async function initDocsXlsx(item){
+  docsXlsxItem = item; docsXlsxMeta = null; docsXlsxSheets = {};
+  docsXlsxCur = 0; docsXlsxQuery = ''; docsXlsxShowAllRows = false;
+  const wrap = document.getElementById('docsXlsxWrap');
+  try {
+    const snap = await getDoc(doc(fbDb, 'docsSheets', item.fsId));
+    if(!snap.exists()){
+      wrap.innerHTML = '<div class="docs-empty">아직 업로드된 데이터가 없습니다.<br>우측 상단 <b>[⬆ 갱신]</b> 버튼으로 엑셀 파일을 올려주세요.</div>';
+      return;
+    }
+    docsXlsxMeta = snap.data();
+    const st = document.getElementById('docsXlsxStatus');
+    if(st && docsXlsxMeta.updatedAt) st.textContent = '갱신 ' + docsXlsxMeta.updatedAt.slice(0, 10);
+    renderDocsXlsxTabs();
+    await docsXlsxShowSheet(0);
+  } catch(e) {
+    console.error(e);
+    wrap.innerHTML = `<div class="docs-empty">${e.code === 'permission-denied'
+      ? '🔒 교사 계정으로 로그인해야 볼 수 있는 자료입니다.'
+      : '불러오기 실패: ' + docsXlsxEsc(e.message)}</div>`;
+  }
+}
+
+function renderDocsXlsxTabs(){
+  const tabs = document.getElementById('docsXlsxTabs');
+  if(!tabs || !docsXlsxMeta) return;
+  tabs.innerHTML = docsXlsxMeta.sheetNames.map((n, i) =>
+    `<button class="docs-xlsx-tab${i === docsXlsxCur ? ' active' : ''}" onclick="docsXlsxShowSheet(${i})">${docsXlsxEsc(n)}</button>`).join('');
+}
+
+async function docsXlsxShowSheet(i){
+  docsXlsxCur = i; docsXlsxShowAllRows = false;
+  renderDocsXlsxTabs();
+  const wrap = document.getElementById('docsXlsxWrap');
+  if(!docsXlsxSheets[i]){
+    wrap.innerHTML = '<div class="docs-empty">시트 불러오는 중…</div>';
+    try {
+      let rows = [];
+      for(let c = 0; c < (docsXlsxMeta.sheetChunks[i] || 0); c++){
+        const s = await getDoc(doc(fbDb, 'docsSheets', `${docsXlsxItem.fsId}_s${i}_c${c}`));
+        if(s.exists()) rows = rows.concat(JSON.parse(s.data().json));
+      }
+      docsXlsxSheets[i] = rows;
+    } catch(e) {
+      console.error(e);
+      wrap.innerHTML = '<div class="docs-empty">시트 불러오기 실패: ' + docsXlsxEsc(e.message) + '</div>';
+      return;
+    }
+  }
+  renderDocsXlsxTable();
+}
+
+function renderDocsXlsxTable(){
+  const wrap = document.getElementById('docsXlsxWrap');
+  if(!wrap) return;
+  const rows = docsXlsxSheets[docsXlsxCur] || [];
+  const q = docsXlsxQuery.trim().toLowerCase();
+  let shown = q ? rows.filter(r => r.some(c => String(c).toLowerCase().includes(q))) : rows;
+  const total = shown.length;
+  const capped = !docsXlsxShowAllRows && total > DOCS_XLSX_ROW_CAP;
+  if(capped) shown = shown.slice(0, DOCS_XLSX_ROW_CAP);
+  const html = shown.map(r => '<tr>' + r.map(c => `<td>${docsXlsxEsc(c)}</td>`).join('') + '</tr>').join('');
+  wrap.innerHTML = (total
+    ? `<table class="docs-xlsx-table"><tbody>${html}</tbody></table>`
+    : '<div class="docs-empty">검색 결과가 없습니다.</div>')
+    + (capped ? `<div style="padding:10px;text-align:center;"><button class="docs-pdf-nav" onclick="docsXlsxShowAll()">전체 ${total}행 모두 표시</button></div>` : '');
+}
+
+function docsXlsxShowAll(){ docsXlsxShowAllRows = true; renderDocsXlsxTable(); }
+
+function docsXlsxSearch(q){
+  clearTimeout(docsXlsxSearchTimer);
+  docsXlsxSearchTimer = setTimeout(() => { docsXlsxQuery = q || ''; docsXlsxShowAllRows = false; renderDocsXlsxTable(); }, 250);
+}
+
+// SheetJS는 업로드할 때만 필요 — 지연 로드 (vendor 셀프호스팅, 학교망 CDN 차단 대비)
+let sheetJsPromise = null;
+function loadSheetJS(){
+  if(window.XLSX) return Promise.resolve();
+  if(!sheetJsPromise) sheetJsPromise = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'vendor/sheetjs/xlsx.full.min.js';
+    s.onload = res;
+    s.onerror = () => { sheetJsPromise = null; rej(new Error('SheetJS 로드 실패')); };
+    document.head.appendChild(s);
+  });
+  return sheetJsPromise;
+}
+
+function docsXlsxUploadClick(){ document.getElementById('docsXlsxFile')?.click(); }
+
+async function docsXlsxUpload(file){
+  if(!file || !docsXlsxItem) return;
+  const st = document.getElementById('docsXlsxStatus');
+  const setS = t => { if(st) st.textContent = t; };
+  try {
+    setS('파일 읽는 중…');
+    await loadSheetJS();
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const fsId = docsXlsxItem.fsId;
+    // 이전 메타(청크 수) 기억 — 새 업로드가 더 작으면 남는 고아 청크 삭제
+    let oldMeta = null;
+    try { const os = await getDoc(doc(fbDb, 'docsSheets', fsId)); if(os.exists()) oldMeta = os.data(); } catch(e) {}
+    const sheetNames = [], sheetChunks = [], sheetRows = [], writes = [];
+    for(const name of wb.SheetNames){
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, defval: '', blankrows: false })
+        .map(r => {
+          let last = r.length - 1;
+          while(last >= 0 && String(r[last]).trim() === '') last--;
+          return r.slice(0, last + 1).map(c => String(c));
+        })
+        .filter(r => r.length);
+      if(!rows.length) continue;
+      const si = sheetNames.length;
+      // 행들을 JSON 70만 "바이트" 이하 청크로 분할 — Firestore 제한(1MiB)은
+      // 글자 수가 아니라 UTF-8 바이트 기준 (한글 1자 = 3바이트)
+      const byteLen = s => new TextEncoder().encode(s).length;
+      const chunks = [];
+      let cur = [], curLen = 2;
+      for(const r of rows){
+        const rl = byteLen(JSON.stringify(r)) + 1;
+        if(cur.length && curLen + rl > 700000){ chunks.push(cur); cur = []; curLen = 2; }
+        cur.push(r); curLen += rl;
+      }
+      if(cur.length) chunks.push(cur);
+      chunks.forEach((c, ci) => writes.push([`${fsId}_s${si}_c${ci}`, { json: JSON.stringify(c) }]));
+      sheetNames.push(name); sheetChunks.push(chunks.length); sheetRows.push(rows.length);
+    }
+    if(!sheetNames.length){ setS('빈 파일입니다'); return; }
+    for(let i = 0; i < writes.length; i++){
+      setS(`저장 중… ${i + 1}/${writes.length}`);
+      await _fsSetDoc(doc(fbDb, 'docsSheets', writes[i][0]), writes[i][1]);
+    }
+    await _fsSetDoc(doc(fbDb, 'docsSheets', fsId), {
+      sheetNames, sheetChunks, sheetRows,
+      updatedAt: new Date().toISOString(),
+      updatedBy: fbAuth.currentUser?.email || '',
+    });
+    if(oldMeta && oldMeta.sheetChunks){
+      for(let s = 0; s < oldMeta.sheetChunks.length; s++){
+        for(let c = (sheetChunks[s] || 0); c < oldMeta.sheetChunks[s]; c++){
+          try { await _fsDeleteDoc(doc(fbDb, 'docsSheets', `${fsId}_s${s}_c${c}`)); } catch(e) {}
+        }
+      }
+    }
+    setS('업로드 완료 ✓');
+    initDocsXlsx(docsXlsxItem);
+  } catch(e) {
+    console.error(e);
+    setS(e.code === 'permission-denied' ? '권한 없음 — 교사 계정 필요' : '업로드 실패: ' + e.message);
+  } finally {
+    const f = document.getElementById('docsXlsxFile');
+    if(f) f.value = '';
+  }
+}
+
 // onclick/oninput 속성에서 호출 — module 스크립트라 전역 노출 필수
 window.openDocsItem = openDocsItem;
 window.showDocsList = showDocsList;
 window.filterDocsTable = filterDocsTable;
+window.docsXlsxShowSheet = docsXlsxShowSheet;
+window.docsXlsxShowAll = docsXlsxShowAll;
+window.docsXlsxSearch = docsXlsxSearch;
+window.docsXlsxUploadClick = docsXlsxUploadClick;
+window.docsXlsxUpload = docsXlsxUpload;
 window.toggleDocsNote = toggleDocsNote;
 window.docsPdfFindInput = docsPdfFindInput;
 window.docsPdfFindNav = docsPdfFindNav;

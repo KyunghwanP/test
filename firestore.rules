@@ -117,6 +117,12 @@ service cloud.firestore {
     match /memos2/{userId}/{document=**} {
       allow read, write: if isYnhsTeacher() && request.auth.uid == userId;
     }
+    // ── 업무자료 엑셀 시트 데이터 (편성·명렬표 등) ──
+    // 학생 개인정보 포함 — 퍼블릭 저장소(GitHub Pages)에 파일로 올릴 수 없어
+    // 교사가 앱에서 직접 업로드(SheetJS 파싱)해 여기에 저장. 교사만 읽기/쓰기.
+    match /docsSheets/{docId} {
+      allow read, write: if isYnhsTeacher();
+    }
     // ── 공통 함수 ──
     function isYnhsTeacher() {
       return request.auth != null
