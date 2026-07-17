@@ -147,6 +147,16 @@
         .pg-para.has-page .pg-badge, .pg-row.has-page .pg-badge { display: block; }
         .pg-para.has-page .pg-text, .pg-row.has-page .pg-text { font-weight: 800; }
         .pg-para[class*="pg-h"] .pg-badge { margin-top: 3px; }
+        /* ── 항목·토글 제목 레벨 (#, ##, ### 마크다운) — 체크박스·토글 기능은 유지한 채 글자만 커짐 ── */
+        .pg-row.pg-lv2 .pg-text { font-size: 25px; font-weight: 900; letter-spacing: -.03em; }
+        .pg-row.pg-lv3 .pg-text { font-size: 20px; font-weight: 900; letter-spacing: -.02em; }
+        .pg-row.pg-lv4 .pg-text { font-size: 17px; font-weight: 800; }
+        .pg-row.pg-lv2 .pg-mark { margin-top: 12px; }
+        .pg-row.pg-lv3 .pg-mark { margin-top: 8px; }
+        .pg-row.pg-lv4 .pg-mark { margin-top: 6px; }
+        .toggle-block__input.tg-h2 { font-size: 25px; font-weight: 900; letter-spacing: -.03em; }
+        .toggle-block__input.tg-h3 { font-size: 20px; font-weight: 900; letter-spacing: -.02em; }
+        .toggle-block__input.tg-h4 { font-size: 17px; font-weight: 800; }
 
         /* ── 페이지 모달 ── */
         .page-modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px 12px; }
@@ -561,6 +571,7 @@
                     text: (typeof it === 'string' ? it : (it && (it.text || it.content))) || '',
                     checked: !!(it && it.checked),
                     pageId: (it && it.pageId) || null,
+                    level: (it && it.level) || 0,   // 항목 제목 레벨 (#=2, ##=3, ###=4) — 0이면 일반
                 }));
             }
             render() {
@@ -571,7 +582,7 @@
             }
             renderRow(item) {
                 const row = document.createElement('div');
-                row.className = 'pg-row' + (item.checked ? ' done' : '') + (item.pageId ? ' has-page' : '');
+                row.className = 'pg-row' + (item.checked ? ' done' : '') + (item.pageId ? ' has-page' : '') + (item.level ? ' pg-lv' + item.level : '');
                 row._item = item;
 
                 const mark = document.createElement('span');
@@ -658,10 +669,43 @@
                         text: r.querySelector('.pg-text').innerHTML,
                         checked: !!r._item.checked,
                         pageId: r._item.pageId || null,
+                        level: r._item.level || 0,
                     })).filter(it => stripTags(it.text) || it.pageId),
                 };
             }
-            static get sanitize() { return { items: { text: { br: true, b: true, i: true, a: true, mark: true }, checked: false, pageId: false } }; }
+            static get sanitize() { return { items: { text: { br: true, b: true, i: true, a: true, mark: true }, checked: false, pageId: false, level: false } }; }
+        }
+
+        // ── 토글 확장: 제목 레벨(#, ##, ###) 지원 ──
+        // 토글 기능(접기/펼치기·하위 블록)은 그대로 두고 제목 글자 크기만 바꾼다.
+        // wrapper에 인스턴스를 걸어 두어 마크다운 핸들러가 setLevel·setAttributesToNewBlock에 접근.
+        class ToggleTool extends window.ToggleBlock {
+            constructor(args) {
+                super(args);
+                this.data.level = (args.data && args.data.level) || 0;
+            }
+            render() {
+                const w = super.render();
+                w.__toggleTool = this;
+                if (this.data.level) {
+                    const input = w.querySelector('.toggle-block__input');
+                    if (input) input.classList.add('tg-h' + this.data.level);
+                }
+                return w;
+            }
+            setLevel(n) {
+                this.data.level = n;
+                const input = this.wrapper && this.wrapper.querySelector('.toggle-block__input');
+                if (input) {
+                    input.classList.remove('tg-h2', 'tg-h3', 'tg-h4');
+                    if (n) input.classList.add('tg-h' + n);
+                }
+            }
+            save(w) {
+                const d = super.save(w);
+                d.level = this.data.level || 0;
+                return d;
+            }
         }
 
         // ── 페이지 데이터 로드 (+ 구버전 자동 이전) ──
@@ -704,7 +748,7 @@
                     todo:   { class: PageItems, config: { mode: 'todo' },   inlineToolbar: ['marker'], toolbox: { title: '체크리스트', icon: '☑' } },
                     bullet: { class: PageItems, config: { mode: 'bullet' }, inlineToolbar: ['marker'], toolbox: { title: '목록', icon: '•' } },
                     number: { class: PageItems, config: { mode: 'number' }, inlineToolbar: ['marker'], toolbox: { title: '번호 목록', icon: '1.' } },
-                    toggle: { class: window.ToggleBlock, inlineToolbar: true },
+                    toggle: { class: ToggleTool, inlineToolbar: true },
                     delimiter: window.Delimiter,
                     marker: window.Marker,
                 },
@@ -762,23 +806,78 @@
                     // 에디터를 재생성해도 holder는 그대로라 리스너가 누적됨 —
                     // 파괴된 에디터를 참조하는 옛 리스너를 제거하고 새로 단다
                     if (holderEl.__mdKeydown) holderEl.removeEventListener('keydown', holderEl.__mdKeydown);
+                    // #/##/### 를 토글 제목·목록 항목 "안"에서 치면: 블록을 갈아치우지 않고
+                    // 글자 크기(레벨)만 적용 — 토글·체크박스 기능이 그대로 살아 있다.
+                    const HEAD_LV = { '#': 2, '##': 3, '###': 4 };
                     holderEl.__mdKeydown = e => {
                         if (e.key !== ' ') return;
                         const sel = getSelection();
                         if (!sel || !sel.anchorNode) return;
                         const el = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
-                        // v2: 기본 블록이 커스텀(.pg-para)이므로 그 편집영역도 인식해야 한다
-                        // (.pg-row 안의 목록 항목은 제외 — 항목 안에서는 변환하지 않음)
-                        const para = el && el.closest && (el.closest('.ce-paragraph') || el.closest('.pg-para > .pg-text'));
-                        if (!para || !holderEl.contains(para)) return;
+                        if (!el || !el.closest || !holderEl.contains(el)) return;
+
+                        // 1) 토글 제목: # → 토글 기능 유지 + 제목 크기
+                        const tgInput = el.closest('.toggle-block__input');
+                        if (tgInput) {
+                            const lv = HEAD_LV[tgInput.textContent.trim()];
+                            if (!lv) return;
+                            e.preventDefault(); e.stopPropagation();
+                            const rootWrap = tgInput.closest('.toggle-block__selector');
+                            const inst = rootWrap && rootWrap.__toggleTool;
+                            if (inst) inst.setLevel(lv);
+                            else { tgInput.classList.remove('tg-h2', 'tg-h3', 'tg-h4'); tgInput.classList.add('tg-h' + lv); }
+                            tgInput.textContent = '';
+                            placeCaretEnd(tgInput);
+                            scheduleSave();
+                            return;
+                        }
+
+                        // 2) 체크리스트·목록 항목: # → 체크박스/마커 유지 + 제목 크기
+                        const itemTxt = el.closest('.pg-row .pg-text');
+                        if (itemTxt) {
+                            const lv = HEAD_LV[itemTxt.textContent.trim()];
+                            if (!lv) return;
+                            e.preventDefault(); e.stopPropagation();
+                            const row = itemTxt.closest('.pg-row');
+                            if (row._item) { row._item.level = lv; row._item.text = ''; }
+                            row.classList.remove('pg-lv2', 'pg-lv3', 'pg-lv4');
+                            row.classList.add('pg-lv' + lv);
+                            itemTxt.innerHTML = '';
+                            placeCaretEnd(itemTxt);
+                            scheduleSave();
+                            return;
+                        }
+
+                        // 3) 빈 문단 → 블록 변환 (v2: 기본 블록이 커스텀 .pg-para이므로 그 편집영역도 인식)
+                        const para = el.closest('.ce-paragraph') || el.closest('.pg-para > .pg-text');
+                        if (!para) return;
                         const trigger = para.textContent.trim();
                         if (!MD_MAP[trigger]) return;
                         e.preventDefault();
                         e.stopPropagation();
                         const idx = ed.blocks.getCurrentBlockIndex();
                         if (idx < 0) return;
+                        // 토글 안의 문단이면 소속(foreignKey)을 기억해 뒀다가 변환된 블록에 승계 —
+                        // insert(replace)가 새 holder를 만들며 속성이 날아가 토글 밖으로 탈출하던 버그 수정
+                        const curBlk = ed.blocks.getBlockByIndex(idx);
+                        const fk = curBlk && curBlk.holder ? curBlk.holder.getAttribute('foreignKey') : null;
                         const [type, data] = MD_MAP[trigger];
                         ed.blocks.insert(type, JSON.parse(JSON.stringify(data)), undefined, idx, false, true);   // 현재 블록 대체 (포커스는 아래에서 직접 처리)
+                        if (fk) {
+                            try {
+                                const rootWrap = document.getElementById(fk);
+                                const inst = rootWrap && rootWrap.__toggleTool;
+                                if (inst) inst.setAttributesToNewBlock(idx);   // 라이브러리 정식 경로 (itemsId 장부까지 등록)
+                                else {
+                                    const nb = ed.blocks.getBlockByIndex(idx);
+                                    if (nb && nb.holder) {
+                                        nb.holder.setAttribute('foreignKey', fk);
+                                        nb.holder.setAttribute('id', newPageId());
+                                        nb.holder.classList.add('toggle-block__item');
+                                    }
+                                }
+                            } catch (err) { console.error(err); }
+                        }
                         // 새 블록의 편집 요소에 커서를 직접 놓아 이어서 바로 입력 가능하게
                         // (needToFocus·caret.setToBlock은 체크리스트/리스트 등에서 비동기 렌더와 타이밍이 안 맞아 포커스가 풀림)
                         // 새 블록의 편집 요소에 커서를 직접 안착 — Editor가 첫 프레임 이후 포커스를 덮어쓰므로
