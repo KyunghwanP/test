@@ -2893,9 +2893,11 @@
   .docs-xlsx-tabs{display:flex;gap:4px;overflow-x:auto;flex-shrink:0;padding:8px 10px 0;background:var(--paper);border-bottom:1px solid var(--rule);}
   .docs-xlsx-tab{border:1px solid var(--rule);border-bottom:none;background:var(--paper-soft);color:var(--ink-soft);font-weight:700;font-size:12.5px;padding:7px 12px;border-radius:8px 8px 0 0;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:inherit;}
   .docs-xlsx-tab.active{background:var(--paper);color:var(--mon);border-color:var(--mon);}
-  .docs-xlsx-wrap{flex:1;min-height:0;overflow:auto;}
-  .docs-xlsx-table{border-collapse:collapse;font-size:12.5px;margin:0;}
-  .docs-xlsx-table td{border:1px solid var(--rule);padding:4px 8px;white-space:nowrap;color:var(--ink);max-width:340px;overflow:hidden;text-overflow:ellipsis;}
+  /* 시트 영역은 원본 재현을 위해 다크모드와 무관하게 흰 배경 고정 (PDF 뷰어와 동일 취지) */
+  .docs-xlsx-wrap{flex:1;min-height:0;overflow:auto;background:#fff;}
+  .docs-xlsx-table{border-collapse:collapse;table-layout:fixed;background:#fff;color:#000;font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:13px;}
+  .docs-xlsx-table td{border:1px solid #dde1e6;padding:0 3px;overflow:hidden;white-space:pre;line-height:1.25;vertical-align:bottom;}
+  .docs-xlsx-hl{outline:2.5px solid #f59e0b;outline-offset:-2.5px;}
   @media(min-width:900px){
     .docs-note-row{display:none !important;}
     .docs-note-hint{display:none;}
@@ -3226,7 +3228,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.16</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.17</div>
   </div>
 </div>
 
@@ -3356,7 +3358,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.16</div>
+    <div class="nav-version" title="Made by 박경환">ver6.17</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -9356,7 +9358,12 @@ function openDocsItem(id){
     body.classList.add('pdf');
     body.innerHTML = `
       <div class="docs-xlsx-bar">
-        <input class="docs-search" type="search" placeholder="🔍 표 내용 검색 (이름·과목 등)" oninput="docsXlsxSearch(this.value)">
+        <input class="docs-search" type="search" placeholder="🔍 시트 내 검색 (Enter: 다음)"
+          oninput="docsXlsxSearch(this.value)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();docsXlsxFindNav(event.shiftKey);}">
+        <button class="docs-pdf-nav" onclick="docsXlsxFindNav(true)" title="이전 결과">◀</button>
+        <button class="docs-pdf-nav" onclick="docsXlsxFindNav(false)" title="다음 결과">▶</button>
+        <span id="docsXlsxMatch" class="docs-pdf-match"></span>
         <button class="docs-pdf-nav" onclick="docsXlsxUploadClick()" title="엑셀 파일로 데이터 갱신 (교사 전용)">⬆ 갱신</button>
         <span id="docsXlsxStatus" class="docs-pdf-match" style="min-width:0;"></span>
       </div>
@@ -9439,24 +9446,115 @@ function bindDocsPdfFind(){
 
 // ── 엑셀 자료 뷰어 (Firestore docsSheets — 교사 전용) ──
 // 원본 xlsx는 개인정보(학생 명렬) 때문에 퍼블릭 저장소에 올릴 수 없다.
-// 대신 교사가 뷰어의 [⬆ 갱신]으로 파일을 고르면 브라우저에서 SheetJS로 파싱해
-// Firestore에 저장하고(교사 전용 규칙), 뷰어는 그 데이터를 읽어 표로 그린다.
-// Firestore 제약: 중첩 배열 금지 + 문서 1MB 제한 → 시트 행들을 JSON 문자열로
-// 직렬화해 70만 자 단위 청크(docsSheets/{id}_s{시트}_c{청크})로 나눠 저장.
-let docsXlsxItem = null;      // 현재 열린 xlsx 항목 (DOCS_ITEMS)
-let docsXlsxMeta = null;      // 메타 문서 { sheetNames, sheetChunks, sheetRows, updatedAt }
-let docsXlsxSheets = {};      // 시트 인덱스 → rows[][] 캐시
+// 대신 교사가 뷰어의 [⬆ 갱신]으로 파일을 고르면 원본 파일 그대로를 base64 청크로
+// Firestore에 저장하고(교사 전용 규칙), 뷰어는 내려받아 ExcelJS로 파싱해
+// 병합·배경색·테두리·글꼴·열너비까지 원본 서식을 재현해 그린다.
+// (Firestore 문서 1MB 제한 → base64 70만 자 단위 청크 docsSheets/{id}_c{n})
+let docsXlsxItem = null;       // 현재 열린 xlsx 항목 (DOCS_ITEMS)
+let docsXlsxWb = null;         // ExcelJS Workbook
 let docsXlsxCur = 0;
+let docsXlsxSheetCtx = null;   // { ws, spans, covered, colCount, rowCount }
+let docsXlsxRendered = 0;      // 현재 시트에서 그려진 행 수 (배치 렌더)
+let docsXlsxObserver = null;
+let docsXlsxMatches = [];      // 검색 결과 [{r,c}]
+let docsXlsxMatchPos = -1;
 let docsXlsxQuery = '';
-let docsXlsxShowAllRows = false;
 let docsXlsxSearchTimer = null;
-const DOCS_XLSX_ROW_CAP = 300;   // 첫 렌더 행 수 제한 (명렬 시트가 커서 DOM 보호)
+const DOCS_XLSX_BATCH = 80;    // 배치당 행 수 (명렬 시트 200+열 대비 DOM 보호)
 
 function docsXlsxEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function docsXlsxColNum(a){ let n = 0; for(const ch of a) n = n * 26 + (ch.charCodeAt(0) - 64); return n; }
+
+// ── 엑셀 색상 → CSS ──
+// Office 2013+ 기본 테마 팔레트 (theme 인덱스: lt1, dk1, lt2, dk2, accent1~6, hlink, folHlink)
+const DOCS_XLSX_THEME = ['FFFFFF','000000','E7E6E6','44546A','4472C4','ED7D31','A5A5A5','FFC000','5B9BD5','70AD47','0563C1','954F72'];
+// 레거시 indexed 팔레트 (표준 0~63)
+const DOCS_XLSX_INDEXED = ['#000000','#FFFFFF','#FF0000','#00FF00','#0000FF','#FFFF00','#FF00FF','#00FFFF','#000000','#FFFFFF','#FF0000','#00FF00','#0000FF','#FFFF00','#FF00FF','#00FFFF','#800000','#008000','#000080','#808000','#800080','#008080','#C0C0C0','#808080','#9999FF','#993366','#FFFFCC','#CCFFFF','#660066','#FF8080','#0066CC','#CCCCFF','#000080','#FF00FF','#FFFF00','#00FFFF','#800080','#800000','#008080','#0000FF','#00CCFF','#CCFFFF','#CCFFCC','#FFFF99','#99CCFF','#FF99CC','#CC99FF','#FFCC99','#3366FF','#33CCCC','#99CC00','#FFCC00','#FF9900','#FF6600','#666699','#969696','#003366','#339966','#003300','#333300','#993300','#993366','#333399','#333333'];
+function docsXlsxTint(hex, tint){
+  const f = c => Math.max(0, Math.min(255, Math.round(tint < 0 ? c * (1 + tint) : c + (255 - c) * tint)));
+  const r = parseInt(hex.substr(0,2),16), g = parseInt(hex.substr(2,2),16), b = parseInt(hex.substr(4,2),16);
+  return `rgb(${f(r)},${f(g)},${f(b)})`;
+}
+function docsXlsxColor(col){
+  if(!col) return null;
+  if(col.argb){
+    const a = parseInt(col.argb.slice(0,2),16) / 255, rgb = col.argb.slice(2);
+    if(a >= 1) return '#' + rgb;
+    return `rgba(${parseInt(rgb.slice(0,2),16)},${parseInt(rgb.slice(2,4),16)},${parseInt(rgb.slice(4,6),16)},${a.toFixed(2)})`;
+  }
+  if(col.theme !== undefined) return docsXlsxTint(DOCS_XLSX_THEME[col.theme] || '000000', col.tint || 0);
+  if(col.indexed !== undefined) return DOCS_XLSX_INDEXED[col.indexed] || null;
+  return null;
+}
+
+// ── 셀 값 → 표시 문자열 (숫자 서식 일부 지원: %, 천단위, 소수 자릿수) ──
+function docsXlsxCellText(cell){
+  let v = cell.value;
+  if(v == null) return '';
+  if(typeof v === 'object' && !(v instanceof Date)){
+    if(v.richText) return v.richText.map(t => t.text).join('');
+    if(v.result !== undefined) v = v.result;
+    else if(v.text !== undefined) v = v.text;
+    else if(v.formula !== undefined) return '';
+    if(v == null) return '';
+  }
+  if(v instanceof Date)
+    return v.getUTCFullYear() + '.' + String(v.getUTCMonth() + 1).padStart(2,'0') + '.' + String(v.getUTCDate()).padStart(2,'0');
+  if(typeof v === 'number'){
+    const fmt = cell.numFmt || '';
+    if(fmt.includes('%')) return (Math.round(v * 10000) / 100) + '%';
+    const dec = fmt.match(/0\.(0+)/);
+    let s = dec ? v.toFixed(dec[1].length) : String(Math.round(v * 1e10) / 1e10);
+    if(fmt.includes(',')){ const p = s.split('.'); p[0] = Number(p[0]).toLocaleString('en-US'); s = p.join('.'); }
+    return s;
+  }
+  return String(v);
+}
+
+// ── 셀 스타일 → 인라인 CSS ──
+const DOCS_XLSX_BW = { thin:'1px', hair:'1px', dotted:'1px', dashed:'1px', dashDot:'1px', dashDotDot:'1px', medium:'2px', mediumDashed:'2px', mediumDashDot:'2px', slantDashDot:'2px', double:'3px', thick:'3px' };
+function docsXlsxCellCss(cell){
+  const st = cell.style || {};
+  let css = '';
+  const fill = st.fill;
+  if(fill && fill.type === 'pattern' && fill.pattern && fill.pattern !== 'none'){
+    const c = docsXlsxColor(fill.fgColor);
+    if(c) css += 'background:' + c + ';';
+  }
+  const f = st.font;
+  if(f){
+    if(f.bold) css += 'font-weight:700;';
+    if(f.italic) css += 'font-style:italic;';
+    if(f.underline) css += 'text-decoration:underline;';
+    if(f.strike) css += 'text-decoration:line-through;';
+    if(f.size && f.size !== 11) css += 'font-size:' + Math.round(f.size * 4 / 3) + 'px;';
+    const c = docsXlsxColor(f.color);
+    if(c) css += 'color:' + c + ';';
+  }
+  const al = st.alignment || {};
+  if(al.horizontal && al.horizontal !== 'fill') css += 'text-align:' + al.horizontal + ';';
+  else if(typeof cell.value === 'number') css += 'text-align:right;';
+  if(al.vertical) css += 'vertical-align:' + (al.vertical === 'center' ? 'middle' : al.vertical) + ';';
+  if(al.wrapText) css += 'white-space:pre-wrap;word-break:break-all;';
+  const b = st.border;
+  if(b) for(const side of ['top','right','bottom','left']){
+    const s = b[side];
+    if(s && s.style){
+      const w = DOCS_XLSX_BW[s.style] || '1px';
+      const ls = s.style === 'double' ? 'double' : /dash/i.test(s.style) ? 'dashed' : s.style === 'dotted' || s.style === 'hair' ? 'dotted' : 'solid';
+      css += `border-${side}:${w} ${ls} ${docsXlsxColor(s.color) || '#000'};`;
+    }
+  }
+  return css;
+}
+
+function docsXlsxVisibleSheets(){
+  return docsXlsxWb ? docsXlsxWb.worksheets.filter(ws => !ws.state || ws.state === 'visible') : [];
+}
 
 async function initDocsXlsx(item){
-  docsXlsxItem = item; docsXlsxMeta = null; docsXlsxSheets = {};
-  docsXlsxCur = 0; docsXlsxQuery = ''; docsXlsxShowAllRows = false;
+  docsXlsxItem = item; docsXlsxWb = null; docsXlsxSheetCtx = null; docsXlsxCur = 0;
+  docsXlsxMatches = []; docsXlsxMatchPos = -1; docsXlsxQuery = '';
   const wrap = document.getElementById('docsXlsxWrap');
   try {
     const snap = await getDoc(doc(fbDb, 'docsSheets', item.fsId));
@@ -9464,11 +9562,26 @@ async function initDocsXlsx(item){
       wrap.innerHTML = '<div class="docs-empty">아직 업로드된 데이터가 없습니다.<br>우측 상단 <b>[⬆ 갱신]</b> 버튼으로 엑셀 파일을 올려주세요.</div>';
       return;
     }
-    docsXlsxMeta = snap.data();
+    const meta = snap.data();
+    wrap.innerHTML = '<div class="docs-empty">파일 불러오는 중…</div>';
+    // base64 청크 조립 → 바이너리 복원 → ExcelJS 파싱
+    const excelP = loadExcelJS();
+    let b64 = '';
+    for(let c = 0; c < (meta.chunks || 0); c++){
+      const s = await getDoc(doc(fbDb, 'docsSheets', `${item.fsId}_c${c}`));
+      if(s.exists()) b64 += s.data().b64;
+    }
+    const bin = atob(b64);
+    const buf = new Uint8Array(bin.length);
+    for(let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    await excelP;
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf.buffer);
+    docsXlsxWb = wb;
     const st = document.getElementById('docsXlsxStatus');
-    if(st && docsXlsxMeta.updatedAt) st.textContent = '갱신 ' + docsXlsxMeta.updatedAt.slice(0, 10);
+    if(st && meta.updatedAt) st.textContent = '갱신 ' + meta.updatedAt.slice(0, 10);
     renderDocsXlsxTabs();
-    await docsXlsxShowSheet(0);
+    docsXlsxShowSheet(0);
   } catch(e) {
     console.error(e);
     wrap.innerHTML = `<div class="docs-empty">${e.code === 'permission-denied'
@@ -9479,68 +9592,128 @@ async function initDocsXlsx(item){
 
 function renderDocsXlsxTabs(){
   const tabs = document.getElementById('docsXlsxTabs');
-  if(!tabs || !docsXlsxMeta) return;
-  tabs.innerHTML = docsXlsxMeta.sheetNames.map((n, i) =>
-    `<button class="docs-xlsx-tab${i === docsXlsxCur ? ' active' : ''}" onclick="docsXlsxShowSheet(${i})">${docsXlsxEsc(n)}</button>`).join('');
+  if(!tabs || !docsXlsxWb) return;
+  tabs.innerHTML = docsXlsxVisibleSheets().map((ws, i) =>
+    `<button class="docs-xlsx-tab${i === docsXlsxCur ? ' active' : ''}" onclick="docsXlsxShowSheet(${i})">${docsXlsxEsc(ws.name)}</button>`).join('');
 }
 
-async function docsXlsxShowSheet(i){
-  docsXlsxCur = i; docsXlsxShowAllRows = false;
+function docsXlsxShowSheet(i){
+  docsXlsxCur = i;
+  docsXlsxMatches = []; docsXlsxMatchPos = -1;   // 검색 결과는 시트 단위
+  const matchEl = document.getElementById('docsXlsxMatch');
+  if(matchEl) matchEl.textContent = '';
   renderDocsXlsxTabs();
   const wrap = document.getElementById('docsXlsxWrap');
-  if(!docsXlsxSheets[i]){
-    wrap.innerHTML = '<div class="docs-empty">시트 불러오는 중…</div>';
-    try {
-      let rows = [];
-      for(let c = 0; c < (docsXlsxMeta.sheetChunks[i] || 0); c++){
-        const s = await getDoc(doc(fbDb, 'docsSheets', `${docsXlsxItem.fsId}_s${i}_c${c}`));
-        if(s.exists()) rows = rows.concat(JSON.parse(s.data().json));
-      }
-      docsXlsxSheets[i] = rows;
-    } catch(e) {
-      console.error(e);
-      wrap.innerHTML = '<div class="docs-empty">시트 불러오기 실패: ' + docsXlsxEsc(e.message) + '</div>';
-      return;
-    }
+  const ws = docsXlsxVisibleSheets()[i];
+  if(!ws){ wrap.innerHTML = '<div class="docs-empty">시트가 없습니다.</div>'; return; }
+  // 병합 범위 → 앵커 셀의 rowspan/colspan + 가려지는 셀 집합
+  const spans = {}, covered = {};
+  (ws.model.merges || []).forEach(rg => {
+    const m = String(rg).match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+    if(!m) return;
+    const c1 = docsXlsxColNum(m[1]), r1 = +m[2], c2 = docsXlsxColNum(m[3]), r2 = +m[4];
+    spans[r1 + '_' + c1] = [r2 - r1 + 1, c2 - c1 + 1];
+    for(let r = r1; r <= r2; r++) for(let c = c1; c <= c2; c++)
+      if(r !== r1 || c !== c1) covered[r + '_' + c] = 1;
+  });
+  const colCount = Math.min(ws.columnCount || 1, 300);
+  const rowCount = ws.rowCount || 1;
+  // 열 너비: 엑셀 단위(문자 폭) ≈ *7px + 5
+  let cols = '';
+  for(let c = 1; c <= colCount; c++){
+    const col = ws.getColumn(c);
+    cols += col.hidden
+      ? '<col style="width:0;visibility:collapse;">'
+      : `<col style="width:${Math.round((col.width || 8.43) * 7 + 5)}px;">`;
   }
-  renderDocsXlsxTable();
+  wrap.innerHTML = `<table class="docs-xlsx-table"><colgroup>${cols}</colgroup><tbody id="docsXlsxTbody"></tbody></table><div id="docsXlsxMore" style="height:1px;"></div>`;
+  wrap.scrollTop = 0; wrap.scrollLeft = 0;
+  docsXlsxSheetCtx = { ws, spans, covered, colCount, rowCount };
+  docsXlsxRendered = 0;
+  docsXlsxAppendRows();
+  // 스크롤이 바닥에 가까워지면 다음 배치 렌더 (큰 명렬 시트 대비)
+  if(docsXlsxObserver) docsXlsxObserver.disconnect();
+  docsXlsxObserver = new IntersectionObserver(es => {
+    if(es.some(e => e.isIntersecting)) docsXlsxAppendRows();
+  }, { root: wrap, rootMargin: '800px' });
+  const more = document.getElementById('docsXlsxMore');
+  if(more) docsXlsxObserver.observe(more);
 }
 
-function renderDocsXlsxTable(){
-  const wrap = document.getElementById('docsXlsxWrap');
-  if(!wrap) return;
-  const rows = docsXlsxSheets[docsXlsxCur] || [];
-  const q = docsXlsxQuery.trim().toLowerCase();
-  let shown = q ? rows.filter(r => r.some(c => String(c).toLowerCase().includes(q))) : rows;
-  const total = shown.length;
-  const capped = !docsXlsxShowAllRows && total > DOCS_XLSX_ROW_CAP;
-  if(capped) shown = shown.slice(0, DOCS_XLSX_ROW_CAP);
-  const html = shown.map(r => '<tr>' + r.map(c => `<td>${docsXlsxEsc(c)}</td>`).join('') + '</tr>').join('');
-  wrap.innerHTML = (total
-    ? `<table class="docs-xlsx-table"><tbody>${html}</tbody></table>`
-    : '<div class="docs-empty">검색 결과가 없습니다.</div>')
-    + (capped ? `<div style="padding:10px;text-align:center;"><button class="docs-pdf-nav" onclick="docsXlsxShowAll()">전체 ${total}행 모두 표시</button></div>` : '');
+function docsXlsxAppendRows(){
+  const ctx = docsXlsxSheetCtx;
+  const tbody = document.getElementById('docsXlsxTbody');
+  if(!ctx || !tbody || docsXlsxRendered >= ctx.rowCount) return;
+  const end = Math.min(ctx.rowCount, docsXlsxRendered + DOCS_XLSX_BATCH);
+  let html = '';
+  for(let r = docsXlsxRendered + 1; r <= end; r++){
+    const row = ctx.ws.getRow(r);
+    html += row.hidden ? '<tr style="display:none;">'
+      : `<tr style="height:${Math.round((row.height || 16.5) * 4 / 3)}px;">`;
+    for(let c = 1; c <= ctx.colCount; c++){
+      if(ctx.covered[r + '_' + c]) continue;
+      const sp = ctx.spans[r + '_' + c];
+      const cell = row.getCell(c);
+      html += `<td data-rc="${r}_${c}"${sp ? ` rowspan="${sp[0]}" colspan="${sp[1]}"` : ''} style="${docsXlsxCellCss(cell)}">${docsXlsxEsc(docsXlsxCellText(cell))}</td>`;
+    }
+    html += '</tr>';
+  }
+  tbody.insertAdjacentHTML('beforeend', html);
+  docsXlsxRendered = end;
+  if(end >= ctx.rowCount){
+    if(docsXlsxObserver) docsXlsxObserver.disconnect();
+    document.getElementById('docsXlsxMore')?.remove();
+  }
 }
 
-function docsXlsxShowAll(){ docsXlsxShowAllRows = true; renderDocsXlsxTable(); }
-
+// ── 시트 내 검색: 행을 숨기지 않고(서식 보존) 일치 셀로 이동·하이라이트 ──
 function docsXlsxSearch(q){
   clearTimeout(docsXlsxSearchTimer);
-  docsXlsxSearchTimer = setTimeout(() => { docsXlsxQuery = q || ''; docsXlsxShowAllRows = false; renderDocsXlsxTable(); }, 250);
+  docsXlsxSearchTimer = setTimeout(() => {
+    docsXlsxQuery = (q || '').trim().toLowerCase();
+    docsXlsxMatches = []; docsXlsxMatchPos = -1;
+    document.querySelectorAll('.docs-xlsx-hl').forEach(el => el.classList.remove('docs-xlsx-hl'));
+    const matchEl = document.getElementById('docsXlsxMatch');
+    if(!docsXlsxQuery){ if(matchEl) matchEl.textContent = ''; return; }
+    const ctx = docsXlsxSheetCtx;
+    if(!ctx) return;
+    for(let r = 1; r <= ctx.rowCount; r++){
+      ctx.ws.getRow(r).eachCell({ includeEmpty: false }, (cell, c) => {
+        if(c > ctx.colCount || ctx.covered[r + '_' + c]) return;
+        if(docsXlsxCellText(cell).toLowerCase().includes(docsXlsxQuery)) docsXlsxMatches.push({ r, c });
+      });
+    }
+    if(matchEl) matchEl.textContent = docsXlsxMatches.length ? `0/${docsXlsxMatches.length}` : '0건';
+    if(docsXlsxMatches.length) docsXlsxFindNav(false);
+  }, 300);
 }
 
-// SheetJS는 업로드할 때만 필요 — 지연 로드 (vendor 셀프호스팅, 학교망 CDN 차단 대비)
-let sheetJsPromise = null;
-function loadSheetJS(){
-  if(window.XLSX) return Promise.resolve();
-  if(!sheetJsPromise) sheetJsPromise = new Promise((res, rej) => {
+function docsXlsxFindNav(prev){
+  if(!docsXlsxMatches.length) return;
+  docsXlsxMatchPos = (docsXlsxMatchPos + (prev ? -1 : 1) + docsXlsxMatches.length) % docsXlsxMatches.length;
+  const m = docsXlsxMatches[docsXlsxMatchPos];
+  // 아직 안 그려진 행이면 그 행까지 배치 렌더를 진행
+  let guard = 0;
+  while(docsXlsxRendered < m.r && docsXlsxSheetCtx && docsXlsxRendered < docsXlsxSheetCtx.rowCount && guard++ < 200) docsXlsxAppendRows();
+  document.querySelectorAll('.docs-xlsx-hl').forEach(el => el.classList.remove('docs-xlsx-hl'));
+  const td = document.querySelector(`td[data-rc="${m.r}_${m.c}"]`);
+  if(td){ td.classList.add('docs-xlsx-hl'); td.scrollIntoView({ block: 'center', inline: 'center' }); }
+  const matchEl = document.getElementById('docsXlsxMatch');
+  if(matchEl) matchEl.textContent = `${docsXlsxMatchPos + 1}/${docsXlsxMatches.length}`;
+}
+
+// ExcelJS는 뷰어를 열 때만 지연 로드 (vendor 셀프호스팅, 학교망 CDN 차단 대비)
+let excelJsPromise = null;
+function loadExcelJS(){
+  if(window.ExcelJS) return Promise.resolve();
+  if(!excelJsPromise) excelJsPromise = new Promise((res, rej) => {
     const s = document.createElement('script');
-    s.src = 'vendor/sheetjs/xlsx.full.min.js';
+    s.src = 'vendor/exceljs/exceljs.min.js';
     s.onload = res;
-    s.onerror = () => { sheetJsPromise = null; rej(new Error('SheetJS 로드 실패')); };
+    s.onerror = () => { excelJsPromise = null; rej(new Error('ExcelJS 로드 실패')); };
     document.head.appendChild(s);
   });
-  return sheetJsPromise;
+  return excelJsPromise;
 }
 
 function docsXlsxUploadClick(){ document.getElementById('docsXlsxFile')?.click(); }
@@ -9550,53 +9723,32 @@ async function docsXlsxUpload(file){
   const st = document.getElementById('docsXlsxStatus');
   const setS = t => { if(st) st.textContent = t; };
   try {
+    if(file.size > 10 * 1024 * 1024){ setS('10MB 이하 파일만 가능합니다'); return; }
     setS('파일 읽는 중…');
-    await loadSheetJS();
-    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    // 원본 파일 그대로 base64로 저장 — 뷰어가 ExcelJS로 파싱해 서식까지 재현
+    const buf = new Uint8Array(await file.arrayBuffer());
+    let binStr = '';
+    for(let i = 0; i < buf.length; i += 0x8000)
+      binStr += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    const b64 = btoa(binStr);
     const fsId = docsXlsxItem.fsId;
-    // 이전 메타(청크 수) 기억 — 새 업로드가 더 작으면 남는 고아 청크 삭제
+    // 이전 메타(청크 수) 기억 — 새 파일이 더 작으면 남는 고아 청크 삭제
     let oldMeta = null;
     try { const os = await getDoc(doc(fbDb, 'docsSheets', fsId)); if(os.exists()) oldMeta = os.data(); } catch(e) {}
-    const sheetNames = [], sheetChunks = [], sheetRows = [], writes = [];
-    for(const name of wb.SheetNames){
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, defval: '', blankrows: false })
-        .map(r => {
-          let last = r.length - 1;
-          while(last >= 0 && String(r[last]).trim() === '') last--;
-          return r.slice(0, last + 1).map(c => String(c));
-        })
-        .filter(r => r.length);
-      if(!rows.length) continue;
-      const si = sheetNames.length;
-      // 행들을 JSON 70만 "바이트" 이하 청크로 분할 — Firestore 제한(1MiB)은
-      // 글자 수가 아니라 UTF-8 바이트 기준 (한글 1자 = 3바이트)
-      const byteLen = s => new TextEncoder().encode(s).length;
-      const chunks = [];
-      let cur = [], curLen = 2;
-      for(const r of rows){
-        const rl = byteLen(JSON.stringify(r)) + 1;
-        if(cur.length && curLen + rl > 700000){ chunks.push(cur); cur = []; curLen = 2; }
-        cur.push(r); curLen += rl;
-      }
-      if(cur.length) chunks.push(cur);
-      chunks.forEach((c, ci) => writes.push([`${fsId}_s${si}_c${ci}`, { json: JSON.stringify(c) }]));
-      sheetNames.push(name); sheetChunks.push(chunks.length); sheetRows.push(rows.length);
-    }
-    if(!sheetNames.length){ setS('빈 파일입니다'); return; }
-    for(let i = 0; i < writes.length; i++){
-      setS(`저장 중… ${i + 1}/${writes.length}`);
-      await _fsSetDoc(doc(fbDb, 'docsSheets', writes[i][0]), writes[i][1]);
+    const CH = 700000;   // base64는 ASCII(1자=1바이트) — 문서 1MiB 제한에 그대로 대응
+    const n = Math.ceil(b64.length / CH);
+    for(let i = 0; i < n; i++){
+      setS(`저장 중… ${i + 1}/${n}`);
+      await _fsSetDoc(doc(fbDb, 'docsSheets', `${fsId}_c${i}`), { b64: b64.slice(i * CH, (i + 1) * CH) });
     }
     await _fsSetDoc(doc(fbDb, 'docsSheets', fsId), {
-      sheetNames, sheetChunks, sheetRows,
+      chunks: n, bytes: buf.length, fileName: file.name,
       updatedAt: new Date().toISOString(),
       updatedBy: fbAuth.currentUser?.email || '',
     });
-    if(oldMeta && oldMeta.sheetChunks){
-      for(let s = 0; s < oldMeta.sheetChunks.length; s++){
-        for(let c = (sheetChunks[s] || 0); c < oldMeta.sheetChunks[s]; c++){
-          try { await _fsDeleteDoc(doc(fbDb, 'docsSheets', `${fsId}_s${s}_c${c}`)); } catch(e) {}
-        }
+    if(oldMeta && oldMeta.chunks > n){
+      for(let c = n; c < oldMeta.chunks; c++){
+        try { await _fsDeleteDoc(doc(fbDb, 'docsSheets', `${fsId}_c${c}`)); } catch(e) {}
       }
     }
     setS('업로드 완료 ✓');
@@ -9615,10 +9767,19 @@ window.openDocsItem = openDocsItem;
 window.showDocsList = showDocsList;
 window.filterDocsTable = filterDocsTable;
 window.docsXlsxShowSheet = docsXlsxShowSheet;
-window.docsXlsxShowAll = docsXlsxShowAll;
 window.docsXlsxSearch = docsXlsxSearch;
+window.docsXlsxFindNav = docsXlsxFindNav;
 window.docsXlsxUploadClick = docsXlsxUploadClick;
 window.docsXlsxUpload = docsXlsxUpload;
+// 개발용: 업로드 없이 로컬 ArrayBuffer를 바로 렌더 (콘솔 테스트·미리보기)
+window.__docsXlsxDebugLoad = async ab => {
+  await loadExcelJS();
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(ab);
+  docsXlsxWb = wb;
+  renderDocsXlsxTabs();
+  docsXlsxShowSheet(0);
+};
 window.toggleDocsNote = toggleDocsNote;
 window.docsPdfFindInput = docsPdfFindInput;
 window.docsPdfFindNav = docsPdfFindNav;
