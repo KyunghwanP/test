@@ -142,6 +142,11 @@
         /* 페이지가 있는 항목은 제목에 밑줄로 표시 */
         .pg-row.has-page .pg-text { text-decoration: underline; text-decoration-color: var(--slate-300); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
         @media (hover: none) { .pg-open { opacity: 1; } }
+        /* 페이지가 된 줄/항목: 📄 아이콘 + 굵은 글씨 */
+        .pg-badge { flex-shrink: 0; display: none; font-size: 15px; line-height: 1.6; padding: 2px 0; user-select: none; }
+        .pg-para.has-page .pg-badge, .pg-row.has-page .pg-badge { display: block; }
+        .pg-para.has-page .pg-text, .pg-row.has-page .pg-text { font-weight: 800; }
+        .pg-para[class*="pg-h"] .pg-badge { margin-top: 3px; }
 
         /* ── 페이지 모달 ── */
         .page-modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px 12px; }
@@ -321,8 +326,25 @@
             const myEditor = active.editor, pid = active.id, title = active.title;  // 시작 시점 기준 고정
             dirty = false;   // 지금부터의 변경은 다음 저장 몫
             setStatus('saving', '저장 중…');
+            let data;
             try {
-                const data = await myEditor.save();
+                data = await myEditor.save();
+            } catch (e) {
+                // 에디터 캡처 실패 — 에디터가 살아 있어야 하므로 일반 재시도
+                console.error(e);
+                dirty = true;
+                setStatus('error', '저장 실패 — 잠시 후 재시도');
+                clearTimeout(saveTimer);
+                saveTimer = setTimeout(saveNow, 4000);
+                return;
+            }
+            // 쓰기 실패 재시도는 캡처된 payload(pid·title·data)로 수행 —
+            // 그 사이 모달이 닫혀 active가 바뀌어도 이 페이지 내용이 유실되지 않는다
+            // (기존 버그: 실패 후 saveNow 재시도가 '그 시점의 active'를 저장해 모달 내용 증발)
+            await writePage(pid, title, data, 0);
+        }
+        async function writePage(pid, title, data, attempt) {
+            try {
                 if (uid) {
                     await setDoc(doc(db, MEMO_COL, uid, 'pages', pid), { title, data, updatedAt: serverTimestamp() });
                 } else {
@@ -331,10 +353,14 @@
                 setStatus('saved', `✓ 저장됨 ${hhmm()}`);
             } catch (e) {
                 console.error(e);
-                dirty = true;
-                setStatus('error', '저장 실패 — 잠시 후 재시도');
-                clearTimeout(saveTimer);
-                saveTimer = setTimeout(saveNow, 4000);
+                if (attempt < 5) {
+                    setStatus('error', `저장 실패 — 재시도 중 (${attempt + 1}/5)`);
+                    setTimeout(() => {
+                        savePromise = savePromise.then(() => writePage(pid, title, data, attempt + 1)).catch(() => {});
+                    }, 4000);
+                } else {
+                    setStatus('error', '저장 실패 — 네트워크 확인 후 다시 입력해 주세요');
+                }
             }
         }
         document.addEventListener('visibilitychange', () => { if (document.hidden && dirty) { clearTimeout(saveTimer); saveNow(); } });
@@ -455,6 +481,12 @@
                 this.wrap = document.createElement('div');
                 this.wrap.className = 'pg-para' + (this.level ? ' pg-h' + this.level : '') + (this.data.pageId ? ' has-page' : '');
 
+                // 페이지가 된 줄 표시용 아이콘 (has-page일 때만 CSS로 노출)
+                this.badge = document.createElement('span');
+                this.badge.className = 'pg-badge';
+                this.badge.contentEditable = 'false';
+                this.badge.textContent = '📄';
+
                 this.txt = document.createElement('div');
                 this.txt.className = 'pg-text';
                 this.txt.contentEditable = 'true';
@@ -494,6 +526,9 @@
                         this.data.pageId = newPageId();
                         this.wrap.classList.add('has-page');
                         try { this.block.dispatchChange(); } catch (err) {}
+                        // dispatchChange의 onChange는 비동기 — dirty를 동기로 세워
+                        // 아래 saveNow가 dirty=false로 스킵되며 pageId가 유실되는 경합 방지
+                        scheduleSave();
                         // 모달이 열리면 저장 대상(active)이 모달로 바뀌므로, 부모의 pageId를 먼저 확정 저장
                         clearTimeout(saveTimer);
                         await saveNow();
@@ -501,7 +536,7 @@
                     openPageModal({ pageId: this.data.pageId, title: stripTags(this.txt.innerHTML) });
                 });
 
-                this.wrap.append(this.txt, open);
+                this.wrap.append(this.badge, this.txt, open);
                 return this.wrap;
             }
             merge(data) {   // Backspace로 이전 블록과 합쳐질 때
@@ -553,6 +588,11 @@
                     });
                 }   // bullet·number 마커는 CSS(::before)로 표시
 
+                const badge = document.createElement('span');
+                badge.className = 'pg-badge';
+                badge.contentEditable = 'false';
+                badge.textContent = '📄';
+
                 const txt = document.createElement('div');
                 txt.className = 'pg-text';
                 txt.contentEditable = 'true';
@@ -580,7 +620,7 @@
                     openPageModal({ pageId: item.pageId, title: stripTags(item.text) });
                 });
 
-                row.append(mark, txt, open);
+                row.append(mark, badge, txt, open);
                 return row;
             }
             onKey(e, row) {
@@ -719,7 +759,10 @@
                         '[]':  ['todo',   { items: [{ text: '', checked: false, pageId: null }] }]
                     };
                     const holderEl = document.getElementById(holderId);
-                    holderEl.addEventListener('keydown', e => {
+                    // 에디터를 재생성해도 holder는 그대로라 리스너가 누적됨 —
+                    // 파괴된 에디터를 참조하는 옛 리스너를 제거하고 새로 단다
+                    if (holderEl.__mdKeydown) holderEl.removeEventListener('keydown', holderEl.__mdKeydown);
+                    holderEl.__mdKeydown = e => {
                         if (e.key !== ' ') return;
                         const sel = getSelection();
                         if (!sel || !sel.anchorNode) return;
@@ -753,7 +796,8 @@
                         requestAnimationFrame(focusNewBlock);
                         setTimeout(focusNewBlock, 30);
                         setTimeout(focusNewBlock, 90);
-                    });
+                    };
+                    holderEl.addEventListener('keydown', holderEl.__mdKeydown);
                 }
             });
             ctx.editor = ed;
