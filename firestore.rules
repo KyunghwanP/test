@@ -113,6 +113,10 @@ service cloud.firestore {
     match /memos/{userId}/{document=**} {
       allow read, write: if isYnhsTeacher() && request.auth.uid == userId;
     }
+    // ── 개인 메모 실험판 (memo2.html) — 본인 것만. 기존 memos와 분리 ──
+    match /memos2/{userId}/{document=**} {
+      allow read, write: if isYnhsTeacher() && request.auth.uid == userId;
+    }
     // ── 공통 함수 ──
     function isYnhsTeacher() {
       return request.auth != null

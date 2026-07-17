@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>개인 메모 v2 (실험)</title>
+    <script>
+      // 본체(index.html) iframe 안에서 열리면 embed 모드 — 자체 헤더를 숨김
+      if (window.self !== window.top) document.documentElement.classList.add('embed');
+      // 다크모드: 본체 이스터 에그 설정 공유 + 토글 시 실시간 동기화
+      (function(){
+        const apply = on => document.documentElement.classList.toggle('dark', on);
+        try { apply(localStorage.getItem('ynhs-dark') === '1'); } catch(e) {}
+        window.addEventListener('storage', e => { if (e.key === 'ynhs-dark') apply(e.newValue === '1'); });
+      })();
+    </script>
+    <!--
+      개인 메모 (Editor.js) — 노션식 "페이지 안의 페이지" 구조
+      - 하위 페이지 블록: 삽입 즉시 페이지 생성(제목 나중에), 클릭 = 제목 수정,
+        호버 시 우측 [열기] 버튼 → 모달로 페이지 열림. 모달 상단에서 제목 수정.
+        모달 안에서 또 페이지를 열면 모달 내 브레드크럼 스택으로 이동.
+      - 루트 에디터는 상주, 모달 에디터는 열 때마다 생성 — 저장은 active 컨텍스트
+        기준으로 프라미스 체인 직렬화(동시 저장·전환 경합 방지, ver6.08 참조)
+      - 저장: 교사 로그인 시 memos/{uid}/pages/{pageId} 자동저장(디바운스),
+        비로그인 시 localStorage(ynhs-memo-pages) 임시 저장
+      - 구버전(단일 memos/{uid} 문서·ynhs-memo-draft) 데이터는 루트 페이지로 자동 이전
+      - 페이지 블록을 지워도 그 페이지 문서는 남는다(고아 문서) — 용량 미미, 감수
+      - vendor/editorjs/ 셀프호스팅 (학교망 CDN 차단 대비, 앱 정책)
+    -->
+    <script src="vendor/editorjs/editorjs.min.js"></script>
+    <script src="vendor/editorjs/header.min.js"></script>
+    <script src="vendor/editorjs/list.min.js"></script>
+    <script src="vendor/editorjs/checklist.min.js"></script>
+    <script src="vendor/editorjs/delimiter.min.js"></script>
+    <script src="vendor/editorjs/marker.min.js"></script>
+    <script src="vendor/editorjs/dragdrop.min.js"></script>
+    <script src="vendor/editorjs/toggle.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --indigo: #4f46e5; --indigo-dark: #4338ca; --indigo-50: #eef2ff; --indigo-100: #e0e7ff;
+            --slate-900: #0f172a; --slate-800: #1e293b; --slate-500: #64748b; --slate-400: #94a3b8;
+            --slate-300: #cbd5e1; --slate-200: #e2e8f0; --slate-100: #f1f5f9; --slate-50: #f8fafc;
+            --paper: #ffffff; --ink: #0f172a; --ink-soft: #64748b; --bg: #f8fafc; --rule: #e2e8f0;
+        }
+        html.dark {
+            --paper: #151F33; --ink: #E2E8F0; --ink-soft: #8FA3BD; --bg: #0B1220; --rule: #26354F;
+            --indigo-50: #1e2742; --indigo-100: #2b3760;
+        }
+        html, body { height: 100%; }
+        body {
+            font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+            letter-spacing: -0.02em; background: var(--bg); color: var(--ink);
+            -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; min-height: 100%;
+        }
+        button, input { font-family: inherit; }
+
+        /* ── 헤더 ── */
+        .site-header { background: var(--paper); border-bottom: 1px solid var(--rule); position: sticky; top: 0; z-index: 30; }
+        html.embed .site-header { display: none; }
+        .site-header-inner { max-width: 56rem; margin: 0 auto; padding: 10px 16px; min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .brand { display: flex; align-items: center; gap: 11px; }
+        .brand-badge { background: var(--indigo); padding: 9px; border-radius: 11px; font-size: 19px; line-height: 1; }
+        .brand h1 { font-size: 17px; line-height: 1.15; font-weight: 900; letter-spacing: -.04em; }
+        .brand .sub { font-size: 10.5px; color: var(--indigo); font-weight: 900; letter-spacing: .2em; text-transform: uppercase; margin-top: 3px; }
+        html.dark .brand .sub { color: #818cf8; }
+        .header-right { display: flex; align-items: center; gap: 8px; }
+        .back-link { font-size: 12.5px; font-weight: 800; color: var(--ink-soft); text-decoration: none; background: var(--paper); border: 1px solid var(--rule); padding: 7px 13px; border-radius: 11px; }
+        .back-link:hover { border-color: var(--indigo); color: var(--indigo); }
+
+        main { flex: 1; width: 100%; max-width: 56rem; margin: 0 auto; padding: 18px 14px 60px; display: flex; flex-direction: column; gap: 10px; }
+
+        /* ── 상태 바 ── */
+        .memo-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        .memo-who { font-size: 12.5px; font-weight: 700; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; min-width: 0; }
+        .memo-who .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--slate-300); flex-shrink: 0; }
+        .memo-who.on .dot { background: #10b981; }
+        #save-status { font-size: 12px; font-weight: 800; color: var(--ink-soft); background: var(--paper); border: 1px solid var(--rule); padding: 5px 12px; border-radius: 999px; white-space: nowrap; transition: color .2s, border-color .2s; }
+        #save-status.saving { color: var(--indigo); border-color: var(--indigo-100); }
+        #save-status.saved { color: #10b981; }
+        #save-status.error { color: #ef4444; border-color: #fecaca; }
+        .memo-local-note { display: none; font-size: 12px; font-weight: 700; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; padding: 9px 14px; border-radius: 12px; line-height: 1.5; }
+        html.dark .memo-local-note { background: #2d2410; border-color: #5c4a1a; color: #fbbf24; }
+        .memo-local-note.show { display: block; }
+
+        /* ── 에디터 카드 ── */
+        .memo-card { background: var(--paper); border: 1px solid var(--rule); border-radius: 18px; box-shadow: 0 4px 20px rgba(148,163,184,.10); padding: 18px 14px 30px; min-height: 62vh; }
+        html.dark .memo-card { box-shadow: 0 4px 20px rgba(0,0,0,.35); }
+        #editorjs { min-height: 55vh; }
+
+        /* ── 하위 페이지 블록 ── */
+        .subpage-block { display: flex; align-items: center; gap: 9px; padding: 7px 10px; margin: 2px 0; border-radius: 10px; cursor: pointer; border: 1px solid transparent; transition: background .12s; min-height: 40px; }
+        .subpage-block:hover { background: var(--indigo-50); border-color: var(--indigo-100); }
+        .subpage-block .sp-icon { font-size: 17px; flex-shrink: 0; }
+        /* 글자 영역(좌우 패딩 넉넉히) 클릭 = 제목 수정, 그 외 행 클릭 = 페이지 열기 */
+        .subpage-block .sp-title { font-weight: 800; color: var(--ink); text-decoration: underline; text-decoration-color: var(--slate-300); text-decoration-thickness: 1.5px; text-underline-offset: 3px; padding: 6px 18px; margin: -6px -8px; border-radius: 8px; cursor: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .subpage-block .sp-title:hover { background: rgba(99,102,241,.10); }
+        .subpage-block .sp-title.untitled { color: var(--slate-400); font-weight: 600; }
+        .subpage-block .sp-open { margin-left: auto; flex-shrink: 0; font-size: 11.5px; font-weight: 800; color: var(--indigo); background: var(--paper); border: 1px solid var(--indigo-100); border-radius: 8px; padding: 4px 10px; cursor: pointer; opacity: 0; transition: opacity .12s; }
+        html.dark .subpage-block .sp-open { color: #818cf8; }
+        .subpage-block:hover .sp-open { opacity: 1; }
+        @media (hover: none) { .subpage-block .sp-open { opacity: 1; } }
+        .subpage-block input { border: none; outline: none; background: transparent; font: inherit; font-weight: 800; color: var(--ink); flex: 1; min-width: 0; }
+        .subpage-block input::placeholder { color: var(--slate-400); font-weight: 600; }
+        .subpage-block.editing { cursor: text; background: var(--indigo-50); border-color: var(--indigo-100); }
+
+        /* ── v2: 항목별 페이지 목록 ── */
+        .pg-items { counter-reset: pgnum; }
+        .pg-row { display: flex; align-items: flex-start; gap: 8px; padding: 3px 6px; border-radius: 8px; min-height: 32px; }
+        .pg-row:hover { background: var(--indigo-50); }
+        .pg-mark { flex-shrink: 0; margin-top: 4px; width: 18px; text-align: center; user-select: none; }
+        /* 체크박스 */
+        .pg-check { width: 17px; height: 17px; border: 2px solid var(--slate-300); border-radius: 5px; cursor: pointer; position: relative; }
+        .pg-check.on { background: var(--indigo); border-color: var(--indigo); }
+        .pg-check.on::after { content: '✓'; position: absolute; inset: 0; color: #fff; font-size: 12px; font-weight: 900; line-height: 13px; text-align: center; }
+        /* 불렛 / 번호 */
+        .pg-bullet .pg-mark::before { content: '•'; color: var(--ink-soft); font-size: 17px; line-height: 1; }
+        .pg-number .pg-row { counter-increment: pgnum; }
+        .pg-number .pg-mark::before { content: counter(pgnum) '.'; color: var(--ink-soft); font-size: 13px; font-weight: 800; }
+        /* 텍스트 */
+        .pg-text { flex: 1; min-width: 0; outline: none; line-height: 1.6; padding: 2px 0; word-break: break-word; }
+        .pg-text:empty::before { content: attr(data-ph); color: var(--slate-300); pointer-events: none; }
+        .pg-row.done .pg-text { color: var(--ink-soft); text-decoration: line-through; }
+        /* 페이지 열기 */
+        .pg-open { flex-shrink: 0; border: 1px solid transparent; background: none; font-size: 13px; line-height: 1; padding: 4px 6px; border-radius: 7px; cursor: pointer; opacity: 0; transition: opacity .12s; }
+        .pg-row:hover .pg-open, .pg-row.has-page .pg-open { opacity: 1; }
+        .pg-open:hover { background: var(--paper); border-color: var(--indigo-100); }
+        /* 페이지가 있는 항목은 제목에 밑줄로 표시 */
+        .pg-row.has-page .pg-text { text-decoration: underline; text-decoration-color: var(--slate-300); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+        @media (hover: none) { .pg-open { opacity: 1; } }
+
+        /* ── 페이지 모달 ── */
+        .page-modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px 12px; }
+        .page-modal[hidden] { display: none; }
+        .page-modal-backdrop { position: absolute; inset: 0; background: rgba(15,23,42,.45); }
+        html.dark .page-modal-backdrop { background: rgba(0,0,0,.6); }
+        .page-modal-card { position: relative; background: var(--paper); border: 1px solid var(--rule); border-radius: 18px; box-shadow: 0 20px 60px rgba(15,23,42,.25); width: min(44rem, 96vw); height: min(82vh, 900px); display: flex; flex-direction: column; overflow: hidden; }
+        .page-modal-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 0; min-height: 40px; }
+        .modal-crumbs { flex: 1; display: flex; align-items: center; gap: 2px; flex-wrap: wrap; font-size: 12.5px; font-weight: 800; min-width: 0; }
+        .modal-crumbs .crumb { color: var(--ink-soft); cursor: pointer; padding: 3px 7px; border-radius: 7px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .modal-crumbs .crumb:hover { background: var(--rule); color: var(--ink); }
+        .modal-crumbs .crumb.here { color: var(--ink); cursor: default; }
+        .modal-crumbs .crumb.here:hover { background: transparent; }
+        .modal-crumbs .crumb-sep { color: var(--slate-400); font-weight: 400; font-size: 11px; }
+        .modal-close { flex-shrink: 0; border: 1px solid var(--rule); background: var(--paper); color: var(--ink-soft); font-size: 14px; font-weight: 800; width: 30px; height: 30px; border-radius: 9px; cursor: pointer; line-height: 1; }
+        .modal-close:hover { border-color: #ef4444; color: #ef4444; }
+        .modal-title { border: none; outline: none; background: transparent; width: 100%; padding: 8px 22px 2px; font-size: 23px; font-weight: 900; letter-spacing: -.04em; color: var(--ink); }
+        .modal-title::placeholder { color: var(--slate-300); }
+        html.dark .modal-title::placeholder { color: #3e4f6e; }
+        .modal-editor-wrap { flex: 1; overflow-y: auto; padding: 6px 22px 40px; }
+        #editorjs-modal { min-height: 100%; }
+        #modal-boot { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 50px 0; color: var(--ink-soft); font-size: 13px; font-weight: 700; }
+        #modal-boot .spin { width: 15px; height: 15px; border: 2.5px solid var(--rule); border-top-color: var(--indigo); border-radius: 50%; animation: spin 1s linear infinite; }
+        @media (max-width: 640px) { .page-modal { padding: 8px 6px; } .page-modal-card { height: 94vh; width: 100%; } .modal-title, .modal-editor-wrap { padding-left: 14px; padding-right: 14px; } }
+
+        /* Editor.js 톤 맞춤 + 다크모드 */
+        .ce-block__content, .ce-toolbar__content { max-width: 100%; }
+        .codex-editor__redactor { padding-bottom: 120px !important; }
+        .ce-paragraph, .ce-header { color: var(--ink); }
+        .ce-header { font-weight: 900; letter-spacing: -.03em; }
+        h2.ce-header { font-size: 23px; }
+        h3.ce-header { font-size: 19px; }
+        h4.ce-header { font-size: 16px; }
+        .cdx-checklist__item-text, .cdx-list__item { color: var(--ink); }
+        .toggle-block__selector { color: var(--ink); }
+        .toggle-block__input { color: var(--ink); font-weight: 700; }
+        .toggle-block__input:empty::before { color: var(--slate-400); }
+        .toggle-block__icon svg { fill: var(--ink-soft); }
+        .cdx-marker { background: rgba(245,158,11,.45); padding: 0 1px; border-radius: 2px; }
+        ::selection { background: rgba(99,102,241,.25); }
+        html.dark .ce-toolbar__plus, html.dark .ce-toolbar__settings-btn { color: var(--ink-soft); }
+        html.dark .ce-toolbar__plus:hover, html.dark .ce-toolbar__settings-btn:hover { background: var(--rule); color: var(--ink); }
+        html.dark .ce-popover { --color-background: #1b2740; --color-text-primary: #E2E8F0; --color-text-secondary: #8FA3BD; --color-border: #26354F; --color-background-item-hover: #26354F; --color-background-item-focus: rgba(99,102,241,.25); }
+        html.dark .ce-inline-toolbar, html.dark .ce-conversion-toolbar { background: #1b2740; border-color: #26354F; color: #E2E8F0; }
+        html.dark .ce-inline-tool, html.dark .ce-conversion-tool { color: #E2E8F0; }
+        html.dark .ce-inline-tool:hover, html.dark .ce-conversion-tool:hover { background: #26354F; }
+        html.dark .cdx-checklist__item-checkbox-check { background: var(--paper); border-color: var(--rule); }
+        html.dark .ce-block--selected .ce-block__content { background: rgba(99,102,241,.18); }
+
+        /* 로더 */
+        #boot { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 60px 0; color: var(--ink-soft); font-size: 13.5px; font-weight: 700; }
+        #boot .spin { width: 16px; height: 16px; border: 2.5px solid var(--rule); border-top-color: var(--indigo); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="site-header-inner">
+            <div class="brand">
+                <div class="brand-badge">📝</div>
+                <div>
+                    <h1>개인 메모 v2 <span style="font-size:11px;color:#f59e0b;">실험</span></h1>
+                    <p class="sub">My Notes</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <a class="back-link" href="index.html">← 홈</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="memo-bar">
+            <span class="memo-who" id="memo-who"><span class="dot"></span><span id="who-text">로그인 확인 중…</span></span>
+            <span id="save-status">—</span>
+        </div>
+        <p class="memo-local-note" id="local-note">🔒 로그인되지 않아 <b>이 기기(브라우저)에만 임시 저장</b>됩니다. 본체 앱에 로그인하면 계정에 저장돼 어디서든 볼 수 있어요.</p>
+        <div class="memo-card">
+            <div id="boot"><span class="spin"></span>메모를 불러오는 중…</div>
+            <div id="editorjs" style="display:none;"></div>
+        </div>
+    </main>
+
+    <!-- 페이지 모달 -->
+    <div class="page-modal" id="page-modal" hidden>
+        <div class="page-modal-backdrop" id="modal-backdrop"></div>
+        <div class="page-modal-card">
+            <div class="page-modal-head">
+                <nav class="modal-crumbs" id="modal-crumbs"></nav>
+                <button class="modal-close" id="modal-close" title="닫기 (Esc)">✕</button>
+            </div>
+            <input class="modal-title" id="modal-title" placeholder="제목 없음" maxlength="60">
+            <div class="modal-editor-wrap">
+                <div id="modal-boot"><span class="spin"></span>페이지를 여는 중…</div>
+                <div id="editorjs-modal" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
+        const app = initializeApp({
+            apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
+            authDomain: "ynhs-7b5ba.firebaseapp.com",
+            projectId: "ynhs-7b5ba",
+            storageBucket: "ynhs-7b5ba.firebasestorage.app",
+            messagingSenderId: "1031618043470",
+            appId: "1:1031618043470:web:edb5b8d1f98db029916d1f"
+        });
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // 실험판(v2) 전용 저장소 — 기존 메모(memos/ynhs-memo-pages)와 완전히 분리
+        const MEMO_COL = 'memos2';
+        const LOCAL_PAGES = 'ynhs-memo2-pages';
+        const LOCAL_LEGACY = 'ynhs-memo2-draft';
+
+        const statusEl = document.getElementById('save-status');
+        const whoEl = document.getElementById('memo-who');
+        const whoText = document.getElementById('who-text');
+        const localNote = document.getElementById('local-note');
+        const bootEl = document.getElementById('boot');
+        const editorEl = document.getElementById('editorjs');
+        const modalEl = document.getElementById('page-modal');
+        const modalCrumbsEl = document.getElementById('modal-crumbs');
+        const modalTitleEl = document.getElementById('modal-title');
+        const modalBootEl = document.getElementById('modal-boot');
+        const modalEditorEl = document.getElementById('editorjs-modal');
+
+        let uid = null;                 // 로그인 uid (없으면 localStorage 모드)
+        // 저장 대상 컨텍스트: 루트 에디터는 상주, 모달 열리면 active가 모달 쪽으로 바뀐다
+        const rootCtx = { editor: null, ready: false, id: 'root', title: '내 메모' };
+        let active = rootCtx;
+        let modalEditor = null;
+        let modalStack = [];            // 모달 안 페이지 스택 [{id,title},...]
+        let saveTimer = null;
+        let dirty = false;
+        let savePromise = Promise.resolve();  // 저장 직렬화 체인 — 동시 저장 방지
+        let switching = false;          // 페이지 전환/모달 개폐 중 중복 진입 방지
+        let titleTimer = null;
+
+        // 세션 내 이름 변경 캐시 — 부모 페이지 문서가 아직 옛 제목을 들고 있어도
+        // 블록이 다시 그려질 때 최신 제목을 쓰게 한다 (모달 스택 복귀 대비)
+        const renamedTitles = new Map();
+        // 살아 있는 하위 페이지 블록 인스턴스: pageId → Set<SubPageTool>
+        const pageBlocks = new Map();
+
+        const isTeacher = u => u && /@yeungnam\.hs\.kr$/.test(u.email || '') && !/^[0-9]{7}@/.test(u.email || '');
+        function setStatus(cls, text) { statusEl.className = cls; statusEl.textContent = text; }
+        const hhmm = () => { const d = new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+        const newPageId = () => (crypto.randomUUID ? crypto.randomUUID() : 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8));
+
+        // ── 비로그인 localStorage 저장소 ──
+        function localPages() { try { return JSON.parse(localStorage.getItem(LOCAL_PAGES) || '{}'); } catch (e) { return {}; } }
+        function localSavePage(pageId, patch) {
+            const all = localPages();
+            all[pageId] = { ...(all[pageId] || {}), ...patch };
+            localStorage.setItem(LOCAL_PAGES, JSON.stringify(all));
+        }
+
+        // ── 저장 (디바운스 1.5초, 체인 직렬화 — ver6.08 경합 수정 참조) ──
+        function scheduleSave() {
+            dirty = true;
+            setStatus('saving', '입력 중…');
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(saveNow, 1500);
+        }
+        function saveNow() {
+            savePromise = savePromise.then(doSave).catch(() => {});
+            return savePromise;
+        }
+        async function doSave() {
+            if (!active.editor || !active.ready || !dirty) return;
+            const myEditor = active.editor, pid = active.id, title = active.title;  // 시작 시점 기준 고정
+            dirty = false;   // 지금부터의 변경은 다음 저장 몫
+            setStatus('saving', '저장 중…');
+            try {
+                const data = await myEditor.save();
+                if (uid) {
+                    await setDoc(doc(db, MEMO_COL, uid, 'pages', pid), { title, data, updatedAt: serverTimestamp() });
+                } else {
+                    localSavePage(pid, { title, data });
+                }
+                setStatus('saved', `✓ 저장됨 ${hhmm()}`);
+            } catch (e) {
+                console.error(e);
+                dirty = true;
+                setStatus('error', '저장 실패 — 잠시 후 재시도');
+                clearTimeout(saveTimer);
+                saveTimer = setTimeout(saveNow, 4000);
+            }
+        }
+        document.addEventListener('visibilitychange', () => { if (document.hidden && dirty) { clearTimeout(saveTimer); saveNow(); } });
+        window.addEventListener('beforeunload', () => { if (dirty) { clearTimeout(saveTimer); saveNow(); } });
+
+        // ── 페이지 제목 변경: 문서 + 살아 있는 블록 + 세션 캐시 동기화 ──
+        function renamePage(pageId, title) {
+            renamedTitles.set(pageId, title);
+            if (uid) setDoc(doc(db, MEMO_COL, uid, 'pages', pageId), { title }, { merge: true }).catch(console.error);
+            else localSavePage(pageId, { title });
+            const set = pageBlocks.get(pageId);
+            if (set) set.forEach(inst => inst.setTitle(title));
+        }
+
+        // ── 하위 페이지 커스텀 블록 ──
+        // 삽입 즉시 페이지 생성(제목 입력 대기), 클릭 = 제목 수정, [열기] 버튼 = 모달
+        class SubPageTool {
+            static get toolbox() { return { title: '하위 페이지', icon: '📄' }; }
+            // 변환 메뉴 지원: 문단으로 적어둔 텍스트 → "하위 페이지"로 전환 시 제목이 됨
+            static get conversionConfig() { return { import: 'title', export: data => data.title || '' }; }
+            constructor({ data, block }) {
+                this.block = block;
+                this.data = { pageId: (data && data.pageId) || null, title: (data && data.title) || '' };
+                this.isNew = !this.data.pageId;
+                if (!this.data.pageId) this.data.pageId = newPageId();
+                if (renamedTitles.has(this.data.pageId)) this.data.title = renamedTitles.get(this.data.pageId);
+                if (!pageBlocks.has(this.data.pageId)) pageBlocks.set(this.data.pageId, new Set());
+                pageBlocks.get(this.data.pageId).add(this);
+            }
+            render() {
+                this.wrap = document.createElement('div');
+                this.wrap.className = 'subpage-block';
+                if (this.isNew && this.data.title) {
+                    // 변환으로 생성 (문단 텍스트 → 제목) — 바로 행으로
+                    this.isNew = false;
+                    // 변환 시 인라인 태그가 섞여올 수 있어 텍스트만 남긴다
+                    const tmp = document.createElement('div'); tmp.innerHTML = this.data.title;
+                    this.data.title = tmp.textContent.trim();
+                    renamePage(this.data.pageId, this.data.title);
+                    scheduleSave();
+                    this.renderRow();
+                } else if (this.isNew) { this.isNew = false; this.renderInput(); }  // 새 블록은 제목 입력 모드
+                else this.renderRow();
+                return this.wrap;
+            }
+            renderInput() {
+                this.wrap.classList.add('editing');
+                this.wrap.onclick = null;
+                this.wrap.innerHTML = '<span class="sp-icon">📄</span>';
+                const input = document.createElement('input');
+                input.placeholder = '페이지 제목 (Enter로 확정)';
+                input.value = this.data.title;
+                // Editor.js가 Enter/Backspace를 블록 조작으로 가로채지 않게 차단
+                input.addEventListener('keydown', e => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); this.commitTitle(); }
+                });
+                input.addEventListener('blur', () => { if (this.wrap.classList.contains('editing')) this.commitTitle(); });
+                this.wrap.appendChild(input);
+                setTimeout(() => { input.focus(); input.select(); }, 50);
+            }
+            commitTitle() {
+                const input = this.wrap.querySelector('input');
+                this.data.title = input ? input.value.trim() : this.data.title;
+                this.wrap.classList.remove('editing');
+                this.renderRow();
+                renamePage(this.data.pageId, this.data.title);
+                // dispatchChange의 onChange는 비동기 — dirty를 동기로 세워 flush 유실 방지
+                scheduleSave();
+                try { this.block.dispatchChange(); } catch (e) {}
+            }
+            renderRow() {
+                const title = this.data.title;
+                this.wrap.innerHTML = `<span class="sp-icon">📄</span><span class="sp-title${title ? '' : ' untitled'}"></span><span class="sp-open">열기 ›</span>`;
+                this.wrap.querySelector('.sp-title').textContent = title || '제목 없음';
+                // 글자 영역 클릭 = 제목 수정, 그 외 행 어디든 = 페이지 열기
+                this.wrap.onclick = () => openPageModal({ ...this.data });
+                this.wrap.querySelector('.sp-title').addEventListener('click', e => {
+                    e.stopPropagation();
+                    this.renderInput();
+                });
+            }
+            setTitle(title) {   // renamePage → 다른 곳에서 바뀐 제목 반영
+                if (this.data.title === title) return;
+                this.data.title = title;
+                const span = this.wrap && this.wrap.querySelector('.sp-title');
+                if (span) { span.textContent = title || '제목 없음'; span.classList.toggle('untitled', !title); }
+            }
+            save() { return { pageId: this.data.pageId, title: this.data.title }; }
+            destroy() { const set = pageBlocks.get(this.data.pageId); if (set) set.delete(this); }
+        }
+
+        // ── 유틸 ──
+        function stripTags(html) { const d = document.createElement('div'); d.innerHTML = html || ''; return (d.textContent || '').trim(); }
+        function placeCaretEnd(el) {
+            el.focus();
+            const r = document.createRange(); r.selectNodeContents(el); r.collapse(false);
+            const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+        }
+
+        // ══ 항목별 페이지 목록 툴 (v2 핵심) ══
+        // 체크리스트·불렛·번호 목록의 "모든 항목이 곧 하나의 페이지".
+        // 각 항목은 {text, checked, pageId}를 갖고, 우측 📄 버튼으로 그 항목의 페이지를 연다.
+        class PageItems {
+            static get toolbox() { return { title: '목록', icon: '•' }; }
+            constructor({ data, config, api, block }) {
+                this.api = api; this.block = block;
+                this.mode = (config && config.mode) || 'todo';   // todo | bullet | number
+                const src = (data && Array.isArray(data.items) && data.items.length) ? data.items : [{}];
+                this.items = src.map(it => ({
+                    text: (typeof it === 'string' ? it : (it && (it.text || it.content))) || '',
+                    checked: !!(it && it.checked),
+                    pageId: (it && it.pageId) || null,
+                }));
+            }
+            render() {
+                this.wrap = document.createElement('div');
+                this.wrap.className = 'pg-items pg-' + this.mode;
+                this.items.forEach(item => this.wrap.appendChild(this.renderRow(item)));
+                return this.wrap;
+            }
+            renderRow(item) {
+                const row = document.createElement('div');
+                row.className = 'pg-row' + (item.checked ? ' done' : '') + (item.pageId ? ' has-page' : '');
+                row._item = item;
+
+                const mark = document.createElement('span');
+                mark.className = 'pg-mark';
+                if (this.mode === 'todo') {
+                    mark.classList.add('pg-check');
+                    mark.classList.toggle('on', item.checked);
+                    mark.addEventListener('mousedown', e => e.preventDefault());
+                    mark.addEventListener('click', () => {
+                        item.checked = !item.checked;
+                        mark.classList.toggle('on', item.checked);
+                        row.classList.toggle('done', item.checked);
+                        this.change();
+                    });
+                }   // bullet·number 마커는 CSS(::before)로 표시
+
+                const txt = document.createElement('div');
+                txt.className = 'pg-text';
+                txt.contentEditable = 'true';
+                txt.innerHTML = item.text || '';
+                txt.dataset.ph = '내용을 입력하고 📄로 페이지를 여세요';
+                txt.addEventListener('keydown', e => this.onKey(e, row));
+                txt.addEventListener('input', () => { item.text = txt.innerHTML; this.change(); });
+
+                const open = document.createElement('button');
+                open.type = 'button';
+                open.className = 'pg-open';
+                open.title = '이 항목을 페이지로 열기';
+                open.textContent = '📄';
+                open.addEventListener('mousedown', e => e.preventDefault());   // 커서 뺏기 방지
+                open.addEventListener('click', e => {
+                    e.preventDefault(); e.stopPropagation();
+                    if (!item.pageId) { item.pageId = newPageId(); row.classList.add('has-page'); this.change(); }
+                    openPageModal({ pageId: item.pageId, title: stripTags(item.text) });
+                });
+
+                row.append(mark, txt, open);
+                return row;
+            }
+            onKey(e, row) {
+                const txt = row.querySelector('.pg-text');
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    // 새 항목 추가 후 바로 이어서 입력
+                    e.preventDefault(); e.stopPropagation();
+                    const item = { text: '', checked: false, pageId: null };
+                    this.items.splice(this.items.indexOf(row._item) + 1, 0, item);
+                    const newRow = this.renderRow(item);
+                    row.after(newRow);
+                    newRow.querySelector('.pg-text').focus();
+                    this.change();
+                } else if (e.key === 'Backspace' && !stripTags(txt.innerHTML)) {
+                    // 빈 항목에서 지우면 이전 항목 끝으로 (마지막 하나는 Editor가 블록 삭제 처리)
+                    if (this.items.length <= 1) return;
+                    e.preventDefault(); e.stopPropagation();
+                    const prev = row.previousElementSibling;
+                    this.items.splice(this.items.indexOf(row._item), 1);
+                    row.remove();
+                    if (prev) {
+                        // Editor가 프레임 뒤에 포커스를 가져가므로 여러 번 시도해 최종 안착
+                        const focusPrev = () => { const t = prev.querySelector('.pg-text'); if (t) placeCaretEnd(t); };
+                        focusPrev();
+                        requestAnimationFrame(focusPrev);
+                        setTimeout(focusPrev, 30);
+                    }
+                    this.change();
+                }
+            }
+            change() { try { this.block.dispatchChange(); } catch (e) {} scheduleSave(); }
+            save() {
+                return {
+                    items: [...this.wrap.querySelectorAll('.pg-row')].map(r => ({
+                        text: r.querySelector('.pg-text').innerHTML,
+                        checked: !!r._item.checked,
+                        pageId: r._item.pageId || null,
+                    })).filter(it => stripTags(it.text) || it.pageId),
+                };
+            }
+            static get sanitize() { return { items: { text: { br: true, b: true, i: true, a: true, mark: true }, checked: false, pageId: false } }; }
+        }
+
+        // ── 페이지 데이터 로드 (+ 구버전 자동 이전) ──
+        // 반환: { data, title } — title은 문서에 저장된 최신 제목(부모 블록보다 우선)
+        async function loadPageData(pageId) {
+            if (uid) {
+                const snap = await getDoc(doc(db, MEMO_COL, uid, 'pages', pageId));
+                if (snap.exists()) return { data: snap.data().data || null, title: snap.data().title || null };
+                if (pageId === 'root') {
+                    const legacy = await getDoc(doc(db, MEMO_COL, uid));
+                    if (legacy.exists() && legacy.data().data) return { data: legacy.data().data, title: null };
+                }
+                return { data: null, title: null };
+            } else {
+                const all = localPages();
+                if (all[pageId]) return { data: all[pageId].data || null, title: all[pageId].title || null };
+                if (pageId === 'root') {
+                    try { return { data: JSON.parse(localStorage.getItem(LOCAL_LEGACY) || 'null'), title: null }; } catch (e) { return { data: null, title: null }; }
+                }
+                return { data: null, title: null };
+            }
+        }
+
+        // ── 에디터 생성 (루트·모달 공용) ──
+        function makeEditor(holderId, savedData, ctx, revealFn) {
+            const ListTool = window.EditorjsList || window.List;
+            const ed = new EditorJS({
+                holder: holderId,
+                placeholder: '메모를 입력하세요. "/" 를 입력하면 블록 메뉴가 열려요.',
+                data: savedData || undefined,
+                tools: {
+                    page: { class: SubPageTool },
+                    header: { class: window.Header, inlineToolbar: ['marker'], config: { levels: [2, 3, 4], defaultLevel: 2, placeholder: '제목' } },
+                    // v2: 모든 항목이 페이지인 커스텀 목록 (기본 list/checklist 대체)
+                    todo:   { class: PageItems, config: { mode: 'todo' },   inlineToolbar: ['marker'], toolbox: { title: '체크리스트', icon: '☑' } },
+                    bullet: { class: PageItems, config: { mode: 'bullet' }, inlineToolbar: ['marker'], toolbox: { title: '목록', icon: '•' } },
+                    number: { class: PageItems, config: { mode: 'number' }, inlineToolbar: ['marker'], toolbox: { title: '번호 목록', icon: '1.' } },
+                    toggle: { class: window.ToggleBlock, inlineToolbar: true },
+                    delimiter: window.Delimiter,
+                    marker: window.Marker,
+                },
+                i18n: {
+                    messages: {
+                        toolNames: { 'Text': '텍스트', 'Heading': '제목', 'List': '목록', 'Unordered List': '목록', 'Ordered List': '번호 목록', 'Checklist': '체크리스트', 'Toggle': '토글 (접기/펼치기)', 'Delimiter': '구분선', 'Marker': '형광펜', 'Bold': '굵게', 'Italic': '기울임', 'Link': '링크' },
+                        ui: {
+                            'blockTunes': { 'toggler': { 'Click to tune': '블록 설정', 'or drag to move': '드래그로 이동' } },
+                            'toolbar': { 'toolbox': { 'Add': '블록 추가' } },
+                            'popover': { 'Filter': '검색', 'Nothing found': '결과 없음', 'Convert to': '변환' }
+                        },
+                        blockTunes: {
+                            'delete': { 'Delete': '삭제', 'Click to delete': '한 번 더 누르면 삭제' },
+                            'moveUp': { 'Move up': '위로' },
+                            'moveDown': { 'Move down': '아래로' }
+                        }
+                    }
+                },
+                onChange: scheduleSave,
+                onReady: () => {
+                    ctx.ready = true;
+                    revealFn();
+                    if (window.DragDrop) { try { new DragDrop(ed); } catch (e) {} }
+                    // Editor.js 자체 onChange가 두 번째 인스턴스부터 DOM 변형(타이핑)을
+                    // 감지하지 못하는 버그가 있어(모달 에디터에서 저장 누락 확인),
+                    // 블록 영역에 자체 MutationObserver를 붙여 저장을 직접 트리거한다.
+                    // 루트에서는 네이티브 onChange와 중복 발화하지만 디바운스가 흡수.
+                    const zone = document.getElementById(holderId).querySelector('.codex-editor__redactor');
+                    if (zone) {
+                        const mo = new MutationObserver(muts => {
+                            const meaningful = muts.some(m => {
+                                if (m.type === 'attributes') {
+                                    if (m.attributeName === 'data-empty') return false;   // Editor.js 내부 마킹
+                                    if (m.attributeName === 'class' && m.target.classList && m.target.classList.contains('ce-block')) return false;   // 블록 선택 하이라이트
+                                }
+                                return true;
+                            });
+                            if (meaningful) scheduleSave();
+                        });
+                        mo.observe(zone, { childList: true, subtree: true, characterData: true, attributes: true });
+                        ed.__memoObserver = mo;
+                    }
+                    // 노션식 마크다운 단축 입력: 빈 문단에 기호만 친 뒤 스페이스 → 블록 변환
+                    // (#=제목1, ##=제목2, ###=제목3, >=토글, -=불렛, 1.=번호, []=체크리스트)
+                    const MD_MAP = {
+                        '#':   ['header', { level: 2 }],
+                        '##':  ['header', { level: 3 }],
+                        '###': ['header', { level: 4 }],
+                        '>':   ['toggle', { text: '', status: 'open' }],
+                        '-':   ['bullet', { items: [{ text: '', checked: false, pageId: null }] }],
+                        '1.':  ['number', { items: [{ text: '', checked: false, pageId: null }] }],
+                        '[]':  ['todo',   { items: [{ text: '', checked: false, pageId: null }] }]
+                    };
+                    const holderEl = document.getElementById(holderId);
+                    holderEl.addEventListener('keydown', e => {
+                        if (e.key !== ' ') return;
+                        const sel = getSelection();
+                        if (!sel || !sel.anchorNode) return;
+                        const el = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
+                        const para = el && el.closest && el.closest('.ce-paragraph');
+                        if (!para || !holderEl.contains(para)) return;   // 문단 블록에서만
+                        const trigger = para.textContent.trim();
+                        if (!MD_MAP[trigger]) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const idx = ed.blocks.getCurrentBlockIndex();
+                        if (idx < 0) return;
+                        const [type, data] = MD_MAP[trigger];
+                        ed.blocks.insert(type, JSON.parse(JSON.stringify(data)), undefined, idx, false, true);   // 현재 블록 대체 (포커스는 아래에서 직접 처리)
+                        // 새 블록의 편집 요소에 커서를 직접 놓아 이어서 바로 입력 가능하게
+                        // (needToFocus·caret.setToBlock은 체크리스트/리스트 등에서 비동기 렌더와 타이밍이 안 맞아 포커스가 풀림)
+                        // 새 블록의 편집 요소에 커서를 직접 안착 — Editor가 첫 프레임 이후 포커스를 덮어쓰므로
+                        // rAF + 짧은 setTimeout으로 여러 번 시도해 최종적으로 커서가 새 블록에 놓이게 한다.
+                        const focusNewBlock = () => {
+                            const blockEl = holderEl.querySelectorAll('.ce-block')[idx];
+                            const editable = blockEl && blockEl.querySelector('[contenteditable="true"], [contenteditable=""]');
+                            if (!editable) return;
+                            editable.focus();
+                            const range = document.createRange();
+                            range.selectNodeContents(editable);
+                            range.collapse(true);
+                            const s = getSelection(); s.removeAllRanges(); s.addRange(range);
+                        };
+                        requestAnimationFrame(focusNewBlock);
+                        setTimeout(focusNewBlock, 30);
+                        setTimeout(focusNewBlock, 90);
+                    });
+                }
+            });
+            ctx.editor = ed;
+            return ed;
+        }
+        async function destroyEditor(ed) {
+            if (!ed) return;
+            if (ed.__memoObserver) { ed.__memoObserver.disconnect(); ed.__memoObserver = null; }
+            try { await ed.isReady; ed.destroy(); } catch (e) {}
+        }
+
+        // ── 모달: 페이지 열기/이동/닫기 ──
+        const curModalPage = () => modalStack[modalStack.length - 1];
+
+        function renderModalCrumbs() {
+            modalCrumbsEl.innerHTML = '';
+            if (modalStack.length < 2) return;   // 한 단계뿐이면 경로 표시 생략
+            modalStack.forEach((p, i) => {
+                if (i > 0) {
+                    const sep = document.createElement('span');
+                    sep.className = 'crumb-sep'; sep.textContent = '›';
+                    modalCrumbsEl.appendChild(sep);
+                }
+                const c = document.createElement('span');
+                c.className = 'crumb' + (i === modalStack.length - 1 ? ' here' : '');
+                c.textContent = p.title || '제목 없음';
+                if (i < modalStack.length - 1) c.onclick = () => modalBack(i);
+                modalCrumbsEl.appendChild(c);
+            });
+        }
+
+        async function showModalPage() {
+            const top = curModalPage();
+            renderModalCrumbs();
+            modalTitleEl.value = top.title || '';
+            modalBootEl.style.display = 'flex';
+            modalEditorEl.style.display = 'none';
+            await destroyEditor(modalEditor); modalEditor = null;
+            // 이 시점부터 저장 대상은 모달 페이지 (로드 완료 전엔 ready=false로 저장 차단)
+            // title은 getter — 저장 시점에 모달에서 수정된 최신 제목이 반영되게
+            const ctx = { editor: null, ready: false, id: top.id, get title() { return top.title || '제목 없음'; } };
+            active = ctx;
+            let loaded = { data: null, title: null };
+            try { loaded = await loadPageData(top.id); }
+            catch (e) { console.error(e); setStatus('error', '불러오기 실패'); }
+            // 문서에 저장된 제목이 부모 블록 제목보다 최신 (다른 기기에서 바꾼 경우 등)
+            if (loaded.title && loaded.title !== top.title) {
+                top.title = loaded.title;
+                modalTitleEl.value = loaded.title;
+                renderModalCrumbs();
+                renamePage(top.id, loaded.title);   // 부모 블록에도 반영
+            }
+            dirty = false;
+            modalEditor = makeEditor('editorjs-modal', loaded.data, ctx, () => {
+                modalBootEl.style.display = 'none';
+                modalEditorEl.style.display = '';
+            });
+            setStatus('', loaded.data ? '' : '새 페이지');
+        }
+
+        async function openPageModal(d) {   // d = {pageId, title}
+            if (switching) return;
+            switching = true;
+            try {
+                clearTimeout(saveTimer);
+                await saveNow();   // 진행 중 저장까지 체인으로 대기
+                // Editor.js는 인스턴스 2개가 동시에 살아 있으면 변경 감지·이벤트 버스가
+                // 꼬인다(모달 저장 누락·빈 렌더 재현됨) → 루트를 파괴하고 모달만 살린다.
+                // 닫을 때 closeModal이 루트를 재생성한다. (항상 단일 인스턴스 유지)
+                await destroyEditor(rootCtx.editor);
+                rootCtx.editor = null; rootCtx.ready = false;
+                bootEl.style.display = 'flex';
+                editorEl.style.display = 'none';
+                modalStack.push({ id: d.pageId, title: d.title || '' });
+                modalEl.hidden = false;
+                document.body.style.overflow = 'hidden';
+                await showModalPage();
+                setTimeout(() => { if (!modalTitleEl.value) modalTitleEl.focus(); }, 100);
+            } finally { switching = false; }
+        }
+
+        async function modalBack(i) {
+            if (switching || i >= modalStack.length - 1) return;
+            switching = true;
+            try {
+                clearTimeout(saveTimer);
+                await saveNow();
+                modalStack = modalStack.slice(0, i + 1);
+                await showModalPage();
+                // 자식 페이지 제목이 바뀌었을 수 있음 — 복귀한 페이지 다시 저장 예약
+                scheduleSave();
+            } finally { switching = false; }
+        }
+
+        async function closeModal() {
+            if (switching || modalEl.hidden) return;
+            switching = true;
+            try {
+                clearTimeout(saveTimer);
+                clearTimeout(titleTimer);
+                await saveNow();
+                await destroyEditor(modalEditor); modalEditor = null;
+                modalStack = [];
+                modalEl.hidden = true;
+                document.body.style.overflow = '';
+                // 루트 에디터 재생성 (열 때 파괴했음 — 단일 인스턴스 유지)
+                active = rootCtx;
+                let loaded = { data: null };
+                try { loaded = await loadPageData('root'); }
+                catch (e) { console.error(e); setStatus('error', '불러오기 실패'); }
+                dirty = false;
+                makeEditor('editorjs', loaded.data, rootCtx, () => {
+                    bootEl.style.display = 'none';
+                    editorEl.style.display = '';
+                });
+                // 모달에서 바뀐 하위 페이지 제목을 부모(루트) 데이터에도 반영
+                scheduleSave();
+            } finally { switching = false; }
+        }
+
+        document.getElementById('modal-close').addEventListener('click', closeModal);
+        document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modalEl.hidden) closeModal(); });
+
+        // 모달 제목 입력 → 현재 페이지·문서·부모 블록 동기화 (디바운스 0.6초)
+        modalTitleEl.addEventListener('input', () => {
+            const top = curModalPage();
+            if (!top) return;
+            top.title = modalTitleEl.value.trim();
+            clearTimeout(titleTimer);
+            titleTimer = setTimeout(() => {
+                renamePage(top.id, top.title);
+                renderModalCrumbs();
+            }, 600);
+        });
+        modalTitleEl.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); modalTitleEl.blur(); }
+        });
+
+        // ── 시작 ──
+        let booted = false;
+        onAuthStateChanged(auth, async user => {
+            if (booted) return;   // 최초 1회만 (세션 갱신에 에디터 재생성 방지)
+            booted = true;
+            if (isTeacher(user)) {
+                uid = user.uid;
+                whoEl.classList.add('on');
+                whoText.textContent = `${user.displayName || user.email} · 계정에 저장됨`;
+            } else {
+                uid = null;
+                whoText.textContent = '비로그인 — 임시 저장 모드';
+                localNote.classList.add('show');
+            }
+            let loaded = { data: null };
+            try { loaded = await loadPageData('root'); }
+            catch (e) { console.error(e); setStatus('error', '불러오기 실패'); }
+            setStatus('', loaded.data ? '저장된 메모 불러옴' : '새 메모');
+            makeEditor('editorjs', loaded.data, rootCtx, () => {
+                bootEl.style.display = 'none';
+                editorEl.style.display = '';
+            });
+        });
+    </script>
+</body>
+</html>
