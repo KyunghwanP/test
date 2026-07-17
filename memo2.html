@@ -104,11 +104,18 @@
         .subpage-block input::placeholder { color: var(--slate-400); font-weight: 600; }
         .subpage-block.editing { cursor: text; background: var(--indigo-50); border-color: var(--indigo-100); }
 
-        /* ── v2: 기본 문단 = 페이지 ── */
+        /* ── v2: 문단·제목 = 페이지 ── */
         .pg-para { display: flex; align-items: flex-start; gap: 8px; padding: 3px 6px; border-radius: 8px; min-height: 32px; }
         .pg-para:hover { background: var(--indigo-50); }
         .pg-para.has-page .pg-text { text-decoration: underline; text-decoration-color: var(--slate-300); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
         .pg-para:hover .pg-open, .pg-para.has-page .pg-open { opacity: 1; }
+        /* 제목 레벨 */
+        .pg-para.pg-h2 { margin-top: 14px; }
+        .pg-para.pg-h3 { margin-top: 10px; }
+        .pg-para.pg-h2 .pg-text { font-size: 25px; font-weight: 900; letter-spacing: -.03em; }
+        .pg-para.pg-h3 .pg-text { font-size: 20px; font-weight: 900; letter-spacing: -.02em; }
+        .pg-para.pg-h4 .pg-text { font-size: 17px; font-weight: 800; }
+        .pg-para[class*="pg-h"] .pg-open { margin-top: 5px; }
 
         /* ── v2: 항목별 페이지 목록 ── */
         .pg-items { counter-reset: pgnum; }
@@ -127,10 +134,11 @@
         .pg-text { flex: 1; min-width: 0; outline: none; line-height: 1.6; padding: 2px 0; word-break: break-word; }
         .pg-text:empty::before { content: attr(data-ph); color: var(--slate-300); pointer-events: none; }
         .pg-row.done .pg-text { color: var(--ink-soft); text-decoration: line-through; }
-        /* 페이지 열기 */
-        .pg-open { flex-shrink: 0; border: 1px solid transparent; background: none; font-size: 13px; line-height: 1; padding: 4px 6px; border-radius: 7px; cursor: pointer; opacity: 0; transition: opacity .12s; }
+        /* 페이지 열기 버튼 — 하위 페이지 블록과 동일한 [열기 ›] 스타일 */
+        .pg-open { flex-shrink: 0; font-size: 11.5px; font-weight: 800; color: var(--indigo); background: var(--paper); border: 1px solid var(--indigo-100); border-radius: 8px; padding: 4px 10px; cursor: pointer; opacity: 0; transition: opacity .12s; white-space: nowrap; margin-top: 2px; }
+        html.dark .pg-open { color: #818cf8; }
+        .pg-open:hover { background: var(--indigo-50); }
         .pg-row:hover .pg-open, .pg-row.has-page .pg-open { opacity: 1; }
-        .pg-open:hover { background: var(--paper); border-color: var(--indigo-100); }
         /* 페이지가 있는 항목은 제목에 밑줄로 표시 */
         .pg-row.has-page .pg-text { text-decoration: underline; text-decoration-color: var(--slate-300); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
         @media (hover: none) { .pg-open { opacity: 1; } }
@@ -427,24 +435,31 @@
             const s = getSelection(); s.removeAllRanges(); s.addRange(r);
         }
 
-        // ══ 기본 문단 = 페이지 (v2 핵심) ══
-        // 그냥 내용만 입력해도 그 줄이 곧 하나의 페이지 — 우측 📄로 하위 내용을 연다.
-        class PageParagraph {
+        // ══ 문단·제목 = 페이지 (v2 핵심) ══
+        // 문단이든 제목이든 그냥 내용만 입력하면 그 줄이 곧 하나의 페이지 — [열기]로 하위 내용을 연다.
+        // level: 0=문단, 2~4=제목
+        class PageBlock {
             static get toolbox() { return { title: '텍스트', icon: 'T' }; }
             static get conversionConfig() { return { import: 'text', export: 'text' }; }
-            constructor({ data, block, api }) {
+            constructor({ data, block, api, config }) {
                 this.block = block; this.api = api;
-                this.data = { text: (data && data.text) || '', pageId: (data && data.pageId) || null };
+                this.level = (config && config.level) || 0;
+                this.data = {
+                    text: (data && data.text) || '',
+                    level: (data && data.level) || this.level,
+                    pageId: (data && data.pageId) || null,
+                };
+                this.level = this.data.level || 0;
             }
             render() {
                 this.wrap = document.createElement('div');
-                this.wrap.className = 'pg-para' + (this.data.pageId ? ' has-page' : '');
+                this.wrap.className = 'pg-para' + (this.level ? ' pg-h' + this.level : '') + (this.data.pageId ? ' has-page' : '');
 
                 this.txt = document.createElement('div');
                 this.txt.className = 'pg-text';
                 this.txt.contentEditable = 'true';
                 this.txt.innerHTML = this.data.text || '';
-                this.txt.dataset.ph = '내용을 입력하세요 — 📄 를 누르면 이 줄이 페이지가 돼요';
+                this.txt.dataset.ph = this.level ? '제목' : '내용을 입력하세요 — [열기]로 이 줄이 페이지가 돼요';
                 this.txt.addEventListener('input', () => { this.data.text = this.txt.innerHTML; });
                 // 기본 문단을 커스텀 툴로 대체하면 Editor의 기본 Enter 분기가 걸리지 않으므로 직접 처리
                 this.txt.addEventListener('keydown', e => {
@@ -471,7 +486,7 @@
                 open.type = 'button';
                 open.className = 'pg-open';
                 open.title = '이 내용을 페이지로 열기';
-                open.textContent = '📄';
+                open.textContent = '열기 ›';
                 open.addEventListener('mousedown', e => e.preventDefault());
                 open.addEventListener('click', async e => {
                     e.preventDefault(); e.stopPropagation();
@@ -494,13 +509,13 @@
                 this.data.text = this.txt.innerHTML;
                 if (!this.data.pageId && data.pageId) this.data.pageId = data.pageId;
             }
-            save() { return { text: this.txt.innerHTML, pageId: this.data.pageId || null }; }
-            static get sanitize() { return { text: { br: true, b: true, i: true, a: true, mark: true }, pageId: false }; }
+            save() { return { text: this.txt.innerHTML, level: this.level || 0, pageId: this.data.pageId || null }; }
+            static get sanitize() { return { text: { br: true, b: true, i: true, a: true, mark: true }, level: false, pageId: false }; }
         }
 
         // ══ 항목별 페이지 목록 툴 (v2 핵심) ══
         // 체크리스트·불렛·번호 목록의 "모든 항목이 곧 하나의 페이지".
-        // 각 항목은 {text, checked, pageId}를 갖고, 우측 📄 버튼으로 그 항목의 페이지를 연다.
+        // 각 항목은 {text, checked, pageId}를 갖고, 우측 [열기] 버튼으로 그 항목의 페이지를 연다.
         class PageItems {
             static get toolbox() { return { title: '목록', icon: '•' }; }
             constructor({ data, config, api, block }) {
@@ -542,7 +557,7 @@
                 txt.className = 'pg-text';
                 txt.contentEditable = 'true';
                 txt.innerHTML = item.text || '';
-                txt.dataset.ph = '내용을 입력하고 📄로 페이지를 여세요';
+                txt.dataset.ph = '내용을 입력하고 [열기]로 페이지를 여세요';
                 txt.addEventListener('keydown', e => this.onKey(e, row));
                 txt.addEventListener('input', () => { item.text = txt.innerHTML; this.change(); });
 
@@ -550,7 +565,7 @@
                 open.type = 'button';
                 open.className = 'pg-open';
                 open.title = '이 항목을 페이지로 열기';
-                open.textContent = '📄';
+                open.textContent = '열기 ›';
                 open.addEventListener('mousedown', e => e.preventDefault());   // 커서 뺏기 방지
                 open.addEventListener('click', async e => {
                     e.preventDefault(); e.stopPropagation();
@@ -639,9 +654,12 @@
                 defaultBlock: 'para',   // v2: 기본 블록이 곧 페이지 (그냥 입력해도 페이지가 됨)
                 data: savedData || undefined,
                 tools: {
-                    para: { class: PageParagraph, inlineToolbar: ['marker'], toolbox: { title: '텍스트', icon: 'T' } },
+                    // v2: 문단·제목 모두 페이지 (기본 header 대체)
+                    para: { class: PageBlock, config: { level: 0 }, inlineToolbar: ['marker'], toolbox: { title: '텍스트', icon: 'T' } },
+                    h2:   { class: PageBlock, config: { level: 2 }, inlineToolbar: ['marker'], toolbox: { title: '제목 1', icon: 'H1' } },
+                    h3:   { class: PageBlock, config: { level: 3 }, inlineToolbar: ['marker'], toolbox: { title: '제목 2', icon: 'H2' } },
+                    h4:   { class: PageBlock, config: { level: 4 }, inlineToolbar: ['marker'], toolbox: { title: '제목 3', icon: 'H3' } },
                     page: { class: SubPageTool },
-                    header: { class: window.Header, inlineToolbar: ['marker'], config: { levels: [2, 3, 4], defaultLevel: 2, placeholder: '제목' } },
                     // v2: 모든 항목이 페이지인 커스텀 목록 (기본 list/checklist 대체)
                     todo:   { class: PageItems, config: { mode: 'todo' },   inlineToolbar: ['marker'], toolbox: { title: '체크리스트', icon: '☑' } },
                     bullet: { class: PageItems, config: { mode: 'bullet' }, inlineToolbar: ['marker'], toolbox: { title: '목록', icon: '•' } },
@@ -692,9 +710,9 @@
                     // 노션식 마크다운 단축 입력: 빈 문단에 기호만 친 뒤 스페이스 → 블록 변환
                     // (#=제목1, ##=제목2, ###=제목3, >=토글, -=불렛, 1.=번호, []=체크리스트)
                     const MD_MAP = {
-                        '#':   ['header', { level: 2 }],
-                        '##':  ['header', { level: 3 }],
-                        '###': ['header', { level: 4 }],
+                        '#':   ['h2', { text: '', level: 2, pageId: null }],
+                        '##':  ['h3', { text: '', level: 3, pageId: null }],
+                        '###': ['h4', { text: '', level: 4, pageId: null }],
                         '>':   ['toggle', { text: '', status: 'open' }],
                         '-':   ['bullet', { items: [{ text: '', checked: false, pageId: null }] }],
                         '1.':  ['number', { items: [{ text: '', checked: false, pageId: null }] }],
@@ -706,8 +724,10 @@
                         const sel = getSelection();
                         if (!sel || !sel.anchorNode) return;
                         const el = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
-                        const para = el && el.closest && el.closest('.ce-paragraph');
-                        if (!para || !holderEl.contains(para)) return;   // 문단 블록에서만
+                        // v2: 기본 블록이 커스텀(.pg-para)이므로 그 편집영역도 인식해야 한다
+                        // (.pg-row 안의 목록 항목은 제외 — 항목 안에서는 변환하지 않음)
+                        const para = el && el.closest && (el.closest('.ce-paragraph') || el.closest('.pg-para > .pg-text'));
+                        if (!para || !holderEl.contains(para)) return;
                         const trigger = para.textContent.trim();
                         if (!MD_MAP[trigger]) return;
                         e.preventDefault();
