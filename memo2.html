@@ -104,6 +104,12 @@
         .subpage-block input::placeholder { color: var(--slate-400); font-weight: 600; }
         .subpage-block.editing { cursor: text; background: var(--indigo-50); border-color: var(--indigo-100); }
 
+        /* ── v2: 기본 문단 = 페이지 ── */
+        .pg-para { display: flex; align-items: flex-start; gap: 8px; padding: 3px 6px; border-radius: 8px; min-height: 32px; }
+        .pg-para:hover { background: var(--indigo-50); }
+        .pg-para.has-page .pg-text { text-decoration: underline; text-decoration-color: var(--slate-300); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+        .pg-para:hover .pg-open, .pg-para.has-page .pg-open { opacity: 1; }
+
         /* ── v2: 항목별 페이지 목록 ── */
         .pg-items { counter-reset: pgnum; }
         .pg-row { display: flex; align-items: flex-start; gap: 8px; padding: 3px 6px; border-radius: 8px; min-height: 32px; }
@@ -421,6 +427,77 @@
             const s = getSelection(); s.removeAllRanges(); s.addRange(r);
         }
 
+        // ══ 기본 문단 = 페이지 (v2 핵심) ══
+        // 그냥 내용만 입력해도 그 줄이 곧 하나의 페이지 — 우측 📄로 하위 내용을 연다.
+        class PageParagraph {
+            static get toolbox() { return { title: '텍스트', icon: 'T' }; }
+            static get conversionConfig() { return { import: 'text', export: 'text' }; }
+            constructor({ data, block, api }) {
+                this.block = block; this.api = api;
+                this.data = { text: (data && data.text) || '', pageId: (data && data.pageId) || null };
+            }
+            render() {
+                this.wrap = document.createElement('div');
+                this.wrap.className = 'pg-para' + (this.data.pageId ? ' has-page' : '');
+
+                this.txt = document.createElement('div');
+                this.txt.className = 'pg-text';
+                this.txt.contentEditable = 'true';
+                this.txt.innerHTML = this.data.text || '';
+                this.txt.dataset.ph = '내용을 입력하세요 — 📄 를 누르면 이 줄이 페이지가 돼요';
+                this.txt.addEventListener('input', () => { this.data.text = this.txt.innerHTML; });
+                // 기본 문단을 커스텀 툴로 대체하면 Editor의 기본 Enter 분기가 걸리지 않으므로 직접 처리
+                this.txt.addEventListener('keydown', e => {
+                    if (e.key !== 'Enter' || e.shiftKey) return;
+                    e.preventDefault(); e.stopPropagation();
+                    // '현재 블록'이 아니라 이 블록의 실제 인덱스를 써야 정확히 아래에 삽입된다
+                    let idx = -1;
+                    try { if (this.block && this.block.id != null) idx = this.api.blocks.getBlockIndex(this.block.id); } catch (err) {}
+                    if (idx < 0) idx = this.api.blocks.getCurrentBlockIndex();
+                    this.api.blocks.insert('para', { text: '', pageId: null }, undefined, idx + 1, false, false);
+                    const focusNew = () => {
+                        const nb = this.api.blocks.getBlockByIndex(idx + 1);
+                        const t = nb && nb.holder && nb.holder.querySelector('.pg-text');
+                        if (t) placeCaretEnd(t);
+                    };
+                    focusNew();
+                    requestAnimationFrame(focusNew);
+                    setTimeout(focusNew, 30);
+                    setTimeout(focusNew, 90);
+                    scheduleSave();
+                });
+
+                const open = document.createElement('button');
+                open.type = 'button';
+                open.className = 'pg-open';
+                open.title = '이 내용을 페이지로 열기';
+                open.textContent = '📄';
+                open.addEventListener('mousedown', e => e.preventDefault());
+                open.addEventListener('click', async e => {
+                    e.preventDefault(); e.stopPropagation();
+                    if (!this.data.pageId) {
+                        this.data.pageId = newPageId();
+                        this.wrap.classList.add('has-page');
+                        try { this.block.dispatchChange(); } catch (err) {}
+                        // 모달이 열리면 저장 대상(active)이 모달로 바뀌므로, 부모의 pageId를 먼저 확정 저장
+                        clearTimeout(saveTimer);
+                        await saveNow();
+                    }
+                    openPageModal({ pageId: this.data.pageId, title: stripTags(this.txt.innerHTML) });
+                });
+
+                this.wrap.append(this.txt, open);
+                return this.wrap;
+            }
+            merge(data) {   // Backspace로 이전 블록과 합쳐질 때
+                this.txt.innerHTML = this.txt.innerHTML + (data.text || '');
+                this.data.text = this.txt.innerHTML;
+                if (!this.data.pageId && data.pageId) this.data.pageId = data.pageId;
+            }
+            save() { return { text: this.txt.innerHTML, pageId: this.data.pageId || null }; }
+            static get sanitize() { return { text: { br: true, b: true, i: true, a: true, mark: true }, pageId: false }; }
+        }
+
         // ══ 항목별 페이지 목록 툴 (v2 핵심) ══
         // 체크리스트·불렛·번호 목록의 "모든 항목이 곧 하나의 페이지".
         // 각 항목은 {text, checked, pageId}를 갖고, 우측 📄 버튼으로 그 항목의 페이지를 연다.
@@ -475,9 +552,16 @@
                 open.title = '이 항목을 페이지로 열기';
                 open.textContent = '📄';
                 open.addEventListener('mousedown', e => e.preventDefault());   // 커서 뺏기 방지
-                open.addEventListener('click', e => {
+                open.addEventListener('click', async e => {
                     e.preventDefault(); e.stopPropagation();
-                    if (!item.pageId) { item.pageId = newPageId(); row.classList.add('has-page'); this.change(); }
+                    if (!item.pageId) {
+                        item.pageId = newPageId();
+                        row.classList.add('has-page');
+                        this.change();
+                        // 모달이 열리면 저장 대상이 바뀌므로 부모의 pageId를 먼저 확정 저장
+                        clearTimeout(saveTimer);
+                        await saveNow();
+                    }
                     openPageModal({ pageId: item.pageId, title: stripTags(item.text) });
                 });
 
@@ -552,8 +636,10 @@
             const ed = new EditorJS({
                 holder: holderId,
                 placeholder: '메모를 입력하세요. "/" 를 입력하면 블록 메뉴가 열려요.',
+                defaultBlock: 'para',   // v2: 기본 블록이 곧 페이지 (그냥 입력해도 페이지가 됨)
                 data: savedData || undefined,
                 tools: {
+                    para: { class: PageParagraph, inlineToolbar: ['marker'], toolbox: { title: '텍스트', icon: 'T' } },
                     page: { class: SubPageTool },
                     header: { class: window.Header, inlineToolbar: ['marker'], config: { levels: [2, 3, 4], defaultLevel: 2, placeholder: '제목' } },
                     // v2: 모든 항목이 페이지인 커스텀 목록 (기본 list/checklist 대체)
