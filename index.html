@@ -3238,7 +3238,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.21</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.22</div>
   </div>
 </div>
 
@@ -3368,7 +3368,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.21</div>
+    <div class="nav-version" title="Made by 박경환">ver6.22</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -9727,13 +9727,27 @@ function docsXlsxShowSheet(i){
   const rowCount = ws.rowCount || 1;
   // 병합 정보: model.merges 문자열 대신 각 셀의 master(병합 앵커) 포인터로 직접 산출
   // — 일부 파일에서 model.merges가 실제와 어긋나 행이 옆으로 밀리는 문제가 있어 셀 기준이 정확하다
-  const spans = {}, covered = {};
+  const spans = {}, covered = {}, subtotals = [];
   {
     const ext = {};   // 앵커키 → [r1, c1, r2, c2] 병합 범위 확장 추적
     for(let r = 1; r <= rowCount; r++){
       const row = ws.getRow(r);
       for(let c = 1; c <= colCount; c++){
         const cell = row.getCell(c);
+        // SUBTOTAL 수식 셀 수집 — 필터 적용 시 보이는 행 기준으로 다시 계산해 준다
+        // cell.formula 접근자를 써야 공유 수식(연속 열에 복사된 수식)도 번역되어 잡힌다
+        const fv = cell.value;
+        if(fv && typeof fv === 'object' && (fv.formula || fv.sharedFormula)){
+          let formula = null;
+          try { formula = cell.formula; } catch(e) {}
+          if(typeof formula === 'string' && /SUBTOTAL/i.test(formula)){
+            const fm = formula.match(/SUBTOTAL\(\s*(\d+)\s*,\s*([^)]+)\)/i);
+            if(fm){
+              const ranges = fm[2].split(',').map(s => docsXlsxParseRange(s.trim().replace(/\$/g, ''))).filter(Boolean);
+              if(ranges.length) subtotals.push({ r, c, fn: +fm[1], ranges, orig: docsXlsxCellText(cell) });
+            }
+          }
+        }
         if(!cell.isMerged) continue;
         const m = cell.master || cell;
         if(m.row !== r || m.col !== c) covered[r + '_' + c] = 1;
@@ -9748,6 +9762,18 @@ function docsXlsxShowSheet(i){
       if(e[2] > e[0] || e[3] > e[1]) spans[k] = [e[2] - e[0] + 1, e[3] - e[1] + 1];
     }
   }
+  // 틀고정(freeze panes) → sticky 렌더 준비. 비정상 값(스크롤 위치에서 고정된 파일)은 축별로 무시
+  let fx = 0, fy = 0;
+  const view = ws.views && ws.views[0];
+  if(view && view.state === 'frozen'){ fx = view.xSplit || 0; fy = view.ySplit || 0; }
+  if(fy > 8) fy = 0;
+  if(fx > 12) fx = 0;
+  const rowTops = [], colLefts = [];
+  { let acc = 0;
+    for(let r = 1; r <= fy; r++){ rowTops[r] = acc; const row = ws.getRow(r); acc += row.hidden ? 0 : Math.round((row.height || 16.5) * 4 / 3); }
+    acc = 0;
+    for(let c = 1; c <= fx; c++){ colLefts[c] = acc; const col = ws.getColumn(c); acc += col.hidden ? 0 : Math.round((col.width || 8.43) * 7 + 5); }
+  }
   // 열 너비: 엑셀 단위(문자 폭) ≈ *7px + 5
   let cols = '';
   for(let c = 1; c <= colCount; c++){
@@ -9760,7 +9786,7 @@ function docsXlsxShowSheet(i){
   wrap.scrollTop = 0; wrap.scrollLeft = 0;
   // 엑셀 자동 필터 범위 (명렬 시트: A4:HS385 등) — 헤더 행에 ▾ 버튼 노출
   const filter = docsXlsxParseRange(ws.autoFilter || (ws.model && ws.model.autoFilter));
-  docsXlsxSheetCtx = { ws, spans, covered, colCount, rowCount,
+  docsXlsxSheetCtx = { ws, spans, covered, colCount, rowCount, subtotals, fx, fy, rowTops, colLefts,
     filter: filter ? { headerRow: filter.r1, c1: filter.c1, c2: Math.min(filter.c2, colCount), r2: Math.min(filter.r2, rowCount) } : null,
     filterSel: {}, filterCache: {} };
   docsXlsxRendered = 0;
@@ -9795,7 +9821,13 @@ function docsXlsxAppendRows(){
       const cell = row.getCell(c);
       const fbtn = (isFilterHead && c >= ctx.filter.c1 && c <= ctx.filter.c2)
         ? `<button class="dxf-btn" data-c="${c}" onclick="docsXlsxFilterOpen(event,${c})" title="필터">▾</button>` : '';
-      html += `<td data-rc="${r}_${c}"${sp ? ` rowspan="${sp[0]}" colspan="${sp[1]}"` : ''} style="${docsXlsxCellCss(cell)}">${docsXlsxCellHtml(cell)}${fbtn}</td>`;
+      let css = docsXlsxCellCss(cell);
+      // 틀고정: 고정 행/열 셀은 sticky (교차 영역은 둘 다 + 최상위 z-index)
+      if(r <= ctx.fy && c <= ctx.fx) css += `position:sticky;top:${ctx.rowTops[r]}px;left:${ctx.colLefts[c]}px;z-index:7;`;
+      else if(r <= ctx.fy) css += `position:sticky;top:${ctx.rowTops[r]}px;z-index:6;`;
+      else if(c <= ctx.fx) css += `position:sticky;left:${ctx.colLefts[c]}px;z-index:5;`;
+      if((r <= ctx.fy || c <= ctx.fx) && !css.includes('background:')) css += 'background:#fff;';   // 투명이면 밑 내용 비침
+      html += `<td data-rc="${r}_${c}"${sp ? ` rowspan="${sp[0]}" colspan="${sp[1]}"` : ''} style="${css}">${docsXlsxCellHtml(cell)}${fbtn}</td>`;
     }
     html += '</tr>';
   }
@@ -9833,6 +9865,47 @@ function docsXlsxFilterApply(){
     if(tr) tr.style.visibility = docsXlsxRowPassesFilter(ctx, r) ? '' : 'collapse';
   }
   document.querySelectorAll('.dxf-btn').forEach(b => b.classList.toggle('on', !!ctx.filterSel[b.dataset.c]));
+  docsXlsxRecalcSubtotals();
+}
+// ── SUBTOTAL 재계산: 필터로 걸러진 행을 제외하고 다시 집계 (엑셀 동작 재현) ──
+// 지원 함수: 1/101 평균, 2/102 숫자개수, 3/103 개수(COUNTA), 4/104 최대, 5/105 최소, 9/109 합계
+function docsXlsxRecalcSubtotals(){
+  const ctx = docsXlsxSheetCtx;
+  if(!ctx || !ctx.subtotals.length) return;
+  const active = ctx.filter && Object.keys(ctx.filterSel).length > 0;
+  for(const st of ctx.subtotals){
+    const td = document.querySelector(`td[data-rc="${st.r}_${st.c}"]`);
+    if(!td) continue;
+    if(!active){ td.textContent = st.orig; continue; }   // 필터 없으면 원본 캐시값 복원
+    if(st.orig === '') continue;   // IF 래핑으로 원래부터 빈 셀
+    const code = st.fn >= 100 ? st.fn - 100 : st.fn;
+    let nums = [], nonEmpty = 0;
+    for(const rg of st.ranges){
+      for(let r = rg.r1; r <= Math.min(rg.r2, ctx.rowCount); r++){
+        const row = ctx.ws.getRow(r);
+        if(row.hidden) continue;
+        if(r > ctx.filter.headerRow && r <= ctx.filter.r2 && !docsXlsxRowPassesFilter(ctx, r)) continue;
+        for(let c = rg.c1; c <= rg.c2; c++){
+          const cell = row.getCell(c);
+          if(docsXlsxCellText(cell) !== '') nonEmpty++;
+          let v = cell.value;
+          if(v && typeof v === 'object' && v.result !== undefined) v = v.result;
+          if(typeof v === 'number') nums.push(v);
+        }
+      }
+    }
+    let val;
+    switch(code){
+      case 1: val = nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0; break;
+      case 2: val = nums.length; break;
+      case 3: val = nonEmpty; break;
+      case 4: val = nums.length ? Math.max(...nums) : 0; break;
+      case 5: val = nums.length ? Math.min(...nums) : 0; break;
+      default: val = nums.reduce((a, b) => a + b, 0);
+    }
+    const fmt = ctx.ws.getRow(st.r).getCell(st.c).numFmt || '';
+    td.textContent = (!fmt || /^general$/i.test(fmt)) ? String(Math.round(val * 1e10) / 1e10) : docsXlsxFormatNum(val, fmt);
+  }
 }
 function docsXlsxFilterOpen(ev, c){
   ev.stopPropagation(); ev.preventDefault();
