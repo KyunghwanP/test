@@ -96,10 +96,13 @@
         .memo-help-toggle { display: block; margin: 0 auto; border: none; background: transparent; color: var(--slate-400); font-size: 15px; line-height: 1; padding: 4px 26px; cursor: pointer; border-radius: 8px; transition: color .15s, transform .2s; }
         .memo-help-toggle:hover { color: var(--indigo); background: var(--indigo-50); }
         .memo-help.open .memo-help-toggle { transform: rotate(180deg); }
-        .memo-help-body { display: none; padding: 10px 12px 6px; border-top: 1px solid var(--rule); font-size: 12px; line-height: 1.9; color: var(--ink-soft); }
+        .memo-help-body { display: none; padding: 12px 10px 6px; border-top: 1px solid var(--rule); }
         .memo-help.open .memo-help-body { display: block; }
-        .memo-help-body kbd { display: inline-block; background: var(--slate-100); border: 1px solid var(--rule); border-radius: 5px; padding: 0 6px; font-family: inherit; font-size: 11px; font-weight: 700; color: var(--ink); margin: 0 1px; }
+        .memo-help-grid { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; align-items: center; font-size: 12px; color: var(--ink-soft); }
+        .memo-help-grid .mh-k { display: flex; gap: 3px; align-items: center; justify-content: flex-start; }
+        .memo-help-body kbd { display: inline-block; background: var(--slate-100); border: 1px solid var(--rule); border-radius: 5px; padding: 1px 7px; font-family: inherit; font-size: 11px; font-weight: 700; color: var(--ink); line-height: 1.5; }
         html.dark .memo-help-body kbd { background: #1b2740; }
+        .memo-help-note { margin-top: 9px; padding-top: 8px; border-top: 1px dashed var(--rule); font-size: 11px; color: var(--slate-400); line-height: 1.6; }
 
         /* ── +·⋮⋮ 버튼: 에디터에 마우스를 올렸을 때만 표시 (터치 기기는 항상) ── */
         .ce-toolbar__plus, .ce-toolbar__settings-btn { opacity: 0; pointer-events: none; transition: opacity .15s; }
@@ -268,15 +271,16 @@
             <div id="editorjs" style="display:none;"></div>
             <div class="memo-help" id="memo-help">
                 <div class="memo-help-body">
-                    <b>빠른 입력</b> — 빈 줄에 기호를 치고 스페이스:
-                    <kbd>#</kbd><kbd>##</kbd><kbd>###</kbd> 제목 ·
-                    <kbd>&gt;</kbd> 토글 ·
-                    <kbd>[]</kbd> 체크리스트 ·
-                    <kbd>-</kbd> 목록 ·
-                    <kbd>1.</kbd> 번호<br>
-                    <kbd>/</kbd> 블록 메뉴 · <kbd>Tab</kbd>/<kbd>Shift+Tab</kbd> 들여쓰기 ·
-                    토글·체크리스트 안에서도 <kbd>#</kbd>로 글자만 키울 수 있어요<br>
-                    줄에 마우스를 올리고 <b>[열기 ›]</b>를 누르면 그 줄이 하위 페이지가 됩니다
+                    <div class="memo-help-grid">
+                        <span class="mh-k"><kbd>#</kbd><kbd>##</kbd><kbd>###</kbd></span><span>제목 (크기 3단계)</span>
+                        <span class="mh-k"><kbd>&gt;</kbd></span><span>토글 (접기/펼치기)</span>
+                        <span class="mh-k"><kbd>[]</kbd></span><span>체크리스트</span>
+                        <span class="mh-k"><kbd>-</kbd><kbd>1.</kbd></span><span>목록 · 번호 목록</span>
+                        <span class="mh-k"><kbd>/</kbd></span><span>블록 메뉴 열기</span>
+                        <span class="mh-k"><kbd>Tab</kbd></span><span>들여쓰기 (<kbd>Shift+Tab</kbd> 해제)</span>
+                        <span class="mh-k"><kbd>열기 ›</kbd></span><span>그 줄을 하위 페이지로</span>
+                    </div>
+                    <div class="memo-help-note">기호는 빈 줄에서 입력 후 스페이스 · 토글/체크리스트 안에서 <kbd>#</kbd> = 기능 유지한 채 글자만 커짐</div>
                 </div>
                 <button class="memo-help-toggle" id="memo-help-toggle" title="간단 사용법">⌃</button>
             </div>
