@@ -69,6 +69,8 @@
         .back-link:hover { border-color: var(--indigo); color: var(--indigo); }
 
         main { flex: 1; width: 100%; max-width: 56rem; margin: 0 auto; padding: 18px 14px 60px; display: flex; flex-direction: column; gap: 10px; }
+        /* 임베드(빠른 메모 패널)에서는 여백을 줄여 패널 바닥까지 꽉 차게 */
+        html.embed main { padding: 10px 10px 12px; }
 
         /* ── 상태 바 ── */
         .memo-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
@@ -84,9 +86,26 @@
         .memo-local-note.show { display: block; }
 
         /* ── 에디터 카드 ── */
-        .memo-card { background: var(--paper); border: 1px solid var(--rule); border-radius: 18px; box-shadow: 0 4px 20px rgba(148,163,184,.10); padding: 18px 14px 30px; min-height: 62vh; }
+        /* 카드가 화면(임베드 시 패널) 바닥까지 채우고, 에디터가 남는 공간을 전부 차지 */
+        .memo-card { background: var(--paper); border: 1px solid var(--rule); border-radius: 18px; box-shadow: 0 4px 20px rgba(148,163,184,.10); padding: 18px 14px 10px; min-height: 62vh; flex: 1; display: flex; flex-direction: column; }
         html.dark .memo-card { box-shadow: 0 4px 20px rgba(0,0,0,.35); }
-        #editorjs { min-height: 55vh; }
+        #editorjs { min-height: 55vh; flex: 1; }
+
+        /* ── 하단 사용법 접이 패널 ── */
+        .memo-help { flex-shrink: 0; margin-top: 6px; }
+        .memo-help-toggle { display: block; margin: 0 auto; border: none; background: transparent; color: var(--slate-400); font-size: 15px; line-height: 1; padding: 4px 26px; cursor: pointer; border-radius: 8px; transition: color .15s, transform .2s; }
+        .memo-help-toggle:hover { color: var(--indigo); background: var(--indigo-50); }
+        .memo-help.open .memo-help-toggle { transform: rotate(180deg); }
+        .memo-help-body { display: none; padding: 10px 12px 6px; border-top: 1px solid var(--rule); font-size: 12px; line-height: 1.9; color: var(--ink-soft); }
+        .memo-help.open .memo-help-body { display: block; }
+        .memo-help-body kbd { display: inline-block; background: var(--slate-100); border: 1px solid var(--rule); border-radius: 5px; padding: 0 6px; font-family: inherit; font-size: 11px; font-weight: 700; color: var(--ink); margin: 0 1px; }
+        html.dark .memo-help-body kbd { background: #1b2740; }
+
+        /* ── +·⋮⋮ 버튼: 에디터에 마우스를 올렸을 때만 표시 (터치 기기는 항상) ── */
+        .ce-toolbar__plus, .ce-toolbar__settings-btn { opacity: 0; pointer-events: none; transition: opacity .15s; }
+        .codex-editor:hover .ce-toolbar__plus, .codex-editor:hover .ce-toolbar__settings-btn,
+        .ce-toolbar--opened .ce-toolbar__plus, .ce-toolbar--opened .ce-toolbar__settings-btn { opacity: 1; pointer-events: auto; }
+        @media (hover: none) { .ce-toolbar__plus, .ce-toolbar__settings-btn { opacity: 1; pointer-events: auto; } }
 
         /* ── 하위 페이지 블록 ── */
         .subpage-block { display: flex; align-items: center; gap: 9px; padding: 7px 10px; margin: 2px 0; border-radius: 10px; cursor: pointer; border: 1px solid transparent; transition: background .12s; min-height: 40px; }
@@ -247,6 +266,20 @@
         <div class="memo-card">
             <div id="boot"><span class="spin"></span>메모를 불러오는 중…</div>
             <div id="editorjs" style="display:none;"></div>
+            <div class="memo-help" id="memo-help">
+                <div class="memo-help-body">
+                    <b>빠른 입력</b> — 빈 줄에 기호를 치고 스페이스:
+                    <kbd>#</kbd><kbd>##</kbd><kbd>###</kbd> 제목 ·
+                    <kbd>&gt;</kbd> 토글 ·
+                    <kbd>[]</kbd> 체크리스트 ·
+                    <kbd>-</kbd> 목록 ·
+                    <kbd>1.</kbd> 번호<br>
+                    <kbd>/</kbd> 블록 메뉴 · <kbd>Tab</kbd>/<kbd>Shift+Tab</kbd> 들여쓰기 ·
+                    토글·체크리스트 안에서도 <kbd>#</kbd>로 글자만 키울 수 있어요<br>
+                    줄에 마우스를 올리고 <b>[열기 ›]</b>를 누르면 그 줄이 하위 페이지가 됩니다
+                </div>
+                <button class="memo-help-toggle" id="memo-help-toggle" title="간단 사용법">⌃</button>
+            </div>
         </div>
     </main>
 
@@ -1163,6 +1196,11 @@
         });
         modalTitleEl.addEventListener('keydown', e => {
             if (e.key === 'Enter') { e.preventDefault(); modalTitleEl.blur(); }
+        });
+
+        // 하단 ⌃ 사용법 패널 여닫기
+        document.getElementById('memo-help-toggle').addEventListener('click', () => {
+            document.getElementById('memo-help').classList.toggle('open');
         });
 
         // ── 시작 ──
