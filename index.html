@@ -2894,7 +2894,17 @@
   .docs-xlsx-tab{border:1px solid var(--rule);border-bottom:none;background:var(--paper-soft);color:var(--ink-soft);font-weight:700;font-size:12.5px;padding:7px 12px;border-radius:8px 8px 0 0;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:inherit;}
   .docs-xlsx-tab.active{background:var(--paper);color:var(--mon);border-color:var(--mon);}
   /* 시트 영역은 원본 재현을 위해 다크모드와 무관하게 흰 배경 고정 (PDF 뷰어와 동일 취지) */
-  .docs-xlsx-wrap{flex:1;min-height:0;overflow:auto;background:#fff;}
+  .docs-xlsx-wrap{flex:1;min-height:0;overflow:auto;background:#fff;position:relative;}
+  /* 자동 필터 (엑셀 autoFilter 재현) */
+  .dxf-btn{border:1px solid #b6bcc4;background:#f3f4f6;border-radius:3px;font-size:9px;line-height:1;padding:2px 3px;margin-left:4px;cursor:pointer;vertical-align:middle;color:#444;}
+  .dxf-btn.on{background:#2563eb;color:#fff;border-color:#2563eb;}
+  .docs-xlsx-filter-pop{position:absolute;z-index:20;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);width:230px;font-size:12.5px;color:#111;font-family:'Malgun Gothic','맑은 고딕',sans-serif;}
+  .docs-xlsx-filter-pop .dxf-head{display:flex;gap:6px;padding:8px;border-bottom:1px solid #e5e7eb;}
+  .docs-xlsx-filter-pop .dxf-head button,.docs-xlsx-filter-pop .dxf-foot button{border:1px solid #d1d5db;background:#f9fafb;border-radius:6px;padding:4px 8px;font-size:11.5px;cursor:pointer;font-family:inherit;color:#111;}
+  .docs-xlsx-filter-pop .dxf-list{max-height:240px;overflow:auto;padding:6px 8px;display:flex;flex-direction:column;gap:2px;}
+  .docs-xlsx-filter-pop .dxf-list label{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
+  .docs-xlsx-filter-pop .dxf-foot{display:flex;gap:6px;padding:8px;border-top:1px solid #e5e7eb;justify-content:flex-end;}
+  .docs-xlsx-filter-pop .dxf-ok{background:#2563eb !important;color:#fff !important;border-color:#2563eb !important;}
   .docs-xlsx-table{border-collapse:collapse;table-layout:fixed;background:#fff;color:#000;font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:13px;}
   .docs-xlsx-table td{border:1px solid #dde1e6;padding:0 3px;overflow:hidden;white-space:pre;line-height:1.25;vertical-align:bottom;}
   .docs-xlsx-hl{outline:2.5px solid #f59e0b;outline-offset:-2.5px;}
@@ -3228,7 +3238,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.19</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.20</div>
   </div>
 </div>
 
@@ -3358,7 +3368,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.19</div>
+    <div class="nav-version" title="Made by 박경환">ver6.20</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -9464,6 +9474,24 @@ const DOCS_XLSX_BATCH = 80;    // 배치당 행 수 (명렬 시트 200+열 대�
 
 function docsXlsxEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function docsXlsxColNum(a){ let n = 0; for(const ch of a) n = n * 26 + (ch.charCodeAt(0) - 64); return n; }
+// 'A4:HS385' / {from,to} / {ref} 형태의 범위를 {r1,c1,r2,c2}로 정규화
+function docsXlsxParseRange(v){
+  if(!v) return null;
+  if(typeof v === 'string'){
+    const m = v.replace(/\$/g, '').match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+    return m ? { r1: +m[2], c1: docsXlsxColNum(m[1]), r2: +m[4], c2: docsXlsxColNum(m[3]) } : null;
+  }
+  if(v.ref) return docsXlsxParseRange(v.ref);
+  if(v.from && v.to){
+    const p = x => {
+      if(typeof x === 'string'){ const m = x.replace(/\$/g, '').match(/^([A-Z]+)(\d+)$/); return m ? { row: +m[2], col: docsXlsxColNum(m[1]) } : null; }
+      return { row: x.row, col: x.col || x.column };
+    };
+    const f = p(v.from), t = p(v.to);
+    return (f && t && f.row && f.col) ? { r1: f.row, c1: f.col, r2: t.row, c2: t.col } : null;
+  }
+  return null;
+}
 
 // ── 엑셀 색상 → CSS ──
 // Office 2013+ 기본 테마 팔레트 (theme 인덱스: lt1, dk1, lt2, dk2, accent1~6, hlink, folHlink)
@@ -9710,7 +9738,11 @@ function docsXlsxShowSheet(i){
   }
   wrap.innerHTML = `<table class="docs-xlsx-table"><colgroup>${cols}</colgroup><tbody id="docsXlsxTbody"></tbody></table><div id="docsXlsxMore" style="height:1px;"></div>`;
   wrap.scrollTop = 0; wrap.scrollLeft = 0;
-  docsXlsxSheetCtx = { ws, spans, covered, colCount, rowCount };
+  // 엑셀 자동 필터 범위 (명렬 시트: A4:HS385 등) — 헤더 행에 ▾ 버튼 노출
+  const filter = docsXlsxParseRange(ws.autoFilter || (ws.model && ws.model.autoFilter));
+  docsXlsxSheetCtx = { ws, spans, covered, colCount, rowCount,
+    filter: filter ? { headerRow: filter.r1, c1: filter.c1, c2: Math.min(filter.c2, colCount), r2: Math.min(filter.r2, rowCount) } : null,
+    filterSel: {}, filterCache: {} };
   docsXlsxRendered = 0;
   docsXlsxAppendRows();
   // 스크롤이 바닥에 가까워지면 다음 배치 렌더 (큰 명렬 시트 대비)
@@ -9732,13 +9764,18 @@ function docsXlsxAppendRows(){
     const row = ctx.ws.getRow(r);
     // 숨김 행은 display:none이 아니라 visibility:collapse — none이면 테이블 격자에서
     // 행이 통째로 빠져, 위쪽 rowspan이 다음 보이는 행까지 흘러넘쳐 열이 밀린다
-    html += row.hidden ? '<tr style="visibility:collapse;">'
+    // (필터로 걸러진 행도 같은 이유로 collapse)
+    const filtered = !row.hidden && !docsXlsxRowPassesFilter(ctx, r);
+    html += (row.hidden || filtered) ? '<tr style="visibility:collapse;">'
       : `<tr style="height:${Math.round((row.height || 16.5) * 4 / 3)}px;">`;
+    const isFilterHead = ctx.filter && r === ctx.filter.headerRow;
     for(let c = 1; c <= ctx.colCount; c++){
       if(ctx.covered[r + '_' + c]) continue;
       const sp = ctx.spans[r + '_' + c];
       const cell = row.getCell(c);
-      html += `<td data-rc="${r}_${c}"${sp ? ` rowspan="${sp[0]}" colspan="${sp[1]}"` : ''} style="${docsXlsxCellCss(cell)}">${docsXlsxEsc(docsXlsxCellText(cell))}</td>`;
+      const fbtn = (isFilterHead && c >= ctx.filter.c1 && c <= ctx.filter.c2)
+        ? `<button class="dxf-btn" data-c="${c}" onclick="docsXlsxFilterOpen(event,${c})" title="필터">▾</button>` : '';
+      html += `<td data-rc="${r}_${c}"${sp ? ` rowspan="${sp[0]}" colspan="${sp[1]}"` : ''} style="${docsXlsxCellCss(cell)}">${docsXlsxEsc(docsXlsxCellText(cell))}${fbtn}</td>`;
     }
     html += '</tr>';
   }
@@ -9748,6 +9785,96 @@ function docsXlsxAppendRows(){
     if(docsXlsxObserver) docsXlsxObserver.disconnect();
     document.getElementById('docsXlsxMore')?.remove();
   }
+}
+
+// ── 자동 필터: 엑셀 autoFilter 헤더의 ▾ → 값 체크리스트로 행 걸러내기 ──
+function docsXlsxRowPassesFilter(ctx, r){
+  if(!ctx.filter || r <= ctx.filter.headerRow || r > ctx.filter.r2) return true;
+  const cols = Object.keys(ctx.filterSel);
+  if(!cols.length) return true;
+  const row = ctx.ws.getRow(r);
+  for(const c of cols){
+    const t = docsXlsxCellText(row.getCell(+c)) || '(빈 셀)';
+    if(!ctx.filterSel[c].has(t)) return false;
+  }
+  return true;
+}
+function docsXlsxFilterApply(){
+  const ctx = docsXlsxSheetCtx;
+  if(!ctx || !ctx.filter) return;
+  // 필터 범위 전체가 그려져 있어야 걸러낼 수 있다
+  let guard = 0;
+  while(docsXlsxRendered < ctx.filter.r2 && guard++ < 500) docsXlsxAppendRows();
+  const trs = document.getElementById('docsXlsxTbody')?.children || [];
+  for(let r = ctx.filter.headerRow + 1; r <= Math.min(ctx.filter.r2, trs.length); r++){
+    const row = ctx.ws.getRow(r);
+    if(row.hidden) continue;   // 원본 숨김 행은 그대로 둔다
+    const tr = trs[r - 1];
+    if(tr) tr.style.visibility = docsXlsxRowPassesFilter(ctx, r) ? '' : 'collapse';
+  }
+  document.querySelectorAll('.dxf-btn').forEach(b => b.classList.toggle('on', !!ctx.filterSel[b.dataset.c]));
+}
+function docsXlsxFilterOpen(ev, c){
+  ev.stopPropagation(); ev.preventDefault();
+  const ctx = docsXlsxSheetCtx;
+  if(!ctx || !ctx.filter) return;
+  docsXlsxFilterClose();
+  if(!ctx.filterCache[c]){
+    const vals = new Set();
+    for(let r = ctx.filter.headerRow + 1; r <= ctx.filter.r2; r++){
+      const row = ctx.ws.getRow(r);
+      if(row.hidden) continue;
+      vals.add(docsXlsxCellText(row.getCell(c)) || '(빈 셀)');
+    }
+    ctx.filterCache[c] = [...vals].sort((a, b) => {
+      const na = parseFloat(a), nb = parseFloat(b);
+      if(!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb;
+      return String(a).localeCompare(String(b), 'ko');
+    });
+  }
+  const cur = ctx.filterSel[c];   // Set이면 부분 선택, 없으면 전체
+  const pop = document.createElement('div');
+  pop.className = 'docs-xlsx-filter-pop';
+  pop.id = 'docsXlsxFilterPop';
+  pop.innerHTML = `
+    <div class="dxf-head">
+      <button onclick="docsXlsxFilterAll(true)">전체 선택</button>
+      <button onclick="docsXlsxFilterAll(false)">전체 해제</button>
+    </div>
+    <div class="dxf-list">${ctx.filterCache[c].map(v =>
+      `<label><input type="checkbox" value="${docsXlsxEsc(v)}"${!cur || cur.has(v) ? ' checked' : ''}> ${docsXlsxEsc(v)}</label>`).join('')}
+    </div>
+    <div class="dxf-foot">
+      <button onclick="docsXlsxFilterReset(${c})">필터 해제</button>
+      <button class="dxf-ok" onclick="docsXlsxFilterOk(${c})">적용</button>
+    </div>`;
+  const td = ev.target.closest('td');
+  pop.style.left = Math.max(0, td.offsetLeft) + 'px';
+  pop.style.top = (td.offsetTop + td.offsetHeight + 2) + 'px';
+  pop.addEventListener('click', e => e.stopPropagation());
+  document.getElementById('docsXlsxWrap').appendChild(pop);
+}
+function docsXlsxFilterClose(){ document.getElementById('docsXlsxFilterPop')?.remove(); }
+document.addEventListener('click', docsXlsxFilterClose);
+function docsXlsxFilterAll(on){
+  document.querySelectorAll('#docsXlsxFilterPop .dxf-list input').forEach(i => { i.checked = on; });
+}
+function docsXlsxFilterOk(c){
+  const ctx = docsXlsxSheetCtx;
+  if(!ctx) return;
+  const boxes = [...document.querySelectorAll('#docsXlsxFilterPop .dxf-list input')];
+  const checked = boxes.filter(b => b.checked).map(b => b.value);
+  if(checked.length === boxes.length) delete ctx.filterSel[c];   // 전부 선택 = 필터 없음
+  else ctx.filterSel[c] = new Set(checked);
+  docsXlsxFilterClose();
+  docsXlsxFilterApply();
+}
+function docsXlsxFilterReset(c){
+  const ctx = docsXlsxSheetCtx;
+  if(!ctx) return;
+  delete ctx.filterSel[c];
+  docsXlsxFilterClose();
+  docsXlsxFilterApply();
 }
 
 // ── 시트 내 검색: 행을 숨기지 않고(서식 보존) 일치 셀로 이동·하이라이트 ──
@@ -9855,6 +9982,10 @@ window.docsXlsxSearch = docsXlsxSearch;
 window.docsXlsxFindNav = docsXlsxFindNav;
 window.docsXlsxUploadClick = docsXlsxUploadClick;
 window.docsXlsxUpload = docsXlsxUpload;
+window.docsXlsxFilterOpen = docsXlsxFilterOpen;
+window.docsXlsxFilterAll = docsXlsxFilterAll;
+window.docsXlsxFilterOk = docsXlsxFilterOk;
+window.docsXlsxFilterReset = docsXlsxFilterReset;
 // 개발용: 업로드 없이 로컬 ArrayBuffer를 바로 렌더 (콘솔 테스트·미리보기)
 window.__docsXlsxDebugLoad = async ab => {
   await loadExcelJS();
