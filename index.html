@@ -3238,7 +3238,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.20</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.21</div>
   </div>
 </div>
 
@@ -3368,7 +3368,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.20</div>
+    <div class="nav-version" title="Made by 박경환">ver6.21</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -9605,6 +9605,35 @@ function docsXlsxCellText(cell){
   return String(v);
 }
 
+// ── 글꼴 → CSS (셀 전체·리치텍스트 부분 서식 공용) ──
+// 굵기·기울임·밑줄·취소선·크기·글꼴 이름(궁서체 등)·글자색까지 재현
+function docsXlsxFontCss(f){
+  if(!f) return '';
+  let css = '';
+  if(f.bold) css += 'font-weight:700;';
+  if(f.italic) css += 'font-style:italic;';
+  if(f.underline && f.strike) css += 'text-decoration:underline line-through;';
+  else if(f.underline) css += 'text-decoration:underline;';
+  else if(f.strike) css += 'text-decoration:line-through;';
+  if(f.size && f.size !== 11) css += 'font-size:' + Math.round(f.size * 4 / 3) + 'px;';
+  if(f.name) css += "font-family:'" + String(f.name).replace(/['"\\]/g, '') + "','Malgun Gothic','맑은 고딕',sans-serif;";
+  const c = docsXlsxColor(f.color);
+  if(c) css += 'color:' + c + ';';
+  return css;
+}
+
+// ── 셀 내용 → HTML — 리치텍스트(한 셀 안 부분 색·굵기)는 run별 span으로 ──
+function docsXlsxCellHtml(cell){
+  const v = cell.value;
+  if(v && typeof v === 'object' && v.richText)
+    return v.richText.map(t => {
+      const css = docsXlsxFontCss(t.font);
+      const txt = docsXlsxEsc(t.text);
+      return css ? `<span style="${css}">${txt}</span>` : txt;
+    }).join('');
+  return docsXlsxEsc(docsXlsxCellText(cell));
+}
+
 // ── 셀 스타일 → 인라인 CSS ──
 const DOCS_XLSX_BW = { thin:'1px', hair:'1px', dotted:'1px', dashed:'1px', dashDot:'1px', dashDotDot:'1px', medium:'2px', mediumDashed:'2px', mediumDashDot:'2px', slantDashDot:'2px', double:'3px', thick:'3px' };
 function docsXlsxCellCss(cell){
@@ -9615,16 +9644,7 @@ function docsXlsxCellCss(cell){
     const c = docsXlsxColor(fill.fgColor);
     if(c) css += 'background:' + c + ';';
   }
-  const f = st.font;
-  if(f){
-    if(f.bold) css += 'font-weight:700;';
-    if(f.italic) css += 'font-style:italic;';
-    if(f.underline) css += 'text-decoration:underline;';
-    if(f.strike) css += 'text-decoration:line-through;';
-    if(f.size && f.size !== 11) css += 'font-size:' + Math.round(f.size * 4 / 3) + 'px;';
-    const c = docsXlsxColor(f.color);
-    if(c) css += 'color:' + c + ';';
-  }
+  css += docsXlsxFontCss(st.font);
   const al = st.alignment || {};
   if(al.horizontal && al.horizontal !== 'fill') css += 'text-align:' + al.horizontal + ';';
   else if(typeof cell.value === 'number') css += 'text-align:right;';
@@ -9775,7 +9795,7 @@ function docsXlsxAppendRows(){
       const cell = row.getCell(c);
       const fbtn = (isFilterHead && c >= ctx.filter.c1 && c <= ctx.filter.c2)
         ? `<button class="dxf-btn" data-c="${c}" onclick="docsXlsxFilterOpen(event,${c})" title="필터">▾</button>` : '';
-      html += `<td data-rc="${r}_${c}"${sp ? ` rowspan="${sp[0]}" colspan="${sp[1]}"` : ''} style="${docsXlsxCellCss(cell)}">${docsXlsxEsc(docsXlsxCellText(cell))}${fbtn}</td>`;
+      html += `<td data-rc="${r}_${c}"${sp ? ` rowspan="${sp[0]}" colspan="${sp[1]}"` : ''} style="${docsXlsxCellCss(cell)}">${docsXlsxCellHtml(cell)}${fbtn}</td>`;
     }
     html += '</tr>';
   }
