@@ -132,7 +132,8 @@
         .pg-number .pg-mark::before { content: counter(pgnum) '.'; color: var(--ink-soft); font-size: 13px; font-weight: 800; }
         /* 텍스트 */
         .pg-text { flex: 1; min-width: 0; outline: none; line-height: 1.6; padding: 2px 0; word-break: break-word; }
-        .pg-text:empty::before { content: attr(data-ph); color: var(--slate-300); pointer-events: none; }
+        /* 안내문(placeholder)은 커서가 있는 빈 줄 + 맨 첫 빈 줄에만 — 빈 줄마다 떠서 지저분하던 것 정리 */
+        .pg-text:empty:focus::before, .ce-block:first-child .pg-para .pg-text:empty::before { content: attr(data-ph); color: var(--slate-300); pointer-events: none; }
         .pg-row.done .pg-text { color: var(--ink-soft); text-decoration: line-through; }
         /* 페이지 열기 버튼 — 하위 페이지 블록과 동일한 [열기 ›] 스타일 */
         .pg-open { flex-shrink: 0; font-size: 11.5px; font-weight: 800; color: var(--indigo); background: var(--paper); border: 1px solid var(--indigo-100); border-radius: 8px; padding: 4px 10px; cursor: pointer; opacity: 0; transition: opacity .12s; white-space: nowrap; margin-top: 2px; }
@@ -897,6 +898,29 @@
                         setTimeout(focusNewBlock, 90);
                     };
                     holderEl.addEventListener('keydown', holderEl.__mdKeydown);
+
+                    // 블록 밖 빈 영역 클릭: Editor.js가 빈 블록을 계속 쌓는 대신
+                    // '가장 위의 빈 줄'에 커서를 놓는다 (빈 줄이 없을 때만 맨 끝에 하나 생성)
+                    if (holderEl.__bgClick) ['mousedown', 'click'].forEach(t => holderEl.removeEventListener(t, holderEl.__bgClick, true));
+                    holderEl.__bgClick = e => {
+                        if (e.target.closest('.ce-block, .ce-toolbar, .ce-inline-toolbar, .ce-popover, .ce-conversion-toolbar')) return;
+                        e.preventDefault(); e.stopPropagation();
+                        if (e.type !== 'mousedown') return;
+                        let target = null;
+                        for (const t of holderEl.querySelectorAll('.ce-block .pg-para:not(.has-page) .pg-text')) {
+                            if (!t.textContent.trim() && t.offsetParent !== null) { target = t; break; }
+                        }
+                        if (target) { placeCaretEnd(target); return; }
+                        try {
+                            const cnt = ed.blocks.getBlocksCount();
+                            ed.blocks.insert('para', { text: '', pageId: null }, undefined, cnt, false, false);
+                            const nb = ed.blocks.getBlockByIndex(cnt);
+                            const t2 = nb && nb.holder && nb.holder.querySelector('.pg-text');
+                            if (t2) placeCaretEnd(t2);
+                            scheduleSave();
+                        } catch (err) {}
+                    };
+                    ['mousedown', 'click'].forEach(t => holderEl.addEventListener(t, holderEl.__bgClick, true));
                 }
             });
             ctx.editor = ed;
