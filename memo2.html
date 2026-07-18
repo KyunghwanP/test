@@ -555,6 +555,9 @@
                     try { if (this.block && this.block.id != null) idx = this.api.blocks.getBlockIndex(this.block.id); } catch (err) {}
                     if (idx < 0) idx = this.api.blocks.getCurrentBlockIndex();
                     this.api.blocks.insert('para', { text: '', pageId: null }, undefined, idx + 1, false, false);
+                    // Editor 내부 currentBlockIndex 동기화 — 이게 stale이면 이어지는
+                    // 마크다운 변환 등이 위 블록을 대상으로 삼는다 (커서는 아래에서 직접 처리)
+                    try { this.api.caret.setToBlock(idx + 1); } catch (err) {}
                     const focusNew = () => {
                         const nb = this.api.blocks.getBlockByIndex(idx + 1);
                         const t = nb && nb.holder && nb.holder.querySelector('.pg-text');
@@ -950,7 +953,13 @@
                         if (!MD_MAP[trigger]) return;
                         e.preventDefault();
                         e.stopPropagation();
-                        const idx = ed.blocks.getCurrentBlockIndex();
+                        // 커서가 있는 블록의 인덱스를 DOM 위치로 직접 계산 —
+                        // 커스텀 블록(PageBlock)의 Enter가 Editor 내부 currentBlockIndex를
+                        // 갱신하지 못해, getCurrentBlockIndex()가 '위 블록'을 가리킨 채
+                        // 변환이 위 블록을 토글로 교체해 사라지게 하던 버그 수정
+                        const blockEl = para.closest('.ce-block');
+                        let idx = blockEl ? [...holderEl.querySelectorAll('.ce-block')].indexOf(blockEl) : -1;
+                        if (idx < 0) idx = ed.blocks.getCurrentBlockIndex();
                         if (idx < 0) return;
                         // 토글 안의 문단이면 소속(foreignKey)을 기억해 뒀다가 변환된 블록에 승계 —
                         // insert(replace)가 새 holder를 만들며 속성이 날아가 토글 밖으로 탈출하던 버그 수정
@@ -958,6 +967,8 @@
                         const fk = curBlk && curBlk.holder ? curBlk.holder.getAttribute('foreignKey') : null;
                         const [type, data] = MD_MAP[trigger];
                         ed.blocks.insert(type, JSON.parse(JSON.stringify(data)), undefined, idx, false, true);   // 현재 블록 대체 (포커스는 아래에서 직접 처리)
+                        // Editor 내부 currentBlockIndex 동기화 (이후 토글 라이브러리 등이 참조)
+                        try { ed.caret.setToBlock(idx); } catch (err) {}
                         if (fk) {
                             try {
                                 const rootWrap = document.getElementById(fk);
