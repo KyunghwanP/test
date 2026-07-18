@@ -130,6 +130,15 @@
         .pg-bullet .pg-mark::before { content: '•'; color: var(--ink-soft); font-size: 17px; line-height: 1; }
         .pg-number .pg-row { counter-increment: pgnum; }
         .pg-number .pg-mark::before { content: counter(pgnum) '.'; color: var(--ink-soft); font-size: 13px; font-weight: 800; }
+        /* Tab 들여쓰기 (0~4단계) — 단계마다 불렛 모양이 바뀐다 (Tab=깊게, Shift+Tab=얕게) */
+        .pg-row.pg-ind1 { margin-left: 24px; }
+        .pg-row.pg-ind2 { margin-left: 48px; }
+        .pg-row.pg-ind3 { margin-left: 72px; }
+        .pg-row.pg-ind4 { margin-left: 96px; }
+        .pg-bullet .pg-row.pg-ind1 .pg-mark::before { content: '◦'; }
+        .pg-bullet .pg-row.pg-ind2 .pg-mark::before { content: '▪'; font-size: 12px; }
+        .pg-bullet .pg-row.pg-ind3 .pg-mark::before { content: '‣'; }
+        .pg-bullet .pg-row.pg-ind4 .pg-mark::before { content: '◦'; }
         /* 텍스트 */
         .pg-text { flex: 1; min-width: 0; outline: none; line-height: 1.6; padding: 2px 0; word-break: break-word; }
         /* 안내문(placeholder)은 커서가 있는 빈 줄 + 맨 첫 빈 줄에만 — 빈 줄마다 떠서 지저분하던 것 정리 */
@@ -509,6 +518,8 @@
                     // 노션식 2단계: 빈 줄에서 Backspace → 블록 삭제 (제목 줄은 먼저 일반 텍스트로 해제)
                     // 페이지 연결(pageId)된 줄은 실수 삭제 방지를 위해 Editor 기본 동작(merge)에 맡긴다
                     if (e.key === 'Backspace' && !e.shiftKey && !stripTags(this.txt.innerHTML) && !this.data.pageId) {
+                        // 꾹 누름(자동 반복)으로는 블록이 연쇄 삭제되지 않게 — 새로 누를 때만 삭제
+                        if (e.repeat) { e.preventDefault(); e.stopPropagation(); return; }
                         let idx = -1;
                         try { if (this.block && this.block.id != null) idx = this.api.blocks.getBlockIndex(this.block.id); } catch (err) {}
                         if (idx < 0) idx = this.api.blocks.getCurrentBlockIndex();
@@ -604,6 +615,7 @@
                     checked: !!(it && it.checked),
                     pageId: (it && it.pageId) || null,
                     level: (it && it.level) || 0,   // 항목 제목 레벨 (#=2, ##=3, ###=4) — 0이면 일반
+                    indent: (it && it.indent) || 0, // Tab 들여쓰기 단계 (0~4)
                 }));
             }
             render() {
@@ -614,7 +626,7 @@
             }
             renderRow(item) {
                 const row = document.createElement('div');
-                row.className = 'pg-row' + (item.checked ? ' done' : '') + (item.pageId ? ' has-page' : '') + (item.level ? ' pg-lv' + item.level : '');
+                row.className = 'pg-row' + (item.checked ? ' done' : '') + (item.pageId ? ' has-page' : '') + (item.level ? ' pg-lv' + item.level : '') + (item.indent ? ' pg-ind' + item.indent : '');
                 row._item = item;
 
                 const mark = document.createElement('span');
@@ -668,16 +680,37 @@
             }
             onKey(e, row) {
                 const txt = row.querySelector('.pg-text');
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    // 새 항목 추가 후 바로 이어서 입력
+                if (e.key === 'Tab') {
+                    // Tab = 한 단계 들여쓰기(불렛 모양 변경), Shift+Tab = 내어쓰기
                     e.preventDefault(); e.stopPropagation();
-                    const item = { text: '', checked: false, pageId: null };
+                    const item = row._item;
+                    const next = Math.max(0, Math.min(4, (item.indent || 0) + (e.shiftKey ? -1 : 1)));
+                    if (next === (item.indent || 0)) return;
+                    item.indent = next;
+                    row.classList.remove('pg-ind1', 'pg-ind2', 'pg-ind3', 'pg-ind4');
+                    if (next) row.classList.add('pg-ind' + next);
+                    this.change();
+                } else if (e.key === 'Enter' && !e.shiftKey) {
+                    // 새 항목 추가 후 바로 이어서 입력 (들여쓰기 단계 승계)
+                    e.preventDefault(); e.stopPropagation();
+                    const item = { text: '', checked: false, pageId: null, level: 0, indent: row._item.indent || 0 };
                     this.items.splice(this.items.indexOf(row._item) + 1, 0, item);
                     const newRow = this.renderRow(item);
                     row.after(newRow);
                     newRow.querySelector('.pg-text').focus();
                     this.change();
                 } else if (e.key === 'Backspace' && !stripTags(txt.innerHTML)) {
+                    // 꾹 누름(자동 반복)으로는 항목·블록이 연쇄 삭제되지 않게 — 새로 누를 때만 동작
+                    if (e.repeat) { e.preventDefault(); e.stopPropagation(); return; }
+                    // 들여쓰기된 항목은 먼저 한 단계씩 내어쓰기 (노션식)
+                    if (row._item.indent) {
+                        e.preventDefault(); e.stopPropagation();
+                        row._item.indent--;
+                        row.classList.remove('pg-ind1', 'pg-ind2', 'pg-ind3', 'pg-ind4');
+                        if (row._item.indent) row.classList.add('pg-ind' + row._item.indent);
+                        this.change();
+                        return;
+                    }
                     // 노션식 1단계: 빈 항목에서 Backspace → 체크박스·마커 기능을 해제하고
                     // 일반 텍스트 줄로 전환 (그 줄에서 한 번 더 Backspace → PageBlock이 삭제 처리)
                     e.preventDefault(); e.stopPropagation();
@@ -731,10 +764,11 @@
                         checked: !!r._item.checked,
                         pageId: r._item.pageId || null,
                         level: r._item.level || 0,
+                        indent: r._item.indent || 0,
                     })).filter(it => stripTags(it.text) || it.pageId),
                 };
             }
-            static get sanitize() { return { items: { text: { br: true, b: true, i: true, a: true, mark: true }, checked: false, pageId: false, level: false } }; }
+            static get sanitize() { return { items: { text: { br: true, b: true, i: true, a: true, mark: true }, checked: false, pageId: false, level: false, indent: false } }; }
         }
 
         // ── 토글 확장: 제목 레벨(#, ##, ###) 지원 ──
