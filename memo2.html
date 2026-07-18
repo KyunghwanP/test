@@ -104,10 +104,13 @@
         html.dark .memo-help-body kbd { background: #1b2740; }
         .memo-help-note { margin-top: 9px; padding-top: 8px; border-top: 1px dashed var(--rule); font-size: 11px; color: var(--slate-400); line-height: 1.6; }
 
-        /* ── +·⋮⋮ 버튼: 에디터에 마우스를 올렸을 때만 표시 (터치 기기는 항상) ── */
+        /* ── +·⋮⋮ 버튼: 블록 줄에 마우스를 올렸을 때([열기 ›]와 같은 타이밍)만 표시 ──
+           에디터 전체 호버 기준이면 사실상 항상 떠 있게 되므로 .ce-block:hover 로 좁힌다.
+           버튼 자체·열린 메뉴 위에 있을 때는 유지, 터치 기기는 항상 표시 */
         .ce-toolbar__plus, .ce-toolbar__settings-btn { opacity: 0; pointer-events: none; transition: opacity .15s; }
-        .codex-editor:hover .ce-toolbar__plus, .codex-editor:hover .ce-toolbar__settings-btn,
-        .ce-toolbar--opened .ce-toolbar__plus, .ce-toolbar--opened .ce-toolbar__settings-btn { opacity: 1; pointer-events: auto; }
+        .codex-editor:has(.ce-block:hover) .ce-toolbar__plus, .codex-editor:has(.ce-block:hover) .ce-toolbar__settings-btn,
+        .ce-toolbar:hover .ce-toolbar__plus, .ce-toolbar:hover .ce-toolbar__settings-btn,
+        .ce-toolbar:has(.ce-popover--opened) .ce-toolbar__plus, .ce-toolbar:has(.ce-popover--opened) .ce-toolbar__settings-btn { opacity: 1; pointer-events: auto; }
         @media (hover: none) { .ce-toolbar__plus, .ce-toolbar__settings-btn { opacity: 1; pointer-events: auto; } }
 
         /* ── 하위 페이지 블록 ── */
