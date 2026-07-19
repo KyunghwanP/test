@@ -3288,7 +3288,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.44</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.45</div>
   </div>
 </div>
 
@@ -3418,7 +3418,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.44</div>
+    <div class="nav-version" title="Made by 박경환">ver6.45</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -12062,7 +12062,7 @@ function _makeHomeTaskRow(t, todayStr, statusColor) {
         <span>${formatMytaskDateRange(t)}</span>
       </div>
     </div>
-    ${mytaskInlineStatusHtml(t) || `<select onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();"
+    ${mytaskInlineStatusHtml(t, true) || `<select onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();"
       onclick="event.stopPropagation();"
       style="font-size:11px;font-weight:700;color:${dotColor};
         border:1.5px solid ${dotColor};border-radius:8px;
@@ -13739,49 +13739,58 @@ function renderMytaskPerDone(t, isOwner){
     btn.style.display = 'none';
   }
 }
+// 내 몫 완료 기록/취소 (모달 버튼·목록 셀렉트 공용) — wantDone: true=완료, false=취소
+async function mytaskSetMyDone(ownerUid, id, wantDone){
+  const user = fbAuth.currentUser;
+  if (!user || !id) return null;
+  const ref = doc(fbDb, 'tasks', ownerUid, 'items', id);
+  const myName = TEACHERS.find(t => t.email === user.email)?.name || user.displayName || user.email;
+  // 트랜잭션: 두 명이 거의 동시에 완료를 눌러도 서로의 기록이 덮어써지지 않게
+  return await _fsRunTransaction(fbDb, async tx => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    let doneBy = data.doneBy || [];
+    const meDone = doneBy.some(d => d.id === user.email);
+    if (meDone === wantDone) return { doneBy };   // 이미 원하는 상태 — 변화 없음
+    const u = { updatedAt: new Date().toISOString() };
+    if (!wantDone) {
+      doneBy = doneBy.filter(d => d.id !== user.email);
+      // 전원 완료로 자동 완료됐던 일정에서 취소하면 진행중으로 되돌린다
+      if (data.status === 'done') u.status = 'doing';
+    } else {
+      doneBy = [...doneBy, { id: user.email, name: myName, at: new Date().toISOString() }];
+      const shareAllDone = (data.sharedWith || []).every(s => {
+        const em = mytaskResolveShareEmail(s);
+        return em ? doneBy.some(d => d.id === em) : doneBy.some(d => d.name === s);
+      });
+      // 작성자 몫의 완료까지 포함해야 전원 완료 (작성자 이메일을 못 찾으면 공유자 기준)
+      const ownerEmail = (ownerUid === user.uid)
+        ? user.email
+        : (TEACHERS.find(x => x.uid && x.uid === ownerUid)?.email || null);
+      const ownerDone = ownerEmail ? doneBy.some(d => d.id === ownerEmail) : true;
+      const allDone = shareAllDone && ownerDone;
+      if (allDone && data.status !== 'done') {
+        u.status = 'done';
+        u.comments = [...(data.comments || []), {
+          email: '', name: '🤖 자동',
+          text: '공유 인원 전원 완료 — 자동으로 완료 처리되었습니다.',
+          createdAt: new Date().toISOString(),
+        }];
+      }
+    }
+    u.doneBy = doneBy;
+    tx.set(ref, u, { merge: true });
+    return u;
+  });
+}
 async function toggleMytaskMyDone(){
   const user = fbAuth.currentUser;
   if (!user || !mytaskEditId) return;
-  const ref = doc(fbDb, 'tasks', mytaskEditOwner, 'items', mytaskEditId);
-  const myName = TEACHERS.find(t => t.email === user.email)?.name || user.displayName || user.email;
+  const t0 = mytaskTasks.find(x => x.id === mytaskEditId) || mytaskShared.find(x => x.id === mytaskEditId);
+  const want = !(t0 && (t0.doneBy || []).some(d => d.id === user.email));
   try {
-    // 트랜잭션: 두 명이 거의 동시에 완료를 눌러도 서로의 기록이 덮어써지지 않게
-    const upd = await _fsRunTransaction(fbDb, async tx => {
-      const snap = await tx.get(ref);
-      if (!snap.exists()) return null;
-      const data = snap.data();
-      let doneBy = data.doneBy || [];
-      const meDone = doneBy.some(d => d.id === user.email);
-      const u = { updatedAt: new Date().toISOString() };
-      if (meDone) {
-        doneBy = doneBy.filter(d => d.id !== user.email);
-        // 전원 완료로 자동 완료됐던 일정에서 취소하면 진행중으로 되돌린다
-        if (data.status === 'done') u.status = 'doing';
-      } else {
-        doneBy = [...doneBy, { id: user.email, name: myName, at: new Date().toISOString() }];
-        const shareAllDone = (data.sharedWith || []).every(s => {
-          const em = mytaskResolveShareEmail(s);
-          return em ? doneBy.some(d => d.id === em) : doneBy.some(d => d.name === s);
-        });
-        // 작성자 몫의 완료까지 포함해야 전원 완료 (작성자 이메일을 못 찾으면 공유자 기준)
-        const ownerEmail = (mytaskEditOwner === user.uid)
-          ? user.email
-          : (TEACHERS.find(x => x.uid && x.uid === mytaskEditOwner)?.email || null);
-        const ownerDone = ownerEmail ? doneBy.some(d => d.id === ownerEmail) : true;
-        const allDone = shareAllDone && ownerDone;
-        if (allDone && data.status !== 'done') {
-          u.status = 'done';
-          u.comments = [...(data.comments || []), {
-            email: '', name: '🤖 자동',
-            text: '공유 인원 전원 완료 — 자동으로 완료 처리되었습니다.',
-            createdAt: new Date().toISOString(),
-          }];
-        }
-      }
-      u.doneBy = doneBy;
-      tx.set(ref, u, { merge: true });
-      return u;
-    });
+    const upd = await mytaskSetMyDone(mytaskEditOwner, mytaskEditId, want);
     if (!upd) return;
     const t = mytaskTasks.find(x => x.id === mytaskEditId) || mytaskShared.find(x => x.id === mytaskEditId);
     if (t) {
@@ -13839,16 +13848,46 @@ function mytaskEffTask(t){
   return (t.status !== 'done' && mytaskDoneForMe(t)) ? { ...t, status: 'done' } : t;
 }
 
-// 목록 인라인 상태 컨트롤: 각자 완료 방식 일정의 수신자에게는 전체 상태 셀렉트 대신
-// 진행 배지(각자 n/m)를 보여준다 — 셀렉트로 전체 상태를 바꾸면 각자 완료 취지가 우회되므로
-function mytaskInlineStatusHtml(t){
+// 목록 인라인 상태 컨트롤: 각자 완료 방식 일정의 수신자에게도 일반 일정과 똑같은
+// 상태 셀렉트를 보여주되, '완료' 선택은 전체 상태가 아니라 내 몫 완료(doneBy)로 기록한다.
+// (전체 상태는 전원 완료 시 자동 전환 — 각자 완료 취지는 그대로 유지)
+function mytaskInlineStatusHtml(t, home){
   const myUid = window._myUid || fbAuth.currentUser?.uid || '';
   if (!(t.perDone && t.ownerUid && t.ownerUid !== myUid)) return null;
   const st = mytaskPerDoneState(t);
-  return `<span title="각자 완료 방식 — 상세에서 내 완료를 체크하세요" style="font-size:11px;font-weight:800;border-radius:8px;padding:3px 8px;white-space:nowrap;flex-shrink:0;${
-    t.status === 'done' ? 'background:#D1FAE5;color:#065F46;' : 'background:var(--paper-soft);color:var(--ink-soft);border:1px solid var(--rule);'
-  }">각자 ${st.done}/${st.total}</span>`;
+  const v = (st.meDone || t.status === 'done') ? 'done' : (t.status || 'todo');
+  const colors = { todo: '#6366F1', doing: '#F59E0B', done: '#10B981' };
+  const opts = `
+    <option value="todo" ${v==='todo'?'selected':''}>🔵 시작전</option>
+    <option value="doing" ${v==='doing'?'selected':''}>🟡 진행중</option>
+    <option value="done" ${v==='done'?'selected':''}>🟢 완료</option>`;
+  const title = `각자 완료 방식(${st.done}/${st.total}) — 완료를 고르면 내 몫만 완료 처리됩니다`;
+  const events = `onchange="updateMytaskMyDoneInline('${t.id}','${t.ownerUid}',this.value);event.stopPropagation();" onclick="event.stopPropagation();"`;
+  if (home) {
+    return `<select title="${title}" ${events}
+      style="font-size:11px;font-weight:700;color:${colors[v]};border:1.5px solid ${colors[v]};border-radius:8px;
+        padding:3px 6px;background:transparent;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">${opts}</select>`;
+  }
+  return `<select class="mytask-status-select ${v}" title="${title}" ${events}>${opts}</select>`;
 }
+// 수신자 셀렉트: '완료'만 내 몫 완료로 기록, 그 외 선택은 완료 취소로 처리 (전체 상태는 안 건드림)
+async function updateMytaskMyDoneInline(id, ownerUid, value){
+  try {
+    const upd = await mytaskSetMyDone(ownerUid, id, value === 'done');
+    if (upd) {
+      const t = mytaskTasks.find(x => x.id === id) || mytaskShared.find(x => x.id === id);
+      if (t) {
+        t.doneBy = upd.doneBy;
+        if (upd.status) t.status = upd.status;
+        if (upd.comments) t.comments = upd.comments;
+      }
+    }
+  } catch(e) { alert('완료 처리 실패: ' + e.message); }
+  renderMytaskList();
+  renderMytaskCalendar();
+  renderHomeTaskSection();
+}
+window.updateMytaskMyDoneInline = updateMytaskMyDoneInline;
 
 function addMytaskShare(email) {
   if (!email || mytaskCurrentShared.includes(email)) return;
