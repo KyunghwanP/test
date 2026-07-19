@@ -2655,6 +2655,45 @@
     .home-tt-row{flex-direction:row;align-items:flex-start;}
     .home-tt-row .home-section{flex:1;min-width:0;}
   }
+  /* 학급 편성 요약 위젯 (현황판) */
+  .co-chip{background:var(--paper-soft);border:1px solid var(--rule);border-radius:999px;padding:4px 12px;font-size:12.5px;font-weight:700;color:var(--ink);white-space:nowrap;}
+  .co-chip.total{background:var(--ink);color:var(--paper);border-color:var(--ink);font-weight:800;}
+  .co-row{display:flex;align-items:center;gap:6px;}
+  .co-row-label{flex-shrink:0;width:52px;font-size:11px;font-weight:900;color:var(--ink-soft);text-align:center;line-height:1.25;}
+  .co-row-label b{color:#16a34a;}
+  .co-cells{flex:1;display:grid;gap:3px;}
+  .co-cell{min-width:0;text-align:center;background:var(--paper-soft);border:1px solid var(--rule);border-radius:7px;padding:3px 1px;position:relative;cursor:pointer;}
+  .co-cell:hover{border-color:var(--mon);background:var(--paper);}
+  .co-cell .co-room{font-family:'IBM Plex Mono';font-size:9px;color:var(--ink-soft);}
+  .co-cell .co-cnt{font-size:12.5px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .co-cell .co-dot{position:absolute;top:2px;right:3px;width:5px;height:5px;border-radius:50%;background:#ef4444;}
+  /* 학급 편성 현황 모달 */
+  .co-overlay{display:flex;position:fixed;inset:0;background:rgba(20,24,18,0.55);align-items:center;justify-content:center;padding:14px;z-index:9050;opacity:0;visibility:hidden;pointer-events:none;transition:opacity 0.18s ease, visibility 0s 0.18s;}
+  .co-overlay.open{opacity:1;visibility:visible;pointer-events:auto;transition:opacity 0.18s ease;}
+  .co-box{position:relative;width:min(1240px,100%);max-height:min(92vh,100%);background:var(--bg-base,#f8fafc);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 30px 60px -20px rgba(0,0,0,0.5);}
+  .co-head{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 52px 10px 18px;background:var(--paper);border-bottom:1px solid var(--rule);}
+  .co-close{position:absolute;top:10px;right:12px;z-index:2;width:34px;height:34px;border:1px solid var(--rule);border-radius:10px;background:var(--paper);color:var(--ink-soft);font-size:16px;line-height:1;cursor:pointer;}
+  .co-body{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:12px;}
+  .co-grade-card{background:var(--paper);border:1px solid var(--rule);border-radius:12px;overflow:hidden;}
+  .co-tbl-wrap{overflow-x:auto;}
+  .co-tbl{border-collapse:collapse;width:100%;min-width:900px;}
+  .co-tbl th,.co-tbl td{border:1px solid var(--rule);padding:6px 3px;text-align:center;font-size:13px;white-space:nowrap;}
+  .co-tbl th.co-rowh{width:100px;font-size:11px;font-weight:800;color:var(--ink-soft);background:var(--paper-soft);}
+  .co-tbl .co-ghead th{font-weight:900;font-size:12.5px;border:none;padding:8px 3px;}
+  .co-g1 .co-ghead th{background:#fef9c3;color:#713f12;} .co-g1 .co-ghead th.co-glabel{background:#facc15;color:#422006;}
+  .co-g2 .co-ghead th{background:#fee2e2;color:#7f1d1d;} .co-g2 .co-ghead th.co-glabel{background:#ef4444;color:#fff;}
+  .co-g3 .co-ghead th{background:#dbeafe;color:#1e3a8a;} .co-g3 .co-ghead th.co-glabel{background:#3b82f6;color:#fff;}
+  .co-tbl th.co-glabel{font-size:13.5px;}
+  .co-tbl td.co-tname{font-weight:800;font-size:13.5px;cursor:pointer;}
+  .co-tbl td.co-tname:hover{background:var(--paper-soft);color:var(--mon);}
+  .co-tbl td.co-subt{color:var(--ink-soft);font-weight:700;background:var(--paper-soft);}
+  .co-tbl td.co-cnt2{font-weight:800;font-variant-numeric:tabular-nums;cursor:pointer;}
+  .co-tbl td.co-cnt2:hover{background:var(--paper-soft);color:var(--mon);}
+  .co-tbl td.co-spec{color:#dc2626;font-weight:800;}
+  .co-tbl td.co-dash{color:var(--rule);}
+  #classOrgEditWrap textarea{width:100%;min-height:220px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;line-height:1.7;padding:12px;border:1.5px solid var(--rule);border-radius:10px;background:var(--paper);color:var(--ink);outline:none;resize:vertical;}
+  html.dark .co-overlay{background:rgba(0,0,0,0.6);}
+
   /* 관리자 전용 3단 현황판: 태블릿보다 넓은 화면(1400px+)에서 오른쪽에 빠른 메모 열 */
   .home-memo-col{display:none;}
   @media(min-width:1400px){
@@ -3248,7 +3287,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.31</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.32</div>
   </div>
 </div>
 
@@ -3378,7 +3417,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.31</div>
+    <div class="nav-version" title="Made by 박경환">ver6.32</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3442,6 +3481,19 @@
                 </div>
                 <div class="home-my-tt" id="homeClassTt"></div>
               </div>
+            </div>
+            <!-- 학급 편성 요약 — 접기(칩 한 줄) / 펼치기(반별 인원 그리드), 자세히=모달 -->
+            <div class="home-section" id="homeClassOrgSection" style="display:none;">
+              <div class="home-section-header" id="classOrgHeader">
+                <span class="home-section-title">🏫 학급 편성 <span id="classOrgTotalTop" style="font-size:11px;font-weight:600;color:var(--ink-soft);"></span></span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <button id="classOrgToggleBtn" style="font-size:12px;padding:4px 12px;border-radius:8px;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);cursor:pointer;white-space:nowrap;font-family:'Pretendard','Noto Sans KR';font-weight:600;">▾ 펼치기</button>
+                  <span class="home-section-arrow">›</span>
+                </div>
+              </div>
+              <div id="classOrgChips" style="display:flex;align-items:center;gap:7px;padding:9px 14px;flex-wrap:wrap;"></div>
+              <div id="classOrgGrid" style="display:none;padding:8px 12px 4px;flex-direction:column;gap:5px;"></div>
+              <div id="classOrgGridNote" style="display:none;padding:0 14px 8px;font-size:10px;color:var(--ink-soft);">● 특이사항 있는 반 · 칸을 누르면 반 명단으로</div>
             </div>
             <!-- 미니 달력(왼쪽) + 진행중인 업무·상담·학사일정(오른쪽) -->
             <div class="home-cal-row">
@@ -4365,6 +4417,19 @@
       </div>
     </div>
     <div class="pts-detail-records" id="ptsDetailRecords"></div>
+  </div>
+</div>
+
+<!-- 학급 편성 현황 모달 (현황판 위젯의 '자세히') -->
+<div class="co-overlay" id="classOrgModal">
+  <div class="co-box">
+    <button class="co-close" id="classOrgModalClose" title="닫기">✕</button>
+    <div class="co-head">
+      <span style="font-size:17px;font-weight:900;color:var(--ink);">🏫 학급 편성 현황</span>
+      <span id="classOrgTotalModal" style="font-size:12.5px;font-weight:700;color:var(--ink-soft);"></span>
+      <button id="classOrgEditBtn" style="display:none;margin-left:auto;font-size:12px;font-weight:800;color:var(--mon);background:var(--paper-soft);border:1px solid var(--rule);border-radius:9px;padding:5px 11px;cursor:pointer;font-family:inherit;">✏️ 부담임·특이사항 입력</button>
+    </div>
+    <div class="co-body" id="classOrgModalBody"></div>
   </div>
 </div>
 
@@ -5619,6 +5684,7 @@ window.addEventListener('popstate', (e)=>{
   if (document.getElementById('ptsDetailModal')?.classList.contains('show')) { closePtsDetailBtn(); armExitGuard(); return; }
   if (document.querySelector('.cd-overlay.open')) { document.querySelector('.cd-overlay.open').classList.remove('open'); armExitGuard(); return; }
   if (document.getElementById('jindanModal')?.classList.contains('open')) { closeJindanModal(); armExitGuard(); return; }
+  if (document.getElementById('classOrgModal')?.classList.contains('open')) { closeClassOrgModal(); armExitGuard(); return; }
 
   // 2. 교체/보강 모달 뎁스
   const newDepth = st.modalDepth || 0;
@@ -8156,6 +8222,207 @@ function renderSchedule(monthKey) {
   }
 }
 
+// ══ 학급 편성 요약 (현황판 위젯 + 자세히 모달) ══
+// 담임·인원은 allStudents/TEACHERS에서 자동 집계, 부담임·특이사항은 appdata/classOrg (관리자 입력)
+let classOrgMeta = { subs: {}, specials: [] };
+let classOrgMetaLoaded = false;
+let classOrgBound = false;
+
+function classOrgData(){
+  const byGrade = {};
+  allStudents.forEach(s => {
+    const g = parseInt(s.grade), r = parseInt(s.room);
+    if (!g || !r) return;
+    (byGrade[g] ??= {})[r] = (byGrade[g][r] || 0) + 1;
+  });
+  const out = Object.keys(byGrade).map(Number).sort((a,b)=>a-b).map(g => {
+    const rooms = Object.keys(byGrade[g]).map(Number).sort((a,b)=>a-b);
+    return { g, rooms: rooms.map(r => ({ r, cnt: byGrade[g][r] })), sum: rooms.reduce((a,r)=>a+byGrade[g][r],0) };
+  });
+  return { grades: out, total: out.reduce((a,x)=>a+x.sum,0) };
+}
+function classOrgSpecialMap(){
+  const m = {};
+  (classOrgMeta.specials || []).forEach(sp => Object.keys(sp.counts || {}).forEach(k => { m[k] = true; }));
+  return m;
+}
+async function loadClassOrgMeta(){
+  if (classOrgMetaLoaded) return;
+  classOrgMetaLoaded = true;
+  try {
+    const snap = await getDoc(doc(fbDb, 'appdata', 'classOrg'));
+    if (snap.exists()) {
+      classOrgMeta = { subs: snap.data().subs || {}, specials: snap.data().specials || [] };
+      renderClassOrgWidget();   // 특이사항 점 반영
+    }
+  } catch(e) { console.error('classOrg meta', e); }
+}
+function goClassRoster(g, r){
+  closeClassOrgModal();
+  navigateTo('search');
+  history.pushState({ page: 'search' }, '');
+  s360Group = { type: 'class', key: `${g}-${r}`, label: `${g}학년 ${r}반` };
+  s360Render();
+}
+function applyClassOrgOpen(){
+  const open = localStorage.getItem('ynhs-classorg-open') === '1';
+  document.getElementById('classOrgChips').style.display = open ? 'none' : 'flex';
+  document.getElementById('classOrgGrid').style.display = open ? 'flex' : 'none';
+  document.getElementById('classOrgGridNote').style.display = open ? 'block' : 'none';
+  const btn = document.getElementById('classOrgToggleBtn');
+  if (btn) btn.textContent = open ? '▴ 접기' : '▾ 펼치기';
+}
+function renderClassOrgWidget(){
+  const section = document.getElementById('homeClassOrgSection');
+  if (!section || !Array.isArray(allStudents) || allStudents.length === 0) return;
+  const { grades, total } = classOrgData();
+  if (!grades.length) return;
+  section.style.display = '';
+  document.getElementById('classOrgTotalTop').textContent = `현원 ${total.toLocaleString()}명`;
+  // 접힘(A안): 요약 칩 한 줄
+  document.getElementById('classOrgChips').innerHTML =
+    `<span class="co-chip total">현원 ${total.toLocaleString()}명</span>` +
+    grades.map(x => `<span class="co-chip">${x.g}학년 ${x.sum}</span>`).join('');
+  // 펼침(B안): 반별 인원 미니 그리드 (+특이사항 점)
+  const specMap = classOrgSpecialMap();
+  document.getElementById('classOrgGrid').innerHTML = grades.map(x => `
+    <div class="co-row">
+      <div class="co-row-label">${x.g}학년<br><b>${x.sum}</b></div>
+      <div class="co-cells" style="grid-template-columns:repeat(${x.rooms.length},1fr);">
+        ${x.rooms.map(c => `<div class="co-cell" data-g="${x.g}" data-r="${c.r}">
+          <div class="co-room">${c.r}반</div><div class="co-cnt">${c.cnt}</div>
+          ${specMap[`${x.g}-${c.r}`] ? '<span class="co-dot"></span>' : ''}
+        </div>`).join('')}
+      </div>
+    </div>`).join('');
+  applyClassOrgOpen();
+  if (!classOrgBound) {
+    classOrgBound = true;
+    document.getElementById('classOrgHeader').addEventListener('click', openClassOrgModal);
+    document.getElementById('classOrgToggleBtn').addEventListener('click', e => {
+      e.stopPropagation();
+      const open = localStorage.getItem('ynhs-classorg-open') === '1';
+      localStorage.setItem('ynhs-classorg-open', open ? '0' : '1');
+      applyClassOrgOpen();
+    });
+    document.getElementById('classOrgGrid').addEventListener('click', e => {
+      const cell = e.target.closest('.co-cell');
+      if (cell) { e.stopPropagation(); goClassRoster(cell.dataset.g, cell.dataset.r); }
+    });
+  }
+  loadClassOrgMeta();
+}
+
+// ── 자세히 모달: 담임·부담임·인원·특이사항 전체 표 ──
+function renderClassOrgModal(){
+  const { grades, total } = classOrgData();
+  document.getElementById('classOrgTotalModal').textContent =
+    `현원 ${total.toLocaleString()}명 · ` + grades.map(x=>`${x.g}학년 ${x.sum}`).join(' · ');
+  const specials = classOrgMeta.specials || [];
+  const html = grades.map(x => {
+    const roomsHead = x.rooms.map(c=>`<th>${c.r}반</th>`).join('');
+    const dam = x.rooms.map(c => {
+      const t = TEACHERS.find(tt => tt.homeroom === `${x.g}-${c.r}`);
+      return `<td class="co-tname" data-g="${x.g}" data-r="${c.r}">${t?escapeHtml(t.name):'-'}</td>`;
+    }).join('');
+    // 부담임: 순서대로 2개 반씩 담당 (마지막 홀수 반은 1개)
+    const subs = (classOrgMeta.subs || {})[String(x.g)] || [];
+    let subRow = '';
+    if (subs.length) {
+      let cells = '', ri = 0;
+      subs.forEach(name => {
+        const span = Math.min(2, x.rooms.length - ri);
+        if (span <= 0) return;
+        cells += `<td class="co-subt" colspan="${span}">${escapeHtml(name)}</td>`;
+        ri += span;
+      });
+      if (ri < x.rooms.length) cells += `<td class="co-subt" colspan="${x.rooms.length - ri}"></td>`;
+      subRow = `<tr><th class="co-rowh">부담임교사</th>${cells}</tr>`;
+    }
+    const cnts = x.rooms.map(c=>`<td class="co-cnt2" data-g="${x.g}" data-r="${c.r}">${c.cnt}</td>`).join('');
+    const specRows = specials.map(sp => {
+      const has = x.rooms.some(c => (sp.counts||{})[`${x.g}-${c.r}`]);
+      if (!has) return '';
+      return `<tr><th class="co-rowh">${escapeHtml(sp.label)}</th>${x.rooms.map(c => {
+        const v = (sp.counts||{})[`${x.g}-${c.r}`];
+        return v ? `<td class="co-spec">${v}명</td>` : '<td class="co-dash">-</td>';
+      }).join('')}</tr>`;
+    }).join('');
+    return `<div class="co-grade-card co-g${x.g}"><div class="co-tbl-wrap"><table class="co-tbl">
+      <tr class="co-ghead"><th class="co-glabel">${x.g}학년 ${x.sum}명</th>${roomsHead}</tr>
+      <tr><th class="co-rowh">담임교사</th>${dam}</tr>
+      ${subRow}
+      <tr><th class="co-rowh">인원</th>${cnts}</tr>
+      ${specRows}
+    </table></div></div>`;
+  }).join('');
+  document.getElementById('classOrgModalBody').innerHTML = html +
+    `<p style="font-size:11px;color:var(--ink-soft);text-align:center;">담임·인원 칸을 누르면 그 반 명단으로 이동 · 담임·인원은 명렬 자동 집계, 부담임·특이사항은 관리자 입력 · 오늘 기준</p>`;
+  document.getElementById('classOrgEditBtn').style.display = _IS_ADMIN() ? '' : 'none';
+}
+async function openClassOrgModal(){
+  await loadClassOrgMeta();
+  renderClassOrgModal();
+  document.getElementById('classOrgModal').classList.add('open');
+}
+function closeClassOrgModal(){
+  document.getElementById('classOrgModal').classList.remove('open');
+}
+document.getElementById('classOrgModalClose').addEventListener('click', closeClassOrgModal);
+document.getElementById('classOrgModal').addEventListener('click', e => { if (e.target.id === 'classOrgModal') closeClassOrgModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeClassOrgModal(); });
+document.getElementById('classOrgModalBody').addEventListener('click', e => {
+  const cell = e.target.closest('.co-tname, .co-cnt2');
+  if (cell && cell.dataset.g) goClassRoster(cell.dataset.g, cell.dataset.r);
+});
+// 관리자: 부담임·특이사항 입력 (appdata/classOrg)
+document.getElementById('classOrgEditBtn').addEventListener('click', () => {
+  const body = document.getElementById('classOrgModalBody');
+  const { grades } = classOrgData();
+  const lines = [];
+  grades.forEach(x => lines.push(`부담임 ${x.g}학년: ${((classOrgMeta.subs||{})[String(x.g)]||[]).join(', ')}`));
+  if ((classOrgMeta.specials||[]).length) {
+    classOrgMeta.specials.forEach(sp => lines.push(`${sp.label}: ` + Object.entries(sp.counts||{}).map(([k,v])=>`${k}=${v}`).join(', ')));
+  } else {
+    lines.push('체육특기자: ', '건강장애학생: ', '대구예담학교: ', '직업교육 위탁과정: ');
+  }
+  body.innerHTML = `<div id="classOrgEditWrap" style="display:flex;flex-direction:column;gap:10px;">
+    <div style="font-size:12.5px;color:var(--ink-soft);line-height:1.7;background:var(--paper);border:1px solid var(--rule);border-radius:10px;padding:10px 14px;">
+      <b>부담임 줄</b> — 「부담임 1학년: 이름, 이름, …」 앞에서부터 2개 반씩 담당합니다 (반 수가 홀수면 마지막 선생님은 1개 반).<br>
+      <b>특이사항 줄</b> — 「체육특기자: 1-8=4, 2-2=2」 처럼 <b>학년-반=인원</b> 형식으로. 값이 없는 줄은 표에 표시되지 않습니다.
+    </div>
+    <textarea id="classOrgEditTa"></textarea>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button id="classOrgEditCancel" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:10px;border:1px solid var(--rule);background:var(--paper);color:var(--ink-soft);cursor:pointer;font-family:inherit;">취소</button>
+      <button id="classOrgEditSave" style="font-size:13px;font-weight:800;padding:9px 22px;border-radius:10px;border:none;background:var(--mon);color:#fff;cursor:pointer;font-family:inherit;">저장</button>
+    </div></div>`;
+  document.getElementById('classOrgEditTa').value = lines.join('\n');
+  document.getElementById('classOrgEditCancel').onclick = renderClassOrgModal;
+  document.getElementById('classOrgEditSave').onclick = async () => {
+    const subs = {}, specials = [];
+    document.getElementById('classOrgEditTa').value.split('\n').forEach(line => {
+      line = line.trim();
+      const ci = line.indexOf(':');
+      if (!line || ci < 0) return;
+      const head = line.slice(0, ci).trim(), rest = line.slice(ci + 1).trim();
+      const m = head.match(/^부담임\s*(\d)학년$/);
+      if (m) { subs[m[1]] = rest.split(',').map(s=>s.trim()).filter(Boolean); return; }
+      const counts = {};
+      rest.split(',').map(s=>s.trim()).filter(Boolean).forEach(pair => {
+        const pm = pair.match(/^(\d+-\d+)\s*=\s*(\d+)$/);
+        if (pm) counts[pm[1]] = parseInt(pm[2]);
+      });
+      if (head) specials.push({ label: head, counts });
+    });
+    try {
+      await setDoc(doc(fbDb, 'appdata', 'classOrg'), { subs, specials, updatedAt: new Date().toISOString() });
+      classOrgMeta = { subs, specials };
+      renderClassOrgModal();
+      renderClassOrgWidget();
+    } catch(err) { alert('저장 실패: ' + err.message); }
+  };
+});
+
 // ---- 홈 현황판 ----
 let homeInitialized = false;
 
@@ -8223,6 +8490,7 @@ async function loadHomeConsult(slotsOverride){
 async function initHomePage() {
   homeInitialized = true;
   document.getElementById('homeLoading').style.display = '';
+  try { renderClassOrgWidget(); } catch(e) { console.error('classOrg widget', e); }
 
   // 유효 사용자(보기 모드면 선택한 교사) 기준
   let myTeacher = effTeacher();
