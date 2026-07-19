@@ -3288,7 +3288,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.40</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.41</div>
   </div>
 </div>
 
@@ -3418,7 +3418,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.40</div>
+    <div class="nav-version" title="Made by 박경환">ver6.41</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -12076,8 +12076,9 @@ function renderHomeTaskSection() {
 
   const todayStr   = new Date().toISOString().slice(0,10);
   const statusColor= { todo:'#6366F1', doing:'#F59E0B' };
-  const activeTasks= mytaskTasks.filter(t => t.status !== 'done').sort((a,b) => a.startDate.localeCompare(b.startDate));
-  const doneTasks  = mytaskTasks.filter(t => t.status === 'done').sort((a,b) => b.startDate.localeCompare(a.startDate));
+  // 각자 완료 일정에서 내 몫을 끝낸 수신자에게는 완료된 업무로 취급 (진행 목록에서 제외)
+  const activeTasks= mytaskTasks.filter(t => !mytaskDoneForMe(t)).sort((a,b) => a.startDate.localeCompare(b.startDate));
+  const doneTasks  = mytaskTasks.filter(t => mytaskDoneForMe(t)).sort((a,b) => b.startDate.localeCompare(a.startDate));
 
   updateCalTaskDates(activeTasks); // 현황판 미니 달력에 업무 날짜 반영
 
@@ -13790,6 +13791,17 @@ async function toggleMytaskMyDone(){
   } catch(e) { alert('완료 처리 실패: ' + e.message); }
 }
 window.toggleMytaskMyDone = toggleMytaskMyDone;
+
+// 각자 완료 일정: 수신자가 내 몫을 완료했으면 현황판에서 완료된 업무로 취급
+// (전체 상태는 아직 진행중이어도, 그 사람 할 일은 끝났으므로 진행 목록에서 치운다)
+function mytaskDoneForMe(t){
+  if (t.status === 'done') return true;
+  if (!t.perDone) return false;
+  const myUid = window._myUid || fbAuth.currentUser?.uid || '';
+  if (!t.ownerUid || t.ownerUid === myUid) return false;   // 작성자 본인은 전체 상태 기준 유지
+  const myEmail = fbAuth.currentUser?.email || '';
+  return (t.doneBy || []).some(d => d.id === myEmail);
+}
 
 // 목록 인라인 상태 컨트롤: 각자 완료 방식 일정의 수신자에게는 전체 상태 셀렉트 대신
 // 진행 배지(각자 n/m)를 보여준다 — 셀렉트로 전체 상태를 바꾸면 각자 완료 취지가 우회되므로
