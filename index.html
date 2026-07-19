@@ -3288,7 +3288,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.42</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.43</div>
   </div>
 </div>
 
@@ -3418,7 +3418,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.42</div>
+    <div class="nav-version" title="Made by 박경환">ver6.43</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4293,12 +4293,12 @@
                아래 체크박스가 위로 점프해 클릭이 빗나가던 문제 방지 -->
           <div id="mytaskShareSug" style="display:none;position:absolute;left:0;right:0;z-index:9999;background:var(--paper);border:1.5px solid var(--mon);border-radius:8px;box-shadow:0 8px 24px -4px rgba(0,0,0,0.2);max-height:180px;overflow-y:auto;margin-top:4px;"></div>
           <!-- 각자 완료 방식 옵션 (작성자 전용) — 기존 공유 방식은 그대로, 켠 일정만 새 동작
-               체크박스 네이티브 클릭이 일부 환경에서 막혀, 줄 전체를 JS로 직접 토글한다
-               (input은 pointer-events:none — 클릭은 항상 바깥 div가 받는다) -->
-          <div onclick="const c=document.getElementById('mytaskPerDoneChk');c.checked=!c.checked;"
-            style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-soft);margin-top:8px;cursor:pointer;user-select:none;padding:6px 8px;margin-left:-8px;border-radius:8px;">
+               일부 환경에서 click 이벤트가 통째로 소실되는 문제 → pointerdown 단계에서 직접 토글
+               (input은 pointer-events:none, 상태는 줄 배경색으로도 표시) -->
+          <div id="mytaskPerDoneOpt" onpointerdown="mytaskPerDoneToggle(event)"
+            style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-soft);margin-top:8px;cursor:pointer;user-select:none;padding:7px 9px;margin-left:-9px;border-radius:9px;border:1.5px solid transparent;transition:background .12s,border-color .12s;">
             <input type="checkbox" id="mytaskPerDoneChk" tabindex="-1" style="width:16px;height:16px;accent-color:var(--mon);flex-shrink:0;pointer-events:none;">
-            각자 완료 방식 — 작성자 포함 전원이 각자 완료하면 자동 완료 (작성자는 직권 완료도 가능)
+            <span>각자 완료 방식 — 작성자 포함 전원이 각자 완료하면 자동 완료 (작성자는 직권 완료도 가능)</span>
           </div>
         </div>
 
@@ -13795,6 +13795,24 @@ async function toggleMytaskMyDone(){
 }
 window.toggleMytaskMyDone = toggleMytaskMyDone;
 
+// 각자 완료 방식 옵션 토글 — click이 소실되는 환경 대비 pointerdown에서 처리
+function mytaskPerDoneToggle(ev){
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  const c = document.getElementById('mytaskPerDoneChk');
+  if (!c) return;
+  c.checked = !c.checked;
+  mytaskSyncPerDoneOpt();
+}
+function mytaskSyncPerDoneOpt(){
+  const c   = document.getElementById('mytaskPerDoneChk');
+  const row = document.getElementById('mytaskPerDoneOpt');
+  if (!c || !row) return;
+  row.style.background  = c.checked ? 'rgba(59,130,246,.12)' : 'transparent';
+  row.style.borderColor = c.checked ? 'var(--mon)' : 'transparent';
+  row.style.color       = c.checked ? 'var(--mon)' : 'var(--ink-soft)';
+}
+window.mytaskPerDoneToggle = mytaskPerDoneToggle;
+
 // 각자 완료 일정: 수신자가 내 몫을 완료했으면 현황판에서 완료된 업무로 취급
 // (전체 상태는 아직 진행중이어도, 그 사람 할 일은 끝났으므로 진행 목록에서 치운다)
 function mytaskDoneForMe(t){
@@ -14160,6 +14178,7 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
   const perField  = document.getElementById('mytaskPerDoneField');
   const statusFld = document.getElementById('mytaskStatusField');
   if (perChk) perChk.checked = !!(perT && perT.perDone);
+  mytaskSyncPerDoneOpt();
   if (perT && perT.perDone) {
     perField.style.display = 'block';
     renderMytaskPerDone(perT, isOwner);
