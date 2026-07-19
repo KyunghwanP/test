@@ -3288,7 +3288,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.39</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.40</div>
   </div>
 </div>
 
@@ -3418,7 +3418,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.39</div>
+    <div class="nav-version" title="Made by 박경환">ver6.40</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4271,7 +4271,7 @@
         </div>
 
         <!-- 담당자 공유 -->
-        <div class="mytask-modal-field">
+        <div class="mytask-modal-field" style="position:relative;">
           <label>공유 담당자</label>
           <div id="mytaskShareBox" style="
             display:flex;flex-wrap:wrap;gap:6px;align-items:center;
@@ -4289,11 +4289,13 @@
               onkeydown="mytaskShareKeydown(event)"
               enterkeyhint="done"></textarea>
           </div>
-          <div id="mytaskShareSug" style="display:none;position:relative;z-index:9999;background:var(--paper);border:1.5px solid var(--mon);border-radius:8px;box-shadow:0 8px 24px -4px rgba(0,0,0,0.2);max-height:180px;overflow-y:auto;margin-top:4px;"></div>
+          <!-- 제안 목록은 오버레이(absolute) — 레이아웃을 밀지 않아, 목록이 닫힐 때
+               아래 체크박스가 위로 점프해 클릭이 빗나가던 문제 방지 -->
+          <div id="mytaskShareSug" style="display:none;position:absolute;left:0;right:0;z-index:9999;background:var(--paper);border:1.5px solid var(--mon);border-radius:8px;box-shadow:0 8px 24px -4px rgba(0,0,0,0.2);max-height:180px;overflow-y:auto;margin-top:4px;"></div>
           <!-- 각자 완료 방식 옵션 (작성자 전용) — 기존 공유 방식은 그대로, 켠 일정만 새 동작 -->
           <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-soft);margin-top:8px;cursor:pointer;">
             <input type="checkbox" id="mytaskPerDoneChk" style="width:16px;height:16px;accent-color:var(--mon);flex-shrink:0;">
-            각자 완료 방식 — 공유받은 전원이 각자 완료해야 자동 완료 (작성자는 직접 완료 가능)
+            각자 완료 방식 — 작성자 포함 전원이 각자 완료하면 자동 완료 (작성자는 직권 완료도 가능)
           </label>
         </div>
 
@@ -13693,6 +13695,15 @@ function mytaskPerDoneState(t){
     const done = em ? doneBy.some(d => d.id === em) : doneBy.some(d => d.name === s);
     return { label: nm, email: em, done };
   });
+  // 작성자도 개인 완료 대상에 포함 — 전체(직권) 완료는 상태 버튼으로 따로 분리
+  const isMine = t.ownerUid === (window._myUid || user?.uid || '');
+  const ownerTeacher = TEACHERS.find(x => x.uid && x.uid === t.ownerUid);
+  const ownerEmail = isMine ? myEmail : (ownerTeacher?.email || null);
+  if (ownerEmail) {
+    const ownerName = t.ownerName || ownerTeacher?.name
+      || TEACHERS.find(x => x.email === ownerEmail)?.name || user?.displayName || '작성자';
+    entries.unshift({ label: `${ownerName} (작성자)`, email: ownerEmail, done: doneBy.some(d => d.id === ownerEmail) });
+  }
   return {
     total: entries.length,
     done: entries.filter(e => e.done).length,
@@ -13710,9 +13721,10 @@ function renderMytaskPerDone(t, isOwner){
     }">${e.done ? '✅' : '⬜'} ${escapeHtml(e.label)}</span>`).join('') ||
     '<span style="font-size:12.5px;color:var(--ink-soft);">공유 대상이 없습니다</span>';
   const btn = document.getElementById('mytaskMyDoneBtn');
-  if (!isOwner && st.iAmRecipient) {
+  // 작성자도 자기 몫의 개인 완료 가능 (전체 직권 완료는 아래 상태 버튼으로 별도)
+  if (isOwner || st.iAmRecipient) {
     btn.style.display = 'block';
-    btn.textContent = st.meDone ? '↩ 완료 취소하기' : '✔ 내 업무 완료 처리';
+    btn.textContent = st.meDone ? '↩ 내 완료 취소하기' : '✔ 내 업무 완료 처리';
     btn.style.background = st.meDone ? 'var(--paper-soft)' : '#10B981';
     btn.style.color = st.meDone ? 'var(--ink-soft)' : '#fff';
     btn.style.border = st.meDone ? '1.5px solid var(--rule)' : 'none';
@@ -13740,10 +13752,16 @@ async function toggleMytaskMyDone(){
         if (data.status === 'done') u.status = 'doing';
       } else {
         doneBy = [...doneBy, { id: user.email, name: myName, at: new Date().toISOString() }];
-        const allDone = (data.sharedWith || []).every(s => {
+        const shareAllDone = (data.sharedWith || []).every(s => {
           const em = mytaskResolveShareEmail(s);
           return em ? doneBy.some(d => d.id === em) : doneBy.some(d => d.name === s);
         });
+        // 작성자 몫의 완료까지 포함해야 전원 완료 (작성자 이메일을 못 찾으면 공유자 기준)
+        const ownerEmail = (mytaskEditOwner === user.uid)
+          ? user.email
+          : (TEACHERS.find(x => x.uid && x.uid === mytaskEditOwner)?.email || null);
+        const ownerDone = ownerEmail ? doneBy.some(d => d.id === ownerEmail) : true;
+        const allDone = shareAllDone && ownerDone;
         if (allDone && data.status !== 'done') {
           u.status = 'done';
           u.comments = [...(data.comments || []), {
@@ -13763,7 +13781,7 @@ async function toggleMytaskMyDone(){
       t.doneBy = upd.doneBy;
       if (upd.status) t.status = upd.status;
       if (upd.comments) { t.comments = upd.comments; renderMytaskComments(t.comments); }
-      renderMytaskPerDone(t, false);
+      renderMytaskPerDone(t, mytaskEditOwner === user.uid);
       setMytaskStatusBtn(t.status);
     }
     renderMytaskList();
