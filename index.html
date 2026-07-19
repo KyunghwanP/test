@@ -3288,7 +3288,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.37</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.38</div>
   </div>
 </div>
 
@@ -3418,7 +3418,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.37</div>
+    <div class="nav-version" title="Made by 박경환">ver6.38</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4290,13 +4290,25 @@
               enterkeyhint="done"></textarea>
           </div>
           <div id="mytaskShareSug" style="display:none;position:relative;z-index:9999;background:var(--paper);border:1.5px solid var(--mon);border-radius:8px;box-shadow:0 8px 24px -4px rgba(0,0,0,0.2);max-height:180px;overflow-y:auto;margin-top:4px;"></div>
+          <!-- 각자 완료 방식 옵션 (작성자 전용) — 기존 공유 방식은 그대로, 켠 일정만 새 동작 -->
+          <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-soft);margin-top:8px;cursor:pointer;">
+            <input type="checkbox" id="mytaskPerDoneChk" style="width:16px;height:16px;accent-color:var(--mon);flex-shrink:0;">
+            각자 완료 방식 — 공유받은 전원이 각자 완료해야 자동 완료 (작성자는 직접 완료 가능)
+          </label>
         </div>
 
 
       </div>
 
-      <!-- 상태 (본인+공유자 모두 가능) -->
-      <div class="mytask-modal-field">
+      <!-- 각자 완료 현황 (perDone 일정 전용) -->
+      <div class="mytask-modal-field" id="mytaskPerDoneField" style="display:none;">
+        <label>각자 완료 현황 <span id="mytaskPerDoneCount" style="font-weight:600;color:var(--ink-soft);"></span></label>
+        <div id="mytaskPerDoneList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        <button id="mytaskMyDoneBtn" onclick="toggleMytaskMyDone()" style="display:none;margin-top:10px;width:100%;padding:11px;border-radius:10px;border:none;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;"></button>
+      </div>
+
+      <!-- 상태 (본인+공유자 모두 가능 · 각자 완료 일정은 작성자만) -->
+      <div class="mytask-modal-field" id="mytaskStatusField">
         <label>상태</label>
         <div style="display:flex;gap:8px;">
           <button class="mytask-status-btn todo" data-status="todo" onclick="setMytaskStatusBtn('todo')">🔵 시작전</button>
@@ -13660,6 +13672,99 @@ function setMytaskStatusBtn(status) {
   });
 }
 
+// ── 각자 완료 방식 (perDone) ──────────────────────────
+// 공유받은 사람마다 자기 완료(doneBy)를 체크. 전원 완료되면 전체 상태가 자동으로
+// 완료가 되고, 작성자는 언제든 상태 버튼으로 직접 완료 처리할 수 있다.
+// 기존(공용 상태) 공유 일정은 그대로 — 작성 시 옵션을 켠 일정에만 적용.
+function mytaskResolveShareEmail(entry){   // sharedWith 항목(이름 또는 이메일) → 이메일
+  if (!entry) return null;
+  if (entry.includes('@')) return entry;
+  return TEACHERS.find(t => t.name === entry)?.email || null;
+}
+function mytaskPerDoneState(t){
+  const myEmail = fbAuth.currentUser?.email || '';
+  const doneBy  = t.doneBy || [];
+  const entries = (t.sharedWith || []).map(s => {
+    const em = mytaskResolveShareEmail(s);
+    const nm = s.includes('@') ? (TEACHERS.find(x => x.email === s)?.name || s.split('@')[0]) : s;
+    const done = em ? doneBy.some(d => d.id === em) : doneBy.some(d => d.name === s);
+    return { label: nm, email: em, done };
+  });
+  return {
+    total: entries.length,
+    done: entries.filter(e => e.done).length,
+    entries,
+    meDone: doneBy.some(d => d.id === myEmail),
+    iAmRecipient: entries.some(e => e.email === myEmail),
+  };
+}
+function renderMytaskPerDone(t, isOwner){
+  const st = mytaskPerDoneState(t);
+  document.getElementById('mytaskPerDoneCount').textContent = `${st.done}/${st.total} 완료`;
+  document.getElementById('mytaskPerDoneList').innerHTML = st.entries.map(e =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:700;padding:5px 10px;border-radius:999px;${
+      e.done ? 'background:#D1FAE5;color:#065F46;border:1px solid #10B981;' : 'background:var(--paper-soft);color:var(--ink-soft);border:1px solid var(--rule);'
+    }">${e.done ? '✅' : '⬜'} ${escapeHtml(e.label)}</span>`).join('') ||
+    '<span style="font-size:12.5px;color:var(--ink-soft);">공유 대상이 없습니다</span>';
+  const btn = document.getElementById('mytaskMyDoneBtn');
+  if (!isOwner && st.iAmRecipient) {
+    btn.style.display = 'block';
+    btn.textContent = st.meDone ? '↩ 완료 취소하기' : '✔ 내 업무 완료 처리';
+    btn.style.background = st.meDone ? 'var(--paper-soft)' : '#10B981';
+    btn.style.color = st.meDone ? 'var(--ink-soft)' : '#fff';
+    btn.style.border = st.meDone ? '1.5px solid var(--rule)' : 'none';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+async function toggleMytaskMyDone(){
+  const user = fbAuth.currentUser;
+  if (!user || !mytaskEditId) return;
+  const ref = doc(fbDb, 'tasks', mytaskEditOwner, 'items', mytaskEditId);
+  try {
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    let doneBy = data.doneBy || [];
+    const meDone = doneBy.some(d => d.id === user.email);
+    const myName = TEACHERS.find(t => t.email === user.email)?.name || user.displayName || user.email;
+    const upd = { updatedAt: new Date().toISOString() };
+    if (meDone) {
+      doneBy = doneBy.filter(d => d.id !== user.email);
+      // 전원 완료로 자동 완료됐던 일정에서 취소하면 진행중으로 되돌린다
+      if (data.status === 'done') upd.status = 'doing';
+    } else {
+      doneBy = [...doneBy, { id: user.email, name: myName, at: new Date().toISOString() }];
+      const allDone = (data.sharedWith || []).every(s => {
+        const em = mytaskResolveShareEmail(s);
+        return em ? doneBy.some(d => d.id === em) : doneBy.some(d => d.name === s);
+      });
+      if (allDone && data.status !== 'done') {
+        upd.status = 'done';
+        upd.comments = [...(data.comments || []), {
+          email: '', name: '🤖 자동',
+          text: '공유 인원 전원 완료 — 자동으로 완료 처리되었습니다.',
+          createdAt: new Date().toISOString(),
+        }];
+      }
+    }
+    upd.doneBy = doneBy;
+    await setDoc(ref, upd, { merge: true });
+    const t = mytaskTasks.find(x => x.id === mytaskEditId) || mytaskShared.find(x => x.id === mytaskEditId);
+    if (t) {
+      t.doneBy = doneBy;
+      if (upd.status) t.status = upd.status;
+      if (upd.comments) { t.comments = upd.comments; renderMytaskComments(t.comments); }
+      renderMytaskPerDone(t, false);
+      setMytaskStatusBtn(t.status);
+    }
+    renderMytaskList();
+    renderMytaskCalendar();
+    renderHomeTaskSection();
+  } catch(e) { alert('완료 처리 실패: ' + e.message); }
+}
+window.toggleMytaskMyDone = toggleMytaskMyDone;
+
 function addMytaskShare(email) {
   if (!email || mytaskCurrentShared.includes(email)) return;
   mytaskCurrentShared.push(email);
@@ -13991,6 +14096,23 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
     setMytaskTimeSelect('mytaskStartTime', '');
     setMytaskTimeSelect('mytaskEndTime', '');
   }
+  // ── 각자 완료 방식 UI 배선 ──
+  const perT      = id ? (mytaskTasks.find(t => t.id === id) || mytaskShared.find(t => t.id === id)) : null;
+  const perChk    = document.getElementById('mytaskPerDoneChk');
+  const perField  = document.getElementById('mytaskPerDoneField');
+  const statusFld = document.getElementById('mytaskStatusField');
+  if (perChk) perChk.checked = !!(perT && perT.perDone);
+  if (perT && perT.perDone) {
+    perField.style.display = 'block';
+    renderMytaskPerDone(perT, isOwner);
+    // 수신자는 전체 상태 대신 '내 완료' 버튼만 사용 (작성자는 직권 완료 가능)
+    statusFld.style.display = isOwner ? 'block' : 'none';
+    saveBtn.style.display   = isOwner ? '' : 'none';
+  } else {
+    perField.style.display  = 'none';
+    statusFld.style.display = 'block';
+    saveBtn.style.display   = '';
+  }
   setMytaskStatusBtn(mytaskCurrentStatus);
   modal.classList.add('show');
   if (isOwner) document.getElementById('mytaskTitle').focus();
@@ -14095,6 +14217,9 @@ async function saveMytask() {
     endTime: endTime || null,
     status: mytaskCurrentStatus,
     sharedWith: mytaskCurrentShared,
+    // 각자 완료 방식: 공유 대상이 있을 때만 유효, 완료 기록(doneBy)은 보존
+    perDone: !!(document.getElementById('mytaskPerDoneChk')?.checked && mytaskCurrentShared.length),
+    doneBy: existing.doneBy || [],
     repeat: repeat,
     comments: existing.comments || [],
     updatedAt: new Date().toISOString()
