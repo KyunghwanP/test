@@ -3288,7 +3288,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.38</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.39</div>
   </div>
 </div>
 
@@ -3418,7 +3418,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.38</div>
+    <div class="nav-version" title="Made by 박경환">ver6.39</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -12054,7 +12054,7 @@ function _makeHomeTaskRow(t, todayStr, statusColor) {
         <span>${formatMytaskDateRange(t)}</span>
       </div>
     </div>
-    <select onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();"
+    ${mytaskInlineStatusHtml(t) || `<select onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();"
       onclick="event.stopPropagation();"
       style="font-size:11px;font-weight:700;color:${dotColor};
         border:1.5px solid ${dotColor};border-radius:8px;
@@ -12062,7 +12062,7 @@ function _makeHomeTaskRow(t, todayStr, statusColor) {
       <option value="todo" ${t.status==='todo'?'selected':''}>🔵 시작전</option>
       <option value="doing" ${t.status==='doing'?'selected':''}>🟡 진행중</option>
       <option value="done" ${t.status==='done'?'selected':''}>🟢 완료</option>
-    </select>
+    </select>`}
   </div>`;
 }
 
@@ -12311,11 +12311,11 @@ function buildPanelList(tasks) {
         <div class="mytask-item-title">${escapeHtml(t.title)}${t.ownerName ? ` <span style="font-size:11px;color:var(--ink-soft);font-weight:400;">[${escapeHtml(t.ownerName)}]</span>` : ''}</div>
         <div class="mytask-item-date">${formatMytaskDateRange(t)}</div>
       </div>
-      <select class="mytask-status-select ${t.status}" onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();" onclick="event.stopPropagation();">
+      ${mytaskInlineStatusHtml(t) || `<select class="mytask-status-select ${t.status}" onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();" onclick="event.stopPropagation();">
         <option value="todo" ${t.status==='todo'?'selected':''}>🔵 시작전</option>
         <option value="doing" ${t.status==='doing'?'selected':''}>🟡 진행중</option>
         <option value="done" ${t.status==='done'?'selected':''}>🟢 완료</option>
-      </select>
+      </select>`}
     </div>`;
   });
   return html;
@@ -13634,11 +13634,11 @@ function renderMytaskList() {
           <div class="mytask-item-title">${escapeHtml(t.title)}</div>
           <div class="mytask-item-date">${formatMytaskDateRange(t)}</div>
         </div>
-        <select class="mytask-status-select ${t.status}" onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();" onclick="event.stopPropagation();">
+        ${mytaskInlineStatusHtml(t) || `<select class="mytask-status-select ${t.status}" onchange="updateMytaskStatus('${t.id}','${t.ownerUid||''}',this.value);event.stopPropagation();" onclick="event.stopPropagation();">
           <option value="todo" ${t.status==='todo'?'selected':''}>🔵 시작전</option>
           <option value="doing" ${t.status==='doing'?'selected':''}>🟡 진행중</option>
           <option value="done" ${t.status==='done'?'selected':''}>🟢 완료</option>
-        </select>
+        </select>`}
       </div>`;
   });
   list.innerHTML = html;
@@ -13682,7 +13682,10 @@ function mytaskResolveShareEmail(entry){   // sharedWith 항목(이름 또는 �
   return TEACHERS.find(t => t.name === entry)?.email || null;
 }
 function mytaskPerDoneState(t){
-  const myEmail = fbAuth.currentUser?.email || '';
+  const user    = fbAuth.currentUser;
+  const myEmail = user?.email || '';
+  // 내 식별자: 이메일·구글 표시이름·교직원 등록이름 (sharedWith에 어느 것이 들어있어도 인식)
+  const myIds   = [myEmail, user?.displayName, TEACHERS.find(x => x.email === myEmail)?.name].filter(Boolean);
   const doneBy  = t.doneBy || [];
   const entries = (t.sharedWith || []).map(s => {
     const em = mytaskResolveShareEmail(s);
@@ -13695,7 +13698,7 @@ function mytaskPerDoneState(t){
     done: entries.filter(e => e.done).length,
     entries,
     meDone: doneBy.some(d => d.id === myEmail),
-    iAmRecipient: entries.some(e => e.email === myEmail),
+    iAmRecipient: (t.sharedWith || []).some(s => myIds.includes(s)) || entries.some(e => e.email === myEmail),
   };
 }
 function renderMytaskPerDone(t, isOwner){
@@ -13721,38 +13724,43 @@ async function toggleMytaskMyDone(){
   const user = fbAuth.currentUser;
   if (!user || !mytaskEditId) return;
   const ref = doc(fbDb, 'tasks', mytaskEditOwner, 'items', mytaskEditId);
+  const myName = TEACHERS.find(t => t.email === user.email)?.name || user.displayName || user.email;
   try {
-    const snap = await getDoc(ref);
-    if (!snap.exists()) return;
-    const data = snap.data();
-    let doneBy = data.doneBy || [];
-    const meDone = doneBy.some(d => d.id === user.email);
-    const myName = TEACHERS.find(t => t.email === user.email)?.name || user.displayName || user.email;
-    const upd = { updatedAt: new Date().toISOString() };
-    if (meDone) {
-      doneBy = doneBy.filter(d => d.id !== user.email);
-      // 전원 완료로 자동 완료됐던 일정에서 취소하면 진행중으로 되돌린다
-      if (data.status === 'done') upd.status = 'doing';
-    } else {
-      doneBy = [...doneBy, { id: user.email, name: myName, at: new Date().toISOString() }];
-      const allDone = (data.sharedWith || []).every(s => {
-        const em = mytaskResolveShareEmail(s);
-        return em ? doneBy.some(d => d.id === em) : doneBy.some(d => d.name === s);
-      });
-      if (allDone && data.status !== 'done') {
-        upd.status = 'done';
-        upd.comments = [...(data.comments || []), {
-          email: '', name: '🤖 자동',
-          text: '공유 인원 전원 완료 — 자동으로 완료 처리되었습니다.',
-          createdAt: new Date().toISOString(),
-        }];
+    // 트랜잭션: 두 명이 거의 동시에 완료를 눌러도 서로의 기록이 덮어써지지 않게
+    const upd = await _fsRunTransaction(fbDb, async tx => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) return null;
+      const data = snap.data();
+      let doneBy = data.doneBy || [];
+      const meDone = doneBy.some(d => d.id === user.email);
+      const u = { updatedAt: new Date().toISOString() };
+      if (meDone) {
+        doneBy = doneBy.filter(d => d.id !== user.email);
+        // 전원 완료로 자동 완료됐던 일정에서 취소하면 진행중으로 되돌린다
+        if (data.status === 'done') u.status = 'doing';
+      } else {
+        doneBy = [...doneBy, { id: user.email, name: myName, at: new Date().toISOString() }];
+        const allDone = (data.sharedWith || []).every(s => {
+          const em = mytaskResolveShareEmail(s);
+          return em ? doneBy.some(d => d.id === em) : doneBy.some(d => d.name === s);
+        });
+        if (allDone && data.status !== 'done') {
+          u.status = 'done';
+          u.comments = [...(data.comments || []), {
+            email: '', name: '🤖 자동',
+            text: '공유 인원 전원 완료 — 자동으로 완료 처리되었습니다.',
+            createdAt: new Date().toISOString(),
+          }];
+        }
       }
-    }
-    upd.doneBy = doneBy;
-    await setDoc(ref, upd, { merge: true });
+      u.doneBy = doneBy;
+      tx.set(ref, u, { merge: true });
+      return u;
+    });
+    if (!upd) return;
     const t = mytaskTasks.find(x => x.id === mytaskEditId) || mytaskShared.find(x => x.id === mytaskEditId);
     if (t) {
-      t.doneBy = doneBy;
+      t.doneBy = upd.doneBy;
       if (upd.status) t.status = upd.status;
       if (upd.comments) { t.comments = upd.comments; renderMytaskComments(t.comments); }
       renderMytaskPerDone(t, false);
@@ -13764,6 +13772,17 @@ async function toggleMytaskMyDone(){
   } catch(e) { alert('완료 처리 실패: ' + e.message); }
 }
 window.toggleMytaskMyDone = toggleMytaskMyDone;
+
+// 목록 인라인 상태 컨트롤: 각자 완료 방식 일정의 수신자에게는 전체 상태 셀렉트 대신
+// 진행 배지(각자 n/m)를 보여준다 — 셀렉트로 전체 상태를 바꾸면 각자 완료 취지가 우회되므로
+function mytaskInlineStatusHtml(t){
+  const myUid = window._myUid || fbAuth.currentUser?.uid || '';
+  if (!(t.perDone && t.ownerUid && t.ownerUid !== myUid)) return null;
+  const st = mytaskPerDoneState(t);
+  return `<span title="각자 완료 방식 — 상세에서 내 완료를 체크하세요" style="font-size:11px;font-weight:800;border-radius:8px;padding:3px 8px;white-space:nowrap;flex-shrink:0;${
+    t.status === 'done' ? 'background:#D1FAE5;color:#065F46;' : 'background:var(--paper-soft);color:var(--ink-soft);border:1px solid var(--rule);'
+  }">각자 ${st.done}/${st.total}</span>`;
+}
 
 function addMytaskShare(email) {
   if (!email || mytaskCurrentShared.includes(email)) return;
