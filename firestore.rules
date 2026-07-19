@@ -148,12 +148,13 @@ service cloud.firestore {
     function isSharedWithMe(sharedWith) {
       return sharedWith.hasAny([request.auth.token.email, request.auth.token.name]);
     }
-    // 이번 수정이 status / comments / sharedWith 필드만 건드렸는지 검사
-    // (sharedWith: 공유받은 사람이 '공유 나가기'로 본인을 제거하는 경우)
+    // 이번 수정이 status / comments / sharedWith / doneBy 필드만 건드렸는지 검사
+    // (sharedWith: 공유받은 사람이 '공유 나가기'로 본인 제거,
+    //  doneBy: '각자 완료 방식' 일정에서 본인 완료 체크)
     function onlyStatusOrComments() {
       return request.resource.data.diff(resource.data)
                .affectedKeys()
-               .hasOnly(['status', 'comments', 'sharedWith', 'updatedAt']);
+               .hasOnly(['status', 'comments', 'sharedWith', 'updatedAt', 'doneBy']);
     }
   }
 }
