@@ -3288,7 +3288,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.41</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.42</div>
   </div>
 </div>
 
@@ -3418,7 +3418,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.41</div>
+    <div class="nav-version" title="Made by 박경환">ver6.42</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4292,11 +4292,14 @@
           <!-- 제안 목록은 오버레이(absolute) — 레이아웃을 밀지 않아, 목록이 닫힐 때
                아래 체크박스가 위로 점프해 클릭이 빗나가던 문제 방지 -->
           <div id="mytaskShareSug" style="display:none;position:absolute;left:0;right:0;z-index:9999;background:var(--paper);border:1.5px solid var(--mon);border-radius:8px;box-shadow:0 8px 24px -4px rgba(0,0,0,0.2);max-height:180px;overflow-y:auto;margin-top:4px;"></div>
-          <!-- 각자 완료 방식 옵션 (작성자 전용) — 기존 공유 방식은 그대로, 켠 일정만 새 동작 -->
-          <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-soft);margin-top:8px;cursor:pointer;">
-            <input type="checkbox" id="mytaskPerDoneChk" style="width:16px;height:16px;accent-color:var(--mon);flex-shrink:0;">
+          <!-- 각자 완료 방식 옵션 (작성자 전용) — 기존 공유 방식은 그대로, 켠 일정만 새 동작
+               체크박스 네이티브 클릭이 일부 환경에서 막혀, 줄 전체를 JS로 직접 토글한다
+               (input은 pointer-events:none — 클릭은 항상 바깥 div가 받는다) -->
+          <div onclick="const c=document.getElementById('mytaskPerDoneChk');c.checked=!c.checked;"
+            style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-soft);margin-top:8px;cursor:pointer;user-select:none;padding:6px 8px;margin-left:-8px;border-radius:8px;">
+            <input type="checkbox" id="mytaskPerDoneChk" tabindex="-1" style="width:16px;height:16px;accent-color:var(--mon);flex-shrink:0;pointer-events:none;">
             각자 완료 방식 — 작성자 포함 전원이 각자 완료하면 자동 완료 (작성자는 직권 완료도 가능)
-          </label>
+          </div>
         </div>
 
 
@@ -11956,7 +11959,7 @@ function renderPanelContent(panel) {
   const ym = `${cy}-${String(cm+1).padStart(2,'0')}`;
 
   // 상태 필터
-  let tasks = mytaskTasks.filter(t => panel.filters.status.includes(t.status));
+  let tasks = mytaskTasks.map(mytaskEffTask).filter(t => panel.filters.status.includes(t.status));
 
   // 기간 필터
   const now = new Date();
@@ -13380,13 +13383,13 @@ function getCalTasks() {
   const ym = `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}`;
   const fromStr = ym + '-01';
   const toStr   = ym + '-31';
-  const base = mytaskTasks.filter(t => calFilters.has(t.status));
+  const base = mytaskTasks.map(mytaskEffTask).filter(t => calFilters.has(t.status));
   return expandRepeatTasks(base, fromStr, toStr).filter(t => calFilters.has(t.status));
 }
 
 function getListTasks() {
-  if (listFilters.has('all')) return expandRepeatTasks(mytaskTasks, '2000-01-01', '2099-12-31');
-  const base = mytaskTasks.filter(t => listFilters.has(t.status));
+  if (listFilters.has('all')) return expandRepeatTasks(mytaskTasks.map(mytaskEffTask), '2000-01-01', '2099-12-31');
+  const base = mytaskTasks.map(mytaskEffTask).filter(t => listFilters.has(t.status));
   return expandRepeatTasks(base, '2000-01-01', '2099-12-31').filter(t => listFilters.has(t.status));
 }
 
@@ -13801,6 +13804,12 @@ function mytaskDoneForMe(t){
   if (!t.ownerUid || t.ownerUid === myUid) return false;   // 작성자 본인은 전체 상태 기준 유지
   const myEmail = fbAuth.currentUser?.email || '';
   return (t.doneBy || []).some(d => d.id === myEmail);
+}
+
+// 캘린더·목록·패널 렌더용: 내 몫을 완료한 각자 완료 일정은 완료 상태로 취급한 사본을 반환
+// (색·배지·필터 모두 완료처럼 동작 — 원본 데이터·모달은 실제 상태 유지)
+function mytaskEffTask(t){
+  return (t.status !== 'done' && mytaskDoneForMe(t)) ? { ...t, status: 'done' } : t;
 }
 
 // 목록 인라인 상태 컨트롤: 각자 완료 방식 일정의 수신자에게는 전체 상태 셀렉트 대신
