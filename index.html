@@ -2676,14 +2676,15 @@
   .co-body{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:12px;}
   .co-grade-card{background:var(--paper);border:1px solid var(--rule);border-radius:12px;overflow:hidden;}
   .co-tbl-wrap{overflow-x:auto;}
-  .co-tbl{border-collapse:collapse;width:100%;min-width:900px;}
-  .co-tbl th,.co-tbl td{border:1px solid var(--rule);padding:6px 3px;text-align:center;font-size:13px;white-space:nowrap;}
-  .co-tbl th.co-rowh{width:100px;font-size:11px;font-weight:800;color:var(--ink-soft);background:var(--paper-soft);}
-  .co-tbl .co-ghead th{font-weight:900;font-size:12.5px;border:none;padding:8px 3px;}
+  .co-tbl{border-collapse:collapse;width:100%;min-width:900px;table-layout:fixed;}
+  .co-tbl th,.co-tbl td{border:1px solid var(--rule);padding:6px 3px;text-align:center;font-size:13px;white-space:nowrap;overflow:hidden;}
+  .co-tbl th.co-rowh{width:110px;font-size:11px;font-weight:800;color:var(--ink-soft);background:var(--paper-soft);}
+  .co-tbl .co-ghead th{font-weight:900;font-size:15px;border:none;padding:9px 3px;}
   .co-g1 .co-ghead th{background:#fef9c3;color:#713f12;} .co-g1 .co-ghead th.co-glabel{background:#facc15;color:#422006;}
   .co-g2 .co-ghead th{background:#fee2e2;color:#7f1d1d;} .co-g2 .co-ghead th.co-glabel{background:#ef4444;color:#fff;}
   .co-g3 .co-ghead th{background:#dbeafe;color:#1e3a8a;} .co-g3 .co-ghead th.co-glabel{background:#3b82f6;color:#fff;}
-  .co-tbl th.co-glabel{font-size:13.5px;}
+  .co-tbl th.co-glabel{width:110px;font-size:13.5px;}
+  .co-tbl td.co-void{background:var(--paper-soft);opacity:.45;}
   .co-tbl td.co-tname{font-weight:800;font-size:13.5px;cursor:pointer;}
   .co-tbl td.co-tname:hover{background:var(--paper-soft);color:var(--mon);}
   .co-tbl td.co-subt{color:var(--ink-soft);font-weight:700;background:var(--paper-soft);}
@@ -3287,7 +3288,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.33</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.34</div>
   </div>
 </div>
 
@@ -3417,7 +3418,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.33</div>
+    <div class="nav-version" title="Made by 박경환">ver6.34</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -8239,7 +8240,9 @@ function classOrgData(){
     const rooms = Object.keys(byGrade[g]).map(Number).sort((a,b)=>a-b);
     return { g, rooms: rooms.map(r => ({ r, cnt: byGrade[g][r] })), sum: rooms.reduce((a,r)=>a+byGrade[g][r],0) };
   });
-  return { grades: out, total: out.reduce((a,x)=>a+x.sum,0) };
+  // 학년마다 반 수가 달라도(13반 vs 14반) 열이 어긋나지 않게 최대 반 수로 통일
+  const maxR = out.reduce((a,x)=>Math.max(a, x.rooms.length ? x.rooms[x.rooms.length-1].r : 0), 0);
+  return { grades: out, total: out.reduce((a,x)=>a+x.sum,0), maxR };
 }
 function classOrgSpecialMap(){
   const m = {};
@@ -8291,7 +8294,7 @@ function renderClassOrgWidget(){
     classOrgEnsureStudents().then(ok => { if (ok) renderClassOrgWidget(); });
     return;
   }
-  const { grades, total } = classOrgData();
+  const { grades, total, maxR } = classOrgData();
   if (!grades.length) return;
   section.style.display = '';
   document.getElementById('classOrgTotalTop').textContent = `현원 ${total.toLocaleString()}명`;
@@ -8299,16 +8302,20 @@ function renderClassOrgWidget(){
   document.getElementById('classOrgChips').innerHTML =
     `<span class="co-chip total">현원 ${total.toLocaleString()}명</span>` +
     grades.map(x => `<span class="co-chip">${x.g}학년 ${x.sum}</span>`).join('');
-  // 펼침(B안): 반별 인원 미니 그리드 (+특이사항 점)
+  // 펼침(B안): 반별 인원 미니 그리드 (+특이사항 점) — 열은 최대 반 수 기준으로 정렬
   const specMap = classOrgSpecialMap();
   document.getElementById('classOrgGrid').innerHTML = grades.map(x => `
     <div class="co-row">
       <div class="co-row-label">${x.g}학년<br><b>${x.sum}</b></div>
-      <div class="co-cells" style="grid-template-columns:repeat(${x.rooms.length},1fr);">
-        ${x.rooms.map(c => `<div class="co-cell" data-g="${x.g}" data-r="${c.r}">
-          <div class="co-room">${c.r}반</div><div class="co-cnt">${c.cnt}</div>
-          ${specMap[`${x.g}-${c.r}`] ? '<span class="co-dot"></span>' : ''}
-        </div>`).join('')}
+      <div class="co-cells" style="grid-template-columns:repeat(${maxR},1fr);">
+        ${Array.from({length: maxR}, (_, i) => {
+          const c = x.rooms.find(rc => rc.r === i + 1);
+          if (!c) return '<div></div>';
+          return `<div class="co-cell" data-g="${x.g}" data-r="${c.r}">
+            <div class="co-room">${c.r}반</div><div class="co-cnt">${c.cnt}</div>
+            ${specMap[`${x.g}-${c.r}`] ? '<span class="co-dot"></span>' : ''}
+          </div>`;
+        }).join('')}
       </div>
     </div>`).join('');
   applyClassOrgOpen();
@@ -8331,15 +8338,18 @@ function renderClassOrgWidget(){
 
 // ── 자세히 모달: 담임·부담임·인원·특이사항 전체 표 ──
 function renderClassOrgModal(){
-  const { grades, total } = classOrgData();
+  const { grades, total, maxR } = classOrgData();
   document.getElementById('classOrgTotalModal').textContent =
     `현원 ${total.toLocaleString()}명 · ` + grades.map(x=>`${x.g}학년 ${x.sum}`).join(' · ');
   const specials = classOrgMeta.specials || [];
+  const cols = Array.from({length: maxR}, (_, i) => i + 1);   // 모든 학년 공통 열 (반 수가 달라도 정렬 유지)
   const html = grades.map(x => {
-    const roomsHead = x.rooms.map(c=>`<th>${c.r}반</th>`).join('');
-    const dam = x.rooms.map(c => {
-      const t = TEACHERS.find(tt => tt.homeroom === `${x.g}-${c.r}`);
-      return `<td class="co-tname" data-g="${x.g}" data-r="${c.r}">${t?escapeHtml(t.name):'-'}</td>`;
+    const room = r => x.rooms.find(c => c.r === r);
+    const roomsHead = cols.map(r => room(r) ? `<th>${r}반</th>` : '<th class="co-void"></th>').join('');
+    const dam = cols.map(r => {
+      if (!room(r)) return '<td class="co-void"></td>';
+      const t = TEACHERS.find(tt => tt.homeroom === `${x.g}-${r}`);
+      return `<td class="co-tname" data-g="${x.g}" data-r="${r}">${t?escapeHtml(t.name):'-'}</td>`;
     }).join('');
     // 부담임: 순서대로 2개 반씩 담당 (마지막 홀수 반은 1개)
     const subs = (classOrgMeta.subs || {})[String(x.g)] || [];
@@ -8353,14 +8363,19 @@ function renderClassOrgModal(){
         ri += span;
       });
       if (ri < x.rooms.length) cells += `<td class="co-subt" colspan="${x.rooms.length - ri}"></td>`;
+      if (x.rooms.length < maxR) cells += `<td class="co-void" colspan="${maxR - x.rooms.length}"></td>`;
       subRow = `<tr><th class="co-rowh">부담임교사</th>${cells}</tr>`;
     }
-    const cnts = x.rooms.map(c=>`<td class="co-cnt2" data-g="${x.g}" data-r="${c.r}">${c.cnt}</td>`).join('');
+    const cnts = cols.map(r => {
+      const c = room(r);
+      return c ? `<td class="co-cnt2" data-g="${x.g}" data-r="${r}">${c.cnt}</td>` : '<td class="co-void"></td>';
+    }).join('');
     const specRows = specials.map(sp => {
       const has = x.rooms.some(c => (sp.counts||{})[`${x.g}-${c.r}`]);
       if (!has) return '';
-      return `<tr><th class="co-rowh">${escapeHtml(sp.label)}</th>${x.rooms.map(c => {
-        const v = (sp.counts||{})[`${x.g}-${c.r}`];
+      return `<tr><th class="co-rowh">${escapeHtml(sp.label)}</th>${cols.map(r => {
+        if (!room(r)) return '<td class="co-void"></td>';
+        const v = (sp.counts||{})[`${x.g}-${r}`];
         return v ? `<td class="co-spec">${v}명</td>` : '<td class="co-dash">-</td>';
       }).join('')}</tr>`;
     }).join('');
