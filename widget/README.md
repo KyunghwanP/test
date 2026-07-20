@@ -1,74 +1,106 @@
 # 영남고 앱 — 바탕화면 위젯
 
-현황판(홈)의 각 위젯(학사일정·급식·날씨·달력·업무·상담·시간표·학급편성·주간요약)을
-**바탕화면에 원하는 위치·크기로 띄우는** 기능입니다.
+현황판(홈)의 각 패널을 **바탕화면 위젯**으로 띄우는 기능. 두 가지 방식이 있습니다.
 
-## 구조 (역할 분담)
+| 파일 | 방식 | 특징 |
+|---|---|---|
+| **`ynhs-widget.ahk`** | AutoHotkey + **WebView2** (권장) | 테두리 없는 진짜 위젯. `Widget.exe` 하나로 배포. 드래그=이동, 클릭=메인 앱 실행 |
+| `ynhs-widgets.ahk` | AutoHotkey + 크롬 앱 모드 (간편판) | 설정 없이 바로 실행되나 창 테두리가 살짝 있고 단일 exe 배포는 안 됨 |
 
-| 구성 | 역할 |
-|---|---|
-| **크롬 앱 모드** | 위젯 화면을 그림. 앱과 같은 주소라 **로그인 세션을 그대로 공유** → 시간표·급식 등 로그인 데이터도 보임 |
-| **AutoHotkey (`ynhs-widgets.ahk`)** | 크롬 창들을 원하는 위치·크기로 배치하고, 숨기기/종료 단축키 제공. `.exe`로 빌드 |
-| **`index.html?widget=<패널>`** | 현황판 코드를 그대로 재사용해 해당 패널 하나만 창 전체에 표시 (앱이 바뀌어도 위젯 자동 동기화) |
-
-위젯 페이지는 이미 배포돼 있어 브라우저에서 바로 확인할 수 있습니다. 예:
+공통으로 웹 위젯 페이지(`index.html?widget=<패널>`)를 사용합니다. 이 페이지는 이미 배포돼 있어
+브라우저에서 바로 확인 가능합니다:
 ```
-https://kyunghwanp.github.io/test/?widget=schedule
-https://kyunghwanp.github.io/test/?widget=meal
-https://kyunghwanp.github.io/test/?widget=weather
+https://kyunghwanp.github.io/test/?widget=schedule   (학사일정)
+https://kyunghwanp.github.io/test/?widget=meal        (급식)
+https://kyunghwanp.github.io/test/?widget=weather     (날씨)
 ```
-쓸 수 있는 패널키: `schedule meal weather cal task consult timetable classtt classorg ai`
+패널키: `schedule meal weather cal task consult timetable classtt classorg ai`
 
-## 사용법 (윈도우)
+---
 
-### 1) 그냥 스크립트로 실행 (AutoHotkey v2 설치 시)
+## A. WebView2 방식 (`ynhs-widget.ahk`) — 권장
+
+### 구조
+- **테두리 없는 창** 여러 개를 바탕화면에 배치. 각 창 안에서 WebView2가 위젯 페이지를 렌더링.
+- **로그인 세션 공유**: 숨김 폴더 `%AppData%\YnhsWidget\Session`. 최초 1회만 로그인하면 모든 위젯이 공유.
+- **드래그 = 위젯 이동**, **단순 클릭 = Neutralino 메인 앱을 해당 화면으로 실행** (없으면 기본 브라우저로 앱 열기).
+- **단일 exe**: `WebView2Loader.dll`을 `FileInstall`로 exe에 내장 → `Widget.exe` 하나만 배포.
+
+### 준비물 (이 폴더에 함께 두어야 하는 파일 2개)
+저장소에는 라이선스/용량 때문에 포함하지 않았습니다. 아래 2개를 `widget/` 폴더에 내려받아 두세요.
+
+1. **`WebView2.ahk`** — WebView2를 AHK에서 쓰는 라이브러리
+   - 출처: [thqby/ahk2_lib](https://github.com/thqby/ahk2_lib) 저장소의 `WebView2/` 폴더 (`WebView2.ahk` 및 관련 파일)
+   - `ynhs-widget.ahk`와 같은 폴더에 두면 `#Include`가 자동으로 찾습니다.
+2. **`WebView2Loader.dll`** — WebView2 로더 (32bit 권장: 32/64bit 윈도우 모두 호환)
+   - Microsoft **WebView2 Runtime**은 최신 윈도우10/11에 이미 깔려 있습니다. `WebView2Loader.dll`은
+     NuGet 패키지 `Microsoft.Web.WebView2`의 `runtimes\win-x86\native\WebView2Loader.dll`에서 얻거나,
+     thqby 라이브러리 배포본에 동봉된 것을 쓰면 됩니다.
+   - 이 파일을 `widget/` 폴더에 두면 빌드 시 exe에 내장됩니다.
+
+### 실행 (테스트)
 1. [AutoHotkey v2](https://www.autohotkey.com/) 설치
-2. `ynhs-widgets.ahk` 더블클릭 → 위젯들이 뜸
-3. 뜬 크롬 창에서 **최초 1회 구글 로그인**(@yeungnam.hs.kr). 이후엔 자동 로그인 유지
+2. `widget/` 폴더에 `ynhs-widget.ahk`, `WebView2.ahk`, `WebView2Loader.dll`이 함께 있는지 확인
+3. `ynhs-widget.ahk` 더블클릭 → 위젯들이 뜸
+4. 뜬 위젯에서 **최초 1회 구글 로그인**(@yeungnam.hs.kr). 이후 자동 유지
 
-### 2) .exe 로 빌드 (설치 없이 배포하고 싶을 때)
-1. AutoHotkey v2 설치 시 함께 깔리는 **`Ahk2Exe.exe`**(컴파일러)를 실행
-2. **Source**: `ynhs-widgets.ahk` 선택
-3. **Base File**: `AutoHotkey64.exe` (v2) 선택
-4. **Convert** → `ynhs-widgets.exe` 생성
-5. 만든 exe를 실행하면 AutoHotkey 없이도 동작. 시작프로그램에 넣으면 부팅 시 자동 실행
+### 단일 exe 빌드 (설치 없이 배포)
+1. AutoHotkey v2와 함께 설치되는 **`Ahk2Exe.exe`** 실행
+2. **Source**: `ynhs-widget.ahk` / **Base File**: `AutoHotkey64.exe` (v2)
+3. **Convert** → `ynhs-widget.exe` 생성. `FileInstall` 덕분에 `WebView2Loader.dll`이 exe 안에 들어갑니다
+4. 배포는 **exe 파일 하나만** 전달. 받는 분이 실행하면 각자 PC에 세션 폴더가 새로 생기고, 각자 1회 로그인
+   - ⚠️ `%AppData%\YnhsWidget\Session` 폴더에는 **본인 로그인 정보**가 들어 있으니 남에게 보내지 마세요
 
-> 명령줄로 빌드하려면:
+> 명령줄 빌드:
 > ```
-> "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe" /in ynhs-widgets.ahk /out ynhs-widgets.exe /base "C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe"
+> "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe" /in ynhs-widget.ahk /out ynhs-widget.exe /base "C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe"
 > ```
 
-## 위젯 추가·이동·크기 조절
+### 메인 앱(클릭 시 실행) 연결
+- `ynhs-widget.ahk` 상단 `NEU_EXE`를 **본인 Neutralino 앱 exe의 실제 경로**로 바꾸세요.
+- 위젯을 클릭하면 그 패널에 맞는 화면으로 앱이 열립니다. 앱은 실행 인자 `--goto=<탭>`을 받아
+  해당 탭으로 이동합니다(index.html에 이미 구현됨). Neutralino exe가 없으면 기본 브라우저로
+  `...?goto=<탭>`을 열어 같은 결과가 됩니다.
 
-`ynhs-widgets.ahk` 상단의 `WIDGETS` 목록만 고치면 됩니다. 형식은
-`["패널키", "제목표시명", X, Y, 너비, 높이]`:
-
+### 위치·크기·패널 바꾸기
+`ynhs-widget.ahk` 상단 `WIDGETS` 목록만 수정: `["패널키", X, Y, 너비, 높이]`
 ```ahk
 global WIDGETS := [
-  ["schedule", "학사일정",       40,  60, 380, 520],   ; 왼쪽 위
-  ["meal",     "급식",           40, 600, 380, 300],   ; 왼쪽 아래
-  ["weather",  "날씨",          440,  60, 300, 220],   ; 가운데 위
-  ["timetable","내 시간표",      440, 300, 360, 300]    ; 원하는 만큼 추가
+    ["schedule",  40,  60, 380, 520],
+    ["meal",      40, 600, 380, 300],
+    ["weather",  440,  60, 300, 220],
+    ["timetable",440, 300, 360, 300]   ; 원하는 만큼 추가
 ]
 ```
-- **X, Y** = 화면 왼쪽 위 기준 픽셀 좌표, **너비·높이** = 창 크기(픽셀)
-- **제목표시명**은 페이지가 창 제목에 붙이는 한글명과 같아야 합니다
-  (`schedule→학사일정, meal→급식, weather→날씨, cal→달력, task→진행중인 업무,
-  consult→상담 일정, timetable→내 시간표, classtt→우리반 시간표,
-  classorg→학급 편성, ai→주간 요약`).
 
-## 단축키
-
+### 단축키
 | 키 | 동작 |
 |---|---|
-| `Win+Alt+H` | 모든 위젯 숨기기 / 다시 보이기 |
-| `Win+Alt+R` | 위치·크기 재배치 (틀어졌을 때) |
-| `Win+Alt+Q` | 모든 위젯 종료 + 런처 종료 |
+| `Win+Alt+H` | 모든 위젯 숨기기 / 보이기 |
+| `Win+Alt+R` | 위치·크기 재배치 |
+| `Win+Alt+T` | 항상 위 토글 |
+| `Win+Alt+Q` | 종료 |
 
-## 참고 / 한계
+### 알아둘 점 (윈도우에서 확인 필요)
+- 이 스크립트는 리눅스 환경에서 만들어져 **AHK 실행 자체는 테스트하지 못했습니다.** 웹 위젯 페이지 동작은
+  헤드리스 브라우저로 검증했습니다.
+- WebView2 컨트롤러를 만드는 한 줄
+  `WebView2.CreateControllerAsync(g.hwnd, , SESSION).await()` 은 thqby 라이브러리 **버전에 따라 인자
+  순서/이름이 다를 수 있습니다.** 실행 시 이 부분에서 오류가 나면, 사용하는 `WebView2.ahk`의
+  `CreateControllerAsync` 시그니처(특히 사용자 데이터 폴더 인자 위치)에 맞춰 조정하면 됩니다.
+  막히면 오류 메시지를 알려주세요 — 바로 고쳐드립니다.
 
-- **로그인**: 위젯 전용 크롬 프로필(`%APPDATA%\ynhs-widgets`)을 써서 평소 크롬과 분리됩니다.
-  최초 1회만 로그인하면 됩니다. 학교 내부망에서 로그인이 막히면 앱 로그인과 동일한 방법으로 처리됩니다.
-- **엣지**도 자동 인식합니다(크롬이 없으면). 둘 다 없으면 스크립트 상단 `BROWSER` 경로를 직접 지정하세요.
-- 크롬의 `--window-position/--window-size` 플래그가 무시되는 환경을 대비해 AutoHotkey가 창을 다시 배치합니다.
-- "바탕화면에 완전히 파묻힌(아이콘 뒤) 위젯"까지는 이 스크립트 범위 밖입니다. 필요하면 알려주세요.
+---
+
+## B. 크롬 앱 모드 방식 (`ynhs-widgets.ahk`) — 간편판
+
+WebView2 준비가 번거로우면 이 방식으로 **바로** 확인할 수 있습니다. 크롬(또는 엣지) 앱 모드로
+위젯 페이지를 띄우고 AHK가 위치를 잡습니다. 자세한 사용법은 스크립트 상단 주석 참고.
+- 장점: 준비물 없이 바로 실행. 단점: 창 테두리가 약간 있고, 단일 exe 배포/클릭-앱실행은 미지원.
+
+---
+
+## 웹 쪽 구현 요약 (참고)
+- `index.html?widget=<패널>` : 현황판 섹션 하나만 창 전체에 표시(상단바·사이드바 숨김). 현황판 코드를
+  그대로 재사용하므로 앱이 바뀌어도 위젯이 자동 동기화됩니다.
+- `index.html?goto=<탭>` (브라우저) / 실행 인자 `--goto=<탭>` (Neutralino) : 로그인 후 해당 탭으로 이동.
