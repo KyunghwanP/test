@@ -1,19 +1,26 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
-; WebView2 라이브러리(thqby/ahk2_lib) — 이 파일과 같은 폴더(Lib\)에 두세요. README 참고.
-#Include %A_ScriptDir%\WebView2.ahk
+; WebView2 라이브러리(thqby/ahk2_lib) — 저장소를 통째로 받아 폴더 구조를 유지해야 합니다.
+;   이 스크립트와 같은 폴더에  ComVar.ahk · Promise.ahk 등 최상위 .ahk 파일들  +  WebView2\ 폴더를 두세요.
+;   (WebView2.ahk 내부가 ..\ComVar.ahk, ..\Promise.ahk 등 형제/상위 파일을 참조하기 때문)
+#Include %A_ScriptDir%\WebView2\WebView2.ahk
 
 ; ============================================================
 ;  영남고 앱 — 바탕화면 위젯 (AutoHotkey v2 + WebView2)
-;  · 테두리 없는 진짜 바탕화면 위젯으로 현황판 각 패널을 띄운다.
+;  · 테두리 없는 위젯으로 현황판 각 패널을 띄운다.
 ;  · 로그인 세션은 숨김 폴더(%AppData%\YnhsWidget\Session)에서 공유 → 최초 1회만 로그인.
 ;  · 드래그 = 위젯 이동, 단순 클릭 = Neutralino 메인 앱을 해당 화면으로 실행.
-;  · WebView2Loader.dll을 exe에 내장(FileInstall)해 Widget.exe 하나로 배포.
+;  · 빌드 시 WebView2Loader.dll을 exe에 내장(FileInstall)해 단일 exe로 배포.
 ;
 ;  전역 단축키:
-;    Win+Alt+H : 모든 위젯 숨기기 / 보이기      Win+Alt+R : 재배치
-;    Win+Alt+T : 항상 위 토글                    Win+Alt+Q : 종료
+;    Win+Alt+H : 숨기기/보이기   Win+Alt+R : 재배치   Win+Alt+T : 항상 위 토글   Win+Alt+Q : 종료
 ; ============================================================
+
+; ── 0) 드래그 상태 전역 (반드시 최상단에서 먼저 초기화) ─────
+;  WebView2 생성 중 .await()가 메시지 루프를 돌리므로, 그 사이 마우스를 떼도
+;  핫키가 이 값들을 안전하게 참조할 수 있도록 창 생성보다 먼저 값을 넣는다.
+global dragHwnd := 0, didDrag := false, dragX := 0, dragY := 0
+global widgetsHidden := false, widgetsTop := true
 
 ; ── 1) 설정 ────────────────────────────────────────────────
 global APP_BASE := "https://kyunghwanp.github.io/test/?widget="
@@ -30,80 +37,86 @@ global WIDGETS := [
     ["weather",  440,  60, 300, 220]
 ]
 
-; ── 2) WebView2Loader.dll 준비 (exe에 내장했다가 임시폴더로 꺼냄) ──
-; 32bit dll을 쓰면 32/64bit 윈도우 모두 호환. 빌드 전 이 폴더에 WebView2Loader.dll을 두세요.
-global DLL_TMP := A_Temp "\YnhsWidget_WebView2Loader.dll"
-FileInstall("WebView2Loader.dll", DLL_TMP, 1)
+; ── 2) WebView2Loader.dll 경로 결정 ────────────────────────
+;  · 컴파일된 exe: FileInstall로 내장한 dll을 임시폴더로 꺼내 사용
+;  · 그냥 스크립트 실행: 폴더에 있는 WebView2Loader.dll을 직접 사용
+global DLL_PATH := ""
+if A_IsCompiled {
+    DLL_PATH := A_Temp "\YnhsWidget_WebView2Loader.dll"
+    FileInstall("WebView2Loader.dll", DLL_PATH, 1)
+} else {
+    for p in [A_ScriptDir "\WebView2Loader.dll", A_ScriptDir "\WebView2\WebView2Loader.dll"]
+        if FileExist(p) {
+            DLL_PATH := p
+            break
+        }
+    if (DLL_PATH = "") {
+        MsgBox("WebView2Loader.dll을 찾지 못했습니다.`n이 스크립트와 같은 폴더에 WebView2Loader.dll을 두세요.`n(WebView2 폴더 안이나 NuGet Microsoft.Web.WebView2에서 구함)")
+        ExitApp
+    }
+}
 try DirCreate(SESSION)
 
 ; ── 3) 위젯 창 생성 ────────────────────────────────────────
-global Widgets := Map()   ; hwnd -> {panel, x, y, w, h, gui, wvc}
+global WidgetWins := Map()   ; hwnd -> {panel, x, y, w, h, gui, wvc}
 
 for w in WIDGETS
     CreateWidget(w[1], w[2], w[3], w[4], w[5])
 
 CreateWidget(panel, x, y, ww, hh) {
-    g := Gui("-Caption +AlwaysOnTop +ToolWindow +E0x80000")  ; 테두리 없음, 작업표시줄에 안 뜸
+    g := Gui("-Caption +AlwaysOnTop +ToolWindow")   ; 테두리 없음, 작업표시줄에 안 뜸
     g.BackColor := "1F3D33"
     g.Show(Format("x{} y{} w{} h{} NoActivate", x, y, ww, hh))
 
-    ; WebView2 컨트롤러 생성 — 공유 세션 폴더 사용(로그인 1회 공유)
-    ; ※ 라이브러리 버전에 따라 인자 순서가 다를 수 있음(README의 "WebView2 호출" 참고)
-    wvc := WebView2.CreateControllerAsync(g.hwnd, , SESSION).await()
-    wv  := wvc.CoreWebView2
+    ; WebView2 컨트롤러 생성 — 공유 세션 폴더(dataDir) + dll 경로 지정
+    ; 시그니처: CreateControllerAsync(hwnd, options, dataDir, edgeRuntime, dllPathOrFuncPtr)
+    wvc := WebView2.CreateControllerAsync(g.hwnd, 0, SESSION, "", DLL_PATH).await()
     wvc.Fill()                       ; 클라이언트 영역 꽉 채움
-    wv.Navigate(APP_BASE panel)
+    wvc.CoreWebView2.Navigate(APP_BASE panel)
 
-    ; 창 크기 변경 시 WebView도 리사이즈
     g.OnEvent("Size", (g, *) => (wvc && wvc.Fill()))
-
-    Widgets[g.hwnd] := {panel: panel, x: x, y: y, w: ww, h: hh, gui: g, wvc: wvc}
+    WidgetWins[g.hwnd] := {panel: panel, x: x, y: y, w: ww, h: hh, gui: g, wvc: wvc}
 }
 
 ; ── 4) 드래그(이동) vs 클릭(앱 실행) 구분 ───────────────────
-; WebView2가 클라이언트 영역을 덮으므로 전역 마우스 훅으로 위젯 창을 직접 처리한다.
-global dragStart := {x: 0, y: 0}, dragHwnd := 0, didDrag := false
-
 ~LButton:: {
-    global dragStart, dragHwnd, didDrag
+    global dragHwnd, didDrag, dragX, dragY
     MouseGetPos(&mx, &my, &win)
     root := GetWidgetRoot(win)
     if !root
         return
-    dragHwnd := root, didDrag := false
-    dragStart := {x: mx, y: my}
+    dragHwnd := root, didDrag := false, dragX := mx, dragY := my
     SetTimer(WatchDrag, 10)
 }
 
 ~LButton Up:: {
     global dragHwnd, didDrag
     SetTimer(WatchDrag, 0)
-    if dragHwnd && !didDrag
-        LaunchMain(Widgets[dragHwnd].panel)   ; 움직임 없었으면 클릭 → 앱 실행
+    if (dragHwnd && !didDrag)
+        LaunchMain(WidgetWins[dragHwnd].panel)   ; 움직임 없었으면 클릭 → 앱 실행
     dragHwnd := 0
 }
 
 WatchDrag() {
-    global dragStart, dragHwnd, didDrag
+    global dragHwnd, didDrag, dragX, dragY
     if !dragHwnd {
         SetTimer(WatchDrag, 0)
         return
     }
     MouseGetPos(&mx, &my)
-    if (Abs(mx - dragStart.x) > 5 || Abs(my - dragStart.y) > 5) {
+    if (Abs(mx - dragX) > 5 || Abs(my - dragY) > 5) {
         didDrag := true
         SetTimer(WatchDrag, 0)
-        ; 제목표시줄을 잡은 것처럼 창을 드래그 (WM_NCLBUTTONDOWN, HTCAPTION)
-        PostMessage(0xA1, 2, 0, , "ahk_id " dragHwnd)
+        PostMessage(0xA1, 2, 0, , "ahk_id " dragHwnd)   ; WM_NCLBUTTONDOWN + HTCAPTION → 창 드래그
     }
 }
 
 ; 마우스가 올라간 창이 위젯(또는 그 WebView2 자식)인지 확인하고 루트 위젯 hwnd 반환
 GetWidgetRoot(hwnd) {
-    global Widgets
+    global WidgetWins
     cur := hwnd, depth := 0
     while (cur && depth < 6) {
-        if Widgets.Has(cur)
+        if WidgetWins.Has(cur)
             return cur
         cur := DllCall("GetParent", "ptr", cur, "ptr")
         depth++
@@ -114,14 +127,13 @@ GetWidgetRoot(hwnd) {
 ; ── 5) 메인 앱 실행 (클릭 시) ──────────────────────────────
 LaunchMain(panel) {
     global NEU_EXE, APP_URL
-    goto := PanelToPage(panel)
+    gotoPage := PanelToPage(panel)                 ; 'goto'는 AHK 예약어 → gotoPage 사용
     if FileExist(NEU_EXE)
-        Run('"' NEU_EXE '" --goto=' goto)          ; Neutralino 앱을 해당 화면으로
+        Run('"' NEU_EXE '" --goto=' gotoPage)      ; Neutralino 앱을 해당 화면으로
     else
-        Run(APP_URL "?goto=" goto)                 ; 폴백: 기본 브라우저로 앱 열기
+        Run(APP_URL "?goto=" gotoPage)             ; 폴백: 기본 브라우저로 앱 열기
 }
 
-; 위젯 패널키 → 메인 앱 탭키 (index.html navigateTo 기준)
 PanelToPage(panel) {
     m := Map("schedule","schedule", "meal","meal", "weather","home",
              "cal","schedule", "task","mytask", "consult","consult",
@@ -130,33 +142,29 @@ PanelToPage(panel) {
 }
 
 ; ── 6) 전역 단축키 ─────────────────────────────────────────
-global widgetsHidden := false, widgetsTop := true
-
-#!h:: {   ; 숨기기/보이기
-    global widgetsHidden, Widgets
+#!h:: {
+    global widgetsHidden, WidgetWins
     widgetsHidden := !widgetsHidden
-    for hwnd, w in Widgets
+    for hwnd, w in WidgetWins
         widgetsHidden ? w.gui.Hide() : w.gui.Show("NoActivate")
 }
-
-#!r:: {   ; 재배치
-    global Widgets
-    for hwnd, w in Widgets
+#!r:: {
+    global WidgetWins
+    for hwnd, w in WidgetWins
         w.gui.Move(w.x, w.y, w.w, w.h)
 }
-
-#!t:: {   ; 항상 위 토글
-    global Widgets, widgetsTop
+#!t:: {
+    global WidgetWins, widgetsTop
     widgetsTop := !widgetsTop
-    for hwnd, w in Widgets
+    for hwnd, w in WidgetWins
         WinSetAlwaysOnTop(widgetsTop, "ahk_id " hwnd)
 }
-
 #!q::ExitApp
 
 ; ── 7) 종료 시 임시 dll 정리 ───────────────────────────────
 OnExit(CleanUp)
 CleanUp(*) {
-    global DLL_TMP
-    try FileDelete(DLL_TMP)
+    global DLL_PATH
+    if A_IsCompiled
+        try FileDelete(DLL_PATH)
 }
