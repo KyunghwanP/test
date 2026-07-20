@@ -49,10 +49,13 @@ https://kyunghwanp.github.io/test/?widget=weather     (날씨)
    > `ahk2_lib-master` 최상위에서 찾아 `ynhs-widget.ahk` 옆(같은 폴더)에 복사하면 됩니다.
 
 #### 2) `WebView2Loader.dll` — 로더 (32bit 권장: 32/64bit 윈도우 모두 호환)
-- Microsoft **WebView2 Runtime**은 최신 윈도우10/11에 이미 깔려 있습니다.
+- Microsoft **WebView2 Runtime**은 최신 윈도우10/11에 이미 깔려 있지만, 로더 DLL은 별도로 있어야 합니다.
 - `WebView2Loader.dll`은 NuGet 패키지 `Microsoft.Web.WebView2`의
   `runtimes\win-x86\native\WebView2Loader.dll`에서 얻거나, thqby 라이브러리 배포본에 동봉된 것을 쓰세요.
-- 이 파일을 `ynhs-widget.ahk` 옆에 두면 빌드 시 exe에 내장됩니다.
+- **이 파일을 `ynhs-widget.ahk`와 같은 폴더에 두세요.**
+  - **스크립트로 실행할 때**: 스크립트가 이 파일을 직접 찾아 씁니다(없으면 안내 후 종료).
+  - **exe로 빌드할 때**: `FileInstall`이 이 파일을 exe 안에 내장합니다(`A_IsCompiled`일 때만 동작).
+    빌드 후엔 exe 하나만 배포하면 되고, 실행 시 임시폴더로 꺼내 쓰고 종료 시 지웁니다.
 
 ### 실행 (테스트)
 1. [AutoHotkey v2](https://www.autohotkey.com/) 설치
