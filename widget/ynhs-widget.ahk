@@ -1,7 +1,13 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
-; WebView2 라이브러리(thqby/ahk2_lib) — 이 파일과 같은 폴더(Lib\)에 두세요. README 참고.
-#Include %A_ScriptDir%\WebView2.ahk
+; WebView2 라이브러리(thqby/ahk2_lib) — 저장소를 통째로 받아 폴더 구조를 유지해야 합니다.
+;   이 스크립트와 같은 폴더에  ComVar.ahk  +  WebView2\  (폴더 통째로)를 두세요.
+;   (WebView2.ahk 내부가 ..\ComVar.ahk 등 형제/상위 파일을 참조하기 때문)
+;   폴더 구조:
+;     ynhs-widget.ahk
+;     ComVar.ahk
+;     WebView2\WebView2.ahk  (그 안의 다른 파일들 포함)
+#Include %A_ScriptDir%\WebView2\WebView2.ahk
 
 ; ============================================================
 ;  영남고 앱 — 바탕화면 위젯 (AutoHotkey v2 + WebView2)

@@ -26,17 +26,33 @@ https://kyunghwanp.github.io/test/?widget=weather     (날씨)
 - **드래그 = 위젯 이동**, **단순 클릭 = Neutralino 메인 앱을 해당 화면으로 실행** (없으면 기본 브라우저로 앱 열기).
 - **단일 exe**: `WebView2Loader.dll`을 `FileInstall`로 exe에 내장 → `Widget.exe` 하나만 배포.
 
-### 준비물 (이 폴더에 함께 두어야 하는 파일 2개)
-저장소에는 라이선스/용량 때문에 포함하지 않았습니다. 아래 2개를 `widget/` 폴더에 내려받아 두세요.
+### 준비물 (저장소엔 라이선스/용량 때문에 미포함)
 
-1. **`WebView2.ahk`** — WebView2를 AHK에서 쓰는 라이브러리
-   - 출처: [thqby/ahk2_lib](https://github.com/thqby/ahk2_lib) 저장소의 `WebView2/` 폴더 (`WebView2.ahk` 및 관련 파일)
-   - `ynhs-widget.ahk`와 같은 폴더에 두면 `#Include`가 자동으로 찾습니다.
-2. **`WebView2Loader.dll`** — WebView2 로더 (32bit 권장: 32/64bit 윈도우 모두 호환)
-   - Microsoft **WebView2 Runtime**은 최신 윈도우10/11에 이미 깔려 있습니다. `WebView2Loader.dll`은
-     NuGet 패키지 `Microsoft.Web.WebView2`의 `runtimes\win-x86\native\WebView2Loader.dll`에서 얻거나,
-     thqby 라이브러리 배포본에 동봉된 것을 쓰면 됩니다.
-   - 이 파일을 `widget/` 폴더에 두면 빌드 시 exe에 내장됩니다.
+#### 1) WebView2 라이브러리 — **저장소를 통째로 받아 폴더 구조를 유지**해야 합니다
+`WebView2.ahk` 파일 하나만 받으면 그 안에서 `..\ComVar.ahk` 등 다른 파일을 `#Include`하기 때문에
+"cannot be opened" 오류가 연쇄적으로 납니다. 반드시 아래처럼 하세요.
+
+1. [thqby/ahk2_lib](https://github.com/thqby/ahk2_lib) → 초록색 **Code** → **Download ZIP** → 압축 해제
+2. 압축 푼 `ahk2_lib-master`에서 다음을 `ynhs-widget.ahk`가 있는 폴더로 복사:
+   - **`ComVar.ahk`** 파일 (저장소 최상위에 있음)
+   - **`WebView2\` 폴더 전체** (그 안의 파일들 포함)
+3. 최종 폴더 구조:
+   ```
+   ynhs-widget\
+   ├── ynhs-widget.ahk
+   ├── ComVar.ahk
+   ├── WebView2Loader.dll      ← 아래 2)에서 준비
+   └── WebView2\
+       └── WebView2.ahk  (+ 폴더 내 다른 파일들)
+   ```
+   > 실행 시 또 다른 파일(예: `Promise.ahk` 등)이 "cannot be opened"으로 뜨면, 같은 이름의 파일을
+   > `ahk2_lib-master` 최상위에서 찾아 `ynhs-widget.ahk` 옆(같은 폴더)에 복사하면 됩니다.
+
+#### 2) `WebView2Loader.dll` — 로더 (32bit 권장: 32/64bit 윈도우 모두 호환)
+- Microsoft **WebView2 Runtime**은 최신 윈도우10/11에 이미 깔려 있습니다.
+- `WebView2Loader.dll`은 NuGet 패키지 `Microsoft.Web.WebView2`의
+  `runtimes\win-x86\native\WebView2Loader.dll`에서 얻거나, thqby 라이브러리 배포본에 동봉된 것을 쓰세요.
+- 이 파일을 `ynhs-widget.ahk` 옆에 두면 빌드 시 exe에 내장됩니다.
 
 ### 실행 (테스트)
 1. [AutoHotkey v2](https://www.autohotkey.com/) 설치
