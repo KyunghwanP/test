@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ynhs-v435';
+const CACHE_NAME = 'ynhs-v436';
 
 self.addEventListener('install', e => {
   self.skipWaiting();

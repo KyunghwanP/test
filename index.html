@@ -2658,8 +2658,15 @@
   /* 학급 편성 요약 위젯 (현황판) */
   .co-chip{background:var(--paper-soft);border:1px solid var(--rule);border-radius:999px;padding:4px 12px;font-size:12.5px;font-weight:700;color:var(--ink);white-space:nowrap;}
   .co-chip.total{background:var(--ink);color:var(--paper);border-color:var(--ink);font-weight:800;}
-  .co-chip.link{display:inline-flex;align-items:center;gap:5px;text-decoration:none;background:var(--paper);border-color:var(--mon);color:var(--mon);cursor:pointer;transition:background .15s,color .15s;}
-  .co-chip.link:hover{background:var(--mon);color:#fff;border-color:var(--mon);}
+  .co-chip.link{display:inline-flex;align-items:center;gap:7px;text-decoration:none;background:var(--paper);border-color:var(--mon);color:var(--mon);cursor:pointer;font-size:14px;padding:6px 14px;transition:background .15s,border-color .15s;}
+  .co-chip.link:hover{background:var(--paper-soft);border-color:var(--mon);}
+  .co-chip.link svg{flex-shrink:0;}
+  /* 학년 명찰색: 1학년 노랑 · 2학년 빨강 · 3학년 파랑 */
+  .co-chip.g1{background:#FACC15;border-color:#EAB308;color:#3f2d00;}
+  .co-chip.g2{background:#EF4444;border-color:#DC2626;color:#fff;}
+  .co-chip.g3{background:#3B82F6;border-color:#2563EB;color:#fff;}
+  /* 학급 편성 헤더 제목만 크게 */
+  #classOrgHeader .home-section-title{font-size:19px;}
   /* 학급 편성 현황 모달 */
   .co-overlay{display:flex;position:fixed;inset:0;background:rgba(20,24,18,0.55);align-items:center;justify-content:center;padding:14px;z-index:9050;opacity:0;visibility:hidden;pointer-events:none;transition:opacity 0.18s ease, visibility 0s 0.18s;}
   .co-overlay.open{opacity:1;visibility:visible;pointer-events:auto;transition:opacity 0.18s ease;}
@@ -3296,7 +3303,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.50</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.51</div>
   </div>
 </div>
 
@@ -3426,7 +3433,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.50</div>
+    <div class="nav-version" title="Made by 박경환">ver6.51</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -8372,8 +8379,8 @@ function renderClassOrgWidget(){
   // 요약 칩 한 줄 — 자세한 내용(반별 인원·담임·부담임·특이사항)은 클릭 시 모달로
   document.getElementById('classOrgChips').innerHTML =
     `<span class="co-chip total">현원 ${total.toLocaleString()}명</span>` +
-    grades.map(x => `<span class="co-chip">${x.g}학년 ${x.sum}</span>`).join('') +
-    `<a class="co-chip link" href="https://drive.google.com/drive/u/1/folders/1iO1IjNiK6v1GLagdqiaTeeztuTdUhakC" target="_blank" rel="noopener" data-external onclick="event.stopPropagation()" title="학급명렬·교육과정현황 공유 폴더">📁 명렬·교육과정 ↗</a>`;
+    grades.map(x => `<span class="co-chip g${x.g}">${x.g}학년 ${x.sum}</span>`).join('') +
+    `<a class="co-chip link" href="https://drive.google.com/drive/u/1/folders/1iO1IjNiK6v1GLagdqiaTeeztuTdUhakC" target="_blank" rel="noopener" data-external onclick="event.stopPropagation()" title="학급명렬·교육과정현황 공유 폴더"><svg viewBox="0 0 87.3 78" width="15" height="15" xmlns="http://www.w3.org/2000/svg"><path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="M43.65 25L29.9 1.2c-1.35.8-2.5 1.9-3.3 3.3L1.2 48.5A9.06 9.06 0 000 53h27.5z" fill="#00ac47"/><path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.798l5.852 11.5z" fill="#ea4335"/><path d="M43.65 25L57.4 1.2c-1.35-.8-2.9-1.2-4.5-1.2H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="M59.8 53H27.5L13.75 76.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="M73.4 26.5L60.7 4.5c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25l16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg> Drive에서 학급명렬 및 교육과정 현황 받기</a>`;
   if (!classOrgBound) {
     classOrgBound = true;
     document.getElementById('classOrgHeader').addEventListener('click', openClassOrgModal);
