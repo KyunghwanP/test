@@ -4,6 +4,72 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>영남고등학교</title>
+<!-- ── 바탕화면 위젯 모드 ──────────────────────────────────────────
+     ?widget=<패널> 로 열면 현황판 섹션 하나만 창 전체에 표시한다.
+     (AutoHotkey + 크롬 앱 모드 데스크톱 위젯용 — widget/ 폴더 참고)
+     데이터·렌더링은 현황판 코드를 그대로 재사용하므로 앞으로 앱이
+     바뀌어도 위젯이 자동으로 동기화된다. FOUC(전체 앱이 잠깐 보임)
+     방지를 위해 head에서 즉시 클래스를 지정한다. -->
+<script>
+  (function(){
+    var p = new URLSearchParams(location.search).get('widget');
+    if(!p) return;
+    var de = document.documentElement;
+    de.classList.add('widget-mode');
+    de.setAttribute('data-widget', p);
+    var names = {meal:'급식',weather:'날씨',schedule:'학사일정',cal:'달력',
+      task:'진행중인 업무',consult:'상담 일정',timetable:'내 시간표',
+      classtt:'우리반 시간표',classorg:'학급 편성',ai:'주간 요약'};
+    document.title = '영남고 위젯 · ' + (names[p] || p);
+  })();
+</script>
+<style>
+  html.widget-mode, html.widget-mode body { height:100%; margin:0; background:#f1f5f9; overflow:hidden; }
+  html.dark.widget-mode, html.dark.widget-mode body { background:#0B1220; }
+  /* 앱 크롬(상단바·사이드바·탭바·FAB·메모열) 전부 숨김 */
+  html.widget-mode .app-header,
+  html.widget-mode .main-nav,
+  html.widget-mode .tab-bar-wrap,
+  html.widget-mode .mobile-tab-bar,
+  html.widget-mode #mytaskFAB,
+  html.widget-mode .home-memo-col,
+  html.widget-mode .home-memo-toggle,
+  html.widget-mode .home-loading { display:none !important; }
+  /* 컨테이너를 창 전체로 펴고 여백 제거 */
+  html.widget-mode .app-body,
+  html.widget-mode .app-content,
+  html.widget-mode #homePage,
+  html.widget-mode .home-body { display:block !important; height:100% !important; margin:0 !important; padding:0 !important; overflow:hidden !important; background:transparent !important; }
+  /* 중간 래퍼는 레이아웃에서 빼서(display:contents) 대상 섹션만 창을 채우게 */
+  html.widget-mode .home-inner,
+  html.widget-mode .home-main-row,
+  html.widget-mode .home-tt-row,
+  html.widget-mode .home-cal-row,
+  html.widget-mode .home-cal-col,
+  html.widget-mode .home-bottom-row,
+  html.widget-mode .home-meal-stack { display:contents !important; }
+  html.widget-mode .home-section { display:none !important; }
+  /* data-widget 값에 해당하는 섹션 하나만 표시 */
+  html.widget-mode[data-widget="meal"]      #homeMealSection,
+  html.widget-mode[data-widget="weather"]   #homeWeatherSection,
+  html.widget-mode[data-widget="schedule"]  #homeScheduleSection,
+  html.widget-mode[data-widget="cal"]       #homeCalSection,
+  html.widget-mode[data-widget="task"]      #homeTaskSection,
+  html.widget-mode[data-widget="consult"]   #homeConsultSection,
+  html.widget-mode[data-widget="timetable"] #homeMyTimetable,
+  html.widget-mode[data-widget="classtt"]   #homeClassTimetable,
+  html.widget-mode[data-widget="classorg"]  #homeClassOrgSection,
+  html.widget-mode[data-widget="ai"]        #homeAISummarySection {
+    display:flex !important; flex-direction:column; margin:0 !important;
+    height:100vh !important; box-sizing:border-box; border-radius:0 !important; overflow:hidden;
+  }
+  /* 내부 목록이 남는 높이를 채우며 스크롤 */
+  html.widget-mode .home-schedule-list,
+  html.widget-mode #homeTaskList,
+  html.widget-mode #homeConsultList,
+  html.widget-mode #homeAISummary,
+  html.widget-mode .home-mini-cal { flex:1 1 auto !important; max-height:none !important; overflow-y:auto; }
+</style>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="/ynhs/icon-180.png">
@@ -3330,7 +3396,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.59</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.60</div>
   </div>
 </div>
 
@@ -3460,7 +3526,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.59</div>
+    <div class="nav-version" title="Made by 박경환">ver6.60</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
