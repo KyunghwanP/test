@@ -2706,7 +2706,22 @@
     body.home-memo3 .home-memo-card iframe{flex:1;width:100%;border:0;display:block;background:var(--paper);}
     /* 링크 카드는 메모 아래 남는 공간을 채움 */
     body.home-memo3 .home-links-card{display:flex;flex-direction:column;flex:1;min-height:120px;}
+    /* 접기 상태: 메모 열 숨김 → 일반 교사와 같은 2단 레이아웃 */
+    body.home-memo3.home-memo-hidden .home-memo-col{display:none;}
+    /* 오른쪽 끝 접기/펼치기 버튼 (관리자 + 1400px 이상에서만) */
+    body.home-memo3 .home-memo-toggle{
+      display:flex;align-items:center;justify-content:center;
+      position:fixed;right:0;top:50%;transform:translateY(-50%);
+      width:18px;height:56px;padding:0;
+      border:1px solid var(--rule);border-right:none;border-radius:10px 0 0 10px;
+      background:var(--paper);color:var(--ink-soft);
+      font-size:13px;line-height:1;cursor:pointer;z-index:60;
+      box-shadow:-2px 2px 8px rgba(0,0,0,0.08);opacity:.6;
+      transition:opacity .15s,color .15s;
+    }
+    body.home-memo3 .home-memo-toggle:hover{opacity:1;color:var(--mon);}
   }
+  .home-memo-toggle{display:none;}
   .home-links-list{display:flex;flex-direction:column;gap:10px;padding:14px 16px;}
   .home-link-item{
     display:flex;align-items:center;gap:12px;
@@ -3302,7 +3317,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.54</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.55</div>
   </div>
 </div>
 
@@ -3432,7 +3447,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.54</div>
+    <div class="nav-version" title="Made by 박경환">ver6.55</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3627,6 +3642,8 @@
               </div>
             </div>
           </aside>
+          <!-- 메모 열 접기/펼치기 (관리자 전용, CSS로 1400px+에서만 표시) -->
+          <button class="home-memo-toggle" id="homeMemoToggle" title="빠른 메모·바로가기 접기">›</button>
           </div><!-- home-inner 끝 -->
         </div><!-- home-body 끝 -->
       </div><!-- homePage 끝 -->
@@ -6178,6 +6195,23 @@ onAuthStateChanged(fbAuth, async (user) => {
       const memoFrame = document.getElementById('homeMemoFrame');
       if (memoFrame && !memoFrame.src) memoFrame.src = 'memo2.html';
       startHomeMemoHeightSync();
+      // 메모 열 접기/펼치기 — 접으면 일반 교사와 같은 2단 화면, 상태는 저장
+      try { if (localStorage.getItem('ynhs-home-memo-hidden') === '1') document.body.classList.add('home-memo-hidden'); } catch (e) {}
+      const memoToggleBtn = document.getElementById('homeMemoToggle');
+      if (memoToggleBtn) {
+        const syncMemoToggleBtn = () => {
+          const hidden = document.body.classList.contains('home-memo-hidden');
+          memoToggleBtn.textContent = hidden ? '‹' : '›';
+          memoToggleBtn.title = hidden ? '빠른 메모·바로가기 펼치기' : '빠른 메모·바로가기 접기';
+        };
+        syncMemoToggleBtn();
+        memoToggleBtn.addEventListener('click', () => {
+          const hidden = document.body.classList.toggle('home-memo-hidden');
+          try { localStorage.setItem('ynhs-home-memo-hidden', hidden ? '1' : '0'); } catch (e) {}
+          syncMemoToggleBtn();
+          requestAnimationFrame(syncHomeMemoHeight);
+        });
+      }
     }
     // 진로진학·학생 종합검색 탭은 ver4.97부터 전체 공개.
     // 성적 데이터 접근 제한(담임 자기 반·부장·교장·교감·관리자)은 Firestore 규칙
