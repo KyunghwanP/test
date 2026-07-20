@@ -2692,10 +2692,25 @@
     /* stretch로 메모 열이 왼쪽 콘텐츠 열과 같은 높이가 되게 (바닥 라인 맞춤) */
     body.home-memo3 .home-inner{flex-direction:row;align-items:stretch;}
     body.home-memo3 #homeMainRow{flex:1;min-width:0;}
-    body.home-memo3 .home-memo-col{display:flex;flex-direction:column;width:420px;flex-shrink:0;}
-    body.home-memo3 .home-memo-card{display:flex;flex-direction:column;flex:1;min-height:560px;}
+    body.home-memo3 .home-memo-col{display:flex;flex-direction:column;width:420px;flex-shrink:0;gap:10px;}
+    /* 메모 카드 높이는 JS(syncHomeMemoHeight)가 캘린더+학사일정 하단에 맞춰 설정 */
+    body.home-memo3 .home-memo-card{display:flex;flex-direction:column;flex-shrink:0;min-height:280px;}
     body.home-memo3 .home-memo-card iframe{flex:1;width:100%;border:0;display:block;background:var(--paper);}
+    /* 링크 카드는 메모 아래 남는 공간을 채움 */
+    body.home-memo3 .home-links-card{display:flex;flex-direction:column;flex:1;min-height:120px;}
   }
+  .home-links-list{display:flex;flex-direction:column;gap:8px;padding:12px 14px;}
+  .home-link-item{
+    display:flex;align-items:center;gap:10px;
+    padding:11px 14px;border-radius:10px;
+    background:var(--paper-soft);color:var(--ink);
+    text-decoration:none;font-size:14px;font-weight:600;
+    border:1px solid var(--rule);
+    transition:background .15s,color .15s,border-color .15s;
+  }
+  .home-link-item:hover{background:var(--mon);color:#fff;border-color:var(--mon);}
+  .home-link-item .home-link-ext{margin-left:auto;font-size:12px;opacity:0.45;}
+  .home-link-item:hover .home-link-ext{opacity:0.85;}
   .home-half{flex:1;min-width:0;}
 
   /* 학사일정 미니 */
@@ -3279,7 +3294,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.47</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.48</div>
   </div>
 </div>
 
@@ -3409,7 +3424,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.47</div>
+    <div class="nav-version" title="Made by 박경환">ver6.48</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -3483,7 +3498,7 @@
               <div id="classOrgChips" style="display:flex;align-items:center;gap:7px;padding:9px 14px;flex-wrap:wrap;cursor:pointer;"></div>
             </div>
             <!-- 미니 달력(왼쪽) + 진행중인 업무·상담·학사일정(오른쪽) -->
-            <div class="home-cal-row">
+            <div class="home-cal-row" id="homeCalRow">
             <div class="home-section home-cal-card" id="homeCalSection">
               <div class="home-section-header" style="cursor:default;">
                 <button onclick="event.stopPropagation();moveScheduleMonth(-1)" style="background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;padding:0 4px;">‹</button>
@@ -3583,12 +3598,22 @@
           </div><!-- home-main-row 끝 -->
           <!-- 관리자 전용 3단: 오른쪽 빠른 메모(memo2) 열 — body.home-memo3 + 1400px 이상에서만 표시 -->
           <aside class="home-memo-col" id="homeMemoCol">
-            <div class="home-section home-memo-card">
+            <div class="home-section home-memo-card" id="homeMemoCard">
               <div class="home-section-header" style="cursor:default;">
                 <span class="home-section-title">📝 빠른 메모</span>
                 <a href="memo2.html" target="_blank" title="새 창에서 크게 열기" style="font-size:14px;color:var(--ink-soft);text-decoration:none;">⤢</a>
               </div>
               <iframe id="homeMemoFrame" title="빠른 메모"></iframe>
+            </div>
+            <div class="home-section home-links-card">
+              <div class="home-section-header" style="cursor:default;">
+                <span class="home-section-title">🔗 바로가기</span>
+              </div>
+              <div class="home-links-list">
+                <a class="home-link-item" href="https://yeungnam.dge.hs.kr/yeungnamh/main.do" target="_blank" rel="noopener" data-external>🏫 학교 홈페이지<span class="home-link-ext">↗</span></a>
+                <a class="home-link-item" href="https://yeungnam.riroschool.kr/" target="_blank" rel="noopener" data-external>📋 학교 리로스쿨<span class="home-link-ext">↗</span></a>
+                <a class="home-link-item" href="https://dge.go.kr/main/sso/index.do" target="_blank" rel="noopener" data-external>🏛 대구광역시교육청<span class="home-link-ext">↗</span></a>
+              </div>
             </div>
           </aside>
           </div><!-- home-inner 끝 -->
@@ -4533,18 +4558,49 @@ window.addEventListener('unhandledrejection', e => {
 
 const IS_NEUTRALINO = (typeof Neutralino !== 'undefined');
 
-// ── 데스크톱 앱: 외부 링크는 시스템 기본 브라우저로 열기 ──
+// ── 데스크톱 앱: 외부 링크(또는 data-external 표식)는 시스템 기본 브라우저로 열기 ──
+// 다른 도메인 링크는 자동으로, 같은 도메인이라도 data-external 이 붙은 링크는 강제로 기본 브라우저 탭으로 연다.
 if(IS_NEUTRALINO){
   document.addEventListener('click', e => {
     const a = e.target.closest('a[href]');
     if(!a) return;
     let url;
     try { url = new URL(a.href, location.href); } catch(err){ return; }
-    if((url.protocol === 'http:' || url.protocol === 'https:') && url.origin !== location.origin){
+    if(url.protocol !== 'http:' && url.protocol !== 'https:') return;
+    const isExternalDomain = (url.origin !== location.origin);
+    const forceExternal = a.hasAttribute('data-external');
+    if(isExternalDomain || forceExternal){
       e.preventDefault();
       Neutralino.os.open(url.href).catch(()=>{});
     }
   }, true);
+}
+
+// ── 현황판 3단: 메모 카드 높이를 캘린더+학사일정(home-cal-row) 하단에 맞춤 ──
+// 메모 열은 왼쪽 콘텐츠 열과 같은 높이로 stretch 되므로, 메모 카드를 cal-row 하단까지로 줄이면
+// 그 아래 남는 공간을 '바로가기' 링크 카드가 채운다.
+function syncHomeMemoHeight(){
+  if(!document.body.classList.contains('home-memo3')) return;
+  const col    = document.getElementById('homeMemoCol');
+  const card   = document.getElementById('homeMemoCard');
+  const calRow = document.getElementById('homeCalRow');
+  if(!col || !card || !calRow) return;
+  if(getComputedStyle(col).display === 'none'){ card.style.height = ''; return; }  // 좁은 화면(1400px 미만)
+  const h = Math.round(calRow.getBoundingClientRect().bottom - col.getBoundingClientRect().top);
+  if(h > 200) card.style.height = h + 'px';
+}
+let _homeMemoSyncStarted = false;
+function startHomeMemoHeightSync(){
+  if(_homeMemoSyncStarted) return;
+  _homeMemoSyncStarted = true;
+  const run = () => requestAnimationFrame(syncHomeMemoHeight);
+  run();
+  setTimeout(run, 300);   // 학사일정 등 지연 로드 후 재보정
+  window.addEventListener('resize', run);
+  const calRow = document.getElementById('homeCalRow');
+  if(calRow && window.ResizeObserver){
+    new ResizeObserver(run).observe(calRow);
+  }
 }
 
 // ── 알림 (Neutralino 데스크톱 / 브라우저 공통) ──
@@ -6110,6 +6166,7 @@ onAuthStateChanged(fbAuth, async (user) => {
       document.body.classList.add('home-memo3');
       const memoFrame = document.getElementById('homeMemoFrame');
       if (memoFrame && !memoFrame.src) memoFrame.src = 'memo2.html';
+      startHomeMemoHeightSync();
     }
     // 진로진학·학생 종합검색 탭은 ver4.97부터 전체 공개.
     // 성적 데이터 접근 제한(담임 자기 반·부장·교장·교감·관리자)은 Firestore 규칙
