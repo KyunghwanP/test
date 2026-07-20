@@ -2672,7 +2672,7 @@
   .co-box{position:relative;width:min(1240px,100%);max-height:min(92vh,100%);background:var(--bg-base,#f8fafc);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 30px 60px -20px rgba(0,0,0,0.5);}
   .co-head{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 52px 10px 18px;background:var(--paper);border-bottom:1px solid var(--rule);}
   .co-close{position:absolute;top:10px;right:12px;z-index:2;width:34px;height:34px;border:1px solid var(--rule);border-radius:10px;background:var(--paper);color:var(--ink-soft);font-size:16px;line-height:1;cursor:pointer;}
-  .co-body{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:12px;}
+  .co-body{flex:1;min-height:0;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:12px;}
   .co-grade-card{background:var(--paper);border:1px solid var(--rule);border-radius:12px;overflow:hidden;}
   .co-tbl-wrap{overflow-x:auto;}
   .co-tbl{border-collapse:collapse;width:100%;min-width:900px;table-layout:fixed;}
@@ -2693,6 +2693,19 @@
   .co-tbl td.co-dash{color:var(--rule);}
   #classOrgEditWrap textarea{width:100%;min-height:220px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;line-height:1.7;padding:12px;border:1.5px solid var(--rule);border-radius:10px;background:var(--paper);color:var(--ink);outline:none;resize:vertical;}
   html.dark .co-overlay{background:rgba(0,0,0,0.6);}
+
+  /* ── 모바일(≤640px): 학급 편성 요약 칩·모달 한 줄/컴팩트 ── */
+  @media(max-width:640px){
+    /* 요약 칩: 줄바꿈 없이 한 줄 고정(넘치면 가로 스크롤), 글자·여백 축소 */
+    #classOrgChips{flex-wrap:nowrap !important;gap:5px !important;padding:8px 10px !important;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    #classOrgChips::-webkit-scrollbar{display:none;}
+    .co-chip{font-size:12px;padding:4px 9px;flex-shrink:0;}
+    /* 드라이브 링크: 아이콘만 표시 */
+    .co-chip.link{margin-left:3px;padding:5px 7px;gap:0;font-size:0;}
+    .co-chip.link svg{width:17px;height:17px;}
+    /* 모달 헤더의 현원·학년 인원 요약 숨김 (표 안에서 확인) */
+    #classOrgTotalModal{display:none;}
+  }
 
   /* 3단 현황판(모든 교사): 태블릿보다 넓은 화면(1400px+)에서 오른쪽에 빠른 메모 열 */
   .home-memo-col{display:none;}
@@ -3317,7 +3330,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.58</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.59</div>
   </div>
 </div>
 
@@ -3447,7 +3460,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.58</div>
+    <div class="nav-version" title="Made by 박경환">ver6.59</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
