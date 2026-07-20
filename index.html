@@ -3279,7 +3279,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.46</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.47</div>
   </div>
 </div>
 
@@ -3409,7 +3409,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.46</div>
+    <div class="nav-version" title="Made by 박경환">ver6.47</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4531,8 +4531,23 @@ window.addEventListener('unhandledrejection', e => {
   if(e.reason && e.reason.message === '읽기 전용 보기 모드') e.preventDefault();
 });
 
-// ── 알림 (Neutralino 데스크톱 / 브라우저 공통) ──
 const IS_NEUTRALINO = (typeof Neutralino !== 'undefined');
+
+// ── 데스크톱 앱: 외부 링크는 시스템 기본 브라우저로 열기 ──
+if(IS_NEUTRALINO){
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href]');
+    if(!a) return;
+    let url;
+    try { url = new URL(a.href, location.href); } catch(err){ return; }
+    if((url.protocol === 'http:' || url.protocol === 'https:') && url.origin !== location.origin){
+      e.preventDefault();
+      Neutralino.os.open(url.href).catch(()=>{});
+    }
+  }, true);
+}
+
+// ── 알림 (Neutralino 데스크톱 / 브라우저 공통) ──
 let notifyReady = false;
 
 // 앱 시작 시 1회: 브라우저면 권한 요청 (Neutralino는 권한 불필요)
