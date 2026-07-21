@@ -200,19 +200,18 @@ CreateWidget(p) {
     }
 }
 
-; ── 고정 모드(위젯별) ─────────────────────────────────────
-;  doPin=true  : 바탕화면(Progman)의 자식 → Win+D에도 100% 안 사라짐(단, 타이핑 불가)
-;  doPin=false : 일반 창(소유자만 바탕화면) → 타이핑 가능(Win+D는 이벤트 훅으로 되돌림)
-ApplyPin(hwnd, doPin) {
+; ── 바탕화면 안착(듀얼 모니터 안전) ───────────────────────
+;  위젯을 '일반 최상위 창'으로 두되 소유자만 바탕화면(Progman)으로 지정한다.
+;  · 최상위 창이라 모니터 어디로 옮겨도 좌표가 안 깨진다(듀얼 모니터 OK) + 타이핑도 됨.
+;  · 소유자=바탕화면이라 다른 창 아래(바탕화면 층)에 깔린다.
+;  · Win+D 최소화는 별도의 최소화 이벤트 훅이 즉시 되돌린다.
+;  (예전의 '바탕화면 자식(SetParent)' 방식은 주 모니터 전용이라 듀얼에서 깨져 제거함)
+ApplyPin(hwnd, doPin := true) {
     global PROGMAN
     if !PROGMAN
         return
-    if doPin {
-        DllCall("SetParent", "ptr", hwnd, "ptr", PROGMAN)          ; 바탕화면 자식(완전 고정)
-    } else {
-        DllCall("SetParent", "ptr", hwnd, "ptr", 0)                ; 최상위 창으로 복귀(입력 가능)
-        DllCall("SetWindowLongPtr", "ptr", hwnd, "int", -8, "ptr", PROGMAN, "ptr")  ; 소유자=바탕화면(맨 아래)
-    }
+    DllCall("SetParent", "ptr", hwnd, "ptr", 0)                     ; 혹시 자식이었다면 최상위로 복귀
+    DllCall("SetWindowLongPtr", "ptr", hwnd, "int", -8, "ptr", PROGMAN, "ptr")  ; 소유자=바탕화면
 }
 
 SetWebViewBounds(wvc, hwnd, topOff) {
@@ -367,8 +366,8 @@ SaveAll() {
     for hwnd, w in WidgetWins
         widgetsHidden ? w.gui.Hide() : w.gui.Show("NoActivate")
 }
-#!t:: {   ; 마우스 올린 위젯을: 바탕화면 완전 고정(입력 X) ↔ 일반 창(입력 O) 전환
-    global WidgetWins
+#!t:: {   ; 마우스 올린 위젯을 잠깐 맨 앞으로 ↔ 바탕화면 층으로 전환
+    global WidgetWins, PROGMAN
     MouseGetPos(, , &win)
     root := DllCall("GetAncestor", "ptr", win, "uint", 2, "ptr")
     if !WidgetWins.Has(root) {
@@ -376,11 +375,16 @@ SaveAll() {
         return
     }
     w := WidgetWins[root]
-    w.pinned := !w.pinned
-    WinGetPos(&px, &py, , , "ahk_id " root)
-    ApplyPin(root, w.pinned)
-    WinMove(px, py, , , "ahk_id " root)
-    TrayTip(w.pinned ? "이 위젯: 바탕화면 완전 고정(입력 불가)" : "이 위젯: 일반 창(검색·메모 입력 가능)", "영남고 위젯", 0x10)
+    w.onTop := !(w.HasOwnProp("onTop") && w.onTop)
+    if w.onTop {
+        DllCall("SetWindowLongPtr", "ptr", root, "int", -8, "ptr", 0, "ptr")   ; 소유자 해제
+        WinSetAlwaysOnTop(true, "ahk_id " root)
+    } else {
+        WinSetAlwaysOnTop(false, "ahk_id " root)
+        if PROGMAN
+            DllCall("SetWindowLongPtr", "ptr", root, "int", -8, "ptr", PROGMAN, "ptr")  ; 다시 바탕화면 층
+    }
+    TrayTip(w.onTop ? "이 위젯: 항상 맨 앞" : "이 위젯: 바탕화면 층", "영남고 위젯", 0x10)
 }
 #!a::ShowSelector()
 #!s::SaveAll()
