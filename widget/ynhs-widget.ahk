@@ -151,7 +151,22 @@ CreateWidget(p) {
     bX.OnEvent("Click", (*) => DestroyWidget(g.hwnd, true))
     g.Show(Format("x{} y{} w{} h{} NoActivate", x, y, ww, hh))
 
-    wvc := WebView2.CreateControllerAsync(g.hwnd, 0, SESSION, "", DLL_PATH).await()
+    ; WebView2 생성 — 실패(세션 폴더 잠김 등) 시 재시도 후, 그래도 안 되면 이 위젯만 건너뜀
+    wvc := ""
+    loop 2 {
+        try {
+            wvc := WebView2.CreateControllerAsync(g.hwnd, 0, SESSION, "", DLL_PATH).await()
+            break
+        } catch as e {
+            if (A_Index = 1) {
+                Sleep 700
+                continue
+            }
+            g.Destroy()
+            MsgBox("'" label "' 위젯을 열지 못했습니다.`n`nWebView2 세션이 잠겨 있을 수 있습니다. 작업관리자에서 msedgewebview2.exe를 모두 종료하거나 PC를 재시작한 뒤 다시 실행해 주세요.`n`n(" e.Message ")", "영남고 위젯", 0x30)
+            return
+        }
+    }
     wvc.CoreWebView2.Navigate(PanelUrl(key) "&t=" A_Now)   ; &t= : 실행마다 최신 페이지 로드(캐시 지연 방지)
     g.OnEvent("Size", OnResize)
     WinSetTransparent(op, "ahk_id " g.hwnd)
