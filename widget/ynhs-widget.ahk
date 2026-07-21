@@ -347,9 +347,13 @@ SaveWidget(hwnd) {
     if !WidgetWins.Has(hwnd) || !WinExist("ahk_id " hwnd)
         return
     w := WidgetWins[hwnd]
-    WinGetPos(&wx, &wy, &wW, &wH, "ahk_id " hwnd)
+    ; 복원(g.Show)과 기준을 일치시킨다: 위치는 창 바깥 좌상단, 크기는 클라이언트 영역.
+    ;   (WinGetPos의 크기는 테두리를 포함해 Show의 클라이언트 기준보다 커서, 그대로 저장하면
+    ;    실행할 때마다 테두리 두께(~8px)만큼 창이 커지고 위치가 밀린다.)
+    WinGetPos(&wx, &wy, , , "ahk_id " hwnd)
+    WinGetClientPos( , , &cw, &ch, "ahk_id " hwnd)
     IniWrite(wx, CONFIG, "pos_" w.panel, "x"), IniWrite(wy, CONFIG, "pos_" w.panel, "y")
-    IniWrite(wW, CONFIG, "pos_" w.panel, "w"), IniWrite(wH, CONFIG, "pos_" w.panel, "h")
+    IniWrite(cw, CONFIG, "pos_" w.panel, "w"), IniWrite(ch, CONFIG, "pos_" w.panel, "h")
     IniWrite(w.opacity, CONFIG, "pos_" w.panel, "opacity")
 }
 
