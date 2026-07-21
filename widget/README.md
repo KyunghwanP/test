@@ -14,16 +14,24 @@ https://kyunghwanp.github.io/test/?widget=schedule   (학사일정)
 https://kyunghwanp.github.io/test/?widget=meal        (급식)
 https://kyunghwanp.github.io/test/?widget=weather     (날씨)
 ```
-패널키: `schedule meal weather cal task consult timetable classtt classorg ai`
+패널키: `fulltt(전체 시간표) schedule meal weather cal task consult timetable classtt classorg ai`
 
 ---
 
 ## A. WebView2 방식 (`ynhs-widget.ahk`) — 권장
 
-### 구조
-- **테두리 없는 창** 여러 개를 바탕화면에 배치. 각 창 안에서 WebView2가 위젯 페이지를 렌더링.
-- **로그인 세션 공유**: 숨김 폴더 `%AppData%\YnhsWidget\Session`. 최초 1회만 로그인하면 모든 위젯이 공유.
-- **드래그 = 위젯 이동**, **단순 클릭 = Neutralino 메인 앱을 해당 화면으로 실행** (없으면 기본 브라우저로 앱 열기).
+### 구조·조작
+- 실행하면 **위젯 선택창**이 먼저 떠서 원하는 위젯만 고릅니다(선택은 기억됨).
+- 각 위젯 맨 위 **손잡이 바**: `⠿ 이름 ……… [↗ 앱] [✕]`
+  - **손잡이 바 드래그** → 위젯 이동
+  - **손잡이 바 위에서 마우스 휠** → 투명도 조절
+  - **↗ 앱** → Neutralino 메인 앱을 해당 화면으로 실행 (없으면 기본 브라우저)
+  - **✕** → 이 위젯만 닫기
+- **크기 조절**: 창 가장자리를 마우스로 드래그
+- **바탕화면에 붙음(기본)**: 항상 아래에 깔림. `Win+Alt+T`로 맨 앞/바탕 전환.
+- **전체 시간표 위젯**(`fulltt`): 로그인한 본인의 **주간 전체 시간표**를 표시.
+- **로그인 세션 공유**: 숨김 폴더 `%AppData%\YnhsWidget\Session`. 최초 1회만 로그인.
+- **위치·크기·투명도·선택 저장**: `%AppData%\YnhsWidget\config.ini`에 저장돼 다음 실행에 복원.
 - **단일 exe**: `WebView2Loader.dll`을 `FileInstall`로 exe에 내장 → `Widget.exe` 하나만 배포.
 
 ### 준비물 (저장소엔 라이선스/용량 때문에 미포함)
@@ -81,33 +89,28 @@ https://kyunghwanp.github.io/test/?widget=weather     (날씨)
   해당 탭으로 이동합니다(index.html에 이미 구현됨). Neutralino exe가 없으면 기본 브라우저로
   `...?goto=<탭>`을 열어 같은 결과가 됩니다.
 
-### 위치·크기·패널 바꾸기
-`ynhs-widget.ahk` 상단 `WIDGETS` 목록만 수정: `["패널키", X, Y, 너비, 높이]`
-```ahk
-global WIDGETS := [
-    ["schedule",  40,  60, 380, 520],
-    ["meal",      40, 600, 380, 300],
-    ["weather",  440,  60, 300, 220],
-    ["timetable",440, 300, 360, 300]   ; 원하는 만큼 추가
-]
-```
+### 위젯 선택·위치·크기·투명도
+- **어떤 위젯을 띄울지**는 실행 시 뜨는 **선택창**에서 체크로 고릅니다(선택 기억).
+- **위치**는 손잡이 바 드래그, **크기**는 창 가장자리 드래그, **투명도**는 손잡이 바 위 마우스 휠.
+- 이 값들은 종료 시 `config.ini`에 저장돼 다음 실행에 복원됩니다.
+- **기본 위치·크기·기본선택**을 바꾸려면 `ynhs-widget.ahk` 상단 `ALL_PANELS`의 각 줄
+  `["패널키","라벨", 기본X, 기본Y, 기본너비, 기본높이, 기본선택("1"/"0")]` 을 수정하세요.
 
 ### 단축키
 | 키 | 동작 |
 |---|---|
 | `Win+Alt+H` | 모든 위젯 숨기기 / 보이기 |
-| `Win+Alt+R` | 위치·크기 재배치 |
-| `Win+Alt+T` | 항상 위 토글 |
+| `Win+Alt+T` | 맨 앞 / 바탕화면 전환 |
+| `Win+Alt+S` | 현재 위치·크기·투명도 저장 |
 | `Win+Alt+Q` | 종료 |
 
 ### 알아둘 점 (윈도우에서 확인 필요)
 - 이 스크립트는 리눅스 환경에서 만들어져 **AHK 실행 자체는 테스트하지 못했습니다.** 웹 위젯 페이지 동작은
   헤드리스 브라우저로 검증했습니다.
 - WebView2 컨트롤러를 만드는 한 줄
-  `WebView2.CreateControllerAsync(g.hwnd, , SESSION).await()` 은 thqby 라이브러리 **버전에 따라 인자
-  순서/이름이 다를 수 있습니다.** 실행 시 이 부분에서 오류가 나면, 사용하는 `WebView2.ahk`의
-  `CreateControllerAsync` 시그니처(특히 사용자 데이터 폴더 인자 위치)에 맞춰 조정하면 됩니다.
-  막히면 오류 메시지를 알려주세요 — 바로 고쳐드립니다.
+  `WebView2.CreateControllerAsync(g.hwnd, 0, SESSION, "", DLL_PATH).await()` 은 thqby 라이브러리
+  **버전에 따라 인자 순서/이름이 다를 수 있습니다.** 실행 시 이 부분에서 오류가 나면 오류 메시지를
+  알려주세요 — 사용하는 `WebView2.ahk`의 시그니처에 맞춰 바로 고쳐드립니다.
 
 ---
 
