@@ -186,11 +186,15 @@ HoverCheck() {
     if !WidgetWins.Has(root)
         root := 0
     for hwnd, w in WidgetWins {
+        if !WinExist("ahk_id " hwnd)      ; 닫히는 중인 위젯은 건너뜀
+            continue
         want := (hwnd = root) || (dragHwnd = hwnd)   ; 드래그 중엔 계속 표시
         if (w.handleShown != want) {
             w.handleShown := want
-            w.lbl.Visible := want, w.sld.Visible := want, w.bApp.Visible := want, w.bX.Visible := want
-            SetWebViewBounds(w.wvc, hwnd, want ? HANDLE_H : 0)
+            try {
+                w.lbl.Visible := want, w.sld.Visible := want, w.bApp.Visible := want, w.bX.Visible := want
+                SetWebViewBounds(w.wvc, hwnd, want ? HANDLE_H : 0)
+            }
         }
     }
 }
@@ -263,8 +267,9 @@ DestroyWidget(hwnd, fromButton := false) {
         return
     SaveWidget(hwnd)
     IniWrite("0", CONFIG, "selected", WidgetWins[hwnd].panel)
-    WidgetWins[hwnd].gui.Destroy()
-    WidgetWins.Delete(hwnd)
+    g := WidgetWins[hwnd].gui
+    WidgetWins.Delete(hwnd)     ; 먼저 목록에서 제거 → 타이머가 파괴 중 컨트롤을 안 만짐
+    try g.Destroy()
 }
 
 LaunchMain(panel) {
