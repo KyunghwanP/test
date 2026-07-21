@@ -136,7 +136,7 @@ CreateWidget(p) {
     g.Show(Format("x{} y{} w{} h{} NoActivate", x, y, ww, hh))
 
     wvc := WebView2.CreateControllerAsync(g.hwnd, 0, SESSION, "", DLL_PATH).await()
-    wvc.CoreWebView2.Navigate(APP_BASE key)
+    wvc.CoreWebView2.Navigate(APP_BASE key "&t=" A_Now)   ; &t= : 실행마다 최신 페이지 로드(캐시 지연 방지)
     g.OnEvent("Size", OnResize)
     WinSetTransparent(op, "ahk_id " g.hwnd)
 
