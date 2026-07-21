@@ -67,6 +67,20 @@ OnMessage(0x201, OnLButtonDown)   ; WM_LBUTTONDOWN — 손잡이 바 드래그
 
 ; ── 시작: 위젯 선택창 ──────────────────────────────────────
 ShowSelector()
+; Win+D(바탕화면 보기)나 다른 앱이 위젯을 최소화하면 즉시 되살려 바탕화면에 계속 떠있게 함
+SetTimer(KeepVisible, 250)
+
+KeepVisible() {
+    global WidgetWins, widgetsHidden
+    if widgetsHidden
+        return
+    for hwnd, w in WidgetWins {
+        if WinExist("ahk_id " hwnd) && WinGetMinMax("ahk_id " hwnd) = -1 {   ; -1 = 최소화됨
+            WinRestore("ahk_id " hwnd)
+            SetWinBottom(hwnd)
+        }
+    }
+}
 
 ShowSelector() {
     global ALL_PANELS, CONFIG
