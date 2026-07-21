@@ -43,7 +43,8 @@ global ALL_PANELS := [
 
 global widgetsHidden := false, alwaysTop := false
 global WidgetWins := Map()   ; gui.hwnd -> {panel, opacity, gui, wvc}
-global dragHwnd := 0, grabOffX := 0, grabOffY := 0
+global dragHwnd := 0, grabOffX := 0, grabOffY := 0, dragW := 0, dragH := 0
+global SNAP := 14   ; 자석 스냅 거리(px)
 
 ; ── WebView2Loader.dll 경로 ────────────────────────────────
 global DLL_PATH := ""
@@ -143,6 +144,8 @@ CreateWidget(p) {
     ; 창의 '소유자'를 바탕화면으로 → 일반 창(타이핑 O)이면서 Win+D에 최소화되지 않음
     if PROGMAN
         DllCall("SetWindowLongPtr", "ptr", g.hwnd, "int", -8, "ptr", PROGMAN, "ptr")
+    ; 창 그림자 제거(DWM 비클라이언트 렌더링 끔) — 환경에 따라 효과 다를 수 있음
+    try DllCall("dwmapi\DwmSetWindowAttribute", "ptr", g.hwnd, "int", 2, "int*", 1, "int", 4)  ; NCRENDERING_POLICY=DISABLED
 
     ; 처음엔 손잡이 바 숨김(웹 화면만) — 마우스 올리면 나타남(HoverCheck)
     lbl.Visible := false, sld.Visible := false, bApp.Visible := false, bX.Visible := false
@@ -198,13 +201,13 @@ OnLButtonDown(wParam, lParam, msg, hwnd) {
     if !WidgetWins.Has(hwnd)          ; Gui 배경/라벨만(버튼·슬라이더·웹뷰 제외)
         return
     MouseGetPos(&cx, &cy)
-    WinGetPos(&wx, &wy, , , "ahk_id " hwnd)
-    dragHwnd := hwnd, grabOffX := cx - wx, grabOffY := cy - wy
+    WinGetPos(&wx, &wy, &wW, &wH, "ahk_id " hwnd)
+    dragHwnd := hwnd, grabOffX := cx - wx, grabOffY := cy - wy, dragW := wW, dragH := wH
     SetTimer(DragMove, 10)
 }
 
 DragMove() {
-    global dragHwnd, grabOffX, grabOffY
+    global dragHwnd, grabOffX, grabOffY, dragW, dragH, WidgetWins, SNAP
     if !dragHwnd || !GetKeyState("LButton", "P") {
         if dragHwnd
             SaveWidget(dragHwnd)
@@ -213,7 +216,36 @@ DragMove() {
         return
     }
     MouseGetPos(&cx, &cy)
-    WinMove(cx - grabOffX, cy - grabOffY, , , "ahk_id " dragHwnd)
+    nx := cx - grabOffX, ny := cy - grabOffY
+    ; 다른 위젯 가장자리에 가까우면 자석처럼 붙임
+    for hwnd, w in WidgetWins {
+        if (hwnd = dragHwnd)
+            continue
+        WinGetPos(&ox, &oy, &oW, &oH, "ahk_id " hwnd)
+        ; 세로로 겹치는 구간이 있을 때만 좌우 스냅
+        if (ny < oy + oH && ny + dragH > oy) {
+            if Abs((nx + dragW) - ox) <= SNAP
+                nx := ox - dragW
+            else if Abs(nx - (ox + oW)) <= SNAP
+                nx := ox + oW
+            else if Abs(nx - ox) <= SNAP
+                nx := ox
+            else if Abs((nx + dragW) - (ox + oW)) <= SNAP
+                nx := ox + oW - dragW
+        }
+        ; 가로로 겹치는 구간이 있을 때만 상하 스냅
+        if (nx < ox + oW && nx + dragW > ox) {
+            if Abs((ny + dragH) - oy) <= SNAP
+                ny := oy - dragH
+            else if Abs(ny - (oy + oH)) <= SNAP
+                ny := oy + oH
+            else if Abs(ny - oy) <= SNAP
+                ny := oy
+            else if Abs((ny + dragH) - (oy + oH)) <= SNAP
+                ny := oy + oH - dragH
+        }
+    }
+    WinMove(nx, ny, , , "ahk_id " dragHwnd)
 }
 
 KeepVisible() {
