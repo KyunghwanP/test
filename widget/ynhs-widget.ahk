@@ -7,14 +7,13 @@ CoordMode "Mouse", "Screen"
 
 ; ============================================================
 ;  영남고 앱 — 바탕화면 위젯 (AutoHotkey v2 + WebView2)
-;  · 실행하면 "위젯 선택창"에서 원하는 위젯만 고른다(선택 기억).
+;  · 창의 '소유자'를 바탕화면(Progman)으로 지정 → 일반 창처럼 타이핑되면서
+;    Win+D(바탕화면 보기)에도 최소화되지 않고 바탕화면 위에 남는다.
 ;  · 트레이 아이콘 우클릭 → "위젯 추가 / 선택"으로 언제든 추가·제거.
-;  · 손잡이 바:  ⠿ 이름 …… [투명도 슬라이더] [↗ 앱] [✕]
+;  · 손잡이 바:  이름 …… [투명도 슬라이더] [↗ 앱] [✕]  (크기 조절 시 우측 정렬 유지)
 ;      - 손잡이 바 드래그 → 이동   - 슬라이더 → 투명도
 ;      - ↗ 앱 → 메인 앱   - ✕ → 이 위젯 닫기   - 웹 위 마우스 휠 → 스크롤(원래대로)
-;  · 창 가장자리 드래그 → 크기 조절. 검색창 등 입력도 정상 동작.
-;  · Win+D(바탕화면 보기)로 최소화돼도 즉시 되살아나 계속 표시.
-;  · 위치·크기·투명도·선택은 %AppData%\YnhsWidget\config.ini 에 저장/복원.
+;  · 창 가장자리 드래그 → 크기 조절. 위치·크기·투명도·선택은 config.ini에 저장/복원.
 ;
 ;  단축키: Win+Alt+H 숨김/보임 · Win+Alt+T 항상위 토글 · Win+Alt+A 위젯추가 · Win+Alt+S 저장 · Win+Alt+Q 종료
 ; ============================================================
@@ -26,6 +25,7 @@ global NEU_EXE  := A_ScriptDir "\ynhs-app.exe"
 global APP_URL  := "https://kyunghwanp.github.io/test/"
 global HANDLE_H := 26
 global DEF_OPACITY := 240
+global PROGMAN := DllCall("FindWindow", "str", "Progman", "ptr", 0, "ptr")
 
 global ALL_PANELS := [
     ["fulltt",    "📅 내 시간표",       40,  60, 640, 460, "1"],
@@ -64,7 +64,7 @@ if A_IsCompiled {
 try DirCreate(SESSION)
 OnMessage(0x201, OnLButtonDown)
 
-; ── 트레이 메뉴 (위젯 추가/저장/종료 버튼) ─────────────────
+; ── 트레이 메뉴 ────────────────────────────────────────────
 try A_TrayMenu.Delete()
 A_TrayMenu.Add("위젯 추가 / 선택", (*) => ShowSelector())
 A_TrayMenu.Add("현재 위치·크기 저장", (*) => SaveAll())
@@ -72,9 +72,8 @@ A_TrayMenu.Add()
 A_TrayMenu.Add("종료", (*) => ExitApp())
 A_TrayMenu.Default := "위젯 추가 / 선택"
 
-; ── 시작: 위젯 선택창 ──────────────────────────────────────
 ShowSelector()
-SetTimer(KeepVisible, 300)   ; Win+D 등으로 최소화되면 되살림
+SetTimer(KeepVisible, 300)   ; 만일 최소화되면 되살림(소유자 지정으로 보통은 불필요한 안전장치)
 
 ShowSelector() {
     global ALL_PANELS, CONFIG
@@ -115,7 +114,7 @@ FindWidgetByPanel(panel) {
 
 ; ── 위젯 창 생성 ───────────────────────────────────────────
 CreateWidget(p) {
-    global CONFIG, DEF_OPACITY, WidgetWins, APP_BASE, SESSION, DLL_PATH
+    global CONFIG, DEF_OPACITY, WidgetWins, APP_BASE, SESSION, DLL_PATH, PROGMAN
     key := p[1], label := p[2]
     x  := Integer(IniRead(CONFIG, "pos_" key, "x", p[3]))
     y  := Integer(IniRead(CONFIG, "pos_" key, "y", p[4]))
@@ -126,22 +125,35 @@ CreateWidget(p) {
     g := Gui("-Caption +Resize +ToolWindow")   ; 테두리없음·크기조절·작업표시줄제외 (활성화 가능 → 입력됨)
     g.BackColor := "FFFFFF"
     g.SetFont("s9 c555555", "맑은 고딕")
-    g.Add("Text", Format("x8 y5 w{} h16 +0x200", ww - 190), label)
-    sld := g.Add("Slider", Format("x{} y4 w78 h18 Range70-255 Line5 Page20", ww - 178), op)
-    sld.OnEvent("Change", OnOpacity)
+    lbl  := g.Add("Text", Format("x8 y5 w{} h16 +0x200", ww - 190), label)
+    sld  := g.Add("Slider", Format("x{} y4 w78 h18 Range70-255 Line5 Page20", ww - 178), op)
     bApp := g.Add("Button", Format("x{} y3 w58 h20", ww - 94), "↗ 앱")
+    bX   := g.Add("Button", Format("x{} y3 w26 h20", ww - 30), "✕")
+    sld.OnEvent("Change", OnOpacity)
     bApp.OnEvent("Click", (*) => LaunchMain(key))
-    bX := g.Add("Button", Format("x{} y3 w26 h20", ww - 30), "✕")
     bX.OnEvent("Click", (*) => DestroyWidget(g.hwnd, true))
     g.Show(Format("x{} y{} w{} h{} NoActivate", x, y, ww, hh))
 
     wvc := WebView2.CreateControllerAsync(g.hwnd, 0, SESSION, "", DLL_PATH).await()
     SetWebViewBounds(wvc, g.hwnd)
     wvc.CoreWebView2.Navigate(APP_BASE key)
-    g.OnEvent("Size", (*) => SetWebViewBounds(wvc, g.hwnd))
+    g.OnEvent("Size", OnResize)
     WinSetTransparent(op, "ahk_id " g.hwnd)
+
+    ; 창의 '소유자'를 바탕화면으로 → 일반 창(타이핑 O)이면서 Win+D에 최소화되지 않음
+    if PROGMAN
+        DllCall("SetWindowLongPtr", "ptr", g.hwnd, "int", -8, "ptr", PROGMAN, "ptr")
+
     WidgetWins[g.hwnd] := {panel: key, opacity: op, gui: g, wvc: wvc}
 
+    ; 크기 조절 시 손잡이 바 컨트롤을 우측 정렬로 재배치 + 웹뷰 리사이즈
+    OnResize(gg, minmax, w, h) {
+        lbl.Move(8, 5, w - 190, 16)
+        sld.Move(w - 178, 4)
+        bApp.Move(w - 94, 3)
+        bX.Move(w - 30, 3)
+        SetWebViewBounds(wvc, g.hwnd)
+    }
     OnOpacity(ctrl, *) {
         WinSetTransparent(ctrl.Value, "ahk_id " g.hwnd)
         if WidgetWins.Has(g.hwnd)
@@ -184,7 +196,6 @@ DragMove() {
     WinMove(cx - grabOffX, cy - grabOffY, , , "ahk_id " dragHwnd)
 }
 
-; ── Win+D 등 최소화 시 되살림 ──────────────────────────────
 KeepVisible() {
     global WidgetWins, widgetsHidden
     if widgetsHidden
@@ -194,7 +205,6 @@ KeepVisible() {
             WinRestore("ahk_id " hwnd)
 }
 
-; ── 위젯 제거 ──────────────────────────────────────────────
 DestroyWidget(hwnd, fromButton := false) {
     global WidgetWins, CONFIG
     if !WidgetWins.Has(hwnd)
@@ -203,10 +213,8 @@ DestroyWidget(hwnd, fromButton := false) {
     IniWrite("0", CONFIG, "selected", WidgetWins[hwnd].panel)
     WidgetWins[hwnd].gui.Destroy()
     WidgetWins.Delete(hwnd)
-    ; ✕로 마지막 위젯까지 닫아도 트레이는 남겨 다시 추가할 수 있게 함(종료는 트레이 메뉴/Win+Alt+Q)
 }
 
-; ── 메인 앱 실행 ───────────────────────────────────────────
 LaunchMain(panel) {
     global NEU_EXE, APP_URL
     gotoPage := PanelToPage(panel)
@@ -223,7 +231,6 @@ PanelToPage(panel) {
     return m.Has(panel) ? m[panel] : "home"
 }
 
-; ── 저장 ───────────────────────────────────────────────────
 SaveWidget(hwnd) {
     global WidgetWins, CONFIG
     if !WidgetWins.Has(hwnd) || !WinExist("ahk_id " hwnd)
