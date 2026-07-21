@@ -28,7 +28,8 @@ global DEF_OPACITY := 240
 global PROGMAN := DllCall("FindWindow", "str", "Progman", "ptr", 0, "ptr")
 
 global ALL_PANELS := [
-    ["fulltt",    "📅 내 시간표",       40,  60, 640, 460, "1"],
+    ["memo",      "📝 빠른 메모",       40,  60, 340, 420, "1"],
+    ["fulltt",    "📅 내 시간표",      400,  60, 640, 460, "1"],
     ["schedule",  "📆 학사일정",       700,  60, 380, 520, "1"],
     ["meal",      "🍱 급식",           40, 540, 380, 300, "1"],
     ["weather",   "🌤 날씨",          440, 540, 300, 220, "0"],
@@ -137,7 +138,7 @@ CreateWidget(p) {
     g.Show(Format("x{} y{} w{} h{} NoActivate", x, y, ww, hh))
 
     wvc := WebView2.CreateControllerAsync(g.hwnd, 0, SESSION, "", DLL_PATH).await()
-    wvc.CoreWebView2.Navigate(APP_BASE key "&t=" A_Now)   ; &t= : 실행마다 최신 페이지 로드(캐시 지연 방지)
+    wvc.CoreWebView2.Navigate(PanelUrl(key) "&t=" A_Now)   ; &t= : 실행마다 최신 페이지 로드(캐시 지연 방지)
     g.OnEvent("Size", OnResize)
     WinSetTransparent(op, "ahk_id " g.hwnd)
 
@@ -281,8 +282,16 @@ LaunchMain(panel) {
         Run(APP_URL "?goto=" gotoPage)
 }
 
+; 위젯 페이지 URL — 메모는 독립 페이지(memo2.html), 나머지는 index.html?widget=
+PanelUrl(panel) {
+    global APP_BASE, APP_URL
+    if (panel = "memo")
+        return APP_URL "memo2.html?embed=1"
+    return APP_BASE panel
+}
+
 PanelToPage(panel) {
-    m := Map("fulltt","timetable", "schedule","schedule", "meal","meal", "weather","home",
+    m := Map("memo","home", "fulltt","timetable", "schedule","schedule", "meal","meal", "weather","home",
              "cal","schedule", "task","mytask", "consult","consult", "timetable","timetable",
              "classtt","timetable", "classorg","home", "ai","weekly")
     return m.Has(panel) ? m[panel] : "home"

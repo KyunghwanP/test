@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>개인 메모 v2 (실험)</title>
     <script>
-      // 본체(index.html) iframe 안에서 열리면 embed 모드 — 자체 헤더를 숨김
-      if (window.self !== window.top) document.documentElement.classList.add('embed');
+      // 본체(index.html) iframe 안이거나 ?embed=1(바탕화면 위젯)이면 embed 모드 — 자체 헤더를 숨김
+      if (window.self !== window.top || /[?&]embed=1/.test(location.search))
+        document.documentElement.classList.add('embed');
       // 다크모드: 본체 이스터 에그 설정 공유 + 토글 시 실시간 동기화
       (function(){
         const apply = on => document.documentElement.classList.toggle('dark', on);
