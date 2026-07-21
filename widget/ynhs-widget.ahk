@@ -169,13 +169,14 @@ CreateWidget(p) {
                            lbl: lbl, sld: sld, bApp: bApp, bX: bX, handleShown: false, pinned: wantPin}
     SetWebViewBounds(wvc, g.hwnd, 0)
 
-    ; 크기 조절 시 손잡이 바 컨트롤 우측 정렬 재배치 + 웹뷰 리사이즈
+    ; 크기 조절 시 손잡이 바 컨트롤 우측 정렬 재배치 + 웹뷰 리사이즈 + 크기 저장(디바운스)
     OnResize(gg, minmax, w, h) {
         lbl.Move(8, 5, w - 190, 16)
         sld.Move(w - 178, 4)
         bApp.Move(w - 94, 3)
         bX.Move(w - 30, 3)
         SetWebViewBounds(wvc, g.hwnd, WidgetWins.Has(g.hwnd) && WidgetWins[g.hwnd].handleShown ? HANDLE_H : 0)
+        SetTimer(() => SaveWidget(g.hwnd), -500)   ; 마지막 리사이즈 0.5초 후 1회 저장
     }
     OnOpacity(ctrl, *) {
         WinSetTransparent(ctrl.Value, "ahk_id " g.hwnd)
