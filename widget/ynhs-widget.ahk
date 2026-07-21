@@ -128,8 +128,8 @@ CreateWidget(p) {
     ; -Caption(테두리없음) +Resize(가장자리 드래그로 크기조절) +ToolWindow(작업표시줄 제외)
     ; +E0x08000000(NOACTIVATE: 눌러도 앞으로 안 나옴 → 바탕화면에 붙은 느낌)
     g := Gui("-Caption +Resize +ToolWindow +E0x08000000")
-    g.BackColor := "1F3D33"
-    g.SetFont("s9 cFFFFFF", "맑은 고딕")
+    g.BackColor := "FFFFFF"                       ; 손잡이 바 흰색 — 아래 웹 내용과 자연스럽게 이어짐
+    g.SetFont("s9 c555555", "맑은 고딕")          ; 어두운 회색 글자
     g.Add("Text", Format("x8 y5 w{} h16 +0x200", ww - 104), label)   ; 드래그 영역(투명 통과)
     bApp := g.Add("Button", Format("x{} y3 w62 h20", ww - 96), "↗ 앱")
     bApp.OnEvent("Click", (*) => LaunchMain(key))
