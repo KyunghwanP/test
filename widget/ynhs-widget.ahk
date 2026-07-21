@@ -164,10 +164,10 @@ WheelDown:: AdjustOpacity(-10)
 
 MouseOverHandle() {
     global WidgetWins, HANDLE_H, hoverHwnd
-    MouseGetPos(, &my, , &win)
+    MouseGetPos(, &my, &win)          ; 3번째 인자 = 마우스 밑 '창' HWND (4번째는 컨트롤명이라 버그였음)
     root := WidgetWins.Has(win) ? win : 0
     if !root {
-        par := DllCall("GetParent", "ptr", win, "ptr")
+        par := DllCall("GetParent", "ptr", win + 0, "ptr")   ; win은 HWND(정수)
         root := (par && WidgetWins.Has(par)) ? par : 0
     }
     hoverHwnd := root
