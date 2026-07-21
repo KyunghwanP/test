@@ -67,6 +67,20 @@ OnMessage(0x201, OnLButtonDown)   ; WM_LBUTTONDOWN — 손잡이 바 드래그
 
 ; ── 시작: 위젯 선택창 ──────────────────────────────────────
 ShowSelector()
+; Win+D(바탕화면 보기)나 다른 앱이 위젯을 최소화하면 즉시 되살려 바탕화면에 계속 떠있게 함
+SetTimer(KeepVisible, 250)
+
+KeepVisible() {
+    global WidgetWins, widgetsHidden
+    if widgetsHidden
+        return
+    for hwnd, w in WidgetWins {
+        if WinExist("ahk_id " hwnd) && WinGetMinMax("ahk_id " hwnd) = -1 {   ; -1 = 최소화됨
+            WinRestore("ahk_id " hwnd)
+            SetWinBottom(hwnd)
+        }
+    }
+}
 
 ShowSelector() {
     global ALL_PANELS, CONFIG
@@ -164,10 +178,10 @@ WheelDown:: AdjustOpacity(-10)
 
 MouseOverHandle() {
     global WidgetWins, HANDLE_H, hoverHwnd
-    MouseGetPos(, &my, , &win)
+    MouseGetPos(, &my, &win)          ; 3번째 인자 = 마우스 밑 '창' HWND (4번째는 컨트롤명이라 버그였음)
     root := WidgetWins.Has(win) ? win : 0
     if !root {
-        par := DllCall("GetParent", "ptr", win, "ptr")
+        par := DllCall("GetParent", "ptr", win + 0, "ptr")   ; win은 HWND(정수)
         root := (par && WidgetWins.Has(par)) ? par : 0
     }
     hoverHwnd := root
