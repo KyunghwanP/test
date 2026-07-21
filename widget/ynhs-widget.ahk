@@ -75,8 +75,20 @@ A_TrayMenu.Add("종료", (*) => ExitApp())
 A_TrayMenu.Default := "위젯 추가 / 선택"
 
 ShowSelector()
-SetTimer(KeepVisible, 300)   ; 만일 최소화되면 되살림(소유자 지정으로 보통은 불필요한 안전장치)
+SetTimer(KeepVisible, 300)   ; 폴백: 혹시 최소화되면 되살림
 SetTimer(HoverCheck, 120)    ; 마우스 올린 위젯만 손잡이 바 표시
+
+; 최소화 '시작' 순간을 이벤트로 잡아 즉시 되돌림 → Win+D·바탕화면 보기에도 안 사라짐
+;   EVENT_SYSTEM_MINIMIZESTART = 0x0016
+global gMinCb := CallbackCreate(OnMinimizeStart, "F", 7)
+global gWinHook := DllCall("SetWinEventHook", "uint", 0x0016, "uint", 0x0016, "ptr", 0
+    , "ptr", gMinCb, "uint", 0, "uint", 0, "uint", 0, "ptr")
+
+OnMinimizeStart(hHook, event, hwnd, idObj, idChild, thread, time) {
+    global WidgetWins
+    if WidgetWins.Has(hwnd)
+        DllCall("ShowWindow", "ptr", hwnd, "int", 9)   ; SW_RESTORE — 최소화되기 전에 되돌림
+}
 
 ShowSelector() {
     global ALL_PANELS, CONFIG
@@ -333,8 +345,10 @@ SaveAll() {
 
 OnExit(OnExitFn)
 OnExitFn(*) {
-    global DLL_PATH
+    global DLL_PATH, gWinHook
     SaveAll()
+    if gWinHook
+        try DllCall("UnhookWinEvent", "ptr", gWinHook)
     if A_IsCompiled
         try FileDelete(DLL_PATH)
 }
