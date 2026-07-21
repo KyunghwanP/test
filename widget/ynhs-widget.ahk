@@ -74,6 +74,7 @@ A_TrayMenu.Default := "위젯 추가 / 선택"
 
 ShowSelector()
 SetTimer(KeepVisible, 300)   ; 만일 최소화되면 되살림(소유자 지정으로 보통은 불필요한 안전장치)
+SetTimer(HoverCheck, 120)    ; 마우스 올린 위젯만 손잡이 바 표시
 
 ShowSelector() {
     global ALL_PANELS, CONFIG
@@ -135,7 +136,6 @@ CreateWidget(p) {
     g.Show(Format("x{} y{} w{} h{} NoActivate", x, y, ww, hh))
 
     wvc := WebView2.CreateControllerAsync(g.hwnd, 0, SESSION, "", DLL_PATH).await()
-    SetWebViewBounds(wvc, g.hwnd)
     wvc.CoreWebView2.Navigate(APP_BASE key)
     g.OnEvent("Size", OnResize)
     WinSetTransparent(op, "ahk_id " g.hwnd)
@@ -144,15 +144,19 @@ CreateWidget(p) {
     if PROGMAN
         DllCall("SetWindowLongPtr", "ptr", g.hwnd, "int", -8, "ptr", PROGMAN, "ptr")
 
-    WidgetWins[g.hwnd] := {panel: key, opacity: op, gui: g, wvc: wvc}
+    ; 처음엔 손잡이 바 숨김(웹 화면만) — 마우스 올리면 나타남(HoverCheck)
+    lbl.Visible := false, sld.Visible := false, bApp.Visible := false, bX.Visible := false
+    WidgetWins[g.hwnd] := {panel: key, opacity: op, gui: g, wvc: wvc,
+                           lbl: lbl, sld: sld, bApp: bApp, bX: bX, handleShown: false}
+    SetWebViewBounds(wvc, g.hwnd, 0)
 
-    ; 크기 조절 시 손잡이 바 컨트롤을 우측 정렬로 재배치 + 웹뷰 리사이즈
+    ; 크기 조절 시 손잡이 바 컨트롤 우측 정렬 재배치 + 웹뷰 리사이즈
     OnResize(gg, minmax, w, h) {
         lbl.Move(8, 5, w - 190, 16)
         sld.Move(w - 178, 4)
         bApp.Move(w - 94, 3)
         bX.Move(w - 30, 3)
-        SetWebViewBounds(wvc, g.hwnd)
+        SetWebViewBounds(wvc, g.hwnd, WidgetWins.Has(g.hwnd) && WidgetWins[g.hwnd].handleShown ? HANDLE_H : 0)
     }
     OnOpacity(ctrl, *) {
         WinSetTransparent(ctrl.Value, "ahk_id " g.hwnd)
@@ -161,15 +165,31 @@ CreateWidget(p) {
     }
 }
 
-SetWebViewBounds(wvc, hwnd) {
-    global HANDLE_H
+SetWebViewBounds(wvc, hwnd, topOff) {
     if !wvc
         return
     DllCall("GetClientRect", "ptr", hwnd, "ptr", rc := Buffer(16))
     r := Buffer(16)
-    NumPut("int", 0, r, 0), NumPut("int", HANDLE_H, r, 4)
+    NumPut("int", 0, r, 0), NumPut("int", topOff, r, 4)
     NumPut("int", NumGet(rc, 8, "int"), r, 8), NumPut("int", NumGet(rc, 12, "int"), r, 12)
     wvc.Bounds := r
+}
+
+; ── 마우스 올린 위젯만 손잡이 바 표시(쌱 나타남) ────────────
+HoverCheck() {
+    global WidgetWins, dragHwnd, HANDLE_H
+    MouseGetPos(, , &win)
+    root := DllCall("GetAncestor", "ptr", win, "uint", 2, "ptr")   ; GA_ROOT
+    if !WidgetWins.Has(root)
+        root := 0
+    for hwnd, w in WidgetWins {
+        want := (hwnd = root) || (dragHwnd = hwnd)   ; 드래그 중엔 계속 표시
+        if (w.handleShown != want) {
+            w.handleShown := want
+            w.lbl.Visible := want, w.sld.Visible := want, w.bApp.Visible := want, w.bX.Visible := want
+            SetWebViewBounds(w.wvc, hwnd, want ? HANDLE_H : 0)
+        }
+    }
 }
 
 ; ── 손잡이 바 드래그(수동 이동) ────────────────────────────
