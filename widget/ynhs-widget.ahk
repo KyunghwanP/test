@@ -139,7 +139,15 @@ CreateWidget(p) {
     hh := Integer(IniRead(CONFIG, "pos_" key, "h", p[6]))
     op := Integer(IniRead(CONFIG, "pos_" key, "opacity", DEF_OPACITY))
 
-    g := Gui("-Caption +Resize +ToolWindow")   ; 테두리없음·크기조절·작업표시줄제외 (활성화 가능 → 입력됨)
+    ; 예전 DPI 런어웨이 버그로 저장된 값이 화면보다 크게 부풀었을 수 있다 →
+    ;   비정상 크기는 이 패널의 기본 위치·크기로 되돌린다(한 번 정상 크기로 뜨면 이후엔 그대로 유지됨).
+    vsW := SysGet(78), vsH := SysGet(79)   ; SM_CXVIRTUALSCREEN / SM_CYVIRTUALSCREEN (전체 가상 화면)
+    if (ww < 150 || ww > vsW || hh < 120 || hh > vsH)
+        x := p[3], y := p[4], ww := p[5], hh := p[6]
+
+    ; -DPIScale: AHK의 GUI 자동 DPI 스케일을 끈다. 이게 켜져 있으면 Show(w/h)는 배율만큼 확대해
+    ;   창을 만드는데 WinGetPos는 물리 픽셀을 돌려줘, 저장→복원 때마다 창이 배율만큼 커진다(런어웨이).
+    g := Gui("-Caption +Resize +ToolWindow -DPIScale")   ; 테두리없음·크기조절·작업표시줄제외 (활성화 가능 → 입력됨)
     g.BackColor := "FFFFFF"
     g.SetFont("s9 c555555", "맑은 고딕")
     lbl  := g.Add("Text", Format("x8 y5 w{} h16 +0x200", ww - 190), label)
