@@ -42,7 +42,9 @@ global ALL_PANELS := [
     ["ai",        "🤖 주간 요약",     1140, 580, 360, 300, "0"]
 ]
 
-global widgetsHidden := false, alwaysTop := false
+global widgetsHidden := false
+; 입력(검색·메모)이 필요한 패널 — 이건 일반 창(타이핑 O), 나머지는 바탕화면 완전 고정(면역)
+global INPUT_PANELS := Map("memo", 1, "fulltt", 1)
 global WidgetWins := Map()   ; gui.hwnd -> {panel, opacity, gui, wvc}
 global dragHwnd := 0, grabOffX := 0, grabOffY := 0, dragW := 0, dragH := 0
 global SNAP := 14   ; 자석 스냅 거리(px)
@@ -129,7 +131,7 @@ FindWidgetByPanel(panel) {
 
 ; ── 위젯 창 생성 ───────────────────────────────────────────
 CreateWidget(p) {
-    global CONFIG, DEF_OPACITY, WidgetWins, APP_BASE, SESSION, DLL_PATH, PROGMAN
+    global CONFIG, DEF_OPACITY, WidgetWins, APP_BASE, SESSION, DLL_PATH, PROGMAN, INPUT_PANELS
     key := p[1], label := p[2]
     x  := Integer(IniRead(CONFIG, "pos_" key, "x", p[3]))
     y  := Integer(IniRead(CONFIG, "pos_" key, "y", p[4]))
@@ -154,16 +156,17 @@ CreateWidget(p) {
     g.OnEvent("Size", OnResize)
     WinSetTransparent(op, "ahk_id " g.hwnd)
 
-    ; 창의 '소유자'를 바탕화면으로 → 일반 창(타이핑 O)이면서 Win+D에 최소화되지 않음
-    if PROGMAN
-        DllCall("SetWindowLongPtr", "ptr", g.hwnd, "int", -8, "ptr", PROGMAN, "ptr")
     ; 창 그림자 제거(DWM 비클라이언트 렌더링 끔) — 환경에 따라 효과 다를 수 있음
     try DllCall("dwmapi\DwmSetWindowAttribute", "ptr", g.hwnd, "int", 2, "int*", 1, "int", 4)  ; NCRENDERING_POLICY=DISABLED
+
+    ; 입력 필요 위젯(메모·시간표)은 일반 창(타이핑 O), 나머지는 바탕화면 완전 고정(면역)
+    wantPin := !INPUT_PANELS.Has(key)
+    ApplyPin(g.hwnd, wantPin)
 
     ; 처음엔 손잡이 바 숨김(웹 화면만) — 마우스 올리면 나타남(HoverCheck)
     lbl.Visible := false, sld.Visible := false, bApp.Visible := false, bX.Visible := false
     WidgetWins[g.hwnd] := {panel: key, opacity: op, gui: g, wvc: wvc,
-                           lbl: lbl, sld: sld, bApp: bApp, bX: bX, handleShown: false}
+                           lbl: lbl, sld: sld, bApp: bApp, bX: bX, handleShown: false, pinned: wantPin}
     SetWebViewBounds(wvc, g.hwnd, 0)
 
     ; 크기 조절 시 손잡이 바 컨트롤 우측 정렬 재배치 + 웹뷰 리사이즈
@@ -178,6 +181,21 @@ CreateWidget(p) {
         WinSetTransparent(ctrl.Value, "ahk_id " g.hwnd)
         if WidgetWins.Has(g.hwnd)
             WidgetWins[g.hwnd].opacity := ctrl.Value
+    }
+}
+
+; ── 고정 모드(위젯별) ─────────────────────────────────────
+;  doPin=true  : 바탕화면(Progman)의 자식 → Win+D에도 100% 안 사라짐(단, 타이핑 불가)
+;  doPin=false : 일반 창(소유자만 바탕화면) → 타이핑 가능(Win+D는 이벤트 훅으로 되돌림)
+ApplyPin(hwnd, doPin) {
+    global PROGMAN
+    if !PROGMAN
+        return
+    if doPin {
+        DllCall("SetParent", "ptr", hwnd, "ptr", PROGMAN)          ; 바탕화면 자식(완전 고정)
+    } else {
+        DllCall("SetParent", "ptr", hwnd, "ptr", 0)                ; 최상위 창으로 복귀(입력 가능)
+        DllCall("SetWindowLongPtr", "ptr", hwnd, "int", -8, "ptr", PROGMAN, "ptr")  ; 소유자=바탕화면(맨 아래)
     }
 }
 
@@ -333,11 +351,20 @@ SaveAll() {
     for hwnd, w in WidgetWins
         widgetsHidden ? w.gui.Hide() : w.gui.Show("NoActivate")
 }
-#!t:: {
-    global WidgetWins, alwaysTop
-    alwaysTop := !alwaysTop
-    for hwnd, w in WidgetWins
-        WinSetAlwaysOnTop(alwaysTop, "ahk_id " hwnd)
+#!t:: {   ; 마우스 올린 위젯을: 바탕화면 완전 고정(입력 X) ↔ 일반 창(입력 O) 전환
+    global WidgetWins
+    MouseGetPos(, , &win)
+    root := DllCall("GetAncestor", "ptr", win, "uint", 2, "ptr")
+    if !WidgetWins.Has(root) {
+        TrayTip("전환할 위젯 위에 마우스를 올리고 Win+Alt+T", "영남고 위젯", 0x10)
+        return
+    }
+    w := WidgetWins[root]
+    w.pinned := !w.pinned
+    WinGetPos(&px, &py, , , "ahk_id " root)
+    ApplyPin(root, w.pinned)
+    WinMove(px, py, , , "ahk_id " root)
+    TrayTip(w.pinned ? "이 위젯: 바탕화면 완전 고정(입력 불가)" : "이 위젯: 일반 창(검색·메모 입력 가능)", "영남고 위젯", 0x10)
 }
 #!a::ShowSelector()
 #!s::SaveAll()
