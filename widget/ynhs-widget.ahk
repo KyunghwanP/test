@@ -7,10 +7,12 @@ CoordMode "Mouse", "Screen"
 
 ; ============================================================
 ;  영남고 앱 — 바탕화면 위젯 (AutoHotkey v2 + WebView2)
-;  · 창의 '소유자'를 바탕화면(Progman)으로 지정 → 일반 창처럼 타이핑되면서
-;    Win+D(바탕화면 보기)에도 최소화되지 않고 바탕화면 위에 남는다.
+;  · 정보 위젯은 바탕화면(Progman)의 '자식'으로 붙여 Win+D(바탕화면 보기)에도
+;    사라지지 않고 바탕화면에 착 붙어 있다. (트레이드오프: 입력 위젯은 타이핑을 위해
+;    일반 창으로 두므로 Win+D에 함께 최소화됨 — memo·fulltt)
 ;  · 트레이 아이콘 우클릭 → "위젯 추가 / 선택"으로 언제든 추가·제거.
-;  · 손잡이 바:  이름 …… [투명도 슬라이더] [↗ 앱] [✕]  (크기 조절 시 우측 정렬 유지)
+;  · 손잡이 바는 웹 위에 '겹쳐' 뜨는 별도 창 → 웹 내용이 밀리지 않아 오클릭 없음.
+;      이름 …… [투명도 슬라이더] [↗ 앱] [✕]
 ;      - 손잡이 바 드래그 → 이동   - 슬라이더 → 투명도
 ;      - ↗ 앱 → 메인 앱   - ✕ → 이 위젯 닫기   - 웹 위 마우스 휠 → 스크롤(원래대로)
 ;  · 창 가장자리 드래그 → 크기 조절. 위치·크기·투명도·선택은 config.ini에 저장/복원.
@@ -45,7 +47,8 @@ global ALL_PANELS := [
 global widgetsHidden := false
 ; 입력(검색·메모)이 필요한 패널 — 이건 일반 창(타이핑 O), 나머지는 바탕화면 완전 고정(면역)
 global INPUT_PANELS := Map("memo", 1, "fulltt", 1)
-global WidgetWins := Map()   ; gui.hwnd -> {panel, opacity, gui, wvc}
+global WidgetWins := Map()   ; gui.hwnd -> {panel, opacity, gui, wvc, handleGui, ...}
+global HandleToWidget := Map()   ; 손잡이 바 hwnd -> 위젯 hwnd (드래그·호버 역참조)
 global dragHwnd := 0, grabOffX := 0, grabOffY := 0, dragW := 0, dragH := 0
 global pendingSaveHwnd := 0   ; 리사이즈 저장 디바운스 대상
 global SNAP := 14   ; 자석 스냅 거리(px)
@@ -78,20 +81,9 @@ A_TrayMenu.Add("종료", (*) => ExitApp())
 A_TrayMenu.Default := "위젯 추가 / 선택"
 
 ShowSelector()
-SetTimer(KeepVisible, 300)   ; 폴백: 혹시 최소화되면 되살림
 SetTimer(HoverCheck, 120)    ; 마우스 올린 위젯만 손잡이 바 표시
-
-; 최소화 '시작' 순간을 이벤트로 잡아 즉시 되돌림 → Win+D·바탕화면 보기에도 안 사라짐
-;   EVENT_SYSTEM_MINIMIZESTART = 0x0016
-global gMinCb := CallbackCreate(OnMinimizeStart, "F", 7)
-global gWinHook := DllCall("SetWinEventHook", "uint", 0x0016, "uint", 0x0016, "ptr", 0
-    , "ptr", gMinCb, "uint", 0, "uint", 0, "uint", 0, "ptr")
-
-OnMinimizeStart(hHook, event, hwnd, idObj, idChild, thread, time) {
-    global WidgetWins
-    if WidgetWins.Has(hwnd)
-        DllCall("ShowWindow", "ptr", hwnd, "int", 9)   ; SW_RESTORE — 최소화되기 전에 되돌림
-}
+; 참고: 정보 위젯은 바탕화면 자식이라 Win+D에 영향받지 않으므로 최소화 훅이 필요 없다.
+;       (예전의 최소화 이벤트 훅은 다른 창의 Win+D 토글까지 막아 제거함)
 
 ShowSelector() {
     global ALL_PANELS, CONFIG
@@ -132,7 +124,7 @@ FindWidgetByPanel(panel) {
 
 ; ── 위젯 창 생성 ───────────────────────────────────────────
 CreateWidget(p) {
-    global CONFIG, DEF_OPACITY, WidgetWins, APP_BASE, SESSION, DLL_PATH, PROGMAN, INPUT_PANELS, pendingSaveHwnd
+    global CONFIG, DEF_OPACITY, WidgetWins, HandleToWidget, APP_BASE, SESSION, DLL_PATH, PROGMAN, INPUT_PANELS, pendingSaveHwnd
     key := p[1], label := p[2]
     x  := Integer(IniRead(CONFIG, "pos_" key, "x", p[3]))
     y  := Integer(IniRead(CONFIG, "pos_" key, "y", p[4]))
@@ -146,18 +138,11 @@ CreateWidget(p) {
     if (ww < 150 || ww > vsW || hh < 120 || hh > vsH)
         x := p[3], y := p[4], ww := p[5], hh := p[6]
 
-    ; -DPIScale: AHK의 GUI 자동 DPI 스케일을 끈다. 이게 켜져 있으면 Show(w/h)는 배율만큼 확대해
-    ;   창을 만드는데 WinGetPos는 물리 픽셀을 돌려줘, 저장→복원 때마다 창이 배율만큼 커진다(런어웨이).
-    g := Gui("-Caption +Resize +ToolWindow -DPIScale")   ; 테두리없음·크기조절·작업표시줄제외 (활성화 가능 → 입력됨)
+    ; 위젯 본체 — 웹만 꽉 채우는 창(손잡이 컨트롤은 별도 창으로 겹쳐 띄운다 → 내용 안 밀림)
+    ; -DPIScale: AHK의 GUI 자동 DPI 스케일을 끈다. 켜져 있으면 Show(w/h)는 배율만큼 확대되는데
+    ;   WinGetPos는 물리 픽셀을 돌려줘 저장→복원마다 창이 배율만큼 커진다(런어웨이).
+    g := Gui("-Caption +Resize +ToolWindow -DPIScale")   ; 테두리없음·크기조절·작업표시줄제외
     g.BackColor := "FFFFFF"
-    g.SetFont("s9 c555555", "맑은 고딕")
-    lbl  := g.Add("Text", Format("x8 y5 w{} h16 +0x200", ww - 190), label)
-    sld  := g.Add("Slider", Format("x{} y4 w78 h18 Range70-255 Line5 Page20", ww - 178), op)
-    bApp := g.Add("Button", Format("x{} y3 w58 h20", ww - 94), "↗ 앱")
-    bX   := g.Add("Button", Format("x{} y3 w26 h20", ww - 30), "✕")
-    sld.OnEvent("Change", OnOpacity)
-    bApp.OnEvent("Click", (*) => LaunchMain(key))
-    bX.OnEvent("Click", (*) => DestroyWidget(g.hwnd, true))
     g.Show(Format("x{} y{} w{} h{} NoActivate", x, y, ww, hh))
 
     ; WebView2 생성 — 실패(세션 폴더 잠김 등) 시 재시도 후, 그래도 안 되면 이 위젯만 건너뜀
@@ -183,47 +168,73 @@ CreateWidget(p) {
     ; 창 그림자 제거(DWM 비클라이언트 렌더링 끔) — 환경에 따라 효과 다를 수 있음
     try DllCall("dwmapi\DwmSetWindowAttribute", "ptr", g.hwnd, "int", 2, "int*", 1, "int", 4)  ; NCRENDERING_POLICY=DISABLED
 
-    ; 입력 필요 위젯(메모·시간표)은 일반 창(타이핑 O), 나머지는 바탕화면 완전 고정(면역)
+    ; ── 손잡이 바(별도 최상위 창) — 호버 시 웹 위에 '겹쳐' 나타남 → 내용이 밀리지 않는다
+    h := Gui("-Caption +AlwaysOnTop +ToolWindow -Resize")
+    h.BackColor := "FFFFFF"
+    h.SetFont("s9 c555555", "맑은 고딕")
+    hlbl := h.Add("Text",   Format("x8 y5 w{} h16 +0x200", ww - 190), label)
+    hsld := h.Add("Slider", Format("x{} y4 w78 h18 Range70-255 Line5 Page20", ww - 178), op)
+    hApp := h.Add("Button", Format("x{} y3 w58 h20", ww - 94), "↗ 앱")
+    hX   := h.Add("Button", Format("x{} y3 w26 h20", ww - 30), "✕")
+    hsld.OnEvent("Change", (ctrl, *) => SetWidgetOpacity(g.hwnd, ctrl.Value))
+    hApp.OnEvent("Click", (*) => LaunchMain(key))
+    hX.OnEvent("Click", (*) => DestroyWidget(g.hwnd, true))
+
+    ; 입력 필요 위젯(메모·시간표)은 일반 창(타이핑 O), 나머지는 바탕화면 자식(Win+D 면역)
     wantPin := !INPUT_PANELS.Has(key)
     ApplyPin(g.hwnd, wantPin)
-    ; 저장된 '바깥 크기'를 정확히 적용(g.Show의 w/h는 안쪽 크기라 어긋남 → WinMove로 통일)
-    WinMove(x, y, ww, hh, "ahk_id " g.hwnd)
+    ; 바탕화면 자식으로 바꾸면 좌표 기준이 부모(바탕화면)로 바뀌므로 위치만 재적용.
+    ;   크기는 건드리지 않는다(-DPIScale + 클라이언트 크기 저장 기준을 유지 → 드리프트 없음).
+    WinMove(x, y, , , "ahk_id " g.hwnd)
+    SetWebViewBounds(wvc, g.hwnd, 0)   ; 웹뷰는 항상 창 전체 — 호버해도 내용이 밀리지 않음
 
-    ; 처음엔 손잡이 바 숨김(웹 화면만) — 마우스 올리면 나타남(HoverCheck)
-    lbl.Visible := false, sld.Visible := false, bApp.Visible := false, bX.Visible := false
-    WidgetWins[g.hwnd] := {panel: key, opacity: op, gui: g, wvc: wvc,
-                           lbl: lbl, sld: sld, bApp: bApp, bX: bX, handleShown: false, pinned: wantPin}
-    SetWebViewBounds(wvc, g.hwnd, 0)
+    WidgetWins[g.hwnd] := {panel: key, opacity: op, gui: g, wvc: wvc, label: label,
+                           handleGui: h, hlbl: hlbl, hsld: hsld, hApp: hApp, hX: hX,
+                           handleShown: false, pinned: wantPin}
+    HandleToWidget[h.hwnd] := g.hwnd
 
-    ; 크기 조절 시 손잡이 바 컨트롤 우측 정렬 재배치 + 웹뷰 리사이즈 + 크기 저장(디바운스)
-    OnResize(gg, minmax, w, h) {
-        lbl.Move(8, 5, w - 190, 16)
-        sld.Move(w - 178, 4)
-        bApp.Move(w - 94, 3)
-        bX.Move(w - 30, 3)
-        SetWebViewBounds(wvc, g.hwnd, WidgetWins.Has(g.hwnd) && WidgetWins[g.hwnd].handleShown ? HANDLE_H : 0)
+    ; 크기 조절 시 웹뷰 리사이즈 + 크기 저장(디바운스). 손잡이 폭은 표시될 때 재배치(PositionHandle)
+    OnResize(gg, minmax, w, hgt) {
+        SetWebViewBounds(wvc, g.hwnd, 0)
         pendingSaveHwnd := g.hwnd
         SetTimer(FlushSave, -500)   ; 마지막 리사이즈 0.5초 후 1회 저장(같은 타이머로 디바운스)
     }
-    OnOpacity(ctrl, *) {
-        WinSetTransparent(ctrl.Value, "ahk_id " g.hwnd)
-        if WidgetWins.Has(g.hwnd)
-            WidgetWins[g.hwnd].opacity := ctrl.Value
-    }
 }
 
-; ── 바탕화면 안착(듀얼 모니터 안전) ───────────────────────
-;  위젯을 '일반 최상위 창'으로 두되 소유자만 바탕화면(Progman)으로 지정한다.
-;  · 최상위 창이라 모니터 어디로 옮겨도 좌표가 안 깨진다(듀얼 모니터 OK) + 타이핑도 됨.
-;  · 소유자=바탕화면이라 다른 창 아래(바탕화면 층)에 깔린다.
-;  · Win+D 최소화는 별도의 최소화 이벤트 훅이 즉시 되돌린다.
-;  (예전의 '바탕화면 자식(SetParent)' 방식은 주 모니터 전용이라 듀얼에서 깨져 제거함)
+; 손잡이 바를 위젯 위쪽 가장자리에 겹쳐 표시(폭에 맞춰 컨트롤 재배치)
+PositionHandle(widgetHwnd) {
+    global WidgetWins, HANDLE_H
+    if !WidgetWins.Has(widgetHwnd)
+        return
+    w := WidgetWins[widgetHwnd]
+    WinGetPos(&wx, &wy, &wW, , "ahk_id " widgetHwnd)
+    w.hlbl.Move(8, 5, wW - 190, 16)
+    w.hsld.Move(wW - 178, 4)
+    w.hApp.Move(wW - 94, 3)
+    w.hX.Move(wW - 30, 3)
+    w.handleGui.Show(Format("x{} y{} w{} h{} NoActivate", wx, wy, wW, HANDLE_H))
+}
+
+SetWidgetOpacity(hwnd, val) {
+    global WidgetWins
+    WinSetTransparent(val, "ahk_id " hwnd)
+    if WidgetWins.Has(hwnd)
+        WidgetWins[hwnd].opacity := val
+}
+
+; ── 바탕화면 안착(Win+D 면역) ─────────────────────────────
+;  위젯을 바탕화면(Progman)의 '자식'으로 붙인다.
+;  · 자식이라 Win+D·바탕화면 보기에도 최소화되지 않고 바탕화면에 착 붙어 남는다.
+;  · 트레이드오프: 자식 창이라 타이핑이 안 되고(그래서 memo·fulltt는 doPin=false),
+;    좌표가 바탕화면 기준이라 보조 모니터에선 위치가 다소 어긋날 수 있다.
 ApplyPin(hwnd, doPin := true) {
     global PROGMAN
-    if !PROGMAN
-        return
-    DllCall("SetParent", "ptr", hwnd, "ptr", 0)                     ; 혹시 자식이었다면 최상위로 복귀
-    DllCall("SetWindowLongPtr", "ptr", hwnd, "int", -8, "ptr", PROGMAN, "ptr")  ; 소유자=바탕화면
+    if doPin && PROGMAN
+        DllCall("SetParent", "ptr", hwnd, "ptr", PROGMAN)          ; 바탕화면의 자식으로 → Win+D 면역
+    else {
+        DllCall("SetParent", "ptr", hwnd, "ptr", 0)                ; 최상위로 복귀(타이핑 O)
+        DllCall("SetWindowLongPtr", "ptr", hwnd, "int", -8, "ptr", 0, "ptr")  ; 소유자 해제
+    }
 }
 
 SetWebViewBounds(wvc, hwnd, topOff) {
@@ -236,35 +247,41 @@ SetWebViewBounds(wvc, hwnd, topOff) {
     wvc.Bounds := r
 }
 
-; ── 마우스 올린 위젯만 손잡이 바 표시(쌱 나타남) ────────────
+; ── 마우스 올린 위젯 위에만 손잡이 바를 겹쳐 표시(쌱 나타남) ──
 HoverCheck() {
-    global WidgetWins, dragHwnd, HANDLE_H
+    global WidgetWins, HandleToWidget, dragHwnd
     MouseGetPos(, , &win)
     root := DllCall("GetAncestor", "ptr", win, "uint", 2, "ptr")   ; GA_ROOT
-    if !WidgetWins.Has(root)
-        root := 0
+    ; 위젯 본체 위 또는 그 손잡이 바 위 → 해당 위젯을 대상으로
+    target := WidgetWins.Has(root) ? root : (HandleToWidget.Has(root) ? HandleToWidget[root] : 0)
+    if dragHwnd
+        target := dragHwnd            ; 드래그 중엔 계속 표시
     for hwnd, w in WidgetWins {
         if !WinExist("ahk_id " hwnd)      ; 닫히는 중인 위젯은 건너뜀
             continue
-        want := (hwnd = root) || (dragHwnd = hwnd)   ; 드래그 중엔 계속 표시
+        want := (hwnd = target)
         if (w.handleShown != want) {
             w.handleShown := want
             try {
-                w.lbl.Visible := want, w.sld.Visible := want, w.bApp.Visible := want, w.bX.Visible := want
-                SetWebViewBounds(w.wvc, hwnd, want ? HANDLE_H : 0)
+                if want
+                    PositionHandle(hwnd)
+                else
+                    w.handleGui.Hide()
             }
         }
     }
 }
 
 ; ── 손잡이 바 드래그(수동 이동) ────────────────────────────
+;  클릭은 손잡이 바(별도 창)의 배경/라벨에서 받는다 → 위젯 본체를 함께 움직인다.
 OnLButtonDown(wParam, lParam, msg, hwnd) {
-    global WidgetWins, dragHwnd, grabOffX, grabOffY
-    if !WidgetWins.Has(hwnd)          ; Gui 배경/라벨만(버튼·슬라이더·웹뷰 제외)
+    global HandleToWidget, dragHwnd, grabOffX, grabOffY, dragW, dragH
+    if !HandleToWidget.Has(hwnd)      ; 손잡이 바 배경/라벨만(버튼·슬라이더·웹뷰 제외)
         return
+    widget := HandleToWidget[hwnd]
     MouseGetPos(&cx, &cy)
-    WinGetPos(&wx, &wy, &wW, &wH, "ahk_id " hwnd)
-    dragHwnd := hwnd, grabOffX := cx - wx, grabOffY := cy - wy, dragW := wW, dragH := wH
+    WinGetPos(&wx, &wy, &wW, &wH, "ahk_id " widget)
+    dragHwnd := widget, grabOffX := cx - wx, grabOffY := cy - wy, dragW := wW, dragH := wH
     SetTimer(DragMove, 10)
 }
 
@@ -308,25 +325,21 @@ DragMove() {
         }
     }
     WinMove(nx, ny, , , "ahk_id " dragHwnd)
-}
-
-KeepVisible() {
-    global WidgetWins, widgetsHidden
-    if widgetsHidden
-        return
-    for hwnd, w in WidgetWins
-        if WinExist("ahk_id " hwnd) && WinGetMinMax("ahk_id " hwnd) = -1
-            WinRestore("ahk_id " hwnd)
+    if WidgetWins.Has(dragHwnd)             ; 손잡이 바도 위젯을 따라 이동
+        try WidgetWins[dragHwnd].handleGui.Move(nx, ny)
 }
 
 DestroyWidget(hwnd, fromButton := false) {
-    global WidgetWins, CONFIG
+    global WidgetWins, HandleToWidget, CONFIG
     if !WidgetWins.Has(hwnd)
         return
     SaveWidget(hwnd)
     IniWrite("0", CONFIG, "selected", WidgetWins[hwnd].panel)
-    g := WidgetWins[hwnd].gui
+    w := WidgetWins[hwnd]
+    g := w.gui, h := w.handleGui
+    HandleToWidget.Delete(h.hwnd)
     WidgetWins.Delete(hwnd)     ; 먼저 목록에서 제거 → 타이머가 파괴 중 컨트롤을 안 만짐
+    try h.Destroy()
     try g.Destroy()
 }
 
@@ -388,11 +401,15 @@ FlushSave() {
 #!h:: {
     global widgetsHidden, WidgetWins
     widgetsHidden := !widgetsHidden
-    for hwnd, w in WidgetWins
-        widgetsHidden ? w.gui.Hide() : w.gui.Show("NoActivate")
+    for hwnd, w in WidgetWins {
+        if widgetsHidden {
+            w.gui.Hide(), w.handleGui.Hide(), w.handleShown := false
+        } else
+            w.gui.Show("NoActivate")
+    }
 }
-#!t:: {   ; 마우스 올린 위젯을 잠깐 맨 앞으로 ↔ 바탕화면 층으로 전환
-    global WidgetWins, PROGMAN
+#!t:: {   ; 마우스 올린 위젯을 맨 앞으로 ↔ 바탕화면 자식으로 전환
+    global WidgetWins
     MouseGetPos(, , &win)
     root := DllCall("GetAncestor", "ptr", win, "uint", 2, "ptr")
     if !WidgetWins.Has(root) {
@@ -402,12 +419,11 @@ FlushSave() {
     w := WidgetWins[root]
     w.onTop := !(w.HasOwnProp("onTop") && w.onTop)
     if w.onTop {
-        DllCall("SetWindowLongPtr", "ptr", root, "int", -8, "ptr", 0, "ptr")   ; 소유자 해제
+        ApplyPin(root, false)                    ; 최상위 창으로
         WinSetAlwaysOnTop(true, "ahk_id " root)
     } else {
         WinSetAlwaysOnTop(false, "ahk_id " root)
-        if PROGMAN
-            DllCall("SetWindowLongPtr", "ptr", root, "int", -8, "ptr", PROGMAN, "ptr")  ; 다시 바탕화면 층
+        ApplyPin(root, true)                      ; 다시 바탕화면 자식
     }
     TrayTip(w.onTop ? "이 위젯: 항상 맨 앞" : "이 위젯: 바탕화면 층", "영남고 위젯", 0x10)
 }
@@ -417,10 +433,8 @@ FlushSave() {
 
 OnExit(OnExitFn)
 OnExitFn(*) {
-    global DLL_PATH, gWinHook
+    global DLL_PATH
     SaveAll()
-    if gWinHook
-        try DllCall("UnhookWinEvent", "ptr", gWinHook)
     if A_IsCompiled
         try FileDelete(DLL_PATH)
 }
