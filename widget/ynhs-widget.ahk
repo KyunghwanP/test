@@ -28,7 +28,6 @@ global APP_URL  := "https://kyunghwanp.github.io/test/"
 global HANDLE_H := 26
 global DEF_OPACITY := 240
 global PROGMAN := DllCall("FindWindow", "str", "Progman", "ptr", 0, "ptr")
-global WALLHOST := GetWallpaperHost()   ; 벽지 창(WorkerW). 여기에 붙이면 Win+D에도 안 사라짐
 
 global ALL_PANELS := [
     ["memo",      "📝 빠른 메모",       40,  60, 340, 420, "1"],
@@ -149,8 +148,8 @@ OnMinimizeStart(hHook, event, hwnd, idObj, idChild, thread, time) {
     global WidgetWins
     if (idObj != 0)                         ; 창 자체(OBJID_WINDOW)만
         return
-    ; 일반 창인 입력 위젯(pinned=false)만 즉시 복원(정보 위젯은 자식이라 애초에 최소화 안 됨)
-    if WidgetWins.Has(hwnd) && !WidgetWins[hwnd].pinned
+    ; 모든 위젯을 최소화 순간 즉시 복원 → Win+D에도 바탕화면 층에 그대로 남음
+    if WidgetWins.Has(hwnd)
         DllCall("ShowWindow", "ptr", hwnd, "int", 9)   ; SW_RESTORE
 }
 
@@ -253,9 +252,9 @@ CreateWidget(p) {
     ; (즉시 파괴하면 스크립트가 크래시 → 위젯이 전부 사라짐)
     hX.OnEvent("Click", (*) => SetTimer(() => DestroyWidget(g.hwnd, true), -1))
 
-    ; 입력 위젯(메모·시간표)은 일반 창(타이핑 O, 단 Win+D에 최소화됨),
-    ;   나머지 정보 위젯은 바탕화면 자식(Win+D 면역). — 타이핑과 Win+D면역은 동시 불가한 트레이드오프
-    wantPin := !INPUT_PANELS.Has(key)
+    ; 모든 위젯: 소유자=바탕화면(뒤 레이어)이되 최상위 창이라 클릭·타이핑 O.
+    ;   Win+D 최소화는 위의 최소화-복원 훅이 즉시 되돌린다(사용자 선택).
+    wantPin := true
     ApplyPin(g.hwnd, wantPin)
     ; 바탕화면 자식으로 바꾸면 좌표 기준이 부모(바탕화면)로 바뀌므로 위치만 재적용.
     ;   크기는 건드리지 않는다(-DPIScale + 클라이언트 크기 저장 기준을 유지 → 드리프트 없음).
@@ -296,48 +295,16 @@ SetWidgetOpacity(hwnd, val) {
         WidgetWins[hwnd].opacity := val
 }
 
-; ── 벽지 창(WorkerW) 찾기 ─────────────────────────────────
-;  Progman에 0x052C를 보내 WorkerW를 만들고, 바탕화면 아이콘(SHELLDLL_DefView) 뒤의
-;  WorkerW(벽지를 그리는 창)를 찾는다. 이 창의 자식이 되면 Win+D에도 사라지지 않는다.
-;  (Progman 자식은 윈도우 버전에 따라 Win+D에 최소화되기도 해서 WorkerW를 쓴다.)
-GetWallpaperHost() {
-    global PROGMAN
-    if !PROGMAN
-        return 0
-    DllCall("SendMessageTimeout", "ptr", PROGMAN, "uint", 0x052C, "ptr", 0, "ptr", 0
-        , "uint", 0, "uint", 1000, "ptr*", 0)
-    host := 0
-    cb := CallbackCreate(EnumWallhost, "F", 2)
-    DllCall("EnumWindows", "ptr", cb, "ptr", 0)
-    CallbackFree(cb)
-    return host ? host : PROGMAN
-
-    EnumWallhost(hwnd, lparam) {
-        ; SHELLDLL_DefView 자식을 가진 창(대개 WorkerW/Progman)을 찾으면, 그 다음 형제 WorkerW가 벽지 창
-        if DllCall("FindWindowEx", "ptr", hwnd, "ptr", 0, "str", "SHELLDLL_DefView", "ptr", 0, "ptr") {
-            w := DllCall("FindWindowEx", "ptr", 0, "ptr", hwnd, "str", "WorkerW", "ptr", 0, "ptr")
-            if w {
-                host := w
-                return 0   ; 찾음 → 열거 중단
-            }
-        }
-        return 1
-    }
-}
-
-; ── 바탕화면 안착(Win+D 면역) ─────────────────────────────
-;  위젯을 벽지 창(WorkerW, 없으면 Progman)의 '자식'으로 붙인다.
-;  · 자식이라 Win+D·바탕화면 보기에도 최소화되지 않고 바탕화면에 착 붙어 남는다.
-;  · 트레이드오프: 자식 창이라 타이핑이 안 되고, 좌표가 바탕화면 기준이라 보조 모니터에선
-;    위치가 다소 어긋날 수 있다.
+; ── 바탕화면 층에 놓기(상호작용 유지) ─────────────────────
+;  위젯을 '최상위 창'으로 두되 소유자만 바탕화면(Progman)으로 지정한다.
+;  · 최상위 창이라 클릭·타이핑·로그인이 모두 된다(바탕화면 자식이면 입력 불가라 못 씀).
+;  · 소유자=바탕화면이라 다른 창들 '뒤'(바탕화면 층)에 깔린다.
+;  · Win+D 최소화는 최소화-복원 훅이 즉시 되돌려 바탕화면 층에 그대로 남긴다.
 ApplyPin(hwnd, doPin := true) {
-    global WALLHOST
-    if doPin && WALLHOST
-        DllCall("SetParent", "ptr", hwnd, "ptr", WALLHOST)         ; 벽지 창의 자식으로 → Win+D 면역
-    else {
-        DllCall("SetParent", "ptr", hwnd, "ptr", 0)                ; 최상위로 복귀(타이핑 O)
-        DllCall("SetWindowLongPtr", "ptr", hwnd, "int", -8, "ptr", 0, "ptr")  ; 소유자 해제
-    }
+    global PROGMAN
+    DllCall("SetParent", "ptr", hwnd, "ptr", 0)                    ; 최상위(상호작용 O)
+    DllCall("SetWindowLongPtr", "ptr", hwnd, "int", -8            ; 소유자=바탕화면(뒤 레이어) / 해제
+        , "ptr", (doPin && PROGMAN) ? PROGMAN : 0, "ptr")
 }
 
 SetWebViewBounds(wvc, hwnd, topOff) {
@@ -533,7 +500,7 @@ FlushSave() {
         WinSetAlwaysOnTop(true, "ahk_id " root)
     } else {
         WinSetAlwaysOnTop(false, "ahk_id " root)
-        ApplyPin(root, true)                      ; 다시 바탕화면 자식
+        ApplyPin(root, true)                      ; 다시 바탕화면 층
     }
     TrayTip(w.onTop ? "이 위젯: 항상 맨 앞" : "이 위젯: 바탕화면 층", "영남고 위젯", 0x10)
 }
