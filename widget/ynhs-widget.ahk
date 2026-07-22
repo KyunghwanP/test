@@ -449,8 +449,10 @@ OnSizing(wParam, lParam, msg, hwnd) {
     global WidgetWins, SNAP
     if !WidgetWins.Has(hwnd)
         return
-    L := NumGet(lParam, 0, "int"), T := NumGet(lParam, 4, "int")
-    R := NumGet(lParam, 8, "int"), B := NumGet(lParam, 12, "int")
+    L := NumGet(lParam, 0, "int")
+    T := NumGet(lParam, 4, "int")
+    R := NumGet(lParam, 8, "int")
+    B := NumGet(lParam, 12, "int")
     dragL := (wParam = 1 || wParam = 4 || wParam = 7)
     dragR := (wParam = 2 || wParam = 5 || wParam = 8)
     dragT := (wParam = 3 || wParam = 4 || wParam = 5)
@@ -459,7 +461,10 @@ OnSizing(wParam, lParam, msg, hwnd) {
         if (h2 = hwnd) || !WinExist("ahk_id " h2)
             continue
         WinGetPos(&ox, &oy, &oW, &oH, "ahk_id " h2)
-        oL := ox, oT := oy, oR := ox + oW, oB := oy + oH
+        oL := ox
+        oT := oy
+        oR := ox + oW
+        oB := oy + oH
         ; 끌고 있는 변을 이웃의 맞붙는 변 또는 같은 쪽 변에 스냅(헬퍼로 단순화)
         if (dragL)
             L := SnapEdge(L, oR, oL)     ; 내 왼쪽 ↔ 이웃 오른쪽(맞붙음)/왼쪽(정렬)
@@ -470,8 +475,10 @@ OnSizing(wParam, lParam, msg, hwnd) {
         if (dragB)
             B := SnapEdge(B, oT, oB)     ; 내 아래 ↔ 이웃 위(맞붙음)/아래(정렬)
     }
-    NumPut("int", L, lParam, 0), NumPut("int", T, lParam, 4)
-    NumPut("int", R, lParam, 8), NumPut("int", B, lParam, 12)
+    NumPut("int", L, lParam, 0)
+    NumPut("int", T, lParam, 4)
+    NumPut("int", R, lParam, 8)
+    NumPut("int", B, lParam, 12)
     return true
 }
 
