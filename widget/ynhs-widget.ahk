@@ -47,6 +47,7 @@ global widgetsHidden := false
 global INPUT_PANELS := Map("memo", 1, "fulltt", 1)
 global WidgetWins := Map()   ; gui.hwnd -> {panel, opacity, gui, wvc}
 global dragHwnd := 0, grabOffX := 0, grabOffY := 0, dragW := 0, dragH := 0
+global pendingSaveHwnd := 0   ; 리사이즈 저장 디바운스 대상
 global SNAP := 14   ; 자석 스냅 거리(px)
 
 ; ── WebView2Loader.dll 경로 ────────────────────────────────
@@ -131,7 +132,7 @@ FindWidgetByPanel(panel) {
 
 ; ── 위젯 창 생성 ───────────────────────────────────────────
 CreateWidget(p) {
-    global CONFIG, DEF_OPACITY, WidgetWins, APP_BASE, SESSION, DLL_PATH, PROGMAN, INPUT_PANELS
+    global CONFIG, DEF_OPACITY, WidgetWins, APP_BASE, SESSION, DLL_PATH, PROGMAN, INPUT_PANELS, pendingSaveHwnd
     key := p[1], label := p[2]
     x  := Integer(IniRead(CONFIG, "pos_" key, "x", p[3]))
     y  := Integer(IniRead(CONFIG, "pos_" key, "y", p[4]))
@@ -185,6 +186,8 @@ CreateWidget(p) {
     ; 입력 필요 위젯(메모·시간표)은 일반 창(타이핑 O), 나머지는 바탕화면 완전 고정(면역)
     wantPin := !INPUT_PANELS.Has(key)
     ApplyPin(g.hwnd, wantPin)
+    ; 저장된 '바깥 크기'를 정확히 적용(g.Show의 w/h는 안쪽 크기라 어긋남 → WinMove로 통일)
+    WinMove(x, y, ww, hh, "ahk_id " g.hwnd)
 
     ; 처음엔 손잡이 바 숨김(웹 화면만) — 마우스 올리면 나타남(HoverCheck)
     lbl.Visible := false, sld.Visible := false, bApp.Visible := false, bX.Visible := false
@@ -199,7 +202,8 @@ CreateWidget(p) {
         bApp.Move(w - 94, 3)
         bX.Move(w - 30, 3)
         SetWebViewBounds(wvc, g.hwnd, WidgetWins.Has(g.hwnd) && WidgetWins[g.hwnd].handleShown ? HANDLE_H : 0)
-        SetTimer(() => SaveWidget(g.hwnd), -500)   ; 마지막 리사이즈 0.5초 후 1회 저장
+        pendingSaveHwnd := g.hwnd
+        SetTimer(FlushSave, -500)   ; 마지막 리사이즈 0.5초 후 1회 저장(같은 타이머로 디바운스)
     }
     OnOpacity(ctrl, *) {
         WinSetTransparent(ctrl.Value, "ahk_id " g.hwnd)
@@ -369,6 +373,15 @@ SaveAll() {
     global WidgetWins
     for hwnd, w in WidgetWins
         SaveWidget(hwnd)
+}
+
+; 리사이즈 디바운스 저장 (같은 함수 참조라 SetTimer가 하나로 묶임)
+FlushSave() {
+    global pendingSaveHwnd
+    if pendingSaveHwnd {
+        SaveWidget(pendingSaveHwnd)
+        pendingSaveHwnd := 0
+    }
 }
 
 ; ── 전역 단축키 ────────────────────────────────────────────
