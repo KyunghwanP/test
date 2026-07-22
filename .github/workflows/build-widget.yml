@@ -23,16 +23,36 @@ jobs:
       - name: 코드 체크아웃
         uses: actions/checkout@v4
 
-      - name: AutoHotkey v2 + Ahk2Exe 설치(공식 설치 프로그램, 컴파일러 포함)
+      - name: AutoHotkey v2 + Ahk2Exe 준비(GitHub 릴리스에서 — autohotkey.com은 Cloudflare 차단)
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          Invoke-WebRequest -Uri 'https://www.autohotkey.com/download/ahk-v2.exe' -OutFile ahk-setup.exe
-          Start-Process -FilePath .\ahk-setup.exe -ArgumentList '/silent' -Wait
-          $base = 'C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe'
-          $a2e  = 'C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe'
-          if (!(Test-Path $base)) { throw "AutoHotkey64.exe 없음: $base" }
-          if (!(Test-Path $a2e))  { throw "Ahk2Exe.exe 없음: $a2e" }
+          $headers = @{ 'User-Agent' = 'gh-actions'; 'Authorization' = "Bearer $env:GH_TOKEN" }
+
+          # AutoHotkey v2 포터블 zip(베이스 파일 AutoHotkey64.exe 포함)
+          $ahkRel = Invoke-RestMethod -Headers $headers 'https://api.github.com/repos/AutoHotkey/AutoHotkey/releases/latest'
+          $ahkZip = ($ahkRel.assets | Where-Object { $_.name -match '^AutoHotkey_.*\.zip$' -and $_.name -notmatch 'src|setup' } | Select-Object -First 1).browser_download_url
+          if (-not $ahkZip) { throw 'AutoHotkey zip 자산을 찾지 못함' }
+          Invoke-WebRequest -Headers $headers -Uri $ahkZip -OutFile ahk.zip
+          Expand-Archive ahk.zip -DestinationPath tools/ahk -Force
+
+          # Ahk2Exe 컴파일러 zip
+          $a2eRel = Invoke-RestMethod -Headers $headers 'https://api.github.com/repos/AutoHotkey/Ahk2Exe/releases/latest'
+          $a2eZip = ($a2eRel.assets | Where-Object { $_.name -match '\.zip$' } | Select-Object -First 1).browser_download_url
+          if (-not $a2eZip) { throw 'Ahk2Exe zip 자산을 찾지 못함' }
+          Invoke-WebRequest -Headers $headers -Uri $a2eZip -OutFile a2e.zip
+          Expand-Archive a2e.zip -DestinationPath tools/ahk2exe -Force
+
+          # 실제 경로 탐색 후 다음 스텝으로 전달
+          $base = (Get-ChildItem tools/ahk    -Recurse -Filter AutoHotkey64.exe | Select-Object -First 1).FullName
+          $a2e  = (Get-ChildItem tools/ahk2exe -Recurse -Filter Ahk2Exe.exe      | Select-Object -First 1).FullName
+          if (-not $base) { throw 'AutoHotkey64.exe 없음' }
+          if (-not $a2e)  { throw 'Ahk2Exe.exe 없음' }
+          "AHK_BASE=$base" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "AHK2EXE=$a2e"   | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "base=$base"; Write-Host "a2e=$a2e"
 
       - name: WebView2 라이브러리(thqby/ahk2_lib) 준비
         shell: pwsh
@@ -54,8 +74,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $base = 'C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe'
-          $a2e  = 'C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe'
+          $base = $env:AHK_BASE
+          $a2e  = $env:AHK2EXE
           & $a2e /in (Resolve-Path widget/ynhs-widget.ahk)   /out (Join-Path $PWD 'ynhs-widget.exe')   /base $base
           if (!(Test-Path ynhs-widget.exe))   { throw '위젯 exe 컴파일 실패' }
           & $a2e /in (Resolve-Path widget/ynhs-launcher.ahk) /out (Join-Path $PWD 'ynhs-launcher.exe') /base $base
