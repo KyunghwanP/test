@@ -449,10 +449,11 @@ DragMove() {
     sizeChanged := (newW != dragW || newH != dragH)
     dragW := newW, dragH := newH
     if WidgetWins.Has(dragHwnd) {
-        if sizeChanged
+        if sizeChanged {
             try PositionHandle(dragHwnd)        ; 폭 바뀌면 손잡이 바도 맞춰 재배치
-        else
+        } else {
             try WidgetWins[dragHwnd].handleGui.Move(nx, ny)   ; 위치만 따라 이동
+        }
     }
 }
 
