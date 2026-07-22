@@ -137,8 +137,22 @@ A_TrayMenu.Default := "위젯 추가 / 선택"
 
 ShowSelector()
 SetTimer(HoverCheck, 120)    ; 마우스 올린 위젯만 손잡이 바 표시
-; 참고: 정보 위젯은 바탕화면 자식이라 Win+D에 영향받지 않으므로 최소화 훅이 필요 없다.
-;       (예전의 최소화 이벤트 훅은 다른 창의 Win+D 토글까지 막아 제거함)
+
+; 입력 위젯(메모·시간표)은 일반 창이라 Win+D에 최소화된다 → 최소화 '시작' 순간을 잡아
+;   즉시 되돌려 타이핑도 되고 Win+D에도 안 사라지게 한다(정보 위젯은 이미 바탕화면 고정이라 제외).
+;   EVENT_SYSTEM_MINIMIZESTART = 0x0016
+global gMinCb := CallbackCreate(OnMinimizeStart, "F", 7)
+global gWinHook := DllCall("SetWinEventHook", "uint", 0x0016, "uint", 0x0016, "ptr", 0
+    , "ptr", gMinCb, "uint", 0, "uint", 0, "uint", 0, "ptr")
+
+OnMinimizeStart(hHook, event, hwnd, idObj, idChild, thread, time) {
+    global WidgetWins
+    if (idObj != 0)                         ; 창 자체(OBJID_WINDOW)만
+        return
+    ; 일반 창인 입력 위젯(pinned=false)만 즉시 복원(정보 위젯은 자식이라 애초에 최소화 안 됨)
+    if WidgetWins.Has(hwnd) && !WidgetWins[hwnd].pinned
+        DllCall("ShowWindow", "ptr", hwnd, "int", 9)   ; SW_RESTORE
+}
 
 ShowSelector() {
     global ALL_PANELS, CONFIG
@@ -529,8 +543,10 @@ FlushSave() {
 
 OnExit(OnExitFn)
 OnExitFn(*) {
-    global DLL_PATH
+    global DLL_PATH, gWinHook
     SaveAll()
+    if gWinHook
+        try DllCall("UnhookWinEvent", "ptr", gWinHook)
     if A_IsCompiled
         try FileDelete(DLL_PATH)
 }
