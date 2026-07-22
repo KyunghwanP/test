@@ -16,14 +16,20 @@ on:
 permissions:
   contents: write      # 릴리스 생성/자산 업로드에 필요
 
+# 새 실행이 시작되면 같은 그룹의 진행 중 실행을 취소 → 연속 머지 때 큐가 쌓이지 않음
+concurrency:
+  group: build-widget
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 10   # 어떤 스텝도 멈추면 10분 후 강제 종료(러너 무한 점유 방지)
     steps:
       - name: 코드 체크아웃
         uses: actions/checkout@v4
 
-      - name: AutoHotkey v2 + Ahk2Exe 준비(GitHub 릴리스에서 — autohotkey.com은 Cloudflare 차단)
+      - name: AutoHotkey v2 준비(GitHub 릴리스 — autohotkey.com은 Cloudflare 차단)
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -31,28 +37,17 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $headers = @{ 'User-Agent' = 'gh-actions'; 'Authorization' = "Bearer $env:GH_TOKEN" }
 
-          # AutoHotkey v2 포터블 zip(베이스 파일 AutoHotkey64.exe 포함)
+          # AutoHotkey v2 포터블 zip(서명된 AutoHotkey64.exe 포함) — 배포 패키지 + 문법검사용
           $ahkRel = Invoke-RestMethod -Headers $headers 'https://api.github.com/repos/AutoHotkey/AutoHotkey/releases/latest'
           $ahkZip = ($ahkRel.assets | Where-Object { $_.name -match '^AutoHotkey_.*\.zip$' -and $_.name -notmatch 'src|setup' } | Select-Object -First 1).browser_download_url
           if (-not $ahkZip) { throw 'AutoHotkey zip 자산을 찾지 못함' }
           Invoke-WebRequest -Headers $headers -Uri $ahkZip -OutFile ahk.zip
           Expand-Archive ahk.zip -DestinationPath tools/ahk -Force
 
-          # Ahk2Exe 컴파일러 zip
-          $a2eRel = Invoke-RestMethod -Headers $headers 'https://api.github.com/repos/AutoHotkey/Ahk2Exe/releases/latest'
-          $a2eZip = ($a2eRel.assets | Where-Object { $_.name -match '\.zip$' } | Select-Object -First 1).browser_download_url
-          if (-not $a2eZip) { throw 'Ahk2Exe zip 자산을 찾지 못함' }
-          Invoke-WebRequest -Headers $headers -Uri $a2eZip -OutFile a2e.zip
-          Expand-Archive a2e.zip -DestinationPath tools/ahk2exe -Force
-
-          # 실제 경로 탐색 후 다음 스텝으로 전달
-          $base = (Get-ChildItem tools/ahk    -Recurse -Filter AutoHotkey64.exe | Select-Object -First 1).FullName
-          $a2e  = (Get-ChildItem tools/ahk2exe -Recurse -Filter Ahk2Exe.exe      | Select-Object -First 1).FullName
+          $base = (Get-ChildItem tools/ahk -Recurse -Filter AutoHotkey64.exe | Select-Object -First 1).FullName
           if (-not $base) { throw 'AutoHotkey64.exe 없음' }
-          if (-not $a2e)  { throw 'Ahk2Exe.exe 없음' }
           "AHK_BASE=$base" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "AHK2EXE=$a2e"   | Out-File -FilePath $env:GITHUB_ENV -Append
-          Write-Host "base=$base"; Write-Host "a2e=$a2e"
+          Write-Host "base=$base"
 
       - name: WebView2 라이브러리(thqby/ahk2_lib) 준비
         shell: pwsh
@@ -70,18 +65,19 @@ jobs:
           Expand-Archive wv2.zip -DestinationPath wv2 -Force
           Copy-Item wv2/runtimes/win-x64/native/WebView2Loader.dll widget/WebView2Loader.dll -Force
 
-      - name: 문법 검증(컴파일로 스크립트 오류만 확인 — 배포엔 미사용)
+      - name: 문법 검증(AutoHotkey /validate — 빠르고 오류창 없이)
         shell: pwsh
+        timeout-minutes: 2   # 혹시라도 멈추면 2분 내 실패(러너 무한 대기 방지)
         run: |
           $ErrorActionPreference = 'Stop'
-          $base = $env:AHK_BASE
-          $a2e  = $env:AHK2EXE
-          # Ahk2Exe는 GUI 앱이라 '&'로는 완료를 안 기다림 → Start-Process -Wait 로 대기.
-          $chk = Join-Path $PWD '_syntaxcheck.exe'
-          Start-Process -FilePath $a2e -Wait -NoNewWindow -ArgumentList @(
-            '/in', (Resolve-Path widget/ynhs-widget.ahk).Path, '/out', $chk, '/base', $base)
-          if (!(Test-Path $chk)) { throw '위젯 스크립트 컴파일(문법) 실패' }
-          Remove-Item $chk -Force
+          # /validate: 스크립트를 로드해 문법만 검사하고 실행 안 함. /ErrorStdOut: 오류를
+          #   대화상자 대신 표준출력으로 → 헤드리스 러너에서 멈추지 않는다(과거 Ahk2Exe가 여기서 hang).
+          $p = Start-Process -FilePath $env:AHK_BASE -Wait -PassThru -NoNewWindow -ArgumentList @(
+            '/ErrorStdOut', '/validate', (Resolve-Path widget/ynhs-widget.ahk).Path)
+          if ($p.ExitCode -ne 0) { throw "위젯 스크립트 문법 오류 (exit $($p.ExitCode))" }
+          $p2 = Start-Process -FilePath $env:AHK_BASE -Wait -PassThru -NoNewWindow -ArgumentList @(
+            '/ErrorStdOut', '/validate', (Resolve-Path widget/ynhs-launcher.ahk).Path)
+          if ($p2.ExitCode -ne 0) { throw "런처 스크립트 문법 오류 (exit $($p2.ExitCode))" }
 
       - name: 포터블 패키지 조립(서명된 AutoHotkey + 스크립트 + 라이브러리)
         shell: pwsh
