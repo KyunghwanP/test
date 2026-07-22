@@ -259,9 +259,10 @@ CreateWidget(p) {
     g.OnEvent("Size", OnResize)
     WinSetTransparent(op, "ahk_id " g.hwnd)
 
-    ; 창 그림자 제거(DWM 비클라이언트 렌더링 끔) — 환경에 따라 효과 다를 수 있음
-    try DllCall("dwmapi\DwmSetWindowAttribute", "ptr", g.hwnd, "int", 2, "int*", 1, "int", 4)  ; NCRENDERING_POLICY=DISABLED
-    StyleWindow(g.hwnd)   ; 둥근 모서리 + 회색 포커스 테두리 제거(Win11)
+    ; 참고: 예전의 '그림자 제거'(NCRENDERING_POLICY=DISABLED)는 DWM 비클라이언트 렌더링을 꺼서
+    ;   둥근 모서리·테두리 색까지 무효화(회색 사각 프레임 잔존)했기에 제거함. → 둥근 모서리+파란
+    ;   테두리를 살리고, 대신 은은한 그림자는 유지(둥근 창엔 자연스러움).
+    StyleWindow(g.hwnd)   ; 둥근 모서리 + 얇은 파란 테두리(Win11)
 
     ; ── 손잡이 바(별도 최상위 창) — 호버 시 웹 위에 '겹쳐' 나타남 → 내용이 밀리지 않는다
     h := Gui("-Caption +AlwaysOnTop +ToolWindow -Resize")
