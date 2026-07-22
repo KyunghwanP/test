@@ -301,13 +301,25 @@ CreateWidget(p) {
     }
 }
 
-; 손잡이 바를 위젯 위쪽 가장자리에 겹쳐 표시(폭에 맞춰 컨트롤 재배치)
+; 위젯의 '실제 보이는' 화면 사각형(리사이즈용 투명 여백 제외) — DWMWA_EXTENDED_FRAME_BOUNDS(9)
+;   +Resize 창은 좌우·아래에 ~8px 투명 여백이 창 좌표에 포함돼, 손잡이 바가 그만큼 넓게 뜬다.
+WidgetVisibleRect(hwnd, &vx, &vy, &vw, &vh) {
+    rc := Buffer(16)
+    if (DllCall("dwmapi\DwmGetWindowAttribute", "ptr", hwnd, "int", 9, "ptr", rc, "int", 16) = 0) {
+        vx := NumGet(rc, 0, "int"), vy := NumGet(rc, 4, "int")
+        vw := NumGet(rc, 8, "int") - vx, vh := NumGet(rc, 12, "int") - vy
+        return
+    }
+    WinGetPos(&vx, &vy, &vw, &vh, "ahk_id " hwnd)   ; DWM 미지원 시 폴백
+}
+
+; 손잡이 바를 위젯 위쪽 가장자리에 겹쳐 표시(보이는 폭에 정확히 맞춤)
 PositionHandle(widgetHwnd) {
     global WidgetWins, HANDLE_H
     if !WidgetWins.Has(widgetHwnd)
         return
     w := WidgetWins[widgetHwnd]
-    WinGetPos(&wx, &wy, &wW, , "ahk_id " widgetHwnd)
+    WidgetVisibleRect(widgetHwnd, &wx, &wy, &wW, &wH)
     w.hlbl.Move(8, 5, wW - 190, 16)
     w.hsld.Move(wW - 178, 4)
     w.hApp.Move(wW - 94, 3)
@@ -440,8 +452,10 @@ DragMove() {
         }
     }
     WinMove(nx, ny, , , "ahk_id " dragHwnd)
-    if WidgetWins.Has(dragHwnd)             ; 손잡이 바도 위젯을 따라 이동
-        try WidgetWins[dragHwnd].handleGui.Move(nx, ny)
+    if WidgetWins.Has(dragHwnd) {          ; 손잡이 바도 위젯의 '보이는' 위치로 따라 이동
+        WidgetVisibleRect(dragHwnd, &vx, &vy, &vw, &vh)
+        try WidgetWins[dragHwnd].handleGui.Move(vx, vy)
+    }
 }
 
 ; ── 크기 조절 시 테두리 자석 스냅(WM_SIZING) ───────────────
