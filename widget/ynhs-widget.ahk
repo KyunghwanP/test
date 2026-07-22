@@ -137,20 +137,42 @@ A_TrayMenu.Default := "위젯 추가 / 선택"
 ShowSelector()
 SetTimer(HoverCheck, 120)    ; 마우스 올린 위젯만 손잡이 바 표시
 
-; 입력 위젯(메모·시간표)은 일반 창이라 Win+D에 최소화된다 → 최소화 '시작' 순간을 잡아
-;   즉시 되돌려 타이핑도 되고 Win+D에도 안 사라지게 한다(정보 위젯은 이미 바탕화면 고정이라 제외).
-;   EVENT_SYSTEM_MINIMIZESTART = 0x0016
-global gMinCb := CallbackCreate(OnMinimizeStart, "F", 7)
-global gWinHook := DllCall("SetWinEventHook", "uint", 0x0016, "uint", 0x0016, "ptr", 0
-    , "ptr", gMinCb, "uint", 0, "uint", 0, "uint", 0, "ptr")
+; Win+D를 우리가 직접 처리 → 위젯은 남기고 '다른 앱 창'만 최소화/복원(정상 토글 유지)
+global gDesktopShown := false
+global gMinList := []
 
-OnMinimizeStart(hHook, event, hwnd, idObj, idChild, thread, time) {
-    global WidgetWins
-    if (idObj != 0)                         ; 창 자체(OBJID_WINDOW)만
-        return
-    ; 모든 위젯을 최소화 순간 즉시 복원 → Win+D에도 바탕화면 층에 그대로 남음
-    if WidgetWins.Has(hwnd)
-        DllCall("ShowWindow", "ptr", hwnd, "int", 9)   ; SW_RESTORE
+#d:: {
+    global gDesktopShown, gMinList, WidgetWins
+    if !gDesktopShown {
+        gMinList := []
+        for hwnd in WinGetList() {          ; 보이는 최상위 창들
+            if WidgetWins.Has(hwnd)         ; 우리 위젯은 건드리지 않음(계속 떠 있음)
+                continue
+            if !IsAppWindow(hwnd)
+                continue
+            gMinList.Push(hwnd)
+            WinMinimize("ahk_id " hwnd)
+        }
+        gDesktopShown := true
+    } else {
+        for hwnd in gMinList                ; 기억해둔 창들만 원래대로 복귀
+            try WinRestore("ahk_id " hwnd)
+        gMinList := []
+        gDesktopShown := false
+    }
+}
+
+; '일반 앱 창'(작업표시줄/Alt+Tab에 뜨는 것) 판별 — 도구창·소유된 대화상자·제목없는 창 제외
+IsAppWindow(hwnd) {
+    if !DllCall("IsWindowVisible", "ptr", hwnd)
+        return false
+    if (WinGetMinMax("ahk_id " hwnd) = -1)          ; 이미 최소화됨
+        return false
+    if (WinGetExStyle("ahk_id " hwnd) & 0x80)       ; WS_EX_TOOLWINDOW → 제외
+        return false
+    if DllCall("GetWindow", "ptr", hwnd, "uint", 4, "ptr")   ; GW_OWNER 있으면(대화상자 등) 제외
+        return false
+    return WinGetTitle("ahk_id " hwnd) != ""
 }
 
 ShowSelector() {
@@ -510,10 +532,8 @@ FlushSave() {
 
 OnExit(OnExitFn)
 OnExitFn(*) {
-    global DLL_PATH, gWinHook
+    global DLL_PATH
     SaveAll()
-    if gWinHook
-        try DllCall("UnhookWinEvent", "ptr", gWinHook)
     if A_IsCompiled
         try FileDelete(DLL_PATH)
 }
