@@ -1,0 +1,77 @@
+name: 위젯 exe 빌드/배포
+
+# 위젯 코드가 바뀌면 윈도우에서 AutoHotkey로 exe를 자동 빌드해
+# 'widget-latest' 릴리스에 올린다. 사용자는 ynhs-launcher.exe만 받아 실행하면
+# 실행할 때마다 이 릴리스의 최신 ynhs-widget.exe 를 내려받아 쓴다(AutoHotkey 불필요).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'widget/ynhs-widget.ahk'
+      - 'widget/ynhs-launcher.ahk'
+      - '.github/workflows/build-widget.yml'
+  workflow_dispatch:   # 수동 실행 버튼
+
+permissions:
+  contents: write      # 릴리스 생성/자산 업로드에 필요
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: AutoHotkey v2 + Ahk2Exe 설치(공식 설치 프로그램, 컴파일러 포함)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Invoke-WebRequest -Uri 'https://www.autohotkey.com/download/ahk-v2.exe' -OutFile ahk-setup.exe
+          Start-Process -FilePath .\ahk-setup.exe -ArgumentList '/silent' -Wait
+          $base = 'C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe'
+          $a2e  = 'C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe'
+          if (!(Test-Path $base)) { throw "AutoHotkey64.exe 없음: $base" }
+          if (!(Test-Path $a2e))  { throw "Ahk2Exe.exe 없음: $a2e" }
+
+      - name: WebView2 라이브러리(thqby/ahk2_lib) 준비
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git clone --depth 1 https://github.com/thqby/ahk2_lib.git lib
+          Copy-Item lib/*.ahk widget/ -Force                       # ComVar.ahk · Promise.ahk 등
+          Copy-Item lib/WebView2 widget/WebView2 -Recurse -Force    # WebView2\ 폴더 전체
+
+      - name: WebView2Loader.dll 준비(NuGet, 64bit)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Invoke-WebRequest -Uri 'https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2' -OutFile wv2.zip
+          Expand-Archive wv2.zip -DestinationPath wv2 -Force
+          Copy-Item wv2/runtimes/win-x64/native/WebView2Loader.dll widget/WebView2Loader.dll -Force
+
+      - name: exe 컴파일(위젯 본체 + 런처)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $base = 'C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe'
+          $a2e  = 'C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe'
+          & $a2e /in (Resolve-Path widget/ynhs-widget.ahk)   /out (Join-Path $PWD 'ynhs-widget.exe')   /base $base
+          if (!(Test-Path ynhs-widget.exe))   { throw '위젯 exe 컴파일 실패' }
+          & $a2e /in (Resolve-Path widget/ynhs-launcher.ahk) /out (Join-Path $PWD 'ynhs-launcher.exe') /base $base
+          if (!(Test-Path ynhs-launcher.exe)) { throw '런처 exe 컴파일 실패' }
+          "$env:GITHUB_SHA".Substring(0,7) | Out-File -FilePath version.txt -Encoding ascii -NoNewline
+
+      - name: 릴리스 배포(widget-latest 롤링 태그)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: widget-latest
+          name: 위젯 최신 빌드
+          body: |
+            영남고 위젯 최신 자동 빌드.
+            · ynhs-launcher.exe — 이것만 받아 실행하세요(자동 업데이트 런처, AutoHotkey 불필요).
+            · ynhs-widget.exe — 위젯 본체(런처가 자동으로 내려받음).
+          files: |
+            ynhs-widget.exe
+            ynhs-launcher.exe
+            version.txt

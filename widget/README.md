@@ -87,25 +87,35 @@ https://kyunghwanp.github.io/test/?widget=weather     (날씨)
 > "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe" /in ynhs-widget.ahk /out ynhs-widget.exe /base "C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe"
 > ```
 
-### 자동 업데이트 실행기 (`ynhs-launcher.ahk`) — 재빌드 없이 최신 유지
+### ⭐ exe 단독 실행 + 자동 업데이트 (권장) — AutoHotkey 설치 불필요
 
-위젯 **동작 코드(`.ahk`)** 가 바뀌어도 매번 다시 빌드하기 싫다면, 이 런처로 실행하세요.
-켤 때마다 GitHub에서 최신 `ynhs-widget.ahk`를 내려받아 교체한 뒤 실행합니다.
+위젯 코드를 고쳐 `main`에 올리면 **GitHub Actions가 윈도우에서 자동으로 exe를 빌드**해
+`widget-latest` 릴리스에 올립니다. 사용자는 **`ynhs-launcher.exe` 하나만** 받아 실행하면
+됩니다. AutoHotkey를 설치할 필요가 전혀 없습니다.
 
-- **웹/앱 내용**(급식·시간표·성적 등)은 원래도 실시간이라 이와 무관하게 항상 자동 반영됩니다.
-- **위젯 동작 코드**만 exe에 박혀 있어 갱신이 안 되던 것을, 이 런처가 대신 최신으로 맞춰 줍니다.
+동작 흐름:
+```
+사용자: ynhs-launcher.exe 실행
+   → 런처가 릴리스에서 최신 ynhs-widget.exe 를 받아 %AppData%\YnhsWidget 에 저장
+   → 그 위젯 exe 실행 (WebView2Loader.dll 내장, AutoHotkey 불필요)
+버전이 같으면 다시 받지 않고, 오프라인이면 기존 exe로 조용히 실행.
+```
 
 사용법:
-1. `ynhs-launcher.ahk`를 `ynhs-widget.ahk`(+WebView2 라이브러리들)와 **같은 폴더**에 둡니다.
-2. `ynhs-launcher.ahk`를 실행(더블클릭)합니다.
-   - 실행할 때마다 최신 `ynhs-widget.ahk`를 받아 덮어쓴 뒤 그걸 실행합니다.
-   - 인터넷이 안 되면 조용히 **기존 파일 그대로** 실행합니다(끊겨도 위젯은 뜸).
-3. **부팅 시 자동 실행**: `Win+R` → `shell:startup` → 열린 폴더에 `ynhs-launcher.ahk`의 **바로가기**를 넣기.
+1. 릴리스 페이지에서 **`ynhs-launcher.exe`** 를 받습니다
+   → https://github.com/KyunghwanP/test/releases/tag/widget-latest
+2. 원하는 폴더에 두고 더블클릭 → 최신 위젯이 뜹니다(최초 1회 구글 로그인).
+3. **부팅 시 자동 실행**: `Win+R` → `shell:startup` → 이 exe의 **바로가기**를 넣기.
 
-> - 런처는 `main` 브랜치의 코드를 받아옵니다(파일 상단 `BRANCH` 값으로 변경 가능).
->   즉 위젯 코드 변경분이 **`main`에 병합되면** 다음 실행부터 자동 반영됩니다.
-> - 런처를 쓰려면 각 PC에 **AutoHotkey v2가 설치**돼 있어야 합니다(exe 단독 배포와는 다른 방식).
->   AutoHotkey 설치 없이 나눠줄 목적이라면 예전처럼 exe로 빌드해 전달하세요(그건 자동 갱신 안 됨).
+> - 앞으로 위젯 코드가 바뀌면(= `main`에 병합되면) CI가 exe를 새로 빌드해 릴리스를 갱신하고,
+>   다음 실행 때 런처가 자동으로 받아옵니다. **재빌드도, 재배포도 사람이 할 필요 없음.**
+> - **웹/앱 내용**(급식·시간표·성적)은 원래도 실시간이라 이와 무관하게 항상 자동 반영됩니다.
+> - CI는 `widget/ynhs-widget.ahk`·`widget/ynhs-launcher.ahk` 변경 시(또는 Actions 탭에서 수동
+>   실행 시) 돕니다. 워크플로: `.github/workflows/build-widget.yml`.
+
+#### (참고) AutoHotkey가 이미 깔린 개발 PC라면
+`ynhs-launcher.ahk`를 그냥 실행해도 됩니다(exe와 동일하게 릴리스의 최신 위젯 exe를 받아 실행).
+위젯 로직을 로컬에서 바로 테스트하려면 `ynhs-widget.ahk`를 직접 실행하세요.
 
 ### 메인 앱(클릭 시 실행) 연결
 - `ynhs-widget.ahk` 상단 `NEU_EXE`를 **본인 Neutralino 앱 exe의 실제 경로**로 바꾸세요.
