@@ -87,6 +87,26 @@ https://kyunghwanp.github.io/test/?widget=weather     (날씨)
 > "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe" /in ynhs-widget.ahk /out ynhs-widget.exe /base "C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe"
 > ```
 
+### 자동 업데이트 실행기 (`ynhs-launcher.ahk`) — 재빌드 없이 최신 유지
+
+위젯 **동작 코드(`.ahk`)** 가 바뀌어도 매번 다시 빌드하기 싫다면, 이 런처로 실행하세요.
+켤 때마다 GitHub에서 최신 `ynhs-widget.ahk`를 내려받아 교체한 뒤 실행합니다.
+
+- **웹/앱 내용**(급식·시간표·성적 등)은 원래도 실시간이라 이와 무관하게 항상 자동 반영됩니다.
+- **위젯 동작 코드**만 exe에 박혀 있어 갱신이 안 되던 것을, 이 런처가 대신 최신으로 맞춰 줍니다.
+
+사용법:
+1. `ynhs-launcher.ahk`를 `ynhs-widget.ahk`(+WebView2 라이브러리들)와 **같은 폴더**에 둡니다.
+2. `ynhs-launcher.ahk`를 실행(더블클릭)합니다.
+   - 실행할 때마다 최신 `ynhs-widget.ahk`를 받아 덮어쓴 뒤 그걸 실행합니다.
+   - 인터넷이 안 되면 조용히 **기존 파일 그대로** 실행합니다(끊겨도 위젯은 뜸).
+3. **부팅 시 자동 실행**: `Win+R` → `shell:startup` → 열린 폴더에 `ynhs-launcher.ahk`의 **바로가기**를 넣기.
+
+> - 런처는 `main` 브랜치의 코드를 받아옵니다(파일 상단 `BRANCH` 값으로 변경 가능).
+>   즉 위젯 코드 변경분이 **`main`에 병합되면** 다음 실행부터 자동 반영됩니다.
+> - 런처를 쓰려면 각 PC에 **AutoHotkey v2가 설치**돼 있어야 합니다(exe 단독 배포와는 다른 방식).
+>   AutoHotkey 설치 없이 나눠줄 목적이라면 예전처럼 exe로 빌드해 전달하세요(그건 자동 갱신 안 됨).
+
 ### 메인 앱(클릭 시 실행) 연결
 - `ynhs-widget.ahk` 상단 `NEU_EXE`를 **본인 Neutralino 앱 exe의 실제 경로**로 바꾸세요.
 - 위젯을 클릭하면 그 패널에 맞는 화면으로 앱이 열립니다. 앱은 실행 인자 `--goto=<탭>`을 받아
