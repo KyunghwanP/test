@@ -321,13 +321,15 @@ SetWidgetOpacity(hwnd, val) {
         WidgetWins[hwnd].opacity := val
 }
 
-; 창 모양 다듬기(Win11 DWM) — 둥근 모서리 + 클릭 시 뜨는 회색 포커스 테두리 제거
+; 창 모양 다듬기(Win11 DWM) — 둥근 모서리 + 얇은 파란 테두리(회색 두꺼운 포커스 테두리 대체)
 ;   · DWMWA_WINDOW_CORNER_PREFERENCE(33)=2(ROUND)
-;   · DWMWA_BORDER_COLOR(34)=DWMWA_COLOR_NONE(0xFFFFFFFE) → 테두리 색 없음(안 튐)
+;   · DWMWA_BORDER_COLOR(34)=COLORREF(0x00BBGGRR) → 얇은 테두리를 조화로운 파란색으로
 ;   (Win10 등 미지원 환경에선 조용히 무시되어 각진 창으로 표시됨)
+global BORDER_COLOR := 0x00C8825A   ; RGB(90,130,200) 소프트 블루 (COLORREF는 BGR 순서)
 StyleWindow(hwnd) {
+    global BORDER_COLOR
     try DllCall("dwmapi\DwmSetWindowAttribute", "ptr", hwnd, "int", 33, "int*", 2, "int", 4)
-    try DllCall("dwmapi\DwmSetWindowAttribute", "ptr", hwnd, "int", 34, "uint*", 0xFFFFFFFE, "int", 4)
+    try DllCall("dwmapi\DwmSetWindowAttribute", "ptr", hwnd, "int", 34, "uint*", BORDER_COLOR, "int", 4)
 }
 
 ; ── 바탕화면 층에 놓기(상호작용 유지) ─────────────────────
