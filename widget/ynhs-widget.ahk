@@ -72,7 +72,8 @@ if A_IsCompiled {
 global WV2ENV := ""      ; 모든 위젯이 공유하는 단일 WebView2 환경
 
 try DirCreate(SESSION)
-CleanupOrphanWebViews()   ; 이전 실행/교체로 남아 세션 폴더를 잠근 webview 프로세스 정리(0x8007139F 예방)
+; 참고: 세션 잠김(0x8007139F)은 EnsureEnv/CreateWidget이 '실패했을 때만' CleanupOrphanWebViews로
+;   정리한다(매 실행마다 프로세스를 종료하지 않음 → 백신 행위 탐지를 덜 자극).
 OnMessage(0x201, OnLButtonDown)
 
 ; 세션 폴더당 환경은 하나만 허용 → 처음 한 번만 만들어 재사용(모든 컨트롤러가 공유)

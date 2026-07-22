@@ -87,35 +87,43 @@ https://kyunghwanp.github.io/test/?widget=weather     (날씨)
 > "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe" /in ynhs-widget.ahk /out ynhs-widget.exe /base "C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe"
 > ```
 
-### ⭐ exe 단독 실행 + 자동 업데이트 (권장) — AutoHotkey 설치 불필요
+### ⭐ 무설치 포터블 패키지(서명된 AutoHotkey로 구동) — 백신 오탐 최소화 · 권장
 
-위젯 코드를 고쳐 `main`에 올리면 **GitHub Actions가 윈도우에서 자동으로 exe를 빌드**해
-`widget-latest` 릴리스에 올립니다. 사용자는 **`ynhs-launcher.exe` 하나만** 받아 실행하면
-됩니다. AutoHotkey를 설치할 필요가 전혀 없습니다.
+위젯 코드를 `main`에 올리면 **GitHub Actions가 포터블 패키지(zip)를 만들어** `widget-latest`
+릴리스에 올립니다. 사용자는 **`YnhsWidget-portable.zip`** 을 받아 압축을 풀고 폴더 안의
+**`YnhsWidget.exe`** 를 실행하면 됩니다.
+
+핵심: `YnhsWidget.exe`는 **이름만 바꾼 '서명된 정품 AutoHotkey'** 입니다. AutoHotkey는
+자기와 같은 이름의 스크립트(`YnhsWidget.ahk`)를 자동 실행하므로, 실제로 도는 프로그램이
+**서명돼 있어 백신 평판 경고가 거의 없습니다.** 자동 업데이트는 exe가 아니라 **스크립트
+(.ahk 텍스트)** 를 받아 실행하므로 "다운로드 후 exe 실행" 같은 행위 탐지도 덜 걸립니다.
 
 동작 흐름:
 ```
-사용자: ynhs-launcher.exe 실행
-   → 런처가 릴리스에서 최신 ynhs-widget.exe 를 받아 %AppData%\YnhsWidget 에 저장
-   → 그 위젯 exe 실행 (WebView2Loader.dll 내장, AutoHotkey 불필요)
-버전이 같으면 다시 받지 않고, 오프라인이면 기존 exe로 조용히 실행.
+사용자: YnhsWidget.exe 실행 (= 서명된 AutoHotkey)
+   → 같은 이름의 YnhsWidget.ahk(런처) 자동 실행
+   → GitHub main에서 최신 ynhs-widget.ahk(스크립트) 받아 교체(오프라인이면 기존 것)
+   → 같은 서명된 AutoHotkey로 위젯 실행
 ```
 
 사용법:
-1. 릴리스 페이지에서 **`ynhs-launcher.exe`** 를 받습니다
-   → https://github.com/KyunghwanP/test/releases/tag/widget-latest
-2. 원하는 폴더에 두고 더블클릭 → 최신 위젯이 뜹니다(최초 1회 구글 로그인).
-3. **부팅 시 자동 실행**: `Win+R` → `shell:startup` → 이 exe의 **바로가기**를 넣기.
+1. 릴리스에서 **`YnhsWidget-portable.zip`** 받기 → https://github.com/KyunghwanP/test/releases/tag/widget-latest
+2. 압축을 풀고, 폴더 안 **`YnhsWidget.exe`** 더블클릭 → 위젯이 뜸(최초 1회 구글 로그인).
+3. 부팅 시 자동 실행: `Win+R` → `shell:startup` → `YnhsWidget.exe`의 **바로가기** 넣기.
 
-> - 앞으로 위젯 코드가 바뀌면(= `main`에 병합되면) CI가 exe를 새로 빌드해 릴리스를 갱신하고,
->   다음 실행 때 런처가 자동으로 받아옵니다. **재빌드도, 재배포도 사람이 할 필요 없음.**
-> - **웹/앱 내용**(급식·시간표·성적)은 원래도 실시간이라 이와 무관하게 항상 자동 반영됩니다.
-> - CI는 `widget/ynhs-widget.ahk`·`widget/ynhs-launcher.ahk` 변경 시(또는 Actions 탭에서 수동
->   실행 시) 돕니다. 워크플로: `.github/workflows/build-widget.yml`.
+> **이름 바꾸기**: `YnhsWidget.exe`를 다른 이름으로 바꾸려면 **`.exe`와 `.ahk`를 같은 이름으로 함께**
+> 바꿔야 합니다(예: `영남고위젯.exe` + `영남고위젯.ahk`). 한쪽만 바꾸면 실행되지 않습니다.
+>
+> **아이콘**: exe에 아이콘을 직접 박으면 **서명이 깨져** 오탐 방지 효과가 사라집니다. 대신
+> **바로가기(.lnk)에 원하는 아이콘**을 지정하세요(exe는 서명 유지). 트레이 아이콘은 스크립트의
+> `TraySetIcon`으로 바꿀 수 있습니다.
+>
+> - 폴더 안 파일(AutoHotkey·WebView2 라이브러리)은 지우지 마세요. `YnhsWidget.exe`만 실행하면 됩니다.
+> - CI는 `widget/*.ahk`·워크플로 변경 시(또는 Actions 탭 수동 실행) 패키지를 새로 빌드합니다.
 
-#### (참고) AutoHotkey가 이미 깔린 개발 PC라면
-`ynhs-launcher.ahk`를 그냥 실행해도 됩니다(exe와 동일하게 릴리스의 최신 위젯 exe를 받아 실행).
-위젯 로직을 로컬에서 바로 테스트하려면 `ynhs-widget.ahk`를 직접 실행하세요.
+#### (참고) 단일 exe로 배포하고 싶다면
+서명·오탐을 감수하고 단일 exe를 원하면 `Ahk2Exe`로 `ynhs-widget.ahk`를 직접 컴파일하면 됩니다
+(위 "단일 exe 빌드" 참고). 다만 무명 exe라 백신 오탐이 날 수 있습니다.
 
 ### 메인 앱(클릭 시 실행) 연결
 - `ynhs-widget.ahk` 상단 `NEU_EXE`를 **본인 Neutralino 앱 exe의 실제 경로**로 바꾸세요.
