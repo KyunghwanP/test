@@ -70,9 +70,31 @@ if A_IsCompiled {
         ExitApp
     }
 }
+global WV2ENV := ""      ; 모든 위젯이 공유하는 단일 WebView2 환경
+
 try DirCreate(SESSION)
 CleanupOrphanWebViews()   ; 이전 실행/교체로 남아 세션 폴더를 잠근 webview 프로세스 정리(0x8007139F 예방)
 OnMessage(0x201, OnLButtonDown)
+
+; 세션 폴더당 환경은 하나만 허용 → 처음 한 번만 만들어 재사용(모든 컨트롤러가 공유)
+EnsureEnv() {
+    global WV2ENV, SESSION, DLL_PATH
+    if WV2ENV
+        return WV2ENV
+    loop 3 {
+        try {
+            WV2ENV := WebView2.CreateEnvironmentAsync(0, SESSION, "", DLL_PATH).await()
+            return WV2ENV
+        } catch as e {
+            if (A_Index < 3) {
+                CleanupOrphanWebViews()
+                Sleep 800
+                continue
+            }
+            throw e
+        }
+    }
+}
 
 ; WebView2 세션 잠김(0x8007139F 등)으로 인한 비동기 오류는 조용히 넘긴다
 ;   → 해당 위젯만 비고 스크립트/다른 위젯은 계속 유지(무서운 오류창 방지).
@@ -178,15 +200,17 @@ CreateWidget(p) {
     g.BackColor := "FFFFFF"
     g.Show(Format("x{} y{} w{} h{} NoActivate", x, y, ww, hh))
 
-    ; WebView2 생성 — 실패(세션 폴더 잠김 등) 시 재시도 후, 그래도 안 되면 이 위젯만 건너뜀
+    ; WebView2 컨트롤러 생성 — 모든 위젯이 '하나의 환경(Environment)'을 공유한다.
+    ;   (위젯마다 환경을 새로 만들면 같은 세션 폴더에 환경이 여러 개가 되어 0x8007139F 발생)
     wvc := ""
     loop 2 {
         try {
-            wvc := WebView2.CreateControllerAsync(g.hwnd, 0, SESSION, "", DLL_PATH).await()
+            wvc := EnsureEnv().CreateCoreWebView2ControllerAsync(g.hwnd).await()
             break
         } catch as e {
             if (A_Index = 1) {
-                Sleep 700
+                CleanupOrphanWebViews()
+                Sleep 800
                 continue
             }
             g.Destroy()
@@ -215,9 +239,9 @@ CreateWidget(p) {
     ; (즉시 파괴하면 스크립트가 크래시 → 위젯이 전부 사라짐)
     hX.OnEvent("Click", (*) => SetTimer(() => DestroyWidget(g.hwnd, true), -1))
 
-    ; 모든 위젯을 바탕화면에 고정(Win+D 면역). 트레이드오프: 바탕화면 자식이라 타이핑은 안 됨
-    ;   (메모 편집·시간표 검색은 손잡이 바의 [↗ 앱]으로 본 앱을 열어서).
-    wantPin := true
+    ; 입력 위젯(메모·시간표)은 일반 창(타이핑 O, 단 Win+D에 최소화됨),
+    ;   나머지 정보 위젯은 바탕화면 자식(Win+D 면역). — 타이핑과 Win+D면역은 동시 불가한 트레이드오프
+    wantPin := !INPUT_PANELS.Has(key)
     ApplyPin(g.hwnd, wantPin)
     ; 바탕화면 자식으로 바꾸면 좌표 기준이 부모(바탕화면)로 바뀌므로 위치만 재적용.
     ;   크기는 건드리지 않는다(-DPIScale + 클라이언트 크기 저장 기준을 유지 → 드리프트 없음).
