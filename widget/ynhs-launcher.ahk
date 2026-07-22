@@ -11,7 +11,9 @@
 ;    인터넷이 안 되면 함께 배포된 기존 스크립트로 조용히 실행한다.
 ; ============================================================
 
-global RAW    := "https://raw.githubusercontent.com/KyunghwanP/test/main/widget/ynhs-widget.ahk"
+; raw.githubusercontent 은 CDN에 ~5분 캐시돼 방금 올린 변경이 늦게 반영된다.
+;   → GitHub API(contents, raw accept)로 받으면 ref=main 최신본이 즉시 온다(캐시 없음).
+global RAW    := "https://api.github.com/repos/KyunghwanP/test/contents/widget/ynhs-widget.ahk?ref=main"
 global TARGET := A_ScriptDir "\ynhs-widget.ahk"
 
 ; ── 최신 위젯 스크립트 받기(실패/오프라인이면 기존 파일 사용) ──
@@ -19,6 +21,8 @@ try {
     req := ComObject("WinHttp.WinHttpRequest.5.1")
     req.Open("GET", RAW, false)
     req.Option[6] := true                       ; 리다이렉트 따라가기
+    req.SetRequestHeader("Accept", "application/vnd.github.raw")   ; 원본 그대로 받기
+    req.SetRequestHeader("User-Agent", "YnhsWidget")              ; GitHub API 필수 헤더
     req.SetRequestHeader("Cache-Control", "no-cache")
     req.Send()
     if (req.Status = 200 && StrLen(req.ResponseText) > 800) {   ; 정상 응답만(부분/오류 페이지 방지)
