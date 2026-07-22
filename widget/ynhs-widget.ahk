@@ -178,7 +178,9 @@ CreateWidget(p) {
     hX   := h.Add("Button", Format("x{} y3 w26 h20", ww - 30), "✕")
     hsld.OnEvent("Change", (ctrl, *) => SetWidgetOpacity(g.hwnd, ctrl.Value))
     hApp.OnEvent("Click", (*) => LaunchMain(key))
-    hX.OnEvent("Click", (*) => DestroyWidget(g.hwnd, true))
+    ; ✕ 는 자기 자신(손잡이 창) 안에서 그 창을 파괴하므로, 이벤트가 끝난 뒤 실행하도록 미룸
+    ; (즉시 파괴하면 스크립트가 크래시 → 위젯이 전부 사라짐)
+    hX.OnEvent("Click", (*) => SetTimer(() => DestroyWidget(g.hwnd, true), -1))
 
     ; 입력 필요 위젯(메모·시간표)은 일반 창(타이핑 O), 나머지는 바탕화면 자식(Win+D 면역)
     wantPin := !INPUT_PANELS.Has(key)
@@ -247,13 +249,20 @@ SetWebViewBounds(wvc, hwnd, topOff) {
     wvc.Bounds := r
 }
 
-; ── 마우스 올린 위젯 위에만 손잡이 바를 겹쳐 표시(쌱 나타남) ──
+; ── 위젯 '위쪽 가장자리'에 마우스를 올렸을 때만 손잡이 바를 겹쳐 표시 ──
+;  본문(목록) 위에선 손잡이가 안 떠서 클릭이 정상. 위쪽 끝으로 가면 손잡이가 뜬다.
 HoverCheck() {
-    global WidgetWins, HandleToWidget, dragHwnd
-    MouseGetPos(, , &win)
+    global WidgetWins, HandleToWidget, dragHwnd, HANDLE_H
+    MouseGetPos(&mx, &my, &win)
     root := DllCall("GetAncestor", "ptr", win, "uint", 2, "ptr")   ; GA_ROOT
-    ; 위젯 본체 위 또는 그 손잡이 바 위 → 해당 위젯을 대상으로
-    target := WidgetWins.Has(root) ? root : (HandleToWidget.Has(root) ? HandleToWidget[root] : 0)
+    target := 0
+    if HandleToWidget.Has(root)
+        target := HandleToWidget[root]            ; 손잡이 바 위 → 계속 표시
+    else if WidgetWins.Has(root) {
+        WinGetPos(&wx, &wy, , , "ahk_id " root)
+        if (my <= wy + HANDLE_H + 4)              ; 위젯 맨 위 가장자리 근처만
+            target := root
+    }
     if dragHwnd
         target := dragHwnd            ; 드래그 중엔 계속 표시
     for hwnd, w in WidgetWins {
