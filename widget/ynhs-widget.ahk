@@ -51,7 +51,8 @@ global WidgetWins := Map()   ; gui.hwnd -> {panel, opacity, gui, wvc, handleGui,
 global HandleToWidget := Map()   ; 손잡이 바 hwnd -> 위젯 hwnd (드래그·호버 역참조)
 global dragHwnd := 0, grabOffX := 0, grabOffY := 0, dragW := 0, dragH := 0
 global pendingSaveHwnd := 0   ; 리사이즈 저장 디바운스 대상
-global SNAP := 14   ; 자석 스냅 거리(px)
+global SNAP := 30       ; 자석 스냅 거리(px) — 더 멀리서도 착 붙게(강하게)
+global SIZESNAP := 40   ; 옆에 붙을 때 크기(폭·높이)를 이웃과 맞추는 허용 오차(px)
 
 ; ── WebView2Loader.dll 경로 ────────────────────────────────
 global DLL_PATH := ""
@@ -260,6 +261,7 @@ CreateWidget(p) {
 
     ; 창 그림자 제거(DWM 비클라이언트 렌더링 끔) — 환경에 따라 효과 다를 수 있음
     try DllCall("dwmapi\DwmSetWindowAttribute", "ptr", g.hwnd, "int", 2, "int*", 1, "int", 4)  ; NCRENDERING_POLICY=DISABLED
+    StyleWindow(g.hwnd)   ; 둥근 모서리 + 회색 포커스 테두리 제거(Win11)
 
     ; ── 손잡이 바(별도 최상위 창) — 호버 시 웹 위에 '겹쳐' 나타남 → 내용이 밀리지 않는다
     h := Gui("-Caption +AlwaysOnTop +ToolWindow -Resize")
@@ -274,6 +276,7 @@ CreateWidget(p) {
     ; ✕ 는 자기 자신(손잡이 창) 안에서 그 창을 파괴하므로, 이벤트가 끝난 뒤 실행하도록 미룸
     ; (즉시 파괴하면 스크립트가 크래시 → 위젯이 전부 사라짐)
     hX.OnEvent("Click", (*) => SetTimer(() => DestroyWidget(g.hwnd, true), -1))
+    StyleWindow(h.hwnd)   ; 손잡이 바도 둥근 모서리 + 테두리 없음(위젯과 통일)
 
     ; 모든 위젯: 소유자=바탕화면(뒤 레이어)이되 최상위 창이라 클릭·타이핑 O.
     ;   Win+D 최소화는 위의 최소화-복원 훅이 즉시 되돌린다(사용자 선택).
@@ -316,6 +319,15 @@ SetWidgetOpacity(hwnd, val) {
     WinSetTransparent(val, "ahk_id " hwnd)
     if WidgetWins.Has(hwnd)
         WidgetWins[hwnd].opacity := val
+}
+
+; 창 모양 다듬기(Win11 DWM) — 둥근 모서리 + 클릭 시 뜨는 회색 포커스 테두리 제거
+;   · DWMWA_WINDOW_CORNER_PREFERENCE(33)=2(ROUND)
+;   · DWMWA_BORDER_COLOR(34)=DWMWA_COLOR_NONE(0xFFFFFFFE) → 테두리 색 없음(안 튐)
+;   (Win10 등 미지원 환경에선 조용히 무시되어 각진 창으로 표시됨)
+StyleWindow(hwnd) {
+    try DllCall("dwmapi\DwmSetWindowAttribute", "ptr", hwnd, "int", 33, "int*", 2, "int", 4)
+    try DllCall("dwmapi\DwmSetWindowAttribute", "ptr", hwnd, "int", 34, "uint*", 0xFFFFFFFE, "int", 4)
 }
 
 ; ── 바탕화면 층에 놓기(상호작용 유지) ─────────────────────
@@ -386,7 +398,7 @@ OnLButtonDown(wParam, lParam, msg, hwnd) {
 }
 
 DragMove() {
-    global dragHwnd, grabOffX, grabOffY, dragW, dragH, WidgetWins, SNAP
+    global dragHwnd, grabOffX, grabOffY, dragW, dragH, WidgetWins, SNAP, SIZESNAP
     if !dragHwnd || !GetKeyState("LButton", "P") {
         if dragHwnd
             SaveWidget(dragHwnd)
@@ -396,37 +408,52 @@ DragMove() {
     }
     MouseGetPos(&cx, &cy)
     nx := cx - grabOffX, ny := cy - grabOffY
-    ; 다른 위젯 가장자리에 가까우면 자석처럼 붙임
+    newW := dragW, newH := dragH
+    ; 다른 위젯 가장자리에 가까우면 자석처럼 붙이고, 나란히 붙을 땐 크기도 이웃과 맞춘다
     for hwnd, w in WidgetWins {
         if (hwnd = dragHwnd)
             continue
         WinGetPos(&ox, &oy, &oW, &oH, "ahk_id " hwnd)
-        ; 세로로 겹치는 구간이 있을 때만 좌우 스냅
+        ; ── 좌우 스냅(세로로 겹칠 때) ──
         if (ny < oy + oH && ny + dragH > oy) {
+            sideBySide := false
             if Abs((nx + dragW) - ox) <= SNAP
-                nx := ox - dragW
+                nx := ox - dragW, sideBySide := true          ; 내 오른쪽 ↔ 이웃 왼쪽
             else if Abs(nx - (ox + oW)) <= SNAP
-                nx := ox + oW
+                nx := ox + oW, sideBySide := true              ; 내 왼쪽 ↔ 이웃 오른쪽
             else if Abs(nx - ox) <= SNAP
-                nx := ox
+                nx := ox                                       ; 왼쪽 정렬
             else if Abs((nx + dragW) - (ox + oW)) <= SNAP
-                nx := ox + oW - dragW
+                nx := ox + oW - dragW                          ; 오른쪽 정렬
+            ; 옆에 딱 붙었고 높이가 비슷하면 → 위 맞춤 + 높이 같게
+            if (sideBySide && Abs(ny - oy) <= SIZESNAP && Abs(dragH - oH) <= SIZESNAP)
+                ny := oy, newH := oH
         }
-        ; 가로로 겹치는 구간이 있을 때만 상하 스냅
+        ; ── 상하 스냅(가로로 겹칠 때) ──
         if (nx < ox + oW && nx + dragW > ox) {
+            stacked := false
             if Abs((ny + dragH) - oy) <= SNAP
-                ny := oy - dragH
+                ny := oy - dragH, stacked := true              ; 내 아래 ↔ 이웃 위
             else if Abs(ny - (oy + oH)) <= SNAP
-                ny := oy + oH
+                ny := oy + oH, stacked := true                 ; 내 위 ↔ 이웃 아래
             else if Abs(ny - oy) <= SNAP
-                ny := oy
+                ny := oy                                       ; 위 정렬
             else if Abs((ny + dragH) - (oy + oH)) <= SNAP
-                ny := oy + oH - dragH
+                ny := oy + oH - dragH                          ; 아래 정렬
+            ; 위아래로 딱 붙었고 폭이 비슷하면 → 왼쪽 맞춤 + 폭 같게
+            if (stacked && Abs(nx - ox) <= SIZESNAP && Abs(dragW - oW) <= SIZESNAP)
+                nx := ox, newW := oW
         }
     }
-    WinMove(nx, ny, , , "ahk_id " dragHwnd)
-    if WidgetWins.Has(dragHwnd)             ; 손잡이 바도 위젯을 따라 이동
-        try WidgetWins[dragHwnd].handleGui.Move(nx, ny)
+    WinMove(nx, ny, newW, newH, "ahk_id " dragHwnd)
+    sizeChanged := (newW != dragW || newH != dragH)
+    dragW := newW, dragH := newH
+    if WidgetWins.Has(dragHwnd) {
+        if sizeChanged
+            try PositionHandle(dragHwnd)        ; 폭 바뀌면 손잡이 바도 맞춰 재배치
+        else
+            try WidgetWins[dragHwnd].handleGui.Move(nx, ny)   ; 위치만 따라 이동
+    }
 }
 
 DestroyWidget(hwnd, fromButton := false) {
