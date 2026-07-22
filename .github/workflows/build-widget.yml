@@ -70,24 +70,48 @@ jobs:
           Expand-Archive wv2.zip -DestinationPath wv2 -Force
           Copy-Item wv2/runtimes/win-x64/native/WebView2Loader.dll widget/WebView2Loader.dll -Force
 
-      - name: exe 컴파일(위젯 본체 + 런처)
+      - name: 문법 검증(컴파일로 스크립트 오류만 확인 — 배포엔 미사용)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $base = $env:AHK_BASE
           $a2e  = $env:AHK2EXE
-          # Ahk2Exe는 GUI 서브시스템 앱이라 '&'로 부르면 PowerShell이 완료를 기다리지 않는다
-          #   → Start-Process -Wait 로 컴파일이 끝날 때까지 대기해야 파일 존재 검사가 정확하다.
-          $out1 = Join-Path $PWD 'ynhs-widget.exe'
+          # Ahk2Exe는 GUI 앱이라 '&'로는 완료를 안 기다림 → Start-Process -Wait 로 대기.
+          $chk = Join-Path $PWD '_syntaxcheck.exe'
           Start-Process -FilePath $a2e -Wait -NoNewWindow -ArgumentList @(
-            '/in',  (Resolve-Path widget/ynhs-widget.ahk).Path, '/out', $out1, '/base', $base)
-          if (!(Test-Path $out1)) { throw '위젯 exe 컴파일 실패' }
+            '/in', (Resolve-Path widget/ynhs-widget.ahk).Path, '/out', $chk, '/base', $base)
+          if (!(Test-Path $chk)) { throw '위젯 스크립트 컴파일(문법) 실패' }
+          Remove-Item $chk -Force
 
-          $out2 = Join-Path $PWD 'ynhs-launcher.exe'
-          Start-Process -FilePath $a2e -Wait -NoNewWindow -ArgumentList @(
-            '/in',  (Resolve-Path widget/ynhs-launcher.ahk).Path, '/out', $out2, '/base', $base)
-          if (!(Test-Path $out2)) { throw '런처 exe 컴파일 실패' }
+      - name: 포터블 패키지 조립(서명된 AutoHotkey + 스크립트 + 라이브러리)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = Join-Path $PWD 'YnhsWidget'
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          # WebView2 라이브러리(ComVar.ahk·Promise.ahk 등) + WebView2\ 폴더 + Loader.dll (widget/에 준비돼 있음)
+          Copy-Item widget/*.ahk       $stage -Force
+          Copy-Item widget/WebView2    (Join-Path $stage 'WebView2') -Recurse -Force
+          Copy-Item widget/WebView2Loader.dll $stage -Force
+          Remove-Item (Join-Path $stage 'ynhs-widgets.ahk') -ErrorAction SilentlyContinue   # 크롬앱 간편판 제외
+          # 서명된 AutoHotkey64.exe를 'YnhsWidget.exe'로 → 같은 이름의 YnhsWidget.ahk를 자동 실행(서명 유지)
+          Copy-Item $env:AHK_BASE (Join-Path $stage 'YnhsWidget.exe') -Force
+          Copy-Item widget/ynhs-launcher.ahk (Join-Path $stage 'YnhsWidget.ahk') -Force
+          Remove-Item (Join-Path $stage 'ynhs-launcher.ahk') -ErrorAction SilentlyContinue  # YnhsWidget.ahk로 대체
+          # 사용 안내
+          @"
+          영남고 위젯 (무설치 포터블)
 
+          1) 이 폴더를 원하는 위치(바탕화면/문서 등)에 통째로 둡니다.
+          2) YnhsWidget.exe 를 더블클릭하면 위젯이 뜹니다. (최초 1회 구글 로그인)
+             - YnhsWidget.exe 는 서명된 정품 AutoHotkey 이고, 같은 이름의 YnhsWidget.ahk 를 실행합니다.
+             - 실행할 때마다 최신 위젯 스크립트를 자동으로 받아옵니다(오프라인이면 기존 것 사용).
+          3) 부팅 시 자동 실행: Win+R -> shell:startup -> YnhsWidget.exe 의 바로가기를 넣기.
+
+          ※ 폴더 안 파일(AutoHotkey·라이브러리)은 지우지 마세요. YnhsWidget.exe 만 실행하면 됩니다.
+          "@ | Out-File -FilePath (Join-Path $stage '읽어주세요.txt') -Encoding utf8
+
+          Compress-Archive -Path (Join-Path $stage '*') -DestinationPath (Join-Path $PWD 'YnhsWidget-portable.zip') -Force
           "$env:GITHUB_SHA".Substring(0,7) | Out-File -FilePath version.txt -Encoding ascii -NoNewline
 
       - name: 릴리스 배포(widget-latest 롤링 태그)
@@ -96,10 +120,11 @@ jobs:
           tag_name: widget-latest
           name: 위젯 최신 빌드
           body: |
-            영남고 위젯 최신 자동 빌드.
-            · ynhs-launcher.exe — 이것만 받아 실행하세요(자동 업데이트 런처, AutoHotkey 불필요).
-            · ynhs-widget.exe — 위젯 본체(런처가 자동으로 내려받음).
+            영남고 위젯 — 무설치 포터블 패키지(서명된 AutoHotkey로 구동).
+
+            · YnhsWidget-portable.zip — 이걸 받아 압축을 풀고 폴더 안의 **YnhsWidget.exe**를 실행하세요.
+              - 실제 실행 파일은 '서명된 정품 AutoHotkey'라 백신 평판 경고가 거의 없습니다.
+              - 실행할 때마다 최신 위젯 스크립트를 자동으로 받아옵니다(자동 업데이트 유지).
           files: |
-            ynhs-widget.exe
-            ynhs-launcher.exe
+            YnhsWidget-portable.zip
             version.txt
