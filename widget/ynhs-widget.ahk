@@ -460,20 +460,18 @@ OnSizing(wParam, lParam, msg, hwnd) {
     for h2, w in WidgetWins {
         if (h2 = hwnd) || !WinExist("ahk_id " h2)
             continue
-        WinGetPos(&ox, &oy, &oW, &oH, "ahk_id " h2)
-        oL := ox
-        oT := oy
-        oR := ox + oW
-        oB := oy + oH
+        WinGetPos(&gx, &gy, &gw, &gh, "ahk_id " h2)
+        gRight  := gx + gw
+        gBottom := gy + gh
         ; 끌고 있는 변을 이웃의 맞붙는 변 또는 같은 쪽 변에 스냅(헬퍼로 단순화)
         if (dragL)
-            L := SnapEdge(L, oR, oL)     ; 내 왼쪽 ↔ 이웃 오른쪽(맞붙음)/왼쪽(정렬)
+            L := SnapEdge(L, gRight, gx)      ; 내 왼쪽 ↔ 이웃 오른쪽(맞붙음)/왼쪽(정렬)
         if (dragR)
-            R := SnapEdge(R, oL, oR)     ; 내 오른쪽 ↔ 이웃 왼쪽(맞붙음)/오른쪽(정렬)
+            R := SnapEdge(R, gx, gRight)      ; 내 오른쪽 ↔ 이웃 왼쪽(맞붙음)/오른쪽(정렬)
         if (dragT)
-            T := SnapEdge(T, oB, oT)     ; 내 위 ↔ 이웃 아래(맞붙음)/위(정렬)
+            T := SnapEdge(T, gBottom, gy)     ; 내 위 ↔ 이웃 아래(맞붙음)/위(정렬)
         if (dragB)
-            B := SnapEdge(B, oT, oB)     ; 내 아래 ↔ 이웃 위(맞붙음)/아래(정렬)
+            B := SnapEdge(B, gy, gBottom)     ; 내 아래 ↔ 이웃 위(맞붙음)/아래(정렬)
     }
     NumPut("int", L, lParam, 0)
     NumPut("int", T, lParam, 4)
