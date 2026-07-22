@@ -76,10 +76,18 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $base = $env:AHK_BASE
           $a2e  = $env:AHK2EXE
-          & $a2e /in (Resolve-Path widget/ynhs-widget.ahk)   /out (Join-Path $PWD 'ynhs-widget.exe')   /base $base
-          if (!(Test-Path ynhs-widget.exe))   { throw '위젯 exe 컴파일 실패' }
-          & $a2e /in (Resolve-Path widget/ynhs-launcher.ahk) /out (Join-Path $PWD 'ynhs-launcher.exe') /base $base
-          if (!(Test-Path ynhs-launcher.exe)) { throw '런처 exe 컴파일 실패' }
+          # Ahk2Exe는 GUI 서브시스템 앱이라 '&'로 부르면 PowerShell이 완료를 기다리지 않는다
+          #   → Start-Process -Wait 로 컴파일이 끝날 때까지 대기해야 파일 존재 검사가 정확하다.
+          $out1 = Join-Path $PWD 'ynhs-widget.exe'
+          Start-Process -FilePath $a2e -Wait -NoNewWindow -ArgumentList @(
+            '/in',  (Resolve-Path widget/ynhs-widget.ahk).Path, '/out', $out1, '/base', $base)
+          if (!(Test-Path $out1)) { throw '위젯 exe 컴파일 실패' }
+
+          $out2 = Join-Path $PWD 'ynhs-launcher.exe'
+          Start-Process -FilePath $a2e -Wait -NoNewWindow -ArgumentList @(
+            '/in',  (Resolve-Path widget/ynhs-launcher.ahk).Path, '/out', $out2, '/base', $base)
+          if (!(Test-Path $out2)) { throw '런처 exe 컴파일 실패' }
+
           "$env:GITHUB_SHA".Substring(0,7) | Out-File -FilePath version.txt -Encoding ascii -NoNewline
 
       - name: 릴리스 배포(widget-latest 롤링 태그)
