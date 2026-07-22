@@ -26,6 +26,7 @@ global CONFIG   := A_AppData "\YnhsWidget\config.ini"
 global NEU_EXE  := A_ScriptDir "\ynhs-app.exe"
 global APP_URL  := "https://kyunghwanp.github.io/test/"
 global HANDLE_H := 26
+global HANDLE_TOP := 8   ; 손잡이 바를 위젯 맨 위에서 이만큼 내림 → 위쪽 테두리(크기조절)를 잡을 여지
 global DEF_OPACITY := 240
 global PROGMAN := DllCall("FindWindow", "str", "Progman", "ptr", 0, "ptr")
 
@@ -315,7 +316,7 @@ WidgetVisibleRect(hwnd, &vx, &vy, &vw, &vh) {
 
 ; 손잡이 바를 위젯 위쪽 가장자리에 겹쳐 표시(보이는 폭에 정확히 맞춤)
 PositionHandle(widgetHwnd) {
-    global WidgetWins, HANDLE_H
+    global WidgetWins, HANDLE_H, HANDLE_TOP
     if !WidgetWins.Has(widgetHwnd)
         return
     w := WidgetWins[widgetHwnd]
@@ -324,7 +325,8 @@ PositionHandle(widgetHwnd) {
     w.hsld.Move(wW - 178, 4)
     w.hApp.Move(wW - 94, 3)
     w.hX.Move(wW - 30, 3)
-    w.handleGui.Show(Format("x{} y{} w{} h{} NoActivate", wx, wy, wW, HANDLE_H))
+    ; 맨 위 HANDLE_TOP 만큼 비워 위쪽 테두리로 크기조절 가능하게(손잡이는 그 아래에 겹침)
+    w.handleGui.Show(Format("x{} y{} w{} h{} NoActivate", wx, wy + HANDLE_TOP, wW, HANDLE_H))
 }
 
 SetWidgetOpacity(hwnd, val) {
@@ -370,7 +372,7 @@ SetWebViewBounds(wvc, hwnd, topOff) {
 ; ── 위젯 '위쪽 가장자리'에 마우스를 올렸을 때만 손잡이 바를 겹쳐 표시 ──
 ;  본문(목록) 위에선 손잡이가 안 떠서 클릭이 정상. 위쪽 끝으로 가면 손잡이가 뜬다.
 HoverCheck() {
-    global WidgetWins, HandleToWidget, dragHwnd, HANDLE_H
+    global WidgetWins, HandleToWidget, dragHwnd, HANDLE_H, HANDLE_TOP
     MouseGetPos(&mx, &my, &win)
     root := DllCall("GetAncestor", "ptr", win, "uint", 2, "ptr")   ; GA_ROOT
     target := 0
@@ -378,7 +380,8 @@ HoverCheck() {
         target := HandleToWidget[root]            ; 손잡이 바 위 → 계속 표시
     else if WidgetWins.Has(root) {
         WinGetPos(&wx, &wy, , , "ahk_id " root)
-        if (my <= wy + HANDLE_H + 4)              ; 위젯 맨 위 가장자리 근처만
+        ; 맨 위 HANDLE_TOP(리사이즈용 여백)~손잡이 아래까지가 손잡이 표시 영역
+        if (my >= wy + HANDLE_TOP && my <= wy + HANDLE_TOP + HANDLE_H + 4)
             target := root
     }
     if dragHwnd
@@ -413,7 +416,7 @@ OnLButtonDown(wParam, lParam, msg, hwnd) {
 }
 
 DragMove() {
-    global dragHwnd, grabOffX, grabOffY, dragW, dragH, WidgetWins, SNAP
+    global dragHwnd, grabOffX, grabOffY, dragW, dragH, WidgetWins, SNAP, HANDLE_TOP
     if !dragHwnd || !GetKeyState("LButton", "P") {
         if dragHwnd
             SaveWidget(dragHwnd)
@@ -454,7 +457,7 @@ DragMove() {
     WinMove(nx, ny, , , "ahk_id " dragHwnd)
     if WidgetWins.Has(dragHwnd) {          ; 손잡이 바도 위젯의 '보이는' 위치로 따라 이동
         WidgetVisibleRect(dragHwnd, &vx, &vy, &vw, &vh)
-        try WidgetWins[dragHwnd].handleGui.Move(vx, vy)
+        try WidgetWins[dragHwnd].handleGui.Move(vx, vy + HANDLE_TOP)
     }
 }
 
