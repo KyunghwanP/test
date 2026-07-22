@@ -28,6 +28,7 @@ global APP_URL  := "https://kyunghwanp.github.io/test/"
 global HANDLE_H := 26
 global DEF_OPACITY := 240
 global PROGMAN := DllCall("FindWindow", "str", "Progman", "ptr", 0, "ptr")
+global WALLHOST := GetWallpaperHost()   ; 벽지 창(WorkerW). 여기에 붙이면 Win+D에도 안 사라짐
 
 global ALL_PANELS := [
     ["memo",      "📝 빠른 메모",       40,  60, 340, 420, "1"],
@@ -70,7 +71,39 @@ if A_IsCompiled {
     }
 }
 try DirCreate(SESSION)
+CleanupOrphanWebViews()   ; 이전 실행/교체로 남아 세션 폴더를 잠근 webview 프로세스 정리(0x8007139F 예방)
 OnMessage(0x201, OnLButtonDown)
+
+; WebView2 세션 잠김(0x8007139F 등)으로 인한 비동기 오류는 조용히 넘긴다
+;   → 해당 위젯만 비고 스크립트/다른 위젯은 계속 유지(무서운 오류창 방지).
+OnError(SuppressWebView2Err)
+SuppressWebView2Err(e, mode) {
+    msg := ""
+    try msg := e.Message
+    return InStr(msg, "8007139F") ? 1 : 0
+}
+
+; 우리 세션 폴더(YnhsWidget\Session)를 쓰는 msedgewebview2.exe만 골라 종료(다른 앱은 건드리지 않음)
+CleanupOrphanWebViews() {
+    global SESSION
+    killed := 0
+    try {
+        wmi := ComObjGet("winmgmts:\\.\root\cimv2")
+        for proc in wmi.ExecQuery("SELECT ProcessId,CommandLine FROM Win32_Process WHERE Name='msedgewebview2.exe'") {
+            cl := ""
+            try cl := proc.CommandLine
+            if (cl != "" && InStr(cl, SESSION)) {
+                try {
+                    ProcessClose(proc.ProcessId)
+                    killed++
+                }
+            }
+        }
+    }
+    if killed
+        Sleep 500   ; 잠금이 풀릴 시간을 준다
+    return killed
+}
 
 ; ── 트레이 메뉴 ────────────────────────────────────────────
 try A_TrayMenu.Delete()
@@ -182,8 +215,9 @@ CreateWidget(p) {
     ; (즉시 파괴하면 스크립트가 크래시 → 위젯이 전부 사라짐)
     hX.OnEvent("Click", (*) => SetTimer(() => DestroyWidget(g.hwnd, true), -1))
 
-    ; 입력 필요 위젯(메모·시간표)은 일반 창(타이핑 O), 나머지는 바탕화면 자식(Win+D 면역)
-    wantPin := !INPUT_PANELS.Has(key)
+    ; 모든 위젯을 바탕화면에 고정(Win+D 면역). 트레이드오프: 바탕화면 자식이라 타이핑은 안 됨
+    ;   (메모 편집·시간표 검색은 손잡이 바의 [↗ 앱]으로 본 앱을 열어서).
+    wantPin := true
     ApplyPin(g.hwnd, wantPin)
     ; 바탕화면 자식으로 바꾸면 좌표 기준이 부모(바탕화면)로 바뀌므로 위치만 재적용.
     ;   크기는 건드리지 않는다(-DPIScale + 클라이언트 크기 저장 기준을 유지 → 드리프트 없음).
@@ -224,15 +258,44 @@ SetWidgetOpacity(hwnd, val) {
         WidgetWins[hwnd].opacity := val
 }
 
-; ── 바탕화면 안착(Win+D 면역) ─────────────────────────────
-;  위젯을 바탕화면(Progman)의 '자식'으로 붙인다.
-;  · 자식이라 Win+D·바탕화면 보기에도 최소화되지 않고 바탕화면에 착 붙어 남는다.
-;  · 트레이드오프: 자식 창이라 타이핑이 안 되고(그래서 memo·fulltt는 doPin=false),
-;    좌표가 바탕화면 기준이라 보조 모니터에선 위치가 다소 어긋날 수 있다.
-ApplyPin(hwnd, doPin := true) {
+; ── 벽지 창(WorkerW) 찾기 ─────────────────────────────────
+;  Progman에 0x052C를 보내 WorkerW를 만들고, 바탕화면 아이콘(SHELLDLL_DefView) 뒤의
+;  WorkerW(벽지를 그리는 창)를 찾는다. 이 창의 자식이 되면 Win+D에도 사라지지 않는다.
+;  (Progman 자식은 윈도우 버전에 따라 Win+D에 최소화되기도 해서 WorkerW를 쓴다.)
+GetWallpaperHost() {
     global PROGMAN
-    if doPin && PROGMAN
-        DllCall("SetParent", "ptr", hwnd, "ptr", PROGMAN)          ; 바탕화면의 자식으로 → Win+D 면역
+    if !PROGMAN
+        return 0
+    DllCall("SendMessageTimeout", "ptr", PROGMAN, "uint", 0x052C, "ptr", 0, "ptr", 0
+        , "uint", 0, "uint", 1000, "ptr*", 0)
+    host := 0
+    cb := CallbackCreate(EnumWallhost, "F", 2)
+    DllCall("EnumWindows", "ptr", cb, "ptr", 0)
+    CallbackFree(cb)
+    return host ? host : PROGMAN
+
+    EnumWallhost(hwnd, lparam) {
+        ; SHELLDLL_DefView 자식을 가진 창(대개 WorkerW/Progman)을 찾으면, 그 다음 형제 WorkerW가 벽지 창
+        if DllCall("FindWindowEx", "ptr", hwnd, "ptr", 0, "str", "SHELLDLL_DefView", "ptr", 0, "ptr") {
+            w := DllCall("FindWindowEx", "ptr", 0, "ptr", hwnd, "str", "WorkerW", "ptr", 0, "ptr")
+            if w {
+                host := w
+                return 0   ; 찾음 → 열거 중단
+            }
+        }
+        return 1
+    }
+}
+
+; ── 바탕화면 안착(Win+D 면역) ─────────────────────────────
+;  위젯을 벽지 창(WorkerW, 없으면 Progman)의 '자식'으로 붙인다.
+;  · 자식이라 Win+D·바탕화면 보기에도 최소화되지 않고 바탕화면에 착 붙어 남는다.
+;  · 트레이드오프: 자식 창이라 타이핑이 안 되고, 좌표가 바탕화면 기준이라 보조 모니터에선
+;    위치가 다소 어긋날 수 있다.
+ApplyPin(hwnd, doPin := true) {
+    global WALLHOST
+    if doPin && WALLHOST
+        DllCall("SetParent", "ptr", hwnd, "ptr", WALLHOST)         ; 벽지 창의 자식으로 → Win+D 면역
     else {
         DllCall("SetParent", "ptr", hwnd, "ptr", 0)                ; 최상위로 복귀(타이핑 O)
         DllCall("SetWindowLongPtr", "ptr", hwnd, "int", -8, "ptr", 0, "ptr")  ; 소유자 해제
