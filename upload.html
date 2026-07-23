@@ -1234,14 +1234,17 @@ function loadExcelJS() {
 //   "Cannot merge already merged cells"를 던져 파싱 전체가 실패한다(사진명렬표에 흔함).
 //   사진·번호·이름 추출에는 병합 정보가 필요 없으므로 이 예외만 조용히 무시하도록 패치.
 function phPatchMerge(){
-  const WSP = ExcelJS && ExcelJS.Worksheet && ExcelJS.Worksheet.prototype;
-  if(!WSP || WSP.__phMergePatched || typeof WSP._mergeCellsInternal !== 'function') return;
-  const orig = WSP._mergeCellsInternal;
-  WSP._mergeCellsInternal = function(...a){
-    try { return orig.apply(this, a); }
-    catch(e){ if(String(e && e.message).indexOf('already merged') !== -1) return; throw e; }
-  };
-  WSP.__phMergePatched = true;
+  try {
+    // 이 min 빌드는 ExcelJS.Worksheet를 전역에 노출하지 않으므로, 인스턴스에서 프로토타입을 얻는다.
+    const WSP = Object.getPrototypeOf(new ExcelJS.Workbook().addWorksheet('t'));
+    if(WSP.__phMergePatched || typeof WSP._mergeCellsInternal !== 'function') return;
+    const orig = WSP._mergeCellsInternal;
+    WSP._mergeCellsInternal = function(...a){
+      try { return orig.apply(this, a); }
+      catch(e){ if(String(e && e.message).indexOf('already merged') !== -1) return; throw e; }
+    };
+    WSP.__phMergePatched = true;
+  } catch(e){ console.warn('phPatchMerge 실패', e); }
 }
 const PH_SKIP = new Set(['번호','이름','성명','학년','학반','학급','사진','명렬','비고','성별','생년월일','담임','합계','소계','구분','순번','연번']);
 let phItems = [];              // [{ dataUrl, num, name, matched:{grade,room,num,name}|null }]
