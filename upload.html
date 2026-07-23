@@ -173,6 +173,17 @@ if ('serviceWorker' in navigator) {
     vertical-align:middle;margin-right:6px;
   }
   @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* 사진명렬 미리보기 카드 */
+  .ph-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:4px;}
+  .ph-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(94px,1fr));gap:10px;max-height:52vh;overflow:auto;padding:8px;border:1px solid var(--rule);border-radius:8px;background:var(--paper-soft);margin-top:14px;}
+  .ph-card{border:1px solid var(--rule);border-radius:8px;background:var(--paper);padding:6px;text-align:center;}
+  .ph-card img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:6px;background:#e5e7eb;}
+  .ph-cap{font-size:12px;font-weight:700;margin-top:4px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ph-match{font-size:11px;color:var(--wed);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ph-nomatch{opacity:.55;}
+  .ph-nomatch .ph-match{color:var(--mon);}
+  .ph-grade{font-family:'Noto Sans KR';font-weight:700;font-size:13.5px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--rule);background:var(--paper-soft);color:var(--ink);cursor:pointer;}
 </style>
 </head>
 <body>
@@ -207,6 +218,8 @@ if ('serviceWorker' in navigator) {
   <button class="tab-nav-btn" data-tab="contacts">📞 비상연락망 업로드</button>
   <button class="tab-nav-btn" data-tab="students">🎒 학생연락망 업로드</button>
   <button class="tab-nav-btn" data-tab="clubs">🎪 동아리 업로드</button>
+  <button class="tab-nav-btn" data-tab="sheets">📊 편성·명렬표 업로드</button>
+  <button class="tab-nav-btn" data-tab="photos">📷 사진명렬 업로드</button>
 </div>
 
 <div class="container">
@@ -391,13 +404,56 @@ if ('serviceWorker' in navigator) {
       </div>
     </div>
   </div>
+
+  <!-- ══ 편성·명렬표 탭 ══ -->
+  <div class="tab-panel" id="tab-sheets">
+    <div class="section">
+      <div class="section-title">📊 편성·명렬표 업로드</div>
+      <div class="section-desc">엑셀 원본 파일을 <b>그대로</b> Firestore(<code>docsSheets/list2026</code>)에 저장합니다. 앱의 <b>업무자료 → 📊 2026학년도 편성·명렬표</b> 뷰어가 이 파일을 서식까지 재현해 보여줍니다. 기존 파일은 덮어씁니다.<br><span style="color:var(--ink-soft);">※ 학생 개인정보 포함 — 저장소(GitHub)에 파일로 올리지 않고 교사 전용 규칙의 Firestore에만 저장합니다.</span></div>
+      <div class="dropzone" id="shDropzone">
+        <div class="dropzone-icon">📂</div>
+        <div class="dropzone-text"><b>파일을 드래그하거나 클릭</b><br>xlsx 지원</div>
+        <input type="file" id="shFileInput" accept=".xlsx" style="display:none;">
+      </div>
+      <div class="status" id="shStatus"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">📋 현재 저장된 편성·명렬표</div>
+      <div class="section-desc">Firestore에 저장된 파일 정보입니다.</div>
+      <div class="stat-chips" id="shDbStats"><div class="stat-chip">새로고침을 눌러주세요</div></div>
+      <div class="btn-row"><button class="btn btn-secondary" id="shRefreshBtn">🔄 새로고침</button></div>
+    </div>
+  </div>
+
+  <!-- ══ 사진명렬 탭 ══ -->
+  <div class="tab-panel" id="tab-photos">
+    <div class="section">
+      <div class="section-title">📷 사진명렬 업로드</div>
+      <div class="section-desc">학생 사진이 들어있는 엑셀(사진명렬표)을 올리면 <b>브라우저 안에서만</b> 사진을 추출·압축한 뒤, 사진 옆 번호·이름을 읽어 학생과 매칭해 저장합니다. 원본 파일(개인정보·수십 MB)은 서버에 올라가지 않고, 압축된 사진만 <code>studentPhotos/{학년-반}</code>에 저장됩니다. 학생 종합검색 상세 화면에 사진이 표시됩니다.</div>
+      <div class="ph-tools">
+        <select id="phGrade" class="ph-grade"><option value="1">1학년</option><option value="2">2학년</option><option value="3">3학년</option></select>
+        <label class="file-label" for="phFileInput">📂 사진명렬 엑셀 선택…</label>
+        <input type="file" id="phFileInput" accept=".xlsx" style="display:none;">
+      </div>
+      <div class="status" id="phStatus"></div>
+      <div id="phPreviewWrap" style="display:none;">
+        <div class="stat-chips" id="phStats" style="margin-top:14px;"></div>
+        <div class="ph-grid" id="phGrid"></div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="phUploadBtn" disabled>☁️ 사진 저장</button>
+          <button class="btn btn-secondary" id="phClearBtn">취소</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
@@ -436,6 +492,7 @@ document.querySelectorAll('.tab-nav-btn').forEach(btn => {
     if (btn.dataset.tab === 'contacts') loadDbContacts();
     if (btn.dataset.tab === 'students') loadDbStudents();
     if (btn.dataset.tab === 'clubs') loadDbClubs();
+    if (btn.dataset.tab === 'sheets') loadDbSheets();
   });
 });
 
@@ -1086,6 +1143,259 @@ document.getElementById('stDownloadBtn').addEventListener('click', () => {
   XLSX.utils.book_append_sheet(wb, ws, '학생연락망');
   XLSX.writeFile(wb, `영남고_학생연락망_${new Date().toLocaleDateString('ko-KR').replace(/\.\s/g,'-')}.xlsx`);
 });
+
+// ════════════════════════════════════
+// ── 편성·명렬표 업로드 (원본 xlsx를 base64 청크로 docsSheets/list2026 저장) ──
+// ════════════════════════════════════
+// 앱(index.html)의 업무자료 뷰어가 이 문서를 내려받아 ExcelJS로 서식까지 재현한다.
+const SHEETS_FSID = 'list2026';
+const shDropzone  = document.getElementById('shDropzone');
+const shFileInput = document.getElementById('shFileInput');
+
+shDropzone.addEventListener('click', () => shFileInput.click());
+shDropzone.addEventListener('dragover', e => { e.preventDefault(); shDropzone.classList.add('drag-over'); });
+shDropzone.addEventListener('dragleave', () => shDropzone.classList.remove('drag-over'));
+shDropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  shDropzone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) uploadSheetFile(e.dataTransfer.files[0]);
+});
+shFileInput.addEventListener('change', () => { if (shFileInput.files[0]) uploadSheetFile(shFileInput.files[0]); });
+
+async function uploadSheetFile(file) {
+  if (!currentUser) { setStatus('shStatus', '로그인이 필요합니다.', 'err'); return; }
+  try {
+    if (file.size > 40 * 1024 * 1024) { setStatus('shStatus', '40MB 이하 파일만 가능합니다.', 'err'); return; }
+    setStatus('shStatus', '📂 파일 읽는 중...', 'loading');
+    const buf = new Uint8Array(await file.arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    const b64 = btoa(bin);
+    // 이전 청크 수 기억 → 새 파일이 더 작으면 고아 청크 삭제
+    let oldMeta = null;
+    try { const os = await getDoc(doc(db, 'docsSheets', SHEETS_FSID)); if (os.exists()) oldMeta = os.data(); } catch(e) {}
+    const CH = 700000, n = Math.ceil(b64.length / CH);   // base64 ASCII → 1자=1바이트, 문서 1MiB 한도 대응
+    for (let i = 0; i < n; i++) {
+      setStatus('shStatus', `☁️ 저장 중… ${i + 1}/${n}`, 'loading');
+      await setDoc(doc(db, 'docsSheets', `${SHEETS_FSID}_c${i}`), { b64: b64.slice(i * CH, (i + 1) * CH) });
+    }
+    await setDoc(doc(db, 'docsSheets', SHEETS_FSID), {
+      chunks: n, bytes: buf.length, fileName: file.name,
+      updatedAt: new Date().toISOString(), updatedBy: auth.currentUser?.email || '',
+    });
+    if (oldMeta && oldMeta.chunks > n) {
+      for (let c = n; c < oldMeta.chunks; c++) { try { await deleteDoc(doc(db, 'docsSheets', `${SHEETS_FSID}_c${c}`)); } catch(e) {} }
+    }
+    setStatus('shStatus', `✅ 업로드 완료! (${(buf.length / 1048576).toFixed(1)}MB · ${n}청크)\n앱의 업무자료 뷰어를 새로고침하면 반영됩니다.`, 'ok');
+    loadDbSheets();
+  } catch(e) {
+    setStatus('shStatus', e.code === 'permission-denied' ? '권한 없음 — 교사 계정 필요' : '업로드 실패: ' + e.message, 'err');
+  } finally {
+    shFileInput.value = '';
+  }
+}
+
+async function loadDbSheets() {
+  const stats = document.getElementById('shDbStats');
+  stats.innerHTML = '<div class="stat-chip">불러오는 중…</div>';
+  try {
+    const snap = await getDoc(doc(db, 'docsSheets', SHEETS_FSID));
+    if (!snap.exists()) { stats.innerHTML = '<div class="stat-chip">저장된 파일 없음</div>'; return; }
+    const d = snap.data();
+    const upd = d.updatedAt ? new Date(d.updatedAt).toLocaleString('ko-KR') : '-';
+    stats.innerHTML = `
+      <div class="stat-chip">파일 <b>${d.fileName || '-'}</b></div>
+      <div class="stat-chip">크기 <b>${d.bytes ? (d.bytes / 1048576).toFixed(1) + 'MB' : '-'}</b></div>
+      <div class="stat-chip">마지막 업데이트 <b>${upd}</b></div>`;
+  } catch(e) {
+    stats.innerHTML = `<div class="stat-chip">불러오기 실패</div>`;
+  }
+}
+
+document.getElementById('shRefreshBtn').addEventListener('click', loadDbSheets);
+
+// ════════════════════════════════════
+// ── 사진명렬 업로드 (엑셀 embedded 이미지 추출·압축·매칭 → studentPhotos/{학년-반}) ──
+// ════════════════════════════════════
+// embedded 이미지 추출은 SheetJS로 안 되므로 ExcelJS를 지연 로드해 사용한다.
+let excelJsPromise = null;
+function loadExcelJS() {
+  if (window.ExcelJS) return Promise.resolve();
+  if (!excelJsPromise) excelJsPromise = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'vendor/exceljs/exceljs.min.js';   // 앱과 동일한 셀프호스팅 경로
+    s.onload = res;
+    s.onerror = () => { excelJsPromise = null; rej(new Error('ExcelJS 로드 실패')); };
+    document.head.appendChild(s);
+  });
+  return excelJsPromise;
+}
+const PH_SKIP = new Set(['번호','이름','성명','학년','학반','학급','사진','명렬','비고','성별','생년월일','담임','합계','소계','구분','순번','연번']);
+let phItems = [];              // [{ dataUrl, num, name, matched:{grade,room,num,name}|null }]
+let phAllStudents = null;      // students/main 캐시
+function phEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+const phFileInput = document.getElementById('phFileInput');
+phFileInput.addEventListener('change', () => { if (phFileInput.files[0]) phProcess(phFileInput.files[0]); });
+document.getElementById('phClearBtn').addEventListener('click', () => {
+  phItems = [];
+  document.getElementById('phPreviewWrap').style.display = 'none';
+  phFileInput.value = '';
+  clearStatus('phStatus');
+});
+document.getElementById('phUploadBtn').addEventListener('click', phUpload);
+
+// ExcelJS media(embedded 이미지) → 축소·jpeg 압축 dataURL
+function phCompress(media) {
+  return new Promise(res => {
+    try {
+      const blob = new Blob([media.buffer], { type: 'image/' + (media.extension || 'png') });
+      const url = URL.createObjectURL(blob);
+      const im = new Image();
+      im.onload = () => {
+        // 150×200 · jpeg 0.62 → 장당 ~10KB(base64 ~14KB). 반 40명이라도 문서 1MB 안.
+        const MAXW = 150, MAXH = 200;
+        const sc = Math.min(MAXW / im.width, MAXH / im.height, 1);
+        const w = Math.max(1, Math.round(im.width * sc)), h = Math.max(1, Math.round(im.height * sc));
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(im, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        try { res(cv.toDataURL('image/jpeg', 0.62)); } catch(e){ res(null); }
+      };
+      im.onerror = () => { URL.revokeObjectURL(url); res(null); };
+      im.src = url;
+    } catch(e){ res(null); }
+  });
+}
+
+async function phProcess(file) {
+  const setS = (t, type) => setStatus('phStatus', t, type || 'loading');
+  phItems = [];
+  document.getElementById('phPreviewWrap').style.display = 'none';
+  document.getElementById('phUploadBtn').disabled = true;
+  try {
+    setS('엑셀 라이브러리 로드 중…');
+    await loadExcelJS();
+    const grade = parseInt(document.getElementById('phGrade').value);
+    if (!phAllStudents) {
+      setS('학생 명단 로드 중…');
+      const snap = await getDoc(doc(db, 'students', 'main'));
+      phAllStudents = snap.exists() ? (snap.data().students || []) : [];
+    }
+    if (!phAllStudents.length) { setS('학생 명단이 없습니다. 먼저 [🎒 학생연락망]을 업로드하세요.', 'err'); return; }
+
+    setS('엑셀 파싱 중… (파일이 커서 잠시 걸립니다)');
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await file.arrayBuffer());
+
+    // 시트마다: embedded 이미지 + 텍스트 셀(번호/이름)을 모아 가장 가까운 이름과 짝지음
+    const pairs = [];   // { media, name, num }
+    wb.eachSheet(ws => {
+      const images = ws.getImages ? ws.getImages() : [];
+      if (!images.length) return;
+      const nameCells = [], numCells = [];
+      ws.eachRow({ includeEmpty:false }, (row, r) => {
+        row.eachCell({ includeEmpty:false }, (cell, c) => {
+          const t = String(cell.text || '').trim();
+          if (!t) return;
+          if (/^\d{1,3}$/.test(t)) numCells.push({ r, c, v: parseInt(t) });
+          else if (/^[가-힣]{2,5}$/.test(t) && !PH_SKIP.has(t)) nameCells.push({ r, c, v: t });
+        });
+      });
+      const used = new Set();
+      images.forEach(im => {
+        const a = im.range && im.range.tl; if (!a) return;
+        const ir = (a.nativeRow != null ? a.nativeRow : a.row) + 1;
+        const ic = (a.nativeCol != null ? a.nativeCol : a.col) + 1;
+        // 캡션은 사진 바로 아래·같은 열대에 오는 경우가 많음 → 아래쪽·같은 열을 우대
+        let best = -1, bestD = 1e9;
+        nameCells.forEach((nc, i) => {
+          if (used.has(i)) return;
+          const dr = nc.r - ir, dc = nc.c - ic;
+          const d = (dr < 0 ? -dr * 2.5 : dr) + Math.abs(dc) * 1.6;
+          if (d < bestD) { bestD = d; best = i; }
+        });
+        if (best < 0 || bestD > 16) return;   // 너무 멀면 라벨 없음(미매칭)
+        used.add(best);
+        const nc = nameCells[best];
+        let num = null, numD = 1e9;
+        numCells.forEach(q => {
+          const d = Math.abs(q.r - nc.r) + Math.abs(q.c - nc.c) * 1.2;
+          if (d < numD) { numD = d; num = q.v; }
+        });
+        const media = wb.getImage ? wb.getImage(Number(im.imageId)) : (wb.model.media || [])[Number(im.imageId)];
+        if (media) pairs.push({ media, name: nc.v, num });
+      });
+    });
+
+    setS(`사진 ${pairs.length}장 압축·매칭 중…`);
+    const gradeStudents = phAllStudents.filter(s => parseInt(s.grade) === grade);
+    for (const p of pairs) {
+      const dataUrl = await phCompress(p.media);
+      if (!dataUrl) continue;
+      const cands = gradeStudents.filter(s => s.name === p.name);   // 이름 매칭(동명이인은 번호 보정)
+      let matched = null;
+      if (cands.length === 1) matched = cands[0];
+      else if (cands.length > 1 && p.num != null) matched = cands.find(s => parseInt(s.num) === p.num) || null;
+      phItems.push({ dataUrl, num: p.num, name: p.name, matched });
+    }
+    phRenderPreview();
+  } catch(e) {
+    console.error(e);
+    setStatus('phStatus', '처리 실패: ' + e.message, 'err');
+  } finally {
+    phFileInput.value = '';
+  }
+}
+
+function phRenderPreview() {
+  const total = phItems.length;
+  const matched = phItems.filter(x => x.matched).length;
+  document.getElementById('phGrid').innerHTML = phItems.map(x => `
+    <div class="ph-card${x.matched ? '' : ' ph-nomatch'}">
+      <img src="${x.dataUrl}" alt="">
+      <div class="ph-cap">${x.num != null ? x.num + ' ' : ''}${phEsc(x.name || '?')}</div>
+      <div class="ph-match">${x.matched ? `→ ${x.matched.room}반 ${x.matched.num}번` : '⚠ 미매칭'}</div>
+    </div>`).join('');
+  document.getElementById('phStats').innerHTML = `
+    <div class="stat-chip">총 <b>${total}</b>장</div>
+    <div class="stat-chip">매칭 <b>${matched}</b></div>
+    <div class="stat-chip">미매칭 <b>${total - matched}</b></div>`;
+  document.getElementById('phPreviewWrap').style.display = '';
+  document.getElementById('phUploadBtn').disabled = matched === 0;
+  setStatus('phStatus', '미리보기 확인 후 [☁️ 사진 저장]. 미매칭(⚠)은 저장되지 않습니다.', 'info');
+}
+
+async function phUpload() {
+  if (!currentUser) { setStatus('phStatus', '로그인이 필요합니다.', 'err'); return; }
+  const btn = document.getElementById('phUploadBtn');
+  btn.disabled = true;
+  // 매칭된 사진을 반별로 묶기
+  const byClass = {};
+  phItems.forEach(x => {
+    if (!x.matched) return;
+    const ck = `${parseInt(x.matched.grade)}-${parseInt(x.matched.room)}`;
+    (byClass[ck] = byClass[ck] || {})[String(parseInt(x.matched.num))] = x.dataUrl;
+  });
+  const keys = Object.keys(byClass);
+  if (!keys.length) { setStatus('phStatus', '업로드할 매칭 사진이 없습니다.', 'err'); return; }
+  try {
+    for (let i = 0; i < keys.length; i++) {
+      setStatus('phStatus', `☁️ 업로드 중… ${i + 1}/${keys.length} (${keys[i]}반)`, 'loading');
+      // merge:true → 다른 반/기존 번호를 덮지 않고 병합(중첩 map도 재귀 병합)
+      await setDoc(doc(db, 'studentPhotos', keys[i]), {
+        photos: byClass[keys[i]],
+        updatedAt: new Date().toISOString(),
+        updatedBy: auth.currentUser?.email || '',
+      }, { merge: true });
+    }
+    setStatus('phStatus', `✅ 사진 저장 완료! (${keys.length}개 반)\n학생 종합검색 상세 화면에서 확인하세요.`, 'ok');
+  } catch(e) {
+    console.error(e);
+    setStatus('phStatus', e.code === 'permission-denied' ? '권한 없음 — 교사 계정 필요' : '업로드 실패: ' + e.message, 'err');
+    btn.disabled = false;
+  }
+}
 </script>
 </body>
 </html>
