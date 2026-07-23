@@ -1199,6 +1199,14 @@
   .s360-list-box{max-width:900px;margin:0 auto;background:var(--paper);border-radius:12px;border:1px solid var(--rule);overflow:hidden;}
   .s360-list-head{max-width:900px;margin:0 auto;}
   .s360-card{max-width:1400px;margin:0 auto;background:var(--paper);border-radius:14px;box-shadow:0 4px 20px -8px rgba(0,0,0,.15);padding:24px 28px;}
+  /* 상세 헤더: 넓은 화면은 사진을 오른쪽에 크게, 모바일은 이름 아래에 크게 */
+  .s360-head{display:flex;gap:18px;align-items:flex-start;margin-bottom:14px;}
+  .s360-head-info{order:1;flex:1;min-width:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+  .s360-photo{order:2;width:150px;height:190px;object-fit:cover;border-radius:12px;border:1px solid var(--rule);background:var(--paper-soft);flex-shrink:0;}
+  @media (max-width:640px){
+    .s360-head{flex-direction:column;align-items:stretch;gap:12px;}
+    .s360-photo{align-self:flex-start;width:176px;height:222px;}
+  }
   .s360-records{max-height:260px;overflow-y:auto;border:1px solid var(--rule);border-radius:8px;padding:8px 12px;background:var(--paper-soft);}
   .s360-records > div{font-size:15px !important;}
   .s360-table-wrap{overflow-x:auto;border:1px solid var(--rule);border-radius:8px;}
@@ -8210,15 +8218,15 @@ async function s360ShowDetail(s){
   main.innerHTML = `
     <button class="s360-back" id="s360BackBtn">← 학생 목록으로</button>
     <div class="s360-card">
-      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:14px;">
-        <img id="s360PhotoImg" alt="" style="display:none;width:84px;height:106px;object-fit:cover;border-radius:10px;border:1px solid var(--rule);background:var(--paper-soft);flex-shrink:0;">
-        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0;">
+      <div class="s360-head">
+        <div class="s360-head-info">
           <span style="font-size:24px;font-weight:900;color:var(--ink);">${escapeHtml(s.name||'')}</span>
           <span style="font-family:'IBM Plex Mono';font-size:14.5px;color:var(--ink-soft);font-weight:700;">${s.grade}학년 ${s.room}반 ${s.num}번</span>
           ${isSciStudent(s) ? SCI_BADGE : ''}
           ${s.club ? `<span class="spot-badge">🎯 ${escapeHtml(s.club)}</span>` : ''}
           <button id="s360ContactBtn" class="spot-badge" style="border:none;cursor:pointer;font-family:inherit;">📞 연락처 보기</button>
         </div>
+        <img id="s360PhotoImg" class="s360-photo" alt="" style="display:none;">
       </div>
       <div class="spot-sec"><div class="spot-sec-title">상벌점 (전체 이력)</div>${ptsHtml}</div>
       <div class="spot-sec"><div class="spot-sec-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">선택과목<span id="s360SimSlot"></span></div>
