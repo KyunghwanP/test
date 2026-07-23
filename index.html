@@ -12342,8 +12342,15 @@ function renderHomeTaskSection() {
       </div>
     </div>` : '';
 
+  // 목록 아래 '+ 일정 추가' 버튼 (업무 없을 때 뜨는 것과 동일한 모양)
+  const addBtn = `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 4px 4px;">
+      <button onclick="openMytaskModal()" style="flex:1;padding:10px 0;border-radius:10px;border:1.5px dashed var(--mon);background:transparent;color:var(--mon);font-size:14px;font-weight:700;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">+ 일정 추가</button>
+    </div>`;
+
   list.innerHTML = `
     ${activeHtml}
+    ${addBtn}
     ${doneSection}`;
 }
 window.renderHomeTaskSection = renderHomeTaskSection;
