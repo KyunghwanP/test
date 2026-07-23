@@ -90,6 +90,27 @@
   html.widget-mode[data-widget="fulltt"] #timetablePage .wrap,
   html.widget-mode[data-widget="fulltt"] #timetablePage .layout,
   html.widget-mode[data-widget="fulltt"] #timetablePage .main { display:block !important; margin:0 !important; padding:6px !important; height:auto !important; }
+  /* 위젯에선 시간표를 시원하게: 셀 높이·글자 키우고 여백 확보(위젯 높이 vh 기준 스케일) */
+  html.widget-mode[data-widget="fulltt"] #timetablePage{
+    --gt-row-h: clamp(44px, 10.8vh, 86px);
+    --gt-head-h: clamp(38px, 7.5vh, 58px);
+    --gt-lunch-h: clamp(18px, 3.2vh, 30px);
+    --gt-gap: clamp(4px, 1vh, 9px);
+    --gt-colnum-w: clamp(30px, 8vw, 54px);
+    --gt-font-head: clamp(13px, 2.7vh, 19px);
+    --gt-font-pnum: clamp(12px, 2.4vh, 16px);
+    --gt-font-subject: clamp(12px, 2.7vh, 18px);
+    --gt-font-class: clamp(10px, 2vh, 14px);
+    --gt-font-corner: clamp(10px, 2vh, 14px);
+    --gt-font-empty: clamp(12px, 2.6vh, 16px);
+  }
+  html.widget-mode[data-widget="fulltt"] #timetablePage .table-wrap{ padding:4px 0 0 !important; }
+  /* 위젯에선 요일 헤더의 원색을 차분한 파스텔로 죽임(구분은 유지) */
+  html.widget-mode[data-widget="fulltt"] #timetablePage .gt-head[data-day="월"]{ background:#f2e7e9 !important; color:#8a5a62 !important; }
+  html.widget-mode[data-widget="fulltt"] #timetablePage .gt-head[data-day="화"]{ background:#ebe6f1 !important; color:#6d6188 !important; }
+  html.widget-mode[data-widget="fulltt"] #timetablePage .gt-head[data-day="수"]{ background:#e3efe7 !important; color:#517c5f !important; }
+  html.widget-mode[data-widget="fulltt"] #timetablePage .gt-head[data-day="목"]{ background:#f5ecd9 !important; color:#8a6d3d !important; }
+  html.widget-mode[data-widget="fulltt"] #timetablePage .gt-head[data-day="금"]{ background:#f2e4e4 !important; color:#8a5252 !important; }
 </style>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
