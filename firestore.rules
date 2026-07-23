@@ -123,6 +123,12 @@ service cloud.firestore {
     match /docsSheets/{docId} {
       allow read, write: if isYnhsTeacher();
     }
+    // ── 사진명렬 (학생 사진) — 반별 문서 {학년-반}.photos = { 번호: dataURL } ──
+    // 학생 개인정보(얼굴) 포함 — 원본 xlsx는 저장소에 못 올려, 교사가 앱에서
+    // 브라우저로 파싱·압축해 사진만 저장. 교사만 읽기/쓰기.
+    match /studentPhotos/{docId} {
+      allow read, write: if isYnhsTeacher();
+    }
     // ── 공통 함수 ──
     function isYnhsTeacher() {
       return request.auth != null

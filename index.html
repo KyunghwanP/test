@@ -7880,6 +7880,12 @@ function s360RenderGroups(){
   s360View = 'groups';
   const body = document.getElementById('s360Body');
   let html = '<div class="s360-groups">';
+  // 사진명렬 업로드 — 관리자 전용(파일은 브라우저에서만 처리, 사진만 Firestore 저장)
+  if (fbAuth.currentUser?.email === ADMIN_EMAIL) {
+    html += `<div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+      <button class="spot-badge" style="border:none;cursor:pointer;font-family:inherit;" onclick="openPhotoRosterTool()">📷 사진명렬 올리기</button>
+    </div>`;
+  }
 
   if (s360Mode === 'class') {
     const classKeys = [...new Set(allStudents.map(s => s.grade && s.room ? `${parseInt(s.grade)}-${parseInt(s.room)}` : null).filter(Boolean))]
@@ -8210,12 +8216,15 @@ async function s360ShowDetail(s){
   main.innerHTML = `
     <button class="s360-back" id="s360BackBtn">← 학생 목록으로</button>
     <div class="s360-card">
-      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-        <span style="font-size:24px;font-weight:900;color:var(--ink);">${escapeHtml(s.name||'')}</span>
-        <span style="font-family:'IBM Plex Mono';font-size:14.5px;color:var(--ink-soft);font-weight:700;">${s.grade}학년 ${s.room}반 ${s.num}번</span>
-        ${isSciStudent(s) ? SCI_BADGE : ''}
-        ${s.club ? `<span class="spot-badge">🎯 ${escapeHtml(s.club)}</span>` : ''}
-        <button id="s360ContactBtn" class="spot-badge" style="border:none;cursor:pointer;font-family:inherit;">📞 연락처 보기</button>
+      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:14px;">
+        <img id="s360PhotoImg" alt="" style="display:none;width:84px;height:106px;object-fit:cover;border-radius:10px;border:1px solid var(--rule);background:var(--paper-soft);flex-shrink:0;">
+        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0;">
+          <span style="font-size:24px;font-weight:900;color:var(--ink);">${escapeHtml(s.name||'')}</span>
+          <span style="font-family:'IBM Plex Mono';font-size:14.5px;color:var(--ink-soft);font-weight:700;">${s.grade}학년 ${s.room}반 ${s.num}번</span>
+          ${isSciStudent(s) ? SCI_BADGE : ''}
+          ${s.club ? `<span class="spot-badge">🎯 ${escapeHtml(s.club)}</span>` : ''}
+          <button id="s360ContactBtn" class="spot-badge" style="border:none;cursor:pointer;font-family:inherit;">📞 연락처 보기</button>
+        </div>
       </div>
       <div class="spot-sec"><div class="spot-sec-title">상벌점 (전체 이력)</div>${ptsHtml}</div>
       <div class="spot-sec"><div class="spot-sec-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">선택과목<span id="s360SimSlot"></span></div>
@@ -8227,6 +8236,7 @@ async function s360ShowDetail(s){
     </div>`;
   document.getElementById('s360BackBtn').addEventListener('click', () => s360Back());
   document.getElementById('s360ContactBtn').addEventListener('click', () => showStudentDetail(s));
+  s360LoadPhoto(s);      // 사진명렬(studentPhotos) — 있으면 헤더에 표시
   s360LoadElectives(s);
 
   // 성적: 해당 반 gradesMock 문서만 지연 로드
@@ -10577,6 +10587,238 @@ function loadExcelJS(){
   });
   return excelJsPromise;
 }
+
+// ══════════════════════════════════════════
+// 사진명렬 — 학생 종합검색 상세에 사진 표시 + 관리자용 업로드 도구
+//  · 사진은 반별 Firestore 문서 studentPhotos/{학년-반}.photos = { 번호: dataURL(jpeg) }
+//  · 원본 xlsx(30MB·개인정보)는 서버·저장소에 올리지 않는다. 교사가 브라우저에서
+//    파일을 고르면 ExcelJS로 embedded 이미지를 뽑아 축소·압축한 뒤 사진만 업로드한다.
+// ══════════════════════════════════════════
+const s360PhotoCache = {};   // '학년-반' → { 번호: dataURL } (반 단위로 한 번만 로드)
+
+async function s360LoadPhoto(s){
+  const img = document.getElementById('s360PhotoImg');
+  if(!img) return;
+  const ck = `${parseInt(s.grade)}-${parseInt(s.room)}`;
+  try {
+    if(s360PhotoCache[ck] === undefined){
+      const snap = await getDoc(doc(fbDb, 'studentPhotos', ck));
+      s360PhotoCache[ck] = snap.exists() ? (snap.data().photos || {}) : {};
+    }
+    const url = s360PhotoCache[ck][String(parseInt(s.num))];
+    if(url){ img.src = url; img.style.display = 'block'; }
+  } catch(e){ /* 사진 없으면 조용히 넘어감 */ }
+}
+
+// ── 업로드 도구 ──
+const PR_SKIP_WORDS = new Set(['번호','이름','성명','학년','학반','학급','사진','명렬','비고','성별','생년월일','담임','합계','소계','구분','순번','연번']);
+let photoRosterItems = [];   // [{ dataUrl, num, name, matched:{grade,room,num,name}|null }]
+
+function openPhotoRosterTool(){
+  if(document.getElementById('photoRosterModal')) return;
+  if(!document.getElementById('photoRosterCss')){
+    const st = document.createElement('style');
+    st.id = 'photoRosterCss';
+    st.textContent = `
+      .pr-modal{position:fixed;inset:0;z-index:9000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:18px;}
+      .pr-box{background:var(--paper);color:var(--ink);border-radius:14px;width:min(920px,96vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.35);overflow:hidden;}
+      .pr-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--rule);}
+      .pr-head b{font-size:15px;}
+      .pr-status{font-size:12px;color:var(--ink-soft);flex:1;min-width:120px;}
+      .pr-x{margin-left:auto;border:none;background:transparent;font-size:16px;cursor:pointer;color:var(--ink-soft);}
+      .pr-grid{flex:1;overflow:auto;padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;background:var(--paper-soft);}
+      .pr-card{border:1px solid var(--rule);border-radius:10px;background:var(--paper);padding:6px;text-align:center;}
+      .pr-card img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:6px;background:#e5e7eb;}
+      .pr-cap{font-size:12px;font-weight:800;margin-top:4px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .pr-match{font-size:11px;color:#2563eb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .pr-nomatch{opacity:.6;}
+      .pr-nomatch .pr-match{color:#dc2626;}
+      .pr-foot{display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--rule);}
+      .pr-foot #prSummary{font-size:13px;color:var(--ink-soft);flex:1;}
+      .pr-btn{border:1px solid var(--rule);background:var(--paper-soft);color:var(--ink);border-radius:8px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+      .pr-primary{background:#2563eb;border-color:#2563eb;color:#fff;}
+      .pr-primary:disabled{opacity:.45;cursor:default;}
+      .pr-grade{border:1px solid var(--rule);border-radius:8px;padding:5px 8px;font-family:inherit;background:var(--paper);color:var(--ink);}`;
+    document.head.appendChild(st);
+  }
+  const m = document.createElement('div');
+  m.id = 'photoRosterModal';
+  m.className = 'pr-modal';
+  m.innerHTML = `
+    <div class="pr-box">
+      <div class="pr-head">
+        <b>📷 사진명렬 올리기</b>
+        <select id="prGrade" class="pr-grade"><option value="1">1학년</option><option value="2">2학년</option><option value="3">3학년</option></select>
+        <button id="prPick" class="pr-btn">엑셀 파일 선택…</button>
+        <span id="prStatus" class="pr-status">파일은 브라우저 안에서만 처리되고, 사진만 서버에 저장됩니다.</span>
+        <button id="prClose" class="pr-x">✕</button>
+      </div>
+      <div id="prGrid" class="pr-grid"></div>
+      <div class="pr-foot">
+        <span id="prSummary"></span>
+        <button id="prUpload" class="pr-btn pr-primary" disabled>업로드</button>
+      </div>
+      <input type="file" id="prFile" accept=".xlsx" style="display:none;">
+    </div>`;
+  document.body.appendChild(m);
+  m.addEventListener('mousedown', e => { if(e.target === m) closePhotoRosterTool(); });
+  document.getElementById('prClose').onclick = closePhotoRosterTool;
+  document.getElementById('prPick').onclick = () => document.getElementById('prFile').click();
+  document.getElementById('prFile').onchange = e => { if(e.target.files[0]) photoRosterProcess(e.target.files[0]); };
+  document.getElementById('prUpload').onclick = photoRosterUpload;
+}
+function closePhotoRosterTool(){ document.getElementById('photoRosterModal')?.remove(); photoRosterItems = []; }
+
+// embedded 이미지(ExcelJS media) → 축소·jpeg 압축 dataURL
+function photoRosterCompress(media){
+  return new Promise(res => {
+    try {
+      const blob = new Blob([media.buffer], { type: 'image/' + (media.extension || 'png') });
+      const url = URL.createObjectURL(blob);
+      const im = new Image();
+      im.onload = () => {
+        // 150×200 · jpeg 0.62 → 장당 ~10KB(base64 ~14KB). 반 40명이라도 문서 1MB 한도 안.
+        const MAXW = 150, MAXH = 200;
+        const sc = Math.min(MAXW / im.width, MAXH / im.height, 1);
+        const w = Math.max(1, Math.round(im.width * sc)), h = Math.max(1, Math.round(im.height * sc));
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(im, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        try { res(cv.toDataURL('image/jpeg', 0.62)); } catch(e){ res(null); }
+      };
+      im.onerror = () => { URL.revokeObjectURL(url); res(null); };
+      im.src = url;
+    } catch(e){ res(null); }
+  });
+}
+
+async function photoRosterProcess(file){
+  const st = document.getElementById('prStatus');
+  const grid = document.getElementById('prGrid');
+  const setS = t => { if(st) st.textContent = t; };
+  photoRosterItems = [];
+  grid.innerHTML = '';
+  document.getElementById('prSummary').textContent = '';
+  document.getElementById('prUpload').disabled = true;
+  try {
+    setS('엑셀 라이브러리 로드 중…');
+    await loadExcelJS();
+    const grade = parseInt(document.getElementById('prGrade').value);
+    if(!allStudents.length){
+      setS('학생 명단 로드 중…');
+      const snap = await getDoc(doc(fbDb, 'students', 'main'));
+      allStudents = snap.exists() ? (snap.data().students || []) : [];
+    }
+    setS('엑셀 파싱 중… (파일이 커서 잠시 걸립니다)');
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await file.arrayBuffer());
+
+    // 시트마다: embedded 이미지 + 텍스트 셀(번호/이름) 라벨을 모아 가장 가까운 이름과 짝지음
+    const pairs = [];   // { media, name, num }
+    wb.eachSheet(ws => {
+      const images = ws.getImages ? ws.getImages() : [];
+      if(!images.length) return;
+      const nameCells = [], numCells = [];
+      ws.eachRow({ includeEmpty:false }, (row, r) => {
+        row.eachCell({ includeEmpty:false }, (cell, c) => {
+          const t = String(cell.text || '').trim();
+          if(!t) return;
+          if(/^\d{1,3}$/.test(t)) numCells.push({ r, c, v: parseInt(t) });
+          else if(/^[가-힣]{2,5}$/.test(t) && !PR_SKIP_WORDS.has(t)) nameCells.push({ r, c, v: t });
+        });
+      });
+      const used = new Set();
+      images.forEach(im => {
+        const a = im.range && im.range.tl; if(!a) return;
+        const ir = (a.nativeRow != null ? a.nativeRow : a.row) + 1;
+        const ic = (a.nativeCol != null ? a.nativeCol : a.col) + 1;
+        // 캡션은 사진 바로 아래·같은 열대에 오는 경우가 많음 → 아래쪽·같은 열을 우대
+        let best = -1, bestD = 1e9;
+        nameCells.forEach((nc, i) => {
+          if(used.has(i)) return;
+          const dr = nc.r - ir, dc = nc.c - ic;
+          const d = (dr < 0 ? -dr * 2.5 : dr) + Math.abs(dc) * 1.6;
+          if(d < bestD){ bestD = d; best = i; }
+        });
+        if(best < 0 || bestD > 16) return;   // 너무 멀면 라벨 없음(미매칭)
+        used.add(best);
+        const nc = nameCells[best];
+        let num = null, numD = 1e9;
+        numCells.forEach(q => {
+          const d = Math.abs(q.r - nc.r) + Math.abs(q.c - nc.c) * 1.2;
+          if(d < numD){ numD = d; num = q.v; }
+        });
+        const media = wb.getImage ? wb.getImage(Number(im.imageId)) : (wb.model.media || [])[Number(im.imageId)];
+        if(media) pairs.push({ media, name: nc.v, num });
+      });
+    });
+
+    setS(`사진 ${pairs.length}장 압축·매칭 중…`);
+    const gradeStudents = allStudents.filter(s => parseInt(s.grade) === grade);
+    for(const p of pairs){
+      const dataUrl = await photoRosterCompress(p.media);
+      if(!dataUrl) continue;
+      const cands = gradeStudents.filter(s => s.name === p.name);   // 이름으로 매칭(동명이인은 번호로 보정)
+      let matched = null;
+      if(cands.length === 1) matched = cands[0];
+      else if(cands.length > 1 && p.num != null) matched = cands.find(s => parseInt(s.num) === p.num) || null;
+      photoRosterItems.push({ dataUrl, num: p.num, name: p.name, matched });
+    }
+    photoRosterRenderPreview();
+  } catch(e){
+    console.error(e);
+    setS('처리 실패: ' + e.message);
+  } finally {
+    const f = document.getElementById('prFile'); if(f) f.value = '';
+  }
+}
+
+function photoRosterRenderPreview(){
+  const grid = document.getElementById('prGrid');
+  const total = photoRosterItems.length;
+  const matched = photoRosterItems.filter(x => x.matched).length;
+  grid.innerHTML = photoRosterItems.map(x => `
+    <div class="pr-card${x.matched ? '' : ' pr-nomatch'}">
+      <img src="${x.dataUrl}" alt="">
+      <div class="pr-cap">${x.num != null ? x.num + ' ' : ''}${escapeHtml(x.name || '?')}</div>
+      <div class="pr-match">${x.matched ? `→ ${x.matched.room}반 ${x.matched.num}번` : '⚠ 미매칭'}</div>
+    </div>`).join('');
+  document.getElementById('prSummary').textContent = `총 ${total}장 · 매칭 ${matched} · 미매칭 ${total - matched}`;
+  document.getElementById('prStatus').textContent = '미리보기 확인 후 [업로드]. 미매칭(⚠)은 저장되지 않습니다.';
+  document.getElementById('prUpload').disabled = matched === 0;
+}
+
+async function photoRosterUpload(){
+  const st = document.getElementById('prStatus');
+  const btn = document.getElementById('prUpload'); btn.disabled = true;
+  // 매칭된 사진을 반별로 묶기
+  const byClass = {};
+  photoRosterItems.forEach(x => {
+    if(!x.matched) return;
+    const ck = `${parseInt(x.matched.grade)}-${parseInt(x.matched.room)}`;
+    (byClass[ck] = byClass[ck] || {})[String(parseInt(x.matched.num))] = x.dataUrl;
+  });
+  const keys = Object.keys(byClass);
+  if(!keys.length){ st.textContent = '업로드할 매칭 사진이 없습니다.'; return; }
+  try {
+    for(let i = 0; i < keys.length; i++){
+      st.textContent = `업로드 중… ${i + 1}/${keys.length} (${keys[i]}반)`;
+      // merge:true → 다른 반/기존 번호를 덮지 않고 병합(중첩 map도 재귀 병합)
+      await _fsSetDoc(doc(fbDb, 'studentPhotos', keys[i]), {
+        photos: byClass[keys[i]],
+        updatedAt: new Date().toISOString(),
+        updatedBy: fbAuth.currentUser?.email || '',
+      }, { merge: true });
+      delete s360PhotoCache[keys[i]];   // 캐시 무효화 → 다음 조회 때 새로 로드
+    }
+    st.textContent = `업로드 완료 ✓ (${keys.length}개 반)`;
+  } catch(e){
+    console.error(e);
+    st.textContent = e.code === 'permission-denied' ? '권한 없음 — 교사 계정 필요' : '업로드 실패: ' + e.message;
+    btn.disabled = false;
+  }
+}
+window.openPhotoRosterTool = openPhotoRosterTool;
 
 function docsXlsxUploadClick(){ document.getElementById('docsXlsxFile')?.click(); }
 
