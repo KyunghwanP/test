@@ -69,6 +69,8 @@
   html.widget-mode #homeConsultList,
   html.widget-mode #homeAISummary,
   html.widget-mode .home-mini-cal { flex:1 1 auto !important; max-height:none !important; overflow-y:auto; }
+  /* 위젯에선 업무 목록 높이 캡(260px) 해제 → 위젯을 키우면 '+ 일정 추가'까지 그냥 다 보임 */
+  html.widget-mode #homeTaskList .home-task-scroll { max-height:none !important; }
   /* 위젯 모드: 스크롤바 숨김(스크롤 기능은 유지) — 루트·모든 요소 포함 */
   html.widget-mode, html.widget-mode body, html.widget-mode * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
   html.widget-mode::-webkit-scrollbar,
@@ -12328,10 +12330,18 @@ function renderHomeTaskSection() {
     return;
   }
 
-  // 진행중 있을 때
+  // 목록 아래 '+ 일정 추가' 버튼 (업무 없을 때 뜨는 것과 동일한 모양)
+  const addBtn = `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 4px 4px;">
+      <button onclick="openMytaskModal()" style="flex:1;padding:10px 0;border-radius:10px;border:1.5px dashed var(--mon);background:transparent;color:var(--mon);font-size:14px;font-weight:700;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">+ 일정 추가</button>
+    </div>`;
+
+  // 진행중 있을 때 — 업무 2개 이상이면 '+ 일정 추가'를 스크롤 박스 안 맨 아래로(내려야 보임)
+  const btnInScroll = activeTasks.length >= 2;
   const activeHtml = `
-    <div style="max-height:260px;overflow-y:auto;">
+    <div class="home-task-scroll" style="max-height:260px;overflow-y:auto;">
       ${activeTasks.map(t => _makeHomeTaskRow(t, todayStr, statusColor)).join('')}
+      ${btnInScroll ? addBtn : ''}
     </div>`;
 
   const doneSection = _homeShowDone && doneTasks.length > 0 ? `
@@ -12339,19 +12349,13 @@ function renderHomeTaskSection() {
       <div style="font-size:11px;font-weight:700;color:var(--ink-soft);padding:4px 4px 2px;border-bottom:1px solid var(--rule);margin-bottom:2px;">완료된 업무</div>
       <div style="max-height:260px;overflow-y:auto;">
         ${doneTasks.map(t => _makeHomeTaskRow(t, todayStr, statusColor)).join('')}
-        
+
       </div>
     </div>` : '';
 
-  // 목록 아래 '+ 일정 추가' 버튼 (업무 없을 때 뜨는 것과 동일한 모양)
-  const addBtn = `
-    <div style="display:flex;align-items:center;gap:8px;padding:8px 4px 4px;">
-      <button onclick="openMytaskModal()" style="flex:1;padding:10px 0;border-radius:10px;border:1.5px dashed var(--mon);background:transparent;color:var(--mon);font-size:14px;font-weight:700;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">+ 일정 추가</button>
-    </div>`;
-
   list.innerHTML = `
     ${activeHtml}
-    ${addBtn}
+    ${btnInScroll ? '' : addBtn}
     ${doneSection}`;
 }
 window.renderHomeTaskSection = renderHomeTaskSection;
