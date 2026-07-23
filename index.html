@@ -8210,12 +8210,15 @@ async function s360ShowDetail(s){
   main.innerHTML = `
     <button class="s360-back" id="s360BackBtn">← 학생 목록으로</button>
     <div class="s360-card">
-      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-        <span style="font-size:24px;font-weight:900;color:var(--ink);">${escapeHtml(s.name||'')}</span>
-        <span style="font-family:'IBM Plex Mono';font-size:14.5px;color:var(--ink-soft);font-weight:700;">${s.grade}학년 ${s.room}반 ${s.num}번</span>
-        ${isSciStudent(s) ? SCI_BADGE : ''}
-        ${s.club ? `<span class="spot-badge">🎯 ${escapeHtml(s.club)}</span>` : ''}
-        <button id="s360ContactBtn" class="spot-badge" style="border:none;cursor:pointer;font-family:inherit;">📞 연락처 보기</button>
+      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:14px;">
+        <img id="s360PhotoImg" alt="" style="display:none;width:84px;height:106px;object-fit:cover;border-radius:10px;border:1px solid var(--rule);background:var(--paper-soft);flex-shrink:0;">
+        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0;">
+          <span style="font-size:24px;font-weight:900;color:var(--ink);">${escapeHtml(s.name||'')}</span>
+          <span style="font-family:'IBM Plex Mono';font-size:14.5px;color:var(--ink-soft);font-weight:700;">${s.grade}학년 ${s.room}반 ${s.num}번</span>
+          ${isSciStudent(s) ? SCI_BADGE : ''}
+          ${s.club ? `<span class="spot-badge">🎯 ${escapeHtml(s.club)}</span>` : ''}
+          <button id="s360ContactBtn" class="spot-badge" style="border:none;cursor:pointer;font-family:inherit;">📞 연락처 보기</button>
+        </div>
       </div>
       <div class="spot-sec"><div class="spot-sec-title">상벌점 (전체 이력)</div>${ptsHtml}</div>
       <div class="spot-sec"><div class="spot-sec-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">선택과목<span id="s360SimSlot"></span></div>
@@ -8227,6 +8230,7 @@ async function s360ShowDetail(s){
     </div>`;
   document.getElementById('s360BackBtn').addEventListener('click', () => s360Back());
   document.getElementById('s360ContactBtn').addEventListener('click', () => showStudentDetail(s));
+  s360LoadPhoto(s);      // 사진명렬(studentPhotos) — 있으면 헤더에 표시
   s360LoadElectives(s);
 
   // 성적: 해당 반 gradesMock 문서만 지연 로드
@@ -9932,7 +9936,6 @@ function openDocsItem(id){
         <button class="docs-pdf-nav" onclick="docsXlsxFindNav(true)" title="이전 결과">◀</button>
         <button class="docs-pdf-nav" onclick="docsXlsxFindNav(false)" title="다음 결과">▶</button>
         <span id="docsXlsxMatch" class="docs-pdf-match"></span>
-        <button class="docs-pdf-nav" onclick="docsXlsxUploadClick()" title="엑셀 파일로 데이터 갱신 (교사 전용)">⬆ 갱신</button>
         <span id="docsXlsxStatus" class="docs-pdf-match" style="min-width:0;"></span>
       </div>
       <div class="docs-xlsx-tabs" id="docsXlsxTabs"></div>
@@ -10234,7 +10237,7 @@ async function initDocsXlsx(item){
   try {
     const snap = await getDoc(doc(fbDb, 'docsSheets', item.fsId));
     if(!snap.exists()){
-      wrap.innerHTML = '<div class="docs-empty">아직 업로드된 데이터가 없습니다.<br>우측 상단 <b>[⬆ 갱신]</b> 버튼으로 엑셀 파일을 올려주세요.</div>';
+      wrap.innerHTML = '<div class="docs-empty">아직 업로드된 데이터가 없습니다.<br>관리자 업로드 페이지(<b>upload.html</b> → 편성·명렬표 업로드)에서 엑셀 파일을 올려주세요.</div>';
       return;
     }
     const meta = snap.data();
@@ -10576,6 +10579,27 @@ function loadExcelJS(){
     document.head.appendChild(s);
   });
   return excelJsPromise;
+}
+
+// ══════════════════════════════════════════
+// 사진명렬 — 학생 종합검색 상세에 사진 표시 (읽기 전용)
+//  · 사진은 반별 Firestore 문서 studentPhotos/{학년-반}.photos = { 번호: dataURL(jpeg) }
+//  · 업로드(엑셀에서 사진 추출·압축·매칭)는 관리자 페이지 upload.html 에서 수행한다.
+// ══════════════════════════════════════════
+const s360PhotoCache = {};   // '학년-반' → { 번호: dataURL } (반 단위로 한 번만 로드)
+
+async function s360LoadPhoto(s){
+  const img = document.getElementById('s360PhotoImg');
+  if(!img) return;
+  const ck = `${parseInt(s.grade)}-${parseInt(s.room)}`;
+  try {
+    if(s360PhotoCache[ck] === undefined){
+      const snap = await getDoc(doc(fbDb, 'studentPhotos', ck));
+      s360PhotoCache[ck] = snap.exists() ? (snap.data().photos || {}) : {};
+    }
+    const url = s360PhotoCache[ck][String(parseInt(s.num))];
+    if(url){ img.src = url; img.style.display = 'block'; }
+  } catch(e){ /* 사진 없으면 조용히 넘어감 */ }
 }
 
 function docsXlsxUploadClick(){ document.getElementById('docsXlsxFile')?.click(); }
