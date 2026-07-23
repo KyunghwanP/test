@@ -1303,46 +1303,68 @@ async function phProcess(file) {
 
     setS('엑셀 파싱 중… (파일이 커서 잠시 걸립니다)');
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(await file.arrayBuffer());
+    try {
+      await wb.xlsx.load(await file.arrayBuffer());
+    } catch(e) {
+      throw new Error('엑셀 로드 실패: ' + (e && e.message || e));   // 어느 단계 오류인지 구분용
+    }
+
+    // 셀 값을 안전하게 문자열로 — cell.text 게터가 특정 셀에서 null.toString()을 던지는 것 회피
+    const cellStr = cell => {
+      let v = cell && cell.value;
+      if (v == null) return '';
+      if (typeof v === 'object') {
+        if (Array.isArray(v.richText)) v = v.richText.map(r => (r && r.text) || '').join('');
+        else if (v.text != null) v = v.text;            // 하이퍼링크
+        else if (v.result != null) v = v.result;        // 수식 결과
+        else if (typeof v.toString !== 'function') return '';
+        else if (v instanceof Date) return '';          // 날짜는 번호/이름 아님
+      }
+      try { return String(v).trim(); } catch(_) { return ''; }
+    };
 
     // 시트마다: embedded 이미지 + 텍스트 셀(번호/이름)을 모아 가장 가까운 이름과 짝지음
     const pairs = [];   // { media, name, num }
     wb.eachSheet(ws => {
-      const images = ws.getImages ? ws.getImages() : [];
-      if (!images.length) return;
-      const nameCells = [], numCells = [];
-      ws.eachRow({ includeEmpty:false }, (row, r) => {
-        row.eachCell({ includeEmpty:false }, (cell, c) => {
-          const t = String(cell.text || '').trim();
-          if (!t) return;
-          if (/^\d{1,3}$/.test(t)) numCells.push({ r, c, v: parseInt(t) });
-          else if (/^[가-힣]{2,5}$/.test(t) && !PH_SKIP.has(t)) nameCells.push({ r, c, v: t });
+      try {
+        let images = [];
+        try { images = ws.getImages ? ws.getImages() : []; } catch(_) { images = []; }
+        if (!images.length) return;
+        const nameCells = [], numCells = [];
+        ws.eachRow({ includeEmpty:false }, (row, r) => {
+          row.eachCell({ includeEmpty:false }, (cell, c) => {
+            const t = cellStr(cell);
+            if (!t) return;
+            if (/^\d{1,3}$/.test(t)) numCells.push({ r, c, v: parseInt(t) });
+            else if (/^[가-힣]{2,5}$/.test(t) && !PH_SKIP.has(t)) nameCells.push({ r, c, v: t });
+          });
         });
-      });
-      const used = new Set();
-      images.forEach(im => {
-        const a = im.range && im.range.tl; if (!a) return;
-        const ir = (a.nativeRow != null ? a.nativeRow : a.row) + 1;
-        const ic = (a.nativeCol != null ? a.nativeCol : a.col) + 1;
-        // 캡션은 사진 바로 아래·같은 열대에 오는 경우가 많음 → 아래쪽·같은 열을 우대
-        let best = -1, bestD = 1e9;
-        nameCells.forEach((nc, i) => {
-          if (used.has(i)) return;
-          const dr = nc.r - ir, dc = nc.c - ic;
-          const d = (dr < 0 ? -dr * 2.5 : dr) + Math.abs(dc) * 1.6;
-          if (d < bestD) { bestD = d; best = i; }
+        const used = new Set();
+        images.forEach(im => {
+          const a = im.range && im.range.tl; if (!a) return;
+          const ir = (a.nativeRow != null ? a.nativeRow : a.row) + 1;
+          const ic = (a.nativeCol != null ? a.nativeCol : a.col) + 1;
+          // 캡션은 사진 바로 아래·같은 열대에 오는 경우가 많음 → 아래쪽·같은 열을 우대
+          let best = -1, bestD = 1e9;
+          nameCells.forEach((nc, i) => {
+            if (used.has(i)) return;
+            const dr = nc.r - ir, dc = nc.c - ic;
+            const d = (dr < 0 ? -dr * 2.5 : dr) + Math.abs(dc) * 1.6;
+            if (d < bestD) { bestD = d; best = i; }
+          });
+          if (best < 0 || bestD > 16) return;   // 너무 멀면 라벨 없음(미매칭)
+          used.add(best);
+          const nc = nameCells[best];
+          let num = null, numD = 1e9;
+          numCells.forEach(q => {
+            const d = Math.abs(q.r - nc.r) + Math.abs(q.c - nc.c) * 1.2;
+            if (d < numD) { numD = d; num = q.v; }
+          });
+          let media = null;
+          try { media = wb.getImage ? wb.getImage(Number(im.imageId)) : (wb.model.media || [])[Number(im.imageId)]; } catch(_) {}
+          if (media && media.buffer) pairs.push({ media, name: nc.v, num });
         });
-        if (best < 0 || bestD > 16) return;   // 너무 멀면 라벨 없음(미매칭)
-        used.add(best);
-        const nc = nameCells[best];
-        let num = null, numD = 1e9;
-        numCells.forEach(q => {
-          const d = Math.abs(q.r - nc.r) + Math.abs(q.c - nc.c) * 1.2;
-          if (d < numD) { numD = d; num = q.v; }
-        });
-        const media = wb.getImage ? wb.getImage(Number(im.imageId)) : (wb.model.media || [])[Number(im.imageId)];
-        if (media) pairs.push({ media, name: nc.v, num });
-      });
+      } catch(err) { console.warn('시트 처리 건너뜀', err); }
     });
 
     setS(`사진 ${pairs.length}장 압축·매칭 중…`);
