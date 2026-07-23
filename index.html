@@ -24,8 +24,9 @@
   })();
 </script>
 <style>
-  html.widget-mode, html.widget-mode body { height:100%; margin:0; background:#f1f5f9; overflow:hidden; }
-  html.dark.widget-mode, html.dark.widget-mode body { background:#0B1220; }
+  /* 위젯 배경 투명 → AHK 창의 아크릴(유리)이 비쳐 '진짜 위젯' 느낌. 카드/패널은 각자 배경 유지 */
+  html.widget-mode, html.widget-mode body { height:100%; margin:0; background:transparent !important; overflow:hidden; }
+  html.dark.widget-mode, html.dark.widget-mode body { background:transparent !important; }
   /* 앱 크롬(상단바·사이드바·탭바·FAB·메모열) 전부 숨김 */
   html.widget-mode .app-header,
   html.widget-mode .main-nav,
