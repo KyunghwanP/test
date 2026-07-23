@@ -374,7 +374,10 @@ SetWebViewBounds(wvc, hwnd, topOff) {
 HoverCheck() {
     global WidgetWins, HandleToWidget, dragHwnd, HANDLE_H, HANDLE_TOP
     MouseGetPos(&mx, &my, &win)
-    root := DllCall("GetAncestor", "ptr", win, "uint", 2, "ptr")   ; GA_ROOT
+    if (win = "" || !win) {          ; 마우스 밑에 창이 없으면 빈 문자열 → DllCall에 넘기면 오류
+        win := 0, root := 0
+    } else
+        root := DllCall("GetAncestor", "ptr", win, "uint", 2, "ptr")   ; GA_ROOT
     target := 0
     if HandleToWidget.Has(root)
         target := HandleToWidget[root]            ; 손잡이 바 위 → 계속 표시
@@ -592,7 +595,7 @@ FlushSave() {
 #!t:: {   ; 마우스 올린 위젯을 맨 앞으로 ↔ 바탕화면 자식으로 전환
     global WidgetWins
     MouseGetPos(, , &win)
-    root := DllCall("GetAncestor", "ptr", win, "uint", 2, "ptr")
+    root := (win = "" || !win) ? 0 : DllCall("GetAncestor", "ptr", win, "uint", 2, "ptr")
     if !WidgetWins.Has(root) {
         TrayTip("전환할 위젯 위에 마우스를 올리고 Win+Alt+T", "영남고 위젯", 0x10)
         return
