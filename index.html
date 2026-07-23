@@ -7880,12 +7880,6 @@ function s360RenderGroups(){
   s360View = 'groups';
   const body = document.getElementById('s360Body');
   let html = '<div class="s360-groups">';
-  // 사진명렬 업로드 — 관리자 전용(파일은 브라우저에서만 처리, 사진만 Firestore 저장)
-  if (fbAuth.currentUser?.email === ADMIN_EMAIL) {
-    html += `<div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
-      <button class="spot-badge" style="border:none;cursor:pointer;font-family:inherit;" onclick="openPhotoRosterTool()">📷 사진명렬 올리기</button>
-    </div>`;
-  }
 
   if (s360Mode === 'class') {
     const classKeys = [...new Set(allStudents.map(s => s.grade && s.room ? `${parseInt(s.grade)}-${parseInt(s.room)}` : null).filter(Boolean))]
@@ -9943,6 +9937,7 @@ function openDocsItem(id){
         <button class="docs-pdf-nav" onclick="docsXlsxFindNav(false)" title="다음 결과">▶</button>
         <span id="docsXlsxMatch" class="docs-pdf-match"></span>
         <button class="docs-pdf-nav" onclick="docsXlsxUploadClick()" title="엑셀 파일로 데이터 갱신 (교사 전용)">⬆ 갱신</button>
+        <button class="docs-pdf-nav" onclick="openPhotoRosterTool()" title="사진명렬 엑셀로 학생 사진 올리기 (교사 전용)">📷 사진명렬</button>
         <span id="docsXlsxStatus" class="docs-pdf-match" style="min-width:0;"></span>
       </div>
       <div class="docs-xlsx-tabs" id="docsXlsxTabs"></div>
