@@ -12312,29 +12312,29 @@ function renderHomeTaskSection() {
     doneToggleBtn.style.display = doneTasks.length > 0 ? '' : 'none';
   }
 
-  if (activeTasks.length === 0) {
-    // 진행중 없을 때
-    const doneSection = _homeShowDone && doneTasks.length > 0 ? `
-      <div style="margin-top:8px;">
-        <div style="font-size:12px;font-weight:700;color:var(--ink-soft);padding:4px 4px 2px;border-bottom:1px solid var(--rule);margin-bottom:2px;">완료된 업무</div>
-        <div style="max-height:260px;overflow-y:auto;">
-          ${doneTasks.map(t => _makeHomeTaskRow(t, todayStr, statusColor)).join('')}
-          
-        </div>
-      </div>` : '';
-    list.innerHTML = `
-      <div style="display:flex;align-items:center;gap:8px;padding:8px 4px 4px;">
-        <button onclick="openMytaskModal()" style="flex:1;padding:10px 0;border-radius:10px;border:1.5px dashed var(--mon);background:transparent;color:var(--mon);font-size:14px;font-weight:700;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">+ 일정 추가</button>
-      </div>
-      ${doneSection}`;
-    return;
-  }
+  const isWidget = document.documentElement.classList.contains('widget-mode');
+  const doneRowsHtml = doneTasks.map(t => _makeHomeTaskRow(t, todayStr, statusColor)).join('');
+  const showDone = _homeShowDone && doneTasks.length > 0;
+
+  // 완료 목록: 앱에선 오버레이(아래 학사일정·급식 위에 겹쳐 뜸 → 캘린더·레이아웃 안 흔들림),
+  //            위젯에선 인라인(현상태 유지). 바깥 클릭 시 자동 닫힘(syncHomeDoneOverlay에서 1회 바인딩).
+  syncHomeDoneOverlay(section, doneRowsHtml, !isWidget && showDone);
+  const inlineDone = (isWidget && showDone) ? `
+    <div style="margin-top:6px;">
+      <div style="font-size:11px;font-weight:700;color:var(--ink-soft);padding:4px 4px 2px;border-bottom:1px solid var(--rule);margin-bottom:2px;">완료된 업무</div>
+      <div style="max-height:260px;overflow-y:auto;">${doneRowsHtml}</div>
+    </div>` : '';
 
   // 목록 아래 '+ 일정 추가' 버튼 (업무 없을 때 뜨는 것과 동일한 모양)
   const addBtn = `
     <div style="display:flex;align-items:center;gap:8px;padding:8px 4px 4px;">
       <button onclick="openMytaskModal()" style="flex:1;padding:10px 0;border-radius:10px;border:1.5px dashed var(--mon);background:transparent;color:var(--mon);font-size:14px;font-weight:700;cursor:pointer;font-family:'Pretendard','Noto Sans KR';">+ 일정 추가</button>
     </div>`;
+
+  if (activeTasks.length === 0) {
+    list.innerHTML = `${addBtn}${inlineDone}`;
+    return;
+  }
 
   // 진행중 있을 때 — 업무 2개 이상이면 '+ 일정 추가'를 스크롤 박스 안 맨 아래로(내려야 보임)
   const btnInScroll = activeTasks.length >= 2;
@@ -12344,19 +12344,41 @@ function renderHomeTaskSection() {
       ${btnInScroll ? addBtn : ''}
     </div>`;
 
-  const doneSection = _homeShowDone && doneTasks.length > 0 ? `
-    <div style="margin-top:6px;">
-      <div style="font-size:11px;font-weight:700;color:var(--ink-soft);padding:4px 4px 2px;border-bottom:1px solid var(--rule);margin-bottom:2px;">완료된 업무</div>
-      <div style="max-height:260px;overflow-y:auto;">
-        ${doneTasks.map(t => _makeHomeTaskRow(t, todayStr, statusColor)).join('')}
-
-      </div>
-    </div>` : '';
-
   list.innerHTML = `
     ${activeHtml}
     ${btnInScroll ? '' : addBtn}
-    ${doneSection}`;
+    ${inlineDone}`;
+}
+
+// 완료 업무 오버레이(앱 전용): 업무 섹션 아래에 겹쳐 띄워 캘린더·주변 레이아웃을 안 흔든다
+function syncHomeDoneOverlay(section, doneRowsHtml, show) {
+  let ov = document.getElementById('homeDoneOverlay');
+  if (show) {
+    section.style.position = 'relative';
+    section.style.zIndex = '60';            // 아래 형제(상담·학사일정) 위로 올림
+    section.style.overflow = 'visible';     // .home-section의 overflow:hidden이 오버레이를 자르지 않게
+    if (!ov) { ov = document.createElement('div'); ov.id = 'homeDoneOverlay'; section.appendChild(ov); }
+    ov.style.cssText = 'position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--paper);'
+      + 'border:1px solid var(--rule);border-radius:12px;box-shadow:0 14px 34px rgba(0,0,0,0.20);'
+      + 'padding:8px 12px;max-height:340px;overflow-y:auto;';
+    ov.innerHTML = `<div style="font-size:12px;font-weight:700;color:var(--ink-soft);padding:2px 2px 6px;border-bottom:1px solid var(--rule);margin-bottom:4px;">완료된 업무</div>${doneRowsHtml}`;
+  } else {
+    section.style.zIndex = '';
+    section.style.overflow = '';
+    if (ov) ov.remove();
+  }
+  // 바깥(다른 영역) 클릭 시 자동 닫힘 — 1회만 바인딩
+  if (!window._homeDoneOutsideBound) {
+    window._homeDoneOutsideBound = true;
+    document.addEventListener('mousedown', function(e) {
+      if (!_homeShowDone || document.documentElement.classList.contains('widget-mode')) return;
+      const sec = document.getElementById('homeTaskSection');
+      if (sec && !sec.contains(e.target)) {
+        _homeShowDone = false; window._homeShowDone = false;
+        renderHomeTaskSection();
+      }
+    }, true);
+  }
 }
 window.renderHomeTaskSection = renderHomeTaskSection;
 
