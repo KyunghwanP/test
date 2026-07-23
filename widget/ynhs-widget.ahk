@@ -256,9 +256,10 @@ CreateWidget(p) {
             return
         }
     }
+    try wvc.DefaultBackgroundColor := 0x00000000   ; 웹뷰 배경 투명 → 뒤의 아크릴(유리)이 비침
     wvc.CoreWebView2.Navigate(PanelUrl(key) "&t=" A_Now)   ; &t= : 실행마다 최신 페이지 로드(캐시 지연 방지)
     g.OnEvent("Size", OnResize)
-    WinSetTransparent(op, "ahk_id " g.hwnd)
+    SetWidgetOpacity(g.hwnd, op)   ; 아크릴 유리 배경(농도=슬라이더). 미지원 환경은 조용히 불투명
 
     ; 참고: 예전의 '그림자 제거'(NCRENDERING_POLICY=DISABLED)는 DWM 비클라이언트 렌더링을 꺼서
     ;   둥근 모서리·테두리 색까지 무효화(회색 사각 프레임 잔존)했기에 제거함. → 둥근 모서리+파란
@@ -331,9 +332,24 @@ PositionHandle(widgetHwnd) {
 
 SetWidgetOpacity(hwnd, val) {
     global WidgetWins
-    WinSetTransparent(val, "ahk_id " hwnd)
+    ; 슬라이더 값(70~255)을 아크릴 유리의 '흰 틴트 농도(알파)'로 사용 → 낮을수록 바탕화면이 더 비침
+    SetAcrylic(hwnd, (val << 24) | 0x00FFFFFF)
     if WidgetWins.Has(hwnd)
         WidgetWins[hwnd].opacity := val
+}
+
+; 창 배경을 아크릴(반투명 흐림 유리)로 — 바탕화면이 흐릿하게 비친다. tint=0xAABBGGRR
+;   (Win10 1803+/Win11. 미지원 시 조용히 무시되어 불투명 배경으로 표시)
+SetAcrylic(hwnd, tint) {
+    accent := Buffer(16, 0)
+    NumPut("int", 4, accent, 0)                 ; ACCENT_ENABLE_ACRYLICBLURBEHIND
+    NumPut("int", 2, accent, 4)                 ; flags(GradientColor 사용)
+    NumPut("uint", tint, accent, 8)             ; GradientColor(AABBGGRR)
+    data := Buffer(24, 0)                        ; WINDOWCOMPOSITIONATTRIBDATA (x64)
+    NumPut("int", 19, data, 0)                  ; WCA_ACCENT_POLICY
+    NumPut("ptr", accent.Ptr, data, 8)          ; pvData
+    NumPut("ptr", 16, data, 16)                 ; cbData = sizeof(ACCENT_POLICY)
+    try DllCall("user32\SetWindowCompositionAttribute", "ptr", hwnd, "ptr", data)
 }
 
 ; 창 모양 다듬기(Win11 DWM) — 둥근 모서리 + 얇은 파란 테두리(회색 두꺼운 포커스 테두리 대체)
