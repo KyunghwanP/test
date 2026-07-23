@@ -1247,26 +1247,21 @@ function phPatchMerge(){
   } catch(e){ console.warn('phPatchMerge 실패', e); }
 }
 const PH_SKIP = new Set(['번호','이름','성명','학년','학반','학급','사진','명렬','사진명렬표','비고','성별','생년월일','담임','합계','소계','구분','순번','연번']);
-let phItems = [];              // [{ dataUrl, matched:{grade,room,num,name}|null }]
+let phItems = [];              // [{ dataUrl, name, num, matched:{grade,room,num,name}|null }]
 let phAllStudents = null;      // students/main 캐시
 let phDebug = [];              // 진단용: 시트에서 감지된 짧은 텍스트 셀(중복 제거)
-let phImages = [];             // 압축된 사진 dataURL(읽기 순서)
-let phRoster = [];             // 배정 대상 학생(해당 학년, 반→번호 순)
-let phOffset = 0;              // 순서 배정 시작 보정
-let phDiag = null;             // 진단 수치 { media, anchored, sheets, ordered }
+let phRoster = [];             // 배정 대상 학생(해당 학년)
+let phDiag = null;             // 진단 수치 { media, anchored, sheets, caps }
 
-// 사진(순서) ↔ 명단(반·번호 순)을 offset 반영해 1:1 배정
-function phBuildAndRender() {
-  phItems = phImages.map((u, i) => {
-    const st = phRoster[i + phOffset];
-    return { dataUrl: u, matched: st ? { grade: st.grade, room: st.room, num: st.num, name: st.name } : null };
-  });
-  phRenderPreview();
+// 셀 텍스트에서 '번호+이름' 캡션 추출 — "홍길동" · "1 홍길동" · "1.홍길동" · "홍길동 1" 등 형식 허용
+function phParseCaption(t) {
+  const nm = t.match(/[가-힣]{2,5}/);
+  if (!nm) return null;
+  const name = nm[0];
+  if (PH_SKIP.has(name)) return null;   // 제목·헤더 제외
+  const numM = t.match(/\d{1,3}/);
+  return { name, num: numM ? parseInt(numM[0]) : null };
 }
-window.phShiftOffset = function(d) {
-  phOffset = Math.max(-(phImages.length - 1), Math.min(phRoster.length - 1, phOffset + d));
-  phBuildAndRender();
-};
 function phEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 const phFileInput = document.getElementById('phFileInput');
@@ -1341,9 +1336,9 @@ async function phProcess(file) {
       try { return String(v).trim(); } catch(_) { return ''; }
     };
 
-    // 이 파일은 학생 번호·이름이 셀이 아니라 사진 이미지 안(노란 태그)에 박혀 있어
-    // 이름으로 매칭할 수 없다. → 모든 사진을 '읽기 순서(시트→행→열)'로 뽑아
-    // 반·번호 순 명단에 순서대로 배정한다(시작 어긋나면 offset으로 조정).
+    // 각 사진(앵커 위치)에 '같은 시트에서 가장 가까운 캡션 셀(번호+이름)'을 붙인다.
+    // → 각 사진이 자기 캡션에 매칭되므로, 중간에 사진 없는 학생이 있어도 순서가 밀리지 않는다.
+    const caps = [];            // { sheet, r, c, name, num }
     const imgs = [];            // { sheet, row, col, id }
     const dbg = new Set();
     let anchored = 0, sheets = 0;
@@ -1353,45 +1348,64 @@ async function phProcess(file) {
         let images = [];
         try { images = ws.getImages ? ws.getImages() : []; } catch(_) { images = []; }
         anchored += images.length;
-        try {
-          ws.eachRow({ includeEmpty:false }, row => row.eachCell({ includeEmpty:false }, cell => {
+        ws.eachRow({ includeEmpty:false }, (row, r) => {
+          row.eachCell({ includeEmpty:false }, (cell, c) => {
             const t = cellStr(cell);
-            if (t && t.length <= 12 && dbg.size < 120) dbg.add(t);
-          }));
-        } catch(_) {}
+            if (!t) return;
+            if (t.length <= 14 && dbg.size < 120) dbg.add(t);
+            const cap = phParseCaption(t);
+            if (cap) caps.push({ sheet: si, r, c, name: cap.name, num: cap.num });
+          });
+        });
         images.forEach(im => {
           const a = im.range && im.range.tl; if (!a) return;
-          const row = (a.nativeRow != null ? a.nativeRow : a.row);
-          const col = (a.nativeCol != null ? a.nativeCol : a.col);
-          imgs.push({ sheet: si, row, col, id: Number(im.imageId) });
+          imgs.push({ sheet: si, row: (a.nativeRow != null ? a.nativeRow : a.row), col: (a.nativeCol != null ? a.nativeCol : a.col), id: Number(im.imageId) });
         });
       } catch(err) { console.warn('시트 건너뜀', err); }
     });
     phDebug = [...dbg];
     const media = (wb.model && wb.model.media) ? wb.model.media : [];
+    phDiag = { media: media.length, anchored, sheets, caps: caps.length };
 
-    // 읽기 순서(시트→행→열)로 정렬
+    // 사진을 읽기 순서로 정렬 후, 각 사진에 가장 가까운(미사용) 캡션 배정
     imgs.sort((a, b) => a.sheet - b.sheet || a.row - b.row || a.col - b.col);
-    // 앵커로 찾은 이미지가 파일 내 전체 이미지 수와 같으면 앵커 순서(정확)를,
-    // 앵커 파싱이 누락되면(앵커<전체) 원본 media 순서(image1,2,3…)를 대신 사용
-    let ordered;
-    if (imgs.length && imgs.length >= media.length) {
-      ordered = imgs.map(x => media[x.id]).filter(m => m && m.buffer);
-    } else {
-      ordered = media.filter(m => m && m.buffer);
-    }
+    const usedCap = new Set();
+    const results = imgs.map(im => {
+      let best = -1, bestD = 1e9;
+      for (let i = 0; i < caps.length; i++) {
+        if (usedCap.has(i)) continue;
+        const cp = caps[i];
+        if (cp.sheet !== im.sheet) continue;
+        const dr = (cp.r - 1) - im.row;     // 캡션 셀(1-based) vs 이미지 앵커(0-based)
+        const dc = (cp.c - 1) - im.col;
+        const d = (dr < 0 ? -dr * 1.4 : dr) + Math.abs(dc) * 1.5;   // 캡션이 사진 아래면 우대
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      if (best < 0 || bestD > 24) return { id: im.id, name: null, num: null };
+      usedCap.add(best);
+      return { id: im.id, name: caps[best].name, num: caps[best].num };
+    });
 
-    phDiag = { media: media.length, anchored, sheets, ordered: ordered.length };
-
-    setS(`사진 ${ordered.length}장 압축 중… (파일이 커서 잠시 걸립니다)`);
-    const roster = phAllStudents.filter(s => parseInt(s.grade) === grade)
-      .sort((a, b) => (parseInt(a.room) || 0) - (parseInt(b.room) || 0) || (parseInt(a.num) || 0) - (parseInt(b.num) || 0));
-
-    phImages = [];
-    for (const m of ordered) { const u = await phCompress(m); if (u) phImages.push(u); }
+    // 압축 + 캡션 이름 → 명단 매칭(동명이인은 번호로 보정)
+    setS(`사진 ${results.length}장 압축·매칭 중…`);
+    const roster = phAllStudents.filter(s => parseInt(s.grade) === grade);
     phRoster = roster;
-    phOffset = 0;
-    phBuildAndRender();
+    phItems = [];
+    let done = 0;
+    for (const rz of results) {
+      const m = media[rz.id];
+      const dataUrl = m && m.buffer ? await phCompress(m) : null;
+      if (!dataUrl) continue;
+      let matched = null;
+      if (rz.name) {
+        const cands = roster.filter(s => s.name === rz.name);
+        if (cands.length === 1) matched = cands[0];
+        else if (cands.length > 1 && rz.num != null) matched = cands.find(s => parseInt(s.num) === rz.num) || null;
+      }
+      phItems.push({ dataUrl, name: rz.name, num: rz.num, matched: matched ? { grade: matched.grade, room: matched.room, num: matched.num, name: matched.name } : null });
+      if ((++done % 40) === 0) setS(`압축·매칭 중… ${done}/${results.length}`);
+    }
+    phRenderPreview();
   } catch(e) {
     console.error(e);
     setStatus('phStatus', '처리 실패: ' + e.message, 'err');
@@ -1402,44 +1416,34 @@ async function phProcess(file) {
 
 function phRenderPreview() {
   const total = phItems.length;
-  const matched = phItems.filter(x => x.matched).length;
-  // 순서 배정: 각 사진에 명단상의 반·번호·이름을 붙여 보여준다.
-  // 교사는 사진 안(노란 태그)의 실제 번호·이름과 카드에 붙은 이름이 같은지 눈으로 확인.
+  const named = phItems.filter(x => x.name).length;       // 캡션(번호+이름)을 읽은 사진
+  const matched = phItems.filter(x => x.matched).length;  // 명단과 매칭된 사진
+  // 카드: 엑셀 캡션에서 읽은 번호·이름 + 명단 매칭 결과. 미매칭은 저장 안 함.
   document.getElementById('phGrid').innerHTML = phItems.map(x => `
     <div class="ph-card${x.matched ? '' : ' ph-nomatch'}">
       <img src="${x.dataUrl}" alt="">
-      <div class="ph-cap">${x.matched ? phEsc(x.matched.name || '?') : '—'}</div>
-      <div class="ph-match">${x.matched ? `${x.matched.room}반 ${x.matched.num}번` : '명단 범위 밖'}</div>
+      <div class="ph-cap">${x.num != null ? x.num + ' ' : ''}${x.name ? phEsc(x.name) : '?'}</div>
+      <div class="ph-match">${x.matched ? `→ ${x.matched.room}반 ${x.matched.num}번` : (x.name ? '⚠ 명단에 없음' : '⚠ 캡션 못읽음')}</div>
     </div>`).join('');
   const d = phDiag || {};
   document.getElementById('phStats').innerHTML = `
     <div class="stat-chip">사진 <b>${total}</b>장</div>
-    <div class="stat-chip">배정 <b>${matched}</b></div>
+    <div class="stat-chip">캡션인식 <b>${named}</b></div>
+    <div class="stat-chip">명단매칭 <b>${matched}</b></div>
     <div class="stat-chip">명단 <b>${phRoster.length}</b>명</div>
-    <div class="stat-chip">파일 내 이미지 <b>${d.media != null ? d.media : '?'}</b> · 앵커 <b>${d.anchored != null ? d.anchored : '?'}</b></div>`;
-  // 시작 정렬 보정 컨트롤 + 안내
+    <div class="stat-chip">파일이미지 <b>${d.media != null ? d.media : '?'}</b> · 앵커 <b>${d.anchored != null ? d.anchored : '?'}</b> · 캡션 <b>${d.caps != null ? d.caps : '?'}</b></div>`;
+  // 캡션 인식이 부진하면(대부분 못 읽음) 원인 파악용으로 읽힌 텍스트 표본을 보여줌
   const grid = document.getElementById('phGrid');
-  const bar = document.createElement('div');
-  bar.style.cssText = 'grid-column:1/-1;background:#fff;border:1px solid var(--rule);border-radius:8px;padding:10px 12px;font-size:12.5px;line-height:1.6;color:var(--ink);display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
-  bar.innerHTML = `
-    <b>순서 배정</b> — 사진을 반·번호 순 명단에 순서대로 붙였습니다. 사진 안 이름과 카드 이름이 어긋나면 시작 위치를 조정하세요.
-    <span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center;">
-      시작 보정 <b>${phOffset >= 0 ? '+' : ''}${phOffset}</b>
-      <button class="btn btn-secondary" style="padding:4px 10px;" onclick="phShiftOffset(-1)">◀ -1</button>
-      <button class="btn btn-secondary" style="padding:4px 10px;" onclick="phShiftOffset(1)">+1 ▶</button>
-    </span>`;
-  grid.insertBefore(bar, grid.firstChild);
-  // 파싱은 됐지만 사진이 명단보다 많이 적으면(누락) 경고
-  if (phDebug.length && total < phRoster.length * 0.9) {
-    const warn = document.createElement('div');
-    warn.style.cssText = 'grid-column:1/-1;background:#FFF8E1;border:1px solid #f0d98c;border-radius:8px;padding:10px 12px;font-size:12.5px;line-height:1.6;color:#8a6d00;';
-    warn.innerHTML = `⚠ 사진(${total}장)이 명단(${phRoster.length}명)보다 적습니다. 중간에 사진 없는 학생이 있으면 그 지점부터 순서가 밀립니다. ` +
-      `읽힌 텍스트 표본: <span style="font-family:'IBM Plex Mono';color:var(--wed);">${phDebug.slice(0,30).map(phEsc).join(' · ')}</span>`;
-    grid.insertBefore(warn, grid.firstChild);
+  if (named < total * 0.5 && phDebug.length) {
+    const dbgBox = document.createElement('div');
+    dbgBox.style.cssText = 'grid-column:1/-1;background:#FFF8E1;border:1px solid #f0d98c;border-radius:8px;padding:10px 12px;font-size:12.5px;line-height:1.6;color:#8a6d00;';
+    dbgBox.innerHTML = `⚠ 캡션(번호+이름)을 대부분 못 읽었습니다. 엑셀에서 읽힌 텍스트 표본(이 안에 학생 이름이 있으면 형식만 맞추면 됩니다):<br>` +
+      `<span style="font-family:'IBM Plex Mono';color:var(--wed);word-break:break-all;">${phDebug.slice(0, 40).map(phEsc).join(' · ')}</span>`;
+    grid.insertBefore(dbgBox, grid.firstChild);
   }
   document.getElementById('phPreviewWrap').style.display = '';
   document.getElementById('phUploadBtn').disabled = matched === 0;
-  setStatus('phStatus', '사진 안 이름과 카드 이름이 맞는지 확인 후 [☁️ 사진 저장]. 시작이 어긋나면 +1/-1로 맞추세요.', 'info');
+  setStatus('phStatus', '사진 안 번호·이름과 카드가 맞는지 확인 후 [☁️ 사진 저장]. 미매칭(⚠)은 저장되지 않습니다.', 'info');
 }
 
 async function phUpload() {
