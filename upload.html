@@ -1246,9 +1246,10 @@ function phPatchMerge(){
     WSP.__phMergePatched = true;
   } catch(e){ console.warn('phPatchMerge 실패', e); }
 }
-const PH_SKIP = new Set(['번호','이름','성명','학년','학반','학급','사진','명렬','비고','성별','생년월일','담임','합계','소계','구분','순번','연번']);
+const PH_SKIP = new Set(['번호','이름','성명','학년','학반','학급','사진','명렬','사진명렬표','비고','성별','생년월일','담임','합계','소계','구분','순번','연번']);
 let phItems = [];              // [{ dataUrl, num, name, matched:{grade,room,num,name}|null }]
 let phAllStudents = null;      // students/main 캐시
+let phDebug = [];              // 진단용: 시트에서 감지된 짧은 텍스트 셀(중복 제거)
 function phEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 const phFileInput = document.getElementById('phFileInput');
@@ -1325,6 +1326,7 @@ async function phProcess(file) {
 
     // 시트마다: embedded 이미지 + 텍스트 셀(번호/이름)을 모아 가장 가까운 이름과 짝지음
     const pairs = [];   // { media, name, num }
+    const dbg = new Set();
     wb.eachSheet(ws => {
       try {
         let images = [];
@@ -1335,6 +1337,7 @@ async function phProcess(file) {
           row.eachCell({ includeEmpty:false }, (cell, c) => {
             const t = cellStr(cell);
             if (!t) return;
+            if (t.length <= 12 && dbg.size < 200) dbg.add(t);   // 진단용 표본
             if (/^\d{1,3}$/.test(t)) numCells.push({ r, c, v: parseInt(t) });
             else if (/^[가-힣]{2,5}$/.test(t) && !PH_SKIP.has(t)) nameCells.push({ r, c, v: t });
           });
@@ -1366,6 +1369,7 @@ async function phProcess(file) {
         });
       } catch(err) { console.warn('시트 처리 건너뜀', err); }
     });
+    phDebug = [...dbg];
 
     setS(`사진 ${pairs.length}장 압축·매칭 중…`);
     const gradeStudents = phAllStudents.filter(s => parseInt(s.grade) === grade);
@@ -1400,6 +1404,15 @@ function phRenderPreview() {
     <div class="stat-chip">총 <b>${total}</b>장</div>
     <div class="stat-chip">매칭 <b>${matched}</b></div>
     <div class="stat-chip">미매칭 <b>${total - matched}</b></div>`;
+  // 매칭이 하나도 안 되면 시트에서 실제로 읽힌 텍스트를 보여줘 원인 진단
+  const grid = document.getElementById('phGrid');
+  if (matched === 0 && phDebug.length) {
+    const dbgBox = document.createElement('div');
+    dbgBox.style.cssText = 'grid-column:1/-1;background:#fff;border:1px solid var(--rule);border-radius:8px;padding:12px 14px;font-size:12.5px;line-height:1.7;color:var(--ink);';
+    dbgBox.innerHTML = `<b>⚠ 진단</b> — 이 엑셀에서 읽힌 텍스트 셀(사진 캡션이 셀이 아니라 이미지 안에 박혀 있으면 학생 이름이 여기 안 보입니다):<br>` +
+      `<div style="margin-top:6px;font-family:'IBM Plex Mono';color:var(--wed);word-break:break-all;">${phDebug.map(phEsc).join(' · ')}</div>`;
+    grid.insertBefore(dbgBox, grid.firstChild);
+  }
   document.getElementById('phPreviewWrap').style.display = '';
   document.getElementById('phUploadBtn').disabled = matched === 0;
   setStatus('phStatus', '미리보기 확인 후 [☁️ 사진 저장]. 미매칭(⚠)은 저장되지 않습니다.', 'info');
