@@ -12339,7 +12339,7 @@ function renderHomeTaskSection() {
   // 진행중 있을 때 — 업무 2개 이상이면 '+ 일정 추가'를 스크롤 박스 안 맨 아래로(내려야 보임)
   const btnInScroll = activeTasks.length >= 2;
   const activeHtml = `
-    <div class="home-task-scroll" style="max-height:260px;overflow-y:auto;">
+    <div class="home-task-scroll" style="max-height:170px;overflow-y:auto;">
       ${activeTasks.map(t => _makeHomeTaskRow(t, todayStr, statusColor)).join('')}
       ${btnInScroll ? addBtn : ''}
     </div>`;
