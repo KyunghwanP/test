@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-wry = { version = "0.35", features = ["rwh_06"] }
-tao = "0.24"
+wry = "0.35"
+tao = { version = "0.24", features = ["rwh_05"] }
 webbrowser = "0.8"
 
 [profile.release]
