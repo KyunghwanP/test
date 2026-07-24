@@ -24,7 +24,7 @@ fn main() -> wry::Result<()> {
         .expect("창 생성 실패");
 
     let _webview = WebViewBuilder::new(&window)
-        .with_url(URL)
+        .with_url(URL)?
         .with_new_window_req_handler(|url| {
             // 새 창 요청 → 기본 브라우저로 열고, 앱 안 새 창은 막음
             let _ = webbrowser::open(&url);
