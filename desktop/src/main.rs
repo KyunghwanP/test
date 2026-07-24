@@ -65,9 +65,9 @@ fn main() -> wry::Result<()> {
             let _ = webbrowser::open(&url);
             false
         })
-        .with_ipc_handler(|req| {
+        .with_ipc_handler(|req: String| {
             // 포털에서 온 메시지(알림 등) 처리
-            handle_ipc(req.body());
+            handle_ipc(&req);
         })
         .build()?;
 
