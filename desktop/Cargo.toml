@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-wry = "0.35"
+wry = { version = "0.35", features = ["rwh_06"] }
 tao = "0.24"
 webbrowser = "0.8"
 
