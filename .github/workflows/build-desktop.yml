@@ -1,0 +1,52 @@
+name: 데스크톱 앱 빌드(wry)
+
+# desktop/ 의 Rust 코드가 바뀌면 Windows 러너에서 exe를 빌드해
+# 'desktop-latest' 릴리스에 올린다. 사용자는 그 exe만 받아 실행하면 된다(설치 불필요).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/build-desktop.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-desktop
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Rust 툴체인 확인
+        run: |
+          rustc --version
+          cargo --version
+
+      - name: 릴리스 빌드
+        working-directory: desktop
+        run: cargo build --release
+
+      - name: 산출물 확인
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          Get-ChildItem target/release -Filter *.exe | ForEach-Object { Write-Host $_.FullName ($_.Length/1MB) 'MB' }
+
+      - name: 릴리스 배포(desktop-latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-latest
+          name: 영남고 데스크톱 앱 (최신)
+          body: |
+            영남고 데스크톱 앱 — github.io 포털을 그대로 띄우고, 링크는 기본 브라우저로 엽니다.
+            · ynhs-desktop.exe 받아서 실행하면 됩니다(설치 불필요, WebView2는 Windows 기본 탑재).
+          files: |
+            desktop/target/release/ynhs-desktop.exe
