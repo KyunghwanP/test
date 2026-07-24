@@ -4719,22 +4719,31 @@ window.addEventListener('unhandledrejection', e => {
 
 const IS_NEUTRALINO = (typeof Neutralino !== 'undefined');
 
-// ── 데스크톱 앱: 외부 링크(또는 data-external 표식)는 시스템 기본 브라우저로 열기 ──
-// 다른 도메인 링크는 자동으로, 같은 도메인이라도 data-external 이 붙은 링크는 강제로 기본 브라우저 탭으로 연다.
+// ── 데스크톱 앱: 새 창/외부 링크는 앱 안이 아니라 시스템 기본 브라우저로 열기 ──
+// 다른 도메인 링크·data-external·target="_blank"(같은 도메인 포함) 모두 기본 브라우저 탭으로 연다.
+// (WebView2가 앱 안에 어정쩡한 새 창을 띄우는 것을 막음)
 if(IS_NEUTRALINO){
+  const openExternal = href => {
+    try { Neutralino.os.open(new URL(href, location.href).href).catch(()=>{}); } catch(_){}
+  };
   document.addEventListener('click', e => {
     const a = e.target.closest('a[href]');
     if(!a) return;
+    const raw = a.getAttribute('href') || '';
+    if(raw === '#' || raw.startsWith('#') || raw.startsWith('javascript:')) return; // 페이지 내 앵커·플레이스홀더
     let url;
     try { url = new URL(a.href, location.href); } catch(err){ return; }
     if(url.protocol !== 'http:' && url.protocol !== 'https:') return;
     const isExternalDomain = (url.origin !== location.origin);
     const forceExternal = a.hasAttribute('data-external');
-    if(isExternalDomain || forceExternal){
+    const isBlank = (a.target === '_blank');   // 같은 도메인 새 창(memo2.html 등)도 기본 브라우저로
+    if(isExternalDomain || forceExternal || isBlank){
       e.preventDefault();
       Neutralino.os.open(url.href).catch(()=>{});
     }
   }, true);
+  // 자바스크립트 window.open 호출도 기본 브라우저로 (앱 안 새 창 방지)
+  window.open = function(u){ if(u) openExternal(u); return null; };
 }
 
 // ── 현황판 3단: 메모 카드 높이를 캘린더+학사일정(home-cal-row) 하단에 맞춤 ──
