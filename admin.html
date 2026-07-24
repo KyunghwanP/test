@@ -218,20 +218,39 @@ document.getElementById('logoutBtn').addEventListener('click', () => signOut(fbA
 document.getElementById('openDashBtn').addEventListener('click', () => { location.href = 'index.html'; });
 
 async function loadTeachers(){
-  const snap = await getDoc(doc(fbDb, 'appdata', 'main'));
-  if(!snap.exists()) throw new Error('appdata/main 문서를 찾을 수 없습니다.');
-  const teachers = Array.isArray(snap.data().teachers) ? snap.data().teachers : [];
-  // 이름순 정렬, 담임 학급 함께 표시. 이메일 없는(로그인 이력 없는) 교사는 선택 불가.
-  const sorted = [...teachers].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ko'));
-  for(const t of sorted){
+  const norm = s => (s || '').replace(/\s/g, '');
+  // ── 명단: 교원 명렬(contacts/main.staff) — 수업 없는 관리자·교감 등 전 교직원 포함 ──
+  const ctSnap = await getDoc(doc(fbDb, 'contacts', 'main'));
+  const staff  = ctSnap.exists() && Array.isArray(ctSnap.data().staff) ? ctSnap.data().staff : [];
+  // ── 이메일·uid·담임: 시간표 기반 teachers(로그인 시 자동 수집) — 이름으로 매칭 ──
+  const tSnap    = await getDoc(doc(fbDb, 'appdata', 'main'));
+  const teachers = tSnap.exists() && Array.isArray(tSnap.data().teachers) ? tSnap.data().teachers : [];
+  const byName = new Map();  // 이름(공백제거) → {email, homeroom}
+  teachers.forEach(t => { if (t.name) byName.set(norm(t.name), t); });
+
+  // 명렬을 기준으로 하되, 명렬에 없는(로그인은 했지만 명렬 미등록) 교사도 뒤에 덧붙여 누락 방지
+  const rows = staff.length
+    ? staff.map(s => ({ name: s.name, role: s.role || '', match: byName.get(norm(s.name)) }))
+    : teachers.map(t => ({ name: t.name, role: '', match: t }));
+  if (staff.length) {
+    const inRoster = new Set(staff.map(s => norm(s.name)));
+    teachers.forEach(t => {
+      if (t.email && t.name && !inRoster.has(norm(t.name))) rows.push({ name: t.name, role: '', match: t });
+    });
+  }
+  rows.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ko'));
+
+  for(const r of rows){
     const opt = document.createElement('option');
-    if(t.email){
-      opt.value = t.email;
-      opt.textContent = t.name + (t.homeroom ? ` (담임 ${t.homeroom})` : '');
+    const m = r.match;
+    const homeroom = m && m.homeroom ? ` (담임 ${m.homeroom})` : (r.role ? ` (${r.role})` : '');
+    if(m && m.email){
+      opt.value = m.email;
+      opt.textContent = r.name + homeroom;
     } else {
       opt.value = '';
       opt.disabled = true;
-      opt.textContent = `${t.name} — 로그인 이력 없음`;
+      opt.textContent = `${r.name}${homeroom} — 로그인 이력 없음`;
     }
     teacherSelect.appendChild(opt);
   }
