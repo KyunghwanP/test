@@ -23,6 +23,31 @@ fn load_icon() -> Option<tao::window::Icon> {
     tao::window::Icon::from_rgba(img.into_raw(), w, h).ok()
 }
 
+// 포털이 window.ipc.postMessage(JSON)로 보낸 알림 → Windows 네이티브 토스트
+// (앱이 최소화돼 있어도 화면 위에 뜬다)
+fn show_toast(title: &str, body: &str) {
+    #[cfg(windows)]
+    {
+        use tauri_winrt_notification::Toast;
+        let _ = Toast::new(Toast::POWERSHELL_APP_ID)
+            .title(title)
+            .text1(body)
+            .show();
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (title, body);
+    }
+}
+
+fn handle_ipc(msg: &str) {
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(msg) {
+        let title = v.get("title").and_then(|x| x.as_str()).unwrap_or("영남고등학교");
+        let body = v.get("body").and_then(|x| x.as_str()).unwrap_or("");
+        show_toast(title, body);
+    }
+}
+
 fn main() -> wry::Result<()> {
     let event_loop = EventLoopBuilder::new().build();
     let window = WindowBuilder::new()
@@ -39,6 +64,10 @@ fn main() -> wry::Result<()> {
             // 새 창 요청 → 기본 브라우저로 열고, 앱 안 새 창은 막음
             let _ = webbrowser::open(&url);
             false
+        })
+        .with_ipc_handler(|req| {
+            // 포털에서 온 메시지(알림 등) 처리
+            handle_ipc(req.body());
         })
         .build()?;
 
