@@ -4801,7 +4801,10 @@ function startHomeMemoHeightSync(){
 let notifyReady = false;
 
 // 앱 시작 시 1회: 브라우저면 권한 요청 (Neutralino는 권한 불필요)
+// wry 데스크톱 앱이면 window.ipc(네이티브 다리)가 주입돼 있음 → 네이티브 토스트로 보냄
+const IS_WRY_APP = (typeof window !== 'undefined' && window.ipc && typeof window.ipc.postMessage === 'function');
 function initNotify(){
+  if(IS_WRY_APP){ notifyReady = true; return; }   // 데스크톱 앱: 권한 불필요, 네이티브 토스트
   if(IS_NEUTRALINO){ notifyReady = true; return; }
   if(typeof Notification === 'undefined') return;
   if(Notification.permission === 'granted'){ notifyReady = true; return; }
@@ -4813,6 +4816,11 @@ function initNotify(){
 // 알림 띄우기
 function showAppNotify(title, body){
   try {
+    if(IS_WRY_APP){
+      // wry 데스크톱 앱 → Rust로 보내 네이티브 Windows 토스트 (앱 최소화돼도 뜸)
+      window.ipc.postMessage(JSON.stringify({ title: String(title||''), body: String(body||'') }));
+      return;
+    }
     if(IS_NEUTRALINO){
       Neutralino.os.showNotification(title, body);
       return;
