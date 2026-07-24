@@ -4649,6 +4649,15 @@
   </div>
 </div>
 
+<!-- Neutralino 데스크톱 앱 안에서 실행 중일 때만 클라이언트 로드 →
+     os.open(새 창을 기본 브라우저로)·알림·storage 등 네이티브 기능 활성화.
+     NL_TOKEN/NL_PORT는 Neutralino가 페이지에 주입하는 전역이라, 일반 브라우저에는 없어 로드되지 않는다.
+     document.write는 파싱 중(모듈 실행 전) 동기 실행 → 아래 모듈에서 Neutralino가 정의된 상태가 됨. -->
+<script>
+  if (window.NL_TOKEN || window.NL_PORT) {
+    document.write('<scr' + 'ipt src="vendor/neutralino.js"><\/scr' + 'ipt>');
+  }
+</script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithCredential, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, indexedDBLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
@@ -4718,6 +4727,8 @@ window.addEventListener('unhandledrejection', e => {
 });
 
 const IS_NEUTRALINO = (typeof Neutralino !== 'undefined');
+// 데스크톱 앱이면 네이티브 브릿지 연결 시작 (이게 있어야 os.open·알림·storage가 실제 동작)
+if(IS_NEUTRALINO){ try { Neutralino.init(); } catch(e){ console.warn('Neutralino.init 실패', e); } }
 
 // ── 데스크톱 앱: 새 창/외부 링크는 앱 안이 아니라 시스템 기본 브라우저로 열기 ──
 // 다른 도메인 링크·data-external·target="_blank"(같은 도메인 포함) 모두 기본 브라우저 탭으로 연다.
