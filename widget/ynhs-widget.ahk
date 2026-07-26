@@ -148,18 +148,31 @@ global gMinList := []
     global gDesktopShown, gMinList, WidgetWins
     if !gDesktopShown {
         gMinList := []
-        for hwnd in WinGetList() {          ; 보이는 최상위 창들
+        for hwnd in WinGetList() {          ; 보이는 최상위 창들(맨 앞→맨 뒤 Z-order 순)
             if WidgetWins.Has(hwnd)         ; 우리 위젯은 건드리지 않음(계속 떠 있음)
                 continue
             if !IsAppWindow(hwnd)
                 continue
-            gMinList.Push(hwnd)
+            ; 창 크기(가로·세로)는 저장하지 않는다. 다만 '최대화 상태였는지'만 1비트 기억한다.
+            ;   → 최대화 창을 그냥 최소화→WinRestore 하면 보통 크기로 줄어드는 걸 막기 위함.
+            gMinList.Push({hwnd: hwnd, max: (WinGetMinMax("ahk_id " hwnd) = 1)})
             WinMinimize("ahk_id " hwnd)
         }
         gDesktopShown := true
     } else {
-        for hwnd in gMinList                ; 기억해둔 창들만 원래대로 복귀
-            try WinRestore("ahk_id " hwnd)
+        ; 최소화의 '역순'으로 복원해야 원래 앞뒤 순서(Z-order)가 유지된다.
+        ;   (기억한 순서 그대로 복원하면 맨 뒤 창이 마지막에 올라와 앞뒤가 뒤집힌다)
+        i := gMinList.Length
+        while (i >= 1) {
+            item := gMinList[i]
+            try {
+                if item.max
+                    WinMaximize("ahk_id " item.hwnd)   ; 최대화였던 창은 다시 최대화(크기 유지)
+                else
+                    WinRestore("ahk_id " item.hwnd)
+            }
+            i--
+        }
         gMinList := []
         gDesktopShown := false
     }
