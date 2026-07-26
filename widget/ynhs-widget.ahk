@@ -146,36 +146,61 @@ global gMinList := []
 
 #d:: {
     global gDesktopShown, gMinList, WidgetWins
-    if !gDesktopShown {
-        gMinList := []
-        for hwnd in WinGetList() {          ; 보이는 최상위 창들(맨 앞→맨 뒤 Z-order 순)
-            if WidgetWins.Has(hwnd)         ; 우리 위젯은 건드리지 않음(계속 떠 있음)
-                continue
-            if !IsAppWindow(hwnd)
-                continue
-            ; 창 크기(가로·세로)는 저장하지 않는다. 다만 '최대화 상태였는지'만 1비트 기억한다.
-            ;   → 최대화 창을 그냥 최소화→WinRestore 하면 보통 크기로 줄어드는 걸 막기 위함.
-            gMinList.Push({hwnd: hwnd, max: (WinGetMinMax("ahk_id " hwnd) = 1)})
-            WinMinimize("ahk_id " hwnd)
-        }
-        gDesktopShown := true
-    } else {
-        ; 최소화의 '역순'으로 복원해야 원래 앞뒤 순서(Z-order)가 유지된다.
-        ;   (기억한 순서 그대로 복원하면 맨 뒤 창이 마지막에 올라와 앞뒤가 뒤집힌다)
-        i := gMinList.Length
-        while (i >= 1) {
-            item := gMinList[i]
-            try {
-                if item.max
-                    WinMaximize("ahk_id " item.hwnd)   ; 최대화였던 창은 다시 최대화(크기 유지)
-                else
-                    WinRestore("ahk_id " item.hwnd)
+    ; 토글하는 그 순간만 최소화 애니메이션을 끈다 → 창별 슬라이드가 사라져 즉각 반응.
+    ;   (창을 하나씩 최소화하느라 애니메이션이 개수만큼 쌓여 느렸음) 끝나면 원래대로 복구.
+    prevAnim := GetMinAnimation()
+    if prevAnim
+        SetMinAnimation(false)
+    try {
+        if !gDesktopShown {
+            gMinList := []
+            for hwnd in WinGetList() {          ; 보이는 최상위 창들(맨 앞→맨 뒤 Z-order 순)
+                if WidgetWins.Has(hwnd)         ; 우리 위젯은 건드리지 않음(계속 떠 있음)
+                    continue
+                if !IsAppWindow(hwnd)
+                    continue
+                ; 창 크기(가로·세로)는 저장하지 않는다. 다만 '최대화 상태였는지'만 1비트 기억한다.
+                ;   → 최대화 창을 그냥 최소화→WinRestore 하면 보통 크기로 줄어드는 걸 막기 위함.
+                gMinList.Push({hwnd: hwnd, max: (WinGetMinMax("ahk_id " hwnd) = 1)})
+                WinMinimize("ahk_id " hwnd)
             }
-            i--
+            gDesktopShown := true
+        } else {
+            ; 최소화의 '역순'으로 복원해야 원래 앞뒤 순서(Z-order)가 유지된다.
+            ;   (기억한 순서 그대로 복원하면 맨 뒤 창이 마지막에 올라와 앞뒤가 뒤집힌다)
+            i := gMinList.Length
+            while (i >= 1) {
+                item := gMinList[i]
+                try {
+                    if item.max
+                        WinMaximize("ahk_id " item.hwnd)   ; 최대화였던 창은 다시 최대화(크기 유지)
+                    else
+                        WinRestore("ahk_id " item.hwnd)
+                }
+                i--
+            }
+            gMinList := []
+            gDesktopShown := false
         }
-        gMinList := []
-        gDesktopShown := false
+    } finally {
+        if prevAnim
+            SetMinAnimation(true)   ; 원래 설정 복구(평소 다른 최소화 애니메이션엔 영향 없음)
     }
+}
+
+; ── 최소화/복원 애니메이션 on/off (ANIMATIONINFO{ UINT cbSize; int iMinAnimate }) ──
+;   SPI_GETANIMATION=0x48 / SPI_SETANIMATION=0x49. fWinIni=0 → 저장·브로드캐스트 안 함(빠름).
+GetMinAnimation() {
+    ai := Buffer(8, 0)
+    NumPut("uint", 8, ai, 0)
+    DllCall("SystemParametersInfoW", "uint", 0x48, "uint", 8, "ptr", ai, "uint", 0)
+    return NumGet(ai, 4, "int") ? 1 : 0
+}
+SetMinAnimation(on) {
+    ai := Buffer(8, 0)
+    NumPut("uint", 8, ai, 0)
+    NumPut("int", on ? 1 : 0, ai, 4)
+    DllCall("SystemParametersInfoW", "uint", 0x49, "uint", 8, "ptr", ai, "uint", 0)
 }
 
 ; '일반 앱 창'(작업표시줄/Alt+Tab에 뜨는 것) 판별 — 도구창·소유된 대화상자·제목없는 창 제외
