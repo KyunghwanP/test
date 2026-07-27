@@ -71,6 +71,17 @@
     .home-card:hover {
       transform: translateY(-12px);
     }
+    /* 각 카드(탭) → 새 창(탭)으로 열기 버튼 */
+    .card-newtab {
+      position: absolute; top: 12px; right: 12px; z-index: 3;
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 12px; font-weight: 700; color: #475569;
+      background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 999px;
+      padding: 4px 10px; cursor: pointer; transition: all .15s;
+    }
+    .card-newtab:hover { background: #e2e8f0; color: #1e293b; }
+    html.dark .card-newtab { background: #26354F; border-color: #31425f; color: #8FA3BD; }
+    html.dark .card-newtab:hover { background: #31425f; color: #E2E8F0; }
     .card-mock:hover {
       box-shadow: 0 20px 35px rgba(232, 62, 140, 0.25);
       border-color: #e83e8c;
@@ -200,6 +211,7 @@
 
       <div class="col-xl-3 col-md-6 col-sm-6 col-12">
         <div class="home-card card-mock" onclick="location.href='grades.html'">
+          <button class="card-newtab" title="새 창으로 열기" onclick="event.stopPropagation(); window.open('grades.html','_blank','noopener');">↗ 새 창</button>
           <div class="icon-circle">📈</div>
           <h3><span class="text-danger fw-bold">개별</span> 모의고사 성적 변화</h3>
           <p style="color: #000;">개별 학생 3년 모의고사<br>성적 변화 추이 그래프 조회</p>
@@ -209,6 +221,7 @@
 
       <div class="col-xl-3 col-md-6 col-sm-6 col-12">
         <div class="home-card card-grad" onclick="location.href='susi.html'">
+          <button class="card-newtab" title="새 창으로 열기" onclick="event.stopPropagation(); window.open('susi.html','_blank','noopener');">↗ 새 창</button>
           <div class="icon-circle">🎓</div>
           <h3><span class="text-primary fw-bold">졸업생 수시</span><br>결과 조회</h3>
           <p style="color: #000;">2025~2026 졸업생들의 수시 합격 결과 및 통계 조회</p>
@@ -218,6 +231,7 @@
 
       <div class="col-xl-3 col-md-6 col-sm-6 col-12">
         <div class="home-card card-trend" onclick="location.href='ipgyeol.html'">
+          <button class="card-newtab" title="새 창으로 열기" onclick="event.stopPropagation(); window.open('ipgyeol.html','_blank','noopener');">↗ 새 창</button>
           <div class="icon-circle">📝</div>
           <h3><span class="text-danger fw-bold">수시</span> 입결 조회</h3>
           <p style="color: #000;">2024~2026 3년 대학교 및 전형별 과거 입결 및 지원 가능 내신 컷 검색</p>
@@ -227,6 +241,7 @@
 
       <div class="col-xl-3 col-md-6 col-sm-6 col-12">
         <div class="home-card card-csat" onclick="location.href='jeongsi.html'">
+          <button class="card-newtab" title="새 창으로 열기" onclick="event.stopPropagation(); window.open('jeongsi.html','_blank','noopener');">↗ 새 창</button>
           <div class="icon-circle">🎯</div>
           <h3><span class="text-primary fw-bold">정시</span> 입결 조회</h3>
           <p style="color: #000;">수능 점수 기반 지원 가능 대학 및 정시 지원 희망 확인</p>
@@ -236,6 +251,7 @@
 
       <div class="col-xl-3 col-md-6 col-sm-6 col-12" id="cardSim">
         <div class="home-card card-sim" onclick="location.href='subject-sim.html'">
+          <button class="card-newtab" title="새 창으로 열기" onclick="event.stopPropagation(); window.open('subject-sim.html','_blank','noopener');">↗ 새 창</button>
           <div class="icon-circle">🧭</div>
           <h3><span class="text-success fw-bold">과목선택</span> 시뮬레이터</h3>
           <p style="color: #000;">2022 개정 교육과정 선택과목 이수 설계 연습 및 학과별 권장 과목 안내</p>
@@ -246,6 +262,7 @@
       <!-- 입시 진단 카드 (전체 공개 — 공개 입결 데이터 기반이라 성적 권한 불필요) -->
       <div class="col-xl-3 col-md-6 col-sm-6 col-12" id="cardJindan">
         <div class="home-card card-jindan" onclick="location.href='jindan.html'">
+          <button class="card-newtab" title="새 창으로 열기" onclick="event.stopPropagation(); window.open('jindan.html','_blank','noopener');">↗ 새 창</button>
           <div class="icon-circle">🩺</div>
           <h3><span class="fw-bold" style="color:#4f46e5;">입시 진단</span> 리포트</h3>
           <p style="color: #000;">5등급제 내신을 9등급 환산하여 2025 수시 입결 기반 안정·적정·소신 진단</p>
@@ -256,6 +273,7 @@
       <!-- 수시 모집요강 검색 카드 (전체 공개 — adiga 공개 PDF) -->
       <div class="col-xl-3 col-md-6 col-sm-6 col-12" id="cardGuide">
         <div class="home-card card-guide" onclick="location.href='appguide.html'">
+          <button class="card-newtab" title="새 창으로 열기" onclick="event.stopPropagation(); window.open('appguide.html','_blank','noopener');">↗ 새 창</button>
           <div class="icon-circle">📑</div>
           <h3><span class="fw-bold" style="color:#0891b2;">2027 수시</span> 모집요강 검색</h3>
           <p style="color: #000;">전국 대학 수시 모집요강 원문을 대학별로 조회하고 문서 내 키워드 검색</p>
