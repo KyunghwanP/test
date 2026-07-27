@@ -2508,6 +2508,10 @@
   .sg-group-card.club-g3:hover{background:rgba(245,158,11,0.14);}
   .sg-group-card.club-g3 .sg-group-count{color:#d97706;}
   .sg-group-card.club-g3 .sg-club-grade{color:#b45309;background:rgba(245,158,11,0.16);border-color:#fbbf24;}
+  /* 동아리 pill(칩) — 학생 목록·상세에서 누르면 동아리 정보 모달 */
+  .club-pill{display:inline-flex;align-items:center;gap:2px;font-size:12px;font-weight:700;color:var(--mon);background:var(--paper-soft);border:1px solid var(--rule);border-radius:999px;padding:2px 9px;cursor:pointer;white-space:nowrap;}
+  .club-pill:hover{background:var(--paper);border-color:var(--mon);}
+  .spot-badge.club{cursor:pointer;}
   .sg-back-row{
     display:flex;align-items:center;gap:10px;
     padding:4px 0 8px;flex-shrink:0;
@@ -3450,7 +3454,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.72</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.73</div>
   </div>
 </div>
 
@@ -3580,7 +3584,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.72</div>
+    <div class="nav-version" title="Made by 박경환">ver6.73</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4738,7 +4742,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.72 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = 'ver6.73 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -7518,6 +7522,64 @@ function clubCardHtml(club, cnt) {
 }
 window.clubCardHtml = clubCardHtml;
 
+// ── 동아리 pill(칩) HTML + 클릭 시 정보 모달 ─────────────────
+// 학생 목록·상세 어디서든 이 pill을 누르면 지도교사·전공·교실·학년이 뜬다.
+function clubPillHtml(club){
+  if (!club) return '';
+  return `<span class="club-pill" data-club="${escapeHtml(club)}" title="동아리 정보 보기">🎯 ${escapeHtml(club)}</span>`;
+}
+window.clubPillHtml = clubPillHtml;
+
+function showClubInfo(club){
+  if (!club) return;
+  const openIt = () => {
+    const m = clubOf(club) || {};
+    const disp = m.name || club;
+    const cnt = allStudents.filter(s => _stripSpace(s.club) === _stripSpace(club)).length;
+    const rows = [
+      ['지도교사', m.teacher],
+      ['전공', m.major],
+      ['교실', m.room],
+      ['학년', m.grade],
+      ['인원', cnt ? cnt + '명' : ''],
+    ].filter(r => r[1]).map(([label, val]) =>
+      `<div class="cd-row"><span class="cd-label">${label}</span><span class="cd-value">${escapeHtml(String(val))}</span></div>`
+    ).join('');
+    const overlay = document.createElement('div');
+    overlay.className = 'cd-overlay';
+    overlay.innerHTML = `
+      <div class="cd-box">
+        <div class="cd-header" style="background:var(--fri);">
+          <div class="cd-avatar">🎯</div>
+          <div>
+            <div class="cd-name">${escapeHtml(disp)}</div>
+            <div class="cd-dept">동아리</div>
+          </div>
+          <button class="cd-close">×</button>
+        </div>
+        <div class="cd-body">${rows || '<div style="padding:6px 2px;color:var(--ink-soft);font-size:14px;">등록된 동아리 정보가 없습니다.</div>'}</div>
+      </div>`;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('open'));
+    const close = () => { overlay.classList.remove('open'); setTimeout(() => overlay.remove(), 200); };
+    overlay.querySelector('.cd-close').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  };
+  if (!clubMetaLoaded) loadClubMeta().then(openIt); else openIt();
+}
+window.showClubInfo = showClubInfo;
+
+// 동아리 pill 클릭(어디서든) → 정보 모달. 캡처 단계에서 가로채 학생 행/카드 클릭과 겹치지 않게.
+document.addEventListener('click', e => {
+  const pill = e.target.closest('.club-pill, .spot-badge.club');
+  if (!pill) return;
+  const club = pill.getAttribute('data-club');
+  if (!club) return;
+  e.stopPropagation();
+  e.preventDefault();
+  showClubInfo(club);
+}, true);
+
 // ── 그룹 목록 ──
 function renderStudentsGroupList() {
   studentsViewMode = 'group';
@@ -7621,7 +7683,7 @@ function renderStudentsInGroup(group) {
         <div class="student-num">${group.type==='club' ? (s.grade+'-'+s.room) : String(s.num||'').padStart(2,'0')}<br>${group.type==='club' ? String(s.num||'').padStart(2,'0')+'번' : ''}</div>
         <div class="student-info">
           <div class="student-name">${escapeHtml(s.name||'')}</div>
-          <div class="student-meta">${group.type==='club' ? '' : (s.club ? '🎯 '+s.club+' ' : '')}${isSciStudent(s) ? '<span style="color:#6d28d9;font-weight:700;">⚗️ 과학중점과정</span>' : ''}</div>
+          <div class="student-meta">${group.type==='club' ? '' : (s.club ? clubPillHtml(s.club)+' ' : '')}${isSciStudent(s) ? '<span style="color:#6d28d9;font-weight:700;">⚗️ 과학중점과정</span>' : ''}</div>
         </div>
       </div>`;
     }).join('')}`;
@@ -7651,7 +7713,7 @@ function showStudentDetail(s) {
   const rows = [
     ['학번', studentId],
     ['생년월일', birthFormatted],
-    ['동아리', s.club],
+    ['동아리', s.club ? clubPillHtml(s.club) : ''],
     ['과정', isSciStudent(s) ? '⚗️ 과학중점과정' : ''],
   ].filter(r => r[1]).map(([label, val]) => `
     <div class="cd-row">
@@ -7698,12 +7760,14 @@ function showStudentDetail(s) {
 
 // ── 검색 ──
 document.getElementById('studentsSearch').addEventListener('input', function() {
-  const q = this.value.trim().toLowerCase();
-  if(!q) {
+  const raw = this.value.trim();
+  if(!raw) {
     if(studentsCurrentGroup) renderStudentsInGroup(studentsCurrentGroup);
     else renderStudentsGroupList();
     return;
   }
+  if(studentsTabMode === 'club') { renderStudentsClubSearch(raw); return; }
+  const q = raw.toLowerCase();
   const filtered = allStudents.filter(s =>
     (s.name||'').toLowerCase().includes(q) ||
     String(s.num||'').includes(q) ||
@@ -7721,7 +7785,7 @@ document.getElementById('studentsSearch').addEventListener('input', function() {
       <div class="student-num">${s.grade||''}-${s.room||''}<br>${String(s.num||'').padStart(2,'0')}</div>
       <div class="student-info">
         <div class="student-name">${escapeHtml(s.name||'')}</div>
-        <div class="student-meta">${s.club ? '🎯 '+s.club : ''}</div>
+        <div class="student-meta">${s.club ? clubPillHtml(s.club) : ''}</div>
       </div>
     </div>`;
   }).join('');
@@ -7733,6 +7797,33 @@ document.getElementById('studentsSearch').addEventListener('input', function() {
     });
   });
 });
+
+// 동아리별 탭에서 검색 → 매칭되는 동아리 칩 표시(띄어쓰기 무시). 칩 클릭 → 그 동아리 명단.
+function renderStudentsClubSearch(q){
+  const list = document.getElementById('studentsList');
+  if (!clubMetaLoaded) loadClubMeta().then(() => {
+    const el = document.getElementById('studentsSearch');
+    if (el && el.value.trim() && studentsTabMode === 'club') renderStudentsClubSearch(q);
+  });
+  const qn = _stripSpace(q).toLowerCase();
+  const clubs = sortClubs([...new Set(allStudents.map(s => s.club).filter(Boolean))])
+    .filter(club => {
+      const m = clubOf(club);
+      const disp = m ? m.name : club;
+      return _stripSpace(disp).toLowerCase().includes(qn) || _stripSpace(club).toLowerCase().includes(qn);
+    });
+  if (!clubs.length) { list.innerHTML = '<div class="contacts-empty">검색 결과 없음</div>'; return; }
+  list.innerHTML = `<div class="sg-group-grid club-grid">` +
+    clubs.map(club => clubCardHtml(club, allStudents.filter(s => s.club === club).length)).join('') +
+    `</div>`;
+  list.querySelectorAll('.sg-group-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const key = card.dataset.key;
+      history.pushState({ page: 'students', root: true }, '');
+      renderStudentsInGroup({type:'club', key, label:key});
+    });
+  });
+}
 
 
 // ══════════════════════════════════════════
@@ -7916,7 +8007,10 @@ function s360Render(){
   if (!spotLoaded){ body.innerHTML = '<div class="spot-empty">학생 데이터를 불러오는 중...</div>'; return; }
   if (!allStudents.length){ body.innerHTML = '<div class="spot-empty">학생 연락망 데이터가 없습니다.</div>'; return; }
   const q = document.getElementById('s360Input').value.trim();
-  if (q) { s360RenderSearch(q); return; }
+  if (q) {
+    if (s360Mode === 'club') { s360RenderClubSearch(q); return; }   // 동아리별 → 동아리 칩 검색
+    s360RenderSearch(q); return;
+  }
   if (s360Group) { s360RenderGroupStudents(); return; }
   s360RenderGroups();
 }
@@ -7992,7 +8086,7 @@ function s360RenderRows(students, headLabel){
       <span class="spot-grn">${s.grade}-${s.room}-${String(s.num||'').padStart(2,'0')}</span>
       <span class="spot-name">${escapeHtml(s.name||'')}</span>
       <span class="spot-cell">${isSciStudent(s) ? '<span class="spot-badge sci">⚗️<span class="spot-badge-lbl"> 과학중점</span></span>' : ''}</span>
-      <span class="spot-cell">${s.club ? `<span class="spot-badge club">🎯 ${escapeHtml(s.club)}</span>` : ''}</span>
+      <span class="spot-cell">${s.club ? `<span class="spot-badge club" data-club="${escapeHtml(s.club)}">🎯 ${escapeHtml(s.club)}</span>` : ''}</span>
       <span class="spot-cell spot-cell-pts">${ptsBadge}</span>
     </div>`;
   }).join('');
@@ -8025,6 +8119,35 @@ function s360RenderGroupStudents(){
       .sort((a,b) => (parseInt(a.grade)||0)-(parseInt(b.grade)||0) || (parseInt(a.room)||0)-(parseInt(b.room)||0) || (parseInt(a.num)||0)-(parseInt(b.num)||0));
   }
   s360RenderRows(filtered, g.label);
+}
+
+// 동아리별 탭에서 검색 → 매칭되는 동아리 칩(띄어쓰기 무시). 칩 클릭 → 그 동아리 학생 목록.
+function s360RenderClubSearch(q){
+  s360View = 'groups';
+  const body = document.getElementById('s360Body');
+  if (!clubMetaLoaded) loadClubMeta().then(() => {
+    if (document.getElementById('s360Input').value.trim() && s360Mode === 'club') s360RenderClubSearch(q);
+  });
+  const qn = _stripSpace(q).toLowerCase();
+  const clubs = sortClubs([...new Set(allStudents.map(s => s.club).filter(Boolean))])
+    .filter(club => {
+      const m = clubOf(club);
+      const disp = m ? m.name : club;
+      return _stripSpace(disp).toLowerCase().includes(qn) || _stripSpace(club).toLowerCase().includes(qn);
+    });
+  let html = '<div class="s360-groups"><div class="sg-group-grid club-grid">';
+  html += clubs.map(club => clubCardHtml(club, allStudents.filter(s => s.club === club).length)).join('');
+  html += '</div></div>';
+  body.innerHTML = clubs.length ? html : '<div class="spot-empty">검색 결과 없음</div>';
+  body.querySelectorAll('.sg-group-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const key = card.dataset.key;
+      history.pushState({ page: 'search' }, '');
+      s360Group = { type:'club', key, label: key };
+      document.getElementById('s360Input').value = '';
+      s360Render();
+    });
+  });
 }
 
 function s360RenderSearch(q){
@@ -8270,7 +8393,7 @@ async function s360ShowDetail(s){
           <span style="font-size:24px;font-weight:900;color:var(--ink);">${escapeHtml(s.name||'')}</span>
           <span style="font-family:'IBM Plex Mono';font-size:14.5px;color:var(--ink-soft);font-weight:700;">${s.grade}학년 ${s.room}반 ${s.num}번</span>
           ${isSciStudent(s) ? SCI_BADGE : ''}
-          ${s.club ? `<span class="spot-badge">🎯 ${escapeHtml(s.club)}</span>` : ''}
+          ${s.club ? `<span class="spot-badge club" data-club="${escapeHtml(s.club)}" style="cursor:pointer;">🎯 ${escapeHtml(s.club)}</span>` : ''}
           <button id="s360ContactBtn" class="spot-badge" style="border:none;cursor:pointer;font-family:inherit;">📞 연락처 보기</button>
         </div>
         <img id="s360PhotoImg" class="s360-photo" alt="" style="display:none;">
