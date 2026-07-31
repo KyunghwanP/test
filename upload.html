@@ -1282,12 +1282,12 @@ function phCompress(media) {
       const url = URL.createObjectURL(blob);
       const im = new Image();
       im.onload = () => {
-        // 150×200 · jpeg 0.62 → 장당 ~10KB(base64 ~14KB). 반 40명이라도 문서 1MB 안.
-        const MAXW = 150, MAXH = 200;
-        const sc = Math.min(MAXW / im.width, MAXH / im.height, 1);
-        const w = Math.max(1, Math.round(im.width * sc)), h = Math.max(1, Math.round(im.height * sc));
-        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-        cv.getContext('2d').drawImage(im, 0, 0, w, h);
+        // 증명사진 3:4 강제 보정 · jpeg 0.62 → 장당 ~10KB(base64 ~14KB). 반 40명이라도 문서 1MB 안.
+        // 엑셀에 늘어난 채(비3:4) 박힌 사진을 3:4 캔버스에 전체 매핑 → 원래 3:4 비율로 복원.
+        // (이미 3:4인 정상 사진은 그대로 유지. 증명사진 규격이 3:4라는 전제.)
+        const OUTW = 150, OUTH = 200;   // 3:4
+        const cv = document.createElement('canvas'); cv.width = OUTW; cv.height = OUTH;
+        cv.getContext('2d').drawImage(im, 0, 0, OUTW, OUTH);
         URL.revokeObjectURL(url);
         try { res(cv.toDataURL('image/jpeg', 0.62)); } catch(e){ res(null); }
       };
