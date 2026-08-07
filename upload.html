@@ -246,6 +246,12 @@ if ('serviceWorker' in navigator) {
         <div class="step-num">2</div>
         <div class="step-body">
           <div class="step-label">Firestore에 업로드</div>
+          <label style="display:block;font-size:13px;color:#555;margin-bottom:8px;">저장 위치
+            <select id="ttTarget" style="margin-left:8px;padding:4px 8px;font-family:inherit;font-size:13px;">
+              <option value="main">현재 학기 (2학기) — appdata/main</option>
+              <option value="main-2026-1">🗄️ 1학기 아카이브 — appdata/main-2026-1</option>
+            </select>
+          </label>
           <button class="btn btn-primary" id="ttUploadBtn" disabled>데이터 업로드</button>
         </div>
       </div>
@@ -571,14 +577,18 @@ ttUploadBtn.addEventListener('click', async () => {
   ttUploadBtn.disabled = true;
   setStatus('ttStatus', '☁️ Firestore에 업로드 중...', 'loading');
   try {
-    await setDoc(doc(db, 'appdata', 'main'), {...ttParsedData, updatedAt: new Date().toISOString()});
+    const target = (document.getElementById('ttTarget') && document.getElementById('ttTarget').value) || 'main';
+    const isArchive = target !== 'main';
+    await setDoc(doc(db, 'appdata', target), {...ttParsedData, updatedAt: new Date().toISOString()});
     setStatus('ttStatus',
-      '✅ 업로드 완료!\n\n' +
+      '✅ 업로드 완료! (' + (isArchive ? '1학기 아카이브 · ' + target : '현재 학기 · main') + ')\n\n' +
       '  교사: ' + ttParsedData.teachers.length + '명\n' +
       '  내선번호: ' + Object.keys(ttParsedData.extMap).length + '건\n' +
       '  시정표: ' + ttParsedData.bellSchedule.length + '개 교시\n' +
       '  묶음선택과목: ' + ttParsedData.electiveBlocks.length + '개 묶음\n\n' +
-      '앱을 새로고침하면 새 데이터가 즉시 반영됩니다.', 'ok');
+      (isArchive
+        ? '1학기 아카이브에 저장됐어요. 앱의 현재 시간표(2학기)에는 영향 없고,\n숨긴 방법(학기 라벨 5연타)으로만 조회됩니다.'
+        : '앱을 새로고침하면 새 데이터가 즉시 반영됩니다.'), 'ok');
     ttUploadBtn.disabled = false;
   } catch(e) {
     setStatus('ttStatus', '❌ 업로드 실패:\n' + e.code + '\n' + e.message, 'err');
