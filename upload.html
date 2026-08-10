@@ -215,6 +215,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="tab-nav">
   <button class="tab-nav-btn active" data-tab="timetable">📅 시간표 업로드</button>
+  <button class="tab-nav-btn" data-tab="operating">📆 운영표 업로드</button>
   <button class="tab-nav-btn" data-tab="contacts">📞 비상연락망 업로드</button>
   <button class="tab-nav-btn" data-tab="students">🎒 학생연락망 업로드</button>
   <button class="tab-nav-btn" data-tab="clubs">🎪 동아리 업로드</button>
@@ -257,6 +258,41 @@ if ('serviceWorker' in navigator) {
       </div>
 
       <div class="status" id="ttStatus"></div>
+    </div>
+  </div>
+
+  <!-- ══ 운영표 탭 ══ -->
+  <div class="tab-panel" id="tab-operating">
+    <div class="section">
+      <div class="section-title">📆 학사 운영표 업로드 (날짜별 요일 대체)</div>
+      <div class="section-desc">날짜별·교시별·학년별 운영표(예: 2026학년도 2학기 일과표.xlsx)를 올리면 <code>appdata/operating</code>에 저장됩니다.
+        앱 시간표의 <b>주간 선택</b>에서 이 데이터로 요일 대체·창체·공강 제거를 반영합니다. 기존 데이터는 덮어씁니다.</div>
+      <div class="format-box">
+        <b>엑셀 형식</b> — 한 시트, 2행이 헤더(<code>주차 · 일자 · 요일 · 교시 · 1학년 · 2학년 · 3학년 · 비고</code>), 3행부터 데이터.
+        일자·요일은 날짜 블록의 첫 행에만 있어도 됩니다(병합). 칸 값: <code>목3</code>(=목요일 3교시 정규표), <code>진로활동/자율활동/동아리활동</code>, <code>공강</code>, <code>ㆍ</code>(빈칸).
+      </div>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-label">엑셀 파일 선택</div>
+          <label class="file-label" for="opFileInput">📂 파일 선택…</label>
+          <input type="file" id="opFileInput" accept=".xlsx,.xls" style="display:none;" disabled>
+          <div class="file-name" id="opFileName">파일을 선택해주세요</div>
+        </div>
+      </div>
+
+      <hr>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-label">Firestore에 업로드</div>
+          <button class="btn btn-primary" id="opUploadBtn" disabled>운영표 업로드</button>
+        </div>
+      </div>
+
+      <div class="status" id="opStatus"></div>
     </div>
   </div>
 
@@ -527,6 +563,8 @@ onAuthStateChanged(auth, user => {
     document.getElementById('userEmail').textContent = user.email;
     document.getElementById('ttFileInput').disabled = false;
     if (ttParsedData) document.getElementById('ttUploadBtn').disabled = false;
+    document.getElementById('opFileInput').disabled = false;
+    if (opParsedData) document.getElementById('opUploadBtn').disabled = false;
   } else {
     currentUser = null;
     document.getElementById('authGate').style.display = 'flex';
@@ -595,6 +633,122 @@ ttUploadBtn.addEventListener('click', async () => {
     ttUploadBtn.disabled = false;
   }
 });
+
+// ════════════════════════════════════
+//  운영표 업로드 (날짜별 요일 대체 → appdata/operating)
+// ════════════════════════════════════
+const opFileInput = document.getElementById('opFileInput');
+const opFileNameEl = document.getElementById('opFileName');
+const opUploadBtn  = document.getElementById('opUploadBtn');
+let opParsedData = null;
+
+opFileInput.addEventListener('change', async () => {
+  const file = opFileInput.files[0];
+  if (!file) { opParsedData = null; return; }
+  opFileNameEl.textContent = file.name;
+  setStatus('opStatus', '파일 분석 중...', 'loading');
+  try {
+    opParsedData = await parseOperatingExcel(file);
+    const dks = Object.keys(opParsedData.dates).sort();
+    const devDays = dks.filter(dk => opParsedData.dates[dk].dev).length;
+    setStatus('opStatus',
+      '파일 분석 완료\n' +
+      '  학기: ' + (opParsedData.semester || '-') + '\n' +
+      '  수업일: ' + dks.length + '일 (' + (dks[0]||'') + ' ~ ' + (dks[dks.length-1]||'') + ')\n' +
+      '  요일 대체·특이 편성일: ' + devDays + '일\n\n' +
+      '이상 없으면 「운영표 업로드」 버튼을 눌러주세요.', 'ok');
+    if (currentUser) opUploadBtn.disabled = false;
+  } catch(e) {
+    opParsedData = null;
+    opUploadBtn.disabled = true;
+    setStatus('opStatus', '파일 분석 실패:\n' + e.message, 'err');
+  }
+});
+
+opUploadBtn.addEventListener('click', async () => {
+  if (!opParsedData || !currentUser) return;
+  opUploadBtn.disabled = true;
+  setStatus('opStatus', '☁️ Firestore에 업로드 중...', 'loading');
+  try {
+    await setDoc(doc(db, 'appdata', 'operating'), { ...opParsedData, updatedAt: new Date().toISOString() });
+    const dks = Object.keys(opParsedData.dates);
+    setStatus('opStatus',
+      '✅ 업로드 완료! (appdata/operating)\n\n' +
+      '  수업일: ' + dks.length + '일\n\n' +
+      '앱 시간표의 주간 선택에서 반영됩니다.', 'ok');
+    opUploadBtn.disabled = false;
+  } catch(e) {
+    setStatus('opStatus', '❌ 업로드 실패:\n' + e.code + '\n' + e.message, 'err');
+    opUploadBtn.disabled = false;
+  }
+});
+
+// 운영표 엑셀 → { semester, dates:{ 'YYYY-MM-DD': {day, cells:{교시:[1학년,2학년,3학년]}, dev} } }
+async function parseOperatingExcel(file) {
+  const buf = await file.arrayBuffer();
+  const wb  = XLSX.read(buf, { type:'array', cellDates:true });
+  const ws  = wb.Sheets[wb.SheetNames[0]];
+  if (!ws) throw new Error('시트를 찾을 수 없습니다.');
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1 });
+  // 헤더 행(…교시…1학년…) 탐색 → 컬럼 인덱스 확정
+  let hr = -1, ci = null;
+  for (let i = 0; i < Math.min(rows.length, 6); i++) {
+    const r = (rows[i] || []).map(c => (c==null?'':String(c).trim()));
+    const pIdx = r.findIndex(c => c === '교시');
+    const g1Idx = r.findIndex(c => c.replace(/\s/g,'') === '1학년');
+    if (pIdx >= 0 && g1Idx >= 0) {
+      hr = i;
+      ci = { date: r.findIndex(c=>c.includes('일자')), day: r.findIndex(c=>c==='요일'),
+             period: pIdx, g1: g1Idx, g2: g1Idx+1, g3: g1Idx+2 };
+      break;
+    }
+  }
+  if (hr < 0) throw new Error('헤더(교시·1학년…)를 찾지 못했습니다. 형식을 확인하세요.');
+
+  const semester = String(wb.SheetNames[0] || '').trim();
+  const PH = /^([월화수목금])([1-7])$/;
+  const toISO = v => {
+    if (v instanceof Date) {
+      const y=v.getFullYear(), m=String(v.getMonth()+1).padStart(2,'0'), d=String(v.getDate()).padStart(2,'0');
+      return `${y}-${m}-${d}`;
+    }
+    return null;
+  };
+  const clean = v => {
+    if (v==null) return '';
+    const s = String(v).trim();
+    return (s==='ㆍ' || s==='·' || s==='.') ? '' : s;
+  };
+
+  const dates = {};
+  let lastDate=null, lastDay=null;
+  for (let i = hr+1; i < rows.length; i++) {
+    const row = rows[i] || [];
+    const dcell = row[ci.date];
+    if (dcell instanceof Date) lastDate = toISO(dcell);
+    const dayCell = ci.day>=0 ? clean(row[ci.day]) : '';
+    if (dayCell) lastDay = dayCell;
+    const per = parseInt(row[ci.period], 10);
+    if (!lastDate || !per) continue;
+    const rec = dates[lastDate] || (dates[lastDate] = { day:lastDay, cells:{} });
+    rec.cells[per] = [clean(row[ci.g1]), clean(row[ci.g2]), clean(row[ci.g3])];
+  }
+  // dev 표시: 하루라도 정규(자기요일+교시) 아닌 배치(다른요일·활동·공강)가 있으면 true
+  Object.keys(dates).forEach(dk => {
+    const rec = dates[dk]; let dev = false;
+    for (const p of Object.keys(rec.cells)) {
+      for (const v of rec.cells[p]) {
+        if (!v) continue;
+        const m = PH.exec(v);
+        if (!(m && m[1]===rec.day && +m[2]===+p)) { dev = true; break; }
+      }
+      if (dev) break;
+    }
+    rec.dev = dev;
+  });
+  if (Object.keys(dates).length < 20) throw new Error('인식된 날짜가 너무 적습니다 ('+Object.keys(dates).length+'일). 형식을 확인하세요.');
+  return { semester, dates };
+}
 
 async function parseTimetableExcel(file) {
   const buf  = await file.arrayBuffer();
