@@ -686,7 +686,7 @@ opUploadBtn.addEventListener('click', async () => {
 // 운영표 엑셀 → { semester, dates:{ 'YYYY-MM-DD': {day, cells:{교시:[1학년,2학년,3학년]}, dev} } }
 async function parseOperatingExcel(file) {
   const buf = await file.arrayBuffer();
-  const wb  = XLSX.read(buf, { type:'array', cellDates:true });
+  const wb  = XLSX.read(buf, { type:'array' });   // cellDates 미사용 → 날짜는 시리얼 숫자 (시간대 무관 변환)
   const ws  = wb.Sheets[wb.SheetNames[0]];
   if (!ws) throw new Error('시트를 찾을 수 없습니다.');
   const rows = XLSX.utils.sheet_to_json(ws, { header:1 });
@@ -707,12 +707,17 @@ async function parseOperatingExcel(file) {
 
   const semester = String(wb.SheetNames[0] || '').trim();
   const PH = /^([월화수목금])([1-7])$/;
+  // 엑셀 날짜 시리얼 → ISO (시간대 무관: UTC 자정 기준으로 계산). Date/문자열도 방어적으로 처리.
   const toISO = v => {
-    if (v instanceof Date) {
-      const y=v.getFullYear(), m=String(v.getMonth()+1).padStart(2,'0'), d=String(v.getDate()).padStart(2,'0');
-      return `${y}-${m}-${d}`;
+    if (typeof v === 'number' && isFinite(v)) {
+      const dt = new Date(Math.round((v - 25569) * 86400000));
+      return dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0');
     }
-    return null;
+    if (v instanceof Date) {
+      return v.getUTCFullYear()+'-'+String(v.getUTCMonth()+1).padStart(2,'0')+'-'+String(v.getUTCDate()).padStart(2,'0');
+    }
+    const m = String(v==null?'':v).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+    return m ? `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}` : null;
   };
   const clean = v => {
     if (v==null) return '';
@@ -725,7 +730,8 @@ async function parseOperatingExcel(file) {
   for (let i = hr+1; i < rows.length; i++) {
     const row = rows[i] || [];
     const dcell = row[ci.date];
-    if (dcell instanceof Date) lastDate = toISO(dcell);
+    const _iso = toISO(dcell);
+    if (_iso) lastDate = _iso;
     const dayCell = ci.day>=0 ? clean(row[ci.day]) : '';
     if (dayCell) lastDay = dayCell;
     const per = parseInt(row[ci.period], 10);
