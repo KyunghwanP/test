@@ -12,7 +12,85 @@
       (function(){
         const apply = on => document.documentElement.classList.toggle('dark', on);
         try { apply(localStorage.getItem('ynhs-dark') === '1'); } catch(e) {}
+        // 위젯(별도 WebView2)은 URL 파라미터 dark=1/0 로 지정 → 적용+기억
+        try { const dp = new URLSearchParams(location.search).get('dark');
+              if (dp === '1' || dp === '0') { apply(dp === '1');
+                try { localStorage.setItem('ynhs-dark', dp); } catch(e) {} } } catch(e) {}
         window.addEventListener('storage', e => { if (e.key === 'ynhs-dark') apply(e.newValue === '1'); });
+        try { if (new URLSearchParams(location.search).get('glass') === '1') document.documentElement.classList.add('glass'); } catch(e) {}
+        // 위젯에서 다크가 어떤 이유로든 안 걸리거나 풀리는 경우 대비: dark=1이면 강제로 유지
+        try {
+          if (new URLSearchParams(location.search).get('dark') === '1') {
+            var _fd = () => document.documentElement.classList.add('dark');
+            _fd();
+            document.addEventListener('DOMContentLoaded', _fd);
+            new MutationObserver(() => { if (!document.documentElement.classList.contains('dark')) _fd(); })
+              .observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+          }
+        } catch(e) {}
+      })();
+    </script>
+    <!-- ── 위젯 손잡이 바(웹 내장) — 데스크톱 위젯(WebView 최상위)일 때만 ── -->
+    <script>
+      (function(){
+        var host = (window.self===window.top && window.chrome && window.chrome.webview) ? window.chrome.webview : null;
+        if(!host) return;                       // 포털 안 iframe/일반 브라우저에선 미표시
+        function post(m){ try{ host.postMessage(m); }catch(e){} }
+        function build(){
+          if(!document.body || document.getElementById('wgtBar')) return;
+          document.documentElement.classList.add('wgt');   // 데스크톱 위젯 컨텍스트 → 투명 배경 적용
+          var op = parseInt(new URLSearchParams(location.search).get('op')||'240',10);
+          // 카드 배경 불투명도(--gop): 바탕(아크릴)이 카드 너머로 비치도록. 글자는 불투명 고정.
+          function opToGop(v){ var f=(v-70)/185; f=Math.max(0,Math.min(1,f)); return (0.18+f*0.42).toFixed(3); }
+          try{ document.documentElement.style.setProperty('--gop', opToGop(op)); }catch(e){}
+          var css = document.createElement('style');
+          css.textContent =
+            '#wgtBar{position:fixed;top:0;left:0;right:0;height:28px;z-index:2147483647;display:flex;'
+            +'align-items:center;gap:6px;padding:0 6px;background:rgba(248,250,252,.96);'
+            +'border-bottom:1px solid rgba(0,0,0,.08);font:600 12px/1 "맑은 고딕",sans-serif;color:#555;'
+            +'opacity:0;transition:opacity .12s;pointer-events:none;-webkit-user-select:none;user-select:none;}'
+            +'html.dark #wgtBar{background:rgba(17,26,45,.96);color:#9fb0c9;border-color:rgba(255,255,255,.08);}'
+            +'#wgtBar.show{opacity:1;pointer-events:auto;}'
+            +'#wgtBar .wgt-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:move;}'
+            +'#wgtBar input[type=range]{width:70px;}'
+            +'#wgtBar button{border:none;background:transparent;cursor:pointer;font:inherit;color:inherit;'
+            +'padding:3px 7px;border-radius:6px;}#wgtBar button:hover{background:rgba(0,0,0,.08);}'
+            +'html.dark #wgtBar button:hover{background:rgba(255,255,255,.12);}';
+          document.head.appendChild(css);
+          var bar = document.createElement('div');
+          bar.id='wgtBar';
+          bar.innerHTML =
+            '<span class="wgt-title" id="wgtDrag">📝 빠른 메모</span>'
+            +'<input type="range" id="wgtOp" min="70" max="255" value="'+op+'" title="투명도">'
+            +'<button id="wgtApp" title="앱에서 열기">↗ 앱</button>'
+            +'<button id="wgtClose" title="닫기">✕</button>';
+          document.body.appendChild(bar);
+          (function(){
+            var applyBarTheme = function(){
+              var d = document.documentElement.classList.contains('dark')
+                      || new URLSearchParams(location.search).get('dark') === '1';
+              bar.style.background = d ? 'rgba(17,26,45,.96)' : 'rgba(248,250,252,.96)';
+              bar.style.color = d ? '#9fb0c9' : '#555';
+              bar.style.borderBottom = '1px solid ' + (d ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)');
+            };
+            applyBarTheme();
+            try{ new MutationObserver(applyBarTheme).observe(document.documentElement,{attributes:true,attributeFilter:['class']}); }catch(e){}
+          })();
+          document.addEventListener('mousemove', function(e){
+            if(e.clientY <= 30) bar.classList.add('show');
+            else if(e.clientY > 40) bar.classList.remove('show');
+          });
+          document.addEventListener('mouseleave', function(){ bar.classList.remove('show'); });
+          document.getElementById('wgtDrag').addEventListener('mousedown', function(e){ e.preventDefault(); post('drag'); });
+          document.getElementById('wgtOp').addEventListener('input', function(){
+            try{ document.documentElement.style.setProperty('--gop', opToGop(this.value)); }catch(e){}
+            post('op:'+this.value);
+          });
+          document.getElementById('wgtApp').addEventListener('click', function(){ post('app'); });
+          document.getElementById('wgtClose').addEventListener('click', function(){ post('close'); });
+          document.addEventListener('mousedown', function(){ post('raise'); }, true);  // 누른 위젯만 앞으로
+        }
+        if(document.readyState!=='loading') build(); else document.addEventListener('DOMContentLoaded', build);
       })();
     </script>
     <!--
@@ -90,6 +168,25 @@
         /* 카드가 화면(임베드 시 패널) 바닥까지 채우고, 에디터가 남는 공간을 전부 차지 */
         .memo-card { background: var(--paper); border: 1px solid var(--rule); border-radius: 18px; box-shadow: 0 4px 20px rgba(148,163,184,.10); padding: 18px 14px 10px; min-height: 62vh; flex: 1; display: flex; flex-direction: column; }
         html.dark .memo-card { box-shadow: 0 4px 20px rgba(0,0,0,.35); }
+        /* ── 위젯 투명도: 배경만 반투명, 글자는 늘 불투명(창이 픽셀단위 배경 투명 처리) ── */
+        html.wgt, html.wgt body { background: transparent !important; }
+        /* 컬러키 투명: 카드 배경도 투명 → 바탕이 또렷이 비침. 글자는 그림자로 가독 확보 */
+        html.wgt .memo-card, html.wgt .site-header { background: transparent !important; box-shadow: none !important; }
+        html.wgt { text-shadow: 0 1px 2px rgba(255,255,255,.55); }
+        html.dark.wgt { text-shadow: 0 1px 3px rgba(0,0,0,.75); }
+        /* ══ 리퀴드 글래스: 창 아크릴이 진짜 바탕화면을 블러해 은은히 비추고, 그 위에 반투명 유리 카드 ══ */
+        html.glass { --gop: .22; }
+        html.glass, html.glass body { background: transparent !important; }  /* 아크릴(블러된 바탕화면)이 비침 */
+        html.glass .memo-card, html.glass .site-header {
+          background: rgba(255,255,255, var(--gop)) !important;
+          border: 1px solid rgba(255,255,255,.55) !important;
+          border-radius: 24px !important;
+          box-shadow: 0 22px 50px -18px rgba(12,24,60,.5), inset 0 0 42px rgba(255,255,255,.28), inset 0 2px 5px rgba(255,255,255,.85);
+        }
+        html.dark.glass .memo-card, html.dark.glass .site-header {
+          background: rgba(16,24,44, calc(var(--gop) + .16)) !important; border-color: rgba(255,255,255,.28) !important;
+          box-shadow: 0 22px 50px -18px rgba(0,0,0,.7), inset 0 0 42px rgba(255,255,255,.10), inset 0 2px 5px rgba(255,255,255,.35);
+        }
         #editorjs { min-height: 55vh; flex: 1; }
 
         /* ── 하단 사용법 접이 패널 ── */

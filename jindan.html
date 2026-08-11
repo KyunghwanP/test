@@ -53,6 +53,42 @@
         .input-card { align-self: center; width: 100%; max-width: 64rem; }
         main.show { opacity: 1; }
 
+        /* 입력 카드 좌우 여백에 학생 선택기(좌)·범례(우) 배치 */
+        .top-row { display: flex; flex-wrap: wrap; gap: 18px; align-items: stretch; justify-content: center; }
+        .top-row > .input-card { align-self: stretch; margin: 0; flex: 2 1 600px; }
+        .side-panel { flex: 1 1 210px; min-width: 200px; max-width: 300px; background: #fff; border: 1px solid var(--slate-100); border-radius: 1.5rem; box-shadow: 0 20px 40px rgba(148,163,184,.15); padding: 20px 18px; display: flex; flex-direction: column; gap: 12px; }
+        @media (max-width: 1120px) { .side-panel { max-width: none; flex-basis: 100%; } }
+        .sp-title { font-size: 15px; font-weight: 900; color: var(--slate-900); }
+        .sp-desc { font-size: 12px; color: var(--slate-500); font-weight: 600; line-height: 1.5; margin-top: -4px; }
+        .sp-selects { display: flex; flex-direction: column; gap: 8px; }
+        .sp-selects select { width: 100%; padding: 10px 12px; border: 1px solid var(--slate-200); border-radius: 12px; font-size: 13px; font-weight: 700; color: var(--slate-800); background: #fff; outline: none; }
+        .sp-selects select:focus { border-color: var(--indigo); }
+        .sp-selects select:disabled { background: var(--slate-50); color: var(--slate-300); }
+        .sp-result { display: none; background: var(--indigo-50); border: 1px solid var(--indigo-100); border-radius: 12px; padding: 11px 13px; }
+        .sp-result .nm { font-size: 13.5px; font-weight: 900; color: var(--slate-900); }
+        .sp-result .gr { font-size: 12.5px; font-weight: 800; color: var(--indigo-dark); margin-top: 3px; }
+        .sp-hint { font-size: 11.5px; font-weight: 600; color: var(--slate-400); line-height: 1.5; }
+        /* 모의고사 이력 (회차 선택) */
+        #stu-hist-wrap { display: none; flex-direction: column; gap: 6px; }
+        .sp-hist-title { font-size: 12px; font-weight: 900; color: var(--slate-600); }
+        .sp-hist-title span { font-size: 10.5px; font-weight: 600; color: var(--slate-400); }
+        #stu-hist-list { display: flex; flex-direction: column; gap: 5px; max-height: 300px; overflow-y: auto; }
+        .hist-row { display: flex; flex-direction: column; gap: 2px; text-align: left; width: 100%; padding: 8px 11px; border: 1.5px solid var(--slate-200); border-radius: 10px; background: #fff; cursor: pointer; transition: border-color .15s, background .15s; }
+        .hist-row:hover { border-color: var(--indigo-100); background: var(--slate-50); }
+        .hist-row.selected { border-color: var(--indigo); background: var(--indigo-50); }
+        .hr-date { font-size: 11.5px; font-weight: 900; color: var(--slate-700); }
+        .hist-row.selected .hr-date { color: var(--indigo-dark); }
+        .hr-tag { font-size: 9.5px; font-weight: 900; color: var(--indigo); }
+        .hr-grades { font-size: 11.5px; font-weight: 700; color: var(--slate-500); font-variant-numeric: tabular-nums; }
+        /* 범례(우측) */
+        .legend-panel .lg-group { display: flex; flex-direction: column; gap: 7px; }
+        .legend-panel .lg-h { font-size: 12px; font-weight: 900; color: var(--slate-400); text-transform: uppercase; letter-spacing: .1em; margin-top: 4px; }
+        .lg-item { display: flex; align-items: baseline; gap: 7px; font-size: 12px; line-height: 1.45; }
+        .lg-sw { flex-shrink: 0; margin-top: 1px; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 900; }
+        .lg-item .lg-tx { color: var(--slate-500); font-weight: 600; }
+        .lg-item .lg-tx b { color: var(--slate-700); font-weight: 800; }
+        .lg-div { border: none; border-top: 1px solid var(--slate-100); margin: 4px 0 2px; }
+
         /* 성적 입력 카드 (세로 압축: 입력·환산 결과 2단 배치) */
         .input-card { position: relative; background: #fff; padding: 26px 28px; border-radius: 2rem; box-shadow: 0 20px 40px rgba(148,163,184,.15); border: 1px solid var(--slate-100); display: flex; flex-direction: column; gap: 20px; }
         .input-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
@@ -137,7 +173,8 @@
         .stat-pill .k { font-size: 11px; font-weight: 900; color: var(--slate-400); text-transform: uppercase; letter-spacing: .15em; }
         .stat-pill .v { font-size: 13px; font-weight: 900; color: var(--indigo); }
         .list-controls { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
-        @media (min-width: 768px) { .list-controls { align-items: flex-end; } }
+        /* 데스크톱: 스위치·토글·초기화 / 범위탭 / 결과수를 한 줄로 가로 배치해 여백 축소 */
+        @media (min-width: 768px) { .list-controls { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px 16px; } }
         .control-row { display: flex; align-items: center; gap: 16px; }
         .toggle-label { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 9px 16px; border: 2px solid var(--slate-200); border-radius: 999px; background: #fff; transition: border-color .2s, background .2s, box-shadow .2s; }
         .toggle-label.on { border-color: var(--indigo); background: var(--indigo-50); box-shadow: 0 3px 10px rgba(79,70,229,.18); }
@@ -195,6 +232,51 @@
         .gap-up   { color: #e11d48; }
         .gap-down { color: #2563eb; }
         .gap-even { color: var(--slate-400); }
+        /* 입시 진단 라벨 배지 (안정/적정/소신/위험) */
+        .diag-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 11px; border-radius: 8px; font-size: 12px; font-weight: 900; letter-spacing: .02em; }
+        .diag-badge.uncertain { border: 1px dashed currentColor; }
+        .diag-badge .diag-edge { font-size: 10px; font-weight: 800; opacity: .7; }
+        .lab-safe  { background: #dbeafe; color: #1d4ed8; }   /* 안정 — 파랑 */
+        .lab-fit   { background: #dcfce7; color: #15803d; }   /* 적정 — 초록 */
+        .lab-reach { background: #fef9c3; color: #a16207; }   /* 소신 — 노랑 */
+        .lab-risk  { background: #fee2e2; color: #b91c1c; }   /* 위험 — 빨강 */
+        /* 상세모달 진단 배너 (라벨 색을 배경으로) */
+        .diag-tile { border: none; }
+        .diag-tile .k { color: currentColor; opacity: .65; }
+        .diag-tile .diag-lg { font-size: 22px; font-weight: 900; letter-spacing: -.02em; margin-top: 2px; }
+        .diag-tile .diag-edge { font-size: 12px; font-weight: 800; opacity: .7; }
+        .diag-tile .diag-why { font-size: 12.5px; font-weight: 700; line-height: 1.55; margin-top: 6px; opacity: .95; }
+        /* 종합전형: 성적 기반 진단 라벨 대신 안내 타일 (성적 외 요소가 커 혼선 방지) */
+        .diag-note { background: #fffbeb; border: 1px solid #fde68a; }
+        .diag-note .k { color: #b45309; opacity: .8; }
+        .diag-note .diag-lg { font-size: 15px; font-weight: 900; color: #92400e; margin-top: 2px; }
+        .diag-note .diag-why { font-size: 12.5px; font-weight: 700; line-height: 1.55; margin-top: 6px; color: #92400e; }
+        /* 수능최저 충족 판정 배지 (학생 선택 시) */
+        .mc-badge { display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 12px; font-weight: 900; flex-shrink: 0; white-space: nowrap; }
+        .mc-pass { background: #dcfce7; color: #15803d; }
+        .mc-fail { background: #fee2e2; color: #b91c1c; }
+        .mc-unknown { background: #e2e8f0; color: #64748b; }
+        /* 3개년 추세 색 (모달 상담포인트 태그 + 카드 메타줄 공용) */
+        .tr-up   { color: #b45309; }   /* 컷 상승(경쟁 심화) — 주황 */
+        .tr-down { color: #2563eb; }   /* 컷 하락(완화) — 파랑 */
+        .tr-flat { color: #64748b; }   /* 보합 — 회색 */
+        /* 충원(추합) 여유 색 (모달 태그용 — 배경 포함) */
+        .ch-high { background: #dcfce7; color: #15803d; }   /* 여유 큼 */
+        .ch-mid  { background: #fef9c3; color: #a16207; }   /* 보통 */
+        .ch-low  { background: #fee2e2; color: #b91c1c; }   /* 적음 */
+        /* 카드 메타줄: 계열 · 추세 · 추합 (진단 칩만 남기고 나머지는 인라인 텍스트) */
+        .meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 9px; font-size: 12px; font-weight: 800; color: var(--slate-500); }
+        .meta-row .sep { color: var(--slate-300); font-weight: 700; }
+        .meta-row .m-up   { color: #b45309; }
+        .meta-row .m-down { color: #2563eb; }
+        .meta-row .m-flat { color: #64748b; }
+        .meta-row .m-high { color: #15803d; }
+        .meta-row .m-mid  { color: #a16207; }
+        .meta-row .m-low  { color: #b91c1c; }
+        /* 상세모달 상담 포인트 */
+        .tip-line { font-size: 12.5px; font-weight: 700; color: var(--slate-700); line-height: 1.5; margin-top: 6px; }
+        .tip-ic { display: inline-block; font-size: 10px; font-weight: 900; padding: 1px 6px; border-radius: 6px; border: 1px solid currentColor; margin-right: 4px; vertical-align: middle; }
+        .tip-caveat { font-size: 11px; font-weight: 600; color: var(--slate-400); line-height: 1.5; margin-top: 8px; }
         .uni-card h3 { font-size: 20px; line-height: 1.2; color: var(--slate-900); }
         .uni-card:hover h3 { color: var(--indigo); }
         .campus-txt { display: inline-block; font-size: 12.5px; font-weight: 900; color: var(--slate-800); background: var(--slate-200); padding: 2px 10px; border-radius: 999px; letter-spacing: 0; margin-top: 7px; }
@@ -243,6 +325,25 @@
         .d-tile.hl { background: var(--indigo-50); border-color: var(--indigo-100); }
         .d-tile.hl .v { color: var(--indigo); }
         .d-tile.wide { grid-column: 1 / -1; }
+        /* 데스크톱: 모달을 가로로 넓혀 2열(좌=컷 정보 / 우=수능최저)로 — 스크롤 최소화 + 내용 확대.
+           모바일(≤719px)은 현행 그대로 세로 스택 유지. */
+        @media (min-width: 720px) {
+            .detail-modal { max-width: 64rem; padding: 32px 36px 26px; }
+            .detail-modal h3 { font-size: 28px; }
+            .detail-dept { font-size: 16px; }
+            .dm-body { display: flex; gap: 22px; align-items: flex-start; }
+            .dm-body #dm-grid { flex: 1 1 0; min-width: 0; margin-top: 4px; }
+            .dm-body .dm-right { flex: 1 1 0; min-width: 0; }
+            .d-tile { padding: 15px 18px; }
+            .d-tile .k { font-size: 11.5px; }
+            .d-tile .v { font-size: 21px; }
+            .diag-tile .diag-lg, .diag-note .diag-lg { font-size: 25px; }
+            .diag-tile .diag-why, .diag-note .diag-why { font-size: 13.5px; }
+            .tip-line { font-size: 13.5px; }
+            .tip-caveat { font-size: 12px; }
+            .dm-year-table { font-size: 14px; }
+            .dm-year-table tr.hl td { font-size: 17px; }
+        }
         /* 상세 모달 3개년 비교표 */
         .dm-year-table { width: 100%; border-collapse: collapse; font-size: 13px; }
         .dm-year-table th, .dm-year-table td { padding: 7px 8px; text-align: center; border-bottom: 1px solid var(--slate-100); font-variant-numeric: tabular-nums; }
@@ -310,7 +411,28 @@
     </header>
 
     <main id="main-ui">
-        <!-- 성적 입력 -->
+        <!-- 성적 입력 (좌: 학생 선택기 / 우: 범례) -->
+        <div class="top-row">
+        <!-- 좌측: 학생 선택 → 내신 자동 반영 (로그인·권한 있을 때만 명단 표시, 없으면 안내로 폴백) -->
+        <aside class="side-panel" id="stu-panel">
+            <p class="sp-title">👤 학생 선택</p>
+            <p class="sp-desc">학생을 고르면 내신이 자동 반영됩니다.</p>
+            <div class="sp-selects">
+                <select id="stu-grade" disabled><option value="">학년</option></select>
+                <select id="stu-ban" disabled><option value="">반</option></select>
+                <select id="stu-bun" disabled><option value="">번호(학생)</option></select>
+            </div>
+            <div class="sp-result" id="stu-result">
+                <div class="nm" id="stu-name"></div>
+                <div class="gr" id="stu-grade-val"></div>
+            </div>
+            <div id="stu-hist-wrap">
+                <p class="sp-hist-title">📊 모의고사 이력 <span>클릭해 최저 판정 기준 선택</span></p>
+                <div id="stu-hist-list"></div>
+            </div>
+            <p class="sp-hint" id="stu-hint">교사용 앱에서 로그인하면 담당 학생 명단이 표시됩니다.</p>
+        </aside>
+
         <section class="input-card">
             <div class="input-head">
                 <div>
@@ -382,6 +504,37 @@
             </div>
         </section>
 
+        <!-- 우측: 방금 추가한 지표 설명(범례) -->
+        <aside class="side-panel legend-panel">
+            <p class="sp-title">📘 리포트 보는 법</p>
+            <div class="lg-group">
+                <p class="lg-h">진단</p>
+                <div class="lg-item"><span class="lg-sw lab-safe">안정</span><span class="lg-tx">내 등급 ≤ <b>50%컷 − 완충</b> — 합격자 중위 위, 무난</span></div>
+                <div class="lg-item"><span class="lg-sw lab-fit">적정</span><span class="lg-tx">합격자 분포 <b>50~70%컷 안</b> — 소신껏</span></div>
+                <div class="lg-item"><span class="lg-sw lab-reach">소신</span><span class="lg-tx"><b>70%컷 ~ +완충(m)</b> 이내 — 도전</span></div>
+                <div class="lg-item"><span class="lg-sw lab-risk">위험</span><span class="lg-tx"><b>70%컷 + 완충</b> 초과 — 합격 낮음</span></div>
+                <div class="lg-item"><span class="lg-sw" style="border:1px dashed var(--slate-400);color:var(--slate-500);">경계</span><span class="lg-tx">데이터 부족·경계선 — <b>단정 말고 참고</b></span></div>
+                <p class="sp-hint" style="margin-top:2px;">※ 완충 m = 그 학과 <b>3개년 컷 변동폭 ÷2</b> (0.15~0.4). 매년 출렁이는 학과일수록 넓게·보수적으로 판정.</p>
+                <p class="sp-hint" style="margin-top:2px;">※ <b>종합전형에는 진단 라벨을 표시하지 않습니다</b> — 성적 외 요소(활동·세특·면접)가 커 성적만으로 판단하면 혼선을 줍니다.</p>
+            </div>
+            <hr class="lg-div">
+            <div class="lg-group">
+                <p class="lg-h">3개년 추세 (합격선)</p>
+                <div class="lg-item"><span class="lg-sw" style="color:#b45309;">▲ 컷 상승</span><span class="lg-tx">합격선 오름세 — <b>경쟁 심화</b></span></div>
+                <div class="lg-item"><span class="lg-sw" style="color:#2563eb;">▼ 컷 하락</span><span class="lg-tx">합격선 내림세 — 다소 완화</span></div>
+                <div class="lg-item"><span class="lg-sw" style="color:#64748b;">→ 컷 보합</span><span class="lg-tx">큰 변동 없음</span></div>
+            </div>
+            <hr class="lg-div">
+            <div class="lg-group">
+                <p class="lg-h">추합률 (충원÷모집)</p>
+                <div class="lg-item"><span class="lg-sw" style="color:#15803d;">여유 큼</span><span class="lg-tx">100%↑ — <b>최초 불합격도 추합 기대</b></span></div>
+                <div class="lg-item"><span class="lg-sw" style="color:#a16207;">보통</span><span class="lg-tx">30~100% — 예비번호 앞이면 기대</span></div>
+                <div class="lg-item"><span class="lg-sw" style="color:#b91c1c;">적음</span><span class="lg-tx">30%↓ — <b>최초합 안에 들어야</b></span></div>
+                <p class="sp-hint" style="margin-top:2px;">※ 어디가 컷은 최종등록자 기준이라 추합이 이미 반영 — 안정성 참고용.</p>
+            </div>
+        </aside>
+        </div>
+
         <!-- 적정 대학 리스트 -->
         <section style="display:flex;flex-direction:column;gap:32px;">
             <div class="list-head">
@@ -445,8 +598,11 @@
                 <div id="empty-state">
                     <div class="circle">🔍</div>
                     <h3>검색 결과가 없습니다</h3>
-                    <p>현재 설정된 범위(<span id="empty-range">±0.10</span>) 내에<br>일치하는 대학이 없습니다.</p>
-                    <button class="expand-btn" onclick="setRange(0.3)">검색 범위 ±0.3으로 확대하기</button>
+                    <div id="empty-kind-hint" style="display:none;margin:0 auto 4px;max-width:320px;font-size:13.5px;line-height:1.6;color:#334155;background:#eef2ff;border:1px solid #c7d2fe;border-radius:12px;padding:14px 16px;"></div>
+                    <div id="empty-range-hint">
+                        <p>현재 설정된 범위(<span id="empty-range">±0.10</span>) 내에<br>일치하는 대학이 없습니다.</p>
+                        <button class="expand-btn" onclick="setRange(0.3)">검색 범위 ±0.3으로 확대하기</button>
+                    </div>
                 </div>
             </div>
         </section>
@@ -463,7 +619,14 @@
             <p class="campus-txt" id="dm-campus"></p>
             <p class="detail-dept" id="dm-dept"></p>
             <p class="detail-adm" id="dm-adm"></p>
-            <div class="detail-grid" id="dm-grid"></div>
+            <div class="dm-body">
+                <div class="detail-grid" id="dm-grid"></div>
+                <div class="dm-right">
+                    <div id="dm-tip"></div>
+                    <div id="dm-susi"></div>
+                    <div class="d-tile" id="dm-meta" style="margin-top:12px;"></div>
+                </div>
+            </div>
             <button class="dm-guide-btn" id="dm-guide-btn" onclick="openGuide()">📑 이 대학 수시 모집요강 보기</button>
             <p class="detail-note">출처 : 2024~2026학년도 어디가 입결 · 환산점수/등급은 각 대학 환산 기준의 50%·70% 컷입니다. 리스트 탐색·정렬은 <b>3개년 환산등급 70%컷 평균</b> 기준입니다.</p>
         </div>
@@ -551,6 +714,7 @@
         let searchRange = 0.1;
         let showAmbitious = true;
         let admissionKind = '교과';           // 학생부 전형 구분: '교과' | '종합' (스위치 토글)
+        let susiMincut = {};                    // 대학코드(int문자열) → 수능최저 규칙 배열
         let currentFiltered = [];              // 현재 필터 결과 (모달·더 보기에서 참조)
         let visibleCount = 150;
         const PAGE_SIZE = 150;
@@ -679,6 +843,20 @@
                 if (!vals.length) continue;    // 3년 모두 미제출·입결없음 → 제외
                 rec.averageGrade = vals.reduce((a, b) => a + b, 0) / vals.length;
                 rec.yearCount = vals.length;
+                // 진단 라벨용: 3개년 70%컷 변동폭(완충 산정) + 50%컷 평균(합격자 중위선)
+                rec.vol70 = vals.length >= 2 ? (Math.max(...vals) - Math.min(...vals)) : 0;
+                const vals50 = SURVEY_YEARS.map(y => rec.years[y] && parseFloat(rec.years[y].grade50)).filter(v => v != null && !isNaN(v));
+                rec.avg50 = vals50.length ? vals50.reduce((a, b) => a + b, 0) / vals50.length : null;
+                // 추세: 첫 유효연도 → 마지막 유효연도 70%컷 변화 (vals는 연도 오름차순)
+                rec.trendDelta = vals.length >= 2 ? (vals[vals.length - 1] - vals[0]) : null;
+                // 추합률: 연도별 충원인원/모집인원(총) 평균 (충원·모집 모두 3개년 존재)
+                const chRates = [];
+                SURVEY_YEARS.forEach(y => {
+                    const yr = rec.years[y]; if (!yr) return;
+                    const w = parseFloat(yr.waitlist), q = parseFloat(yr.quotaTotal);
+                    if (!isNaN(w) && w >= 0 && !isNaN(q) && q > 0) chRates.push(w / q);
+                });
+                rec.chungRate = chRates.length ? chRates.reduce((a, b) => a + b, 0) / chRates.length : null;
                 records.push(rec);
             }
             return records;
@@ -698,15 +876,28 @@
             const upper = target + searchRange;
             return { lower, upper };
         }
+        // 흔한 약칭 → 정식명칭 일부로 변환 (부분일치 검색이 놓치는 케이스 보정)
+        //   예: "한국외대/외대" → 한국외국어대학교,  "대구교대" → 대구교육대학교
+        function uniAlias(t) {
+            t = (t || '').trim();
+            const A = { '한국외대':'한국외국어', '외대':'한국외국어', '포항공대':'포항공과', '포스텍':'포항공과',
+                        '유니스트':'울산과학기술', '카이스트':'한국과학기술', '지스트':'광주과학기술', '디지스트':'대구경북과학기술' };
+            if (A[t]) return A[t];
+            const m = t.match(/^(.+?)교대$/); if (m) return m[1] + '교육대';   // OO교대 → OO교육대(학교)
+            return t;
+        }
         function baseFilter(record, bounds) {
-            const gradeMatch = record.averageGrade >= bounds.lower && record.averageGrade <= bounds.upper;
             const kindMatch = record.kind === '기타' || record.kind === admissionKind;
-            const uq = selectedUniversity.trim().toLowerCase();
-            const uniMatch = !uq || record.university.toLowerCase().includes(uq);
-            const q = searchQuery.toLowerCase();
-            const searchMatch = record.university.toLowerCase().includes(q) ||
-                                record.department.toLowerCase().includes(q) ||
-                                record.admissionName.toLowerCase().includes(q);
+            const uni = record.university.toLowerCase();
+            const uqRaw = selectedUniversity.trim().toLowerCase();
+            const uniMatch = !uqRaw || uni.includes(uqRaw) || uni.includes(uniAlias(uqRaw).toLowerCase());
+            const qRaw = searchQuery.trim().toLowerCase();
+            const searchMatch = uni.includes(qRaw) || uni.includes(uniAlias(qRaw).toLowerCase()) ||
+                                record.department.toLowerCase().includes(qRaw) ||
+                                record.admissionName.toLowerCase().includes(qRaw);
+            // 대학명을 지정해 검색하면('대학 지정' 모드) 성적 범위 필터를 풀어 그 대학 전체를 노출.
+            // (성적 대비 위치는 카드의 격차 화살표로 표시 — 범위는 '둘러보기'용이라 지정검색엔 부적절)
+            const gradeMatch = uqRaw ? true : (record.averageGrade >= bounds.lower && record.averageGrade <= bounds.upper);
             return gradeMatch && kindMatch && uniMatch && searchMatch;
         }
         // 대학 70% 컷과 내 등급의 차이 (주식 표시 스타일)
@@ -718,6 +909,69 @@
             if (mag < 0.005) return { arrow: '−', cls: 'gap-even', text: '0.00' };
             if (d < 0)       return { arrow: '▲', cls: 'gap-up',   text: mag.toFixed(2) };
             return             { arrow: '▼', cls: 'gap-down', text: mag.toFixed(2) };
+        }
+
+        // ─── 입시 진단 라벨 ───
+        // 임의의 ±밴드 대신 각 학과의 '합격자 성적 구간 [50%컷 ~ 70%컷]'으로 판정한다.
+        //  - 완충(margin) = 3개년 70%컷 변동폭의 절반을 [0.15, 0.4]로 제한
+        //    → 매년 컷이 출렁이는 학과일수록 완충이 커져 경계 판정이 자동으로 보수적이 된다.
+        //  - 50%컷 미제출(약 23%)이면 70%컷 하나로 축소 판정.
+        //  내 등급(myG)은 숫자가 작을수록 우수.
+        function classify(myG, rec) {
+            const a70 = rec.averageGrade;
+            const no50 = (rec.avg50 == null);
+            const a50 = no50 ? a70 : rec.avg50;
+            const m = Math.min(0.4, Math.max(0.15, (rec.vol70 || 0) / 2));
+            let label, cls;
+            if (myG <= a50 - m)      { label = '안정'; cls = 'lab-safe';  }
+            else if (myG <= a70)     { label = '적정'; cls = 'lab-fit';   }
+            else if (myG <= a70 + m) { label = '소신'; cls = 'lab-reach'; }
+            else                     { label = '위험'; cls = 'lab-risk';  }
+            // 경계/불확실: 데이터 부족·변동 과다·판정선 바로 옆(환산 오차 감안)이면 단정하지 않는다.
+            const near = Math.min(Math.abs(myG - (a50 - m)), Math.abs(myG - a70), Math.abs(myG - (a70 + m)));
+            const uncertain = (rec.yearCount < 2) || ((rec.vol70 || 0) >= 0.8) || (near < 0.1);
+            return { label, cls, uncertain, a50, a70, m, no50 };
+        }
+        // 상세모달용: 왜 이 라벨인지 한 문장으로 설명 (학부모 앞 방어용)
+        function diagReason(myG, d) {
+            const me = myG.toFixed(2), a50 = d.a50.toFixed(2), a70 = d.a70.toFixed(2);
+            if (d.label === '안정') return `내 등급 ${me}이(가) 합격자 중위(50%컷 ${a50})보다 위 — 무난 지원권입니다.`;
+            if (d.label === '적정') return (d.no50 || a50 === a70)
+                ? `내 등급 ${me}이(가) 합격선(70%컷 ${a70}) 부근 — 적정 지원권입니다.${d.no50 ? ' (50%컷 미제출)' : ''}`
+                : `내 등급 ${me}이(가) 합격자 분포(50%컷 ${a50} ~ 70%컷 ${a70}) 안 — 소신껏 지원권입니다.`;
+            if (d.label === '소신') return `내 등급 ${me}이(가) 70%컷(${a70}) 하한 부근 — 도전(소신) 지원권입니다.`;
+            return `내 등급 ${me}이(가) 70%컷(${a70})보다 아래 — 합격 가능성이 낮습니다.`;
+        }
+
+        // ─── 3개년 합격선 추세 ───
+        // 등급 숫자가 줄면(예 3.5→3.0) 합격선 상승=경쟁 심화, 늘면 하락=완화. 0.15 미만은 보합.
+        function gradeTrend(rec) {
+            const dl = rec.trendDelta;
+            if (dl == null) return null;                        // 단년 → 추세 없음
+            if (Math.abs(dl) < 0.15) return { label: '컷 보합', cls: 'tr-flat', dir: 'flat', arrow: '→', delta: dl };
+            if (dl < 0)             return { label: '컷 상승', cls: 'tr-up',   dir: 'up',   arrow: '▲', delta: dl };  // 합격선↑(경쟁 심화)
+            return                        { label: '컷 하락', cls: 'tr-down', dir: 'down', arrow: '▼', delta: dl };  // 합격선↓(완화)
+        }
+        // 상세모달용 추세 설명
+        function trendReason(t) {
+            if (!t) return '3개년 중 유효 데이터가 1개뿐이라 추세를 판단할 수 없습니다.';
+            const d = Math.abs(t.delta).toFixed(2);
+            if (t.cls === 'tr-up')   return `최근 3개년 합격선이 상승(약 ${d}등급 강화) — 올해는 더 치열할 수 있어 보수적으로.`;
+            if (t.cls === 'tr-down') return `최근 3개년 합격선이 하락(약 ${d}등급 완화) — 다소 여유가 생기는 추세.`;
+            return '최근 3개년 합격선이 큰 변동 없이 유지되는 추세입니다.';
+        }
+
+        // ─── 충원(추합) 여유 ───
+        // 어디가 70%컷은 '최종등록자' 기준이라 추합이 이미 반영됨 → 추합률은 합격선 보정이 아니라
+        // '예비번호 기대치·안정성' 지표로 활용한다. (충원배수 = 충원인원/모집인원)
+        function chungInfo(rec) {
+            if (rec.chungRate == null) return null;
+            const pct = Math.round(rec.chungRate * 100);
+            let cls, lv, note;
+            if (rec.chungRate >= 1.0)      { cls = 'ch-high'; lv = 'high'; note = '추합 여유 큼 — 최초 불합격이어도 추합 기대'; }
+            else if (rec.chungRate >= 0.3) { cls = 'ch-mid';  lv = 'mid';  note = '추합 보통 — 예비번호 앞이면 기대 가능'; }
+            else                           { cls = 'ch-low';  lv = 'low';  note = '추합 적음 — 최초합 안에 들어야 안전'; }
+            return { pct, cls, lv, note };
         }
 
         // 카드 하단 3개년 스트립 — 학년도별 70%컷(큰 숫자) + 내 등급 대비 편차(빨강▲/파랑▼), 미제출은 –
@@ -781,9 +1035,20 @@
             render();
         }
         function clearManualGrade9() { manualGrade9 = null; render(); }
+        // 학생 선택기(좌측 패널)에서 호출: 1·2학년='12'(5등급)/3학년='3'(9등급) 자동 전환 후 반영
+        window.applyStudentGrade = function(mode, gpaVal) {
+            const num = parseFloat(gpaVal);
+            if (isNaN(num)) return;
+            if (mode === '3') { gradeMode = '3'; gpa9 = Math.min(9, Math.max(1, num)); }
+            else { gradeMode = '12'; gpa5 = Math.min(5, Math.max(1, num)); manualGrade9 = null; }
+            try { localStorage.setItem('jindan-grade-mode', gradeMode); } catch(e) {}
+            syncModeUI();
+            render();
+        };
         function setCategory(cat) { selectedCategory = cat; render(); }
         function setRange(r) { searchRange = r; render(); }
         function toggleKind() { admissionKind = admissionKind === '교과' ? '종합' : '교과'; render(); }
+        function setAdmissionKind(k) { admissionKind = k; render(); }
         function resetFilters() {
             selectedUniversity = ''; selectedCategory = '전체'; searchQuery = '';
             searchRange = 0.3; showAmbitious = true; admissionKind = '교과';
@@ -867,7 +1132,9 @@
                 `<button class="range-tab ${searchRange === r ? 'active' : ''}" onclick="setRange(${typeof r === 'number' ? r : `'${r}'`})">${r === 'all' ? '전체' : '±' + r}</button>`
             ).join('');
             document.getElementById('target-label').textContent = target.toFixed(2);
-            document.getElementById('bounds-label').textContent = searchRange === 'all' ? '전체 등급' : `${bounds.lower.toFixed(2)} ~ ${bounds.upper.toFixed(2)}`;
+            document.getElementById('bounds-label').textContent = selectedUniversity.trim()
+                ? '대학 지정 · 범위 무시'
+                : (searchRange === 'all' ? '전체 등급' : `${bounds.lower.toFixed(2)} ~ ${bounds.upper.toFixed(2)}`);
             document.getElementById('ambitious-track').classList.toggle('on', showAmbitious);
             document.getElementById('ambitious-label').classList.toggle('on', showAmbitious);
             document.getElementById('kind-switch').classList.toggle('jonghap', admissionKind === '종합');
@@ -880,6 +1147,41 @@
                 .filter(r => selectedCategory === '전체' || r.category === selectedCategory)
                 .sort((a, b) => b.averageGrade - a.averageGrade);
             document.getElementById('result-count').textContent = currentFiltered.length.toLocaleString();
+
+            // 결과 0건인데 검색어가 있으면 원인별로 안내:
+            //  ① 현재 전형종류엔 학과가 있으나 성적 범위 밖 → 범위 확대 유도 (예: 서강대 교과 21건, 컷 1.5대)
+            //  ② 현재 전형종류엔 아예 없고 반대 종류에만 있음 → 전형 전환 유도 (예: 한국외대·서울대·교대 = 종합만)
+            const kindHint = document.getElementById('empty-kind-hint');
+            const rangeHint = document.getElementById('empty-range-hint');
+            const term = (selectedUniversity || searchQuery).trim();
+            let hintHtml = null;
+            if (!currentFiltered.length && term) {
+                const raw = term.toLowerCase(), alias = uniAlias(term).toLowerCase();
+                const matchTerm = r => { const u = r.university.toLowerCase();
+                    return u.includes(raw) || u.includes(alias) ||
+                           r.department.toLowerCase().includes(raw) || r.admissionName.toLowerCase().includes(raw); };
+                const inB = r => r.averageGrade >= bounds.lower && r.averageGrade <= bounds.upper;
+                const other = admissionKind === '교과' ? '종합' : '교과';
+                const termRecs = allRecords.filter(matchTerm);
+                const curAll = termRecs.filter(r => r.kind === '기타' || r.kind === admissionKind);
+                const curInB = curAll.filter(inB);
+                const otherAll = termRecs.filter(r => r.kind === other);
+                const otherInB = otherAll.filter(inB);
+                if (curAll.length && !curInB.length && searchRange !== 'all') {
+                    // 현재 전형종류에 학과가 있으나 성적 범위 밖 → 범위 확대
+                    hintHtml = `“${term}” <b>${admissionKind} 전형</b>은 <b>${curAll.length}건</b> 있지만, 지금 성적 범위(${bounds.lower.toFixed(2)}~${bounds.upper.toFixed(2)}) 밖이라 가려졌어요.
+                        <button class="expand-btn" style="margin-top:10px;" onclick="setRange('all')">성적 범위 전체로 보기</button>`;
+                } else if (!curAll.length && otherAll.length) {
+                    // 현재 전형종류엔 없고 반대 종류에만 있음 → 전형 전환
+                    const n = otherInB.length || otherAll.length;
+                    const rangeNote = otherInB.length ? '' : ' <span style="color:#64748b;">(성적 범위도 넓혀야 보일 수 있어요)</span>';
+                    hintHtml = `“${term}”은(는) <b>${other} 전형</b>에만 <b>${n}건</b> 있어요. 지금은 <b>${admissionKind} 전형</b>만 보는 중입니다.${rangeNote}
+                        <button class="expand-btn" style="margin-top:10px;" onclick="setAdmissionKind('${other}')">${other} 전형으로 보기</button>`;
+                }
+            }
+            if (kindHint) { kindHint.style.display = hintHtml ? 'block' : 'none'; if (hintHtml) kindHint.innerHTML = hintHtml; }
+            if (rangeHint) rangeHint.style.display = hintHtml ? 'none' : 'block';
+
             visibleCount = PAGE_SIZE;
             renderList(target);
         }
@@ -891,12 +1193,21 @@
             emptyState.style.display = currentFiltered.length ? 'none' : 'block';
             list.insertAdjacentHTML('afterbegin', currentFiltered.slice(0, visibleCount).map((r, idx) => {
                 const gap = gradeGap(r.averageGrade, target);
+                // 종합전형은 성적 외 요소(활동·세특·면접)가 커 성적 기반 진단 라벨을 표시하지 않음
+                const isJonghap = admissionKind === '종합';
+                const d = isJonghap ? null : classify(target, r);
+                const t = gradeTrend(r);
+                const ch = chungInfo(r);
+                const meta = [`<span>${r.category}</span>`]
+                    .concat(t ? [`<span class="sep">·</span><span class="m-${t.dir}">${t.arrow} ${t.label}</span>`] : [])
+                    .concat(ch ? [`<span class="sep">·</span><span class="m-${ch.lv}">추합 ${ch.pct}%</span>`] : [])
+                    .join('');
                 return `<div class="uni-card" style="animation-delay:${Math.min((idx % PAGE_SIZE) * 0.03, 0.3)}s" onclick="openDetail(${idx})">
                     <div class="uni-card-top">
                         <div style="min-width:0;">
-                            <div class="badge-row">
-                                <span class="cat-badge">${r.category}</span>
-                            </div>
+                            ${d ? `<div class="badge-row">
+                                <span class="diag-badge ${d.cls}${d.uncertain ? ' uncertain' : ''}">${d.label}${d.uncertain ? ' <span class="diag-edge">경계</span>' : ''}</span>
+                            </div>` : ''}
                             <h3 class="serif">${r.university}</h3>
                             <p class="campus-txt">${r.campus}</p>
                         </div>
@@ -905,6 +1216,7 @@
                     <div class="uni-card-bottom">
                         <p class="dept-name">${r.department}</p>
                         <p class="adm-name">${r.admissionName}</p>
+                        <div class="meta-row">${meta}</div>
                         <div class="year-strip">${yearStripHtml(r, target)}</div>
                         <p class="view-more">View More <span class="arrow">→</span></p>
                     </div>
@@ -950,19 +1262,269 @@
                 ['경쟁률', y => (y && y.competition) ? y.competition + ' : 1' : null],
                 ['충원 (추합)', y => y && y.waitlist],
                 ['모집인원 (총)', y => y && y.quotaTotal],
+                ['추합률 (충원/모집)', y => {
+                    if (!y) return null;
+                    const w = parseFloat(y.waitlist), q = parseFloat(y.quotaTotal);
+                    return (!isNaN(w) && w >= 0 && !isNaN(q) && q > 0) ? Math.round(w / q * 100) + '%' : null;
+                }],
             ];
             const head = `<tr><th></th>${SURVEY_YEARS.map(y => `<th>'${schoolYearShort(y)}<span class="yy">학년도</span></th>`).join('')}</tr>`;
             const body = rows.map(([label, fn, hl]) =>
                 `<tr${hl ? ' class="hl"' : ''}><th class="rl">${label}</th>${SURVEY_YEARS.map(y => (hl ? cell70 : cell(fn))(r.years[y])).join('')}</tr>`
             ).join('');
+            // 종합전형은 성적 외 요소가 커 성적 기반 진단 라벨을 표시하지 않고 안내로 대체
+            const isJonghap = admissionKind === '종합';
+            const d = isJonghap ? null : classify(myG, r);
+            const t = gradeTrend(r);
+            const ch = chungInfo(r);
+            const diagTileHtml = d
+                ? `<div class="d-tile wide diag-tile ${d.cls}"><p class="k">입시 진단</p><p class="diag-lg">${d.label}${d.uncertain ? ' <span class="diag-edge">· 경계(참고)</span>' : ''}</p><p class="diag-why">${diagReason(myG, d)}</p></div>`
+                : `<div class="d-tile wide diag-note"><p class="k">입시 진단</p><p class="diag-lg">종합전형은 성적만으로 판단하지 않습니다</p><p class="diag-why">활동·세특·면접 등 성적 외 요소가 크게 작용해 안정/적정/소신 라벨은 제공하지 않습니다. 아래 컷·추세·추합·수능최저는 참고 지표로만 활용하세요.</p></div>`;
             document.getElementById('dm-grid').innerHTML = `
+                ${diagTileHtml}
                 <div class="d-tile hl" style="grid-column:1/-1;"><p class="k">${r.yearCount}개년 평균 환산등급 70%컷</p><p class="v">${r.averageGrade.toFixed(2)}</p><p class="gap-box ${gap.cls}" style="justify-content:flex-start;margin-top:3px;font-size:11.5px;">내 등급 대비 <span class="arr">${gap.arrow}</span>${gap.text}</p></div>
-                <div style="grid-column:1/-1;overflow-x:auto;"><table class="dm-year-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>
-                <div class="d-tile"><p class="k">계열 / 전형유형</p><p class="v" style="font-size:14px;">${r.category} · ${r.kind}</p></div>
-                <div class="d-tile"><p class="k">대학코드</p><p class="v">${fmt(r.uniCode)}</p></div>`;
+                <div style="grid-column:1/-1;overflow-x:auto;"><table class="dm-year-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+            document.getElementById('dm-tip').innerHTML =
+                `<div class="d-tile wide"><p class="k">상담 포인트</p><p class="tip-line"><b class="tip-ic ${t ? t.cls : 'tr-flat'}">추세</b> ${trendReason(t)}</p>${ch ? `<p class="tip-line"><b class="tip-ic ${ch.cls}">추합</b> ${ch.note} (평균 추합률 ${ch.pct}%)</p>` : ''}<p class="tip-caveat">※ 어디가 컷은 최종등록자 기준이라 추합이 이미 반영됨 — 추합률은 예비번호 기대·안정성 참고용입니다.</p></div>`;
+            renderSusi(r);
+            document.getElementById('dm-meta').innerHTML =
+                `<p class="k">계열 / 전형유형 / 대학코드</p><p class="v" style="font-size:15px;">${r.category} · ${r.kind} · ${fmt(r.uniCode)}</p>`;
             document.getElementById('detail-overlay').classList.add('open');
             document.body.style.overflow = 'hidden';
         }
+        // ── 수능최저학력기준 안내 (해당 학교·학과·전형) ──
+        // 최저 기준을 한 줄 텍스트로 (예: "국·수·영·탐 2개 합5 · 한4")
+        // 기준값: 데이터의 값이 null이면 원문에서 복구 (예: "3개 합 6이내" → 6) — 표시·판정 공용
+        function mincutVal(rule) {
+            if (rule['값'] != null) return rule['값'];
+            const m = String(rule['원문'] || '').match(/(?:합|각|단일)\s*(\d+)|(\d+)\s*이내/);
+            return m ? parseInt(m[1] || m[2], 10) : null;
+        }
+        // 택N(과목 수)이 비어있으면 원문에서 복구 (소스 오타 '중 2개개 합7' 등으로 추출 실패한 케이스)
+        function mincutN(rule) {
+            if (rule['택N']) return rule['택N'];
+            const m = String(rule['원문'] || '').match(/(\d+)\s*개|(\d+)\s*과목/);
+            return m ? parseInt(m[1] || m[2], 10) : null;
+        }
+        function critText(rule) {
+            if (rule['최저있음'] !== 'Y') return '수능최저 미적용';
+            const m = rule['방식']==='sum'?'합':rule['방식']==='each'?'각':rule['방식']==='single'?'단일':'';
+            const area = (rule['반영영역']||[]).join('·');
+            const v = mincutVal(rule);
+            return `${area} ${mincutN(rule)||''}개 ${m}${v!=null?' '+v:''}${typeof rule['한국사']==='number'?' · 한'+rule['한국사']:''}`;
+        }
+        // 전형유형 일치도: 2=구체매칭, 1=전 전형(모든전형 적용), 0=불일치(정시 포함)
+        function typeMatch(rule, r) {
+            const tag = s => { s=s||''; const t=new Set();
+                if (s.includes('교과')) t.add('교과');
+                if (s.includes('종합')) t.add('종합');
+                if (s.includes('논술')) t.add('논술');
+                if (/실기|실적|특기/.test(s)) t.add('실기');
+                return t; };
+            const rt = tag(rule['전형유형']);
+            if ((rule['전형유형']||'').includes('정시')) return 0;   // 수시 진단이므로 정시 최저 제외
+            const at = tag(r.admissionName);
+            if (r.kind==='교과') at.add('교과'); if (r.kind==='종합') at.add('종합');
+            if (rt.size===0) return 1;                              // '전 전형'·'수시'·'기타' → 모든 전형 적용
+            for (const x of rt) if (at.has(x)) return 2;
+            return 0;
+        }
+        // 전형명(상세) 매칭 — 리포트 전형명의 괄호 안 내용을 규칙 전형명과 부분 일치
+        // 순서 중요: 긴 복합키(지역기회균형 등)를 짧은 키(기회균형)보다 먼저 둔다.
+        const NAME_KW = ['지역의사광역','지역의사진료','지역의사','지역기회균형','약학기회균형',
+            '지역인재','지역균형','기회균형','고른기회','사회통합','사회배려','사회기여','농어촌',
+            '특성화고','특성화','특수교육','특기자','기초생활','국가보훈','만학','성인','재직자','서해5도',
+            '다문화','장애','학교장추천','고교추천','고교연계','추천','논술','실기','면접',
+            '교과성적우수자','교과우수자','학생부우수자','학교생활우수자','창의인재','모바일과학인재','영농창업'];
+        // 학교장추천·고교추천·(단순)추천은 같은 '추천' 전형군으로 취급 (대학마다 명칭만 다름)
+        const REC_FAM = new Set(['학교장추천', '고교추천', '추천']);
+        function canonName(s) {
+            s = s || '';
+            const m = s.match(/\(([^)]*)\)/); if (m) s = m[1];   // "학생부교과(지역인재전형)" → 괄호 안 우선
+            for (const k of NAME_KW) if (s.includes(k)) return REC_FAM.has(k) ? '추천' : k;
+            if (s.includes('일반')) return '일반';
+            return '';                                           // 미상
+        }
+        // 괄호 안을 정규화한 키(카논이 못 잡는 '지역전형' 등 보완용)
+        function keyName(s) {
+            s = s || '';
+            const m = s.match(/\(([^)]*)\)/); if (m) s = m[1];
+            return s.replace(/전형|특별|우수자|졸업자|등대상자|대상자|학생|계열|[\s\[\]()·]/g, '');
+        }
+        // 일치도: 3=같은 전형, 2=부분/한쪽미상, 1=이름은 있으나 다름, 0=서로 다른 특수전형(제외)
+        function nameScore(rule, r) {
+            const a = canonName(r.admissionName), b = canonName(rule['전형명']);
+            if (a && b) { if (a === b) return 3; if (a === '일반' || b === '일반') return 1; return 0; }
+            const ka = keyName(r.admissionName), kb = keyName(rule['전형명']);
+            if (ka && kb) { if (ka === kb) return 3; if (ka.includes(kb) || kb.includes(ka)) return 2; }
+            if (!ka || !kb) return 2;
+            return 1;
+        }
+        // 모집단위 일치도: 4=정확, 3=부분, 2=계열, 1=전체/해당모집단위, 0=불일치
+        function unitMatch(rule, r) {
+            const u = rule['모집단위']||'', dep = r.department||'';
+            if (u && dep) {
+                if (u === dep) return 4;
+                const d2 = dep.replace(/학과|학부|학전공|전공|계열|과$/g,'');
+                const u2 = u.replace(/학과|학부|학전공|전공|계열|과$/g,'');
+                if (d2.length>=2 && (u.includes(d2) || (u2.length>=2 && dep.includes(u2)))) return 3;
+                // 단과대학 ↔ 학과 매핑(의약 계열): "의과대학" 규칙이 "의예과"에 매칭되도록
+                // (단어경계 체크 — "수의과대학"이 "의과대학"에 오매칭되지 않도록)
+                const COL = [['수의과대학','수의'],['의과대학','의예'],['의학과','의예'],['치과대학','치의'],
+                             ['치의학','치의'],['약학대학','약'],['간호대학','간호']];
+                for (const [c, dk] of COL) {
+                    const idx = u.indexOf(c);
+                    if (idx >= 0 && (idx === 0 || /[^가-힣]/.test(u[idx-1])) && dep.includes(dk)) return 3;
+                }
+            }
+            if (/계열|인문|자연|공학|예체능|의약|사회|이공/.test(u)) {
+                const kw = {인문:['인문'],사회:['사회','상경','인문'],자연:['자연','이학','이공'],
+                            공학:['공학','이공','자연'],의약:['의약','의','약','간호','보건'],
+                            교육:['사범','교육','인문'],기타:[]}[r.category]||[];
+                if (kw.some(k => u.includes(k))) return 2;
+            }
+            if (/전체|전 ?모집|전 ?학과|전 ?학부|전 ?계열|모든|해당 ?모집단위|자율전공|자유전공/.test(u)) return 1;
+            // 모집단위가 학과가 아니라 전형명(지역균형 등)을 그대로 반복 → 해당 전형 전체 적용(와일드카드)
+            if (canonName(u) && canonName(u) === canonName(rule['전형명'])) return 1;
+            return 0;
+        }
+        // ── 수능최저 충족 판정 (학생 모의고사 등급 vs 규칙) ──
+        // 기준: 최근 모의고사 / 애매한 규칙은 보수적으로 '미판정'. 탐구는 기본 상위1과목, '2과목평균' 명시 시 평균.
+        function gnum(v) { const n = parseFloat(v); return isNaN(n) ? null : n; }
+        function evalMincut(rule, csat) {
+            if (!csat || rule['최저있음'] !== 'Y') return null;
+            const method = rule['방식'], N = mincutN(rule);
+            const val = mincutVal(rule);
+            if (!['sum', 'each', 'single'].includes(method) || val == null || !N)
+                return { cls: 'unknown', label: '미판정', detail: '규칙이 복잡해 자동 판정을 생략했습니다. 원문(요강)을 확인하세요.' };
+            const g = { '국': gnum(csat['국']), '수': gnum(csat['수']), '영': gnum(csat['영']) };
+            // 탐구 값 산출
+            const tam = (csat['탐'] || []).map(gnum).filter(v => v != null);
+            let tamNote = '';
+            if (tam.length) {
+                const tg = rule['탐구'] || '';
+                if (/평균/.test(tg) && tam.length >= 2) {
+                    const avg = (tam[0] + tam[1]) / 2;
+                    g['탐'] = /절사|버림/.test(tg) ? Math.floor(avg) : Math.round(avg);
+                    tamNote = `탐 2과목평균 ${g['탐']}`;
+                } else { g['탐'] = Math.min(...tam); tamNote = `탐 상위1 ${g['탐']}`; }
+            }
+            // 한국사 별도 (반영영역 밖)
+            let histFail = false, histNote = '';
+            const histReq = gnum(rule['한국사']);
+            if (histReq != null) {
+                const h = gnum(csat['한']);
+                if (h == null) histNote = `한국사 미확인(기준 ${histReq})`;
+                else if (h > histReq) { histFail = true; histNote = `한국사 ${h}>기준 ${histReq}`; }
+                else histNote = `한국사 ${h}≤${histReq} ✓`;
+            }
+            const reflected = rule['반영영역'] && rule['반영영역'].length ? rule['반영영역'] : ['국', '수', '영', '탐'];
+            const avail = reflected.filter(a => g[a] != null).map(a => ({ area: a, grade: g[a] }));
+            if (avail.length < N) return { cls: 'unknown', label: '미판정', detail: `학생 등급이 부족해 판정 불가 (필요 ${N}개 영역)` };
+            const sorted = [...avail].sort((a, b) => a.grade - b.grade);
+            let chosen;
+            if (rule['수학포함']) {
+                const su = avail.find(x => x.area === '수');
+                if (!su) return { cls: 'unknown', label: '미판정', detail: '수학 필수인데 수학 등급이 없습니다.' };
+                chosen = [su, ...sorted.filter(x => x.area !== '수').slice(0, N - 1)];
+            } else chosen = sorted.slice(0, N);
+            let ok, shown;
+            if (method === 'sum') {
+                const s = chosen.reduce((a, b) => a + b.grade, 0);
+                ok = s <= val; shown = `합 ${s} (기준 ${val})`;
+            } else {
+                const worst = Math.max(...chosen.map(x => x.grade));
+                ok = worst <= val;
+                shown = method === 'single' ? `${worst} (기준 ${val})` : `각 최고 ${worst} (기준 ${val})`;
+            }
+            // 수능최저는 충족/미충족 이분법 — '근접' 개념 없음
+            const label = (!histFail && ok) ? '충족' : '미충족';
+            const cls = (!histFail && ok) ? 'pass' : 'fail';
+            let detail = `${chosen.map(x => x.area + x.grade).join('·')} → ${shown}`;
+            if (tamNote && reflected.includes('탐')) detail += ` · ${tamNote}`;
+            if (histNote) detail += ` · ${histNote}`;
+            return { cls, label, detail };
+        }
+        function renderSusi(r) {
+            const el = document.getElementById('dm-susi');
+            const all = susiMincut[r.uniCode] || [];
+            const cs = window.studentCsat;
+            const exams = window.studentExams || [];
+            let basis;
+            if (cs && exams.length > 1) {   // 회차 여러 개 → 모달에서 직접 선택 가능
+                const opts = exams.map((e, i) => `<option value="${i}"${i === window.studentExamIdx ? ' selected' : ''}>${e.date || ('회차 ' + (i + 1))}${e.grades ? ' · ' + e.grades : ''}</option>`).join('');
+                basis = `<span style="font-size:11px;color:#4f46e5;font-weight:800;margin-right:6px;">👤 판정 기준</span><select onchange="window.selectStudentExam(+this.value)" style="font-family:inherit;font-size:11.5px;font-weight:700;color:#4338ca;background:#eef2ff;border:1px solid #e0e7ff;border-radius:8px;padding:3px 8px;cursor:pointer;max-width:100%;">${opts}</select>`;
+            } else if (cs) {
+                basis = `<span style="font-size:11px;color:#4f46e5;font-weight:800;background:#eef2ff;border:1px solid #e0e7ff;border-radius:999px;padding:2px 9px;">👤 ${cs.examDate || '최근'} 모의 기준 판정</span>`;
+            } else {
+                basis = `<span style="font-size:11px;color:#94a3b8;font-weight:600;">※ 왼쪽에서 학생을 선택하면 충족 여부를 자동 판정합니다.</span>`;
+            }
+            let html = `<div style="margin-top:14px;border-top:1px solid #e2e8f0;padding-top:12px;">
+                <p style="font-weight:900;font-size:14px;margin:0 0 6px;">🎯 수능최저학력기준
+                    <span style="font-size:11px;color:#94a3b8;font-weight:600;">${r.department || ''} · ${r.admissionName || ''}</span></p>
+                <p style="margin:0 0 10px;">${basis}</p>`;
+            if (!all.length) { el.innerHTML = html + `<p style="color:#64748b;font-size:13px;">이 대학의 수능최저 데이터가 없습니다.</p></div>`; return; }
+
+            // 이 학과·전형에 해당하는 규칙만 점수화(전형유형→전형명→모집단위)해서 최적 매칭 선택
+            const scored = all.map(rule => ({ rule, tm: typeMatch(rule, r), ns: nameScore(rule, r), um: unitMatch(rule, r) }))
+                              .filter(x => x.tm > 0 && x.ns > 0 && x.um > 0);
+            const score = x => x.tm*1000 + x.um*100 + x.ns*10;   // 전형유형 > 모집단위 > 전형명
+            const best = scored.length ? Math.max(...scored.map(score)) : 0;
+            const picked = scored.filter(x => score(x) === best).map(x => x.rule);
+
+            if (picked.length) {
+                const anyY = picked.some(p => p['최저있음'] === 'Y');
+                if (!anyY) {
+                    html += `<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:12px 14px;">
+                        <b style="color:#059669;">이 학과·전형은 수능최저를 적용하지 않습니다.</b></div>`;
+                } else {
+                    const _seen = new Set();
+                    picked.filter(p => p['최저있음']==='Y').filter(p => {   // 같은 값 규칙은 한 줄로
+                        const k = `${p['전형유형']}|${mincutN(p)}|${p['방식']}|${mincutVal(p)}|${p['수학포함']}`;
+                        if (_seen.has(k)) return false; _seen.add(k); return true;
+                    }).forEach(rule => {
+                        const ev = evalMincut(rule, cs);
+                        const cond = (label, val) => `<p style="font-size:14px;font-weight:700;color:#334155;margin:6px 0 0;"><span style="display:inline-block;min-width:38px;color:#4f46e5;font-weight:900;">${label}</span>${val}</p>`;
+                        // 자동추출 오류로 탐구/수학 칸에 전체 규칙 텍스트가 잘못 들어간 경우는 표시 제외
+                        const badField = v => !v || v==='-' || /등급\s*합|합\s*\d|\d\s*이내|적용하지\s*않/.test(v);
+                        html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:8px;">
+                            <span style="font-size:12px;color:#64748b;">${rule['전형유형']||''} ${rule['전형명']||''} · ${rule['모집단위']||''}</span>
+                            <p style="font-size:19px;font-weight:900;margin:6px 0 2px;color:#0f172a;">${critText(rule)}</p>
+                            ${ev ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 0;">
+                                <span class="mc-badge mc-${ev.cls}">${ev.label}</span>
+                                <span style="font-size:12px;color:#475569;font-weight:600;">${ev.detail}</span></div>`:''}
+                            ${!badField(rule['수학제한']) ? cond('수학', rule['수학제한']) : ''}
+                            ${!badField(rule['탐구']) ? cond('탐구', rule['탐구']) : ''}
+                            ${rule['비고'] && rule['비고']!=='-' ? cond('기타', rule['비고']) : ''}
+                            ${rule['원문'] && rule['원문']!=='-' ? `<p style="font-size:11px;color:#94a3b8;font-weight:600;margin:8px 0 0;padding-top:8px;border-top:1px dashed #e2e8f0;">📄 원문: ${rule['원문']}</p>`:''}
+                        </div>`;
+                    });
+                }
+            } else {
+                html += `<p style="color:#64748b;font-size:13px;">이 학과·전형에 딱 맞는 최저 항목을 찾지 못했어요. 아래 '이 대학 전체 최저 보기'를 확인하세요.</p>`;
+            }
+
+            // 나머지는 접어두기 (매칭이 애매할 때 대비)
+            const yAll = all.filter(x => x['최저있음'] === 'Y');
+            if (yAll.length) {
+                html += `<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;color:#6366f1;font-weight:800;">이 대학 전체 최저 보기 (${yAll.length}건)</summary>
+                    <div style="overflow-x:auto;margin-top:8px;"><table style="width:100%;border-collapse:collapse;font-size:12px;">
+                    <tr style="background:#eef2ff;"><th style="padding:6px;text-align:left;">전형</th><th style="padding:6px;text-align:left;">모집단위</th><th style="padding:6px;">최저 기준</th>${cs ? '<th style="padding:6px;">판정</th>' : ''}</tr>`;
+                yAll.forEach(rule => {
+                    const hi = picked.includes(rule) ? 'background:#fef9c3;' : '';
+                    const ev = cs ? evalMincut(rule, cs) : null;
+                    const evCell = cs ? `<td style="padding:6px;text-align:center;">${ev ? `<span class="mc-badge mc-${ev.cls}">${ev.label}</span>` : '-'}</td>` : '';
+                    html += `<tr style="border-top:1px solid #e2e8f0;${hi}"><td style="padding:6px;">${rule['전형유형']||''} ${rule['전형명']||''}</td><td style="padding:6px;">${rule['모집단위']||''}</td><td style="padding:6px;text-align:center;">${critText(rule)}</td>${evCell}</tr>`;
+                });
+                html += `</table></div></details>`;
+            }
+            html += `<p style="font-size:11px;color:#94a3b8;margin-top:8px;">※ 참고용 — 미적분/기하 지정·과탐 2과목 평균 등 세부조건은 원문(요강)으로 최종 확인하세요.</p></div>`;
+            el.innerHTML = html;
+        }
+        // 학생 선택이 바뀌면 열려 있는 모달의 수능최저 판정을 갱신
+        window.refreshSusi = function() {
+            if (_guideRec && document.getElementById('detail-overlay').classList.contains('open')) renderSusi(_guideRec);
+        };
         function closeDetail() {
             document.getElementById('detail-overlay').classList.remove('open');
             document.body.style.overflow = '';
@@ -1025,6 +1587,7 @@
                 const response = await fetch(DATA_URL);
                 if (!response.ok) throw new Error("Data fetch error");
                 allRecords = parseCSV(await response.text());
+                try { const mr = await fetch('./susi_mincut.json'); if (mr.ok) susiMincut = await mr.json(); } catch(e){}
                 document.getElementById('db-count').textContent = `${allRecords.length.toLocaleString()}개 학과·전형`;
                 const unis = Array.from(new Set(allRecords.map(r => r.university))).sort();
                 document.getElementById('uni-datalist').innerHTML = unis.map(u => `<option value="${u}">`).join('');
@@ -1037,6 +1600,155 @@
             } catch (error) {
                 console.error(error);
                 document.getElementById('initial-loader').innerHTML = `<p style="color:#f43f5e;font-weight:700;">데이터를 불러올 수 없습니다.</p>`;
+            }
+        });
+    </script>
+
+    <!-- 학생 선택기: Firebase 로그인 세션(앱과 같은 도메인 자동 공유) + Firestore gradesMock.
+         index.html·grades.html과 동일한 접근. 미로그인/무권한이면 서버 규칙이 막고 안내로 폴백(페이지는 그대로 동작). -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
+        const app = initializeApp({
+            apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
+            authDomain: "ynhs-7b5ba.firebaseapp.com",
+            projectId: "ynhs-7b5ba",
+            storageBucket: "ynhs-7b5ba.firebasestorage.app",
+            messagingSenderId: "1031618043470",
+            appId: "1:1031618043470:web:edb5b8d1f98db029916d1f"
+        });
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const $ = id => document.getElementById(id);
+        const gradeSel = $('stu-grade'), banSel = $('stu-ban'), bunSel = $('stu-bun');
+        const hintEl = $('stu-hint'), resultEl = $('stu-result');
+        const setHint = msg => { hintEl.textContent = msg; hintEl.style.display = ''; };
+        const opt = (v, t) => { const o = document.createElement('option'); o.value = v; o.textContent = t; return o; };
+
+        let tree = null;            // { grade: { ban: { bun: name } } }
+        const classCache = {};
+
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) { setHint('교사용 앱에서 로그인하면 담당 학생 명단이 표시됩니다.'); return; }
+            try {
+                const snap = await getDoc(doc(db, 'gradesMock', 'index'));
+                if (!snap.exists()) { setHint('학생 성적 데이터가 아직 동기화되지 않았습니다.'); return; }
+                tree = snap.data().tree || {};
+                initTree();
+            } catch (e) {
+                setHint(e.code === 'permission-denied'
+                    ? '학생 명단 열람 권한이 없습니다. (담임·부장·교장·교감·관리자)'
+                    : '학생 데이터를 불러오지 못했습니다.');
+            }
+        });
+
+        function initTree() {
+            hintEl.style.display = 'none';
+            gradeSel.innerHTML = ''; gradeSel.appendChild(opt('', '학년'));
+            Object.keys(tree).sort((a, b) => a - b).forEach(g => gradeSel.appendChild(opt(g, g + '학년')));
+            gradeSel.disabled = false;
+            autoSelectFromParams();
+        }
+        // 학생종합검색에서 넘어온 학생 자동 선택 (?sgrade=&sban=&sbun=) — 명단·내신·모의고사까지 자동 반영
+        function autoSelectFromParams() {
+            const p = new URLSearchParams(location.search);
+            const sg = p.get('sgrade'), sb = p.get('sban'), sn = p.get('sbun');
+            if (!sg || !sb || !sn || !tree || !tree[sg] || !tree[sg][sb] || !tree[sg][sb][sn]) return;
+            gradeSel.value = sg; gradeSel.dispatchEvent(new Event('change'));   // 반 옵션 채움
+            banSel.value = sb; banSel.dispatchEvent(new Event('change'));       // 번호 옵션 채움
+            bunSel.value = sn; bunSel.dispatchEvent(new Event('change'));       // 학생 로드(내신·모의고사)
+        }
+        function resetSel(sel, ph) { sel.innerHTML = ''; sel.appendChild(opt('', ph)); sel.disabled = true; }
+
+        gradeSel.addEventListener('change', () => {
+            const g = gradeSel.value;
+            resetSel(banSel, '반'); resetSel(bunSel, '번호(학생)'); resultEl.style.display = 'none'; clearCsat();
+            if (!g || !tree[g]) return;
+            Object.keys(tree[g]).sort((a, b) => a - b).forEach(b => banSel.appendChild(opt(b, b + '반')));
+            banSel.disabled = false;
+        });
+        banSel.addEventListener('change', () => {
+            const g = gradeSel.value, b = banSel.value;
+            resetSel(bunSel, '번호(학생)'); resultEl.style.display = 'none'; clearCsat();
+            if (!g || !b || !tree[g][b]) return;
+            Object.keys(tree[g][b]).sort((a, b2) => a - b2).forEach(n => bunSel.appendChild(opt(n, n + '번 ' + tree[g][b][n])));
+            bunSel.disabled = false;
+        });
+        // 모의고사 회차별 등급 → 수능최저 판정용. history: 오래된→최신 (리스트는 최신부터)
+        const _gg = x => (x && x.g != null && x.g !== '-' && x.g !== '') ? x.g : null;   // kor/math/tam: {g}
+        const _sg = x => (x != null && x !== '-' && x !== '') ? x : null;                 // eng/hist: 값 직접
+        function csatFromExam(h) {
+            const kor = _gg(h.kor), math = _gg(h.math), eng = _sg(h.eng), his = _sg(h.hist), t1 = _gg(h.tam1), t2 = _gg(h.tam2);
+            if (kor == null && math == null && eng == null && t1 == null && t2 == null) return null;
+            return { '국': kor, '수': math, '영': eng, '한': his, '탐': [t1, t2].filter(v => v != null), mathSub: (h.math && h.math.sub) || '', examDate: h.examDate || '' };
+        }
+        function examGradeStr(cs) {
+            return [cs['국'] != null ? '국' + cs['국'] : '', cs['수'] != null ? '수' + cs['수'] : '', cs['영'] != null ? '영' + cs['영'] : '', cs['탐'].length ? '탐' + cs['탐'].join('·') : '', cs['한'] != null ? '한' + cs['한'] : ''].filter(Boolean).join(' ');
+        }
+        let histExams = [];   // [{cs, date}] 최신순
+        let selIdx = 0;
+        function renderHistory() {
+            const wrap = $('stu-hist-wrap'), list = $('stu-hist-list');
+            if (!histExams.length) { wrap.style.display = 'none'; window.studentCsat = null; if (window.refreshSusi) window.refreshSusi(); return; }
+            wrap.style.display = 'flex';
+            list.innerHTML = histExams.map((e, i) => `<button type="button" class="hist-row${i === selIdx ? ' selected' : ''}" data-i="${i}">
+                <span class="hr-date">${e.date || '-'}${i === selIdx ? ' <span class="hr-tag">· 판정 기준</span>' : ''}</span>
+                <span class="hr-grades">${examGradeStr(e.cs)}</span></button>`).join('');
+            list.querySelectorAll('.hist-row').forEach(btn => btn.addEventListener('click', () => selectExam(+btn.dataset.i)));
+        }
+        function selectExam(i) {
+            if (!histExams[i]) return;
+            selIdx = i;
+            window.studentCsat = histExams[i].cs;
+            window.studentExamIdx = i;
+            renderHistory();
+            if (window.refreshSusi) window.refreshSusi();
+        }
+        window.selectStudentExam = selectExam;   // 모달 안 드롭다운에서 회차 전환용
+        function loadHistory(st) {
+            const hist = Array.isArray(st.history) ? st.history : [];
+            histExams = hist.slice().reverse().map(h => { const cs = csatFromExam(h); return cs ? { cs, date: cs.examDate } : null; }).filter(Boolean);
+            selIdx = 0;
+            window.studentCsat = histExams.length ? histExams[0].cs : null;
+            window.studentExams = histExams.map(e => ({ date: e.date, grades: examGradeStr(e.cs) }));   // 모달 드롭다운 라벨용
+            window.studentExamIdx = 0;
+            renderHistory();
+        }
+        function clearCsat() { window.studentCsat = null; window.studentExams = []; window.studentExamIdx = 0; histExams = []; selIdx = 0; const w = document.getElementById('stu-hist-wrap'); if (w) w.style.display = 'none'; if (window.refreshSusi) window.refreshSusi(); }
+
+        bunSel.addEventListener('change', async () => {
+            const g = gradeSel.value, b = banSel.value, n = bunSel.value;
+            if (!g || !b || !n) { resultEl.style.display = 'none'; clearCsat(); return; }
+            const key = g + '-' + b;
+            const name = (tree[g] && tree[g][b] && tree[g][b][n]) || '';
+            try {
+                if (!classCache[key]) {
+                    const s = await getDoc(doc(db, 'gradesMock', key));
+                    classCache[key] = s.exists() ? s.data() : { students: {} };
+                }
+                const st = (classCache[key].students || {})[n] || {};
+                $('stu-name').textContent = `${g}학년 ${b}반 ${n}번 ${name}`;
+                // 모의고사 이력 렌더 + 최신 회차를 기본 판정 기준으로 (내신 유무와 무관하게 먼저 반영)
+                loadHistory(st);
+                if (window.refreshSusi) window.refreshSusi();
+                // 필드명 주의(index.html과 동일): gpa9=5등급제 내신, gpa5=9등급제 내신
+                const is3 = String(g) === '3';
+                const val = is3 ? st.gpa5 : st.gpa9;
+                if (!val || val === '-') {
+                    $('stu-grade-val').textContent = '등록된 내신 정보가 없습니다.';
+                    resultEl.style.display = 'block';
+                    return;
+                }
+                $('stu-grade-val').textContent = is3 ? `9등급제 내신 ${val} 반영` : `5등급제 내신 ${val} 반영`;
+                resultEl.style.display = 'block';
+                if (window.applyStudentGrade) window.applyStudentGrade(is3 ? '3' : '12', val);
+            } catch (e) {
+                $('stu-name').textContent = name;
+                $('stu-grade-val').textContent = e.code === 'permission-denied' ? '이 학생 성적 열람 권한이 없습니다.' : '성적을 불러오지 못했습니다.';
+                resultEl.style.display = 'block';
             }
         });
     </script>
