@@ -108,6 +108,10 @@
   /* 예약 오픈 전 잠금 */
   .slot.locked{opacity:.5;cursor:default;pointer-events:none;}
   .slot-badge.lock{background:#F1F5F9;color:var(--ink-soft);}
+  /* 이미 지난 시간 — 음영 + 선택 불가 */
+  .slot.past{opacity:.42;cursor:default;pointer-events:none;background:#F1F5F9;}
+  .slot.past .slot-time{text-decoration:line-through;}
+  .slot-badge.past{background:#E2E8F0;color:var(--ink-soft);}
   .open-banner{
     background:#FFF7ED;border:1.5px solid #FDBA74;border-radius:14px;
     padding:16px 18px;margin-bottom:16px;text-align:center;
@@ -366,6 +370,8 @@ async function loadSlots(){
   const notOpen = openAt && new Date(openAt).getTime() > Date.now();
 
   openSlots = Array.isArray(data.slots) ? data.slots : [];
+  const _nowMs = Date.now();
+  const _isPast = s => { const dt = new Date(`${s.date}T${(s.time||'00:00')}:00`); return !isNaN(dt.getTime()) && dt.getTime() <= _nowMs; };
   if(openSlots.length === 0 && !notOpen){
     slotList.innerHTML = '<div class="loading">아직 열린 상담 시간이 없습니다.<br>선생님이 시간을 등록하면 예약할 수 있습니다.</div>';
     return;
@@ -387,7 +393,14 @@ async function loadSlots(){
   Object.keys(byDate).sort().forEach(date => {
     html += `<div class="slot-date-group"><div class="slot-date-head">${esc(fmtDate(date))}</div>`;
     byDate[date].forEach(s => {
-      if (s.booked) {
+      if (_isPast(s)) {
+        html += `
+          <div class="slot past">
+            <div class="slot-time">${esc(s.time)}</div>
+            <div class="slot-meta">${esc(String(s.duration||20))}분 상담</div>
+            <span class="slot-badge past">지난 시간</span>
+          </div>`;
+      } else if (s.booked) {
         html += `
           <div class="slot booked">
             <div class="slot-time">${esc(s.time)}</div>
@@ -428,7 +441,7 @@ async function loadSlots(){
     return;
   }
 
-  slotList.querySelectorAll('.slot:not(.booked)').forEach(el => {
+  slotList.querySelectorAll('.slot[data-id]').forEach(el => {
     el.addEventListener('click', () => {
       const id = el.dataset.id;
       const s  = openSlots.find(x => x.id === id);
