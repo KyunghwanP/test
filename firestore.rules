@@ -71,10 +71,10 @@ service cloud.firestore {
       allow read: if isYnhsTeacher();
       allow write: if false;
     }
-    // ── 학생 선택과목 (교육과정 현황 시트 → GitHub Actions 동기화) ──
+    // ── 학생 선택과목 (교육과정 현황 엑셀 → upload.html 교사 업로드) ──
+    // 2026-08부터 구글시트 동기화 대신 교사가 앱에서 직접 업로드(SheetJS 파싱). 교사 읽기/쓰기.
     match /electives/{docId} {
-      allow read: if isYnhsTeacher();
-      allow write: if false;
+      allow read, write: if isYnhsTeacher();
     }
     // 업무 캘린더
     match /tasks/{userId}/items/{itemId} {

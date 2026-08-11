@@ -220,6 +220,7 @@ if ('serviceWorker' in navigator) {
   <button class="tab-nav-btn" data-tab="students">🎒 학생연락망 업로드</button>
   <button class="tab-nav-btn" data-tab="clubs">🎪 동아리 업로드</button>
   <button class="tab-nav-btn" data-tab="sheets">📊 편성·명렬표 업로드</button>
+  <button class="tab-nav-btn" data-tab="electives">📚 선택과목 업로드</button>
   <button class="tab-nav-btn" data-tab="photos">📷 사진명렬 업로드</button>
 </div>
 
@@ -293,6 +294,42 @@ if ('serviceWorker' in navigator) {
       </div>
 
       <div class="status" id="opStatus"></div>
+    </div>
+  </div>
+
+  <!-- ══ 선택과목 탭 ══ -->
+  <div class="tab-panel" id="tab-electives">
+    <div class="section">
+      <div class="section-title">📚 학생 선택과목 업로드 (교육과정 현황)</div>
+      <div class="section-desc">학년별 선택과목 현황 엑셀(탭 <code>1학년 · 2학년 · 3학년</code>)을 올리면 <code>electives</code> 컬렉션에 저장됩니다.
+        학생종합검색(360)의 <b>선택과목</b> 배지에 반영됩니다. 기존 데이터는 덮어씁니다.</div>
+      <div class="format-box">
+        <b>엑셀 형식</b> — 학년마다 탭 하나(<code>1학년/2학년/3학년</code>). 각 탭에서 <code>주소</code> 열이 있는 행이 헤더.
+        신원 열(<code>신반 · 신번호 · 성명</code>) + 주소 뒤로 과목 헤더가 이어집니다. 과목 헤더가 채워진 열에 학생 행 값이 있으면 그 과목 선택.
+        <code>단위수</code> 헤더가 나오면 <b>이번학년</b> 블록 종료 → 빈 열 하나 뒤부터 <b>직전학년</b> 블록. <code>비고</code>란 '과학중점' 표기 시 과학중점 플래그.
+      </div>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-label">엑셀 파일 선택</div>
+          <label class="file-label" for="elFileInput">📂 파일 선택…</label>
+          <input type="file" id="elFileInput" accept=".xlsx,.xls" style="display:none;" disabled>
+          <div class="file-name" id="elFileName">파일을 선택해주세요</div>
+        </div>
+      </div>
+
+      <hr>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-label">Firestore에 업로드</div>
+          <button class="btn btn-primary" id="elUploadBtn" disabled>선택과목 업로드</button>
+        </div>
+      </div>
+
+      <div class="status" id="elStatus"></div>
     </div>
   </div>
 
@@ -495,7 +532,7 @@ if ('serviceWorker' in navigator) {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
@@ -565,6 +602,8 @@ onAuthStateChanged(auth, user => {
     if (ttParsedData) document.getElementById('ttUploadBtn').disabled = false;
     document.getElementById('opFileInput').disabled = false;
     if (opParsedData) document.getElementById('opUploadBtn').disabled = false;
+    document.getElementById('elFileInput').disabled = false;
+    if (elParsedData) document.getElementById('elUploadBtn').disabled = false;
   } else {
     currentUser = null;
     document.getElementById('authGate').style.display = 'flex';
@@ -762,6 +801,130 @@ async function parseOperatingExcel(file) {
   if (Object.keys(dates).length < 20) throw new Error('인식된 날짜가 너무 적습니다 ('+Object.keys(dates).length+'일). 형식을 확인하세요.');
   return { semester, dates };
 }
+
+// ════════════════════════════════════════════════════════════
+//  학생 선택과목 업로드 (교육과정 현황 → electives)
+//  파싱 규칙은 scripts/sync-grades.js(구글시트 동기화)와 동일 — 이제 이 업로드가 단일 소스.
+//  탭 '1학년/2학년/3학년', '주소' 열이 있는 행이 헤더, '단위수'로 이번학년/직전학년 블록 분리.
+// ════════════════════════════════════════════════════════════
+const elFileInput = document.getElementById('elFileInput');
+const elFileNameEl = document.getElementById('elFileName');
+const elUploadBtn  = document.getElementById('elUploadBtn');
+let elParsedData = null;
+
+function parseElectivesExcel(wb) {
+  const hcell = h => String(h ?? '').trim();
+  const cell  = (row, c) => { const v = row ? row[c] : undefined; return (v===undefined||v===null) ? '' : v; };
+  const num   = v => { const n = parseInt(String(v).replace(/[^\d]/g,''), 10); return isFinite(n) ? n : 0; };
+  const elTree = {}, elClasses = {}, elSci = {};
+  const perTab = [];
+
+  for (const grade of [1, 2, 3]) {
+    const tab = `${grade}학년`;
+    const ws = wb.Sheets[tab];
+    if (!ws) { perTab.push(`${tab}: 탭 없음(건너뜀)`); continue; }
+    const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:null });
+    if (!rows.length) { perTab.push(`${tab}: 비어있음`); continue; }
+
+    // '주소' 열이 있는 행 = 헤더 (위 8행 중, 정확일치→부분일치)
+    let headerRowIdx = -1, addrIdx = -1;
+    for (let r = 0; r < Math.min(8, rows.length); r++) {
+      let idx = (rows[r]||[]).findIndex(h => hcell(h) === '주소');
+      if (idx === -1) idx = (rows[r]||[]).findIndex(h => hcell(h).includes('주소'));
+      if (idx !== -1) { headerRowIdx = r; addrIdx = idx; break; }
+    }
+    if (addrIdx === -1) { perTab.push(`${tab}: '주소' 열을 못 찾음(건너뜀)`); continue; }
+    const header = rows[headerRowIdx];
+    const findCol = (label, fb) => { const i = header.findIndex(h => hcell(h) === label); return i === -1 ? fb : i; };
+    const roomCol = findCol('신반', 0), seatCol = findCol('신번호', 1), nameCol = findCol('성명', 4);
+    const bigoCol = header.findIndex(h => hcell(h) === '비고');
+
+    // 이번학년(block1)/직전학년(block2) 과목 열 동적 분리
+    const block1 = [], block2 = [];
+    let state = 'block1';
+    for (let c = addrIdx + 1; c < header.length; c++) {
+      if (c === bigoCol) continue;
+      const h = hcell(header[c]);
+      if (state === 'block1') {
+        if (h === '단위수') { state = 'afterUnit'; continue; }
+        if (!h) continue;
+        block1.push({ col: c, name: h });
+      } else if (state === 'afterUnit') {
+        if (h === '단위수') continue;
+        if (!h) { state = 'block2'; continue; }
+        state = 'block2'; block2.push({ col: c, name: h });
+      } else {
+        if (!h || h === '단위수') continue;
+        block2.push({ col: c, name: h });
+      }
+    }
+
+    let cnt = 0;
+    for (let i = headerRowIdx + 1; i < rows.length; i++) {
+      const row = rows[i]; if (!row) continue;
+      const room = num(cell(row, roomCol)), seat = num(cell(row, seatCol)), name = String(cell(row, nameCol)).trim();
+      if (!room || !seat || !name) continue;
+      const current   = [...new Set(block1.filter(sc => String(cell(row, sc.col)).trim()).map(sc => sc.name))];
+      const prevGrade = [...new Set(block2.filter(sc => String(cell(row, sc.col)).trim()).map(sc => sc.name))];
+      const sci = bigoCol !== -1 && String(cell(row, bigoCol)).includes('과학중점');
+      (elTree[grade] ??= {}); (elTree[grade][room] ??= {}); elTree[grade][room][seat] = name;
+      (elClasses[grade + '-' + room] ??= {})[seat] = { name, current, prevGrade, ...(sci ? { sci: 1 } : {}) };
+      if (sci) (elSci[grade + '-' + room] ??= []).push(seat);
+      cnt++;
+    }
+    const sciN = Object.entries(elSci).filter(([k]) => k.startsWith(grade + '-')).reduce((a,[,v]) => a+v.length, 0);
+    perTab.push(`${tab}: 학생 ${cnt}명, 이번학년 과목 ${block1.length} / 직전학년 ${block2.length}${sciN?`, 과학중점 ${sciN}명`:''}`);
+  }
+  return { tree: elTree, classes: elClasses, sci: elSci, perTab, classIds: Object.keys(elClasses) };
+}
+
+elFileInput.addEventListener('change', async () => {
+  const file = elFileInput.files[0];
+  if (!file) { elParsedData = null; return; }
+  elFileNameEl.textContent = file.name;
+  setStatus('elStatus', '파일 분석 중...', 'loading');
+  try {
+    const buf = await file.arrayBuffer();
+    const wb  = XLSX.read(buf, { type:'array' });
+    elParsedData = parseElectivesExcel(wb);
+    if (!elParsedData.classIds.length) throw new Error('인식된 학생이 없습니다. 탭 이름(1학년/2학년/3학년)·헤더(주소 열)를 확인하세요.');
+    setStatus('elStatus',
+      '파일 분석 완료\n  ' + elParsedData.perTab.join('\n  ') +
+      `\n  → 반 ${elParsedData.classIds.length}개\n\n이상 없으면 「선택과목 업로드」를 눌러주세요.`, 'ok');
+    if (currentUser) elUploadBtn.disabled = false;
+  } catch (e) {
+    elParsedData = null; elUploadBtn.disabled = true;
+    setStatus('elStatus', '파일 분석 실패:\n' + e.message, 'err');
+  }
+});
+
+elUploadBtn.addEventListener('click', async () => {
+  if (!elParsedData || !currentUser) return;
+  elUploadBtn.disabled = true;
+  setStatus('elStatus', '☁️ Firestore에 업로드 중...', 'loading');
+  try {
+    const t = new Date().toISOString();
+    await setDoc(doc(db, 'electives', 'index'), { t, tree: elParsedData.tree, sci: elParsedData.sci });
+    for (const id of elParsedData.classIds) {
+      await setDoc(doc(db, 'electives', id), { t, students: elParsedData.classes[id] });
+    }
+    // 이번 업로드에 없는 옛 반 문서 정리(stale) — index 제외
+    let removed = 0;
+    try {
+      const snap = await getDocs(collection(db, 'electives'));
+      for (const d of snap.docs) {
+        if (d.id !== 'index' && !elParsedData.classes[d.id]) { await deleteDoc(doc(db, 'electives', d.id)); removed++; }
+      }
+    } catch (e) { /* 목록 조회 실패는 무시 */ }
+    setStatus('elStatus',
+      `✅ 업로드 완료! (electives)\n\n  반 ${elParsedData.classIds.length}개 저장${removed?`, 옛 문서 ${removed}개 삭제`:''}\n\n학생종합검색의 선택과목 배지에 반영됩니다.`, 'ok');
+    elUploadBtn.disabled = false;
+  } catch (e) {
+    setStatus('elStatus', '❌ 업로드 실패:\n' + (e.code || '') + '\n' + e.message +
+      (e.code === 'permission-denied' ? '\n\n※ electives 쓰기 권한(파이어베이스 규칙) 배포가 필요할 수 있습니다.' : ''), 'err');
+    elUploadBtn.disabled = false;
+  }
+});
 
 async function parseTimetableExcel(file) {
   const buf  = await file.arrayBuffer();
