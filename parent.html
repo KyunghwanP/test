@@ -105,6 +105,17 @@
   .slot-check{font-size:20px;color:var(--mon);width:22px;text-align:center;}
   .slot.booked{opacity:.55;cursor:default;pointer-events:none;}
   .slot-badge.taken{background:#F1F5F9;color:var(--ink-soft);}
+  /* 예약 오픈 전 잠금 */
+  .slot.locked{opacity:.5;cursor:default;pointer-events:none;}
+  .slot-badge.lock{background:#F1F5F9;color:var(--ink-soft);}
+  .open-banner{
+    background:#FFF7ED;border:1.5px solid #FDBA74;border-radius:14px;
+    padding:16px 18px;margin-bottom:16px;text-align:center;
+  }
+  .open-banner .ob-title{font-size:14px;font-weight:800;color:#c2410c;margin-bottom:6px;}
+  .open-banner .ob-when{font-size:14px;color:var(--ink);font-weight:600;margin-bottom:10px;}
+  .open-banner .ob-count{font-size:26px;font-weight:800;font-family:'IBM Plex Mono';color:#c2410c;letter-spacing:1px;}
+  .open-banner .ob-note{font-size:12.5px;color:var(--ink-soft);margin-top:8px;}
 
   .booking-card{
     background:#ECFDF5;border:1.5px solid var(--ok);border-radius:14px;
@@ -310,7 +321,22 @@ const myBookingWrap = document.getElementById('myBookingWrap');
 
 let openSlots = [];
 
+let openCountdownTimer = null;
+function clearOpenCountdown(){ if(openCountdownTimer){ clearInterval(openCountdownTimer); openCountdownTimer = null; } }
+function fmtCountdown(ms){
+  if(ms < 0) ms = 0;
+  const s = Math.floor(ms/1000);
+  const d = Math.floor(s/86400), h = Math.floor(s%86400/3600), m = Math.floor(s%3600/60), sec = s%60;
+  const p = n => String(n).padStart(2,'0');
+  return (d>0 ? d+'일 ' : '') + `${p(h)}:${p(m)}:${p(sec)}`;
+}
+function fmtOpenWhen(openAt){
+  const dt = new Date(openAt);
+  return `${dt.getMonth()+1}월 ${dt.getDate()}일 (${WEEKDAY[dt.getDay()]}) ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+}
+
 async function loadSlots(){
+  clearOpenCountdown();
   slotList.innerHTML = '<div class="loading"><span class="spinner"></span>불러오는 중...</div>';
   confirmCard.classList.add('hidden');
   myBookingWrap.classList.add('hidden');
@@ -329,14 +355,18 @@ async function loadSlots(){
     return;
   }
 
-  // 이미 예약했으면 내 예약 표시
+  // 이미 예약했으면 내 예약 표시 (오픈 시각과 무관하게 조회·취소 가능)
   if(data.mine){
     showMyBooking(data.mine);
     return;
   }
 
+  // 예약 오픈 시각(선착순): 아직 오픈 전이면 잠금 + 카운트다운
+  const openAt = data.openAt || '';
+  const notOpen = openAt && new Date(openAt).getTime() > Date.now();
+
   openSlots = Array.isArray(data.slots) ? data.slots : [];
-  if(openSlots.length === 0){
+  if(openSlots.length === 0 && !notOpen){
     slotList.innerHTML = '<div class="loading">아직 열린 상담 시간이 없습니다.<br>선생님이 시간을 등록하면 예약할 수 있습니다.</div>';
     return;
   }
@@ -346,6 +376,14 @@ async function loadSlots(){
   openSlots.forEach(s => { (byDate[s.date] = byDate[s.date] || []).push(s); });
 
   let html = '';
+  if(notOpen){
+    html += `<div class="open-banner">
+      <div class="ob-title">🔒 아직 예약 오픈 전입니다</div>
+      <div class="ob-when">${esc(fmtOpenWhen(openAt))}에 열립니다</div>
+      <div class="ob-count" id="obCount">--:--:--</div>
+      <div class="ob-note">선착순 예약이에요. 오픈되면 이 화면에서 바로 예약할 수 있습니다.</div>
+    </div>`;
+  }
   Object.keys(byDate).sort().forEach(date => {
     html += `<div class="slot-date-group"><div class="slot-date-head">${esc(fmtDate(date))}</div>`;
     byDate[date].forEach(s => {
@@ -355,6 +393,13 @@ async function loadSlots(){
             <div class="slot-time">${esc(s.time)}</div>
             <div class="slot-meta">${esc(String(s.duration||20))}분 상담</div>
             <span class="slot-badge taken">예약됨</span>
+          </div>`;
+      } else if (notOpen) {
+        html += `
+          <div class="slot locked">
+            <div class="slot-time">${esc(s.time)}</div>
+            <div class="slot-meta">${esc(String(s.duration||20))}분 상담</div>
+            <span class="slot-badge lock">오픈 전</span>
           </div>`;
       } else {
         html += `
@@ -368,6 +413,20 @@ async function loadSlots(){
     html += `</div>`;
   });
   slotList.innerHTML = html;
+
+  // 오픈 전이면 카운트다운 구동, 오픈 시각 도달 시 자동으로 다시 불러오기
+  if(notOpen){
+    const target = new Date(openAt).getTime();
+    const tick = () => {
+      const left = target - Date.now();
+      const el = document.getElementById('obCount');
+      if(el) el.textContent = fmtCountdown(left);
+      if(left <= 0){ clearOpenCountdown(); loadSlots(); }
+    };
+    tick();
+    openCountdownTimer = setInterval(tick, 1000);
+    return;
+  }
 
   slotList.querySelectorAll('.slot:not(.booked)').forEach(el => {
     el.addEventListener('click', () => {
@@ -442,10 +501,11 @@ confirmBtn.addEventListener('click', async () => {
     const map = {
       TAKEN: '방금 다른 분이 이 시간을 예약했습니다. 다른 시간을 선택해 주세요.',
       GONE:  '선택한 시간이 사라졌습니다. 목록을 다시 불러옵니다.',
-      ALREADY_BOOKED: '이미 예약된 상담이 있습니다.'
+      ALREADY_BOOKED: '이미 예약된 상담이 있습니다.',
+      NOT_OPEN: '아직 예약 오픈 전입니다. 오픈 시각에 다시 시도해 주세요.'
     };
     showMsg(confirmMsg, map[data.error] || ('예약에 실패했습니다: ' + (data.error||'')), 'error');
-    if(['TAKEN','GONE','ALREADY_BOOKED'].includes(data.error)){
+    if(['TAKEN','GONE','ALREADY_BOOKED','NOT_OPEN'].includes(data.error)){
       setTimeout(loadSlots, 1500);
     }
   } catch(e){
