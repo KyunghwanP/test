@@ -845,6 +845,7 @@ function parseElectivesExcel(wb) {
     for (let c = addrIdx + 1; c < header.length; c++) {
       if (c === bigoCol) continue;
       const h = hcell(header[c]);
+      if (h === '계' || h === '소계' || h === '합계' || h === '총계') continue;   // 합계/계 열은 과목 아님(통계·회계 등 실과목은 정확일치라 안 걸림)
       if (state === 'block1') {
         if (h === '단위수') { state = 'afterUnit'; continue; }
         if (!h) continue;
