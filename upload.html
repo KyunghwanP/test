@@ -699,7 +699,8 @@ async function parseOperatingExcel(file) {
     if (pIdx >= 0 && g1Idx >= 0) {
       hr = i;
       ci = { date: r.findIndex(c=>c.includes('일자')), day: r.findIndex(c=>c==='요일'),
-             period: pIdx, g1: g1Idx, g2: g1Idx+1, g3: g1Idx+2 };
+             period: pIdx, g1: g1Idx, g2: g1Idx+1, g3: g1Idx+2,
+             remark: r.findIndex(c=>c.includes('비고')) };
       break;
     }
   }
@@ -738,7 +739,13 @@ async function parseOperatingExcel(file) {
     if (!lastDate || !per) continue;
     const rec = dates[lastDate] || (dates[lastDate] = { day:lastDay, cells:{} });
     rec.cells[per] = [clean(row[ci.g1]), clean(row[ci.g2]), clean(row[ci.g3])];
+    if (ci.remark >= 0) {                                   // 비고(휴일명·학력평가 등)
+      const rmk = String(row[ci.remark]==null ? '' : row[ci.remark]).trim();
+      if (rmk && rmk!=='ㆍ' && rmk!=='·' && rmk!=='.') (rec._rmk || (rec._rmk=[])).push(rmk);
+    }
   }
+  Object.keys(dates).forEach(dk => { const rec=dates[dk];
+    if (rec._rmk) { rec.remark = rec._rmk.join(' ').replace(/\s+/g,' ').trim(); delete rec._rmk; } });
   // dev 표시: 하루라도 정규(자기요일+교시) 아닌 배치(다른요일·활동·공강)가 있으면 true
   Object.keys(dates).forEach(dk => {
     const rec = dates[dk]; let dev = false;
