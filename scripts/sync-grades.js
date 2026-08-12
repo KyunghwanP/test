@@ -42,9 +42,10 @@ async function syncGradeRoles() {
   const fs = require('fs');
   const path = require('path');
   const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'grade-roles.json'), 'utf8'));
-  const [appSnap, contactsSnap] = await Promise.all([
+  const [appSnap, contactsSnap, dirSnap] = await Promise.all([
     db.doc('appdata/main').get(),
-    db.doc('contacts/main').get()
+    db.doc('contacts/main').get(),
+    db.doc('acl/emailByName').get()   // 교원 명렬(이름→학교 이메일) — 로그인 여부와 무관
   ]);
   const teachers = appSnap.exists ? (appSnap.data().teachers || []) : [];
   const staff = contactsSnap.exists ? (contactsSnap.data().staff || []) : [];
@@ -55,6 +56,17 @@ async function syncGradeRoles() {
   // 엑셀에 없는 값이라 통째로 날아갔다(→ 권한이 조용히 끊김). 업로드 쪽은 보존하도록
   // 고쳤지만, 이미 비어 있는 것과 앞으로의 사고에 대비해 매 동기화마다 Firebase Auth의
   // 실제 로그인 기록에서 이름으로 찾아 메운다.
+  // 교원 명렬에서 온 이름→이메일 (가장 확실한 출처: 로그인·시간표와 무관하게 전원 수록).
+  // acl/emailByName = { "홍길동": "id@yeungnam.hs.kr", ... }
+  const dirByName = new Map();
+  if (dirSnap.exists) {
+    Object.entries(dirSnap.data() || {}).forEach(([name, email]) => {
+      if (typeof email === 'string' && email.includes('@')) dirByName.set(norm(name), email);
+    });
+    console.log(`  📇 교원 명렬 ${dirByName.size}명 로드 (acl/emailByName)`);
+  }
+  const emailOf = name => dirByName.get(norm(name));
+
   let healed = 0;
   const authByName = new Map();   // 정규화 이름 → { email, uid } (아래 권한 해석에도 쓴다)
   try {
@@ -100,7 +112,8 @@ async function syncGradeRoles() {
     // teachers에서 못 찾으면 Firebase Auth의 실제 로그인 계정에서 이름으로 찾는다.
     const t = teachers.find(t => norm(t.name) === norm(name));
     const fromAuth = authByName.get(norm(name));
-    const email = (t && t.email) || (fromAuth && fromAuth.email);
+    // 우선순위: 교원 명렬 > 앱이 수집한 값 > 로그인 계정
+    const email = emailOf(name) || (t && t.email) || (fromAuth && fromAuth.email);
     if (email) {
       managers.add(email);
       if (!(t && t.email)) console.log(`  ↻ '${name}' 은 시간표에 없어 로그인 계정에서 확인 — 권한 부여`);
@@ -111,6 +124,8 @@ async function syncGradeRoles() {
 
   const homerooms = {};
   teachers.forEach(t => {
+    // 담임 이메일도 명렬을 우선 사용 → 아직 앱에 로그인하지 않은 담임도 자기 반을 볼 수 있다.
+    if (!t.email && t.name) t.email = emailOf(t.name) || t.email;
     if (!t.homeroom || !t.email) return;
     // '2-03' 같은 표기도 gradesMock 문서 ID('2-3')와 맞도록 정규화
     homerooms[t.email] = String(t.homeroom).split('-').map(Number).join('-');
