@@ -33,22 +33,20 @@ const jwt = new JWT({
 
 // ── 성적 열람 권한(acl/gradeRoles) 동기화 ──
 // firestore.rules가 이 문서를 get()으로 참조해 gradesMock 읽기를 제한한다.
-//   managers: 전체 열람 — 교원연락망(contacts/main.staff)의 직위(role)가 교장·교감·부장인
-//             교사 자동 포함 + grade-roles.json 추가 명단 + 관리자(항상)
 //   homerooms: { 이메일: '학년-반' } — 담임은 자기 반 문서만 열람 (teachers.homeroom 자동)
-// 이메일은 appdata/main.teachers에서 이름으로 해석(앱 로그인 시 자동 수집된 값).
+//   managers:  관리자 계정 하나만. 전교생 전체 열람은 민감도가 높아 '직위 자동 부여'를
+//              쓰지 않는다(부장까지 15명이 자동으로 열리던 구조를 폐지).
+//              → 전체 열람은 acl/gradeManual 에 명시적으로 넣은 사람만.
+//                 규칙이 그 문서를 직접 읽으므로 콘솔에서 넣는 즉시 반영되고,
+//                 누가 권한을 갖는지 한 곳에서 눈으로 확인된다.
+// 이메일은 교원 명렬(acl/emailByName)에서 이름으로 해석한다(로그인 여부와 무관).
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 async function syncGradeRoles() {
-  const fs = require('fs');
-  const path = require('path');
-  const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'grade-roles.json'), 'utf8'));
-  const [appSnap, contactsSnap, dirSnap] = await Promise.all([
+  const [appSnap, dirSnap] = await Promise.all([
     db.doc('appdata/main').get(),
-    db.doc('contacts/main').get(),
     db.doc('acl/emailByName').get()   // 교원 명렬(이름→학교 이메일) — 로그인 여부와 무관
   ]);
   const teachers = appSnap.exists ? (appSnap.data().teachers || []) : [];
-  const staff = contactsSnap.exists ? (contactsSnap.data().staff || []) : [];
   const norm = s => String(s || '').replace(/\s/g, '');
 
   // ── 이메일 자동 복구 ──
@@ -101,26 +99,9 @@ async function syncGradeRoles() {
     console.warn('  ⚠️ 이메일 자동 복구 건너뜀:', e.message);
   }
 
-  // 교원연락망 직위 기준 자동 명단 + JSON 추가 명단
-  const autoNames = staff.filter(c => /교장|교감|부장/.test(c.role || '')).map(c => c.name);
-  const wantNames = [...new Set([...autoNames, ...(cfg.managers || [])])];
-
+  // 전체 열람(전교생 성적)은 직위로 자동 부여하지 않는다 — acl/gradeManual 에 명시된 사람만.
+  // 여기서는 관리자 계정만 넣어, gradeManual 이 비어 있어도 최소 한 명은 확인할 수 있게 한다.
   const managers = new Set([ADMIN_EMAIL]);
-  wantNames.forEach(name => {
-    // 교장·교감처럼 수업 시간표가 없는 분은 appdata/main.teachers에 아예 없다.
-    // 앱의 이메일 수집도 teachers 목록에 있는 사람만 대상이라 영원히 비어 있게 되므로,
-    // teachers에서 못 찾으면 Firebase Auth의 실제 로그인 계정에서 이름으로 찾는다.
-    const t = teachers.find(t => norm(t.name) === norm(name));
-    const fromAuth = authByName.get(norm(name));
-    // 우선순위: 교원 명렬 > 앱이 수집한 값 > 로그인 계정
-    const email = emailOf(name) || (t && t.email) || (fromAuth && fromAuth.email);
-    if (email) {
-      managers.add(email);
-      if (!(t && t.email)) console.log(`  ↻ '${name}' 은 시간표에 없어 로그인 계정에서 확인 — 권한 부여`);
-    } else {
-      console.warn(`  ⚠️ 전체열람 권한자 '${name}' 이메일 미수집 — 본인이 앱에 로그인하면 다음 동기화에 반영됩니다`);
-    }
-  });
 
   const homerooms = {};
   teachers.forEach(t => {
@@ -132,7 +113,8 @@ async function syncGradeRoles() {
   });
 
   await db.doc('acl/gradeRoles').set({ t: Date.now(), managers: [...managers], homerooms });
-  console.log(`✅ acl/gradeRoles 저장 — 전체열람 ${managers.size}명(직위 자동 ${autoNames.length}명), 담임 ${Object.keys(homerooms).length}명`);
+  console.log(`✅ acl/gradeRoles 저장 — 담임 ${Object.keys(homerooms).length}명`);
+  console.log(`   전체 열람은 acl/gradeManual 명단으로만 부여됩니다(직위 자동 부여 없음).`);
 }
 
 async function readRange(range, sheetId = SHEET_ID) {
