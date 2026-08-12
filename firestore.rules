@@ -49,9 +49,12 @@ service cloud.firestore {
     // ── 성적 열람 권한 문서 (sync-grades Actions가 매일 생성) ──
     // { managers: [이메일...], homerooms: { 이메일: '학년-반' } }
     // 교사 읽기 허용(앱이 탭 노출 판단에 사용). 쓰기는 서비스 계정만.
+    // 쓰기는 동기화(서비스 계정, 규칙 미적용)와 관리자만.
+    // 관리자 쓰기는 upload.html의 '교원 명렬 업로드'와 전체열람 명단 관리를 위한 것.
+    // (교사 전체에 열면 누구나 자기를 전체열람 권한자로 넣을 수 있다)
     match /acl/{docId} {
       allow read: if isYnhsTeacher();
-      allow write: if false;
+      allow write: if isAppAdmin();
     }
     // ── 모의고사 성적 (진로진학부 시트 → GitHub Actions 동기화) ──
     // 읽기: 전체열람 권한자(관리자·교장·교감·부장) 또는 자기 반 담임만.
@@ -158,6 +161,10 @@ service cloud.firestore {
     // 관리자가 콘솔에서 직접 관리하는 전체열람 명단(acl/gradeManual).
     // Actions 동기화를 기다리지 않고 즉시 반영된다. 문서가 없어도 안전하도록
     // exists()로 먼저 확인한다(없는 문서를 get()하면 규칙 전체가 거부된다).
+    // 앱 관리자(권한 명단·교원 명렬을 관리하는 계정)
+    function isAppAdmin() {
+      return isYnhsTeacher() && request.auth.token.email == 'pkh910518@yeungnam.hs.kr';
+    }
     function isManualManager() {
       return exists(/databases/$(database)/documents/acl/gradeManual)
         && request.auth.token.email in
