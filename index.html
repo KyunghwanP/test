@@ -14385,14 +14385,16 @@ async function saveConsultOpenAt(){
   const iso = new Date(v).toISOString();   // 로컬 입력 → UTC ISO
   try{
     await setDoc(doc(fbDb, 'consultations', consultClassKey), { openAt: iso, updatedAt: new Date().toISOString() }, { merge:true });
-    await setDoc(consultPubRef(consultClassKey), { openAt: iso }, { merge:true });   // 학부모 화면 카운트다운용
+    // 미러(학부모 화면 카운트다운용)는 보조 정보 — 실패해도 본 저장을 실패로 알리지 않는다.
+    // (구독 중 syncConsultPublic이 다시 맞춘다)
+    setDoc(consultPubRef(consultClassKey), { openAt: iso }, { merge:true }).catch(()=>{});
   }catch(e){ alert('저장 실패: ' + e.message); }
 }
 async function clearConsultOpenAt(){
   if(!consultClassKey) return;
   try{
     await setDoc(doc(fbDb, 'consultations', consultClassKey), { openAt: '', updatedAt: new Date().toISOString() }, { merge:true });
-    await setDoc(consultPubRef(consultClassKey), { openAt: '' }, { merge:true });
+    setDoc(consultPubRef(consultClassKey), { openAt: '' }, { merge:true }).catch(()=>{});
   }catch(e){ alert('해제 실패: ' + e.message); }
 }
 
