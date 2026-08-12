@@ -155,9 +155,18 @@ service cloud.firestore {
     function gradeAcl() {
       return get(/databases/$(database)/documents/acl/gradeRoles).data;
     }
+    // 관리자가 콘솔에서 직접 관리하는 전체열람 명단(acl/gradeManual).
+    // Actions 동기화를 기다리지 않고 즉시 반영된다. 문서가 없어도 안전하도록
+    // exists()로 먼저 확인한다(없는 문서를 get()하면 규칙 전체가 거부된다).
+    function isManualManager() {
+      return exists(/databases/$(database)/documents/acl/gradeManual)
+        && request.auth.token.email in
+             get(/databases/$(database)/documents/acl/gradeManual).data.managers;
+    }
     function canReadGrades(docId) {
       return isYnhsTeacher() && (
-        request.auth.token.email in gradeAcl().managers
+        isManualManager()
+        || request.auth.token.email in gradeAcl().managers
         || (request.auth.token.email in gradeAcl().homerooms
             && (docId == 'index'
                 || gradeAcl().homerooms[request.auth.token.email] == docId))
