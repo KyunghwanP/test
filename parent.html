@@ -241,7 +241,15 @@
 // 없어 훨씬 빠르고, 예약 오픈 시각의 동시 접속도 견딘다).
 // 문제가 생기면 false 로만 바꾸면 즉시 기존 GAS 경로로 돌아간다
 // → 그래서 워커가 안정화될 때까지 GAS 배포는 지우지 말 것.
-const USE_WORKER = true;
+// 기본값은 아직 GAS(false) — 학부모가 쓰는 실제 페이지이므로, 워커가 실제로
+// 동작하는 걸 확인하기 전까지는 지금까지와 똑같이 동작해야 한다.
+// 검증용: 주소 끝에 ?worker=1 을 붙이면 그 방문에서만 워커를 쓴다(?worker=0 이면 GAS).
+// 확인이 끝나면 아래 값을 true 로 바꾸는 것만으로 전체 전환된다.
+const USE_WORKER_DEFAULT = false;
+const _workerQuery = new URLSearchParams(location.search).get('worker');
+const USE_WORKER = _workerQuery === '1' ? true
+                 : _workerQuery === '0' ? false
+                 : USE_WORKER_DEFAULT;
 const WORKER_URL = 'https://consult-api.pkh910518.workers.dev';   // ← 배포 후 실제 주소로 교체
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
 
