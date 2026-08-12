@@ -103,6 +103,37 @@ async function syncGradeRoles() {
   // 여기서는 관리자 계정만 넣어, gradeManual 이 비어 있어도 최소 한 명은 확인할 수 있게 한다.
   const managers = new Set([ADMIN_EMAIL]);
 
+  // ── 최초 1회 씨앗 ──
+  // gradeManual 문서가 아직 없으면, 폐지 직전의 직위 규칙(교장·교감·부장)으로 명단을
+  // 한 번 만들어 둔다. 전환 시점에 권한이 갑자기 끊기지 않게 하기 위함이다.
+  // 문서가 이미 있으면 절대 건드리지 않는다 — 이후 관리는 사람이 콘솔에서 한다.
+  try {
+    const manualRef  = db.doc('acl/gradeManual');
+    const manualSnap = await manualRef.get();
+    if (!manualSnap.exists) {
+      const contactsSnap = await db.doc('contacts/main').get();
+      const staff = contactsSnap.exists ? (contactsSnap.data().staff || []) : [];
+      const seedNames = staff.filter(c => /교장|교감|부장/.test(c.role || '')).map(c => c.name);
+      const seed = [], missing = [];
+      seedNames.forEach(name => {
+        const t = teachers.find(t => norm(t.name) === norm(name));
+        const fromAuth = authByName.get(norm(name));
+        const email = emailOf(name) || (t && t.email) || (fromAuth && fromAuth.email);
+        if (email) { if (!seed.includes(email)) seed.push(email); }
+        else missing.push(name);
+      });
+      await manualRef.set({
+        managers: seed,
+        seededAt: new Date().toISOString(),
+        note: '직위(교장·교감·부장) 기준으로 최초 1회 자동 생성. 이후 이 문서는 콘솔에서 직접 관리하세요. 여기서 빼면 즉시 권한이 사라지고, 넣으면 즉시 부여됩니다.'
+      });
+      console.log(`🌱 acl/gradeManual 최초 생성 — ${seed.length}명 (직위 대상 ${seedNames.length}명)`);
+      if (missing.length) console.warn(`   ⚠️ 이메일을 못 찾아 제외: ${missing.join(', ')}`);
+    }
+  } catch (e) {
+    console.warn('  ⚠️ gradeManual 씨앗 생성 건너뜀:', e.message);
+  }
+
   const homerooms = {};
   teachers.forEach(t => {
     // 담임 이메일도 명렬을 우선 사용 → 아직 앱에 로그인하지 않은 담임도 자기 반을 볼 수 있다.
