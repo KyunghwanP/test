@@ -233,12 +233,32 @@
   </div>
 
 <script>
-// ※ 이 페이지는 Firestore에 직접 접근하지 않습니다.
-//   모든 조회·예약·취소는 GAS를 거치며, 다른 학부모의 개인정보는
-//   브라우저로 전송되지 않습니다.
+// ※ 다른 학부모의 개인정보는 어떤 경로로도 이 브라우저에 오지 않습니다.
+//   · 인증·예약·취소 → 서버(Worker 또는 GAS)가 처리
+//   · 슬롯 목록      → 개인정보를 뺀 공개 미러(consultationsPublic)만 직접 읽음
+//
+// USE_WORKER=true 면 Cloudflare Worker를 쓴다(GAS의 302 리다이렉트·콜드 스타트가
+// 없어 훨씬 빠르고, 예약 오픈 시각의 동시 접속도 견딘다).
+// 문제가 생기면 false 로만 바꾸면 즉시 기존 GAS 경로로 돌아간다
+// → 그래서 워커가 안정화될 때까지 GAS 배포는 지우지 말 것.
+// 기본값은 아직 GAS(false) — 학부모가 쓰는 실제 페이지이므로, 워커가 실제로
+// 동작하는 걸 확인하기 전까지는 지금까지와 똑같이 동작해야 한다.
+// 검증용: 주소 끝에 ?worker=1 을 붙이면 그 방문에서만 워커를 쓴다(?worker=0 이면 GAS).
+// 확인이 끝나면 아래 값을 true 로 바꾸는 것만으로 전체 전환된다.
+const USE_WORKER_DEFAULT = false;
+const _workerQuery = new URLSearchParams(location.search).get('worker');
+const USE_WORKER = _workerQuery === '1' ? true
+                 : _workerQuery === '0' ? false
+                 : USE_WORKER_DEFAULT;
+const WORKER_URL = 'https://consult-api.pkh910518.workers.dev';   // ← 배포 후 실제 주소로 교체
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
 
+// 슬롯 목록 직접 읽기용 (공개 미러 문서 전용 — 개인정보 없음)
+const FB_API_KEY = 'AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA';
+const FB_PROJECT = 'ynhs-7b5ba';
+
 // ── 상태 ──
+let idToken     = null;   // 미러 직접 읽기용 (워커가 준 커스텀 토큰을 교환해 얻는다)
 let parentToken = null;
 let classKey    = null;
 let teacher     = null;
@@ -246,6 +266,8 @@ let studentName = '';
 let studentNum  = '';
 let selectedType = 'face';   // 학부모가 고른 상담 방식
 let selectedSlot = null;
+let firstPayload = null;     // 인증 응답에 함께 온 첫 슬롯 목록(추가 왕복 없이 사용)
+let myBooking    = null;     // 내 예약(미러엔 없으므로 서버 응답을 기억해 둔다)
 
 // ── 유틸 ──
 function esc(v){
@@ -270,6 +292,59 @@ async function callGas(action, params){
   return await res.json();
 }
 
+// 서버 호출 — 워커(POST JSON) 또는 GAS(GET). 액션 이름·응답 형태를 여기서 흡수해
+// 아래 화면 코드는 어느 쪽을 쓰든 동일하게 동작한다.
+const GAS_ACTION = { verify:'verifyParent', slots:'getOpenSlots', book:'bookSlot', cancel:'cancelBooking' };
+async function callApi(action, params){
+  if(!USE_WORKER){
+    const data = await callGas(GAS_ACTION[action] || action, Object.assign({ token: parentToken }, params));
+    if(action === 'verify' && data && data.success) data.session = data.token;   // 이름 통일
+    return data;
+  }
+  const res = await fetch(WORKER_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ action, session: parentToken }, params))
+  });
+  return await res.json();
+}
+
+// 워커가 준 커스텀 토큰 → Firestore 읽기에 쓸 ID 토큰으로 교환.
+// (Firebase SDK를 통째로 받지 않고 REST만 쓴다 — 학부모 휴대폰에서 가볍게)
+async function exchangeToken(customToken){
+  try{
+    const res = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${FB_API_KEY}`,
+      { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ token: customToken, returnSecureToken: true }) });
+    const j = await res.json();
+    return j.idToken || null;
+  }catch(e){ return null; }
+}
+
+// 공개 미러 문서를 직접 읽는다 — 서버를 거치지 않아 가장 빠르고, 예약 오픈
+// 시각에 사람이 몰려도 서버 부하가 생기지 않는다. 실패하면 null(→ 서버 경로로 대체).
+async function fetchPublicSlots(){
+  if(!idToken || !classKey) return null;
+  try{
+    const res = await fetch(
+      `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents/consultationsPublic/${encodeURIComponent(classKey)}`,
+      { headers: { Authorization: 'Bearer ' + idToken } });
+    if(!res.ok) return null;
+    const f = (await res.json()).fields || {};
+    const slots = ((f.slots && f.slots.arrayValue && f.slots.arrayValue.values) || []).map(v => {
+      const m = (v.mapValue && v.mapValue.fields) || {};
+      return {
+        id: m.id && m.id.stringValue,
+        date: m.date && m.date.stringValue,
+        time: m.time && m.time.stringValue,
+        duration: m.duration ? Number(m.duration.integerValue || m.duration.doubleValue || 20) : 20
+      };
+    }).filter(s => s.id && s.date && s.time);
+    return { slots, openAt: (f.openAt && f.openAt.stringValue) || '' };
+  }catch(e){ return null; }
+}
+
 // ── STEP 1: 인증 ──
 const authBtn = document.getElementById('authBtn');
 const authMsg = document.getElementById('authMsg');
@@ -290,7 +365,7 @@ authBtn.addEventListener('click', async () => {
   hideMsg(authMsg);
 
   try {
-    const data = await callGas('verifyParent', { grade, room, name, birth });
+    const data = await callApi('verify', { grade, room, name, birth });
     if(!data.success){
       showMsg(authMsg, data.error || '일치하는 자녀 정보를 찾을 수 없습니다. 학년·반·이름·생년월일을 다시 확인해 주세요.', 'error');
       authBtn.disabled = false;
@@ -298,11 +373,15 @@ authBtn.addEventListener('click', async () => {
       return;
     }
 
-    parentToken = data.token;
+    parentToken = data.session || data.token;
     classKey    = data.classKey;
     teacher     = data.teacher;
     studentName = data.studentName || '';
     studentNum  = data.studentNum || '';
+    // 이후 슬롯 목록을 서버 없이 직접 읽기 위한 토큰(실패해도 서버 경로로 동작)
+    if(data.customToken) idToken = await exchangeToken(data.customToken);
+    // 인증 응답에 이미 슬롯이 실려 오면 추가 왕복 없이 그대로 그린다
+    if(data.slots) firstPayload = { slots:data.slots, openAt:data.openAt||'', mine:data.mine||null };
 
     document.getElementById('teacherName').textContent =
       teacher ? teacher + ' 선생님' : '담임 미배정';
@@ -347,13 +426,27 @@ async function loadSlots(){
   slotCard.classList.remove('hidden');
   selectedSlot = null;
 
+  // ① 인증 응답에 이미 실려 온 목록 → 추가 왕복 없음
+  // ② 공개 미러 직접 읽기 → 서버를 안 거쳐 가장 빠름(오픈 시각 폭주에도 견딤)
+  // ③ 둘 다 안 되면 서버 조회
   let data;
-  try {
-    data = await callGas('getOpenSlots', { classKey, token: parentToken });
-  } catch(e){
-    slotList.innerHTML = '<div class="loading">시간표를 불러오지 못했습니다.</div>';
-    return;
+  if(firstPayload){
+    data = Object.assign({ success:true }, firstPayload);
+    firstPayload = null;
+  } else {
+    const pub = USE_WORKER ? await fetchPublicSlots() : null;
+    if(pub){
+      data = { success:true, slots:pub.slots, openAt:pub.openAt, mine:myBooking };
+    } else {
+      try {
+        data = await callApi('slots', { classKey });
+      } catch(e){
+        slotList.innerHTML = '<div class="loading">시간표를 불러오지 못했습니다.</div>';
+        return;
+      }
+    }
   }
+  if(data.mine) myBooking = data.mine;
   if(!data.success){
     slotList.innerHTML = `<div class="loading">${esc(data.error||'불러오기 실패')}</div>`;
     return;
@@ -500,13 +593,15 @@ confirmBtn.addEventListener('click', async () => {
   hideMsg(confirmMsg);
 
   try {
-    const data = await callGas('bookSlot', {
-      classKey, token: parentToken, slotId: selectedSlot.id,
+    const data = await callApi('book', {
+      classKey, slotId: selectedSlot.id,
       bkName, bkPhone, bkMemo,
       studentName, studentNum, bkType: selectedType
     });
 
     if(data.success){
+      // 예약 내용은 미러에 없으므로 서버 응답을 기억해 둔다(없으면 서버에서 다시 확인)
+      myBooking = data.mine || null;
       await loadSlots();   // 내 예약 화면으로 전환
       return;
     }
@@ -547,12 +642,15 @@ document.getElementById('cancelBtn').addEventListener('click', async () => {
   cancelBtn.textContent = '취소 중...';
 
   try {
-    const data = await callGas('cancelBooking', { classKey, token: parentToken });
+    const data = await callApi('cancel', { classKey });
     if(data.success){
+      myBooking = null;          // 취소했으니 다시 목록 화면으로
       await loadSlots();
       return;
     }
-    alert('취소에 실패했습니다: ' + (data.error||''));
+    alert(data.error === 'TEACHER_BOOKED'
+      ? '선생님이 직접 잡아 주신 상담이라 여기서는 취소할 수 없습니다. 담임 선생님께 연락해 주세요.'
+      : '취소에 실패했습니다: ' + (data.error||''));
   } catch(e){
     alert('취소 처리 중 오류가 발생했습니다. 다시 시도해 주세요.');
   } finally {

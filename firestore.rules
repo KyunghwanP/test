@@ -102,6 +102,19 @@ service cloud.firestore {
     match /consultations/{classKey} {
       allow read, write: if isYnhsTeacher();
     }
+    // ── 학부모 상담: 학부모에게 공개하는 미러 문서 ──
+    // 원본(consultations)에는 예약자 이름·연락처·메모가 들어 있어 학부모가 직접
+    // 읽으면 남의 개인정보가 보인다. 그래서 개인정보를 뺀 미러를 따로 두고,
+    // 학부모 브라우저는 이 문서만 '직접' 읽는다(오픈 시각 폭주를 서버 없이 감당).
+    //   내용: 열린 슬롯의 id·date·time·duration + openAt 뿐. 개인정보 없음.
+    // 읽기: Worker가 발급한 커스텀 토큰의 classKey 클레임이 일치하는 학부모만
+    //       자기 반 문서를. (교사도 학교 계정으로 읽을 수 있어야 미러 동기화 가능)
+    // 쓰기: 교사 앱(슬롯 편집 시 원본과 함께 갱신). 워커는 서비스계정이라 규칙 미적용.
+    match /consultationsPublic/{classKey} {
+      allow read: if isYnhsTeacher()
+                 || (request.auth != null && request.auth.token.classKey == classKey);
+      allow write: if isYnhsTeacher();
+    }
     // ── 특별실 사용 예약 ──
     // _config(특별실 목록)·{roomId}_{주} 예약 문서. 교사만 접근.
     // (취소 권한 등 세부 제어는 클라이언트에서 처리 — 상담 예약과 동일한 신뢰 모델)
