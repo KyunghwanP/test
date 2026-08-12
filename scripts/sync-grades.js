@@ -50,15 +50,63 @@ async function syncGradeRoles() {
   const staff = contactsSnap.exists ? (contactsSnap.data().staff || []) : [];
   const norm = s => String(s || '').replace(/\s/g, '');
 
+  // ── 이메일 자동 복구 ──
+  // teachers의 email/uid는 앱 로그인 시 수집되는데, 시간표를 다시 업로드하면
+  // 엑셀에 없는 값이라 통째로 날아갔다(→ 권한이 조용히 끊김). 업로드 쪽은 보존하도록
+  // 고쳤지만, 이미 비어 있는 것과 앞으로의 사고에 대비해 매 동기화마다 Firebase Auth의
+  // 실제 로그인 기록에서 이름으로 찾아 메운다.
+  let healed = 0;
+  const authByName = new Map();   // 정규화 이름 → { email, uid } (아래 권한 해석에도 쓴다)
+  try {
+    const authUsers = [];
+    let pageToken;
+    do {
+      const page = await admin.auth().listUsers(1000, pageToken);
+      authUsers.push(...page.users);
+      pageToken = page.pageToken;
+    } while (pageToken);
+    // 학교 계정만 — 학생 계정(7자리 숫자)은 제외. 앱의 접근 기준과 동일.
+    authUsers.forEach(u => {
+      const email = u.email || '';
+      if (!/@yeungnam\.hs\.kr$/.test(email)) return;
+      if (/^[0-9]{7}@/.test(email)) return;
+      if (!u.displayName) return;
+      authByName.set(norm(u.displayName), { email, uid: u.uid });
+    });
+    teachers.forEach(t => {
+      if (!t || !t.name || t.email) return;          // 이미 있으면 건드리지 않는다
+      const hit = authByName.get(norm(t.name));
+      if (!hit) return;
+      t.email = hit.email;
+      t.uid   = t.uid || hit.uid;
+      healed++;
+    });
+    if (healed) {
+      await db.doc('appdata/main').update({ teachers });
+      console.log(`  ↻ 로그인 기록에서 이메일 복구 ${healed}명 (appdata/main 갱신)`);
+    }
+  } catch (e) {
+    console.warn('  ⚠️ 이메일 자동 복구 건너뜀:', e.message);
+  }
+
   // 교원연락망 직위 기준 자동 명단 + JSON 추가 명단
   const autoNames = staff.filter(c => /교장|교감|부장/.test(c.role || '')).map(c => c.name);
   const wantNames = [...new Set([...autoNames, ...(cfg.managers || [])])];
 
   const managers = new Set([ADMIN_EMAIL]);
   wantNames.forEach(name => {
+    // 교장·교감처럼 수업 시간표가 없는 분은 appdata/main.teachers에 아예 없다.
+    // 앱의 이메일 수집도 teachers 목록에 있는 사람만 대상이라 영원히 비어 있게 되므로,
+    // teachers에서 못 찾으면 Firebase Auth의 실제 로그인 계정에서 이름으로 찾는다.
     const t = teachers.find(t => norm(t.name) === norm(name));
-    if (t && t.email) managers.add(t.email);
-    else console.warn(`  ⚠️ 전체열람 권한자 '${name}' 이메일 미수집 — 본인이 앱에 로그인하면 다음 동기화에 반영됩니다`);
+    const fromAuth = authByName.get(norm(name));
+    const email = (t && t.email) || (fromAuth && fromAuth.email);
+    if (email) {
+      managers.add(email);
+      if (!(t && t.email)) console.log(`  ↻ '${name}' 은 시간표에 없어 로그인 계정에서 확인 — 권한 부여`);
+    } else {
+      console.warn(`  ⚠️ 전체열람 권한자 '${name}' 이메일 미수집 — 본인이 앱에 로그인하면 다음 동기화에 반영됩니다`);
+    }
   });
 
   const homerooms = {};
