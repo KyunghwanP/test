@@ -406,10 +406,13 @@ async function handleCancel(env, body) {
 
 // ── 진입점 ───────────────────────────────────────────────────────────────────
 function corsHeaders(env, origin) {
+  // 끝 슬래시·대소문자 차이로 매칭이 어긋나는 사고가 잦아 정규화해서 비교한다.
+  // (예: 'https://kyunghwanp.github.io/' 로 적어도 동작하게)
+  const norm = s => String(s || '').trim().replace(/\/+$/, '').toLowerCase();
   const allow = String(env.ALLOWED_ORIGINS || '')
-    .split(',').map(s => s.trim()).filter(Boolean);
+    .split(',').map(norm).filter(Boolean);
   // 허용 목록이 비어 있으면(초기 설정 전) 아무 곳도 허용하지 않는다 — 안전측.
-  const ok = allow.includes(origin);
+  const ok = allow.includes(norm(origin));
   return {
     'Access-Control-Allow-Origin': ok ? origin : 'null',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
