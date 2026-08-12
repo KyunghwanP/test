@@ -14178,10 +14178,37 @@ function initConsultPage(){
     const slots = Array.isArray(data.slots) ? data.slots : [];
     renderConsultList(slots);
     updateConsultOpenUI(data.openAt || '');
+    syncConsultPublic(consultClassKey, slots, data.openAt);   // 미러가 뒤처졌으면 맞춰둔다
   }, err => {
     document.getElementById('consultList').innerHTML =
       '<div class="consult-empty">현황을 불러오지 못했습니다.</div>';
   });
+}
+
+// ── 학부모 공개 미러 (consultationsPublic/{반}) ──────────────────────────────
+// 원본 consultations 문서에는 예약자 이름·연락처·메모가 들어 있어 학부모가 직접
+// 읽을 수 없다. 그래서 개인정보를 뺀 미러를 따로 두고, 학부모 페이지는 이 문서만
+// 직접 읽는다 → 예약 오픈 시각의 접속 폭주를 서버(GAS·워커) 없이 감당한다.
+// 슬롯을 바꾸는 모든 트랜잭션에서 원본과 '같은 트랜잭션으로' 함께 갱신해 항상 일치시킨다.
+function consultPublicSlots(slots){
+  return (Array.isArray(slots) ? slots : [])
+    .filter(s => s && s.status !== 'booked')                    // 예약된 건 숨김(빈 시간만 공개)
+    .map(s => ({ id:s.id, date:s.date, time:s.time, duration:s.duration||20 }));
+}
+function consultPubRef(classKey){ return doc(fbDb, 'consultationsPublic', classKey); }
+function consultPublicView(slots, openAt){
+  return { slots: consultPublicSlots(slots), openAt: openAt || '', updatedAt: new Date().toISOString() };
+}
+// 자기 치유용: 구독 중 원본이 바뀌었는데 미러가 다르면 맞춘다.
+// (이 기능 도입 전부터 있던 반의 최초 생성 = 백필도 여기서 처리된다)
+let _consultPubLast = '';
+function syncConsultPublic(classKey, slots, openAt){
+  if(!classKey) return;
+  const view = consultPublicView(slots, openAt);
+  const sig  = classKey + '|' + JSON.stringify(view.slots) + '|' + view.openAt;
+  if(sig === _consultPubLast) return;      // 바뀐 게 없으면 쓰지 않는다(쓰기 낭비 방지)
+  _consultPubLast = sig;
+  setDoc(consultPubRef(classKey), view, { merge:true }).catch(()=>{});
 }
 
 function bindConsultForm(){
@@ -14319,6 +14346,7 @@ async function addConsultSlots(){
                   || fbAuth.currentUser?.displayName
                   || '담임';
       tx.set(ref, { slots, teacher: myName, updatedAt: new Date().toISOString() }, { merge: true });
+      tx.set(consultPubRef(consultClassKey), consultPublicView(slots, data.openAt), { merge: true });
     });
     btn.textContent = '✓ 완료';
     consultCurWeek = consultWeekStart(date);  // 만든 주로 캘린더 이동
@@ -14357,12 +14385,14 @@ async function saveConsultOpenAt(){
   const iso = new Date(v).toISOString();   // 로컬 입력 → UTC ISO
   try{
     await setDoc(doc(fbDb, 'consultations', consultClassKey), { openAt: iso, updatedAt: new Date().toISOString() }, { merge:true });
+    await setDoc(consultPubRef(consultClassKey), { openAt: iso }, { merge:true });   // 학부모 화면 카운트다운용
   }catch(e){ alert('저장 실패: ' + e.message); }
 }
 async function clearConsultOpenAt(){
   if(!consultClassKey) return;
   try{
     await setDoc(doc(fbDb, 'consultations', consultClassKey), { openAt: '', updatedAt: new Date().toISOString() }, { merge:true });
+    await setDoc(consultPubRef(consultClassKey), { openAt: '' }, { merge:true });
   }catch(e){ alert('해제 실패: ' + e.message); }
 }
 
@@ -14472,6 +14502,7 @@ async function createConsultAuto(){
       const myName = TEACHERS.find(t=>t.homeroom===consultClassKey)?.name
                   || fbAuth.currentUser?.displayName || '담임';
       tx.set(ref, { slots, teacher: myName, updatedAt: new Date().toISOString() }, { merge: true });
+      tx.set(consultPubRef(consultClassKey), consultPublicView(slots, data.openAt), { merge: true });
     });
     consultCurWeek = consultWeekStart(dateStr);
     closeConsultAutoModal();
@@ -14749,6 +14780,7 @@ async function saveConsultModal(){
         slots.push(ns);
       }
       tx.set(ref, { slots, updatedAt: new Date().toISOString() }, { merge: true });
+      tx.set(consultPubRef(consultClassKey), consultPublicView(slots, data.openAt), { merge: true });
     });
     consultCurWeek = consultWeekStart(newDate);
     closeConsultModal();
@@ -14779,6 +14811,7 @@ async function deleteConsultSlot(id){
       const data  = snap.exists() ? (snap.data()||{}) : {};
       const slots = (Array.isArray(data.slots) ? data.slots : []).filter(s => s.id !== id);
       tx.set(ref, { slots }, { merge: true });
+      tx.set(consultPubRef(consultClassKey), consultPublicView(slots, data.openAt), { merge: true });
     });
   } catch(e){ alert('삭제 실패: ' + e.message); }
 }
@@ -14791,6 +14824,7 @@ async function deleteConsultDay(date){
       const data  = snap.exists() ? (snap.data()||{}) : {};
       const slots = (Array.isArray(data.slots) ? data.slots : []).filter(s => s.date !== date);
       tx.set(ref, { slots }, { merge: true });
+      tx.set(consultPubRef(consultClassKey), consultPublicView(slots, data.openAt), { merge: true });
     });
   } catch(e){ alert('삭제 실패: ' + e.message); }
 }
