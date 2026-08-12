@@ -8932,11 +8932,8 @@ function s360RenderGroupStudents(){
 // ── FHD 3열 마스터-디테일 (학급별 전용): [학반 리스트 | 반 명렬 | 학생 상세] ──
 function s360RenderClassPanes(){
   s360View = 'panes';
-  // 이전에 고른 학생이 현재 선택 반과 다르면 해제
-  if (s360PaneStudent && s360Group) {
-    const [g,r] = s360Group.key.split('-');
-    if (!(String(parseInt(s360PaneStudent.grade))===g && String(parseInt(s360PaneStudent.room))===r)) s360PaneStudent = null;
-  }
+  // 다른 반을 눌러도 보고 있던 학생 상세는 그대로 유지한다(반 이동 중에도 비교·참조 가능).
+  // 명렬 패널에서는 그 학생이 이 반에 없으니 자연히 선택 표시만 사라진다.
   const body = document.getElementById('s360Body');
   body.classList.add('s360-body-panes');
   const hasStudent = !!s360PaneStudent;   // 학생 선택 전엔 명렬이 넓게(2열), 선택하면 상세 열림(3열)
@@ -8978,8 +8975,10 @@ function s360FillClassPane(){
     const key=b.dataset.key; const [grade,room]=key.split('-');
     s360Group={ type:'class', key, label:`${grade}학년 ${room}반` };
     s360OpenGrade = grade;
-    s360PaneStudent=null;
-    s360RenderClassPanes();   // 반 바꾸면 상세 닫고 명렬 넓게(2열)로 재구성
+    // 상세가 열려 있으면 3열 구조가 그대로이므로 학반·명렬 패널만 갱신한다.
+    // (전체를 다시 그리면 보고 있던 학생의 차트·선택과목이 매번 재렌더돼 깜빡인다)
+    if (s360PaneStudent) { s360FillClassPane(); s360FillRosterPane(); }
+    else s360RenderClassPanes();
   }));
 }
 function s360FillRosterPane(){
