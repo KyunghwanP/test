@@ -1897,7 +1897,13 @@
                     const snap = await getDoc(doc(db, 'electives', key));
                     _elCache[key] = snap.exists() ? snap.data() : { students: {} };
                 }
-                return _elCache[key].students?.[String(parseInt(num))] || null;
+                const st = _elCache[key].students?.[String(parseInt(num))];
+                if (!st) return null;
+                // 엑셀 합계 열('계·소계·합계·총계')은 과목이 아니므로 제외(정확일치 → '통계·회계'는 유지).
+                // 업로드 파싱에도 필터가 있지만, 그 이전에 올라간 기존 문서를 위해 여기서도 거른다.
+                const NOT_SUBJ = new Set(['계', '소계', '합계', '총계']);
+                const clean = list => (list || []).filter(n => !NOT_SUBJ.has(String(n).trim()));
+                return { ...st, current: clean(st.current), prevGrade: clean(st.prevGrade) };
             } catch (e) { return null; /* 권한 없음 등 */ }
         };
         onAuthStateChanged(getAuth(app), async user => {

@@ -9224,7 +9224,11 @@ function subjSubjectArea(name){
   return 'subj-liberal';
 }
 
-// 선택과목: 해당 반 electives 문서만 지연 로드 (교육과정 현황 시트 → sync-grades.js)
+// 엑셀 합계 열('계·소계·합계·총계')은 과목이 아니므로 제외. 정확일치라 '통계·회계'는 안 걸림.
+const ELEC_NOT_SUBJECT = new Set(['계', '소계', '합계', '총계']);
+const elecOnlySubjects = list => (list || []).filter(n => !ELEC_NOT_SUBJECT.has(String(n).trim()));
+
+// 선택과목: 해당 반 electives 문서만 지연 로드 (교육과정 현황 엑셀 → upload.html 업로드)
 async function s360LoadElectives(s){
   const el = document.getElementById('s360Electives');
   if (!el) return;
@@ -9235,7 +9239,12 @@ async function s360LoadElectives(s){
       spotElectiveCls[key] = snap.exists() ? snap.data() : { students: {} };
     }
     const st = spotElectiveCls[key].students?.[String(parseInt(s.num))];
-    if (!st || (!st.current?.length && !st.prevGrade?.length)) {
+    // '계·소계·합계·총계'는 엑셀의 합계 열이지 과목이 아니다. upload.html 파싱에서도 거르지만,
+    // 그 필터가 생기기 전에 올라간 기존 문서에도 적용되도록 표시 단계에서 한 번 더 거른다
+    // (재업로드 없이 즉시 정상화). 정확일치라 '통계·회계' 같은 실제 과목은 걸리지 않는다.
+    const cur  = elecOnlySubjects(st?.current);
+    const prev = elecOnlySubjects(st?.prevGrade);
+    if (!st || (!cur.length && !prev.length)) {
       el.innerHTML = '<div style="font-size:15px;color:var(--ink-soft);">등록된 선택과목 데이터 없음</div>';
       return;
     }
@@ -9243,8 +9252,8 @@ async function s360LoadElectives(s){
     // 과목선택 시뮬레이터 연동: 관리자 전용 + 1·2학년만 (시뮬레이터가 2026·2025 입학생 편제표 기준)
     const yr = parseInt(s.grade);
     el.innerHTML = `
-      ${st.current?.length ? `<div style="margin-bottom:8px;"><div style="font-size:13.5px;font-weight:800;color:var(--ink-soft);margin-bottom:6px;">이번학년</div><div style="display:flex;gap:7px;flex-wrap:wrap;">${badges(st.current)}</div></div>` : ''}
-      ${st.prevGrade?.length ? `<div><div style="font-size:13.5px;font-weight:800;color:var(--ink-soft);margin-bottom:6px;">직전학년</div><div style="display:flex;gap:7px;flex-wrap:wrap;">${badges(st.prevGrade)}</div></div>` : ''}`;
+      ${cur.length ? `<div style="margin-bottom:8px;"><div style="font-size:13.5px;font-weight:800;color:var(--ink-soft);margin-bottom:6px;">이번학년</div><div style="display:flex;gap:7px;flex-wrap:wrap;">${badges(cur)}</div></div>` : ''}
+      ${prev.length ? `<div><div style="font-size:13.5px;font-weight:800;color:var(--ink-soft);margin-bottom:6px;">직전학년</div><div style="display:flex;gap:7px;flex-wrap:wrap;">${badges(prev)}</div></div>` : ''}`;
     const simSlot = document.getElementById('s360SimSlot');
     if (simSlot && _IS_ADMIN() && (yr === 1 || yr === 2)) {
       simSlot.innerHTML = `<button class="s360-susi-goto-btn" id="s360SimBtn">🧭 선택과목 시뮬레이터 열기 →</button>`;
@@ -9254,10 +9263,10 @@ async function s360LoadElectives(s){
       if (isSciStudent(s)) qs.push('track=science'); // 과학중점과정 자동 전환
       if (yr === 2) {
         // 2학년: 이수 중인 과목 → 시뮬레이터 오른쪽 계획표(2학년 이수 현황)에 표시
-        qs.push(`taken=${encodeURIComponent((st.current || []).join(','))}`);
+        qs.push(`taken=${encodeURIComponent(cur.join(','))}`);
       } else {
         // 1학년: 등록된 선택(신청)과목 → 선택군에 자동 체크
-        qs.push(`subjects=${encodeURIComponent([...(st.current || []), ...(st.prevGrade || [])].join(','))}`);
+        qs.push(`subjects=${encodeURIComponent([...cur, ...prev].join(','))}`);
       }
       navigateTo('grades');
       const gf = document.getElementById('gradesFrame');
