@@ -90,7 +90,9 @@ async function getAccessToken(env) {
     { alg: 'RS256', typ: 'JWT' },
     {
       iss: sa.client_email,
-      scope: 'https://www.googleapis.com/auth/datastore',
+      // Firestore(datastore) + 사용자 조회(identitytoolkit). 스코프는 공백으로 구분한다.
+      // identitytoolkit 이 없으면 관리자 '실제 권한으로 보기'의 계정 조회가 403으로 막힌다.
+      scope: 'https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/identitytoolkit',
       aud: 'https://oauth2.googleapis.com/token',
       iat, exp: iat + 3600
     });
@@ -435,7 +437,11 @@ async function handleImpersonate(env, body) {
     { method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: [target] }) });
-  if (!lres.ok) return { success: false, error: 'LOOKUP_FAILED' };
+  if (!lres.ok) {
+    // 원인 파악이 빠르도록 상태코드를 함께 준다(403이면 대개 스코프 문제).
+    console.error('accounts:lookup', lres.status, (await lres.text()).slice(0, 200));
+    return { success: false, error: 'LOOKUP_FAILED_' + lres.status };
+  }
   const user = ((await lres.json()).users || [])[0];
   if (!user || !user.localId) return { success: false, error: 'NEVER_LOGGED_IN' };
 
