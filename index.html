@@ -5113,13 +5113,20 @@ const stripTeacherSuffix = s => (s || '').trim().replace(/\s*(선생님|교사|�
 
 // 유효 사용자: 보기 모드면 선택한 교사의 TEACHERS 레코드, 아니면 로그인 사용자의 레코드
 function effTeacher(){
-  if(isViewAs()) return TEACHERS.find(t => t.email === VIEW_AS_EMAIL) || null;
+  // 가장 모드는 '실제로 그 계정으로 로그인'된 상태다 → 아래 currentUser 경로가 맞다.
+  // (VIEW_AS_EMAIL 은 표시 전용 보기에서만 넘어온다. 가장 모드에서 이 줄을 타면
+  //  email === null 로 검색해 항상 못 찾고, 시간표·현황판이 통째로 비어버린다)
+  if(isViewAs() && VIEW_AS_EMAIL) return TEACHERS.find(t => t.email === VIEW_AS_EMAIL) || null;
   const u = fbAuth.currentUser;
   if(!u) return null;
   return TEACHERS.find(t => t.email && t.email === u.email)
       || TEACHERS.find(t => t.name === stripTeacherSuffix(u.displayName));
 }
-function effUid(){ return isViewAs() ? (effTeacher()?.uid || null) : (fbAuth.currentUser?.uid || null); }
+function effUid(){
+  // 가장 모드에서는 currentUser 가 곧 그 교사이므로 그 uid 를 쓴다.
+  if(isViewAs() && VIEW_AS_EMAIL) return effTeacher()?.uid || null;
+  return fbAuth.currentUser?.uid || null;
+}
 
 // 보기 모드에서는 모든 Firestore 쓰기를 단일 지점에서 차단 (읽기 전용 보장)
 let _viewAsToastTimer = null;
