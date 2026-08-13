@@ -5062,7 +5062,7 @@
 </script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithCredential, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, indexedDBLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithCredential, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, indexedDBLocalPersistence, inMemoryPersistence, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc as _fsSetDoc, addDoc as _fsAddDoc, getDocs, deleteDoc as _fsDeleteDoc, collection, onSnapshot, runTransaction as _fsRunTransaction } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -5082,16 +5082,28 @@ const fbApp = initializeApp(firebaseConfig);
 const fbAuth = getAuth(fbApp);
 // PWA(홈화면 설치)에서 세션이 유지되도록 영속성 명시 설정
 // indexedDB 우선, 실패 시 localStorage 폴백
-setPersistence(fbAuth, indexedDBLocalPersistence)
-  .catch(() => setPersistence(fbAuth, browserLocalPersistence))
-  .catch(e => console.log('persistence 설정 실패:', e.message));
+// 가장 모드(?impersonate=)는 메모리 전용 세션 — 관리자 본인의 로그인을 덮어쓰지 않는다.
+if (new URLSearchParams(location.search).get('impersonate')) {
+  setPersistence(fbAuth, inMemoryPersistence).catch(()=>{});
+} else {
+  setPersistence(fbAuth, indexedDBLocalPersistence)
+    .catch(() => setPersistence(fbAuth, browserLocalPersistence))
+    .catch(e => console.log('persistence 설정 실패:', e.message));
+}
 const fbDb = getFirestore(fbApp);
 const TEACHERS = [];
 
 // ── 관리자 '다른 교사로 보기' (admin.html → index.html?viewAs=이메일, 읽기 전용) ──
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
-const isViewAs = () => !!VIEW_AS_EMAIL && fbAuth.currentUser?.email === ADMIN_EMAIL;
+// 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
+// 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
+// 적용된다(= 권한이 제대로 부여됐는지 진짜로 확인할 수 있다).
+//   · 세션은 메모리에만 둔다 → 부모 창의 관리자 로그인을 건드리지 않는다.
+//   · 쓰기는 아래 isViewAs()로 계속 차단한다(가장 상태에서 남의 이름으로 저장 방지).
+const IMPERSONATE = new URLSearchParams(location.search).get('impersonate') || null;
+const isViewAs = () => !!IMPERSONATE
+  || (!!VIEW_AS_EMAIL && fbAuth.currentUser?.email === ADMIN_EMAIL);
 const stripTeacherSuffix = s => (s || '').trim().replace(/\s*(선생님|교사|쌤)/, '');
 
 // 유효 사용자: 보기 모드면 선택한 교사의 TEACHERS 레코드, 아니면 로그인 사용자의 레코드
@@ -7141,6 +7153,13 @@ async function loadDataFromFirestore(){
 }
 
 let appInitialized = false;
+
+// 가장 모드: 넘겨받은 커스텀 토큰으로 그 교사 계정에 로그인한다(메모리 세션).
+// 실패하면 로그인 화면이 그대로 남아 상황을 알 수 있다.
+if (IMPERSONATE) {
+  signInWithCustomToken(fbAuth, IMPERSONATE)
+    .catch(e => setAuthStatus('보기 모드 로그인 실패: ' + e.message, true));
+}
 
 onAuthStateChanged(fbAuth, async (user) => {
   if(!user){
