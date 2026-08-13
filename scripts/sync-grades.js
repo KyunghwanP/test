@@ -95,6 +95,15 @@ async function syncGradeRoles() {
       await db.doc('appdata/main').update({ teachers });
       console.log(`  ↻ 로그인 기록에서 이메일 복구 ${healed}명 (appdata/main 갱신)`);
     }
+
+    // 실제 로그인한 적 있는 교원 명단(이름 → uid).
+    // teachers 배열은 시간표에서 오므로 수업 없는 교장·교감은 항목 자체가 없고,
+    // 그러면 관리자 화면이 '앱 미사용'으로만 보인다. 로그인 여부는 Auth 가 진실이므로
+    // 여기 따로 저장해 그 화면이 참조하게 한다.
+    const loginByName = {};
+    authByName.forEach((v, k) => { loginByName[k] = v.uid; });
+    await db.doc('acl/loginByName').set(loginByName);
+    console.log(`  🔑 로그인 이력 ${Object.keys(loginByName).length}명 저장 (acl/loginByName)`);
   } catch (e) {
     console.warn('  ⚠️ 이메일 자동 복구 건너뜀:', e.message);
   }
