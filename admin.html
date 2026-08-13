@@ -270,6 +270,34 @@ async function loadTeachers(){
   }
 }
 
+// 실제 그 교사 자격으로 열기 — 워커가 관리자를 검증한 뒤 그 계정의 커스텀 토큰을 준다.
+// 그래야 Firestore 규칙이 그 사람 기준으로 평가돼 '권한이 진짜로 부여됐는지' 확인된다.
+// 실패하면 기존 표시 전용 보기(viewAs)로 내려간다 — 화면 구성은 볼 수 있다.
+const WORKER_URL = 'https://consult-api.pkh910518.workers.dev';
+
+async function openAsTeacher(email){
+  placeholder.style.display = 'none';
+  viewFrame.style.display = 'block';
+  const fallback = () => { viewFrame.src = 'index.html?viewAs=' + encodeURIComponent(email); };
+  try{
+    const idToken = await fbAuth.currentUser.getIdToken();
+    const res  = await fetch(WORKER_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'impersonate', idToken, targetEmail: email })
+    });
+    const data = await res.json();
+    if (data.success && data.customToken){
+      // 토큰은 1시간짜리 메모리 세션용 — 관리자 본인 로그인은 그대로 유지된다.
+      viewFrame.src = 'index.html?impersonate=' + encodeURIComponent(data.customToken);
+      return;
+    }
+    if (data.error === 'NEVER_LOGGED_IN'){
+      alert('이 선생님은 아직 앱에 로그인한 적이 없어 계정이 없습니다.\n실제 권한으로는 열 수 없어 화면 구성만 보여드립니다.');
+    }
+    fallback();
+  }catch(e){ fallback(); }
+}
+
 teacherSelect.addEventListener('change', () => {
   const email = teacherSelect.value;
   if(!email){
@@ -278,9 +306,7 @@ teacherSelect.addEventListener('change', () => {
     placeholder.style.display = 'flex';
     return;
   }
-  placeholder.style.display = 'none';
-  viewFrame.style.display = 'block';
-  viewFrame.src = 'index.html?viewAs=' + encodeURIComponent(email);
+  openAsTeacher(email);
 });
 
 onAuthStateChanged(fbAuth, async (user) => {

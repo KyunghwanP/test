@@ -404,6 +404,44 @@ async function handleCancel(env, body) {
   return { success: false, error: 'BUSY' };
 }
 
+// ── 관리자: 다른 교사 계정으로 보기(가장) ────────────────────────────────────
+// 권한이 실제로 부여됐는지 확인하려면 그 사람 자격으로 규칙이 평가돼야 한다.
+// 관리자 본인의 ID 토큰을 검증한 뒤, 대상 교사 uid 로 커스텀 토큰을 발급한다.
+// (앱은 이 토큰을 메모리 세션으로만 쓰고, 그 상태에서 쓰기는 전부 차단한다)
+const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
+
+async function handleImpersonate(env, body) {
+  const idToken = String(body.idToken || '');
+  const target  = String(body.targetEmail || '').trim().toLowerCase();
+  if (!idToken || !target) return { success: false, error: 'MISSING_FIELDS' };
+  if (!env.FIREBASE_API_KEY) return { success: false, error: 'NO_API_KEY' };
+
+  // 1) 호출자가 정말 관리자인지 — 토큰을 Identity Toolkit 에 물어 검증한다.
+  const vres = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${env.FIREBASE_API_KEY}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }) });
+  if (!vres.ok) return { success: false, error: 'AUTH' };
+  const me = ((await vres.json()).users || [])[0];
+  const admin = String(env.ADMIN_EMAIL || ADMIN_EMAIL).toLowerCase();
+  if (!me || !me.emailVerified || String(me.email || '').toLowerCase() !== admin) {
+    return { success: false, error: 'FORBIDDEN' };
+  }
+
+  // 2) 대상 교사의 uid 찾기 — 한 번도 로그인한 적 없으면 계정 자체가 없다.
+  const token = await getAccessToken(env);
+  const lres = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/projects/${projectId(env)}/accounts:lookup`,
+    { method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: [target] }) });
+  if (!lres.ok) return { success: false, error: 'LOOKUP_FAILED' };
+  const user = ((await lres.json()).users || [])[0];
+  if (!user || !user.localId) return { success: false, error: 'NEVER_LOGGED_IN' };
+
+  return { success: true, customToken: await mintCustomToken(env, user.localId, {}) };
+}
+
 // ── 진입점 ───────────────────────────────────────────────────────────────────
 function corsHeaders(env, origin) {
   // 끝 슬래시·대소문자 차이로 매칭이 어긋나는 사고가 잦아 정규화해서 비교한다.
@@ -446,6 +484,7 @@ export default {
         case 'slots':  return json(await handleSlots(env, body),  200, cors);
         case 'book':   return json(await handleBook(env, body),   200, cors);
         case 'cancel': return json(await handleCancel(env, body), 200, cors);
+        case 'impersonate': return json(await handleImpersonate(env, body), 200, cors);
         default:       return json({ success: false, error: 'UNKNOWN_ACTION' }, 400, cors);
       }
     } catch (e) {
