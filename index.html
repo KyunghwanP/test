@@ -14938,7 +14938,9 @@ async function loadMytasks() {
   // uid 있는 선생님들의 일정 중 나를 공유한 것 구독
   // 공유 저장값은 (email || name)이므로, 내 식별자도 email·displayName·TEACHERS등록이름 모두 포함
   // (보기 모드에서는 선택한 교사의 식별자만 사용)
-  const myIdentifiers = isViewAs()
+  // 가장 모드에서는 user 가 곧 그 교사이므로 아래(로그인 사용자) 경로가 더 정확하다.
+  // 표시 전용 보기일 때만 선택한 교사의 식별자만 쓴다.
+  const myIdentifiers = (isViewAs() && VIEW_AS_EMAIL)
     ? [effMe?.email, effMe?.name].filter(Boolean)
     : [user.email, user.displayName, effMe?.name, effMe?.email].filter(Boolean);
   TEACHERS.filter(t => t.uid && t.uid !== myUid).forEach(teacher => {
