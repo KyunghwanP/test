@@ -5083,8 +5083,9 @@ const fbAuth = getAuth(fbApp);
 // PWA(홈화면 설치)에서 세션이 유지되도록 영속성 명시 설정
 // indexedDB 우선, 실패 시 localStorage 폴백
 // 가장 모드(?impersonate=)는 메모리 전용 세션 — 관리자 본인의 로그인을 덮어쓰지 않는다.
+// (실제 전환·로그인은 아래 IMPERSONATE 블록에서 순서를 지켜 수행한다)
 if (new URLSearchParams(location.search).get('impersonate')) {
-  setPersistence(fbAuth, inMemoryPersistence).catch(()=>{});
+  /* no-op */
 } else {
   setPersistence(fbAuth, indexedDBLocalPersistence)
     .catch(() => setPersistence(fbAuth, browserLocalPersistence))
@@ -7157,7 +7158,10 @@ let appInitialized = false;
 // 가장 모드: 넘겨받은 커스텀 토큰으로 그 교사 계정에 로그인한다(메모리 세션).
 // 실패하면 로그인 화면이 그대로 남아 상황을 알 수 있다.
 if (IMPERSONATE) {
-  signInWithCustomToken(fbAuth, IMPERSONATE)
+  // 메모리 전환이 '끝난 뒤에' 로그인해야 한다. 순서가 어긋나면 세션이 저장소에 써져
+  // 관리자 본인 로그인이 덮여 로그아웃된다.
+  setPersistence(fbAuth, inMemoryPersistence)
+    .then(() => signInWithCustomToken(fbAuth, IMPERSONATE))
     .catch(e => setAuthStatus('보기 모드 로그인 실패: ' + e.message, true));
 
   // 자식 iframe(성적·진로 등)은 각자 인증을 새로 하므로, 그냥 두면 '저장된 관리자
