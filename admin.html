@@ -225,8 +225,17 @@ async function loadTeachers(){
   // ── 이메일·uid·담임: 시간표 기반 teachers(로그인 시 자동 수집) — 이름으로 매칭 ──
   const tSnap    = await getDoc(doc(fbDb, 'appdata', 'main'));
   const teachers = tSnap.exists() && Array.isArray(tSnap.data().teachers) ? tSnap.data().teachers : [];
-  const byName = new Map();  // 이름(공백제거) → {email, homeroom}
+  const byName = new Map();  // 이름(공백제거) → {email, uid, homeroom}
   teachers.forEach(t => { if (t.name) byName.set(norm(t.name), t); });
+  // ── 교원 명렬(acl/emailByName) — 시간표에 없는 교장·교감 등의 계정도 알 수 있다 ──
+  // teachers의 email은 '앱에 로그인해야' 채워져, 수업 없는 교원은 영원히 비어 있었다.
+  const dirSnap = await getDoc(doc(fbDb, 'acl', 'emailByName')).catch(() => null);
+  const dirByName = new Map();
+  if (dirSnap && dirSnap.exists()) {
+    Object.entries(dirSnap.data() || {}).forEach(([n, e]) => {
+      if (typeof e === 'string' && e.includes('@')) dirByName.set(norm(n), e);
+    });
+  }
 
   // 명렬을 기준으로 하되, 명렬에 없는(로그인은 했지만 명렬 미등록) 교사도 뒤에 덧붙여 누락 방지
   const rows = staff.length
@@ -244,13 +253,18 @@ async function loadTeachers(){
     const opt = document.createElement('option');
     const m = r.match;
     const homeroom = m && m.homeroom ? ` (담임 ${m.homeroom})` : (r.role ? ` (${r.role})` : '');
-    if(m && m.email){
-      opt.value = m.email;
-      opt.textContent = r.name + homeroom;
+    // 계정(email)을 알면 '보기'가 가능하다. 명렬에도 있으므로 로그인 여부와 무관.
+    const email = (m && m.email) || dirByName.get(norm(r.name)) || '';
+    // 실제 로그인 여부는 uid로 판단한다 — uid는 로그인했을 때만 저장된다.
+    // (email은 명렬에서도 채워지므로 더 이상 로그인 신호가 아니다)
+    const everLoggedIn = !!(m && m.uid);
+    if(email){
+      opt.value = email;
+      opt.textContent = r.name + homeroom + (everLoggedIn ? '' : ' — 앱 미사용');
     } else {
       opt.value = '';
       opt.disabled = true;
-      opt.textContent = `${r.name}${homeroom} — 로그인 이력 없음`;
+      opt.textContent = `${r.name}${homeroom} — 계정 미등록`;
     }
     teacherSelect.appendChild(opt);
   }
