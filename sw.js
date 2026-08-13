@@ -4,11 +4,14 @@ const BASE = self.location.pathname.replace(/[^/]*$/, '');   // 예: '/ynhs/' ·
 // 캐시 저장소는 '경로'가 아니라 '출처' 단위로 공유된다 → /ynhs/ 와 /test/ 는 같은 출처라
 // 캐시 이름이 같으면 서로의 캐시를 지운다(한쪽 버전이 올라갈 때 activate가 삭제).
 // 그래서 이름에 BASE를 넣어 배포별로 분리한다. 예: 'ynhs:/ynhs/:v496'
-const CACHE_VER  = 'v496';
+const CACHE_VER  = 'v497';
 const CACHE_NAME = 'ynhs:' + BASE + ':' + CACHE_VER;
 const CACHE_MINE = 'ynhs:' + BASE + ':';                     // 이 배포가 소유한 캐시 접두사
 // 화면(HTML)을 네트워크에서 기다려 주는 최대 시간. 이 시간을 넘기면 캐시로 즉시 전환한다.
 const NAV_TIMEOUT = 3500;
+// 캐시가 없어 네트워크를 기다려야 할 때의 상한. 이걸 넘기면 매달려 있지 않고
+// 안내 응답을 돌려준다(브라우저가 무한 대기 끝에 타임아웃 페이지를 띄우는 것보다 낫다).
+const HARD_TIMEOUT = 15000;
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -93,8 +96,10 @@ self.addEventListener('fetch', e => {
       }
     }
 
-    // 캐시가 없다 → 네트워크를 끝까지 기다린다(타임아웃 없이).
-    const res = await net;
+    // 캐시가 없다 → 네트워크를 기다리되 '무한정'은 안 된다.
+    // 여기서 무한 대기하면 서비스 워커가 요청을 붙잡은 채 끝나지 않아 브라우저가
+    // ERR_TIMED_OUT 을 띄운다(시크릿 창은 워커가 없어 멀쩡한데 일반 창만 먹통).
+    const res = await withTimeout(net, HARD_TIMEOUT);
     if (res) return res;
 
     // 네트워크도 실패 + 캐시도 없음 → undefined 대신 명확한 응답(ERR_FAILED 방지).
