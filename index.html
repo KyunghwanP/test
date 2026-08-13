@@ -7159,6 +7159,23 @@ let appInitialized = false;
 if (IMPERSONATE) {
   signInWithCustomToken(fbAuth, IMPERSONATE)
     .catch(e => setAuthStatus('보기 모드 로그인 실패: ' + e.message, true));
+
+  // 자식 iframe(성적·진로 등)은 각자 인증을 새로 하므로, 그냥 두면 '저장된 관리자
+  // 세션'으로 로그인해 전부 보인다. src 가 바뀔 때마다 토큰을 붙여 같은 자격으로 열게 한다.
+  // (src 를 어디서 설정하든 잡히도록 속성 변화를 관찰한다 — 설정 지점이 여러 곳이다)
+  const _impFrames = () => document.querySelectorAll('iframe#gradesFrame');
+  const _impTag = 'impersonate=' + encodeURIComponent(IMPERSONATE);
+  const _impFix = fr => {
+    const s = fr.getAttribute('src');
+    if (!s || s === 'about:blank' || s.includes('impersonate=')) return;
+    fr.setAttribute('src', s + (s.includes('?') ? '&' : '?') + _impTag);
+  };
+  document.addEventListener('DOMContentLoaded', () => {
+    _impFrames().forEach(fr => {
+      _impFix(fr);
+      new MutationObserver(() => _impFix(fr)).observe(fr, { attributes: true, attributeFilter: ['src'] });
+    });
+  });
 }
 
 onAuthStateChanged(fbAuth, async (user) => {

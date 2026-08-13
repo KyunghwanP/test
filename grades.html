@@ -668,7 +668,7 @@
   <!-- 데이터 계층: Firebase 로그인 세션(앱과 같은 도메인이라 자동 공유) + Firestore gradesMock -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+    import { getAuth, onAuthStateChanged, setPersistence, inMemoryPersistence, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
     import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
     const app = initializeApp({
@@ -681,6 +681,16 @@
     });
     const auth = getAuth(app);
     const db = getFirestore(app);
+
+    // 관리자 '실제 권한으로 보기' — 부모(index.html)가 넘겨준 커스텀 토큰으로 그 교사
+    // 계정에 로그인한다. 이 페이지는 중첩 iframe이라 부모의 메모리 세션을 물려받지
+    // 못하고, 그냥 두면 저장된 관리자 세션으로 로그인해 성적이 전부 보인다.
+    const IMPERSONATE = new URLSearchParams(location.search).get('impersonate');
+    if (IMPERSONATE) {
+      setPersistence(auth, inMemoryPersistence)
+        .then(() => signInWithCustomToken(auth, IMPERSONATE))
+        .catch(e => console.log('보기 모드 로그인 실패:', e.message));
+    }
 
     const classCache = {};
     window.gradesGetStudentHistory = async function(grade, ban, bun) {
