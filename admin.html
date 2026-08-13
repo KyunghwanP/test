@@ -291,11 +291,25 @@ async function openAsTeacher(email){
       viewFrame.src = 'index.html?impersonate=' + encodeURIComponent(data.customToken);
       return;
     }
-    if (data.error === 'NEVER_LOGGED_IN'){
-      alert('이 선생님은 아직 앱에 로그인한 적이 없어 계정이 없습니다.\n실제 권한으로는 열 수 없어 화면 구성만 보여드립니다.');
-    }
+    // 실패를 조용히 넘기면 '관리자 자격'으로 열려 성적이 전부 보이는데, 그걸 그 교사의
+    // 권한으로 오해하게 된다. 반드시 이유를 알린다.
+    const why = {
+      NEVER_LOGGED_IN: '이 선생님은 앱에 로그인한 적이 없어 계정 자체가 없습니다.',
+      NO_API_KEY:      '워커에 FIREBASE_API_KEY 변수가 없습니다. (Settings → Variables)',
+      UNKNOWN_ACTION:  '워커가 옛 코드입니다. consult-api.js를 최신으로 다시 배포하세요.',
+      FORBIDDEN:       '관리자 계정이 아니거나 이메일 인증이 안 된 계정입니다.',
+      AUTH:            '로그인 토큰 검증에 실패했습니다. 다시 로그인해 보세요.',
+      ORIGIN:          '워커의 ALLOWED_ORIGINS에 이 주소가 없습니다.'
+    }[data.error] || ('워커 응답: ' + (data.error || '알 수 없음'));
+    alert('⚠️ 실제 권한으로 열지 못했습니다.\n\n' + why +
+          '\n\n지금은 관리자 자격으로 열립니다 — 여기 보이는 성적·메모는\n' +
+          '그 선생님 권한이 아니라 사장님 권한으로 보이는 것입니다.');
     fallback();
-  }catch(e){ fallback(); }
+  }catch(e){
+    alert('⚠️ 워커에 연결하지 못했습니다: ' + e.message +
+          '\n\n지금은 관리자 자격으로 열립니다(그 선생님 권한이 아닙니다).');
+    fallback();
+  }
 }
 
 teacherSelect.addEventListener('change', () => {
