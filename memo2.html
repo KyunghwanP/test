@@ -406,9 +406,12 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, setPersistence, inMemoryPersistence, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
+        // 관리자 '실제 권한으로 보기' — 부모가 넘긴 토큰으로 그 교사 계정에 로그인한다.
+        // 별도 이름의 앱으로 띄워야 부모 창(관리자)의 세션과 저장소를 공유하지 않는다.
+        const _IMP = new URLSearchParams(location.search).get('impersonate') || null;
         const app = initializeApp({
             apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
             authDomain: "ynhs-7b5ba.firebaseapp.com",
@@ -416,9 +419,14 @@
             storageBucket: "ynhs-7b5ba.firebasestorage.app",
             messagingSenderId: "1031618043470",
             appId: "1:1031618043470:web:edb5b8d1f98db029916d1f"
-        });
+        }, _IMP ? 'impersonate' : undefined);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        if (_IMP) {
+            setPersistence(auth, inMemoryPersistence)
+                .then(() => signInWithCustomToken(auth, _IMP))
+                .catch(e => console.log('보기 모드 로그인 실패:', e.message));
+        }
 
         // 실험판(v2) 전용 저장소 — 기존 메모(memos/ynhs-memo-pages)와 완전히 분리
         const MEMO_COL = 'memos2';
