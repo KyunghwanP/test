@@ -4650,8 +4650,12 @@
               <div class="cm-edit">
                 <div class="cm-edit-grid">
                   <div>
-                    <label>날짜</label>
-                    <input type="date" id="caDate" min="2020-01-01" max="2099-12-31">
+                    <label>날짜 <span style="font-weight:400;color:var(--ink-soft);font-size:12px;">(끝날짜를 넣으면 그 기간 전체)</span></label>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                      <input type="date" id="caDate" min="2020-01-01" max="2099-12-31" style="flex:1;min-width:0;">
+                      <span style="color:var(--ink-soft);">~</span>
+                      <input type="date" id="caDateEnd" min="2020-01-01" max="2099-12-31" style="flex:1;min-width:0;" placeholder="선택">
+                    </div>
                   </div>
                   <div>
                     <label>시간 단위</label>
@@ -14465,6 +14469,7 @@ let caUnit = 30;  // 30 or 60
 function openConsultAutoModal(){
   if(!consultClassKey) return;
   document.getElementById('caDate').value = consultLocalYmd(new Date());
+  document.getElementById('caDateEnd').value = '';        // 비워 두면 하루만
   caUnit = 30;
   document.querySelectorAll('.ca-unit-btn').forEach(b => b.classList.toggle('active', b.dataset.unit==='30'));
   renderCaList();
@@ -14541,6 +14546,21 @@ async function createConsultAuto(){
   checkedRows.forEach(r => { caBlockTimes(r.dataset.start).forEach(t => times.push(t)); });
   const dur = caUnit;
 
+  // 끝날짜를 넣으면 그 기간의 '평일 전체'에 같은 시간대를 만든다(18~20일 같이 며칠씩 여는 경우).
+  // 비워 두면 하루만 만든다(기존 동작).
+  const endStr = document.getElementById('caDateEnd').value;
+  const dates = [];
+  if (endStr && endStr >= dateStr) {
+    for (let d = dateStr; d <= endStr; d = consultAddDays(d, 1)) {
+      const wd = new Date(d + 'T00:00:00').getDay();
+      if (wd === 0 || wd === 6) continue;          // 주말 제외(상담 화면이 월~금)
+      dates.push(d);
+    }
+  } else {
+    dates.push(dateStr);
+  }
+  if (dates.length === 0) { alert('선택한 기간에 평일이 없습니다.'); return; }
+
   const btn = document.getElementById('caCreateBtn');
   btn.disabled = true; btn.textContent = '생성 중...';
   const ref = doc(fbDb, 'consultations', consultClassKey);
@@ -14549,11 +14569,13 @@ async function createConsultAuto(){
       const snap  = await tx.get(ref);
       const data  = snap.exists() ? (snap.data()||{}) : {};
       const slots = Array.isArray(data.slots) ? data.slots : [];
-      times.forEach(time => {
-        if(slots.some(s => s.date === dateStr && s.time === time)) return;
-        slots.push({
-          id: `${dateStr}_${time}_${Math.random().toString(36).slice(2,7)}`,
-          date: dateStr, time, duration: dur, status: 'open'
+      dates.forEach(day => {
+        times.forEach(time => {
+          if(slots.some(s => s.date === day && s.time === time)) return;   // 이미 있으면 건너뜀
+          slots.push({
+            id: `${day}_${time}_${Math.random().toString(36).slice(2,7)}`,
+            date: day, time, duration: dur, status: 'open'
+          });
         });
       });
       const myName = TEACHERS.find(t=>t.homeroom===consultClassKey)?.name
@@ -14605,14 +14627,18 @@ function renderConsultList(slots){
   document.getElementById('consultStatOpen').textContent   = openCnt;
   document.getElementById('consultStatBooked').textContent = bookedCnt;
 
-  // 현재 주가 안 정해졌으면: 슬롯이 있는 가장 이른 주, 없으면 이번 주
+  // 현재 주가 안 정해졌으면 '이번 주'로 연다.
+  //   예전에는 슬롯이 있는 가장 이른 주로 갔는데, 슬롯은 한 문서에 계속 누적되므로
+  //   지난 학기 상담이 남아 있으면 매번 그 옛 주가 열렸다(들어갈 때마다 과거 주차).
+  //   앞으로 예정된 상담이 있으면 그 주를, 그마저 없으면 이번 주를 보여 준다.
   if(consultCurWeek === null){
-    if(slots.length > 0){
-      const earliest = slots.map(s => s.date).sort()[0];
-      consultCurWeek = consultWeekStart(earliest);
-    } else {
-      consultCurWeek = consultWeekStart(consultLocalYmd(new Date()));
-    }
+    const today = consultLocalYmd(new Date());
+    const upcoming = slots.map(s => s.date).filter(d => d >= today).sort()[0];
+    const thisWeek = consultWeekStart(today);
+    // 이번 주에 상담이 있으면 이번 주, 아니면 다음으로 예정된 상담이 있는 주
+    consultCurWeek = (upcoming && consultWeekStart(upcoming) > thisWeek && !slots.some(s => s.date >= today && consultWeekStart(s.date) === thisWeek))
+      ? consultWeekStart(upcoming)
+      : thisWeek;
   }
 
   const wk = consultCurWeek;
