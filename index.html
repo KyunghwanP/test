@@ -1424,10 +1424,22 @@
   .s360-head-info{grid-area:info;min-width:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
   .s360-head-pts{grid-area:pts;margin-bottom:0 !important;}
   .s360-photo{grid-area:photo;align-self:start;width:150px;height:190px;object-fit:cover;border-radius:12px;border:1px solid var(--rule);background:var(--paper-soft);}
+  .s360-photo.zoomable{cursor:zoom-in;}
   @media (max-width:640px){
     .s360-head{grid-template-columns:1fr;grid-template-areas:"info" "photo" "pts";}
     .s360-photo{justify-self:center;width:176px;height:222px;}
   }
+  /* 사진 크게 보기 — 원본이 150×200이라 그 이상 늘리면 뭉개진다. 2.2배(330×440)에서 멈춘다. */
+  .s360-zoom{position:fixed;inset:0;z-index:9100;display:none;align-items:center;justify-content:center;
+    background:rgba(20,24,18,0.62);padding:16px;}
+  .s360-zoom.open{display:flex;}
+  .s360-zoom-box{background:var(--paper);border-radius:16px;padding:16px;box-shadow:0 30px 60px -20px rgba(0,0,0,0.5);
+    display:flex;flex-direction:column;align-items:center;gap:10px;max-height:100%;}
+  .s360-zoom-box img{width:min(330px,72vw);height:auto;aspect-ratio:3/4;object-fit:cover;
+    border-radius:10px;border:1px solid var(--rule);background:var(--paper-soft);}
+  .s360-zoom-cap{font-size:14.5px;font-weight:800;color:var(--ink);text-align:center;}
+  .s360-zoom-cap .sub{font-family:'IBM Plex Mono';font-weight:700;color:var(--ink-soft);margin-left:8px;}
+  .s360-zoom-hint{font-size:12px;color:var(--ink-soft);font-weight:600;}
   .s360-records{max-height:260px;overflow-y:auto;border:1px solid var(--rule);border-radius:8px;padding:8px 12px;background:var(--paper-soft);}
   .s360-records > div{font-size:15px !important;}
   .s360-table-wrap{overflow-x:auto;border:1px solid var(--rule);border-radius:8px;}
@@ -5043,6 +5055,14 @@
     <button class="jd-close" id="jindanModalClose" title="닫기">✕</button>
     <button class="jd-open" id="jindanOpenBtn" title="새 페이지로 크게 보기">⛶ 페이지로</button>
     <iframe id="jindanFrame" title="적정 대학 진단"></iframe>
+  </div>
+</div>
+
+<div class="s360-zoom" id="s360PhotoZoom">
+  <div class="s360-zoom-box">
+    <img id="s360ZoomImg" alt="">
+    <div class="s360-zoom-cap" id="s360ZoomCap"></div>
+    <div class="s360-zoom-hint">아무 곳이나 클릭하거나 Esc 를 누르면 닫힙니다</div>
   </div>
 </div>
 
@@ -8701,10 +8721,12 @@ async function s360LoadSusi(){
 // 성적→입결 매칭: 이 학생의 내신(9등급제) ±범위에서 수시 최종합격한 졸업생 사례
 let s360SusiRange = 0.3; // 마지막 선택 범위 기억 (학생을 바꿔도 유지)
 let s360SusiSort = null; // {f:필드, asc:true|false} — null이면 기본(내신 가까운 순)
-let s360SusiQuery = ''; // 대학·모집단위·전형 검색어 (학생을 바꿔도 유지)
+let s360SusiQuery = ''; // 대학·모집단위·전형 검색어 (범위·정렬과 달리 학생이 바뀌면 비운다)
 async function s360RenderSusiMatch(st){
   const el = document.getElementById('s360SusiMatch');
   if (!el) return;
+  // 앞 학생에게 걸어둔 검색어가 남아 있으면 다음 학생 결과가 이유 없이 비어 보인다 → 학생마다 초기화
+  s360SusiQuery = '';
   // 내신값 파싱: 3학년은 단일값("2.75"), 1·2학년 9등급 환산은 범위("2.3~2.8")로 옴
   // → 범위면 [최솟값−a, 최댓값+a]로 필터링
   const rawG = String(st.gpa5 || '').trim();
@@ -11817,9 +11839,32 @@ async function s360LoadPhoto(s){
       s360PhotoCache[ck] = snap.exists() ? (snap.data().photos || {}) : {};
     }
     const url = s360PhotoCache[ck][String(parseInt(s.num))];
-    if(url){ img.src = url; img.style.display = 'block'; }
+    if(url){
+      img.src = url; img.style.display = 'block';
+      // 사진이 실제로 있을 때만 확대 가능 — 빈 칸을 눌러 빈 모달이 뜨는 일이 없게
+      img.classList.add('zoomable');
+      img.title = '클릭하면 크게 보기';
+      img.onclick = () => s360OpenPhotoZoom(url, s);
+    }
   } catch(e){ /* 사진 없으면 조용히 넘어감 */ }
 }
+
+function s360OpenPhotoZoom(url, s){
+  const ov = document.getElementById('s360PhotoZoom');
+  if(!ov) return;
+  document.getElementById('s360ZoomImg').src = url;
+  document.getElementById('s360ZoomCap').innerHTML =
+    `${escapeHtml(s.name || '')}<span class="sub">${s.grade}학년 ${s.room}반 ${s.num}번</span>`;
+  ov.classList.add('open');
+}
+function s360ClosePhotoZoom(){
+  const ov = document.getElementById('s360PhotoZoom');
+  if(!ov || !ov.classList.contains('open')) return;
+  ov.classList.remove('open');
+  document.getElementById('s360ZoomImg').src = '';   // 메모리 해제
+}
+document.getElementById('s360PhotoZoom')?.addEventListener('click', s360ClosePhotoZoom);
+document.addEventListener('keydown', e => { if(e.key === 'Escape') s360ClosePhotoZoom(); });
 
 function docsXlsxUploadClick(){ document.getElementById('docsXlsxFile')?.click(); }
 
