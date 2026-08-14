@@ -4532,8 +4532,12 @@
                   <h4>➕ 상담 시간 열기</h4>
                   <div class="consult-form-grid">
                     <div>
-                      <label>날짜</label>
-                      <input type="date" id="consultDate" min="2020-01-01" max="2099-12-31">
+                      <label>날짜 <span style="font-weight:400;color:var(--ink-soft);font-size:12px;">(끝날짜를 넣으면 기간 전체)</span></label>
+                      <div style="display:flex;align-items:center;gap:6px;">
+                        <input type="date" id="consultDate" min="2020-01-01" max="2099-12-31" style="flex:1;min-width:0;">
+                        <span style="color:var(--ink-soft);">~</span>
+                        <input type="date" id="consultDateEnd" min="2020-01-01" max="2099-12-31" style="flex:1;min-width:0;">
+                      </div>
                     </div>
                     <div>
                       <label>시작 시각</label>
@@ -4650,12 +4654,8 @@
               <div class="cm-edit">
                 <div class="cm-edit-grid">
                   <div>
-                    <label>날짜 <span style="font-weight:400;color:var(--ink-soft);font-size:12px;">(끝날짜를 넣으면 그 기간 전체)</span></label>
-                    <div style="display:flex;align-items:center;gap:6px;">
-                      <input type="date" id="caDate" min="2020-01-01" max="2099-12-31" style="flex:1;min-width:0;">
-                      <span style="color:var(--ink-soft);">~</span>
-                      <input type="date" id="caDateEnd" min="2020-01-01" max="2099-12-31" style="flex:1;min-width:0;" placeholder="선택">
-                    </div>
+                    <label>날짜</label>
+                    <input type="date" id="caDate" min="2020-01-01" max="2099-12-31">
                   </div>
                   <div>
                     <label>시간 단위</label>
@@ -14382,6 +14382,21 @@ async function addConsultSlots(){
   if(!date){ alert('날짜를 선택하세요.'); return; }
   if(times.length === 0){ alert('시작 시각을 확인하세요.'); return; }
 
+  // 끝날짜를 넣으면 그 기간의 평일 전체에 같은 시간대를 만든다(18~20일처럼 며칠씩 여는 경우).
+  // 비워 두면 하루만 만든다(기존 동작).
+  const endDate = document.getElementById('consultDateEnd').value;
+  const days = [];
+  if(endDate && endDate >= date){
+    for(let d = date; d <= endDate; d = consultAddDays(d, 1)){
+      const wd = new Date(d + 'T00:00:00').getDay();
+      if(wd === 0 || wd === 6) continue;          // 주말 제외(상담 화면이 월~금)
+      days.push(d);
+    }
+  } else {
+    days.push(date);
+  }
+  if(days.length === 0){ alert('선택한 기간에 평일이 없습니다.'); return; }
+
   const btn = document.getElementById('consultAddBtn');
   btn.disabled = true;
   btn.textContent = '만드는 중...';
@@ -14393,12 +14408,14 @@ async function addConsultSlots(){
       const data  = snap.exists() ? (snap.data()||{}) : {};
       const slots = Array.isArray(data.slots) ? data.slots : [];
 
-      times.forEach(time => {
-        // 같은 날짜+시각 중복 방지
-        if(slots.some(s => s.date === date && s.time === time)) return;
-        slots.push({
-          id: `${date}_${time}_${Math.random().toString(36).slice(2,7)}`,
-          date, time, duration: dur, status: 'open'
+      days.forEach(day => {
+        times.forEach(time => {
+          // 같은 날짜+시각 중복 방지
+          if(slots.some(s => s.date === day && s.time === time)) return;
+          slots.push({
+            id: `${day}_${time}_${Math.random().toString(36).slice(2,7)}`,
+            date: day, time, duration: dur, status: 'open'
+          });
         });
       });
       const myName = TEACHERS.find(t=>t.homeroom===consultClassKey)?.name
@@ -14469,7 +14486,6 @@ let caUnit = 30;  // 30 or 60
 function openConsultAutoModal(){
   if(!consultClassKey) return;
   document.getElementById('caDate').value = consultLocalYmd(new Date());
-  document.getElementById('caDateEnd').value = '';        // 비워 두면 하루만
   caUnit = 30;
   document.querySelectorAll('.ca-unit-btn').forEach(b => b.classList.toggle('active', b.dataset.unit==='30'));
   renderCaList();
@@ -14546,20 +14562,6 @@ async function createConsultAuto(){
   checkedRows.forEach(r => { caBlockTimes(r.dataset.start).forEach(t => times.push(t)); });
   const dur = caUnit;
 
-  // 끝날짜를 넣으면 그 기간의 '평일 전체'에 같은 시간대를 만든다(18~20일 같이 며칠씩 여는 경우).
-  // 비워 두면 하루만 만든다(기존 동작).
-  const endStr = document.getElementById('caDateEnd').value;
-  const dates = [];
-  if (endStr && endStr >= dateStr) {
-    for (let d = dateStr; d <= endStr; d = consultAddDays(d, 1)) {
-      const wd = new Date(d + 'T00:00:00').getDay();
-      if (wd === 0 || wd === 6) continue;          // 주말 제외(상담 화면이 월~금)
-      dates.push(d);
-    }
-  } else {
-    dates.push(dateStr);
-  }
-  if (dates.length === 0) { alert('선택한 기간에 평일이 없습니다.'); return; }
 
   const btn = document.getElementById('caCreateBtn');
   btn.disabled = true; btn.textContent = '생성 중...';
@@ -14569,13 +14571,11 @@ async function createConsultAuto(){
       const snap  = await tx.get(ref);
       const data  = snap.exists() ? (snap.data()||{}) : {};
       const slots = Array.isArray(data.slots) ? data.slots : [];
-      dates.forEach(day => {
-        times.forEach(time => {
-          if(slots.some(s => s.date === day && s.time === time)) return;   // 이미 있으면 건너뜀
-          slots.push({
-            id: `${day}_${time}_${Math.random().toString(36).slice(2,7)}`,
-            date: day, time, duration: dur, status: 'open'
-          });
+      times.forEach(time => {
+        if(slots.some(s => s.date === dateStr && s.time === time)) return;
+        slots.push({
+          id: `${dateStr}_${time}_${Math.random().toString(36).slice(2,7)}`,
+          date: dateStr, time, duration: dur, status: 'open'
         });
       });
       const myName = TEACHERS.find(t=>t.homeroom===consultClassKey)?.name
