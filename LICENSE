@@ -1,0 +1,71 @@
+저작권 및 이용 조건 (All Rights Reserved)
+Copyright (c) 2026 박경환 (pkh910518@yeungnam.hs.kr). All rights reserved.
+
+--------------------------------------------------------------------------
+한국어
+--------------------------------------------------------------------------
+
+이 저장소의 소스 코드·문서·디자인·설정 파일(이하 "본 저작물")에 대한 모든
+권리는 저작권자에게 있습니다.
+
+소스가 공개되어 있는 것은 열람과 검증을 위한 것이며, 그 자체로 어떠한
+이용 허락도 부여하지 않습니다. 저작권자의 사전 서면 동의 없이 다음 행위를
+할 수 없습니다.
+
+  1. 복제, 전재, 배포, 공중송신, 전시
+  2. 수정, 번역, 그 밖의 방법으로 2차적 저작물을 작성하는 행위
+  3. 본 저작물의 전부 또는 일부를 다른 소프트웨어·서비스에 포함하는 행위
+  4. 영리·비영리를 불문한 자체 설치·운영 및 제3자 제공
+  5. 위 권리를 재이용허락(sublicense)하는 행위
+
+이용을 원하시는 경우 pkh910518@yeungnam.hs.kr 로 문의해 주십시오.
+사용 범위·기간·대가는 개별 협의로 정합니다.
+
+[예외] GitHub 이용약관에 따라 이 저장소를 열람·포크(fork)하는 행위, 그리고
+저작권법상 인용 등 저작재산권이 제한되는 경우는 위 제한을 받지 않습니다.
+
+[제3자 구성요소] 본 저작물은 아래 외부 라이브러리·서비스를 참조합니다.
+각 구성요소는 해당 권리자의 라이선스를 따르며 본 이용 조건의 대상이
+아닙니다. Firebase JS SDK, Chart.js, PDF.js, SheetJS(xlsx), ExcelJS,
+Bootstrap, Pretendard·IBM Plex Mono 등 웹폰트.
+
+[데이터] 저장소에 포함된 대학 입시 결과 자료(어디가 입결 등)의 권리는 원
+제공기관에 있습니다. 본 이용 조건은 해당 자료에 대한 어떠한 권리도
+부여하지 않습니다.
+
+[보증의 부인] 본 저작물은 "있는 그대로" 제공되며, 저작권자는 상품성,
+특정 목적 적합성, 무결성을 포함한 어떠한 명시적·묵시적 보증도 하지
+않습니다. 본 저작물의 사용 또는 사용 불능으로 발생한 어떠한 손해에
+대해서도 저작권자는 책임을 지지 않습니다.
+
+--------------------------------------------------------------------------
+English
+--------------------------------------------------------------------------
+
+All rights in the source code, documentation, design, and configuration
+files in this repository (the "Work") are reserved by the copyright holder.
+
+Public visibility of the source is for inspection only and grants no
+license. Without prior written permission from the copyright holder, you
+may not copy, publish, distribute, transmit, display, modify, translate,
+create derivative works from, incorporate into other software or services,
+deploy or operate (whether commercially or not), provide to third parties,
+or sublicense the Work, in whole or in part.
+
+For licensing inquiries, contact pkh910518@yeungnam.hs.kr. Scope, term,
+and consideration are agreed individually.
+
+Exceptions: viewing and forking this repository as permitted by the GitHub
+Terms of Service, and uses permitted by applicable copyright law (such as
+quotation), are not restricted by the above.
+
+Third-party components (Firebase JS SDK, Chart.js, PDF.js, SheetJS, ExcelJS,
+Bootstrap, Pretendard and IBM Plex Mono web fonts, and others) remain under
+their respective licenses and are not covered by these terms. Rights in the
+university admissions result data included in this repository belong to the
+originating institutions; no rights to that data are granted here.
+
+THE WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM,
+DAMAGES, OR OTHER LIABILITY ARISING FROM THE USE OF OR INABILITY TO USE
+THE WORK.
