@@ -1439,16 +1439,19 @@
   /* 성적→입결 매칭: 세로 스크롤 + 헤더 고정 */
   .s360-susi-wrap td{font-family:'Pretendard','Noto Sans KR';}
   .s360-range-btn{border:1px solid var(--rule);background:var(--paper-soft);color:var(--ink-soft);
-    font-size:12.5px;font-weight:800;padding:3px 10px;border-radius:20px;cursor:pointer;font-family:'IBM Plex Mono';}
+    font-size:13.5px;font-weight:800;padding:4px 12px;border-radius:20px;cursor:pointer;font-family:'IBM Plex Mono';}
   .s360-range-btn.on{background:var(--ink);color:var(--paper,#fff);border-color:var(--ink);}
   .s360-susi-goto-btn{border:1px solid var(--mon);background:var(--paper);color:var(--mon);
-    font-size:12.5px;font-weight:800;padding:3px 10px;border-radius:20px;cursor:pointer;font-family:'Pretendard','Noto Sans KR';}
+    font-size:13.5px;font-weight:800;padding:4px 12px;border-radius:20px;cursor:pointer;font-family:'Pretendard','Noto Sans KR';}
   .s360-susi-goto-btn:hover{background:var(--mon);color:var(--paper,#fff);}
+  .s360-susi-title{font-size:15.5px;font-weight:800;color:var(--ink);}
+  .s360-susi-count{font-size:13.5px;font-weight:700;color:var(--ink-soft);}
+  .s360-susi-empty{font-size:14.5px;color:var(--ink-soft);}
   .s360-susi-q{border:1px solid var(--rule);background:var(--paper);color:var(--ink);
-    font-size:12.5px;font-weight:700;padding:3px 10px;border-radius:20px;width:190px;
+    font-size:14px;font-weight:700;padding:4px 13px;border-radius:20px;width:230px;
     font-family:'Pretendard','Noto Sans KR';outline:none;}
   .s360-susi-q:focus{border-color:var(--mon);}
-  .s360-susi-q::placeholder{color:var(--ink-soft);font-weight:600;}
+  .s360-susi-q::placeholder{color:var(--ink-soft);font-weight:600;font-size:13px;}
   .s360-back{display:inline-block;background:none;border:0;color:var(--ink-soft);font-weight:700;cursor:pointer;padding:0 0 10px;font-size:14px;font-family:inherit;}
   .s360-back:hover{color:var(--ink);}
   /* 차트 3개: 넓으면 3열, 좁으면 바로 1열 (2열 중간 단계 없음)
@@ -8718,7 +8721,12 @@ async function s360RenderSusiMatch(st){
     // 검색 정규화: 공백 제거 + 소문자 → "경북 대"로도 "경북대"가 잡힘
     const norm = v => String(v || '').toLowerCase().replace(/\s+/g, '');
     let qTimer = null;
-    const draw = (refocus) => {
+    // 화면은 두 단계로 나눈다.
+    //  draw()  — 머리줄(칩·검색창·버튼)을 한 번만 만들고 핸들러를 건다
+    //  paint() — 결과 표와 건수만 다시 그린다
+    // 검색할 때마다 innerHTML을 통째로 갈아끼우면 입력창이 새로 만들어져,
+    // 한글 조합이 끊긴다(ㄱ + ㅔ 가 '게'로 합쳐지지 않고 'ㄱㅔ'가 됨). 그래서 입력창은 건드리지 않는다.
+    const paint = () => {
       const RANGE = s360SusiRange;
       // 검색어는 공백으로 나눠 모두 포함(AND) — "경북 간호"처럼 좁혀 쓸 수 있게
       const terms = s360SusiQuery.trim().split(/\s+/).map(norm).filter(Boolean);
@@ -8749,8 +8757,6 @@ async function s360RenderSusiMatch(st){
           dist(parseFloat(a.score)) - dist(parseFloat(b.score))
           || String(b.year).localeCompare(String(a.year)));
       }
-      const chips = [0.1, 0.3, 0.5].map(r =>
-        `<button class="s360-range-btn${r === RANGE ? ' on' : ''}" data-r="${r}">±${r}</button>`).join('');
       const trs = hits.slice(0, MAX_SHOW).map(r => `
         <tr>
           <td>${escapeHtml(r.year || '-')}</td>
@@ -8770,55 +8776,60 @@ async function s360RenderSusiMatch(st){
           <tbody>${trs}</tbody>
         </table></div>`
         : (terms.length
-          ? `<div style="font-size:13.5px;color:var(--ink-soft);">'${escapeHtml(s360SusiQuery.trim())}'와(과) 맞는 합격 사례가 없습니다. 검색어를 지우거나 범위를 넓혀보세요.</div>`
-          : `<div style="font-size:13.5px;color:var(--ink-soft);">해당 범위의 수시 최종합격 사례가 없습니다. 범위를 넓혀보세요.</div>`);
+          ? `<div class="s360-susi-empty">'${escapeHtml(s360SusiQuery.trim())}'와(과) 맞는 합격 사례가 없습니다. 검색어를 지우거나 범위를 넓혀보세요.</div>`
+          : `<div class="s360-susi-empty">해당 범위의 수시 최종합격 사례가 없습니다. 범위를 넓혀보세요.</div>`);
       // 검색 중이면 '전체 N건 중 M건'으로 걸러진 정도를 함께 보여준다
       const countTxt = terms.length
         ? `내신 ${gLabel} ±${RANGE} · '${escapeHtml(s360SusiQuery.trim())}' ${hits.length}건 / 전체 ${inRange.length}건`
         : `내신 ${gLabel} ±${RANGE} · 수시 최종합격 ${hits.length}건`;
-      el.innerHTML = `
-        <div style="margin-top:14px;">
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
-            <span style="font-size:14px;font-weight:800;color:var(--ink);">🎓 이 내신으로 합격한 선배들</span>
-            ${chips}
-            <input class="s360-susi-q" id="s360SusiQ" type="search" placeholder="🔎 대학 · 모집단위 · 전형"
-                   value="${escapeHtml(s360SusiQuery)}" title="공백으로 여러 낱말을 넣으면 모두 포함된 것만 남습니다 (예: 경북 간호)">
-            <button class="s360-susi-goto-btn" id="s360SusiGotoBtn">진로진학 상담에서 전체 조회 →</button>
-            <span style="font-weight:700;color:var(--ink-soft);font-size:12.5px;">${countTxt}${hits.length > MAX_SHOW ? ` 중 ${srt ? '' : '가까운 순 '}${MAX_SHOW}건` : ''}</span>
-          </div>
-          ${body}
-        </div>`;
       el.querySelectorAll('.s360-range-btn').forEach(b =>
-        b.addEventListener('click', () => { s360SusiRange = parseFloat(b.dataset.r); draw(); }));
-      const qi = document.getElementById('s360SusiQ');
-      if (qi) {
-        // draw()가 innerHTML을 통째로 갈아끼우므로 입력 중이던 포커스·커서를 되살린다
-        if (refocus) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); }
-        qi.addEventListener('input', () => {
-          s360SusiQuery = qi.value;
-          clearTimeout(qTimer);
-          qTimer = setTimeout(() => draw(true), 180);
-        });
-        qi.addEventListener('keydown', e => {
-          if (e.key !== 'Escape' || !qi.value) return;
-          qi.value = ''; s360SusiQuery = '';
-          clearTimeout(qTimer); draw(true);
-        });
-      }
-      document.getElementById('s360SusiGotoBtn')?.addEventListener('click', () => {
-        navigateTo('grades');
-        const gf = document.getElementById('gradesFrame');
-        if (gf) gf.src = 'susi.html';
-      });
+        b.classList.toggle('on', parseFloat(b.dataset.r) === RANGE));
+      el.querySelector('#s360SusiCount').innerHTML =
+        countTxt + (hits.length > MAX_SHOW ? ` 중 ${srt ? '' : '가까운 순 '}${MAX_SHOW}건` : '');
+      const bodyEl = el.querySelector('#s360SusiBody');
+      bodyEl.innerHTML = body;
       // 열 제목 클릭: 오름차순 → 내림차순 → 기본(가까운 순) 순환
-      el.querySelectorAll('th[data-f]').forEach(th =>
+      bodyEl.querySelectorAll('th[data-f]').forEach(th =>
         th.addEventListener('click', () => {
           const f = th.dataset.f;
           if (!s360SusiSort || s360SusiSort.f !== f) s360SusiSort = { f, asc: true };
           else if (s360SusiSort.asc) s360SusiSort.asc = false;
           else s360SusiSort = null;
-          draw();
+          paint();
         }));
+    };
+    const draw = () => {
+      el.innerHTML = `
+        <div style="margin-top:14px;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+            <span class="s360-susi-title">🎓 이 내신으로 합격한 선배들</span>
+            ${[0.1, 0.3, 0.5].map(r => `<button class="s360-range-btn" data-r="${r}">±${r}</button>`).join('')}
+            <input class="s360-susi-q" id="s360SusiQ" type="search" placeholder="🔎 대학 · 모집단위 · 전형"
+                   value="${escapeHtml(s360SusiQuery)}" title="공백으로 여러 낱말을 넣으면 모두 포함된 것만 남습니다 (예: 경북 간호)">
+            <button class="s360-susi-goto-btn" id="s360SusiGotoBtn">진로진학 상담에서 전체 조회 →</button>
+            <span class="s360-susi-count" id="s360SusiCount"></span>
+          </div>
+          <div id="s360SusiBody"></div>
+        </div>`;
+      el.querySelectorAll('.s360-range-btn').forEach(b =>
+        b.addEventListener('click', () => { s360SusiRange = parseFloat(b.dataset.r); paint(); }));
+      const qi = el.querySelector('#s360SusiQ');
+      qi.addEventListener('input', () => {
+        s360SusiQuery = qi.value;
+        clearTimeout(qTimer);
+        qTimer = setTimeout(paint, 180);
+      });
+      qi.addEventListener('keydown', e => {
+        if (e.key !== 'Escape' || !qi.value) return;
+        qi.value = ''; s360SusiQuery = '';
+        clearTimeout(qTimer); paint();
+      });
+      el.querySelector('#s360SusiGotoBtn').addEventListener('click', () => {
+        navigateTo('grades');
+        const gf = document.getElementById('gradesFrame');
+        if (gf) gf.src = 'susi.html';
+      });
+      paint();
     };
     draw();
   } catch(e) {

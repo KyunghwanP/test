@@ -306,6 +306,39 @@
         .uni-card:hover .view-more { opacity: 1; transform: translateY(0); }
         .uni-card:hover .view-more .arrow { transform: translateX(4px); }
 
+        /* 목록(자세히) 보기 — 카드 그리드 대신 한 줄 한 학과의 표.
+           display:block 이 위 미디어쿼리의 grid-template-columns를 통째로 무력화한다(#id+.class 우선). */
+        #data-list.list-mode { display: block; }
+        .uni-table-wrap { background: #fff; border: 1px solid var(--slate-100); border-radius: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,.04); overflow: auto; max-height: 72vh; }
+        table.uni-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; white-space: nowrap; }
+        table.uni-table th, table.uni-table td { padding: 9px 12px; border-bottom: 1px solid var(--slate-50); text-align: left; }
+        table.uni-table thead th { position: sticky; top: 0; z-index: 2; background: var(--slate-50); color: var(--slate-400);
+            font-size: 11px; font-weight: 900; letter-spacing: .06em; border-bottom: 1px solid var(--slate-200);
+            cursor: pointer; user-select: none; }
+        table.uni-table thead th:hover { color: var(--indigo); }
+        table.uni-table thead th.on { color: var(--indigo); }
+        table.uni-table thead th .ar { font-size: 9px; margin-left: 3px; opacity: .35; }
+        table.uni-table thead th.on .ar { opacity: 1; }
+        table.uni-table tbody tr { cursor: pointer; }
+        table.uni-table tbody tr:hover td { background: var(--indigo-50); }
+        table.uni-table th.num, table.uni-table td.num { text-align: right; }
+        table.uni-table td.num { font-variant-numeric: tabular-nums; font-family: 'IBM Plex Mono', monospace; font-weight: 800; color: var(--slate-700); }
+        table.uni-table td.uni { font-weight: 900; color: var(--slate-900); }
+        table.uni-table td.uni .cp { font-weight: 700; color: var(--slate-400); font-size: 11px; margin-left: 5px; }
+        table.uni-table td.dept { font-weight: 800; color: var(--slate-800); }
+        table.uni-table td.adm { font-weight: 700; color: var(--indigo-dark); max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+        table.uni-table td.avg { color: var(--indigo); font-weight: 900; }
+        table.uni-table td .dim { color: var(--slate-300); }
+        table.uni-table td .diag-badge { padding: 2px 8px; font-size: 11px; }
+        table.uni-table td .gap-box { margin: 0; justify-content: flex-end; font-size: 12px; }
+        /* 가로 스크롤 시 '무슨 대학 줄인지'를 놓치지 않도록 앞 열을 왼쪽에 고정.
+           left 값은 렌더 후 실제 열 너비로 계산해 넣는다(auto 레이아웃이라 CSS로는 알 수 없음). */
+        table.uni-table th.stick, table.uni-table td.stick { position: sticky; z-index: 1; background: #fff; }
+        table.uni-table thead th.stick { z-index: 3; background: var(--slate-50); }
+        table.uni-table tbody tr:hover td.stick { background: var(--indigo-50); }
+        table.uni-table .stick.edge { box-shadow: 1px 0 0 var(--slate-200); }
+
         /* 상세 모달 */
         #detail-overlay { position: fixed; inset: 0; z-index: 50; background: rgba(15,23,42,.55); backdrop-filter: blur(4px); display: none; align-items: flex-end; justify-content: center; padding: 16px; }
         #detail-overlay.open { display: flex; }
@@ -564,6 +597,10 @@
                         <button class="reset-btn" onclick="resetFilters()">필터 초기화</button>
                     </div>
                     <div class="range-tabs" id="range-tabs"></div>
+                    <div class="range-tabs" id="view-tabs">
+                        <button class="range-tab" id="view-card" onclick="setViewMode('card')" title="카드로 보기">▦ 카드</button>
+                        <button class="range-tab" id="view-list" onclick="setViewMode('list')" title="목록으로 보기 (열 제목 클릭 시 정렬)">☰ 자세히</button>
+                    </div>
                     <div class="found-pill">
                         <span class="k">Departments Found</span>
                         <span class="v" id="result-count">0</span>
@@ -718,6 +755,9 @@
         let currentFiltered = [];              // 현재 필터 결과 (모달·더 보기에서 참조)
         let visibleCount = 150;
         const PAGE_SIZE = 150;
+        // 결과 표시 방식: 'card' 카드 그리드 | 'list' 목록(자세히). 선택은 브라우저에 기억한다.
+        let viewMode = (function(){ try { return localStorage.getItem('jindan-view') === 'list' ? 'list' : 'card'; } catch(e) { return 'card'; } })();
+        let listSort = null;                   // {f, asc} — null이면 카드 보기와 같은 기본 정렬
 
         const VERSIONS = [
             { id: 'gyeonggi', name: '경기 진협 분석 자료', desc: '경기진협 버전' },
@@ -1045,6 +1085,61 @@
             syncModeUI();
             render();
         };
+        // ─── 목록(자세히) 보기 ───
+        const lastYear = rec => rec.years[SURVEY_YEARS[SURVEY_YEARS.length - 1]] || null;   // 최신 학년도(모집·경쟁률 표시용)
+        const yearCut = (rec, y) => { const v = rec.years[y] && rec.years[y].grade70; return (v == null || isNaN(v)) ? null : v; };
+        const lastNum = (rec, k) => { const y = lastYear(rec); const v = y && parseFloat(y[k]); return (v == null || isNaN(v)) ? null : v; };
+        // 열 → 정렬값. 문자열이면 가나다순, 숫자면 크기순, null이면 항상 뒤로 보낸다.
+        const LIST_COLS = [
+            { f: 'diag',  label: '진단',   sort: null, gyogwaOnly: true, stick: true },
+            { f: 'univ',  label: '대학',   sort: r => r.university, stick: true },
+            { f: 'dept',  label: '모집단위', sort: r => r.department },
+            { f: 'adm',   label: '전형명', sort: r => r.admissionName },
+            { f: 'cat',   label: '계열',   sort: r => r.category },
+        ].concat(SURVEY_YEARS.map(y => ({ f: 'y' + y, label: `'${schoolYearShort(y)} 컷`, num: true, sort: r => yearCut(r, y) })))
+         .concat([
+            { f: 'avg',   label: '평균컷', num: true, sort: r => r.averageGrade },
+            { f: 'gap',   label: '내 등급차', num: true, sort: r => r.averageGrade },  // 격차는 평균컷의 단조함수라 같은 순서
+            { f: 'trend', label: '추세',   sort: r => r.trendDelta },
+            { f: 'chung', label: '추합',   num: true, sort: r => r.chungRate },
+            { f: 'quota', label: '모집',   num: true, sort: r => lastNum(r, 'quotaTotal') },
+            { f: 'comp',  label: '경쟁률', num: true, sort: r => lastNum(r, 'competition') },
+        ]);
+        function sortFiltered() {
+            const col = listSort && LIST_COLS.find(c => c.f === listSort.f && c.sort);
+            if (viewMode !== 'list' || !col) {
+                currentFiltered.sort((a, b) => b.averageGrade - a.averageGrade);
+                return;
+            }
+            const dir = listSort.asc ? 1 : -1;
+            currentFiltered.sort((a, b) => {
+                const va = col.sort(a), vb = col.sort(b);
+                const ea = va == null || va === '', eb = vb == null || vb === '';
+                if (ea || eb) return ea && eb ? 0 : (ea ? 1 : -1);   // 값 없는 행은 정렬 방향과 무관하게 아래로
+                return dir * (typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb), 'ko'));
+            });
+        }
+        function setViewMode(v) {
+            if (viewMode === v) return;
+            viewMode = v;
+            try { localStorage.setItem('jindan-view', v); } catch (e) {}
+            syncViewTabs();
+            sortFiltered();                      // 카드로 돌아갈 땐 기본 정렬로 복귀
+            renderList(getTargetGrade());
+        }
+        function syncViewTabs() {
+            document.getElementById('view-card').classList.toggle('active', viewMode === 'card');
+            document.getElementById('view-list').classList.toggle('active', viewMode === 'list');
+        }
+        // 열 제목 클릭: 오름차순 → 내림차순 → 기본순 (더 보기로 펼친 행 수는 유지)
+        function setListSort(f) {
+            if (!listSort || listSort.f !== f) listSort = { f, asc: true };
+            else if (listSort.asc) listSort.asc = false;
+            else listSort = null;
+            sortFiltered();
+            renderList(getTargetGrade());
+        }
+
         function setCategory(cat) { selectedCategory = cat; render(); }
         function setRange(r) { searchRange = r; render(); }
         function toggleKind() { admissionKind = admissionKind === '교과' ? '종합' : '교과'; render(); }
@@ -1144,8 +1239,8 @@
 
             // 결과 목록 (데이터가 1.7만 건이라 일정 개수씩 나눠 렌더링)
             currentFiltered = baseFiltered
-                .filter(r => selectedCategory === '전체' || r.category === selectedCategory)
-                .sort((a, b) => b.averageGrade - a.averageGrade);
+                .filter(r => selectedCategory === '전체' || r.category === selectedCategory);
+            sortFiltered();
             document.getElementById('result-count').textContent = currentFiltered.length.toLocaleString();
 
             // 결과 0건인데 검색어가 있으면 원인별로 안내:
@@ -1189,9 +1284,21 @@
         function renderList(target) {
             const emptyState = document.getElementById('empty-state');
             const list = document.getElementById('data-list');
-            list.querySelectorAll('.uni-card, #load-more-wrap').forEach(el => el.remove());
+            list.querySelectorAll('.uni-card, .uni-table-wrap, #load-more-wrap').forEach(el => el.remove());
+            list.classList.toggle('list-mode', viewMode === 'list');
+            syncViewTabs();
             emptyState.style.display = currentFiltered.length ? 'none' : 'block';
-            list.insertAdjacentHTML('afterbegin', currentFiltered.slice(0, visibleCount).map((r, idx) => {
+            list.insertAdjacentHTML('afterbegin', viewMode === 'list' ? tableHtml(target) : cardsHtml(target));
+            if (viewMode === 'list') placeStickyCols(list);
+            if (currentFiltered.length > visibleCount) {
+                list.insertAdjacentHTML('beforeend', `<div id="load-more-wrap" style="grid-column:1/-1;text-align:center;padding:8px 0;">
+                    <button class="expand-btn" onclick="loadMore()">결과 더 보기 (${(currentFiltered.length - visibleCount).toLocaleString()}건 남음)</button>
+                </div>`);
+            }
+        }
+
+        function cardsHtml(target) {
+            return currentFiltered.slice(0, visibleCount).map((r, idx) => {
                 const gap = gradeGap(r.averageGrade, target);
                 // 종합전형은 성적 외 요소(활동·세특·면접)가 커 성적 기반 진단 라벨을 표시하지 않음
                 const isJonghap = admissionKind === '종합';
@@ -1221,12 +1328,63 @@
                         <p class="view-more">View More <span class="arrow">→</span></p>
                     </div>
                 </div>`;
-            }).join(''));
-            if (currentFiltered.length > visibleCount) {
-                list.insertAdjacentHTML('beforeend', `<div id="load-more-wrap" style="grid-column:1/-1;text-align:center;padding:8px 0;">
-                    <button class="expand-btn" onclick="loadMore()">결과 더 보기 (${(currentFiltered.length - visibleCount).toLocaleString()}건 남음)</button>
-                </div>`);
+            }).join('');
+        }
+
+        // 왼쪽 고정 열의 left 오프셋을 실제 렌더 너비로 채운다.
+        // 표가 auto 레이아웃이라 열 너비가 내용에 따라 달라져 CSS만으로는 지정할 수 없다.
+        function placeStickyCols(list) {
+            const table = list.querySelector('table.uni-table');
+            const head = table && table.tHead && table.tHead.rows[0];
+            if (!head) return;
+            let left = 0, last = -1;
+            for (let i = 0; i < head.cells.length && head.cells[i].classList.contains('stick'); i++) {
+                for (const row of table.rows) { const c = row.cells[i]; if (c) c.style.left = left + 'px'; }
+                left += head.cells[i].offsetWidth;
+                last = i;
             }
+            // 마지막 고정 열에만 경계선을 그어 스크롤 영역과 구분
+            if (last >= 0) for (const row of table.rows) { const c = row.cells[last]; if (c) c.classList.add('edge'); }
+        }
+
+        // 목록(자세히) 보기 — 카드가 담던 정보를 열로 펼치고, 카드엔 없던 모집인원·경쟁률(최신 학년도)까지 붙인다
+        function tableHtml(target) {
+            const isJonghap = admissionKind === '종합';
+            const cols = LIST_COLS.filter(c => !(c.gyogwaOnly && isJonghap));   // 종합전형엔 진단 라벨 없음
+            const ths = cols.map(c => {
+                const on = c.sort && listSort && listSort.f === c.f;
+                const ar = !c.sort ? '' : `<span class="ar">${on ? (listSort.asc ? '▲' : '▼') : '↕'}</span>`;
+                const click = c.sort ? ` onclick="setListSort('${c.f}')"` : ' style="cursor:default;"';
+                return `<th class="${c.num ? 'num' : ''}${c.stick ? ' stick' : ''}${on ? ' on' : ''}"${click}>${c.label}${ar}</th>`;
+            }).join('');
+            const dim = '<span class="dim">–</span>';
+            const trs = currentFiltered.slice(0, visibleCount).map((r, idx) => {
+                const gap = gradeGap(r.averageGrade, target);
+                const d = isJonghap ? null : classify(target, r);
+                const t = gradeTrend(r);
+                const ch = chungInfo(r);
+                const q = lastNum(r, 'quotaTotal'), cp = lastNum(r, 'competition');
+                const cell = {
+                    diag: d ? `<span class="diag-badge ${d.cls}${d.uncertain ? ' uncertain' : ''}">${d.label}</span>` : dim,
+                    univ: `${r.university}<span class="cp">${r.campus}</span>`,
+                    dept: r.department,
+                    adm: r.admissionName,
+                    cat: r.category,
+                    avg: r.averageGrade.toFixed(2),
+                    gap: `<span class="gap-box ${gap.cls}"><span class="arr">${gap.arrow}</span>${gap.text}</span>`,
+                    trend: t ? `<span class="m-${t.dir}" style="font-weight:800;">${t.arrow} ${t.label}</span>` : dim,
+                    chung: ch ? `<span class="m-${ch.lv}">${ch.pct}%</span>` : dim,
+                    quota: q == null ? dim : q.toLocaleString(),
+                    comp: cp == null ? dim : cp.toFixed(2),
+                };
+                SURVEY_YEARS.forEach(y => { const v = yearCut(r, y); cell['y' + y] = v == null ? dim : v.toFixed(2); });
+                const TD_CLS = { univ: 'uni', dept: 'dept', adm: 'adm', avg: 'avg' };
+                return `<tr onclick="openDetail(${idx})">` +
+                    cols.map(c => `<td class="${c.num ? 'num' : ''}${c.stick ? ' stick' : ''} ${TD_CLS[c.f] || ''}">${cell[c.f]}</td>`).join('') +
+                    '</tr>';
+            }).join('');
+            return `<div class="uni-table-wrap"><table class="uni-table">
+                <thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
         }
         function loadMore() { visibleCount += PAGE_SIZE; renderList(getTargetGrade()); }
 
@@ -1543,6 +1701,14 @@
             document.getElementById('guide-overlay').classList.remove('open');
             document.getElementById('guide-frame').src = 'about:blank';   // iframe 메모리 해제
         }
+
+        // 창 크기가 바뀌면 열 너비가 달라져 고정 열의 left가 어긋난다 → 다시 계산
+        let _stickyTimer = null;
+        window.addEventListener('resize', () => {
+            if (viewMode !== 'list') return;
+            clearTimeout(_stickyTimer);
+            _stickyTimer = setTimeout(() => placeStickyCols(document.getElementById('data-list')), 150);
+        });
 
         // ─── 초기화 ───
         window.addEventListener('DOMContentLoaded', async () => {
