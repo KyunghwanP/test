@@ -255,10 +255,20 @@ function mirrorWrite(env, classKey, slots, openAt) {
     updatedAt: new Date().toISOString()
   });
 }
-// 내 예약 찾기 — 학생 이름+번호로 식별(직접 예약분도 잡히도록)
+// 오늘(KST) 날짜 'YYYY-MM-DD'. 워커는 UTC로 도므로 9시간을 더해 계산한다.
+function todayKst() {
+  return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+// 내 예약 찾기 — 학생 이름+번호로 식별(직접 예약분도 잡히도록).
+//   지난 날짜의 예약은 제외한다. 슬롯은 한 문서에 계속 누적되므로, 전체를 훑으면
+//   지난 학기 예약 때문에 다음 상담 주간에 '이미 예약됨'으로 막힌다.
+//   '이미 예약이 있다'는 판단은 앞으로 있을 상담에만 적용되어야 한다.
 function findMine(slots, studentName, studentNum) {
+  const today = todayKst();
   return (Array.isArray(slots) ? slots : []).find(s =>
     s && s.status === 'booked' &&
+    String(s.date || '') >= today &&
     String(s.studentName || '').trim() === String(studentName || '').trim() &&
     String(s.studentNum || '') === String(studentNum || '')
   ) || null;
