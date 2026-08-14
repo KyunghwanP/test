@@ -1444,6 +1444,11 @@
   .s360-susi-goto-btn{border:1px solid var(--mon);background:var(--paper);color:var(--mon);
     font-size:12.5px;font-weight:800;padding:3px 10px;border-radius:20px;cursor:pointer;font-family:'Pretendard','Noto Sans KR';}
   .s360-susi-goto-btn:hover{background:var(--mon);color:var(--paper,#fff);}
+  .s360-susi-q{border:1px solid var(--rule);background:var(--paper);color:var(--ink);
+    font-size:12.5px;font-weight:700;padding:3px 10px;border-radius:20px;width:190px;
+    font-family:'Pretendard','Noto Sans KR';outline:none;}
+  .s360-susi-q:focus{border-color:var(--mon);}
+  .s360-susi-q::placeholder{color:var(--ink-soft);font-weight:600;}
   .s360-back{display:inline-block;background:none;border:0;color:var(--ink-soft);font-weight:700;cursor:pointer;padding:0 0 10px;font-size:14px;font-family:inherit;}
   .s360-back:hover{color:var(--ink);}
   /* 차트 3개: 넓으면 3열, 좁으면 바로 1열 (2열 중간 단계 없음)
@@ -8693,6 +8698,7 @@ async function s360LoadSusi(){
 // 성적→입결 매칭: 이 학생의 내신(9등급제) ±범위에서 수시 최종합격한 졸업생 사례
 let s360SusiRange = 0.3; // 마지막 선택 범위 기억 (학생을 바꿔도 유지)
 let s360SusiSort = null; // {f:필드, asc:true|false} — null이면 기본(내신 가까운 순)
+let s360SusiQuery = ''; // 대학·모집단위·전형 검색어 (학생을 바꿔도 유지)
 async function s360RenderSusiMatch(st){
   const el = document.getElementById('s360SusiMatch');
   if (!el) return;
@@ -8709,16 +8715,25 @@ async function s360RenderSusiMatch(st){
   try {
     const rows = await s360LoadSusi();
     const MAX_SHOW = 150;
-    const draw = () => {
+    // 검색 정규화: 공백 제거 + 소문자 → "경북 대"로도 "경북대"가 잡힘
+    const norm = v => String(v || '').toLowerCase().replace(/\s+/g, '');
+    let qTimer = null;
+    const draw = (refocus) => {
       const RANGE = s360SusiRange;
+      // 검색어는 공백으로 나눠 모두 포함(AND) — "경북 간호"처럼 좁혀 쓸 수 있게
+      const terms = s360SusiQuery.trim().split(/\s+/).map(norm).filter(Boolean);
       // 구간 밖 거리(구간 안이면 0) — 필터와 '가까운 순' 정렬에 함께 사용
       const dist = s => s < gLo ? gLo - s : (s > gHi ? s - gHi : 0);
-      const hits = rows.filter(r => {
+      const inRange = rows.filter(r => {
         const s = parseFloat(r.score);
         if (isNaN(s) || dist(s) > RANGE + 1e-9) return false; // 1e-9: 부동소수점 경계 보정(3.1-2.8=0.30000...4)
         const f = r.final || '';
         return f.includes('합격') && !f.includes('불합격');
       });
+      const hits = terms.length ? inRange.filter(r => {
+        const hay = norm(`${r.univ || ''} ${r.unit || ''} ${r.type || ''} ${r.detail || ''}`);
+        return terms.every(t => hay.includes(t));
+      }) : inRange;
       // 정렬: 기본은 내신 가까운 순, 열 제목 클릭 시 해당 열 오름/내림차순
       const srt = s360SusiSort;
       if (srt) {
@@ -8754,19 +8769,42 @@ async function s360RenderSusiMatch(st){
           <thead><tr>${ths}</tr></thead>
           <tbody>${trs}</tbody>
         </table></div>`
-        : `<div style="font-size:13.5px;color:var(--ink-soft);">해당 범위의 수시 최종합격 사례가 없습니다. 범위를 넓혀보세요.</div>`;
+        : (terms.length
+          ? `<div style="font-size:13.5px;color:var(--ink-soft);">'${escapeHtml(s360SusiQuery.trim())}'와(과) 맞는 합격 사례가 없습니다. 검색어를 지우거나 범위를 넓혀보세요.</div>`
+          : `<div style="font-size:13.5px;color:var(--ink-soft);">해당 범위의 수시 최종합격 사례가 없습니다. 범위를 넓혀보세요.</div>`);
+      // 검색 중이면 '전체 N건 중 M건'으로 걸러진 정도를 함께 보여준다
+      const countTxt = terms.length
+        ? `내신 ${gLabel} ±${RANGE} · '${escapeHtml(s360SusiQuery.trim())}' ${hits.length}건 / 전체 ${inRange.length}건`
+        : `내신 ${gLabel} ±${RANGE} · 수시 최종합격 ${hits.length}건`;
       el.innerHTML = `
         <div style="margin-top:14px;">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
             <span style="font-size:14px;font-weight:800;color:var(--ink);">🎓 이 내신으로 합격한 선배들</span>
             ${chips}
+            <input class="s360-susi-q" id="s360SusiQ" type="search" placeholder="🔎 대학 · 모집단위 · 전형"
+                   value="${escapeHtml(s360SusiQuery)}" title="공백으로 여러 낱말을 넣으면 모두 포함된 것만 남습니다 (예: 경북 간호)">
             <button class="s360-susi-goto-btn" id="s360SusiGotoBtn">진로진학 상담에서 전체 조회 →</button>
-            <span style="font-weight:700;color:var(--ink-soft);font-size:12.5px;">내신 ${gLabel} ±${RANGE} · 수시 최종합격 ${hits.length}건${hits.length > MAX_SHOW ? ` 중 ${srt ? '' : '가까운 순 '}${MAX_SHOW}건` : ''}</span>
+            <span style="font-weight:700;color:var(--ink-soft);font-size:12.5px;">${countTxt}${hits.length > MAX_SHOW ? ` 중 ${srt ? '' : '가까운 순 '}${MAX_SHOW}건` : ''}</span>
           </div>
           ${body}
         </div>`;
       el.querySelectorAll('.s360-range-btn').forEach(b =>
         b.addEventListener('click', () => { s360SusiRange = parseFloat(b.dataset.r); draw(); }));
+      const qi = document.getElementById('s360SusiQ');
+      if (qi) {
+        // draw()가 innerHTML을 통째로 갈아끼우므로 입력 중이던 포커스·커서를 되살린다
+        if (refocus) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); }
+        qi.addEventListener('input', () => {
+          s360SusiQuery = qi.value;
+          clearTimeout(qTimer);
+          qTimer = setTimeout(() => draw(true), 180);
+        });
+        qi.addEventListener('keydown', e => {
+          if (e.key !== 'Escape' || !qi.value) return;
+          qi.value = ''; s360SusiQuery = '';
+          clearTimeout(qTimer); draw(true);
+        });
+      }
       document.getElementById('s360SusiGotoBtn')?.addEventListener('click', () => {
         navigateTo('grades');
         const gf = document.getElementById('gradesFrame');
