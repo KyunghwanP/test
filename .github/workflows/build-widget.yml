@@ -89,6 +89,7 @@ jobs:
           Copy-Item widget/*.ahk       $stage -Force
           Copy-Item widget/WebView2    (Join-Path $stage 'WebView2') -Recurse -Force
           Copy-Item widget/WebView2Loader.dll $stage -Force
+          Copy-Item widget/widget.ico  $stage -Force   # 트레이 전용 아이콘(로고 + 파란 W)
           Remove-Item (Join-Path $stage 'ynhs-widgets.ahk') -ErrorAction SilentlyContinue   # 크롬앱 간편판 제외
           # 서명된 AutoHotkey64.exe를 'YnhsWidget.exe'로 → 같은 이름의 YnhsWidget.ahk를 자동 실행(서명 유지)
           Copy-Item $env:AHK_BASE (Join-Path $stage 'YnhsWidget.exe') -Force

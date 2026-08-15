@@ -1553,6 +1553,15 @@
     display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));
     gap:8px;margin-bottom:16px;
   }
+  /* 반 카드를 학년 단위로 묶어 줄을 나눈다 — '전체'에서 1·2·3학년이 한 줄에 섞이지 않게 */
+  .pts-group-block{margin-bottom:14px;}
+  .pts-group-block:last-child{margin-bottom:2px;}
+  .pts-group-block .pts-group-grid{margin-bottom:0;}
+  .pts-group-label{
+    display:flex;align-items:baseline;gap:8px;margin:0 0 7px 2px;
+    font-family:'Pretendard','Noto Sans KR';font-weight:800;font-size:13.5px;color:var(--ink);
+  }
+  .pts-group-label .cnt{font-weight:700;font-size:12px;color:var(--ink-soft);}
   .pts-group-card{
     background:var(--paper);border-radius:10px;padding:12px 8px;
     text-align:center;cursor:pointer;border:1.5px solid var(--rule);
@@ -4435,7 +4444,7 @@
 
               <!-- 반 그룹 카드 -->
               <div id="ptsGroupSection">
-                <div class="pts-group-grid" id="ptsGroupGrid"></div>
+                <div id="ptsGroupGrid"></div>
               </div>
 
               <!-- 학생 목록 -->
@@ -5190,7 +5199,7 @@ if(IS_NEUTRALINO){ try { Neutralino.init(); } catch(e){ console.warn('Neutralino
 // 데스크톱 로컬 번들엔 무거운 자산(업무자료 PDF·적정대학진단 csv)을 넣지 않는다.
 // 그 iframe 기능들은 github.io 배포본에서 불러온다(iframe 교차출처 로드는 허용, 내부는 같은 출처).
 // 웹(브라우저)에선 빈 문자열 → 기존처럼 상대경로.
-const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.github.io/ynhs/' : '';
+const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.github.io/test/' : '';
 // 진단: 버전 라벨에 출처·NL전역·브릿지 상태 표시 (로컬번들/원격/브릿지 여부를 한 번에 확인)
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
@@ -5316,7 +5325,7 @@ function showAppNotify(title, body, opts){
 
 // ── 새 상담 예약 감시 (앱 켜져 있는 동안 상시) ──
 let consultNotifyUnsub = null;
-let consultNotifySeen = null;   // 이미 본 예약 slotId 집합 (null=첫 로드 전)
+let consultNotifySeen = null;   // Map(slotId → {who,when}) — 취소 알림 문구용 (null=첫 로드 전)
 function startConsultNotifyWatch(user){
   // 담임 학급 결정 (관리자 테스트는 1-1)
   let classKey = getMyHomeroom ? getMyHomeroom() : null;
@@ -5329,51 +5338,161 @@ function startConsultNotifyWatch(user){
     const data  = snap.exists() ? (snap.data()||{}) : {};
     const slots = Array.isArray(data.slots) ? data.slots : [];
     const booked = slots.filter(s => s.status === 'booked');
+    // 알림 문구용 요약 — 예약이 사라진 뒤에도 "누구·언제"를 말해줄 수 있어야 해서 함께 보관한다
+    const brief = s => ({
+      who : s.studentName || s.bookedName || '학부모',
+      when: `${(s.date||'').slice(5).replace('-','/')} ${s.time||''}`.trim()
+    });
 
     if(consultNotifySeen === null){
       // 첫 로드: 기준선만 기록, 알림 안 띄움
-      consultNotifySeen = new Set(booked.map(s => s.id));
+      consultNotifySeen = new Map(booked.map(s => [s.id, brief(s)]));
       return;
     }
     // 새로 예약된 것만 알림
     booked.forEach(s => {
       if(!consultNotifySeen.has(s.id)){
-        consultNotifySeen.add(s.id);
-        const who = s.studentName || s.bookedName || '학부모';
-        const when = `${s.date.slice(5).replace('-','/')} ${s.time}`;
-        showAppNotify('새 상담 예약', `${who} · ${when}`, { type:'cal', id:'consult:'+s.id });
+        const b = brief(s);
+        consultNotifySeen.set(s.id, b);
+        showAppNotify('새 상담 예약', `${b.who} · ${b.when}`, { type:'cal', id:'consult:'+s.id, goto:'consult' });
       }
     });
-    // 취소된 것 정리
-    const cur = new Set(booked.map(s => s.id));
-    consultNotifySeen.forEach(id => { if(!cur.has(id)) consultNotifySeen.delete(id); });
+    // 예약이 풀린 것 → 취소 알림.
+    // 단 '칸 자체가 사라진 경우'는 담임이 직접 시간을 닫은 것이므로 알리지 않는다
+    // (학부모 취소는 칸이 남고 status만 booked→open 으로 바뀐다).
+    const cur      = new Set(booked.map(s => s.id));
+    const slotIds  = new Set(slots.map(s => s.id));
+    [...consultNotifySeen.keys()].forEach(id => {
+      if(cur.has(id)) return;
+      const b = consultNotifySeen.get(id);
+      consultNotifySeen.delete(id);
+      if(!slotIds.has(id)) return;
+      showAppNotify('상담 예약 취소', `${b.who} · ${b.when}`, { type:'deadline', id:'consultOff:'+id, goto:'consult' });
+    });
     // 홈 현황판 상담 섹션 실시간 갱신 (예약·삭제 즉시 반영)
     loadHomeConsult(slots);
   }, err => { /* 구독 실패 무시 */ });
 }
 
 // ── 공유받은 업무 일정 감시 ──
+// 새 공유뿐 아니라 '댓글'과 '각자 완료' 진행도 알린다. docChanges는 바뀐 뒤 문서만 주므로
+// 직전 상태(댓글 수·완료자 목록)를 따로 들고 있다가 늘어난 만큼만 알림을 띄운다.
 let taskNotifyUnsubs = [];
+let taskNotifyState  = new Map();   // 'ownerUid/docId' → {c: 댓글수, dIds: [완료자 id]}
 function startTaskNotifyWatch(user){
   taskNotifyUnsubs.forEach(u => { try{u();}catch(e){} });
   taskNotifyUnsubs = [];
+  taskNotifyState.clear();
 
-  const myIds = [user.email, user.displayName].filter(Boolean);
-  TEACHERS.forEach(t => {
-    if(!t.uid || t.uid === user.uid) return;
-    let firstSnap = true;  // 이 교사 일정의 첫 스냅샷은 기준선
-    const unsub = onSnapshot(collection(fbDb, 'tasks', t.uid, 'items'), snap => {
-      if(firstSnap){ firstSnap = false; return; }  // 기존 항목은 알림 안 띄움
+  // sharedWith·doneBy 에는 이메일이 들어갈 수도 이름이 들어갈 수도 있다 → 셋 다 내 식별자로 본다
+  const myIds = [user.email, user.displayName,
+                 TEACHERS.find(x => x.email === user.email)?.name].filter(Boolean);
+  // 감시 대상 = 다른 교사들의 일정(내가 공유받은 것) + 내 일정(내가 만들어 남에게 공유한 것).
+  // 내 컬렉션도 봐야 '각자 완료'가 작성자에게 전달된다.
+  const targets = TEACHERS.filter(t => t.uid && t.uid !== user.uid).map(t => t.uid);
+  targets.push(user.uid);
+
+  targets.forEach(ownerUid => {
+    const isMine = (ownerUid === user.uid);
+    let firstSnap = true;  // 이 컬렉션의 첫 스냅샷은 기준선
+    const unsub = onSnapshot(collection(fbDb, 'tasks', ownerUid, 'items'), snap => {
+      const baseline = firstSnap; firstSnap = false;
       snap.docChanges().forEach(ch => {
-        if(ch.type !== 'added') return;
         const d = ch.doc.data();
-        const sharedToMe = (d.sharedWith || []).some(s => myIds.includes(s));
-        if(!sharedToMe) return;
-        showAppNotify('공유된 업무 일정', d.title || '새 일정이 공유되었습니다', { type:'memo', id:'task:'+ch.doc.id });
+        // 내 일정이면 '남에게 공유한 것'만, 남의 일정이면 '나에게 공유된 것'만 본다
+        const relevant = isMine
+          ? (d.sharedWith || []).length > 0
+          : (d.sharedWith || []).some(s => myIds.includes(s));
+        if(!relevant) return;
+
+        const key   = ownerUid + '/' + ch.doc.id;
+        const cs    = d.comments || [];
+        const dIds  = (d.doneBy || []).map(x => x.id || x.name || '');
+        const prev  = taskNotifyState.get(key);
+        taskNotifyState.set(key, { c: cs.length, dIds });
+        if(baseline) return;                       // 첫 스냅샷은 기준선만 잡고 조용히 지나감
+
+        if(ch.type === 'added'){
+          if(isMine) return;                       // 내가 방금 만든 일정은 알릴 필요 없음
+          showAppNotify('공유된 업무 일정', d.title || '새 일정이 공유되었습니다',
+            { type:'memo', id:'task:'+ch.doc.id, goto:'mytask' });
+          return;
+        }
+        if(ch.type !== 'modified' || !prev) return;
+
+        // 새 댓글 — 내가 쓴 건 제외.
+        // 각자 완료 일정이면 '내 몫을 아직 안 끝낸 사람'에게만 보낸다
+        // (이미 자기 몫을 끝냈으면 이후 논의는 알림까지 받을 일이 아니다)
+        if(cs.length > prev.c){
+          const last     = cs[cs.length - 1] || {};
+          const iAmDone  = d.perDone && dIds.some(x => myIds.includes(x));
+          if(last.email !== user.email && !iAmDone){
+            showAppNotify(`💬 ${last.name || '새 댓글'}`,
+              `${d.title || '업무 일정'} — ${last.text || ''}`,
+              { type:'memo', id:'taskC:'+ch.doc.id+':'+cs.length, goto:'mytask' });
+          }
+        }
+        // 각자 완료 진행 — 진행 상황이 궁금한 건 '작성자'이므로 내 일정일 때만 알린다.
+        // (공유받은 사람끼리 서로의 완료를 통보받으면 알림만 시끄러워진다)
+        if(d.perDone && isMine){
+          const added = dIds.filter(x => x && !prev.dIds.includes(x));
+          if(added.length && !added.every(x => x === user.email)){
+            const total = (d.sharedWith || []).length + 1;   // 작성자 포함
+            const who   = (d.doneBy || []).find(x => (x.id || x.name) === added[0]);
+            const name  = who ? (who.name || (TEACHERS.find(t => t.email === who.id)?.name) || '') : '';
+            showAppNotify('각자 완료 진행',
+              `${d.title || '업무 일정'} — ${name ? name + ' 완료 · ' : ''}${dIds.length}/${total}`,
+              { type:'bell', id:'taskD:'+ch.doc.id+':'+dIds.length, goto:'mytask' });
+          }
+        }
       });
     }, err => {});
     taskNotifyUnsubs.push(unsub);
   });
+}
+
+// ── 다음 수업 5분 전 알림 ──
+// 오늘 내 시간표(요일 대체·보강 반영)를 1분마다 보고, 시작 5분 전이면 한 번만 알린다.
+// 시간표는 이미 메모리에 있어 서버 왕복이 없다.
+let nextClassNotifyTimer = null;
+let nextClassNotified    = new Set();   // 'YYYY-MM-DD:교시' — 하루에 교시당 한 번만
+function startNextClassNotifyWatch(){
+  if(nextClassNotifyTimer) clearInterval(nextClassNotifyTimer);
+  const tick = () => {
+    try{
+      const me = effTeacher();
+      if(!me || !me.schedule) return;
+      const now = new Date();
+      const wd  = ['일','월','화','수','목','금','토'][now.getDay()];
+      if(wd === '토' || wd === '일') return;
+
+      const nowMin = now.getHours()*60 + now.getMinutes();
+      const iso    = ttISO(now);
+      const op     = ttOpForDate(iso);
+      const pulled = op ? (ttTeacherDay(op, wd)[me.name] || null) : null;   // 다른 요일에서 당겨온 수업
+
+      if(nextClassNotified.size > 100) nextClassNotified.clear();           // 장기 실행 시 누적 방지
+
+      BELL_SCHEDULE.forEach(b => {
+        if(b.period === 'lunch') return;
+        const lead = toMinutes(b.start) - nowMin;
+        if(lead < 4 || lead > 6) return;               // 시작 5분 전 (틱 지연 대비 ±1분)
+        const key = iso + ':' + b.period;
+        if(nextClassNotified.has(key)) return;
+
+        const base = (me.schedule[wd] || []).find(x => x.period === b.period) || null;
+        const slot = op ? ttMaskTeacherSlot(op, base, pulled && pulled[b.period], wd, b.period) : base;
+        if(!slot || !slot.subject) return;             // 그 교시에 수업이 없으면 조용히
+
+        nextClassNotified.add(key);
+        showAppNotify(`${b.period}교시 수업 5분 전`,
+          `${slot.subject}${slot.class ? ' · ' + slot.class : ''} (${b.start} 시작)`,
+          { type:'cal', id:'class:'+key, goto:'timetable' });
+      });
+    }catch(e){ /* 시간표 미로딩 등은 조용히 무시 */ }
+  };
+  tick();
+  nextClassNotifyTimer = setInterval(tick, 60000);
 }
 
 
@@ -7257,7 +7376,9 @@ onAuthStateChanged(fbAuth, async (user) => {
       if (adminBtn)  adminBtn.style.display  = 'block';
       if (adminBtnD) adminBtnD.style.display = 'block';
       // 관리자 페이지(admin.html)는 사이드바에 노출하지 않음 — 주소 직접 입력으로만 접근
-      // 특별실 예약 탭: 시범 운영 동안 관리자만 노출
+    }
+    // 특별실 예약 탭: 전체 교사에게 공개(시범 운영 종료)
+    {
       const navRoom = document.getElementById('navRoom');
       const tabRoom = document.getElementById('tabRoom');
       if (navRoom) navRoom.style.display = '';
@@ -7305,6 +7426,7 @@ onAuthStateChanged(fbAuth, async (user) => {
       initNotify();
       startConsultNotifyWatch(user);
       startTaskNotifyWatch(user);
+      startNextClassNotifyWatch();
     }
   }catch(e){
     // 타임아웃이나 네트워크 오류 시에도 앱은 일단 진행
@@ -12875,18 +12997,30 @@ function renderPtsGroups() {
     const [bg, br] = b.split('-').map(Number);
     return ag !== bg ? ag - bg : ar - br;
   });
-  grid.innerHTML = rooms.map(key => {
-    const [g, r] = key.split('-');
-    const cnt = filtered.filter(s => String(s.grade)===g && String(s.room)===r).length;
-    return `<div class="pts-group-card ${ptsViewRoom===key?'active':''}" onclick="selectPtsRoom('${key}')">
-      <div class="pts-group-card-name">${g}학년 ${r}반</div>
-      <div class="pts-group-card-count">${cnt}명</div>
-    </div>`;
-  }).join('');
 
   if (rooms.length === 0) {
     grid.innerHTML = '<div class="pts-view-empty">데이터가 없습니다.</div>';
+    return;
   }
+
+  // 학년 단위로 묶어 줄을 나눈다 — '전체'에서 1·2·3학년 반이 한 줄에 이어 붙지 않게.
+  // 학년은 머리글에 한 번만 적고 카드에는 반만 남긴다.
+  const grades = [...new Set(rooms.map(k => k.split('-')[0]))];
+  grid.innerHTML = grades.map(g => {
+    const cards = rooms.filter(k => k.split('-')[0] === g).map(key => {
+      const r = key.split('-')[1];
+      const cnt = filtered.filter(s => String(s.grade)===g && String(s.room)===r).length;
+      return `<div class="pts-group-card ${ptsViewRoom===key?'active':''}" onclick="selectPtsRoom('${key}')">
+        <div class="pts-group-card-name">${r}반</div>
+        <div class="pts-group-card-count">${cnt}명</div>
+      </div>`;
+    }).join('');
+    const total = filtered.filter(s => String(s.grade) === g).length;
+    return `<div class="pts-group-block">
+      <div class="pts-group-label">${g}학년<span class="cnt">${total}명</span></div>
+      <div class="pts-group-grid">${cards}</div>
+    </div>`;
+  }).join('');
 }
 
 let ptsSortKey  = null;

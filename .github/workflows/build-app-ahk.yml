@@ -1,0 +1,146 @@
+name: 통합앱 exe 빌드/배포(AHK)
+
+# app/ 의 AHK 통합앱이 바뀌면 Windows 러너에서 포터블 패키지를 만들어
+# 'app-latest' 릴리스에 올린다. (서명된 정품 AutoHotkey로 구동 → 백신 오탐 위험 낮음)
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/ynhs-app.ahk'
+      - 'app/ynhs-app-launcher.ahk'
+      - 'app/설치.ahk'
+      - 'app/제거.ahk'
+      - 'widget/ynhs-widget.ahk'
+      - 'widget/ynhs-launcher.ahk'
+      - '.github/workflows/build-app-ahk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-app-ahk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: AutoHotkey v2 준비(서명된 정품 — GitHub 릴리스)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $headers = @{ 'User-Agent' = 'gh-actions'; 'Authorization' = "Bearer $env:GH_TOKEN" }
+          $ahkRel = Invoke-RestMethod -Headers $headers 'https://api.github.com/repos/AutoHotkey/AutoHotkey/releases/latest'
+          $ahkZip = ($ahkRel.assets | Where-Object { $_.name -match '^AutoHotkey_.*\.zip$' -and $_.name -notmatch 'src|setup' } | Select-Object -First 1).browser_download_url
+          if (-not $ahkZip) { throw 'AutoHotkey zip 자산을 찾지 못함' }
+          Invoke-WebRequest -Headers $headers -Uri $ahkZip -OutFile ahk.zip
+          Expand-Archive ahk.zip -DestinationPath tools/ahk -Force
+          $base = (Get-ChildItem tools/ahk -Recurse -Filter AutoHotkey64.exe | Select-Object -First 1).FullName
+          if (-not $base) { throw 'AutoHotkey64.exe 없음' }
+          "AHK_BASE=$base" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: WebView2 라이브러리(thqby/ahk2_lib) 준비
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git clone --depth 1 https://github.com/thqby/ahk2_lib.git lib
+
+      - name: WebView2Loader.dll 준비(NuGet, 64bit)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Invoke-WebRequest -Uri 'https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2' -OutFile wv2.zip
+          Expand-Archive wv2.zip -DestinationPath wv2 -Force
+
+      - name: 문법 검증(AutoHotkey /validate)
+        shell: pwsh
+        timeout-minutes: 2
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # 검증하려면 #Include 대상(WebView2 라이브러리)이 스크립트 옆에 있어야 함
+          Copy-Item lib/*.ahk app/ -Force
+          Copy-Item lib/WebView2 app/WebView2 -Recurse -Force
+          Copy-Item wv2/runtimes/win-x64/native/WebView2Loader.dll app/WebView2Loader.dll -Force
+          $p = Start-Process -FilePath $env:AHK_BASE -Wait -PassThru -NoNewWindow -ArgumentList @(
+            '/ErrorStdOut', '/validate', (Resolve-Path app/ynhs-app.ahk).Path)
+          if ($p.ExitCode -ne 0) { throw "통합앱 스크립트 문법 오류 (exit $($p.ExitCode))" }
+          $p2 = Start-Process -FilePath $env:AHK_BASE -Wait -PassThru -NoNewWindow -ArgumentList @(
+            '/ErrorStdOut', '/validate', (Resolve-Path app/ynhs-app-launcher.ahk).Path)
+          if ($p2.ExitCode -ne 0) { throw "런처 스크립트 문법 오류 (exit $($p2.ExitCode))" }
+          $p3 = Start-Process -FilePath $env:AHK_BASE -Wait -PassThru -NoNewWindow -ArgumentList @(
+            '/ErrorStdOut', '/validate', (Resolve-Path 'app/제거.ahk').Path)
+          if ($p3.ExitCode -ne 0) { throw "제거기 스크립트 문법 오류 (exit $($p3.ExitCode))" }
+          $p4 = Start-Process -FilePath $env:AHK_BASE -Wait -PassThru -NoNewWindow -ArgumentList @(
+            '/ErrorStdOut', '/validate', (Resolve-Path 'app/설치.ahk').Path)
+          if ($p4.ExitCode -ne 0) { throw "설치기 스크립트 문법 오류 (exit $($p4.ExitCode))" }
+
+      - name: 포터블 패키지 조립(서명된 AutoHotkey + 스크립트 + 라이브러리)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = Join-Path $PWD 'YnhsApp'
+          # 안쪽 폴더 이름은 사용자가 '열어볼 필요 없다'고 바로 알 수 있게 영문으로 지음(예전엔 '영남고'라 앱인 줄 오해).
+          $inner = Join-Path $stage 'App Files'
+          New-Item -ItemType Directory -Force -Path $inner | Out-Null
+
+          # ── 안쪽 프로그램 파일 폴더: 실제 앱 파일 일체 ──
+          Copy-Item lib/*.ahk       $inner -Force
+          Copy-Item lib/WebView2    (Join-Path $inner 'WebView2') -Recurse -Force
+          Copy-Item wv2/runtimes/win-x64/native/WebView2Loader.dll $inner -Force
+          Copy-Item app/icon.ico    $inner -Force
+          Copy-Item widget/widget.ico $inner -Force   # 위젯 트레이 전용 아이콘(W 배지)
+          # 오프라인 폴백용 앱 스크립트(런처가 실행 때마다 최신본으로 덮어씀)
+          Copy-Item app/ynhs-app.ahk (Join-Path $inner 'ynhs-app.ahk') -Force
+          # 서명된 AutoHotkey64.exe를 '영남고.exe'로 → 같은 이름의 '영남고.ahk'(=런처)를 자동 실행(서명 유지)
+          Copy-Item $env:AHK_BASE (Join-Path $inner '영남고.exe') -Force
+          Copy-Item app/ynhs-app-launcher.ahk (Join-Path $inner '영남고.ahk') -Force
+          # 제거기: 서명된 AutoHotkey를 '제거.exe'로 → 같은 이름의 '제거.ahk' 실행
+          Copy-Item $env:AHK_BASE (Join-Path $inner '제거.exe') -Force
+          Copy-Item 'app/제거.ahk' (Join-Path $inner '제거.ahk') -Force
+          # 바탕화면 위젯(풀 기능) — 위젯.exe(서명 AHK)가 위젯.ahk(런처)를 실행,
+          #   런처가 실행 때마다 최신 ynhs-widget.ahk를 받아 실행(자동 업데이트). WebView2는 위 폴더 공유.
+          Copy-Item $env:AHK_BASE (Join-Path $inner '위젯.exe') -Force
+          Copy-Item widget/ynhs-launcher.ahk (Join-Path $inner '위젯.ahk') -Force
+          Copy-Item widget/ynhs-widget.ahk   (Join-Path $inner 'ynhs-widget.ahk') -Force
+          @"
+          이 폴더는 열어보지 않으셔도 됩니다. '영남고 통합앱'의 프로그램 파일이 들어있어요.
+          → 설치는 이 폴더 밖(위)에 있는 '설치.exe' 를 실행하세요.
+          (여기 파일은 지우지 마세요. 제거는 설치 후 시작 메뉴의 '영남고 제거'.)
+          "@ | Out-File -FilePath (Join-Path $inner '읽어주세요.txt') -Encoding utf8
+
+          # ── 맨 위: 설치.exe + (숨김)설치.ahk 만 보이게 ──
+          Copy-Item $env:AHK_BASE (Join-Path $stage '설치.exe') -Force
+          Copy-Item 'app/설치.ahk' (Join-Path $stage '설치.ahk') -Force
+          # 설치.ahk 는 설치.exe 의 짝(스크립트)이라 옆에 있어야 하지만, 보기엔 지저분하니 숨김 처리
+          attrib +h (Join-Path $stage '설치.ahk')
+
+          # ── zip (숨김 파일도 포함되도록 ZipFile 사용 — Compress-Archive 는 숨김 파일을 빠뜨림) ──
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = Join-Path $PWD 'YnhsApp-portable.zip'
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          [System.IO.Compression.ZipFile]::CreateFromDirectory($stage, $zip)
+          Write-Host '=== zip 최상위 구성 ==='
+          Get-ChildItem $stage -Force | ForEach-Object { Write-Host $_.Name }
+
+      - name: 릴리스 배포(app-latest 롤링 태그)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-latest
+          name: 영남고 통합앱 (최신)
+          body: |
+            영남고 통합앱 — 포털을 전체 창으로 띄우는 AutoHotkey + WebView2 앱.
+
+            · YnhsApp-portable.zip 받아 압축을 풀고 **설치.exe** 를 실행하세요.
+              (안쪽 'App Files' 폴더는 열지 않아도 됩니다.)
+              - 설치하면 바탕화면·시작메뉴에 '영남고' 바로가기가 생기고 부팅 시 자동 실행됩니다.
+              - 실제 실행 파일은 '서명된 정품 AutoHotkey'라 백신 평판 경고가 거의 없습니다.
+              - 링크는 기본 브라우저로 열리고, 닫기(X)는 트레이로 숨겨 상주합니다.
+          files: |
+            YnhsApp-portable.zip

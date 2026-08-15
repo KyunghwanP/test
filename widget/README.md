@@ -107,7 +107,7 @@ https://kyunghwanp.github.io/test/?widget=weather     (날씨)
 ```
 
 사용법:
-1. 릴리스에서 **`YnhsWidget-portable.zip`** 받기 → https://github.com/KyunghwanP/test/releases/tag/widget-latest
+1. 릴리스에서 **`YnhsWidget-portable.zip`** 받기 → https://github.com/KyunghwanP/ynhs/releases/tag/widget-latest
 2. 압축을 풀고, 폴더 안 **`YnhsWidget.exe`** 더블클릭 → 위젯이 뜸(최초 1회 구글 로그인).
 3. 부팅 시 자동 실행: `Win+R` → `shell:startup` → `YnhsWidget.exe`의 **바로가기** 넣기.
 

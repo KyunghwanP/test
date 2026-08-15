@@ -8,6 +8,7 @@ wry = "0.35"
 tao = { version = "0.24", features = ["rwh_05"] }
 webbrowser = "0.8"
 image = { version = "0.24", default-features = false, features = ["png"] }
+tray-icon = "0.14"
 
 [build-dependencies]
 winresource = "0.1"
