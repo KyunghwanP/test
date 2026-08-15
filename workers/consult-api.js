@@ -553,8 +553,12 @@ function corsHeaders(env, origin) {
     'Vary': 'Origin'
   };
 }
+// 오류 응답은 절대 캐시되면 안 된다. 405·404 등은 규격상 브라우저가 임의로 캐시해도 되는
+// 상태 코드라, no-store가 없으면 배포를 고친 뒤에도 옛 오류가 계속 나온다.
+// (사진 본문만 따로 max-age를 준다 — handlePhotoGet 참고)
 const json = (obj, status, headers) => new Response(JSON.stringify(obj), {
-  status, headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers }
+  status, headers: { 'Content-Type': 'application/json; charset=utf-8',
+                     'Cache-Control': 'no-store', ...headers }
 });
 
 export default {
