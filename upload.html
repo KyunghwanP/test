@@ -1947,7 +1947,7 @@ async function phProcess(file) {
         else if (cands.length > 1 && rz.num != null) matched = cands.find(s => parseInt(s.num) === rz.num) || null;
       }
       phItems.push({ dataUrl, large: pic.large, name: rz.name, num: rz.num, matched: matched ? { grade: matched.grade, room: matched.room, num: matched.num, name: matched.name } : null });
-      if ((++done % 40) === 0) setS(`압축·매칭 중… ${done}/${results.length}`);
+      if ((++done % 10) === 0) setS(`압축·매칭 중… ${done}/${results.length}`);
     }
     phRenderPreview();
   } catch(e) {
@@ -2017,7 +2017,7 @@ async function phUpload() {
     // Firestore 저장이 끝난 뒤에 시도한다. 여기서 실패해도 위의 작은 사진은 이미
     // 들어가 있으므로 화면은 정상이다 → 실패를 '경고'로만 알린다.
     const bigs = phItems.filter(x => x.matched && x.large);
-    let okBig = 0, failBig = 0;
+    let okBig = 0, failBig = 0, bigErr = '';
     if (bigs.length && PHOTO_WORKER) {
       const idToken = await auth.currentUser.getIdToken();
       for (let i = 0; i < bigs.length; i++) {
@@ -2030,12 +2030,22 @@ async function phUpload() {
               g: x.matched.grade, r: x.matched.room, n: x.matched.num, dataUrl: x.large })
           });
           const j = await r.json().catch(() => ({}));
-          j && j.success ? okBig++ : failBig++;
-        } catch(e){ failBig++; }
+          if (j && j.success) okBig++;
+          else {
+            failBig++;
+            // 왜 실패했는지 남긴다. 이유 없이 '실패'만 뜨면 원인을 찾을 수가 없다.
+            if (!bigErr) bigErr = `${r.status} ${(j && j.error) || '응답 없음'}`;
+            if (failBig <= 3) console.warn('photoPut 실패', r.status, j, x.matched);
+          }
+        } catch(e){
+          failBig++;
+          if (!bigErr) bigErr = '연결 실패: ' + (e && e.message || e);
+          if (failBig <= 3) console.warn('photoPut 예외', e, x.matched);
+        }
       }
     }
     const bigMsg = !bigs.length || !PHOTO_WORKER ? ''
-      : (failBig ? `\n🖼 고화질 ${okBig}장 저장 · ${failBig}장 실패(작은 사진은 정상)`
+      : (failBig ? `\n🖼 고화질 ${okBig}장 저장 · ${failBig}장 실패 — ${bigErr} (작은 사진은 정상)`
                  : `\n🖼 고화질 ${okBig}장 저장`);
     setStatus('phStatus', `✅ 사진 저장 완료! (${keys.length}개 반)${bigMsg}\n학생 종합검색 상세 화면에서 확인하세요.`, 'ok');
   } catch(e) {
