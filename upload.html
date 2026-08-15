@@ -2020,9 +2020,11 @@ async function phUpload() {
     let okBig = 0, failBig = 0, bigErr = '';
     if (bigs.length && PHOTO_WORKER) {
       const idToken = await auth.currentUser.getIdToken();
-      for (let i = 0; i < bigs.length; i++) {
-        const x = bigs[i];
-        if (i % 10 === 0) setStatus('phStatus', `🖼 고화질 저장 중… ${i}/${bigs.length}`, 'loading');
+      // 한 장씩 순서대로 보내면 왕복 수백 번이 그대로 시간이 된다 → 몇 장씩 동시에.
+      // 너무 늘리면 브라우저가 큐를 잡고 워커도 몰려 오히려 느려진다(6이 무난).
+      const LANES = 6;
+      let next = 0, done = 0;
+      const putOne = async (x) => {
         try {
           const r = await fetch(PHOTO_WORKER, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2042,7 +2044,11 @@ async function phUpload() {
           if (!bigErr) bigErr = '연결 실패: ' + (e && e.message || e);
           if (failBig <= 3) console.warn('photoPut 예외', e, x.matched);
         }
-      }
+        if ((++done % 10) === 0 || done === bigs.length)
+          setStatus('phStatus', `🖼 고화질 저장 중… ${done}/${bigs.length}`, 'loading');
+      };
+      const lane = async () => { while (next < bigs.length) await putOne(bigs[next++]); };
+      await Promise.all(Array.from({ length: Math.min(LANES, bigs.length) }, lane));
     }
     const bigMsg = !bigs.length || !PHOTO_WORKER ? ''
       : (failBig ? `\n🖼 고화질 ${okBig}장 저장 · ${failBig}장 실패 — ${bigErr} (작은 사진은 정상)`

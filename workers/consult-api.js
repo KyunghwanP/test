@@ -481,9 +481,17 @@ function photoKey(g, r, n) {
   return `photos/${gg}-${rr}/${nn}.jpg`;
 }
 
+// 토큰 검증 결과를 잠깐 재사용한다. 사진명렬 업로드는 수백 장을 연달아 올리는데,
+// 장마다 Identity Toolkit 왕복이 붙으면 그것만으로 몇 분이 걸린다.
+// 토큰 문자열 자체를 키로 쓰고 수명을 짧게 둔다(성공만 캐시, 실패는 매번 다시 확인).
+const _teacherCache = new Map();   // idToken → { who, exp }
+const TEACHER_TTL = 120;           // 초
+
 // 교사 Firebase ID 토큰 검증 → { email, admin } / 실패면 null
 async function verifyTeacher(env, idToken) {
   if (!idToken || !env.FIREBASE_API_KEY) return null;
+  const hit = _teacherCache.get(idToken);
+  if (hit && hit.exp > nowSec()) return hit.who;
   const res = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${env.FIREBASE_API_KEY}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -493,7 +501,10 @@ async function verifyTeacher(env, idToken) {
   const email = String(u && u.email || '').toLowerCase();
   if (!u || !u.emailVerified || !email.endsWith('@yeungnam.hs.kr')) return null;
   if (/^[0-9]{7}@yeungnam\.hs\.kr$/.test(email)) return null;    // 학생 계정 제외
-  return { email, admin: email === String(env.ADMIN_EMAIL || ADMIN_EMAIL).toLowerCase() };
+  const who = { email, admin: email === String(env.ADMIN_EMAIL || ADMIN_EMAIL).toLowerCase() };
+  if (_teacherCache.size > 200) _teacherCache.clear();          // 무한정 쌓이지 않게
+  _teacherCache.set(idToken, { who, exp: nowSec() + TEACHER_TTL });
+  return who;
 }
 
 // 사진 내려주기 — GET /photo?g=&r=&n= + Authorization: Bearer <idToken>
