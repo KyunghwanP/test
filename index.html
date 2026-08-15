@@ -1553,6 +1553,15 @@
     display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));
     gap:8px;margin-bottom:16px;
   }
+  /* 반 카드를 학년 단위로 묶어 줄을 나눈다 — '전체'에서 1·2·3학년이 한 줄에 섞이지 않게 */
+  .pts-group-block{margin-bottom:14px;}
+  .pts-group-block:last-child{margin-bottom:2px;}
+  .pts-group-block .pts-group-grid{margin-bottom:0;}
+  .pts-group-label{
+    display:flex;align-items:baseline;gap:8px;margin:0 0 7px 2px;
+    font-family:'Pretendard','Noto Sans KR';font-weight:800;font-size:13.5px;color:var(--ink);
+  }
+  .pts-group-label .cnt{font-weight:700;font-size:12px;color:var(--ink-soft);}
   .pts-group-card{
     background:var(--paper);border-radius:10px;padding:12px 8px;
     text-align:center;cursor:pointer;border:1.5px solid var(--rule);
@@ -4435,7 +4444,7 @@
 
               <!-- 반 그룹 카드 -->
               <div id="ptsGroupSection">
-                <div class="pts-group-grid" id="ptsGroupGrid"></div>
+                <div id="ptsGroupGrid"></div>
               </div>
 
               <!-- 학생 목록 -->
@@ -12875,18 +12884,30 @@ function renderPtsGroups() {
     const [bg, br] = b.split('-').map(Number);
     return ag !== bg ? ag - bg : ar - br;
   });
-  grid.innerHTML = rooms.map(key => {
-    const [g, r] = key.split('-');
-    const cnt = filtered.filter(s => String(s.grade)===g && String(s.room)===r).length;
-    return `<div class="pts-group-card ${ptsViewRoom===key?'active':''}" onclick="selectPtsRoom('${key}')">
-      <div class="pts-group-card-name">${g}학년 ${r}반</div>
-      <div class="pts-group-card-count">${cnt}명</div>
-    </div>`;
-  }).join('');
 
   if (rooms.length === 0) {
     grid.innerHTML = '<div class="pts-view-empty">데이터가 없습니다.</div>';
+    return;
   }
+
+  // 학년 단위로 묶어 줄을 나눈다 — '전체'에서 1·2·3학년 반이 한 줄에 이어 붙지 않게.
+  // 학년은 머리글에 한 번만 적고 카드에는 반만 남긴다.
+  const grades = [...new Set(rooms.map(k => k.split('-')[0]))];
+  grid.innerHTML = grades.map(g => {
+    const cards = rooms.filter(k => k.split('-')[0] === g).map(key => {
+      const r = key.split('-')[1];
+      const cnt = filtered.filter(s => String(s.grade)===g && String(s.room)===r).length;
+      return `<div class="pts-group-card ${ptsViewRoom===key?'active':''}" onclick="selectPtsRoom('${key}')">
+        <div class="pts-group-card-name">${r}반</div>
+        <div class="pts-group-card-count">${cnt}명</div>
+      </div>`;
+    }).join('');
+    const total = filtered.filter(s => String(s.grade) === g).length;
+    return `<div class="pts-group-block">
+      <div class="pts-group-label">${g}학년<span class="cnt">${total}명</span></div>
+      <div class="pts-group-grid">${cards}</div>
+    </div>`;
+  }).join('');
 }
 
 let ptsSortKey  = null;
