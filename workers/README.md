@@ -97,6 +97,46 @@ const WORKER_URL = 'https://consult-api.<계정>.workers.dev';
 npx wrangler tail
 ```
 
+## 학생 사진 고화질 (R2) — 선택
+
+안 해도 앱은 그대로 돕니다. 설정하면 학생 사진이 **150×200 → 600×800**이 됩니다.
+
+**왜 필요한가**: Firestore는 문서 하나가 1MB라 반 40명을 한 문서에 담으려면 장당
+10KB(150×200)가 한계였습니다. R2는 그 제한이 없습니다.
+
+### 1) 버킷 만들기
+
+Cloudflare 대시보드 → **R2** → *Create bucket* → 이름 `ynhs-photos`.
+**공개 접근은 켜지 마세요.** 워커만 통해서 나가야 합니다.
+
+### 2) 워커에 연결
+
+Workers → `consult-api` → **Settings → Bindings → Add → R2 bucket**
+
+| 항목 | 값 |
+|---|---|
+| Variable name | `PHOTOS` |
+| R2 bucket | `ynhs-photos` |
+
+`FIREBASE_API_KEY`도 있어야 합니다(교사 토큰 검증용). 이미 '실제 권한으로 보기'를
+쓰고 계시면 설정돼 있습니다.
+
+### 3) 워커 코드 갱신 후 배포
+
+`consult-api.js` 최신본을 붙여넣고 Deploy.
+
+### 4) 사진명렬 다시 올리기
+
+`upload.html` → **🪪 사진명렬 업로드**. 예전과 똑같이 파일 고르고 저장하면 됩니다.
+작은 사진은 Firestore에, 고화질은 R2에 **함께** 들어갑니다.
+
+> 다시 올리기 전까지는 기존 사진이 그대로 보입니다. R2에 없으면 앱이 작은 사진으로
+> 되돌아가므로 중간에 깨지지 않습니다.
+
+**용량**: 장당 약 90KB × 전교 600명 ≈ 54MB (무료 10GB 안).
+
+**되돌리기**: 바인딩(`PHOTOS`)만 지우면 사진 기능은 조용히 꺼지고 작은 사진으로 돌아갑니다.
+
 ## 되돌리기
 
 `parent.html`의 `USE_WORKER` 를 `false`로 되돌리면 즉시 기존 GAS 경로로 돌아갑니다.

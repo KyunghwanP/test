@@ -1745,7 +1745,10 @@ async function loadDbSheets() {
 document.getElementById('shRefreshBtn').addEventListener('click', loadDbSheets);
 
 // ════════════════════════════════════
-// ── 사진명렬 업로드 (엑셀 embedded 이미지 추출·압축·매칭 → studentPhotos/{학년-반}) ──
+// ── 사진명렬 업로드 (엑셀 embedded 이미지 추출·압축·매칭) ──
+// 작은 사진 → Firestore studentPhotos/{학년-반} (지금까지와 동일)
+// 고화질     → R2 (워커 경유). 워커가 없거나 실패해도 작은 사진은 그대로 들어간다.
+const PHOTO_WORKER = 'https://consult-api.pkh910518.workers.dev';
 // ════════════════════════════════════
 // embedded 이미지 추출은 SheetJS로 안 되므로 ExcelJS를 지연 로드해 사용한다.
 let excelJsPromise = null;
@@ -1804,7 +1807,19 @@ document.getElementById('phClearBtn').addEventListener('click', () => {
 });
 document.getElementById('phUploadBtn').addEventListener('click', phUpload);
 
-// ExcelJS media(embedded 이미지) → 축소·jpeg 압축 dataURL
+// ExcelJS media(embedded 이미지) → 두 벌로 만든다.
+//   small : 150×200 q0.62 — Firestore(studentPhotos)에 지금까지처럼. 문서 1MB 한계 때문.
+//   large : 600×800 q0.80 — R2에. 문서 한계가 없어 크게 넣을 수 있다.
+// 엑셀 원본은 어디에도 올리지 않는다(개인정보). 압축은 이 브라우저 안에서만 일어난다.
+function phDraw(im, w, h, q) {
+  // 엑셀에 늘어난 채(비3:4) 박힌 사진을 3:4 캔버스에 전체 매핑 → 원래 3:4 비율로 복원.
+  // (이미 3:4인 정상 사진은 그대로 유지. 증명사진 규격이 3:4라는 전제.)
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const cx = cv.getContext('2d');
+  cx.imageSmoothingQuality = 'high';
+  cx.drawImage(im, 0, 0, w, h);
+  try { return cv.toDataURL('image/jpeg', q); } catch(e){ return null; }
+}
 function phCompress(media) {
   return new Promise(res => {
     try {
@@ -1812,14 +1827,12 @@ function phCompress(media) {
       const url = URL.createObjectURL(blob);
       const im = new Image();
       im.onload = () => {
-        // 증명사진 3:4 강제 보정 · jpeg 0.62 → 장당 ~10KB(base64 ~14KB). 반 40명이라도 문서 1MB 안.
-        // 엑셀에 늘어난 채(비3:4) 박힌 사진을 3:4 캔버스에 전체 매핑 → 원래 3:4 비율로 복원.
-        // (이미 3:4인 정상 사진은 그대로 유지. 증명사진 규격이 3:4라는 전제.)
-        const OUTW = 150, OUTH = 200;   // 3:4
-        const cv = document.createElement('canvas'); cv.width = OUTW; cv.height = OUTH;
-        cv.getContext('2d').drawImage(im, 0, 0, OUTW, OUTH);
+        const small = phDraw(im, 150, 200, 0.62);
+        // 원본이 600×800보다 작으면 늘려봐야 뭉개지기만 한다 → 원본 크기를 넘지 않게
+        const lw = Math.min(600, Math.max(150, im.naturalWidth  || 600));
+        const large = phDraw(im, lw, Math.round(lw * 4 / 3), 0.80);
         URL.revokeObjectURL(url);
-        try { res(cv.toDataURL('image/jpeg', 0.62)); } catch(e){ res(null); }
+        res(small ? { small, large } : null);
       };
       im.onerror = () => { URL.revokeObjectURL(url); res(null); };
       im.src = url;
@@ -1924,15 +1937,16 @@ async function phProcess(file) {
     let done = 0;
     for (const rz of results) {
       const m = media[rz.id];
-      const dataUrl = m && m.buffer ? await phCompress(m) : null;
-      if (!dataUrl) continue;
+      const pic = m && m.buffer ? await phCompress(m) : null;
+      if (!pic) continue;
+      const dataUrl = pic.small;
       let matched = null;
       if (rz.name) {
         const cands = roster.filter(s => s.name === rz.name);
         if (cands.length === 1) matched = cands[0];
         else if (cands.length > 1 && rz.num != null) matched = cands.find(s => parseInt(s.num) === rz.num) || null;
       }
-      phItems.push({ dataUrl, name: rz.name, num: rz.num, matched: matched ? { grade: matched.grade, room: matched.room, num: matched.num, name: matched.name } : null });
+      phItems.push({ dataUrl, large: pic.large, name: rz.name, num: rz.num, matched: matched ? { grade: matched.grade, room: matched.room, num: matched.num, name: matched.name } : null });
       if ((++done % 40) === 0) setS(`압축·매칭 중… ${done}/${results.length}`);
     }
     phRenderPreview();
@@ -1999,7 +2013,31 @@ async function phUpload() {
         updatedBy: auth.currentUser?.email || '',
       }, { merge: true });
     }
-    setStatus('phStatus', `✅ 사진 저장 완료! (${keys.length}개 반)\n학생 종합검색 상세 화면에서 확인하세요.`, 'ok');
+    // ── 고화질 사본을 R2에 (선택) ────────────────────────────────────────
+    // Firestore 저장이 끝난 뒤에 시도한다. 여기서 실패해도 위의 작은 사진은 이미
+    // 들어가 있으므로 화면은 정상이다 → 실패를 '경고'로만 알린다.
+    const bigs = phItems.filter(x => x.matched && x.large);
+    let okBig = 0, failBig = 0;
+    if (bigs.length && PHOTO_WORKER) {
+      const idToken = await auth.currentUser.getIdToken();
+      for (let i = 0; i < bigs.length; i++) {
+        const x = bigs[i];
+        if (i % 10 === 0) setStatus('phStatus', `🖼 고화질 저장 중… ${i}/${bigs.length}`, 'loading');
+        try {
+          const r = await fetch(PHOTO_WORKER, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'photoPut', idToken,
+              g: x.matched.grade, r: x.matched.room, n: x.matched.num, dataUrl: x.large })
+          });
+          const j = await r.json().catch(() => ({}));
+          j && j.success ? okBig++ : failBig++;
+        } catch(e){ failBig++; }
+      }
+    }
+    const bigMsg = !bigs.length || !PHOTO_WORKER ? ''
+      : (failBig ? `\n🖼 고화질 ${okBig}장 저장 · ${failBig}장 실패(작은 사진은 정상)`
+                 : `\n🖼 고화질 ${okBig}장 저장`);
+    setStatus('phStatus', `✅ 사진 저장 완료! (${keys.length}개 반)${bigMsg}\n학생 종합검색 상세 화면에서 확인하세요.`, 'ok');
   } catch(e) {
     console.error(e);
     setStatus('phStatus', e.code === 'permission-denied' ? '권한 없음 — 교사 계정 필요' : '업로드 실패: ' + e.message, 'err');
