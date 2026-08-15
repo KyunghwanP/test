@@ -7037,6 +7037,7 @@ window.addEventListener('popstate', (e)=>{
   if (document.querySelector('.cd-overlay.open')) { document.querySelector('.cd-overlay.open').classList.remove('open'); armExitGuard(); return; }
   if (document.getElementById('jindanModal')?.classList.contains('open')) { closeJindanModal(); armExitGuard(); return; }
   if (document.getElementById('classOrgModal')?.classList.contains('open')) { closeClassOrgModal(); armExitGuard(); return; }
+  if (document.getElementById('s360PhotoZoom')?.classList.contains('open')) { s360ClosePhotoZoom(); armExitGuard(); return; }
 
   // 2. 교체/보강 모달 뎁스
   const newDepth = st.modalDepth || 0;
@@ -12179,6 +12180,7 @@ function loadExcelJS(){
 const CONSULT_WORKER = 'https://consult-api.pkh910518.workers.dev';
 const s360PhotoCache = {};   // '학년-반' → { 번호: dataURL } (반 단위로 한 번만 로드)
 const s360BigCache   = {};   // '학년-반-번호' → blob URL (고화질, 세션 동안 재사용)
+let   _thumbFor      = 0;    // 늦게 온 고화질이 그 사이 바뀐 학생 위에 덮이지 않게
 
 // 고화질 사진(R2)을 워커에서 받아온다. 없으면 null → 호출부가 작은 사진을 쓴다.
 // 워커가 로그인 확인을 하므로 <img src>로는 못 받는다(헤더를 못 붙임) → fetch 후 blob.
@@ -12216,6 +12218,15 @@ async function s360LoadPhoto(s){
       img.classList.add('zoomable');
       img.title = '클릭하면 크게 보기';
       img.onclick = () => s360OpenPhotoZoom(url, s);
+      // 썸네일도 고화질로 바꿔 끼운다. 표시 크기가 220px라 150×200을 늘려 쓰면 흐리다.
+      // 작은 사진(반 단위로 이미 받아둔 것)을 먼저 띄워 기다림을 없애고, 오면 교체한다.
+      const my = ++_thumbFor;
+      s360BigPhoto(s).then(big => {
+        if(!big || my !== _thumbFor) return;
+        if(document.getElementById('s360PhotoImg') !== img) return;   // 그 사이 다른 학생으로 바뀜
+        img.src = big;
+        img.onclick = () => s360OpenPhotoZoom(big, s);
+      });
     }
   } catch(e){ /* 사진 없으면 조용히 넘어감 */ }
 }
@@ -12238,14 +12249,17 @@ async function s360OpenPhotoZoom(url, s){
     ov.classList.add('big');     // 원본이 크니 표시 크기도 키운다
   }
 }
+// 닫기는 다른 모달들과 같은 방식이다. 여는 쪽에서 히스토리를 쌓지 않고,
+// 앱이 늘 유지하는 가드 항목을 popstate가 소비한 뒤 armExitGuard()로 다시 쌓는다.
+// (모바일 뒤로가기가 뒤 화면을 넘기지 않고 사진만 닫게 하는 장치)
 function s360ClosePhotoZoom(){
   const ov = document.getElementById('s360PhotoZoom');
   if(!ov || !ov.classList.contains('open')) return;
-  ov.classList.remove('open');
+  ov.classList.remove('open', 'big');
   _zoomFor++;                                        // 진행 중인 고화질 요청 무효화
   document.getElementById('s360ZoomImg').src = '';   // 메모리 해제
 }
-document.getElementById('s360PhotoZoom')?.addEventListener('click', s360ClosePhotoZoom);
+document.getElementById('s360PhotoZoom')?.addEventListener('click', () => s360ClosePhotoZoom());
 document.addEventListener('keydown', e => { if(e.key === 'Escape') s360ClosePhotoZoom(); });
 
 function docsXlsxUploadClick(){ document.getElementById('docsXlsxFile')?.click(); }
