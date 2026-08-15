@@ -14,11 +14,19 @@
  *    그 반 학부모로 인증된 사람만 읽도록 보안 규칙으로 막는다.
  *  · 인증·예약·취소     → 이 워커. 서비스 계정으로 Firestore에 접근한다.
  *
+ * 학생 사진(photoGet/photoPut)도 이 워커가 맡는다.
+ *  · Firestore는 문서 하나가 1MB라 반 40명을 한 문서에 담으면 장당 10KB(150×200)가
+ *    한계였다. R2는 그 제한이 없어 600×800으로 올릴 수 있다.
+ *  · R2 버킷 자체에는 로그인 개념이 없다 → 비공개로 두고 이 워커가 문지기를 한다.
+ *    (교사 Firebase ID 토큰을 Identity Toolkit에 물어 검증)
+ *
  * 필요한 시크릿/변수 (wrangler secret put / 대시보드 Variables)
  *  · SA_JSON         : 서비스 계정 JSON 전체 문자열 (필수, 암호화 시크릿)
  *  · ALLOWED_ORIGINS : 쉼표 구분 허용 Origin
  *                      예) https://kyunghwanp.github.io
  *  · PROJECT_ID      : (선택) 미지정 시 SA_JSON의 project_id 사용
+ *  · FIREBASE_API_KEY: 교사 토큰 검증용 (impersonate·photo* 에 필요)
+ *  · PHOTOS          : (선택) R2 버킷 바인딩. 없으면 사진 기능만 조용히 꺼진다.
  *
  * 자세한 배포 방법은 같은 폴더의 README.md 참고.
  */
@@ -459,6 +467,71 @@ async function handleImpersonate(env, body) {
 }
 
 // ── 진입점 ───────────────────────────────────────────────────────────────────
+// ── 학생 사진 (R2) ──────────────────────────────────────────────────────────
+// 키: photos/{학년}-{반}/{번호}.jpg  — 학생 한 명 = 파일 하나.
+// Firestore(studentPhotos)의 작은 사진은 그대로 둔다. R2에 없으면 앱이 그쪽으로
+// 되돌아가므로, 사진명렬을 다시 올리기 전까지 화면이 깨지지 않는다.
+function photoKey(g, r, n) {
+  // parseInt는 '2/x'에서 2를 뽑아낸다. 키를 정수로 다시 조립하므로 경로 탈출은 없지만,
+  // 엉뚱한 입력을 조용히 받아들이지 않도록 '숫자만'인지 먼저 본다.
+  const i = v => (/^\d{1,2}$/.test(String(v).trim()) ? parseInt(v, 10) : null);
+  const [gg, rr, nn] = [i(g), i(r), i(n)];
+  if (gg === null || rr === null || nn === null) return null;
+  if (gg < 1 || gg > 9 || rr < 1 || rr > 99 || nn < 1 || nn > 99) return null;   // 경로 조작 방지
+  return `photos/${gg}-${rr}/${nn}.jpg`;
+}
+
+// 교사 Firebase ID 토큰 검증 → { email, admin } / 실패면 null
+async function verifyTeacher(env, idToken) {
+  if (!idToken || !env.FIREBASE_API_KEY) return null;
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${env.FIREBASE_API_KEY}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }) });
+  if (!res.ok) return null;
+  const u = ((await res.json()).users || [])[0];
+  const email = String(u && u.email || '').toLowerCase();
+  if (!u || !u.emailVerified || !email.endsWith('@yeungnam.hs.kr')) return null;
+  if (/^[0-9]{7}@yeungnam\.hs\.kr$/.test(email)) return null;    // 학생 계정 제외
+  return { email, admin: email === String(env.ADMIN_EMAIL || ADMIN_EMAIL).toLowerCase() };
+}
+
+// 사진 내려주기 — 응답은 JSON이 아니라 이미지 바이트다.
+async function handlePhotoGet(env, body, cors) {
+  if (!env.PHOTOS) return json({ success: false, error: 'NO_BUCKET' }, 503, cors);
+  const who = await verifyTeacher(env, String(body.idToken || ''));
+  if (!who) return json({ success: false, error: 'AUTH' }, 403, cors);
+  const key = photoKey(body.g, body.r, body.n);
+  if (!key) return json({ success: false, error: 'BAD_KEY' }, 400, cors);
+
+  const obj = await env.PHOTOS.get(key);
+  if (!obj) return json({ success: false, error: 'NOT_FOUND' }, 404, cors);
+  return new Response(obj.body, {
+    status: 200,
+    headers: { ...cors, 'Content-Type': 'image/jpeg',
+               // 사진은 잘 안 바뀐다. 브라우저가 다시 묻지 않도록 오래 잡아둔다.
+               'Cache-Control': 'private, max-age=86400' }
+  });
+}
+
+// 사진 올리기 — 관리자만. upload.html의 '사진명렬 업로드'가 장당 한 번씩 부른다.
+async function handlePhotoPut(env, body) {
+  if (!env.PHOTOS) return { success: false, error: 'NO_BUCKET' };
+  const who = await verifyTeacher(env, String(body.idToken || ''));
+  if (!who) return { success: false, error: 'AUTH' };
+  if (!who.admin) return { success: false, error: 'FORBIDDEN' };
+  const key = photoKey(body.g, body.r, body.n);
+  if (!key) return { success: false, error: 'BAD_KEY' };
+
+  const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String(body.dataUrl || ''));
+  if (!m) return { success: false, error: 'BAD_IMAGE' };
+  const bytes = bytesFromB64(m[1]);
+  if (bytes.length > 2 * 1024 * 1024) return { success: false, error: 'TOO_LARGE' };
+
+  await env.PHOTOS.put(key, bytes, { httpMetadata: { contentType: 'image/jpeg' } });
+  return { success: true, key, size: bytes.length };
+}
+
 function corsHeaders(env, origin) {
   // 끝 슬래시·대소문자 차이로 매칭이 어긋나는 사고가 잦아 정규화해서 비교한다.
   // (예: 'https://kyunghwanp.github.io/' 로 적어도 동작하게)
@@ -501,6 +574,9 @@ export default {
         case 'book':   return json(await handleBook(env, body),   200, cors);
         case 'cancel': return json(await handleCancel(env, body), 200, cors);
         case 'impersonate': return json(await handleImpersonate(env, body), 200, cors);
+        // 사진 조회만 이미지 바이트를 그대로 돌려준다(base64로 감싸면 33% 커진다)
+        case 'photoGet': return await handlePhotoGet(env, body, cors);
+        case 'photoPut': return json(await handlePhotoPut(env, body), 200, cors);
         default:       return json({ success: false, error: 'UNKNOWN_ACTION' }, 400, cors);
       }
     } catch (e) {

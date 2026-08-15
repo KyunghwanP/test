@@ -1432,16 +1432,19 @@
     .s360-head{grid-template-columns:1fr;grid-template-areas:"info" "photo" "pts";}
     .s360-photo{justify-self:center;width:176px;height:222px;}
   }
-  /* 사진 크게 보기 — 원본이 150×200이라 그 이상 늘리면 뭉개진다. 2.2배(330×440)에서 멈춘다. */
+  /* 사진 크게 보기 — 작은 사진(150×200)일 땐 2.2배(330×440)에서 멈춘다. 더 늘리면 뭉개진다.
+     R2 고화질(600×800)이 오면 .big 이 붙어 그 크기까지 키운다. */
   .s360-zoom{position:fixed;inset:0;z-index:9100;display:none;align-items:center;justify-content:center;
     background:rgba(20,24,18,0.62);padding:16px;}
   .s360-zoom.open{display:flex;}
   .s360-zoom-box{background:var(--paper);border-radius:16px;padding:16px;box-shadow:0 30px 60px -20px rgba(0,0,0,0.5);
     display:flex;flex-direction:column;align-items:center;gap:10px;max-height:100%;}
   .s360-zoom-box img{width:min(330px,72vw);height:auto;aspect-ratio:3/4;object-fit:cover;
+    transition:width .18s ease;
     border-radius:10px;border:1px solid var(--rule);background:var(--paper-soft);}
   .s360-zoom-cap{font-size:14.5px;font-weight:800;color:var(--ink);text-align:center;}
   .s360-zoom-cap .sub{font-family:'IBM Plex Mono';font-weight:700;color:var(--ink-soft);margin-left:8px;}
+  .s360-zoom.big .s360-zoom-box img{width:min(520px,80vw);}
   .s360-zoom-hint{font-size:12px;color:var(--ink-soft);font-weight:600;}
   .s360-records{max-height:260px;overflow-y:auto;border:1px solid var(--rule);border-radius:8px;padding:8px 12px;background:var(--paper-soft);}
   .s360-records > div{font-size:15px !important;}
@@ -12164,10 +12167,34 @@ function loadExcelJS(){
 
 // ══════════════════════════════════════════
 // 사진명렬 — 학생 종합검색 상세에 사진 표시 (읽기 전용)
-//  · 사진은 반별 Firestore 문서 studentPhotos/{학년-반}.photos = { 번호: dataURL(jpeg) }
+//  · 작은 사진(150×200): 반별 Firestore 문서 studentPhotos/{학년-반}.photos = { 번호: dataURL }
+//    문서 하나가 1MB라 40명을 담으려면 이 크기가 한계다. 목록·썸네일용.
+//  · 고화질(600×800): R2. 문서 한계가 없어 크게 넣을 수 있고, 워커가 로그인을 확인하고 내준다.
+//    없으면 작은 사진으로 되돌아가므로 사진명렬을 다시 올리기 전에도 화면은 정상이다.
 //  · 업로드(엑셀에서 사진 추출·압축·매칭)는 관리자 페이지 upload.html 에서 수행한다.
 // ══════════════════════════════════════════
+const CONSULT_WORKER = 'https://consult-api.pkh910518.workers.dev';
 const s360PhotoCache = {};   // '학년-반' → { 번호: dataURL } (반 단위로 한 번만 로드)
+const s360BigCache   = {};   // '학년-반-번호' → blob URL (고화질, 세션 동안 재사용)
+
+// 고화질 사진(R2)을 워커에서 받아온다. 없으면 null → 호출부가 작은 사진을 쓴다.
+// 워커가 로그인 확인을 하므로 <img src>로는 못 받는다(헤더를 못 붙임) → fetch 후 blob.
+async function s360BigPhoto(s){
+  const key = `${parseInt(s.grade)}-${parseInt(s.room)}-${parseInt(s.num)}`;
+  if(s360BigCache[key] !== undefined) return s360BigCache[key];
+  s360BigCache[key] = null;                       // 실패해도 다시 묻지 않게 먼저 박아둔다
+  try {
+    const idToken = await fbAuth.currentUser.getIdToken();
+    const res = await fetch(CONSULT_WORKER, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action:'photoGet', idToken,
+                             g:parseInt(s.grade), r:parseInt(s.room), n:parseInt(s.num) })
+    });
+    if(!res.ok || !(res.headers.get('Content-Type')||'').startsWith('image/')) return null;
+    s360BigCache[key] = URL.createObjectURL(await res.blob());
+  } catch(e){ /* 워커 없음·네트워크 실패 → 작은 사진으로 */ }
+  return s360BigCache[key];
+}
 
 async function s360LoadPhoto(s){
   const img = document.getElementById('s360PhotoImg');
@@ -12189,18 +12216,29 @@ async function s360LoadPhoto(s){
   } catch(e){ /* 사진 없으면 조용히 넘어감 */ }
 }
 
-function s360OpenPhotoZoom(url, s){
+let _zoomFor = 0;    // 늦게 도착한 고화질이 그 사이 바뀐 학생 위에 덮이지 않게
+async function s360OpenPhotoZoom(url, s){
   const ov = document.getElementById('s360PhotoZoom');
   if(!ov) return;
-  document.getElementById('s360ZoomImg').src = url;
+  const my = ++_zoomFor;
+  const im = document.getElementById('s360ZoomImg');
+  // 작은 사진을 먼저 띄워 기다림이 없게 하고, 고화질이 오면 바꿔 끼운다
+  im.src = url;
+  ov.classList.remove('big');
   document.getElementById('s360ZoomCap').innerHTML =
     `${escapeHtml(s.name || '')}<span class="sub">${s.grade}학년 ${s.room}반 ${s.num}번</span>`;
   ov.classList.add('open');
+  const big = await s360BigPhoto(s);
+  if(big && my === _zoomFor && ov.classList.contains('open')){
+    im.src = big;
+    ov.classList.add('big');     // 원본이 크니 표시 크기도 키운다
+  }
 }
 function s360ClosePhotoZoom(){
   const ov = document.getElementById('s360PhotoZoom');
   if(!ov || !ov.classList.contains('open')) return;
   ov.classList.remove('open');
+  _zoomFor++;                                        // 진행 중인 고화질 요청 무효화
   document.getElementById('s360ZoomImg').src = '';   // 메모리 해제
 }
 document.getElementById('s360PhotoZoom')?.addEventListener('click', s360ClosePhotoZoom);
