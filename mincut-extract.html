@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>수능최저 일괄 추출</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!--
+  수시 모집요강 PDF에서 '수능최저' 언급 페이지 텍스트를 브라우저에서 일괄 추출하는 도구.
+  · appguide.csv(대학명·대학코드·다운로드링크)를 읽어 각 PDF를 프록시로 받아 PDF.js로 텍스트 추출
+  · '수능최저/최저학력기준' 앵커가 있는 페이지만 모아 결과 JSON으로 저장 → 정규화 단계로 전달
+  · 파이썬/터미널 불필요. 이 페이지를 열고 [추출 시작]만 누르면 됨.
+-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root{ --indigo:#4f46e5; --slate:#64748b; --line:#e2e8f0; }
+  *{ box-sizing:border-box; }
+  body{ font-family:'Malgun Gothic',system-ui,sans-serif; background:#f1f5f9; color:#1e293b; margin:0; padding:24px; }
+  .wrap{ max-width:820px; margin:0 auto; }
+  h1{ font-size:22px; margin:0 0 6px; }
+  p.sub{ color:var(--slate); margin:0 0 20px; font-size:14px; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:16px; padding:20px; box-shadow:0 4px 16px rgba(15,23,42,.05); }
+  .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  button{ border:none; border-radius:10px; padding:11px 18px; font-size:14px; font-weight:800; cursor:pointer; }
+  .btn-go{ background:var(--indigo); color:#fff; }
+  .btn-go:disabled{ opacity:.5; cursor:default; }
+  .btn-dl{ background:#059669; color:#fff; }
+  .btn-ghost{ background:#eef2ff; color:var(--indigo); }
+  label.chk{ font-size:13px; color:var(--slate); display:flex; align-items:center; gap:6px; }
+  .bar{ height:12px; background:#eef2f7; border-radius:99px; overflow:hidden; margin:14px 0 8px; }
+  .bar > i{ display:block; height:100%; width:0; background:var(--indigo); transition:width .2s; }
+  .stat{ font-size:13px; color:var(--slate); font-variant-numeric:tabular-nums; }
+  .log{ margin-top:14px; max-height:320px; overflow:auto; border:1px solid var(--line); border-radius:10px; padding:10px; background:#fafbfc; font:12px/1.5 ui-monospace,Consolas,monospace; }
+  .log b.ok{ color:#059669; } .log b.scan{ color:#d97706; } .log b.fail{ color:#dc2626; }
+  .counts{ display:flex; gap:18px; margin-top:12px; font-size:13px; font-weight:800; }
+  .counts .ok{ color:#059669; } .counts .scan{ color:#d97706; } .counts .fail{ color:#dc2626; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📑 수능최저 일괄 추출 <span style="font-size:13px;background:#059669;color:#fff;padding:3px 9px;border-radius:8px;vertical-align:middle;">v2 · 좌표복원</span></h1>
+  <p class="sub">모집요강 PDF에서 ‘수능최저’ 언급 페이지 텍스트를 모아 결과 파일로 저장합니다. 다 되면 <b>결과 JSON 다운로드</b>를 눌러 파일을 전달해 주세요. <b style="color:#059669">(이 초록 v2 배지가 보여야 최신 버전)</b></p>
+  <div class="card">
+    <div class="row">
+      <button class="btn-go" id="go">▶ 추출 시작</button>
+      <button class="btn-ghost" id="test">🔎 5개만 테스트</button>
+      <button class="btn-dl" id="dl" style="display:none">⬇ 결과 JSON 다운로드</button>
+      <label class="chk"><input type="checkbox" id="anchorOnly" checked> 최저 언급 페이지만 저장(권장)</label>
+    </div>
+    <div class="bar"><i id="barfill"></i></div>
+    <div class="stat" id="stat">대기 중…</div>
+    <div class="counts">
+      <span class="ok">텍스트OK <span id="cOk">0</span></span>
+      <span class="scan">스캔본 <span id="cScan">0</span></span>
+      <span class="fail">실패 <span id="cFail">0</span></span>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const PROXY = "https://adiga-pdf-proxy.pkh910518.workers.dev/?url=";
+const ANCHOR = /(수능\s*최저|최저\s*학력\s*기준|수능최저학력)/;
+// 실제 '기준 표'인지(단순 언급과 구분): 반영영역 + 등급·합·이내 패턴
+function hasCriteriaTable(t){ return /(반영\s*영역)/.test(t) && /(등급|합\s*\d|이내|평균)/.test(t); }
+// 전형 귀속 힌트(페이지 내 전형 키워드)
+const FORM_WORDS = ['논술','학생부교과','교과','학생부종합','종합','실기','정시','지역균형','지역인재','농어촌','기회균형','특성화'];
+function detectForms(t){ return FORM_WORDS.filter(w => t.includes(w)); }
+
+// 좌표 기반 줄 복원: y로 행을 묶고 x로 정렬 → 표 구조가 살아남(값이 그룹에서 안 떨어짐).
+//   큰 x간격은 '|'로 표시해 열 경계 힌트를 남긴다. (기존: 좌표 버리고 한 줄로 이어붙여 표 붕괴)
+function pageLines(tc){
+  const items = tc.items.filter(it => it.str && it.str.trim() !== '');
+  items.forEach(it => { it._x = it.transform[4]; it._y = it.transform[5]; it._h = Math.abs(it.transform[3])||10; });
+  items.sort((a,b) => (b._y - a._y) || (a._x - b._x));
+  const lines = []; let cur = []; let lastY = null;
+  for(const it of items){
+    const tol = Math.max(3, it._h * 0.6);
+    if(lastY === null || Math.abs(it._y - lastY) <= tol) cur.push(it);
+    else { lines.push(cur); cur = [it]; }
+    lastY = it._y;
+  }
+  if(cur.length) lines.push(cur);
+  return lines.map(line => {
+    line.sort((a,b) => a._x - b._x);
+    let s = '', prevEnd = null;
+    for(const it of line){
+      if(prevEnd !== null){
+        const gap = it._x - prevEnd;
+        if(gap > 14) s += '  |  ';      // 열 경계 힌트
+        else if(gap > 1.5) s += ' ';
+      }
+      s += it.str;
+      prevEnd = it._x + (it.width || 0);
+    }
+    return s.trim();
+  }).filter(s => s);
+}
+
+const $ = id => document.getElementById(id);
+const logBox = $('log');
+let results = [], counts = {ok:0, scan:0, fail:0};
+
+function log(html){ logBox.innerHTML += html + '<br>'; logBox.scrollTop = logBox.scrollHeight; }
+function setBar(done, total){ $('barfill').style.width = (total? (done/total*100):0)+'%'; $('stat').textContent = `${done} / ${total} 처리`; }
+function refreshCounts(){ $('cOk').textContent=counts.ok; $('cScan').textContent=counts.scan; $('cFail').textContent=counts.fail; }
+
+// 간단 CSV 파서(따옴표 처리)
+function parseCSV(text){
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<text.length;i++){ const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else { if(c==='"') q=true; else if(c===','){ row.push(cur); cur=''; }
+      else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; }
+      else if(c==='\r'){} else cur+=c; }
+  }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
+  return rows;
+}
+
+async function loadList(){
+  const res = await fetch('./appguide.csv', {cache:'no-store'});
+  const txt = await res.text();
+  const rows = parseCSV(txt).filter(r=>r.length>=5 && r[0]!=='조회연도' && r[0].trim()!=='');
+  return rows.map(r=>({ year:r[0], name:r[1], code:r[2], kind:r[3], link:r[4] }));
+}
+
+async function processOne(u, anchorOnly){
+  const res = await fetch(PROXY + encodeURIComponent(u.link));
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const buf = await res.arrayBuffer();
+  const doc = await pdfjsLib.getDocument({data:buf}).promise;
+  const N = doc.numPages;
+  // 1) 모든 페이지 텍스트 추출
+  const pageText = {}; let totalLen = 0;
+  for(let p=1; p<=N; p++){
+    const page = await doc.getPage(p);
+    const tc = await page.getTextContent();
+    const text = pageLines(tc).join('\n');       // 좌표 기반 줄 복원(표 구조 보존)
+    pageText[p] = text; totalLen += text.replace(/\s/g,'').length;
+  }
+  try{ await doc.destroy(); }catch(e){}
+  const scanned = totalLen < 200;
+  // 2) 최저 언급 페이지 + '표가 다음 장으로 넘어가는' 경우 대비해 다음 페이지까지 포함
+  const keep = new Set();
+  for(let p=1; p<=N; p++){
+    if(ANCHOR.test(pageText[p])){ keep.add(p); if(p+1<=N) keep.add(p+1); }
+  }
+  // 3) anchorOnly=false면 전체 페이지 저장(디버그용)
+  const pages = anchorOnly ? [...keep].sort((a,b)=>a-b) : Array.from({length:N},(_,i)=>i+1);
+  const hits = pages.map(p => ({
+    page: p,
+    text: pageText[p],
+    isAnchor: ANCHOR.test(pageText[p]),      // 이 페이지에 최저 문구가 직접 있나
+    hasTable: hasCriteriaTable(pageText[p]), // 실제 기준 표로 보이나(단순 언급과 구분)
+    forms: detectForms(pageText[p])          // 전형 귀속 힌트
+  }));
+  return { scanned, pages: N, hits };
+}
+
+async function run(limit){
+  $('go').disabled = true; $('test').disabled = true; $('dl').style.display='none';
+  results = []; counts = {ok:0,scan:0,fail:0}; refreshCounts(); logBox.innerHTML='';
+  let list;
+  try { list = await loadList(); }
+  catch(e){ log('<b class="fail">appguide.csv 를 못 읽었어요. 이 파일을 appguide.csv 와 같은 폴더/사이트에 두세요.</b>'); $('go').disabled=false; $('test').disabled=false; return; }
+  if(limit) list = list.slice(0, limit);
+  const total = list.length;
+  const anchorOnly = $('anchorOnly').checked;
+
+  for(let i=0;i<total;i++){
+    const u = list[i];
+    try{
+      const r = await processOne(u, anchorOnly);
+      const entry = { code:u.code, name:u.name, year:u.year, pages:r.pages, scanned:r.scanned, hits:r.hits };
+      results.push(entry);
+      if(r.scanned){ counts.scan++; log(`<b class="scan">[스캔본]</b> ${u.name} — 텍스트 거의 없음(OCR 필요)`); }
+      else { counts.ok++; const tbl=r.hits.filter(h=>h.hasTable).length;
+        log(`<b class="ok">[OK]</b> ${u.name} — 기준표 ${tbl}p / 관련 ${r.hits.length}p`); }
+    }catch(e){
+      counts.fail++; results.push({ code:u.code, name:u.name, error:String(e) });
+      log(`<b class="fail">[실패]</b> ${u.name} — ${e}`);
+    }
+    refreshCounts(); setBar(i+1, total);
+    await new Promise(r=>setTimeout(r, 120)); // 프록시 과부하 방지
+  }
+  log('<br><b>완료!</b> 아래 [결과 JSON 다운로드]를 눌러 파일을 전달해 주세요.');
+  $('dl').style.display=''; $('go').disabled=false; $('test').disabled=false;
+}
+
+$('go').onclick = ()=>run(0);
+$('test').onclick = ()=>run(5);
+$('dl').onclick = ()=>{
+  const blob = new Blob([JSON.stringify({ generated:new Date().toISOString(), count:results.length, results }, null, 1)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'mincut_extract.json'; a.click();
+};
+</script>
+</body>
+</html>

@@ -19,10 +19,6 @@
 | **데스크톱 앱** | `desktop/` | Rust(wry). 통합앱과 별개의 대안 |
 | **상담 예약 API** | `workers/consult-api.js` | Cloudflare Worker |
 | **자동화** | `.github/workflows/` | 성적·날씨·상벌점 동기화, exe 빌드 |
-| **업로드 도구** | `upload.html` | 엑셀 → Firestore (시간표·운영표·연락망·명렬·선택과목·사진·교원 명렬) |
-| **관리자 화면** | `admin.html` | 다른 교사 화면 보기(가장), 권한 점검 |
-| **동기화 스크립트** | `scripts/` | 성적 시트 → Firestore, 권한 문서 생성 |
-| **학부모 페이지** | `parent.html` | 상담 예약(비로그인) |
 
 배포는 GitHub Pages. `KyunghwanP/ynhs` → `/ynhs/`, `KyunghwanP/test` → `/test/`.
 **두 저장소는 대부분 파일을 동일하게 유지**하며, `admin.html`·`upload.html`·`scripts/`는
