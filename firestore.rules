@@ -99,11 +99,16 @@ service cloud.firestore {
     }
     // ── 학부모 상담 예약 ──
     // 학부모(비로그인)는 Firestore를 직접 접근하지 않는다. 조회·예약·취소는
-    // 모두 GAS(서비스계정)가 처리하며, 서비스계정은 보안 규칙의 적용을 받지
+    // 모두 Worker(서비스계정)가 처리하며, 서비스계정은 보안 규칙의 적용을 받지
     // 않으므로(관리자 권한) 학부모용 동작은 여기서 전부 차단해도 된다.
-    // → 교사(학교 계정 로그인)만 직접 읽기/쓰기 가능. 외부인은 차단.
+    //
+    // 이 문서에는 예약자 이름·연락처·상담 사유(bookedMemo)가 들어 있다.
+    // 상담 사유에는 가정 문제·교우 관계 같은 내용이 적히므로 담임 외에는 볼 이유가 없다.
+    // → '학교 계정이면 전부'가 아니라 '그 반 담임 + 관리자'로 좁힌다.
+    //   (앱은 원래 본인 반만 읽으므로 화면 동작은 달라지지 않는다.
+    //    막히는 것은 콘솔 등으로 남의 반 문서를 직접 여는 경우뿐이다.)
     match /consultations/{classKey} {
-      allow read, write: if isYnhsTeacher();
+      allow read, write: if isAppAdmin() || isHomeroomOf(classKey);
     }
     // ── 학부모 상담: 학부모에게 공개하는 미러 문서 ──
     // 원본(consultations)에는 예약자 이름·연락처·메모가 들어 있어 학부모가 직접
@@ -157,6 +162,24 @@ service cloud.firestore {
     //  sync-grades Actions를 한 번 실행해 문서를 만들어 둘 것)
     function gradeAcl() {
       return get(/databases/$(database)/documents/acl/gradeRoles).data;
+    }
+    // 이 사람이 classKey 반의 담임인가 (학부모 상담 문서 접근 판정)
+    //  · acl/gradeRoles.homerooms = { 이메일: '학년-반' } — 성적 권한이 쓰는 그 문서를 재사용
+    //  · 문서가 없으면 get()이 규칙 전체를 거부하므로 exists()로 먼저 확인한다
+    //  · 표기가 다를 수 있다: homerooms는 '2-3'으로 정규화해 저장하는데,
+    //    상담 문서 ID는 시간표의 원본 표기(예 '2-03')를 그대로 쓴다.
+    //    담임이 자기 반에서 막히는 일이 없도록 숫자로 비교한다.
+    function isHomeroomOf(classKey) {
+      return isYnhsTeacher()
+        && exists(/databases/$(database)/documents/acl/gradeRoles)
+        && request.auth.token.email in gradeAcl().homerooms
+        && sameClass(gradeAcl().homerooms[request.auth.token.email], classKey);
+    }
+    function sameClass(a, b) {
+      return a == b
+        || (a.matches('^[0-9]+-[0-9]+$') && b.matches('^[0-9]+-[0-9]+$')
+            && int(a.split('-')[0]) == int(b.split('-')[0])
+            && int(a.split('-')[1]) == int(b.split('-')[1]));
     }
     // 관리자가 콘솔에서 직접 관리하는 전체열람 명단(acl/gradeManual).
     // Actions 동기화를 기다리지 않고 즉시 반영된다. 문서가 없어도 안전하도록
