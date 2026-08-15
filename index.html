@@ -235,6 +235,9 @@
   html.widget-mode[data-widget="fulltt"] #timetablePage .rule,
   html.widget-mode[data-widget="fulltt"] #timetablePage .winsize-group,
   html.widget-mode[data-widget="fulltt"] #timetablePage .subject-chip-row { display:none !important; }
+  /* 협의 시간 찾기는 앱에서만 쓴다. data-widget을 가리지 않고 widget-mode 전체를 잡으므로
+     위젯을 새로 추가해도 자동으로 빠진다. */
+  html.widget-mode .tt-meet-btn, html.widget-mode .s360-zoom, html.widget-mode #ttMeetModal { display:none !important; }
   html.widget-mode[data-widget="fulltt"] #timetablePage .masthead { padding:6px 2px !important; margin:0 !important; }
   html.widget-mode[data-widget="fulltt"] #timetablePage .wrap,
   html.widget-mode[data-widget="fulltt"] #timetablePage .layout,
@@ -2402,6 +2405,116 @@
   .subject-item:hover{background:var(--paper-soft);}
   .subject-item.active{background:var(--mon);color:#fff;}
 
+  /* ── 협의 시간 찾기 ── */
+  .tt-meet-btn{
+    display:inline-flex;align-items:center;gap:6px;flex-shrink:0;
+    padding:7px 14px;border-radius:20px;border:1.5px solid var(--mon);
+    background:var(--paper);color:var(--mon);cursor:pointer;
+    font-family:'Pretendard','Noto Sans KR';font-size:13px;font-weight:800;white-space:nowrap;
+  }
+  .tt-meet-btn:hover{background:var(--mon);color:#fff;}
+  @media (max-width:640px){ .tt-meet-btn .btn-long{display:none;} }
+  @media (min-width:641px){ .tt-meet-btn .btn-short{display:none;} }
+
+  .meet-box{
+    background:var(--paper);border-radius:14px;width:min(880px,100%);max-height:min(88vh,100%);
+    display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 60px -20px rgba(0,0,0,0.5);
+  }
+  .meet-head{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--rule);}
+  .meet-head h3{font-size:16.5px;font-weight:900;color:var(--ink);margin:0;flex:1;}
+  .meet-close{width:30px;height:30px;border-radius:50%;border:1px solid var(--rule);background:var(--paper);
+    color:var(--ink-soft);font-size:14px;font-weight:900;cursor:pointer;flex-shrink:0;}
+  .meet-body{padding:14px 18px 18px;overflow-y:auto;}
+  .meet-label{font-size:12.5px;font-weight:800;color:var(--ink-soft);margin:0 0 7px;}
+  .meet-sec{margin-bottom:14px;}
+  /* 선택된 교사 칩 */
+  .meet-picked{display:flex;flex-wrap:wrap;gap:6px;min-height:32px;margin-bottom:8px;}
+  .meet-picked:empty::after{content:'아래에서 교과나 이름을 눌러 대상을 고르세요';
+    font-size:13px;color:var(--ink-soft);font-weight:600;align-self:center;}
+  .meet-chip{display:inline-flex;align-items:center;gap:5px;background:var(--mon);color:#fff;
+    border-radius:20px;padding:4px 8px 4px 12px;font-size:13px;font-weight:700;}
+  .meet-chip button{background:none;border:0;color:#fff;opacity:.75;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;}
+  .meet-chip button:hover{opacity:1;}
+  /* 교과 칩 + 검색 */
+  .meet-subjects{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+  .meet-sub-chip{border:1px solid var(--rule);background:var(--paper-soft);color:var(--ink);
+    border-radius:20px;padding:4px 11px;font-size:12.5px;font-weight:700;cursor:pointer;}
+  .meet-sub-chip:hover{border-color:var(--mon);color:var(--mon);}
+  .meet-sub-chip.on{background:var(--mon);border-color:var(--mon);color:#fff;}
+  .meet-search{position:relative;}
+  .meet-search input{width:min(320px,100%);padding:8px 13px;border:1px solid var(--rule);border-radius:20px;
+    background:var(--paper);color:var(--ink);font-family:'Pretendard','Noto Sans KR';font-size:13.5px;font-weight:600;outline:none;}
+  .meet-search input:focus{border-color:var(--mon);}
+  .meet-sugg{position:absolute;top:100%;left:0;width:min(320px,100%);z-index:5;margin-top:4px;max-height:210px;overflow-y:auto;
+    background:var(--paper);border:1px solid var(--rule);border-radius:10px;box-shadow:0 12px 24px -12px rgba(0,0,0,.4);display:none;}
+  .meet-sugg.on{display:block;}
+  .meet-sugg div{padding:8px 13px;font-size:13.5px;font-weight:600;color:var(--ink);cursor:pointer;}
+  .meet-sugg div:hover{background:var(--paper-soft);}
+  .meet-sugg .dim{color:var(--ink-soft);font-weight:600;font-size:12.5px;margin-left:6px;}
+  /* 주 전환 */
+  .meet-weeks{display:flex;gap:6px;}
+  .meet-week-btn{border:1px solid var(--rule);background:var(--paper-soft);color:var(--ink-soft);
+    border-radius:20px;padding:5px 14px;font-size:12.5px;font-weight:800;cursor:pointer;}
+  .meet-week-btn.on{background:var(--ink);border-color:var(--ink);color:var(--paper,#fff);}
+  /* 결과 격자 — 시간표 탭의 .grid-table 과 같은 언어로 그린다.
+     요일별 색 헤더, 흰 셀 + rule 테두리 + radius 8, 교시 번호는 paper-soft + Mono.
+     '쓸 수 있는 칸'은 앱이 이미 쓰는 주목 표현(#FFF8E3 / #E8A93A 링)을 그대로 쓴다. */
+  .meet-grid-wrap{overflow-x:auto;}
+  table.meet-grid{border-collapse:separate;border-spacing:var(--gt-gap,5px);width:100%;}
+  table.meet-grid td{padding:0;}
+  .meet-hd{border-radius:8px;color:#fff;font-family:'Pretendard','Noto Sans KR';
+    font-weight:700;font-size:12.5px;padding:5px 2px;text-align:center;}
+  .meet-hd[data-day="월"]{background:var(--mon);}
+  .meet-hd[data-day="화"]{background:var(--tue);}
+  .meet-hd[data-day="수"]{background:var(--wed);}
+  .meet-hd[data-day="목"]{background:var(--thu);}
+  .meet-hd[data-day="금"]{background:var(--fri);}
+  table.meet-grid td:first-child{width:1%;}          /* 교시 열은 글자 폭만큼만 */
+  .meet-pnum{background:var(--paper-soft);border:1px solid var(--rule);border-radius:8px;
+    font-family:'IBM Plex Mono';font-weight:700;font-size:11.5px;color:var(--ink-soft);
+    text-align:center;padding:0 7px;white-space:nowrap;height:32px;display:flex;align-items:center;justify-content:center;}
+  tr.special .meet-pnum{font-family:'Noto Sans KR';font-style:italic;font-weight:600;background:none;border:none;}
+  .meet-cell{display:flex;align-items:center;justify-content:center;height:32px;min-width:44px;
+    border-radius:8px;font-size:12px;font-weight:700;line-height:1;
+    background:#fff;border:1px solid var(--rule);transition:box-shadow .12s;}
+  /* 전원 가능 — 앱이 '지금 이 교시'에 쓰는 강조 그대로. 이 화면에서 여기가 볼 곳이다 */
+  .meet-cell.ok{background:#FFF8E3;border-color:#E8A93A;box-shadow:0 0 0 3px rgba(232,169,58,.18);
+    color:#92611a;cursor:pointer;}
+  .meet-cell.ok::after{content:'가능';letter-spacing:.03em;}
+  /* 1명만 빠짐 — 숫자 대신 그 사람 이름. 누구를 설득하면 되는지가 곧 정보다 */
+  .meet-cell.near{border-style:dashed;color:var(--ink-soft);cursor:pointer;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 5px;}
+  /* 못 고르는 칸은 배경으로 가라앉힌다 — 비워야 열린 칸이 보인다 */
+  .meet-cell.no{background:var(--paper-soft);border-color:transparent;}
+  /* 점심·방과후는 매일 비어 있다. 교시와 같은 세기로 칠하면 정작 봐야 할 곳을 덮는다 */
+  tr.special .meet-cell.ok{box-shadow:none;background:#FEFCF6;border-color:#EFE3CC;color:#B49A6E;}
+  .meet-cell.ok:hover{box-shadow:0 0 0 4px rgba(232,169,58,.3);}
+  .meet-cell.near:hover{border-color:var(--ink-soft);}
+  .meet-cell.sel{outline:2px solid var(--ink);outline-offset:2px;}
+  /* 후보 목록 — 격자가 '지도'라면 이쪽이 '답'이다. 셀과 같은 카드 언어를 쓴다. */
+  .meet-list{margin-top:14px;display:flex;flex-direction:column;gap:5px;}
+  .meet-row{display:flex;align-items:center;gap:11px;padding:11px 14px;
+    border:1px solid var(--rule);border-radius:8px;background:#fff;cursor:pointer;
+    text-align:left;font-family:inherit;transition:border-color .12s,background .12s;}
+  .meet-row:hover{border-color:var(--ink-soft);}
+  .meet-row.sel{background:var(--mon);border-color:var(--mon);}
+  .meet-row.sel .when{color:#fff;}
+  .meet-row.sel .who, .meet-row.sel .time{color:rgba(255,255,255,.82);}
+  .meet-row.sel .dot{background:#fff;}
+  .meet-row .when{font-weight:800;color:var(--ink);font-size:14px;flex-shrink:0;min-width:76px;}
+  .meet-row .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .meet-row .dot.ok{background:#E8A93A;}
+  .meet-row .dot.near{background:var(--rule);border:1px solid var(--ink-soft);}
+  .meet-row .who{font-size:13px;font-weight:700;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .meet-row .time{margin-left:auto;font-family:'IBM Plex Mono';font-size:12px;color:var(--ink-soft);font-weight:700;flex-shrink:0;}
+  .meet-note{font-size:12px;color:var(--ink-soft);font-weight:600;margin-top:10px;line-height:1.5;}
+  .meet-empty{font-size:13.5px;color:var(--ink-soft);font-weight:600;padding:18px 2px;}
+  .meet-foot{display:flex;align-items:center;gap:10px;padding:12px 18px;border-top:1px solid var(--rule);}
+  .meet-foot .sum{font-size:13px;font-weight:700;color:var(--ink-soft);flex:1;}
+  .meet-add{border:0;background:var(--mon);color:#fff;border-radius:20px;padding:8px 18px;
+    font-family:'Pretendard','Noto Sans KR';font-size:13.5px;font-weight:800;cursor:pointer;}
+  .meet-add:disabled{background:var(--rule);color:var(--ink-soft);cursor:default;}
+
   .subject-chip-row{display:none;}
   .subject-chip{
     flex-shrink:0;padding:6px 13px;border-radius:20px;
@@ -2513,7 +2626,7 @@
 
     body{background:#fff !important;padding:0;}
     .masthead::before, .masthead::after{display:none;}
-    .masthead .controls, .subject-chip-row, .winsize-group{display:none !important;}
+    .masthead .controls, .subject-chip-row, .winsize-group, .tt-meet-btn{display:none !important;}
     .layout{display:block !important;margin-top:10px;}
     .sidebar{display:none !important;}
     .main{display:block !important;}
@@ -4229,6 +4342,9 @@
         <select id="gradeSelect"><option value="">학년 선택</option></select>
         <select id="roomSelect"><option value="">반 선택</option></select>
       </div>
+      <button class="tt-meet-btn" id="ttMeetBtn" title="여러 선생님이 함께 비는 시간 찾기">
+        🗓 <span class="btn-long">협의 시간 찾기</span><span class="btn-short">협의</span>
+      </button>
     </div>
     <div class="subject-chip-row" id="subjectChipRow"></div>
   </div>
@@ -5064,6 +5180,39 @@
     <button class="jd-close" id="jindanModalClose" title="닫기">✕</button>
     <button class="jd-open" id="jindanOpenBtn" title="새 페이지로 크게 보기">⛶ 페이지로</button>
     <iframe id="jindanFrame" title="적정 대학 진단"></iframe>
+  </div>
+</div>
+
+<!-- 협의 시간 찾기 — #timetablePage 바깥에 둔다(위젯이 시간표 페이지를 늘려도 영향 없게) -->
+<div class="modal-overlay" id="ttMeetModal">
+  <div class="meet-box">
+    <div class="meet-head">
+      <h3>🗓 협의 시간 찾기</h3>
+      <button class="meet-close" id="ttMeetClose" aria-label="닫기">✕</button>
+    </div>
+    <div class="meet-body">
+      <div class="meet-sec">
+        <p class="meet-label">협의 대상</p>
+        <div class="meet-picked" id="ttMeetPicked"></div>
+        <div class="meet-search">
+          <input type="text" id="ttMeetSearch" placeholder="이름으로 찾기..." autocomplete="off">
+          <div class="meet-sugg" id="ttMeetSugg"></div>
+        </div>
+        <div class="meet-subjects" id="ttMeetSubjects"></div>
+      </div>
+      <div class="meet-sec">
+        <p class="meet-label">기간</p>
+        <div class="meet-weeks" id="ttMeetWeeks">
+          <button class="meet-week-btn on" data-w="0">이번 주</button>
+          <button class="meet-week-btn" data-w="1">다음 주</button>
+        </div>
+      </div>
+      <div id="ttMeetResult"></div>
+    </div>
+    <div class="meet-foot">
+      <span class="sum" id="ttMeetSum">대상을 고르세요</span>
+      <button class="meet-add" id="ttMeetAdd" disabled>업무캘린더에 넣기</button>
+    </div>
   </div>
 </div>
 
@@ -6103,6 +6252,57 @@ function ttTeacherDay(op, day){
   });
   return top;
 }
+// ══════════════════════════════════════════
+// 협의 시간 찾기 — 여러 교사가 함께 비는 교시를 찾는다.
+//  · 계산은 현황판 '오늘 시간표'와 같은 경로를 쓴다(운영표 → 당겨온 수업 → 마스킹).
+//    단순히 schedule[요일]만 보면 요일 대체·시험·창체가 있는 날 틀린다.
+//  · 시간표에 없는 일정(출장·연수·담임 업무)은 알 수 없다 → 화면에 명시한다.
+// ══════════════════════════════════════════
+let ttMeetPicked = [];      // 선택한 교사 이름
+let ttMeetWeek   = 0;       // 0=이번 주, 1=다음 주
+let ttMeetSel    = null;    // 고른 후보 {day, period, iso}
+
+// 그 날짜·교시에 이 교사가 수업이 있나 (true = 수업 있음)
+function ttMeetBusy(name, day, period, op, pulledAll){
+  const t = TEACHERS.find(x => x.name === name);
+  if(!t) return false;                                    // 시간표에 없는 사람은 비는 것으로 본다
+  const base = (t.schedule[day] || []).find(x => x.period === period) || null;
+  if(!op) return !!base;
+  const pull = pulledAll[name] && pulledAll[name][period];
+  return !!ttMaskTeacherSlot(op, base, pull, day, period);   // null이면 그 교시 비어 있음
+}
+
+// 이번/다음 주의 월~금 각 교시에 대해 {빈 사람 수, 수업 있는 사람 목록}
+function ttMeetCompute(names, weekOffset){
+  const mon = ttMondayOf(new Date());
+  mon.setDate(mon.getDate() + weekOffset * 7);
+  const out = [];
+  DAYS.forEach((day, di) => {
+    const d = new Date(mon); d.setDate(d.getDate() + di);
+    const iso = ttISO(d);
+    const op  = ttOpForDate(iso);
+    // 요일 대체 역산은 하루에 한 번만 (교사마다 다시 돌리면 느리다)
+    const pulledAll = op ? ttTeacherDay(op, day) : {};
+    const cells = {};
+    BELL_SCHEDULE.forEach(b => {
+      // 점심·방과후도 후보다 — 실제 협의는 거기서 많이 잡힌다
+      const busy = (b.period === 'lunch') ? [] : names.filter(n => ttMeetBusy(n, day, b.period, op, pulledAll));
+      cells[b.period] = { busy, free: names.length - busy.length };
+    });
+    // 방과후(7교시 이후)는 항상 전원 가능으로 둔다
+    cells['after'] = { busy: [], free: names.length };
+    out.push({ day, iso, op, cells });
+  });
+  return out;
+}
+
+// special: 수업이 아니라 항상 비는 시간. 후보 목록에서는 정규 교시 뒤로 민다
+// (점심·방과후는 늘 '전원 가능'이라 위에 두면 정작 알고 싶은 교시를 덮어버린다)
+const TT_MEET_ROWS = BELL_SCHEDULE
+  .map(b => ({ key: b.period, label: b.period === 'lunch' ? '점심' : `${b.period}교시`,
+               start: b.start, special: b.period === 'lunch' }))
+  .concat([{ key: 'after', label: '방과후', start: '16:30', special: true }]);
+
 // 그 날 운영 요일(요일 대체 시 대표 요일) — 안내 문구용
 function ttCrossDayOf(op, wd, gi){
   if(!op||!op.cells) return null; const base = wd || op.day; const cnt={};
@@ -14708,6 +14908,193 @@ function consultFmtDate(dateStr){
   return `${d.getMonth()+1}월 ${d.getDate()}일 (${CONSULT_WD[d.getDay()]})`;
 }
 
+// ══════════════════════════════════════════
+// 협의 시간 찾기 — 화면
+// ══════════════════════════════════════════
+function ttMeetOpen(){
+  ttMeetSel = null;
+  // 처음 열면 본인을 넣어둔다 — 협의에 본인이 빠지는 경우는 거의 없다
+  if(!ttMeetPicked.length){
+    const me = effTeacher();
+    if(me && me.name) ttMeetPicked = [me.name];
+  }
+  ttMeetRenderSubjects();
+  ttMeetRenderPicked();
+  document.getElementById('ttMeetSearch').value = '';
+  document.getElementById('ttMeetSugg').classList.remove('on');
+  document.getElementById('ttMeetModal').classList.add('open');
+}
+function ttMeetClose(){ document.getElementById('ttMeetModal').classList.remove('open'); }
+
+function ttMeetRenderSubjects(){
+  const el = document.getElementById('ttMeetSubjects');
+  if(!el) return;
+  // 교과 칩: 그 교과 교사가 모두 선택돼 있으면 켜짐 → 다시 누르면 통째로 해제
+  el.innerHTML = SUBJECT_GROUPS.map(g => {
+    const all = g.teachers.length && g.teachers.every(n => ttMeetPicked.includes(n));
+    return `<button class="meet-sub-chip${all ? ' on' : ''}" data-sub="${escapeHtml(g.subject)}">${escapeHtml(g.subject)} <span style="opacity:.6;">${g.teachers.length}</span></button>`;
+  }).join('');
+  el.querySelectorAll('.meet-sub-chip').forEach(b => b.addEventListener('click', () => {
+    const g = SUBJECT_GROUPS.find(x => x.subject === b.dataset.sub);
+    if(!g) return;
+    const all = g.teachers.every(n => ttMeetPicked.includes(n));
+    if(all) ttMeetPicked = ttMeetPicked.filter(n => !g.teachers.includes(n));
+    else    g.teachers.forEach(n => { if(!ttMeetPicked.includes(n)) ttMeetPicked.push(n); });
+    ttMeetRenderSubjects(); ttMeetRenderPicked();
+  }));
+}
+
+function ttMeetRenderPicked(){
+  const el = document.getElementById('ttMeetPicked');
+  el.innerHTML = ttMeetPicked.map(n =>
+    `<span class="meet-chip">${escapeHtml(n)}<button data-n="${escapeHtml(n)}" aria-label="빼기">✕</button></span>`).join('');
+  el.querySelectorAll('button[data-n]').forEach(b => b.addEventListener('click', () => {
+    ttMeetPicked = ttMeetPicked.filter(n => n !== b.dataset.n);
+    ttMeetRenderSubjects(); ttMeetRenderPicked();
+  }));
+  ttMeetRender();
+}
+
+function ttMeetRenderSugg(q){
+  const box = document.getElementById('ttMeetSugg');
+  const s = q.trim();
+  if(!s){ box.classList.remove('on'); return; }
+  const hits = TEACHERS.filter(t => t.name && t.name.includes(s) && !ttMeetPicked.includes(t.name)).slice(0, 12);
+  if(!hits.length){ box.classList.remove('on'); return; }
+  box.innerHTML = hits.map(t =>
+    `<div data-n="${escapeHtml(t.name)}">${escapeHtml(t.name)}<span class="dim">${escapeHtml(TEACHER_TO_SUBJECT[t.name] || '')}</span></div>`).join('');
+  box.querySelectorAll('div[data-n]').forEach(d => d.addEventListener('click', () => {
+    ttMeetPicked.push(d.dataset.n);
+    document.getElementById('ttMeetSearch').value = '';
+    box.classList.remove('on');
+    ttMeetRenderSubjects(); ttMeetRenderPicked();
+  }));
+  box.classList.add('on');
+}
+
+function ttMeetRender(){
+  const wrap = document.getElementById('ttMeetResult');
+  const sum  = document.getElementById('ttMeetSum');
+  const add  = document.getElementById('ttMeetAdd');
+  const N = ttMeetPicked.length;
+  add.disabled = true;
+  if(N < 2){
+    wrap.innerHTML = `<div class="meet-empty">협의 대상을 ${N === 0 ? '' : '한 명 더 '}고르면 함께 비는 시간을 찾습니다.</div>`;
+    sum.textContent = N === 0 ? '대상을 고르세요' : `${N}명 선택됨`;
+    return;
+  }
+  const week = ttMeetCompute(ttMeetPicked, ttMeetWeek);
+
+  const head = `<tr><td></td>${week.map(w => `<td><div class="meet-hd" data-day="${w.day}">${w.day}</div></td>`).join('')}</tr>`;
+  const body = TT_MEET_ROWS.map(r => {
+    const tds = week.map(w => {
+      const c  = w.cells[r.key];
+      const on = ttMeetSel && ttMeetSel.day === w.day && ttMeetSel.key === r.key ? ' sel' : '';
+      // 2명 이상 빠지는 칸은 고를 수 없다 → 아무것도 쓰지 않는다. 화면을 비워야 열린 칸이 보인다.
+      if(c.busy.length >= 2) return '<td><span class="meet-cell no"></span></td>';
+      // 전원 가능은 색으로 읽히고, 1명만 빠지면 숫자 대신 그 사람 이름을 적는다.
+      // 누구를 설득하면 되는지가 곧 정보다 — '−1'은 그걸 숨긴다.
+      const cls = c.busy.length === 0 ? 'ok' : 'near';
+      const txt = c.busy.length === 0 ? '' : escapeHtml(c.busy[0]);
+      const tip = c.busy.length === 0
+        ? `${w.day} ${r.label} · ${ttMeetPicked.length}명 전원 가능`
+        : `${w.day} ${r.label} · ${c.busy[0]} 선생님만 수업`;
+      return `<td><span class="meet-cell ${cls}${on}" data-day="${w.day}" data-key="${r.key}" title="${escapeHtml(tip)}">${txt}</span></td>`;
+    }).join('');
+    return `<tr class="${r.special ? 'special' : ''}"><td><div class="meet-pnum">${r.label}</div></td>${tds}</tr>`;
+  }).join('');
+
+  // 후보 목록은 '교시'만 담는다. 점심·방과후는 매일 비어 있어 목록에 넣으면 정작 알고 싶은
+  // 교시를 덮어버린다(5명만 모아도 점심·방과후 10칸이 위를 다 차지한다). 격자에는 그대로 보이고,
+  // 거기서 눌러 고를 수도 있다.
+  const cands = [];
+  week.forEach(w => TT_MEET_ROWS.forEach(r => {
+    if(r.special) return;
+    const c = w.cells[r.key];
+    if(c.busy.length <= 1) cands.push({ day: w.day, key: r.key, label: r.label, start: r.start,
+                                        iso: w.iso, busy: c.busy });
+  }));
+  // 전원 가능 먼저, 그다음 1명만 빠지는 시간. 1명 빠질 땐 누가 빠지는지 이름을 찍는다.
+  cands.sort((a, b) => a.busy.length - b.busy.length
+    || DAYS.indexOf(a.day) - DAYS.indexOf(b.day)
+    || TT_MEET_ROWS.findIndex(x => x.key === a.key) - TT_MEET_ROWS.findIndex(x => x.key === b.key));
+
+  const list = cands.length ? cands.slice(0, 12).map(c => {
+    const on = ttMeetSel && ttMeetSel.day === c.day && ttMeetSel.key === c.key ? ' sel' : '';
+    const ok = c.busy.length === 0;
+    return `<button class="meet-row${on}" data-day="${c.day}" data-key="${c.key}">
+      <span class="dot ${ok ? 'ok' : 'near'}"></span>
+      <span class="when">${c.day} ${c.label}</span>
+      <span class="who">${ok ? '전원 가능' : `${escapeHtml(c.busy[0])} 선생님만 수업`}</span>
+      <span class="time">${c.start}~</span>
+    </button>`;
+  }).join('') : `<div class="meet-empty">${ttMeetWeek ? '다음' : '이번'} 주에는 ${N}명이 함께 비는 <b>교시</b>가 없습니다.<br>
+      점심·방과후는 매일 가능하니 위 격자에서 고르거나, 다른 주를 보거나 대상을 줄여보세요.</div>`;
+
+  wrap.innerHTML = `
+    <div class="meet-grid-wrap"><table class="meet-grid"><thead>${head}</thead><tbody>${body}</tbody></table></div>
+    <div class="meet-list">${list}</div>
+    <p class="meet-note">※ <b>시간표 기준</b>입니다. 출장·연수·학년 업무 등 시간표에 없는 일정은 반영되지 않습니다.<br>
+      점심·방과후는 늘 비어 있어 아래 목록에서는 뺐습니다 — 격자에서 눌러 고를 수 있습니다.</p>`;
+
+  const pick = (day, key) => {
+    const r = TT_MEET_ROWS.find(x => String(x.key) === String(key));
+    const w = week.find(x => x.day === day);
+    if(!r || !w) return;
+    ttMeetSel = { day, key: r.key, label: r.label, start: r.start, iso: w.iso, busy: w.cells[r.key].busy };
+    ttMeetRender();
+  };
+  wrap.querySelectorAll('.meet-cell[data-day]').forEach(el =>
+    el.addEventListener('click', () => pick(el.dataset.day, el.dataset.key)));
+  wrap.querySelectorAll('.meet-row[data-day]').forEach(el =>
+    el.addEventListener('click', () => pick(el.dataset.day, el.dataset.key)));
+
+  // cands에는 이미 교시만 들어 있다 — '교시 중 몇 곳'이라야 정보가 된다
+  const okCnt = cands.filter(c => !c.busy.length).length;
+  sum.textContent = ttMeetSel
+    ? `${ttMeetSel.day} ${ttMeetSel.label} 선택됨`
+    : `${N}명 · 전원 가능한 교시 ${okCnt}곳`;
+  add.disabled = !ttMeetSel;
+}
+
+// 고른 시간을 업무캘린더 '일정 추가'로 넘긴다 — 바로 저장하지 않고 제목·메모를 손볼 수 있게
+async function ttMeetAddToCalendar(){
+  if(!ttMeetSel) return;
+  const sel = ttMeetSel;
+  ttMeetClose();
+  navigateTo('mytask');
+  await openMytaskModal(null, null, sel.iso);
+  // 참석자에게 공유 — sharedWith는 이메일·이름 어느 쪽도 받는다
+  const meName = effTeacher()?.name;
+  mytaskCurrentShared = ttMeetPicked.filter(n => n !== meName)
+    .map(n => { const t = TEACHERS.find(x => x.name === n); return (t && t.email) || n; });
+  // 채우기는 부가 기능 — 모달 구조가 바뀌어도 일정 추가 자체는 살아 있어야 한다
+  try {
+    const set = (id, v) => { const el = document.getElementById(id); if(el) el.value = v; };
+    set('mytaskTitle', '협의');
+    set('mytaskMemo', `대상: ${ttMeetPicked.join(', ')}`
+      + (sel.busy.length ? `\n※ ${sel.busy.join(', ')} 선생님은 이 시간 수업이 있습니다.` : ''));
+    const b = BELL_SCHEDULE.find(x => String(x.period) === String(sel.key));
+    if(b){ setMytaskTimeSelect('mytaskStartTime', b.start); setMytaskTimeSelect('mytaskEndTime', b.end); }
+    renderMytaskSharedList();
+  } catch(e){ console.warn('협의 일정 프리필 실패', e); }
+}
+
+document.getElementById('ttMeetBtn')?.addEventListener('click', ttMeetOpen);
+document.getElementById('ttMeetClose')?.addEventListener('click', ttMeetClose);
+document.getElementById('ttMeetAdd')?.addEventListener('click', ttMeetAddToCalendar);
+document.getElementById('ttMeetModal')?.addEventListener('click', e => {
+  if(e.target.id === 'ttMeetModal') ttMeetClose();      // 바깥 클릭으로 닫기
+});
+document.getElementById('ttMeetSearch')?.addEventListener('input', e => ttMeetRenderSugg(e.target.value));
+document.getElementById('ttMeetWeeks')?.addEventListener('click', e => {
+  const b = e.target.closest('.meet-week-btn'); if(!b) return;
+  ttMeetWeek = parseInt(b.dataset.w) || 0;
+  ttMeetSel = null;
+  document.querySelectorAll('#ttMeetWeeks .meet-week-btn').forEach(x => x.classList.toggle('on', x === b));
+  ttMeetRender();
+});
+
 // ── 공강에서 상담 열기 (모달) ──
 let caUnit = 30;  // 30 or 60
 
@@ -15176,6 +15563,7 @@ async function loadMytasks() {
     collection(fbDb, 'tasks', myUid, 'items'),
     snap => {
       const myTasks = snap.docs.map(d => ({ id: d.id, ownerUid: myUid, ...d.data() }));
+      mytaskHealShareIds(myTasks, myUid);   // 이름으로 저장된 공유 대상을 이메일로 정정
       // 공유받은 일정(ownerUid !== myUid)은 유지, 내 일정만 교체
       mytaskTasks = [...myTasks, ...mytaskTasks.filter(t => t.ownerUid !== myUid)];
       if (mytaskInitialized && document.getElementById('mytaskPage')?.classList.contains('active')) {
@@ -15588,6 +15976,53 @@ function setMytaskStatusBtn(status) {
 // 공유받은 사람마다 자기 완료(doneBy)를 체크. 전원 완료되면 전체 상태가 자동으로
 // 완료가 되고, 작성자는 언제든 상태 버튼으로 직접 완료 처리할 수 있다.
 // 기존(공용 상태) 공유 일정은 그대로 — 작성 시 옵션을 켠 일정에만 적용.
+// ── 공유 대상 식별자 자가 치유 (이름 → 이메일) ──
+// sharedWith·doneBy 에는 (email || name)이 저장된다. 아직 로그인한 적 없는 교사는
+// 이메일이 없어 이름으로 들어가는데, 보안 규칙의 isSharedWithMe 는 완전 일치 비교라
+// 그 사람은 상태·댓글·완료를 저장할 수 없다(화면에 보이기는 한다).
+// 규칙 안에서는 리스트 원소를 정규화할 수단이 없으므로 데이터 쪽을 이메일로 맞춘다.
+// 고칠 수 있는 건 문서 소유자뿐이라(규칙상 전체 쓰기는 소유자 한정) 자기 일정을
+// 불러올 때 조용히 바꾼다. 선생님들이 앱을 쓰는 대로 자연히 수렴한다.
+let mytaskHealTried = new Set();        // 문서당 이 세션 1회만 시도 (쓰기 루프 방지)
+function mytaskHealShareIds(tasks, myUid){
+  if (IS_WIDGET_WV) return;             // 위젯 창마다 중복 실행되는 것 방지 — 메인 앱에서만
+  if (isViewAs()) return;               // 읽기 전용 보기: 어차피 쓰기가 막히고 경고만 뜬다
+  if (!TEACHERS.length || !myUid) return;   // 명렬 로딩 전이면 다음 스냅샷에서
+
+  // 동명이인이면 엉뚱한 사람에게 공유가 옮겨붙을 수 있다 → 유일할 때만 변환
+  const toEmail = name => {
+    const hit = TEACHERS.filter(t => t.name === name && t.email);
+    return hit.length === 1 ? hit[0].email : null;
+  };
+
+  tasks.forEach(t => {
+    if (mytaskHealTried.has(t.id)) return;
+    const shared = t.sharedWith || [];
+    if (!shared.some(x => x && !x.includes('@'))) return;      // 고칠 것 없음
+
+    // 풀리지 않는 이름(퇴직·전출·명렬 미등록)은 그대로 둔다 — 지우면 조용한 공유 해제가 된다
+    const newShared = shared.map(x => (x && !x.includes('@') && toEmail(x)) || x);
+    if (newShared.every((v, i) => v === shared[i])) return;    // 하나도 못 풀었으면 쓰지 않음
+
+    // doneBy 도 같은 형식이라 함께 옮긴다. 안 맞추면 완료 판정이 어긋나
+    // 이미 자기 몫을 끝낸 사람이 미완료로 되돌아 보인다.
+    const done    = t.doneBy || [];
+    const newDone = done.map(d => {
+      const id = d && d.id;
+      if (!id || id.includes('@')) return d;
+      const em = toEmail(id);
+      return em ? { ...d, id: em } : d;
+    });
+
+    mytaskHealTried.add(t.id);
+    const payload = { sharedWith: newShared };
+    if (newDone.some((v, i) => v !== done[i])) payload.doneBy = newDone;
+    // setDoc(merge) 는 보기 모드 차단 래퍼를 통과한다. 배열은 통째로 교체된다(원하는 동작).
+    setDoc(doc(fbDb, 'tasks', myUid, 'items', t.id), payload, { merge: true })
+      .catch(() => { /* 실패해도 다음 접속 때 다시 시도 */ });
+  });
+}
+
 function mytaskResolveShareEmail(entry){   // sharedWith 항목(이름 또는 이메일) → 이메일
   if (!entry) return null;
   if (entry.includes('@')) return entry;
@@ -15846,7 +16281,11 @@ function searchMytaskShare(val) {
       + ' onmouseover="this.style.background=\'var(--paper-soft)\'"'
       + ' onmouseout="this.style.background=\'\'"> '
       + t.name + ' <span style="font-size:12px;color:var(--ink-soft);">' + (t.subject||'') + '</span>'
-      + (t.email ? '<span style="font-size:10px;color:#10B981;margin-left:4px;">✓</span>' : '')
+      + (t.email
+          ? '<span style="font-size:10px;color:#10B981;margin-left:4px;">✓</span>'
+          : '<span style="font-size:10px;color:var(--ink-soft);margin-left:6px;border:1px solid var(--rule);'
+            + 'border-radius:6px;padding:1px 5px;" title="아직 앱에 로그인한 적이 없어 이름으로 저장됩니다. '
+            + '본인이 로그인하고 작성자가 앱을 열면 자동으로 연결됩니다.">아직 로그인 전</span>')
       + '</div>';
   }).join('');
 
