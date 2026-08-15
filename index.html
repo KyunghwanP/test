@@ -12185,10 +12185,11 @@ async function s360BigPhoto(s){
   s360BigCache[key] = null;                       // 실패해도 다시 묻지 않게 먼저 박아둔다
   try {
     const idToken = await fbAuth.currentUser.getIdToken();
-    const res = await fetch(CONSULT_WORKER, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action:'photoGet', idToken,
-                             g:parseInt(s.grade), r:parseInt(s.room), n:parseInt(s.num) })
+    // GET이라야 브라우저가 응답을 캐시한다(워커가 max-age=86400을 준다).
+    // POST면 같은 학생을 다시 열 때마다 90KB를 새로 받는다.
+    const q = `?g=${parseInt(s.grade)}&r=${parseInt(s.room)}&n=${parseInt(s.num)}`;
+    const res = await fetch(CONSULT_WORKER + '/photo' + q, {
+      headers: { Authorization: `Bearer ${idToken}` }
     });
     if(!res.ok || !(res.headers.get('Content-Type')||'').startsWith('image/')) return null;
     s360BigCache[key] = URL.createObjectURL(await res.blob());
