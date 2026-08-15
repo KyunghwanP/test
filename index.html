@@ -1426,11 +1426,14 @@
   .s360-head{display:grid;grid-template-columns:1fr auto;grid-template-areas:"info photo" "pts photo";column-gap:18px;row-gap:12px;align-items:start;margin-bottom:14px;}
   .s360-head-info{grid-area:info;min-width:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
   .s360-head-pts{grid-area:pts;margin-bottom:0 !important;}
-  .s360-photo{grid-area:photo;align-self:start;width:150px;height:190px;object-fit:cover;border-radius:12px;border:1px solid var(--rule);background:var(--paper-soft);}
+  /* 3:4 — 원본(600×800)과 같은 비율이라 잘리지 않는다.
+     예전 150×190은 3:4가 아니라 object-fit:cover 가 위아래를 조금씩 잘라내고 있었다.
+     260 이상으로 키우면 이름 줄이 밀려 '연락처 보기'가 두 번째 줄로 떨어진다. */
+  .s360-photo{grid-area:photo;align-self:start;width:220px;height:293px;object-fit:cover;border-radius:12px;border:1px solid var(--rule);background:var(--paper-soft);}
   .s360-photo.zoomable{cursor:zoom-in;}
   @media (max-width:640px){
     .s360-head{grid-template-columns:1fr;grid-template-areas:"info" "photo" "pts";}
-    .s360-photo{justify-self:center;width:176px;height:222px;}
+    .s360-photo{justify-self:center;width:200px;height:267px;}
   }
   /* 사진 크게 보기 — 작은 사진(150×200)일 땐 2.2배(330×440)에서 멈춘다. 더 늘리면 뭉개진다.
      R2 고화질(600×800)이 오면 .big 이 붙어 그 크기까지 키운다. */
