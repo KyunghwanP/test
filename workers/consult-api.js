@@ -496,12 +496,16 @@ async function verifyTeacher(env, idToken) {
   return { email, admin: email === String(env.ADMIN_EMAIL || ADMIN_EMAIL).toLowerCase() };
 }
 
-// 사진 내려주기 — 응답은 JSON이 아니라 이미지 바이트다.
-async function handlePhotoGet(env, body, cors) {
+// 사진 내려주기 — GET /photo?g=&r=&n= + Authorization: Bearer <idToken>
+// POST로 하면 브라우저가 응답을 캐시하지 않는다. 같은 학생을 다시 열 때마다 90KB를
+// 새로 받게 되므로 GET으로 둔다(Cache-Control이 살아난다).
+async function handlePhotoGet(env, request, cors) {
   if (!env.PHOTOS) return json({ success: false, error: 'NO_BUCKET' }, 503, cors);
-  const who = await verifyTeacher(env, String(body.idToken || ''));
+  const m = /^Bearer\s+(.+)$/i.exec(request.headers.get('Authorization') || '');
+  const who = await verifyTeacher(env, m ? m[1] : '');
   if (!who) return json({ success: false, error: 'AUTH' }, 403, cors);
-  const key = photoKey(body.g, body.r, body.n);
+  const q = new URL(request.url).searchParams;
+  const key = photoKey(q.get('g'), q.get('r'), q.get('n'));
   if (!key) return json({ success: false, error: 'BAD_KEY' }, 400, cors);
 
   const obj = await env.PHOTOS.get(key);
@@ -542,8 +546,9 @@ function corsHeaders(env, origin) {
   const ok = allow.includes(norm(origin));
   return {
     'Access-Control-Allow-Origin': ok ? origin : 'null',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    // 사진 조회는 GET + Authorization 이다(브라우저 캐시를 쓰려면 GET이어야 한다)
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin'
   };
@@ -558,10 +563,19 @@ export default {
     const cors = corsHeaders(env, origin);
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-    if (request.method !== 'POST') return json({ success: false, error: 'METHOD' }, 405, cors);
     if (cors['Access-Control-Allow-Origin'] === 'null') {
       return json({ success: false, error: 'ORIGIN' }, 403, cors);
     }
+    // 사진 조회만 GET (브라우저 캐시를 쓰기 위해). 나머지는 전부 POST + JSON.
+    if (request.method === 'GET') {
+      if (new URL(request.url).pathname === '/photo') {
+        try { return await handlePhotoGet(env, request, cors); }
+        catch (e) { console.error('photoGet', e && e.message);
+                    return json({ success: false, error: 'SERVER' }, 500, cors); }
+      }
+      return json({ success: false, error: 'METHOD' }, 405, cors);
+    }
+    if (request.method !== 'POST') return json({ success: false, error: 'METHOD' }, 405, cors);
 
     let body;
     try { body = await request.json(); }
@@ -574,8 +588,6 @@ export default {
         case 'book':   return json(await handleBook(env, body),   200, cors);
         case 'cancel': return json(await handleCancel(env, body), 200, cors);
         case 'impersonate': return json(await handleImpersonate(env, body), 200, cors);
-        // 사진 조회만 이미지 바이트를 그대로 돌려준다(base64로 감싸면 33% 커진다)
-        case 'photoGet': return await handlePhotoGet(env, body, cors);
         case 'photoPut': return json(await handlePhotoPut(env, body), 200, cors);
         default:       return json({ success: false, error: 'UNKNOWN_ACTION' }, 400, cors);
       }
