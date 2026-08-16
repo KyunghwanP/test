@@ -1795,6 +1795,7 @@ let phItems = [];              // [{ dataUrl, name, num, matched:{grade,room,num
 let phAllStudents = null;      // students/main 캐시
 let phDebug = [];              // 진단용: 시트에서 감지된 짧은 텍스트 셀(중복 제거)
 let phRoster = [];             // 배정 대상 학생(해당 학년)
+let phSheetRoom = {};          // 시트번호 → 추정된 반 (동명이인 오배정 방지)
 let phDiag = null;             // 진단 수치 { media, anchored, sheets, caps }
 
 // 셀 텍스트에서 '번호+이름' 캡션 추출 — "홍길동" · "1 홍길동" · "1.홍길동" · "홍길동 1" 등 형식 허용
@@ -1897,8 +1898,10 @@ async function phProcess(file) {
     const imgs = [];            // { sheet, row, col, id }
     const dbg = new Set();
     let anchored = 0, sheets = 0;
+    const sheetNames = [];
     wb.eachSheet(ws => {
       const si = sheets++;
+      sheetNames[si] = String(ws.name || '');
       try {
         let images = [];
         try { images = ws.getImages ? ws.getImages() : []; } catch(_) { images = []; }
@@ -1936,15 +1939,37 @@ async function phProcess(file) {
         const d = (dr < 0 ? -dr * 1.4 : dr) + Math.abs(dc) * 1.5;   // 캡션이 사진 아래면 우대
         if (d < bestD) { bestD = d; best = i; }
       }
-      if (best < 0 || bestD > 24) return { id: im.id, name: null, num: null };
+      if (best < 0 || bestD > 24) return { id: im.id, sheet: im.sheet, name: null, num: null };
       usedCap.add(best);
-      return { id: im.id, name: caps[best].name, num: caps[best].num };
+      return { id: im.id, sheet: im.sheet, name: caps[best].name, num: caps[best].num };
     });
 
-    // 압축 + 캡션 이름 → 명단 매칭(동명이인은 번호로 보정)
+    // 압축 + 캡션 이름 → 명단 매칭
     setS(`사진 ${results.length}장 압축·매칭 중…`);
     const roster = phAllStudents.filter(s => parseInt(s.grade) === grade);
     phRoster = roster;
+    // 시트마다 어느 반인지 먼저 정한다. 사진명렬표는 대개 시트 하나가 한 반이다.
+    // 학년 전체에서 이름으로 찾으면 동명이인이 다른 반 학생에게 붙는다. 번호로도 못 가른다
+    // (3반 12번과 7반 12번이 둘 다 같은 이름일 수 있다) → 반을 먼저 좁혀야 한다.
+    const sheetRoom = {};
+    [...new Set(results.map(r => r.sheet))].forEach(si => {
+      // ⓐ 시트 이름에 반이 적혀 있으면 그대로 ('3반', '2-3', '3')
+      const nm = sheetNames[si] || '';
+      const m = /(\d{1,2})\s*반/.exec(nm) || /\d\s*-\s*(\d{1,2})/.exec(nm) || /^\s*(\d{1,2})\s*$/.exec(nm);
+      if (m && roster.some(t => parseInt(t.room) === parseInt(m[1]))) { sheetRoom[si] = parseInt(m[1]); return; }
+      // ⓑ 아니면 캡션(번호+이름)이 가장 잘 들어맞는 반을 고른다. 이름만 맞으면 1점, 번호까지 맞으면 2점.
+      const score = {};
+      results.filter(r => r.sheet === si && r.name).forEach(cp =>
+        roster.forEach(t => {
+          if (t.name !== cp.name) return;
+          if (cp.num != null && parseInt(t.num) !== cp.num) return;
+          score[t.room] = (score[t.room] || 0) + (cp.num != null ? 2 : 1);
+        }));
+      let best = null, bv = 0;
+      for (const r in score) if (score[r] > bv) { bv = score[r]; best = parseInt(r); }
+      if (bv >= 4) sheetRoom[si] = best;   // 근거가 빈약하면 정하지 않는다(손지정으로 넘김)
+    });
+    phSheetRoom = sheetRoom;
     phItems = [];
     let done = 0;
     for (const rz of results) {
@@ -1954,9 +1979,15 @@ async function phProcess(file) {
       const dataUrl = pic.small;
       let matched = null;
       if (rz.name) {
-        const cands = roster.filter(s => s.name === rz.name);
+        const room = sheetRoom[rz.sheet];
+        // 반을 알면 그 반 안에서만 찾는다 → 다른 반 동명이인에게 갈 수 없다
+        const pool = room != null ? roster.filter(s => parseInt(s.room) === room) : roster;
+        const cands = pool.filter(s => s.name === rz.name);
         if (cands.length === 1) matched = cands[0];
-        else if (cands.length > 1 && rz.num != null) matched = cands.find(s => parseInt(s.num) === rz.num) || null;
+        // 반을 알 때만 번호로 가른다. 반을 모르는 채 번호로 고르면 3반 12번과 7반 12번이
+        // 이름까지 같을 때 엉뚱한 학생에게 붙는다 → 그 경우는 미매칭으로 남겨 손으로 지정하게 한다.
+        else if (cands.length > 1 && room != null && rz.num != null)
+          matched = cands.find(s => parseInt(s.num) === rz.num) || null;
       }
       phItems.push({ dataUrl, large: pic.large, name: rz.name, num: rz.num, matched: matched ? { grade: matched.grade, room: matched.room, num: matched.num, name: matched.name } : null });
       if ((++done % 10) === 0) setS(`압축·매칭 중… ${done}/${results.length}`);
@@ -2018,6 +2049,8 @@ function phRenderPreview() {
     <div class="stat-chip">캡션인식 <b>${named}</b></div>
     <div class="stat-chip">명단매칭 <b>${matched}</b>${phItems.filter(x=>x.fixed).length ? ` <span style="color:#15803d;">(손지정 ${phItems.filter(x=>x.fixed).length})</span>` : ''}</div>
     <div class="stat-chip">명단 <b>${phRoster.length}</b>명</div>
+    ${Object.keys(phSheetRoom).length
+      ? `<div class="stat-chip">시트→반 <b>${Object.values(phSheetRoom).map(r=>r+'반').join(' · ')}</b></div>` : ''}
     <div class="stat-chip">파일이미지 <b>${d.media != null ? d.media : '?'}</b> · 앵커 <b>${d.anchored != null ? d.anchored : '?'}</b> · 캡션 <b>${d.caps != null ? d.caps : '?'}</b></div>`;
   // 캡션 인식이 부진하면(대부분 못 읽음) 원인 파악용으로 읽힌 텍스트 표본을 보여줌
   const grid = document.getElementById('phGrid');
