@@ -181,8 +181,16 @@ if ('serviceWorker' in navigator) {
   .ph-card img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:6px;background:#e5e7eb;}
   .ph-cap{font-size:12px;font-weight:700;margin-top:4px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .ph-match{font-size:11px;color:var(--wed);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .ph-nomatch{opacity:.55;}
+  .ph-nomatch{opacity:1;border-color:#f0c14b;background:#fffbeb;}
   .ph-nomatch .ph-match{color:var(--mon);}
+  /* 미매칭 사진은 버리지 않고 손으로 지정할 수 있게 한다 — 이름 표기 차이·전입생 등 */
+  .ph-pick{width:100%;margin-top:5px;padding:4px 6px;border:1px solid var(--rule);border-radius:6px;
+    font-family:'Pretendard','Noto Sans KR';font-size:11.5px;font-weight:700;background:var(--paper);color:var(--ink);}
+  .ph-pick:focus{outline:none;border-color:var(--mon);}
+  .ph-card.ph-fixed{border-color:#16a34a;background:#f0fdf4;}
+  .ph-card.ph-fixed .ph-match{color:#15803d;font-weight:800;}
+  .ph-only{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;
+    color:var(--ink);cursor:pointer;user-select:none;}
   .ph-grade{font-family:'Noto Sans KR';font-weight:700;font-size:13.5px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--rule);background:var(--paper-soft);color:var(--ink);cursor:pointer;}
 </style>
 </head>
@@ -576,6 +584,9 @@ if ('serviceWorker' in navigator) {
       <div class="status" id="phStatus"></div>
       <div id="phPreviewWrap" style="display:none;">
         <div class="stat-chips" id="phStats" style="margin-top:14px;"></div>
+        <label class="ph-only" id="phOnlyWrap" style="display:none;margin:8px 0 2px;">
+          <input type="checkbox" id="phOnlyNoMatch"> 매칭 안 된 것만 보기
+        </label>
         <div class="ph-grid" id="phGrid"></div>
         <div class="btn-row">
           <button class="btn btn-primary" id="phUploadBtn" disabled>☁️ 사진 저장</button>
@@ -1806,6 +1817,7 @@ document.getElementById('phClearBtn').addEventListener('click', () => {
   clearStatus('phStatus');
 });
 document.getElementById('phUploadBtn').addEventListener('click', phUpload);
+document.getElementById('phOnlyNoMatch')?.addEventListener('change', phRenderPreview);
 
 // ExcelJS media(embedded 이미지) → 두 벌로 만든다.
 //   small : 150×200 q0.62 — Firestore(studentPhotos)에 지금까지처럼. 문서 1MB 한계 때문.
@@ -1963,17 +1975,48 @@ function phRenderPreview() {
   const named = phItems.filter(x => x.name).length;       // 캡션(번호+이름)을 읽은 사진
   const matched = phItems.filter(x => x.matched).length;  // 명단과 매칭된 사진
   // 카드: 엑셀 캡션에서 읽은 번호·이름 + 명단 매칭 결과. 미매칭은 저장 안 함.
-  document.getElementById('phGrid').innerHTML = phItems.map(x => `
-    <div class="ph-card${x.matched ? '' : ' ph-nomatch'}">
+  // 이미 다른 사진이 가져간 학생은 목록에서 빼 중복 지정을 막는다
+  const taken = new Set(phItems.filter(x => x.matched)
+    .map(x => `${x.matched.room}-${x.matched.num}`));
+  const onlyNo = document.getElementById('phOnlyNoMatch')?.checked;
+  document.getElementById('phGrid').innerHTML = phItems.map((x, i) => {
+    if (onlyNo && x.matched && !x.fixed) return '';
+    // 미매칭이면 손으로 고를 수 있게 명단을 드롭다운으로 붙인다.
+    // 자동 매칭이 실패하는 건 대개 이름 표기 차이·전입생·캡션 오독이라 사람이 보면 바로 안다.
+    // 손으로 지정한 카드에도 드롭다운을 남긴다 — 잘못 골랐을 때 바꾸거나 해제할 수 있어야 한다.
+    // (자동 매칭된 것은 건드릴 일이 없으므로 그대로 둔다)
+    const cur = x.fixed && x.matched ? `${x.matched.room}|${x.matched.num}` : '';
+    const pick = (x.matched && !x.fixed) ? '' : `
+      <select class="ph-pick" data-i="${i}">
+        <option value="">— 학생 지정 —</option>
+        ${phRoster.filter(st => !taken.has(`${st.room}-${st.num}`) || `${st.room}|${st.num}` === cur)
+          .map(st => `<option value="${st.room}|${st.num}"${`${st.room}|${st.num}` === cur ? ' selected' : ''}>${st.room}반 ${st.num}번 ${phEsc(st.name)}</option>`).join('')}
+      </select>`;
+    return `
+    <div class="ph-card${x.matched ? (x.fixed ? ' ph-fixed' : '') : ' ph-nomatch'}">
       <img src="${x.dataUrl}" alt="">
       <div class="ph-cap">${x.num != null ? x.num + ' ' : ''}${x.name ? phEsc(x.name) : '?'}</div>
-      <div class="ph-match">${x.matched ? `→ ${x.matched.room}반 ${x.matched.num}번` : (x.name ? '⚠ 명단에 없음' : '⚠ 캡션 못읽음')}</div>
-    </div>`).join('');
+      <div class="ph-match">${x.matched
+        ? `${x.fixed ? '✔ ' : '→ '}${x.matched.room}반 ${x.matched.num}번${x.fixed ? ' ' + phEsc(x.matched.name) : ''}`
+        : (x.name ? '⚠ 명단에 없음' : '⚠ 캡션 못읽음')}</div>
+      ${pick}
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.ph-pick').forEach(sel => sel.addEventListener('change', () => {
+    const x = phItems[parseInt(sel.dataset.i)];
+    if (!sel.value) { x.matched = null; x.fixed = false; }
+    else {
+      const [room, num] = sel.value.split('|');
+      const st = phRoster.find(t => String(t.room) === room && String(t.num) === num);
+      if (st) { x.matched = { grade: st.grade, room: st.room, num: st.num, name: st.name }; x.fixed = true; }
+    }
+    phRenderPreview();
+  }));
   const d = phDiag || {};
   document.getElementById('phStats').innerHTML = `
     <div class="stat-chip">사진 <b>${total}</b>장</div>
     <div class="stat-chip">캡션인식 <b>${named}</b></div>
-    <div class="stat-chip">명단매칭 <b>${matched}</b></div>
+    <div class="stat-chip">명단매칭 <b>${matched}</b>${phItems.filter(x=>x.fixed).length ? ` <span style="color:#15803d;">(손지정 ${phItems.filter(x=>x.fixed).length})</span>` : ''}</div>
     <div class="stat-chip">명단 <b>${phRoster.length}</b>명</div>
     <div class="stat-chip">파일이미지 <b>${d.media != null ? d.media : '?'}</b> · 앵커 <b>${d.anchored != null ? d.anchored : '?'}</b> · 캡션 <b>${d.caps != null ? d.caps : '?'}</b></div>`;
   // 캡션 인식이 부진하면(대부분 못 읽음) 원인 파악용으로 읽힌 텍스트 표본을 보여줌
@@ -1987,7 +2030,12 @@ function phRenderPreview() {
   }
   document.getElementById('phPreviewWrap').style.display = '';
   document.getElementById('phUploadBtn').disabled = matched === 0;
-  setStatus('phStatus', '사진 안 번호·이름과 카드가 맞는지 확인 후 [☁️ 사진 저장]. 미매칭(⚠)은 저장되지 않습니다.', 'info');
+  const noMatch = total - matched;
+  const wrap = document.getElementById('phOnlyWrap');
+  if (wrap) wrap.style.display = noMatch ? '' : 'none';
+  setStatus('phStatus', noMatch
+    ? `매칭 안 된 사진이 ${noMatch}장 있습니다. 카드 아래 [— 학생 지정 —]에서 직접 고르면 함께 저장됩니다.`
+    : '사진 안 번호·이름과 카드가 맞는지 확인 후 [☁️ 사진 저장].', 'info');
 }
 
 async function phUpload() {
