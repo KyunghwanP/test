@@ -309,11 +309,20 @@
 <script>
   // 다크모드: 저장된 설정을 스타일 로드 전에 적용 (깜빡임 방지)
   try{ if(localStorage.getItem('ynhs-dark')==='1') document.documentElement.classList.add('dark'); }catch(e){}
-  // 위젯(별도 WebView2, localStorage 미공유)은 URL 파라미터 dark=1/0 로 다크모드 지정 → 적용+기억
+  // 위젯은 URL 파라미터 dark=1/0 으로 자기 창의 테마를 지정한다.
+  // 저장은 하지 않는다 — 위젯과 앱이 같은 WebView2 프로필(로그인 공유)을 쓰게 된 뒤로
+  // localStorage가 공용이라, 위젯이 저장하면 앱의 라이트/다크 설정을 덮어썼다.
+  // (증상: 라이트로 껐는데 다크로 켜짐 / 앱은 라이트인데 메모 iframe만 다크)
   try{ var _dp=new URLSearchParams(location.search).get('dark');
-       if(_dp==='1'||_dp==='0'){ var _on=_dp==='1';
-         document.documentElement.classList.toggle('dark',_on);
-         try{ localStorage.setItem('ynhs-dark', _on?'1':'0'); }catch(e){} } }catch(e){}
+       if(_dp==='1'||_dp==='0'){ document.documentElement.classList.toggle('dark',_dp==='1'); } }catch(e){}
+  // 다른 창(앱·다른 위젯)에서 테마를 바꾸면 이 창도 따라간다.
+  // 단, dark 파라미터로 고정된 창은 자기 설정을 지킨다.
+  try{ window.addEventListener('storage', function(e){
+         if(e.key !== 'ynhs-dark') return;
+         var p = new URLSearchParams(location.search).get('dark');
+         if(p === '1' || p === '0') return;
+         document.documentElement.classList.toggle('dark', e.newValue === '1');
+       }); }catch(e){}
   // 위젯 글래스(아크릴) 모드: 창은 아크릴, 페이지는 반투명 유리질감
   try{ if(new URLSearchParams(location.search).get('glass')==='1') document.documentElement.classList.add('glass'); }catch(e){}
 </script>
@@ -12180,19 +12189,22 @@ function loadExcelJS(){
 const CONSULT_WORKER = 'https://consult-api.pkh910518.workers.dev';
 const s360PhotoCache = {};   // '학년-반' → { 번호: dataURL } (반 단위로 한 번만 로드)
 const s360BigCache   = {};   // '학년-반-번호' → blob URL (고화질, 세션 동안 재사용)
+const s360PhotoVer   = {};   // '학년-반' → 사진 갱신 시각 (캐시 무효화용)
 let   _thumbFor      = 0;    // 늦게 온 고화질이 그 사이 바뀐 학생 위에 덮이지 않게
 
 // 고화질 사진(R2)을 워커에서 받아온다. 없으면 null → 호출부가 작은 사진을 쓴다.
 // 워커가 로그인 확인을 하므로 <img src>로는 못 받는다(헤더를 못 붙임) → fetch 후 blob.
 async function s360BigPhoto(s){
-  const key = `${parseInt(s.grade)}-${parseInt(s.room)}-${parseInt(s.num)}`;
+  const key = `${parseInt(s.grade)}-${parseInt(s.room)}-${parseInt(s.num)}|${s360PhotoVer[`${parseInt(s.grade)}-${parseInt(s.room)}`] || ''}`;
   if(s360BigCache[key] !== undefined) return s360BigCache[key];
   s360BigCache[key] = null;                       // 실패해도 다시 묻지 않게 먼저 박아둔다
   try {
     const idToken = await fbAuth.currentUser.getIdToken();
     // GET이라야 브라우저가 응답을 캐시한다(워커가 max-age=86400을 준다).
     // POST면 같은 학생을 다시 열 때마다 90KB를 새로 받는다.
-    const q = `?g=${parseInt(s.grade)}&r=${parseInt(s.room)}&n=${parseInt(s.num)}`;
+    const ver = s360PhotoVer[`${parseInt(s.grade)}-${parseInt(s.room)}`] || '';
+    const q = `?g=${parseInt(s.grade)}&r=${parseInt(s.room)}&n=${parseInt(s.num)}`
+            + (ver ? `&v=${encodeURIComponent(ver)}` : '');
     const res = await fetch(CONSULT_WORKER + '/photo' + q, {
       headers: { Authorization: `Bearer ${idToken}` }
     });
@@ -12209,7 +12221,11 @@ async function s360LoadPhoto(s){
   try {
     if(s360PhotoCache[ck] === undefined){
       const snap = await getDoc(doc(fbDb, 'studentPhotos', ck));
-      s360PhotoCache[ck] = snap.exists() ? (snap.data().photos || {}) : {};
+      const d = snap.exists() ? (snap.data() || {}) : {};
+      s360PhotoCache[ck] = d.photos || {};
+      // 사진을 다시 올리면 이 값이 바뀐다 → 고화질 URL에 붙여 브라우저 캐시를 갈아치운다.
+      // (워커가 max-age=86400 을 주므로 URL이 그대로면 하루 동안 옛 사진이 나온다)
+      s360PhotoVer[ck] = String(d.updatedAt || '');
     }
     const url = s360PhotoCache[ck][String(parseInt(s.num))];
     if(url){

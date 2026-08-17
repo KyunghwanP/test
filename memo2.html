@@ -12,11 +12,17 @@
       (function(){
         const apply = on => document.documentElement.classList.toggle('dark', on);
         try { apply(localStorage.getItem('ynhs-dark') === '1'); } catch(e) {}
-        // 위젯(별도 WebView2)은 URL 파라미터 dark=1/0 로 지정 → 적용+기억
+        // 위젯은 URL 파라미터로 자기 창의 테마를 지정한다. 저장하지 않는다 —
+        // 앱과 localStorage를 공유하므로 저장하면 앱 설정을 덮어쓴다.
         try { const dp = new URLSearchParams(location.search).get('dark');
-              if (dp === '1' || dp === '0') { apply(dp === '1');
-                try { localStorage.setItem('ynhs-dark', dp); } catch(e) {} } } catch(e) {}
-        window.addEventListener('storage', e => { if (e.key === 'ynhs-dark') apply(e.newValue === '1'); });
+              if (dp === '1' || dp === '0') apply(dp === '1'); } catch(e) {}
+        // 다른 창에서 토글하면 따라간다. 단 dark 파라미터로 고정된 창(위젯)은 자기 설정을 지킨다.
+        window.addEventListener('storage', e => {
+          if (e.key !== 'ynhs-dark') return;
+          const p = new URLSearchParams(location.search).get('dark');
+          if (p === '1' || p === '0') return;
+          apply(e.newValue === '1');
+        });
         try { if (new URLSearchParams(location.search).get('glass') === '1') document.documentElement.classList.add('glass'); } catch(e) {}
         // 위젯에서 다크가 어떤 이유로든 안 걸리거나 풀리는 경우 대비: dark=1이면 강제로 유지
         try {
