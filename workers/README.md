@@ -24,6 +24,9 @@ node workers/teacher-api.test.mjs     # 워커 로직 (fetch를 스텁으로 물
 node workers/roster-split.test.mjs    # upload.html 분리 저장 → 워커 조회가 이어지는지
 ```
 
+> `roster-split.test.mjs`는 `upload.html`을 읽습니다. 업로드 도구는 **test 저장소에만**
+> 있으므로 이 테스트도 test 저장소에서만 돕니다(ynhs에는 파일을 두지 않습니다).
+
 ---
 
 # 학부모 상담 예약 API (`consult-api`)
