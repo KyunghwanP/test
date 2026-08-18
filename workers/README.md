@@ -193,13 +193,36 @@ Value에 JSON **파일 전체**를 붙여넣습니다(`{` 부터 `}` 까지, 줄
 
 ### 6) 확인
 
-```bash
-curl -s https://teacher-api.pkh910518.workers.dev/photo
-# {"success":false,"error":"ORIGIN"}      ← 정상 (Origin 헤더가 없으니 거부)
+**① 배포됐는지만 먼저** — 주소창에 그대로 붙여넣습니다.
 
+```
+https://teacher-api.pkh910518.workers.dev/photo
+```
+
+`{"success":false,"error":"ORIGIN"}` 이 보이면 워커는 살아있습니다. 주소창 접속은
+Origin 헤더를 안 보내므로 거부되는 것이 정상입니다.
+
+**② 변수·바인딩까지** — 브라우저 콘솔이 가장 정확합니다. Origin 헤더를 브라우저가
+붙여주고, 실제 앱이 부르는 경로와 완전히 같습니다.
+
+`https://kyunghwanp.github.io/test/` 접속 → **F12 → Console**:
+
+```js
+fetch('https://teacher-api.pkh910518.workers.dev/photo').then(r=>r.json()).then(console.log)
+```
+
+터미널을 쓴다면:
+
+```bash
+# macOS · Linux · Git Bash
 curl -s -H 'Origin: https://kyunghwanp.github.io' \
      https://teacher-api.pkh910518.workers.dev/photo
-# {"success":false,"error":"AUTH"}        ← 여기까지 나오면 2)·4)는 성공
+```
+
+```powershell
+# PowerShell — 'curl' 은 Invoke-WebRequest 별칭이라 -s·-H 를 못 알아듣는다.
+# 반드시 curl.exe 로 부르고 한 줄로 쓴다(줄 끝 \ 는 bash 문법).
+curl.exe -s -H "Origin: https://kyunghwanp.github.io" https://teacher-api.pkh910518.workers.dev/photo
 ```
 
 | 돌아온 값 | 뜻 |
