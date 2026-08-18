@@ -4,7 +4,7 @@ const BASE = self.location.pathname.replace(/[^/]*$/, '');   // 예: '/ynhs/' ·
 // 캐시 저장소는 '경로'가 아니라 '출처' 단위로 공유된다 → /ynhs/ 와 /test/ 는 같은 출처라
 // 캐시 이름이 같으면 서로의 캐시를 지운다(한쪽 버전이 올라갈 때 activate가 삭제).
 // 그래서 이름에 BASE를 넣어 배포별로 분리한다. 예: 'ynhs:/ynhs/:v496'
-const CACHE_VER  = 'v514';
+const CACHE_VER  = 'v515';
 const CACHE_NAME = 'ynhs:' + BASE + ':' + CACHE_VER;
 const CACHE_MINE = 'ynhs:' + BASE + ':';                     // 이 배포가 소유한 캐시 접두사
 // 화면(HTML)을 네트워크에서 기다려 주는 최대 시간. 이 시간을 넘기면 캐시로 즉시 전환한다.
@@ -103,7 +103,11 @@ self.addEventListener('fetch', e => {
     if (res) return res;
 
     // 네트워크도 실패 + 캐시도 없음 → undefined 대신 명확한 응답(ERR_FAILED 방지).
-    if (isNav) {
+    // 이 폴백은 '앱 첫 화면' 요청에만 쓴다. career.html 같은 다른 페이지 자리에 앱 껍데기를
+    // 돌려주면 그 페이지가 있어야 할 자리에 앱이 통째로 들어간다. iframe 로드도 mode가
+    // 'navigate' 라서, 진로진학 탭 안에서 그 일이 벌어지면 그 안의 앱이 또 career.html 을
+    // 요청해 사이드바가 무한히 중첩된다(망이 느린 사용자에게만 나타남).
+    if (isNav && (url.pathname === BASE || url.pathname === BASE + 'index.html')) {
       const shell = await cache.match(new Request(url.origin + BASE))
                  || await cache.match(new Request(url.origin + BASE + 'index.html'));
       if (shell) return shell;
