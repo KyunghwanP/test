@@ -8453,9 +8453,62 @@ document.getElementById('mealGrid').addEventListener('wheel', function(e) {
   this.scrollLeft += e.deltaY * 2;
 }, { passive: false });
 
+// ══════════════════════════════════════════
+// 교사 전용 백엔드 (teacher-api 워커)
+//  학부모가 두드리는 consult-api 와 분리돼 있다. 인증 성격이 정반대라 한쪽 실수가
+//  다른 쪽으로 새지 않게 하려는 것이다.
+//
+//  연락처를 왜 여기서 받나 — 예전에는 앱이 students/main · contacts/main 문서를
+//  통째로 받았다. 화면에는 한 반씩만 보여주면서 실제로는 전교생·전교직원의 연락처를
+//  전부 브라우저로 내려보내고 있었던 것이라, 개발자 도구 없이 '페이지 저장' 한 번으로
+//  전체가 유출됐다. 이제 연락처는 '상세를 연 그 1명분'만 받는다.
+//  조회는 서버에 기록되고, 하루에 서로 다른 100명을 넘기면 막힌다.
+// ══════════════════════════════════════════
+const TEACHER_WORKER = 'https://teacher-api.pkh910518.workers.dev';
+
+async function teacherApi(payload){
+  const idToken = await fbAuth.currentUser.getIdToken();
+  const res = await fetch(TEACHER_WORKER, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...payload, idToken })
+  });
+  return res.json();
+}
+
+// 연락처 조회 실패를 사용자 말로 옮긴다. 상한은 '오류'가 아니라 안내에 가깝다.
+function contactErrText(err){
+  if (err === 'DAILY_LIMIT') return '오늘 연락처 조회 한도를 넘었습니다. 내일 다시 가능합니다.';
+  if (err === 'AUTH')        return '로그인이 만료되었습니다. 새로고침해 주세요.';
+  if (err === 'NOT_FOUND')   return '등록된 번호가 없습니다.';
+  return '불러오지 못했습니다.';
+}
+
 // ---- 비상연락망 ----
 let contactsInitialized = false;
 let allContacts = [];
+// 이번 화면에서 이미 받아온 교원 번호 (같은 사람을 다시 눌러도 또 받지 않게)
+const staffPhoneCache = {};
+
+// 교원 휴대폰 1건. 목록에는 번호가 내려오지 않으므로 누른 그 사람 것만 받아온다.
+// 분리 업로드 전(문서에 아직 번호가 들어있는 상태)에는 그대로 쓴다.
+async function staffPhone(c){
+  if (!c) return { ok:false, msg:'불러오지 못했습니다.' };
+  if (c.phone) return { ok:true, phone:c.phone };
+  const ck = `${c.name}|${c.dept||''}`;
+  if (staffPhoneCache[ck] !== undefined) return staffPhoneCache[ck];
+  let out;
+  try {
+    const r = await teacherApi({ action:'contact', type:'staff',
+                                 i: allContacts.indexOf(c), name: c.name });
+    out = r && r.success && r.contact.phone
+        ? { ok:true, phone:r.contact.phone }
+        : { ok:false, msg:contactErrText(r && r.error) };
+  } catch(e){ out = { ok:false, msg:'불러오지 못했습니다.' }; }
+  // 상한·네트워크 실패는 나중에 다시 시도할 수 있어야 하므로 캐시하지 않는다.
+  if (out.ok) staffPhoneCache[ck] = out;
+  return out;
+}
 
 async function initContactsPage() {
   contactsInitialized = true;
@@ -8492,11 +8545,13 @@ function renderContacts(contacts) {
   let html = contacts.map((c, idx) => {
     const color = avatarColor(c.dept);
     const initial = c.name ? c.name[0] : '?';
-    // 휴대폰: 전화 + 문자 아이콘
-    const phoneNum = c.phone ? c.phone.replace(/-/g,'') : '';
-    const phoneBtn = phoneNum
-      ? `<a class="contact-btn phone" href="tel:${phoneNum}" title="전화걸기">📞</a>
-         <a class="contact-btn sms" href="sms:${phoneNum}" title="문자보내기">💬</a>`
+    // 휴대폰: 전화 + 문자 아이콘.
+    // 예전에는 여기에 href="tel:번호"를 그대로 박았다. 그러면 목록 HTML 안에 전 교직원의
+    // 번호가 통째로 들어가, 소스 보기나 페이지 저장만으로 전원 번호가 새어 나갔다.
+    // 지금은 누른 순간 그 사람 것만 받아온다(hasPhone은 번호 유무만 알려주는 표시).
+    const phoneBtn = (c.phone || c.hasPhone)
+      ? `<button type="button" class="contact-btn phone" data-call="${idx}" title="전화걸기">📞</button>
+         <button type="button" class="contact-btn sms"  data-sms="${idx}"  title="문자보내기">💬</button>`
       : '';
     // 내선: 053-235-#### 형태로 변환해서 클릭 시 전화 연결
     const extNum = c.ext ? '053235' + String(c.ext).replace(/-/g,'').slice(-4) : '';
@@ -8523,6 +8578,24 @@ function renderContacts(contacts) {
       showContactDetail(c);
     });
   });
+
+  // 📞·💬 — 누른 그 사람의 번호만 받아와서 연결한다.
+  list.querySelectorAll('[data-call],[data-sms]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const isSms = btn.hasAttribute('data-sms');
+      const c = contacts[parseInt(btn.dataset.call ?? btn.dataset.sms)];
+      if (btn.disabled) return;
+      btn.disabled = true;
+      const keep = btn.textContent;
+      btn.textContent = '…';
+      const r = await staffPhone(c);
+      btn.textContent = keep;
+      btn.disabled = false;
+      if (!r.ok) { showPointsToast(r.msg, 'error'); return; }
+      // tel:·sms: 는 팝업이 아니라 프로토콜 이동이라 비동기 뒤에도 차단되지 않는다.
+      location.href = (isSms ? 'sms:' : 'tel:') + r.phone.replace(/-/g,'');
+    });
+  });
 }
 
 // 상세 팝업
@@ -8538,17 +8611,16 @@ function showContactDetail(c) {
       <span class="cd-value">${val}</span>
     </div>`).join('');
 
-  const phoneNum = c.phone ? c.phone.replace(/-/g,'') : '';
   const extNum   = c.ext   ? '053235' + String(c.ext).replace(/-/g,'').slice(-4) : '';
   const extFormatted = c.ext ? '053-235-' + String(c.ext).slice(-4) : '';
 
-  const phoneRow = phoneNum ? `
-    <div class="cd-row">
+  // 휴대폰은 목록과 함께 내려오지 않는다 → 팝업을 연 뒤 이 사람 것만 받아 채운다.
+  // 자리를 먼저 잡아두어 내용이 들어올 때 팝업 크기가 튀지 않게 한다.
+  const phoneRow = (c.phone || c.hasPhone) ? `
+    <div class="cd-row" id="cdPhoneRow">
       <span class="cd-label">휴대폰</span>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span style="font-size:15px;font-weight:700;color:var(--ink);font-family:'IBM Plex Mono';">${c.phone}</span>
-        <a class="contact-btn phone" href="tel:${phoneNum}">📞</a>
-        <a class="contact-btn sms" href="sms:${phoneNum}">💬</a>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:28px;">
+        <span style="font-size:13px;color:var(--ink-soft);">불러오는 중…</span>
       </div>
     </div>` : '';
 
@@ -8589,6 +8661,21 @@ function showContactDetail(c) {
   };
   overlay.querySelector('.cd-close').addEventListener('click', close);
   overlay.addEventListener('click', e => { if(e.target === overlay) close(); });
+
+  // 휴대폰 채우기 — 이 사람 1명분만 받아온다.
+  const slot = overlay.querySelector('#cdPhoneRow > div');
+  if (slot) staffPhone(c).then(r => {
+    if (!overlay.isConnected) return;              // 그 사이 닫혔으면 그만
+    if (!r.ok) {
+      slot.innerHTML = `<span style="font-size:13px;color:var(--ink-soft);">${escapeHtml(r.msg)}</span>`;
+      return;
+    }
+    const n = r.phone.replace(/-/g,'');
+    slot.innerHTML =
+      `<span style="font-size:15px;font-weight:700;color:var(--ink);font-family:'IBM Plex Mono';">${escapeHtml(r.phone)}</span>
+       <a class="contact-btn phone" href="tel:${n}">📞</a>
+       <a class="contact-btn sms" href="sms:${n}">💬</a>`;
+  });
 }
 
 // 검색
@@ -8929,27 +9016,37 @@ function renderStudentsInGroup(group) {
 function showStudentDetail(s) {
   // 학번: 학년+반(2자리)+번호(2자리) = 10113
   const studentId = `${s.grade||''}${String(s.room||'').padStart(2,'0')}${String(s.num||'').padStart(2,'0')}`;
-  // 생년월일: yyyy.mm.dd 형식
-  const birthFormatted = s.birth ? s.birth.replace(/-/g, '.') : '';
   // 번호 앞 0 제거
   const numDisplay = parseInt(s.num||'0');
 
+  // 생년월일·연락처는 명렬과 함께 내려오지 않는다. 팝업을 연 뒤 이 학생 1명분만
+  // 워커에서 받아 채운다(예전에는 전교생 것이 한 번에 브라우저로 왔다).
+  // 생년월일 자리는 원래 순서(학번 바로 아래)가 유지되도록 여기서 미리 잡아둔다.
   const rows = [
     ['학번', studentId],
-    ['생년월일', birthFormatted],
+    ['생년월일', '<span style="font-size:13px;color:var(--ink-soft);">불러오는 중…</span>'],
     ['동아리', s.club ? clubPillHtml(s.club) : ''],
     ['과정', isSciStudent(s) ? '⚗️ 과학중점과정' : ''],
   ].filter(r => r[1]).map(([label, val]) => `
-    <div class="cd-row">
+    <div class="cd-row"${label === '생년월일' ? ' id="cdStuBirthRow"' : ''}>
       <span class="cd-label">${label}</span>
       <span class="cd-value">${val}</span>
     </div>`).join('');
+
+  // 연락처는 몇 줄이 채워질지 받아봐야 알기 때문에, 자리만 잡고 안내 문구를 먼저 띄운다.
+  const contactBox = `
+    <div id="cdStuContact" style="display:flex;flex-direction:column;gap:10px;min-height:38px;">
+      <div class="cd-row">
+        <span class="cd-label">연락처</span>
+        <span class="cd-value" style="font-size:13px;color:var(--ink-soft);">불러오는 중…</span>
+      </div>
+    </div>`;
 
   const makePhoneRow = (label, phone) => phone ? `
     <div class="cd-row">
       <span class="cd-label">${label}</span>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span style="font-size:15px;font-weight:700;color:var(--ink);font-family:'IBM Plex Mono';">${phone}</span>
+        <span style="font-size:15px;font-weight:700;color:var(--ink);font-family:'IBM Plex Mono';">${escapeHtml(phone)}</span>
         <a class="contact-btn phone" href="tel:${phone.replace(/-/g,'')}">📞</a>
         <a class="contact-btn sms" href="sms:${phone.replace(/-/g,'')}">💬</a>
       </div>
@@ -8969,9 +9066,7 @@ function showStudentDetail(s) {
       </div>
       <div class="cd-body">
         ${rows}
-        ${makePhoneRow('학생', s.phone)}
-        ${makePhoneRow('부', s.fatherPhone)}
-        ${makePhoneRow('모', s.motherPhone)}
+        ${contactBox}
       </div>
     </div>`;
 
@@ -8980,6 +9075,49 @@ function showStudentDetail(s) {
   const close = () => { overlay.classList.remove('open'); setTimeout(() => overlay.remove(), 200); };
   overlay.querySelector('.cd-close').addEventListener('click', close);
   overlay.addEventListener('click', e => { if(e.target === overlay) close(); });
+
+  // 이 학생 1명분만 받아 채운다.
+  const box      = overlay.querySelector('#cdStuContact');
+  const birthRow = overlay.querySelector('#cdStuBirthRow');
+  const note = t => `<div class="cd-row"><span class="cd-label">연락처</span>
+    <span class="cd-value" style="font-size:13px;color:var(--ink-soft);">${escapeHtml(t)}</span></div>`;
+  studentContact(s).then(r => {
+    if (!overlay.isConnected) return;              // 그 사이 닫혔으면 그만
+    if (!r.ok) { birthRow.remove(); box.innerHTML = note(r.msg); return; }
+    const c = r.contact;
+    // 생년월일이 없으면 줄 자체를 없앤다(예전과 같은 모습).
+    if (c.birth) birthRow.querySelector('.cd-value').textContent = c.birth.replace(/-/g,'.');
+    else         birthRow.remove();
+    const html = makePhoneRow('학생', c.phone)
+               + makePhoneRow('부',   c.fatherPhone)
+               + makePhoneRow('모',   c.motherPhone);
+    box.innerHTML = html || note('등록된 번호가 없습니다.');
+  });
+}
+
+// 이번 화면에서 이미 받아온 학생 연락처
+const studentContactCache = {};
+
+// 학생 연락처 1명분. 명렬(students/main)에는 번호가 없고, 이 경로로만 나간다.
+// 분리 업로드 전(문서에 아직 번호가 들어있는 상태)에는 그대로 쓴다.
+async function studentContact(s){
+  if (s.phone || s.fatherPhone || s.motherPhone) {
+    return { ok:true, contact:{ birth:s.birth||'', phone:s.phone||'',
+                                fatherPhone:s.fatherPhone||'', motherPhone:s.motherPhone||'' } };
+  }
+  const g = parseInt(s.grade), r = parseInt(s.room), n = parseInt(s.num);
+  const ck = `${g}-${r}-${n}`;
+  if (studentContactCache[ck] !== undefined) return studentContactCache[ck];
+  let out;
+  try {
+    const res = await teacherApi({ action:'contact', type:'student', g, r, n });
+    out = res && res.success
+        ? { ok:true, contact:res.contact }
+        : { ok:false, msg:contactErrText(res && res.error) };
+  } catch(e){ out = { ok:false, msg:'불러오지 못했습니다.' }; }
+  // 상한·네트워크 실패는 나중에 다시 시도할 수 있어야 하므로 캐시하지 않는다.
+  if (out.ok) studentContactCache[ck] = out;
+  return out;
 }
 
 // ── 검색 ──
@@ -12186,7 +12324,6 @@ function loadExcelJS(){
 //    없으면 작은 사진으로 되돌아가므로 사진명렬을 다시 올리기 전에도 화면은 정상이다.
 //  · 업로드(엑셀에서 사진 추출·압축·매칭)는 관리자 페이지 upload.html 에서 수행한다.
 // ══════════════════════════════════════════
-const CONSULT_WORKER = 'https://consult-api.pkh910518.workers.dev';
 const s360PhotoCache = {};   // '학년-반' → { 번호: dataURL } (반 단위로 한 번만 로드)
 const s360BigCache   = {};   // '학년-반-번호' → blob URL (고화질, 세션 동안 재사용)
 const s360PhotoVer   = {};   // '학년-반' → 사진 갱신 시각 (캐시 무효화용)
@@ -12205,7 +12342,7 @@ async function s360BigPhoto(s){
     const ver = s360PhotoVer[`${parseInt(s.grade)}-${parseInt(s.room)}`] || '';
     const q = `?g=${parseInt(s.grade)}&r=${parseInt(s.room)}&n=${parseInt(s.num)}`
             + (ver ? `&v=${encodeURIComponent(ver)}` : '');
-    const res = await fetch(CONSULT_WORKER + '/photo' + q, {
+    const res = await fetch(TEACHER_WORKER + '/photo' + q, {
       headers: { Authorization: `Bearer ${idToken}` }
     });
     if(!res.ok || !(res.headers.get('Content-Type')||'').startsWith('image/')) return null;

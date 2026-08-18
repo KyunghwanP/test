@@ -255,7 +255,10 @@ reset({ split: false });
 {
   const a = await (await post({ action: 'contact', idToken: 'tok-teacher', type: 'student', g: 2, r: 1, n: 12 })).json();
   check('students/main 으로 폴백', a.success && a.contact.phone === '010-6666-6666', a);
-  check('먼저 분리 문서를 본다', READS[0] === 'studentsContact/main', READS);
+  // 접속기록 읽기는 연락처 읽기와 '동시에' 시작한다(사용자가 기다리는 왕복을 하나 줄임).
+  check('기록 읽기를 먼저 띄운다(동시 진행)', READS[0].startsWith('accessLogs/'), READS);
+  check('분리 문서를 예전 문서보다 먼저 본다',
+        READS.indexOf('studentsContact/main') < READS.indexOf('students/main'), READS);
   const b2 = await (await post({ action: 'contact', idToken: 'tok-teacher', type: 'staff', i: 1, name: '이교사' })).json();
   check('contacts/main 으로 폴백', b2.success && b2.contact.phone === '010-9999-9999', b2);
 }

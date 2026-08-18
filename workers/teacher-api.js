@@ -297,10 +297,11 @@ function logId(email, date) {
 }
 
 // 하루 상한 확인 + 기록. 상한을 넘었으면 false(=조회 거부).
-async function noteAccess(env, email, target) {
+// cur(기록 문서)는 호출부가 연락처 읽기와 '동시에' 미리 받아둔 것을 넘겨준다.
+// 순서대로 하면 왕복이 하나 더 붙어 사용자가 기다리는 시간이 그만큼 늘어난다.
+async function noteAccess(env, email, target, cur) {
   const date = todayKst();
-  const cur = await fsGet(env, 'accessLogs', logId(email, date));
-  const prev = cur.data || {};
+  const prev = (cur && cur.data) || {};
   const items = Array.isArray(prev.items) ? prev.items : [];
   const seen = new Set(items.map(x => x && x.target));
   if (!seen.has(target) && seen.size >= CONTACT_DAILY_LIMIT) return false;
@@ -351,6 +352,9 @@ async function handleContact(env, body) {
   const type = String(body.type || '');
   let found = null, target = '';
 
+  // 접속기록 문서를 연락처와 동시에 받기 시작한다(기다리는 시간을 왕복 하나만큼 줄인다).
+  const logP = fsGet(env, 'accessLogs', logId(who.email, todayKst())).catch(() => null);
+
   if (type === 'student') {
     const list = await loadStudentContacts(env);
     const s = list.find(x => x && sameNum(x.grade, body.g) &&
@@ -382,7 +386,7 @@ async function handleContact(env, body) {
     return { success: false, error: 'BAD_TYPE' };
   }
 
-  if (!(await noteAccess(env, who.email, target))) {
+  if (!(await noteAccess(env, who.email, target, await logP))) {
     return { success: false, error: 'DAILY_LIMIT', limit: CONTACT_DAILY_LIMIT };
   }
   return { success: true, contact: found };
