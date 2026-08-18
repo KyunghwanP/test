@@ -1297,11 +1297,11 @@ function renderContactPreview(contacts) {
 //  30명인데 브라우저에는 전교생 연락처가 들어와 있어서, 개발자 도구 없이
 //  '페이지 저장' 한 번이면 전체가 새어 나갔다.
 //
-//  ⚠ 운영(ynhs)이 아직 옛 코드라 students/main·contacts/main 에서 연락처를 읽는다.
-//  그래서 당분간 '양쪽에' 쓴다. ynhs 배포가 끝나면 아래를 false 로 바꾸고 명렬을
-//  한 번만 다시 올리면 옛 문서에서 연락처가 사라진다.
+//  ⚠ 이 값이 true 이면 옛 문서(students/main·contacts/main)에도 연락처를 함께 쓴다.
+//  운영(ynhs)이 옛 코드로 돌던 전환 기간에 필요했다. 이제 양쪽 다 새 코드라 false 다.
+//  되돌려야 하면(옛 버전으로 롤백 등) true 로 바꾸고 명렬을 다시 올리면 된다.
 // ══════════════════════════════════════════
-const KEEP_CONTACT_IN_ROSTER = true;
+const KEEP_CONTACT_IN_ROSTER = false;
 
 const STU_CONTACT_FIELDS   = ['birth', 'phone', 'fatherPhone', 'motherPhone'];
 const STAFF_CONTACT_FIELDS = ['phone'];
