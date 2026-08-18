@@ -1,6 +1,34 @@
-# 학부모 상담 예약 API (Cloudflare Worker)
+# Cloudflare Workers
 
-기존 Google Apps Script(GAS)를 대체하는 백엔드입니다. `consult-api.js` 한 파일이 전부입니다.
+워커가 **둘**입니다. 경계는 '누가 부르느냐'입니다.
+
+| 파일 | 워커 이름 | 담당 | 호출자 |
+|---|---|---|---|
+| `consult-api.js` | `consult-api` | 상담 인증·예약·취소 | **학부모** (인증 전 아무나 두드릴 수 있는 입구) |
+| `teacher-api.js` | `teacher-api` | 학생 사진, 연락처 조회 | **교사** (모든 경로가 토큰 검증 뒤) |
+
+### 왜 나눴나
+
+1. **인증 성격이 정반대다.** 한 파일에 두면 학부모 쪽 실수 하나가 교직원·학생
+   연락처로 새는 경로가 된다.
+2. **재배포가 겹친다.** 연락처를 고치려고 배포했다가 상담 예약이 깨지면 하필
+   그날이 상담 오픈일일 수 있다(반대도 마찬가지).
+
+대가로 공통 코드(서명·Firestore REST·CORS) 약 200줄이 두 파일에 중복됩니다. 거의
+바뀌지 않는 인프라 코드라 중복을 감수했습니다. **한쪽을 고치면 다른 쪽도 봐야 합니다.**
+
+### 검증
+
+```bash
+node workers/teacher-api.test.mjs     # 워커 로직 (fetch를 스텁으로 물려 실제 경로를 태움)
+node workers/roster-split.test.mjs    # upload.html 분리 저장 → 워커 조회가 이어지는지
+```
+
+---
+
+# 학부모 상담 예약 API (`consult-api`)
+
+기존 Google Apps Script(GAS)를 대체하는 백엔드입니다.
 
 ## 왜 바꾸나
 
@@ -97,9 +125,74 @@ const WORKER_URL = 'https://consult-api.<계정>.workers.dev';
 npx wrangler tail
 ```
 
-## 학생 사진 고화질 (R2) — 선택
+---
 
-안 해도 앱은 그대로 돕니다. 설정하면 학생 사진이 **150×200 → 600×800**이 됩니다.
+# 교사 전용 API (`teacher-api`)
+
+교사 Firebase ID 토큰이 있어야만 열리는 것만 담습니다.
+
+- `GET  /photo?g=&r=&n=` — 학생 사진 (R2)
+- `POST {action:'photoPut'}` — 사진 올리기 (관리자만)
+- `POST {action:'contact'}` — 학생·교원 연락처 **1건** 조회
+
+## 배포
+
+`consult-api`와 같은 방법입니다. 대시보드에서 Worker를 새로 만들고 이름을
+`teacher-api`로 둔 뒤 `teacher-api.js` 내용을 붙여넣습니다.
+
+시크릿·변수 (**`consult-api`와 별도로 다시 넣어야 합니다**):
+
+| 이름 | 종류 | 값 |
+|---|---|---|
+| `SA_JSON` | Secret | 서비스 계정 JSON 전체 |
+| `ALLOWED_ORIGINS` | 변수 | `https://kyunghwanp.github.io` |
+| `FIREBASE_API_KEY` | 변수 | 교사 토큰 검증용 (**필수**) |
+| `PHOTOS` | R2 바인딩 | 버킷 `ynhs-photos` |
+
+## 연락처를 왜 워커가 내주나
+
+예전에는 앱이 `students/main` · `contacts/main` 문서를 **통째로** 받았습니다.
+화면에는 한 반(30명)만 보여주면서 실제로는 전교생 연락처를 브라우저로 내려보내고
+있었던 것이라, 개발자 도구 없이 **'페이지 저장' 한 번으로 전체가 유출**됐습니다.
+교원 목록은 더 노골적이어서 `href="tel:번호"`가 전원 몫으로 HTML에 박혀 있었습니다.
+
+지금은:
+
+- 연락처 원본은 `studentsContact/main` · `contactsPhone/main`에 있고, 보안 규칙이
+  **브라우저 읽기를 차단**합니다(`read: false`). 서비스 계정만 읽힙니다.
+- 앱은 상세를 연 **그 1명분**만 워커에서 받습니다.
+- 조회는 전부 `accessLogs/{이메일}_{날짜}`에 기록됩니다.
+- 하루에 **서로 다른 100명**을 넘기면 막힙니다. '몇 번 눌렀나'가 아니라
+  '몇 사람의 번호를 봤나'로 세는데, 같은 학생을 다시 열었다고 상한이 깎이면
+  정상 업무만 불편해지고 정작 막아야 할 대량 수집은 서로 다른 사람을 훑는
+  행위이기 때문입니다.
+
+> **한계**: 원천 차단은 아닙니다. 마음먹으면 100명까지는 볼 수 있습니다. 바뀌는 것은
+> ① 무심코·우연히 전체가 새는 경로가 없어지고 ② 고의로 긁으면 기록에 남고
+> ③ 상한에 걸린다는 점입니다.
+
+### 접속기록 정리 (권장)
+
+문서마다 `expireAt`(timestamp)이 붙습니다. Firebase 콘솔 → **Firestore → TTL** 에서
+컬렉션 `accessLogs`, 필드 `expireAt` 으로 정책을 만들면 400일 뒤 자동 삭제됩니다.
+안 만들어도 동작에는 지장이 없지만 문서가 계속 쌓입니다.
+
+### 명렬 다시 올리기 (전환 마무리)
+
+`upload.html`의 `KEEP_CONTACT_IN_ROSTER`가 지금 **`true`** 입니다. 운영(ynhs)이 아직
+옛 코드라 `students/main`에서 연락처를 읽기 때문에, 당분간 **양쪽에** 씁니다.
+
+ynhs 배포가 끝나면:
+
+1. `upload.html`에서 `KEEP_CONTACT_IN_ROSTER = false` 로 변경
+2. 명렬(교원·학생)을 **한 번씩 다시 업로드**
+
+그러면 옛 문서에서 연락처가 사라지고, 그때부터 실제로 차단됩니다.
+**이 두 단계를 하기 전까지는 옛 문서에 연락처가 그대로 있습니다.**
+
+## 학생 사진 고화질 (R2)
+
+설정하면 학생 사진이 **150×200 → 600×800**이 됩니다.
 
 **왜 필요한가**: Firestore는 문서 하나가 1MB라 반 40명을 한 문서에 담으려면 장당
 10KB(150×200)가 한계였습니다. R2는 그 제한이 없습니다.
@@ -111,7 +204,7 @@ Cloudflare 대시보드 → **R2** → *Create bucket* → 이름 `ynhs-photos`.
 
 ### 2) 워커에 연결
 
-Workers → `consult-api` → **Settings → Bindings → Add → R2 bucket**
+Workers → `teacher-api` → **Settings → Bindings → Add → R2 bucket**
 
 | 항목 | 값 |
 |---|---|
@@ -123,7 +216,7 @@ Workers → `consult-api` → **Settings → Bindings → Add → R2 bucket**
 
 ### 3) 워커 코드 갱신 후 배포
 
-`consult-api.js` 최신본을 붙여넣고 Deploy.
+`teacher-api.js` 최신본을 붙여넣고 Deploy.
 
 ### 4) 사진명렬 다시 올리기
 
