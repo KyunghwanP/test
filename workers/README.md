@@ -140,17 +140,81 @@ npx wrangler tail
 
 ## 배포
 
-`consult-api`와 같은 방법입니다. 대시보드에서 Worker를 새로 만들고 이름을
-`teacher-api`로 둔 뒤 `teacher-api.js` 내용을 붙여넣습니다.
+> **먼저 알아둘 것 — `SA_JSON`은 `consult-api`에서 복사할 수 없습니다.**
+> Cloudflare는 Secret에 한 번 넣은 값을 다시 보여주지 않습니다(가려진 채로만 보입니다).
+> 서비스 계정 JSON 원본 파일이 있으면 그걸 쓰고, 없으면 Firebase 콘솔에서 새로
+> 발급하세요. **기존 키는 그대로 살아있어서 `consult-api`는 안 깨집니다**
+> (서비스 계정 하나에 키를 여러 개 둘 수 있습니다).
 
-시크릿·변수 (**`consult-api`와 별도로 다시 넣어야 합니다**):
+### 1) Worker 만들기
 
-| 이름 | 종류 | 값 |
+Cloudflare 대시보드 → **Workers & Pages** → **Create** → *Start with Hello World!*
+→ 이름을 **`teacher-api`** 로 → **Deploy**
+
+만들어지면 **Edit code** → 기본 코드를 전부 지우고 `teacher-api.js` 내용을 붙여넣기
+→ **Deploy**
+
+### 2) 변수 2개 (일반 Text)
+
+**Settings → Variables and Secrets → + Add**
+
+| Type | Name | Value |
 |---|---|---|
-| `SA_JSON` | Secret | 서비스 계정 JSON 전체 |
-| `ALLOWED_ORIGINS` | 변수 | `https://kyunghwanp.github.io` |
-| `FIREBASE_API_KEY` | 변수 | 교사 토큰 검증용 (**필수**) |
-| `PHOTOS` | R2 바인딩 | 버킷 `ynhs-photos` |
+| Text | `ALLOWED_ORIGINS` | `https://kyunghwanp.github.io` |
+| Text | `FIREBASE_API_KEY` | `AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA` |
+
+`FIREBASE_API_KEY`는 `index.html`에 이미 공개돼 있는 값입니다(웹 API 키는 원래
+공개용). Secret으로 둘 필요 없고, `consult-api` 대시보드에서 그대로 봐도 됩니다.
+
+### 3) `SA_JSON` (Secret)
+
+같은 화면에서 **+ Add** → **Type: Secret** → Name `SA_JSON` →
+Value에 JSON **파일 전체**를 붙여넣습니다(`{` 부터 `}` 까지, 줄바꿈 그대로).
+
+원본이 없으면: Firebase 콘솔 → **프로젝트 설정 → 서비스 계정 → 새 비공개 키 생성**
+→ JSON 다운로드.
+
+### 4) R2 바인딩 `PHOTOS`
+
+**Settings → Bindings → + Add → R2 bucket**
+
+| 항목 | 값 |
+|---|---|
+| Variable name | `PHOTOS` ← 대문자 그대로 |
+| R2 bucket | `ynhs-photos` |
+
+> 예전에 여기서 한 번 막혔습니다. **Variable name** 칸에 버킷 이름이나
+> `R2 bucket`을 적으면 안 됩니다. 코드가 찾는 이름은 정확히 `PHOTOS` 입니다.
+
+### 5) 다시 Deploy
+
+**변수를 추가해도 이미 돌고 있는 버전에는 안 붙습니다.** 설정을 마친 뒤
+**Deploy**를 한 번 더 눌러야 반영됩니다.
+
+### 6) 확인
+
+```bash
+curl -s https://teacher-api.pkh910518.workers.dev/photo
+# {"success":false,"error":"ORIGIN"}      ← 정상 (Origin 헤더가 없으니 거부)
+
+curl -s -H 'Origin: https://kyunghwanp.github.io' \
+     https://teacher-api.pkh910518.workers.dev/photo
+# {"success":false,"error":"AUTH"}        ← 여기까지 나오면 2)·4)는 성공
+```
+
+| 돌아온 값 | 뜻 |
+|---|---|
+| `ORIGIN` (두 번째 명령에서도) | `ALLOWED_ORIGINS` 오타. 끝 슬래시·대소문자는 무시되니 철자를 보세요 |
+| `NO_BUCKET` | R2 바인딩 이름이 `PHOTOS`가 아님 |
+| `AUTH` | **정상.** 토큰이 없으니 당연히 거부 |
+
+`SA_JSON`과 `FIREBASE_API_KEY`는 curl로는 확인이 안 됩니다(토큰 검증을 통과해야
+Firestore를 건드리기 때문). 실제 앱에서 확인하세요:
+
+`/test/` 접속 → 교원연락망에서 📞 누르기 →
+- 전화 연결되면 **전부 정상**
+- "불러오지 못했습니다" → **Workers → teacher-api → Logs → Begin log stream** 켜고
+  다시 눌러 보면 원인이 찍힙니다(`SA_JSON 시크릿이 설정되지 않았습니다` 등)
 
 ## 연락처를 왜 워커가 내주나
 
