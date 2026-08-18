@@ -13,17 +13,45 @@ service cloud.firestore {
                         && !request.auth.token.email.matches('^[0-9]{7}@yeungnam[.]hs[.]kr$')
                         && request.auth.token.email_verified == true;
     }
+    // 교원 명렬 — 이름·부서·학반 등 '화면에 보이는 것'만 들어있다.
+    // 연락처는 여기 없다(아래 contactsPhone 참고). 쓰기는 명렬 업로드뿐이라 관리자만.
     match /contacts/{docId} {
-      allow read, write: if request.auth != null
+      allow read: if request.auth != null
                         && request.auth.token.email.matches('.*@yeungnam[.]hs[.]kr$')
                         && !request.auth.token.email.matches('^[0-9]{7}@yeungnam[.]hs[.]kr$')
                         && request.auth.token.email_verified == true;
+      allow write: if isAppAdmin();
     }
+    // 학생 명렬 — 이름·학반·번호·동아리 등 '화면에 보이는 것'만 들어있다.
+    // 연락처는 여기 없다(아래 studentsContact 참고). 쓰기는 명렬 업로드뿐이라 관리자만.
     match /students/{docId} {
-      allow read, write: if request.auth != null
+      allow read: if request.auth != null
                         && request.auth.token.email.matches('.*@yeungnam[.]hs[.]kr$')
                         && !request.auth.token.email.matches('^[0-9]{7}@yeungnam[.]hs[.]kr$')
                         && request.auth.token.email_verified == true;
+      allow write: if isAppAdmin();
+    }
+    // ── 연락처 원본 ────────────────────────────────────────────────────
+    // 브라우저는 절대 못 읽는다(read: false). teacher-api 워커가 서비스 계정으로만
+    // 읽어서 '한 번에 1명분'씩 내주고, 그 조회를 accessLogs 에 남긴다.
+    //   왜: 예전에는 앱이 students/main · contacts/main 을 통째로 받아, 화면에는
+    //   한 반만 보여주면서 전교생 연락처를 브라우저로 내려보내고 있었다. 개발자
+    //   도구 없이 '페이지 저장' 한 번으로 전체가 유출되는 상태였다.
+    // 쓰기는 명렬 업로드(upload.html)뿐이라 관리자만.
+    match /studentsContact/{docId} {
+      allow read: if false;
+      allow write: if isAppAdmin();
+    }
+    match /contactsPhone/{docId} {
+      allow read: if false;
+      allow write: if isAppAdmin();
+    }
+    // ── 접속기록 (개인정보 보호법 제29조 안전조치 — 접속기록 보관·점검) ──
+    // 워커(서비스 계정)만 쓴다. 교사가 자기 기록을 지우거나 고칠 수 없어야 한다.
+    // 열람은 관리자만. 문서마다 expireAt 이 있어 Firestore TTL이 400일 뒤 지운다.
+    match /accessLogs/{docId} {
+      allow read: if isAppAdmin();
+      allow write: if false;
     }
     // 동아리 메타데이터 (지도교사·전공·교실·정원·학년) — 교사 읽기/쓰기
     match /clubs/{docId} {
