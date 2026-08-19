@@ -172,5 +172,45 @@ console.log('\n■ 캐시도 없고 네트워크도 죽으면 — 그때만 안�
   check('503 을 준다(undefined 가 아니라)', r?.status === 503, r);
 }
 
+console.log('\n■ 탈출구 — ?nosw=1 이면 가로채지 않고 등록도 푼다');
+{
+  // 워커가 화면을 못 띄우는 상황에서 F12 없이 빠져나올 수 있어야 한다.
+  let unreg = 0, responded = false;
+  const { listeners, sandbox } = loadSW({ seed: {}, fetchImpl: async () => mkRes('net') });
+  sandbox.self.registration = { unregister: async () => { unreg++; } };
+  await listeners.fetch({
+    request: { url: 'https://x.io/test/?nosw=1', mode: 'navigate', method: 'GET' },
+    respondWith: () => { responded = true; },
+    waitUntil: p => p
+  });
+  check('가로채지 않는다(브라우저가 직접 받는다)', responded === false);
+  check('등록을 스스로 푼다', unreg === 1, unreg);
+
+  // 평소 요청은 그대로 가로챈다
+  let responded2 = false;
+  await listeners.fetch({
+    request: { url: 'https://x.io/test/', mode: 'navigate', method: 'GET' },
+    respondWith: () => { responded2 = true; }, waitUntil: () => {}
+  });
+  check('nosw 가 없으면 평소대로 가로챈다', responded2 === true);
+}
+
+console.log('\n■ 안내 화면 — 빠져나갈 길을 함께 준다');
+{
+  const { listeners } = loadSW({ seed: {}, fetchImpl: async () => { throw new Error('down'); } });
+  let out;
+  await listeners.fetch({
+    request: { url: 'https://x.io/test/', mode: 'navigate', method: 'GET' },
+    respondWith: p => { out = p; }, waitUntil: () => {}
+  });
+  const r = await out;
+  const body = String(r?.body || '');
+  check('글자가 아니라 화면을 준다', /text\/html/.test(r?.headers?.['Content-Type'] || ''), r?.headers);
+  check('다시 시도 버튼이 있다', body.includes('다시 시도'));
+  check('캐시 없이 열기 링크가 있다', body.includes('nosw=1'), body.slice(0, 200));
+  check('페이지도 nosw 를 알아본다',
+        /nosw/.test(fs.readFileSync('index.html', 'utf8')));
+}
+
 console.log(`\n통과 ${pass} / 실패 ${fail}\n`);
 process.exit(fail ? 1 : 0);

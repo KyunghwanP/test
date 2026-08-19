@@ -4252,7 +4252,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.76</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.77</div>
   </div>
 </div>
 
@@ -4388,7 +4388,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.76</div>
+    <div class="nav-version" title="Made by 박경환">ver6.77</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5792,7 +5792,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.76 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = 'ver6.77 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -7751,7 +7751,12 @@ function autoLoadMyTimetable(){
 
 // PWA: http/https로 서빙될 때만 서비스워커 등록.
 // 데스크톱 앱(Neutralino 로컬 번들)에서는 등록하지 않는다 — 로컬 캐시가 갱신을 방해하지 않게.
-if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')
+// ?nosw=1 로 들어왔으면 등록하지 않는다. 워커가 화면을 못 띄워 탈출한 사람인데
+// 여기서 다시 등록하면 그대로 같은 구덩이로 돌아간다.
+const _noSW = new URLSearchParams(location.search).get('nosw') === '1';
+if (_noSW) {
+  try { navigator.serviceWorker?.getRegistrations().then(rs => rs.forEach(r => r.unregister())); } catch(e){}
+} else if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')
     && !window.NL_TOKEN && !window.NL_PORT) {
   navigator.serviceWorker.register('sw.js').catch(()=>{});
 
