@@ -4252,7 +4252,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.78</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.79</div>
   </div>
 </div>
 
@@ -4388,7 +4388,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.78</div>
+    <div class="nav-version" title="Made by 박경환">ver6.79</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5792,7 +5792,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.78 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = 'ver6.79 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -9547,6 +9547,49 @@ window.passCloseForm = passCloseForm;
 window.passCloseDetail = passCloseDetail;
 window.passUnpick = passUnpick;
 window.passSave = passSave;
+
+// ══════════════════════════════════════════
+// 진단 — 콘솔에서 __diag() 를 부르면 지금 상태를 한 번에 찍는다.
+//  앱이 모듈이라 TEACHERS·구독 같은 최상위 값이 콘솔에서 안 보인다. 문제가 났을 때
+//  '무엇을 쳐야 하는지' 매번 안내하는 대신, 창구를 하나 열어 둔다.
+//  읽기만 한다 — 아무것도 바꾸지 않는다.
+// ══════════════════════════════════════════
+window.__diag = async function(){
+  const out = { 앱: (document.querySelector('.nav-version')?.textContent || '?') };
+
+  const withUid = TEACHERS.filter(t => t.uid).length;
+  out.교사 = { 전체: TEACHERS.length, uid있음: withUid };
+
+  // 실시간 구독 — 많을수록 WebChannel 이 무거워지고 400/재연결이 잦아진다
+  out.실시간구독 = {
+    '남의 업무(교사당 1개)': taskNotifyUnsubs.length,
+    '외출증': passUnsub ? 1 : 0,
+    '내 업무': mytaskUnsubscribe ? 1 : 0,
+    '상담': (consultUnsub ? 1 : 0) + (consultNotifyUnsub ? 1 : 0),
+    '특별실': (roomUnsub ? 1 : 0) + (roomCfgUnsub ? 1 : 0)
+  };
+  out.실시간구독.합계 = Object.values(out.실시간구독).reduce((a,b) => a + b, 0);
+
+  try {
+    const e = await navigator.storage.estimate();
+    out.저장 = `${(e.usage/1048576).toFixed(1)}MB / ${(e.quota/1048576).toFixed(0)}MB`;
+  } catch(err){ out.저장 = '확인 불가'; }
+
+  try {
+    out.캐시 = {};
+    for(const k of await caches.keys()){
+      out.캐시[k] = (await (await caches.open(k)).keys()).length + '개';
+    }
+    const rs = await navigator.serviceWorker.getRegistrations();
+    out.워커 = rs.map(r => ({
+      범위: r.scope.replace(location.origin, ''),
+      상태: r.active?.state, 대기중: !!r.waiting, 설치중: !!r.installing
+    }));
+  } catch(err){ out.워커 = '확인 불가'; }
+
+  console.log('%c영남고 앱 진단', 'font-weight:700;font-size:13px', out);
+  return out;
+};
 
 // ---- 비상연락망 ----
 let contactsInitialized = false;
