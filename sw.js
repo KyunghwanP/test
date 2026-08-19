@@ -4,7 +4,7 @@ const BASE = self.location.pathname.replace(/[^/]*$/, '');   // 예: '/ynhs/' ·
 // 캐시 저장소는 '경로'가 아니라 '출처' 단위로 공유된다 → /ynhs/ 와 /test/ 는 같은 출처라
 // 캐시 이름이 같으면 서로의 캐시를 지운다(한쪽 버전이 올라갈 때 activate가 삭제).
 // 그래서 이름에 BASE를 넣어 배포별로 분리한다. 예: 'ynhs:/ynhs/:v496'
-const CACHE_VER  = 'v518';
+const CACHE_VER  = 'v520';
 const CACHE_NAME = 'ynhs:' + BASE + ':' + CACHE_VER;
 const CACHE_MINE = 'ynhs:' + BASE + ':';                     // 이 배포가 소유한 캐시 접두사
 // 화면(HTML)을 네트워크에서 기다려 주는 최대 시간. 이 시간을 넘기면 캐시로 즉시 전환한다.
@@ -22,9 +22,27 @@ self.addEventListener('activate', e => {
     const keys = await caches.keys();
     // 내 배포의 옛 버전 + 구버전 공용 이름(ynhs-v###)만 정리한다.
     // 다른 배포(/test/ ↔ /ynhs/)의 캐시는 건드리지 않는다.
-    await Promise.all(keys
-      .filter(k => (k.startsWith(CACHE_MINE) && k !== CACHE_NAME) || /^ynhs-v\d+$/.test(k))
-      .map(k => caches.delete(k)));
+    const old = keys.filter(k => (k.startsWith(CACHE_MINE) && k !== CACHE_NAME) || /^ynhs-v\d+$/.test(k));
+
+    // 지우기 전에 옮겨 담는다.
+    //   그냥 지우면 배포 직후 캐시가 텅 빈 채로 시작한다. 그러면
+    //   · 모든 자원을 네트워크에서 새로 받아야 해서 첫 접속이 눈에 띄게 느리고,
+    //   · 망이 느려 15초(HARD_TIMEOUT)를 넘기면 돌려줄 것이 없어
+    //     '오프라인 상태이고 캐시된 내용이 없습니다'가 뜬다.
+    //   옛 자원이라도 손에 쥐고 있는 편이 낫다 — 화면(HTML)은 어차피 네트워크 우선이라
+    //   최신이 오면 그것을 쓰고, 안 오면 옛것이라도 띄운다.
+    const cache = await caches.open(CACHE_NAME);
+    for (const k of old) {
+      try {
+        const prev = await caches.open(k);
+        for (const req of await prev.keys()) {
+          if (await cache.match(req)) continue;      // 새 캐시에 이미 있으면 그대로 둔다
+          const res = await prev.match(req);
+          if (res) await cache.put(req, res).catch(() => {});
+        }
+      } catch (e) { /* 한 캐시가 실패해도 나머지는 옮긴다 */ }
+    }
+    await Promise.all(old.map(k => caches.delete(k)));
     await self.clients.claim();
   })());
 });
@@ -38,6 +56,25 @@ function netFetch(req, cache, cacheKey) {
     }
     return res;
   }).catch(() => null);
+}
+
+// 같은 파일인지 ETag(없으면 Last-Modified)로 본다. 본문을 읽어 비교하면
+// 900KB를 한 번 더 훑게 되고, 스트림을 소비해 응답을 못 쓰게 된다.
+function stamp(res) {
+  if (!res || !res.headers) return '';
+  return res.headers.get('etag') || res.headers.get('last-modified') || '';
+}
+
+// 캐시로 화면을 띄운 뒤, 배경에서 받은 것이 다르면 페이지에 알린다.
+// 페이지가 '새 버전이 있습니다'를 띄우고 사용자가 원할 때 새로고침한다.
+// 이게 없으면 망이 3.5초를 넘길 때마다 옛 화면이 나오고 배포가 반영되지 않는다.
+async function notifyIfNewer(net, cached) {
+  const fresh = await net;
+  if (!fresh || !fresh.ok) return;
+  const a = stamp(cached), b = stamp(fresh);
+  if (!a || !b || a === b) return;
+  const list = await self.clients.matchAll({ type: 'window' });
+  for (const c of list) c.postMessage({ type: 'sw-update' });
 }
 
 // ms 안에 안 끝나면 null. (원래 promise는 계속 진행 → 배경 캐시 갱신은 그대로 이뤄진다)
@@ -84,7 +121,8 @@ self.addEventListener('fetch', e => {
       if (fresh) return fresh;
       const cached = await cache.match(cacheKey);
       if (cached) {
-        e.waitUntil(net);     // 느린 네트워크는 배경에서 계속 받아 캐시를 갱신
+        // 느린 네트워크는 배경에서 계속 받아 캐시를 갱신하고, 내용이 달라졌으면 알린다
+        e.waitUntil(notifyIfNewer(net, cached));
         return cached;
       }
     } else {
