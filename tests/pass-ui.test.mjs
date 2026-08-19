@@ -332,7 +332,15 @@ console.log('\n■ 상태 — 대기 → 나감 → 완료');
     await page.evaluate(() => window.passRender());
     await page.waitForTimeout(60);
   };
-  const st = async i => (await page.locator('.pass-card').nth(i).locator('.pass-state').textContent()).trim();
+  // 카드 순서가 상태에 따라 바뀌므로 위치가 아니라 이름으로 찾는다
+  const card = nm => page.locator('.pass-card').filter({ has: page.locator('.pass-name', { hasText: nm }) });
+  const st = async nm => (await card(nm).locator('.pass-state').textContent()).trim();
+  const done = nm => card(nm).evaluate(e => e.classList.contains('done'));
+  // 다른 날짜 묶음(앞 테스트에서 남은 것)이 섞이지 않게 '오늘' 묶음만 본다
+  const order = () => page.evaluate(() => {
+    const g = document.querySelector('.pass-dayhead.today')?.closest('.pass-daygroup');
+    return [...(g ? g.querySelectorAll('.pass-name') : [])].map(x => x.textContent);
+  });
 
   await page.evaluate(() => {
     window.reset(); window.__past = {}; window.__future = {};
@@ -348,35 +356,36 @@ console.log('\n■ 상태 — 대기 → 나감 → 완료');
   await page.waitForTimeout(120);
 
   await at('09:00');
-  check('나가기 전에는 대기', (await st(0)) === '대기' && (await st(1)) === '대기', [await st(0), await st(1)]);
-  check('대기는 가라앉히지 않는다',
-        !(await page.locator('.pass-card').nth(0).evaluate(e => e.classList.contains('done'))) &&
-        !(await page.locator('.pass-card').nth(1).evaluate(e => e.classList.contains('done'))));
+  check('나가기 전에는 대기', (await st('김학생')) === '대기' && (await st('이학생')) === '대기');
+  check('대기는 가라앉히지 않는다', !(await done('김학생')) && !(await done('이학생')));
+  check('아무도 안 나갔으면 시각 순 그대로',
+        JSON.stringify(await order()) === JSON.stringify(['김학생','이학생','박학생']), await order());
 
   await at('13:30');
-  check('조퇴는 나간 시각이 지나면 완료', (await st(0)) === '완료', await st(0));
-  check('완료 카드는 가라앉는다', (await page.locator('.pass-card').nth(0).evaluate(e => e.classList.contains('done'))));
-  check('아직 안 나간 외출은 대기', (await st(1)) === '대기', await st(1));
+  check('조퇴는 나간 시각이 지나면 완료', (await st('김학생')) === '완료', await st('김학생'));
+  check('완료 카드는 가라앉는다', await done('김학생'));
+  check('아직 안 나간 외출은 대기', (await st('이학생')) === '대기', await st('이학생'));
+  check('끝난 건은 뒤로 밀린다',
+        JSON.stringify(await order()) === JSON.stringify(['이학생','박학생','김학생']), await order());
 
   await at('14:30');
-  check('외출은 나간 뒤 복귀 전까지 나감', (await st(1)) === '나감', await st(1));
-  check('나감은 완료로 죽이지 않는다',
-        !(await page.locator('.pass-card').nth(1).evaluate(e => e.classList.contains('done'))));
+  check('외출은 나간 뒤 복귀 전까지 나감', (await st('이학생')) === '나감', await st('이학생'));
+  check('나감은 완료로 죽이지 않는다', !(await done('이학생')));
+  check('나간 건도 아직 안 나간 건보다 뒤로',
+        JSON.stringify(await order()) === JSON.stringify(['박학생','이학생','김학생']), await order());
   const tally = async () => (await page.innerText('#passTally')).replace(/\s+/g, ' ');
   check('요약에 나가 있음이 뜬다', (await tally()).includes('나가 있음 1'), await tally());
 
   await at('15:45');
-  check('복귀 시각이 지나면 완료로 바뀐다', (await st(1)) === '완료', await st(1));
-  check('완료 카드는 배경에 묻히지 않는다', await page.evaluate(() => {
-    const c = document.querySelectorAll('.pass-card')[1];
-    return getComputedStyle(c).backgroundColor !== getComputedStyle(document.getElementById('passPage')).backgroundColor;
-  }));
+  check('복귀 시각이 지나면 완료로 바뀐다', (await st('이학생')) === '완료', await st('이학생'));
+  check('완료 카드는 배경에 묻히지 않는다', await card('이학생').evaluate(c =>
+    getComputedStyle(c).backgroundColor !== getComputedStyle(document.getElementById('passPage')).backgroundColor));
   check('카드 상태는 한 줄로 끝난다', await page.evaluate(() =>
     [...document.querySelectorAll('.pass-state')].every(e => e.getBoundingClientRect().height < 30)));
   check('요약에 완료 건수가 뜬다', (await tally()).includes('완료 2'), await tally());
 
   await at('16:30');
-  check('복귀 시각을 안 적은 외출은 나감에 머문다', (await st(2)) === '나감', await st(2));
+  check('복귀 시각을 안 적은 외출은 나감에 머문다', (await st('박학생')) === '나감', await st('박학생'));
 
   check('지난 날은 통째로 완료',
         await page.evaluate(() => passState({ kind:'조퇴', outAt:'23:59' }, '2000-01-01').label === '완료'));
@@ -384,13 +393,13 @@ console.log('\n■ 상태 — 대기 → 나감 → 완료');
         await page.evaluate(() => passState({ kind:'조퇴', outAt:'00:01' }, '2999-01-01').label === '예정'));
 
   await at('14:30');
-  await page.locator('.pass-card').nth(1).click();
+  await card('이학생').click();
   await page.waitForTimeout(120);
   check('상세에도 상태가 보인다', (await page.innerText('#passDetailBody')).includes('나감'),
         await page.innerText('#passDetailBody'));
   await page.evaluate(() => window.passCloseDetail());
   await at('15:45');
-  await page.locator('.pass-card').nth(1).click();
+  await card('이학생').click();
   await page.waitForTimeout(120);
   check('상세에는 왜 완료인지까지 적는다',
         (await page.innerText('#passDetailBody')).includes('복귀 예정 15:30 지남'),
@@ -486,6 +495,226 @@ console.log('\n■ 다크 모드 — 파랑 채도를 낮춘다');
     const [r,g,b] = [1,3,5].map(i => parseInt(dark.slice(i, i+2), 16));
     return b > r && b > g; })(), dark);
   await page.evaluate(() => document.documentElement.classList.remove('dark'));
+}
+
+console.log('\n■ 검색 결과 — 얼굴을 함께 띄운다');
+{
+  await page.setViewportSize({ width: 900, height: 900 });
+  await page.evaluate(({ PX }) => {
+    window.reset();
+    window.__photos = { '1-3': { '7': PX } };            // 김학생만 사진 있음
+    window.setStudents([
+      { grade:1, room:3, num:7,  name:'김학생' },
+      { grade:1, room:3, num:8,  name:'이학생' },
+      { grade:2, room:1, num:12, name:'박학생' }
+    ]);
+    window.pushToday([]);
+    window.passOpenForm();
+  }, { PX });
+  await page.waitForTimeout(80);
+  await page.fill('#passSearch', '1-3');
+  await page.waitForTimeout(80);
+  await page.waitForFunction(() => document.querySelectorAll('#passSearchResult img.pass-photo').length > 0);
+  const items = page.locator('.pass-pick-item');
+  check('사진 있는 학생은 사진', (await items.nth(0).locator('img.pass-photo.sm').count()) === 1);
+  check('사진 없는 학생은 이름 첫 글자',
+        (await items.nth(1).locator('.pass-photo-none.sm').textContent()) === '이');
+  const box = await items.nth(0).locator('img.pass-photo').boundingBox();
+  check('목록 사진보다 작게', box.width <= 40 && box.height <= 50, box);
+}
+
+console.log('\n■ 검색 — 키보드로 고른다');
+{
+  check('첫 결과가 미리 짚혀 있다', (await page.locator('.pass-pick-item.on').count()) === 1);
+  check('짚힌 것은 첫 번째',
+        await page.locator('.pass-pick-item').nth(0).evaluate(e => e.classList.contains('on')));
+
+  await page.focus('#passSearch');
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(50);
+  check('↓ 로 다음으로 내려간다',
+        await page.locator('.pass-pick-item').nth(1).evaluate(e => e.classList.contains('on')));
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp');
+  await page.waitForTimeout(50);
+  check('↑ 는 위로, 끝에서는 돌아간다',
+        await page.locator('.pass-pick-item').nth(1).evaluate(e => e.classList.contains('on')));
+
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(80);
+  check('Enter 로 골라진다', await page.locator('#passFields, #passPicked').first().isVisible());
+  check('짚고 있던 학생이 골라진다', (await page.innerText('#passPicked')).includes('이학생'),
+        await page.innerText('#passPicked'));
+  check('저장 버튼이 풀린다', !(await page.locator('#passSaveBtn').isDisabled()));
+}
+
+console.log('\n■ 검색 — 결과가 하나면 Enter 한 번');
+{
+  await page.evaluate(() => window.passUnpick());
+  await page.fill('#passSearch', '박학생');
+  await page.waitForTimeout(80);
+  check('결과가 하나', (await page.locator('.pass-pick-item').count()) === 1);
+  await page.focus('#passSearch');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(80);
+  check('바로 골라진다', (await page.innerText('#passPicked')).includes('박학생'),
+        await page.innerText('#passPicked'));
+
+  await page.evaluate(() => window.passUnpick());
+  await page.fill('#passSearch', '없는이름');
+  await page.waitForTimeout(80);
+  await page.focus('#passSearch');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(80);
+  check('결과가 없으면 Enter 가 아무것도 안 한다',
+        !(await page.locator('#passPicked').isVisible()));
+  await page.evaluate(() => window.passCloseForm());
+}
+
+console.log('\n■ 상세 사진 — 고화질로 바꿔 끼운다');
+{
+  await page.evaluate(({ PX }) => {
+    window.reset();
+    window.__photos = { '1-3': { '7': PX } };
+    window.__big = 'data:image/png;base64,BIGPHOTO';      // 워커가 준 고화질인 척
+    window.pushToday([{ id:'q', grade:1, room:3, num:7, name:'김학생', kind:'조퇴', outAt:'13:00',
+      guardian:'전화', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' }]);
+  }, { PX });
+  await page.waitForTimeout(120);
+  await page.waitForFunction(() => document.querySelectorAll('.pass-card img.pass-photo').length > 0);
+  await page.locator('.pass-card').first().click();
+  await page.waitForFunction(() =>
+    document.querySelector('#passDetailBody img.pass-photo')?.src.includes('BIGPHOTO'), null, { timeout: 3000 })
+    .then(() => check('고화질로 교체된다', true))
+    .catch(async () => check('고화질로 교체된다', false,
+      await page.getAttribute('#passDetailBody img.pass-photo', 'src')));
+  check('목록 카드는 작은 사진 그대로',
+        !(await page.getAttribute('.pass-card img.pass-photo', 'src')).includes('BIGPHOTO'));
+  await page.evaluate(() => { window.__big = null; window.passCloseDetail(); });
+}
+
+console.log('\n■ 나이스 출결 문구를 지웠다');
+{
+  check('페이지 하단에 없다', !(await page.innerText('#passPage')).includes('나이스'));
+  await page.locator('.pass-card').first().click();
+  await page.waitForTimeout(120);
+  check('상세 모달에도 없다', !(await page.innerText('#passDetailOverlay')).includes('나이스'));
+  await page.evaluate(() => window.passCloseDetail());
+}
+
+console.log('\n■ 수정·삭제 권한');
+{
+  const put = rows => page.evaluate(r => { window.reset(); window.pushToday(r); }, rows);
+  const MINE   = { id:'m1', grade:1, room:3, num:7, name:'김학생', kind:'조퇴', outAt:'13:00',
+                   reason:'병원', guardian:'전화', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' };
+  const OTHERS = { id:'o1', grade:1, room:3, num:8, name:'이학생', kind:'외출', outAt:'10:00', backAt:'11:30',
+                   reason:'치과', guardian:'문자', issuedBy:'kim@yeungnam.hs.kr', issuedName:'김교사' };
+
+  await put([MINE, OTHERS]);
+  await page.waitForTimeout(120);
+  const open = async nm => {
+    await page.locator('.pass-card').filter({ has: page.locator('.pass-name', { hasText: nm }) }).click();
+    await page.waitForTimeout(100);
+  };
+
+  await open('김학생');
+  check('내가 끊은 건 — 수정 버튼', (await page.locator('#passEditBtn').count()) === 1);
+  check('내가 끊은 건 — 삭제 버튼', (await page.locator('#passDelBtn').count()) === 1);
+  await page.evaluate(() => window.passCloseDetail());
+
+  await open('이학생');
+  check('남이 끊은 건 — 수정 버튼 없음', (await page.locator('#passEditBtn').count()) === 0);
+  check('남이 끊은 건 — 삭제 버튼도 없음', (await page.locator('#passDelBtn').count()) === 0);
+  await page.evaluate(() => window.passCloseDetail());
+
+  await page.evaluate(() => { window.__admin = true; });
+  await open('이학생');
+  check('관리자는 남의 것도 삭제할 수 있다', (await page.locator('#passDelBtn').count()) === 1);
+  check('관리자라도 남의 것은 수정 못 한다', (await page.locator('#passEditBtn').count()) === 0);
+  await page.evaluate(() => { window.passCloseDetail(); window.__admin = false; });
+}
+
+console.log('\n■ 수정 — 틀은 그대로, 값만 바뀐다');
+{
+  await page.locator('.pass-card').filter({ has: page.locator('.pass-name', { hasText: '김학생' }) }).click();
+  await page.waitForTimeout(100);
+  const heroBefore = await page.innerText('.pass-detail-hero');
+  const rowsBefore = await page.$$eval('.pass-row .k', n => n.map(x => x.textContent));
+
+  await page.locator('#passEditBtn').click();
+  await page.waitForTimeout(100);
+  check('모달은 그대로 열려 있다', await page.locator('#passDetailOverlay.open').isVisible());
+  check('사진·이름 영역은 안 변한다', (await page.innerText('.pass-detail-hero')) === heroBefore);
+  check('줄 구조(항목 이름)는 유지된다',
+        JSON.stringify(await page.$$eval('.pass-row .k', n => n.map(x => x.textContent)))
+          .includes('나가는 시각'));
+  check('값 자리가 입력칸으로 바뀐다', (await page.locator('.pass-row .pass-edit').count()) >= 4);
+  check('날짜는 못 고친다', (await page.locator('#passEdDate').count()) === 0);
+  check('학생을 바꾸는 칸은 없다', (await page.locator('#passDetailBody #passSearch').count()) === 0);
+  check('현재 값이 채워져 있다',
+        (await page.inputValue('#passEdOut')) === '13:00' &&
+        (await page.inputValue('#passEdReason')) === '병원', rowsBefore);
+  check('조퇴라 복귀 줄은 숨어 있다', !(await page.locator('#passEdBackRow').isVisible()));
+}
+
+console.log('\n■ 수정 — 저장');
+{
+  await page.selectOption('#passEdKind', '외출');
+  await page.waitForTimeout(50);
+  check('외출로 바꾸면 복귀 줄이 나온다', await page.locator('#passEdBackRow').isVisible());
+  await page.fill('#passEdBack', '15:00');
+  await page.fill('#passEdOut', '13:40');
+  await page.fill('#passEdReason', '치과 진료');
+  await page.selectOption('#passEdGuard', '방문');
+  await page.locator('#passEdSave').click();
+  await page.waitForTimeout(150);
+
+  const up = await page.evaluate(() => window.__updated);
+  check('한 건만 저장된다', up.length === 1, up);
+  check('그 외출증 문서로 간다', /^passes\/\d{4}-\d{2}-\d{2}\/items$/.test(up[0].path.replace(/\/m1$/, '')) || up[0].path.endsWith('/m1'), up[0].path);
+  check('merge 로 덮어쓴다', up[0].opt && up[0].opt.merge === true, up[0].opt);
+  check('바꾼 값이 담긴다',
+        up[0].data.kind === '외출' && up[0].data.outAt === '13:40' &&
+        up[0].data.backAt === '15:00' && up[0].data.reason === '치과 진료' &&
+        up[0].data.guardian === '방문', up[0].data);
+  check('발급자는 건드리지 않는다', !('issuedBy' in up[0].data) && !('issuedName' in up[0].data), up[0].data);
+  check('학생도 건드리지 않는다',
+        !('grade' in up[0].data) && !('num' in up[0].data) && !('name' in up[0].data), up[0].data);
+
+  check('저장하면 보기로 돌아온다', (await page.locator('.pass-row .pass-edit').count()) === 0);
+  check('모달은 열린 채', await page.locator('#passDetailOverlay.open').isVisible());
+  const body = await page.innerText('#passDetailBody');
+  check('바뀐 내용이 상세에 보인다', body.includes('13:40') && body.includes('치과 진료') && body.includes('방문'), body);
+  const listTxt = await page.innerText('#passList, #passFeed');
+  check('목록에도 바로 반영된다', listTxt.includes('13:40') && listTxt.includes('치과 진료'), listTxt);
+}
+
+console.log('\n■ 수정 — 취소와 실수 방지');
+{
+  await page.locator('#passEditBtn').click();
+  await page.waitForTimeout(80);
+  await page.fill('#passEdReason', '지워질 내용');
+  // 수정 중에 바깥을 눌러도 닫히면 안 된다
+  await page.locator('#passDetailOverlay').click({ position: { x: 5, y: 5 } });
+  await page.waitForTimeout(80);
+  check('수정 중에는 바깥을 눌러도 안 닫힌다', await page.locator('#passDetailOverlay.open').isVisible());
+  await page.evaluate(() => { window.__updated = []; });
+  await page.locator('#passEdCancel').click();
+  await page.waitForTimeout(80);
+  check('취소하면 저장하지 않는다', (await page.evaluate(() => window.__updated)).length === 0);
+  check('취소하면 보기로 돌아온다', (await page.locator('.pass-row .pass-edit').count()) === 0);
+  check('취소해도 값은 그대로', (await page.innerText('#passDetailBody')).includes('치과 진료'));
+
+  await page.locator('#passEditBtn').click();
+  await page.waitForTimeout(80);
+  await page.fill('#passEdOut', '');
+  await page.evaluate(() => { window.__updated = []; });
+  await page.locator('#passEdSave').click();
+  await page.waitForTimeout(100);
+  check('시각을 비우면 저장을 막는다', (await page.evaluate(() => window.__updated)).length === 0);
+  check('안내가 뜬다', (await page.innerText('#passEdMsg')).includes('시각'));
+  await page.evaluate(() => { window.passEditing = false; window.passCloseDetail(); });
+  await page.evaluate(() => window.passCloseDetail());
 }
 
 console.log('\n■ 데스크톱은 FAB 을 쓰지 않는다');
