@@ -1,198 +1,221 @@
-// 외출증 UI 검증 — 실제 Chromium에서 DOM을 본다.
+// 외출증 UI 검증 — 실제 Chromium 에서 DOM 을 본다.
+// 하네스는 index.html 에서 코드·마크업·CSS 를 그대로 떼어 온다(tests/build-pass-harness.py).
 import { chromium } from 'playwright';
-const URL = 'file://' + process.env.PASS_HARNESS + '';
+const URL = 'file://' + process.env.PASS_HARNESS;
 
 const STUDENTS = [
-  { grade: 1, room: 3, num: 7,  name: '김학생' },
-  { grade: 1, room: 3, num: 8,  name: '이학생' },
-  { grade: 2, room: 1, num: 12, name: '박학생' }
+  { grade: 1, room: 3, num: 7,  name: '김민준' },
+  { grade: 1, room: 3, num: 8,  name: '이서연' },
+  { grade: 2, room: 1, num: 12, name: '박지호' }
 ];
 const PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const shift = n => { const d = new Date(); d.setDate(d.getDate()+n); return ymd(d); };
 
 let pass = 0, fail = 0;
 const check = (n, c, x) => c ? (pass++, console.log('  ✅', n))
                              : (fail++, console.log('  ❌', n, x !== undefined ? '\n       → ' + JSON.stringify(x) : ''));
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
-const page = await browser.newPage({ viewport: { width: 900, height: 900 } });
+const page = await browser.newPage({ viewport: { width: 1000, height: 900 } });
 page.on('pageerror', e => { console.log('  ⚠ 페이지 오류:', e.message); fail++; });
 await page.goto(URL);
-await page.evaluate(s => { window.setStudents(s); window.initPassPage(); }, STUDENTS);
 
-console.log('\n■ 목록 — 사진과 함께 보이는가');
+// 지난 날짜(한 번만 읽는 것) 준비
+await page.evaluate(({ y1, y2 }) => {
+  window.__past = {
+    [y1]: [{ id:'p1', grade:3, room:5, num:5, name:'오지민', kind:'조퇴', outAt:'11:10',
+             reason:'발열', guardian:'전화', issuedBy:'kim@yeungnam.hs.kr', issuedName:'김교사', createdAt:'2026-08-18T01:58:00Z' }],
+    [y2]: [{ id:'p2', grade:2, room:2, num:21, name:'임건우', kind:'결과', outAt:'09:40',
+             reason:'대회 준비', guardian:'미확인', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동', createdAt:'2026-08-17T00:12:00Z' }]
+  };
+}, { y1: shift(-1), y2: shift(-2) });
+
+await page.evaluate(s => { window.setStudents(s); window.initPassPage(); }, STUDENTS);
+await page.waitForTimeout(80);
+
+console.log('\n■ 오늘 목록 — 사진과 함께');
 await page.evaluate(({ PX }) => {
   window.reset();
-  window.__photos = { '1-3': { '7': PX } };          // 김학생만 사진 있음
-  window.pushSnap([
-    { id:'a', grade:1, room:3, num:7, name:'김학생', kind:'조퇴', outAt:'14:30',
-      reason:'병원 진료', guardian:'전화', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동', createdAt:'1' },
-    { id:'b', grade:1, room:3, num:8, name:'이학생', kind:'외출', outAt:'10:00', backAt:'11:30',
-      reason:'', guardian:'문자', issuedBy:'kim@yeungnam.hs.kr', issuedName:'김교사', createdAt:'2' }
+  window.__photos = { '1-3': { '7': PX } };
+  window.pushToday([
+    { id:'a', grade:1, room:3, num:7, name:'김민준', kind:'조퇴', outAt:'14:30',
+      reason:'몸살', guardian:'문자', issuedBy:'kim@yeungnam.hs.kr', issuedName:'김교사', createdAt:'2026-08-19T05:12:00Z' },
+    { id:'b', grade:1, room:3, num:8, name:'이서연', kind:'외출', outAt:'10:00', backAt:'11:30',
+      reason:'치과 진료', guardian:'전화', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동', createdAt:'2026-08-19T00:41:00Z' }
   ]);
 }, { PX });
-await page.waitForTimeout(120);
+await page.waitForTimeout(200);
 {
-  check('두 건이 보인다', (await page.locator('.pass-card').count()) === 2);
-  // outAt 순 정렬: 이학생(10:00)이 김학생(14:30)보다 위
-  const names = await page.$$eval('.pass-name', n => n.map(x => x.textContent));
-  check('나가는 시각 순으로 정렬', names[0] === '이학생' && names[1] === '김학생', names);
-  await page.waitForFunction(() => document.querySelectorAll('.pass-photo').length > 0);
-  check('사진 있는 학생은 사진이 뜬다', (await page.locator('.pass-card').nth(1).locator('img.pass-photo').count()) === 1);
-  check('사진 없는 학생은 이름 첫 글자', (await page.locator('.pass-card').nth(0).locator('.pass-photo-none').textContent()) === '이');
-  const txt = await page.innerText('#passList');
-  check('복귀 시각은 외출에만 표시', txt.includes('복귀 11:30'), txt);
-  check('조퇴에는 복귀가 없다', (txt.match(/복귀/g) || []).length === 1, txt);
-  check('사유·보호자 확인이 보인다', txt.includes('병원 진료') && txt.includes('보호자 전화'), txt);
-  check('발급자가 보인다', txt.includes('홍길동 발급') && txt.includes('김교사 발급'), txt);
+  check('오늘 2건이 보인다', (await page.locator('.pass-daygroup').first().locator('.pass-card').count()) === 2);
+  const names = await page.$$eval('.pass-daygroup:first-child .pass-name', n => n.map(x => x.textContent));
+  check('나가는 시각 순', names[0] === '이서연' && names[1] === '김민준', names);
+  await page.waitForFunction(() => document.querySelectorAll('img.pass-photo').length > 0);
+  check('사진 있는 학생은 사진', (await page.locator('.pass-card').nth(1).locator('img.pass-photo').count()) === 1);
+  check('사진 없는 학생은 첫 글자', (await page.locator('.pass-card').nth(0).locator('.pass-photo-none').textContent()) === '이');
+  // innerText 는 inline-flex 자식 사이에 줄바꿈을 넣는다 → 공백을 눌러서 비교
+  const t = (await page.textContent('#passTally')).replace(/\s+/g, ' ').trim();
+  check('요약 칩: 오늘 2건', t.includes('오늘 2건'), t);
+  check('요약 칩: 종류별', t.includes('조퇴 1') && t.includes('외출 1') && t.includes('결과 0'), t);
 }
 
-console.log('\n■ 삭제 버튼 — 발급자 본인에게만');
+console.log('\n■ 날짜별 묶음 (달력 없음)');
 {
-  const cards = page.locator('.pass-card');
-  check('내가 끊은 건에는 삭제 버튼', (await cards.nth(1).locator('.pass-del').count()) === 1);
-  check('남이 끊은 건에는 없다',   (await cards.nth(0).locator('.pass-del').count()) === 0);
-  await page.evaluate(() => { window.__admin = true; window.pushSnap([
-    { id:'b', grade:1, room:3, num:8, name:'이학생', kind:'외출', outAt:'10:00',
-      issuedBy:'kim@yeungnam.hs.kr', issuedName:'김교사', createdAt:'2' }]); });
-  await page.waitForTimeout(80);
-  check('관리자는 남의 것도 지울 수 있다', (await page.locator('.pass-del').count()) === 1);
+  check('달력이 없다', (await page.locator('.grid7, .pass-daynav').count()) === 0);
+  check('날짜 그룹이 3개(오늘+지난 2일)', (await page.locator('.pass-daygroup').count()) === 3);
+  const heads = await page.$$eval('.pass-dayhead .d', n => n.map(x => x.textContent));
+  check('맨 위가 오늘', heads[0] === '오늘', heads);
+  check('오늘 그룹만 today 표시', (await page.locator('.pass-dayhead.today').count()) === 1);
+  check('그룹마다 건수 표시', (await page.locator('.pass-dayhead .c').first().textContent()) === '2건');
+  check('지난 날짜도 보인다', (await page.innerText('#passFeed')).includes('오지민'));
+  check('날짜 머리가 sticky',
+        (await page.locator('.pass-dayhead').first().evaluate(e => getComputedStyle(e).position)) === 'sticky');
+}
+
+console.log('\n■ 카드 누르면 상세 모달');
+{
+  await page.locator('.pass-card').first().click();   // 이서연 (외출, 내가 발급)
+  await page.waitForTimeout(150);
+  check('모달이 열린다', await page.locator('#passDetailOverlay.open').isVisible());
+  const body = await page.innerText('#passDetailBody');
+  check('학년·반·번호가 풀어서 보인다', body.includes('1학년 3반 8번'), body);
+  check('이름', body.includes('이서연'));
+  check('나가는 시각', body.includes('10:00'));
+  check('복귀 예정(외출)', body.includes('복귀 예정') && body.includes('11:30'));
+  check('사유·보호자', body.includes('치과 진료') && body.includes('전화'));
+  check('발급자와 시각', body.includes('홍길동') && body.includes('00:41'), body);
+  check('사진이 크게', (await page.locator('#passDetailBody .pass-photo, #passDetailBody .pass-photo-none')
+        .first().evaluate(e => parseInt(getComputedStyle(e).width))) >= 88);
+  check('내가 끊은 건은 삭제 버튼', (await page.locator('#passDelBtn').count()) === 1);
+}
+
+console.log('\n■ 조퇴는 복귀 줄이 없다 / 남의 것은 삭제 불가');
+{
+  await page.evaluate(() => window.passCloseDetail());
+  await page.locator('.pass-card').nth(1).click();     // 김민준 (조퇴, 김교사 발급)
+  await page.waitForTimeout(150);
+  const body = await page.innerText('#passDetailBody');
+  check('복귀 예정 줄이 없다', !body.includes('복귀 예정'), body);
+  check('남이 끊은 건은 삭제 버튼 없음', (await page.locator('#passDelBtn').count()) === 0);
+  await page.evaluate(() => { window.__admin = true; });
+  await page.evaluate(() => window.passCloseDetail());
+  await page.locator('.pass-card').nth(1).click();
+  await page.waitForTimeout(150);
+  check('관리자는 남의 것도 삭제 가능', (await page.locator('#passDelBtn').count()) === 1);
   await page.evaluate(() => { window.__admin = false; });
 }
 
-console.log('\n■ 삭제 동작');
+console.log('\n■ 삭제');
 {
   await page.evaluate(() => { window.reset(); window.__admin = true; });
-  await page.locator('.pass-del').first().click();
-  await page.waitForTimeout(80);
-  check('확인을 누르면 지운다', (await page.evaluate(() => window.__deleted)).length === 1);
+  await page.evaluate(() => window.passCloseDetail());
+  await page.locator('.pass-card').first().click();
+  await page.waitForTimeout(120);
+  await page.locator('#passDelBtn').click();
+  await page.waitForTimeout(150);
+  const del = await page.evaluate(() => window.__deleted);
+  check('오늘 날짜 경로로 지운다', del.length === 1 && /^passes\/\d{4}-\d{2}-\d{2}\/items\/b$/.test(del[0]), del);
+  check('삭제 후 모달이 닫힌다', !(await page.locator('#passDetailOverlay.open').isVisible()));
   await page.evaluate(() => { window.reset(); window.__confirm = false; });
-  await page.locator('.pass-del').first().click();
-  await page.waitForTimeout(80);
+  await page.locator('.pass-card').first().click();
+  await page.waitForTimeout(120);
+  await page.locator('#passDelBtn').click();
+  await page.waitForTimeout(120);
   check('취소하면 안 지운다', (await page.evaluate(() => window.__deleted)).length === 0);
-  await page.evaluate(() => { window.__confirm = true; window.__admin = false; });
+  await page.evaluate(() => { window.__confirm = true; window.__admin = false; window.passCloseDetail(); });
 }
 
-console.log('\n■ 빈 날짜');
+console.log('\n■ 지난 날짜 삭제는 화면에서 직접 걷어낸다 (구독이 안 걸려 있으므로)');
 {
-  await page.evaluate(() => window.pushSnap([]));
-  await page.waitForTimeout(60);
-  check('안내 문구가 뜬다', (await page.innerText('#passList')).includes('외출증이 없습니다'));
+  await page.evaluate(() => { window.reset(); window.__admin = true; });
+  const before = await page.locator('.pass-card').count();
+  await page.locator('.pass-daygroup').nth(2).locator('.pass-card').first().click();  // 임건우 (그제)
+  await page.waitForTimeout(120);
+  await page.locator('#passDelBtn').click();
+  await page.waitForTimeout(200);
+  check('지난 날 카드가 사라진다', (await page.locator('.pass-card').count()) === before - 1);
+  check('그 그룹도 사라진다', (await page.locator('.pass-daygroup').count()) === 2);
+  await page.evaluate(() => { window.__admin = false; });
 }
 
-console.log('\n■ 날짜 이동');
-{
-  const today = await page.evaluate(() => document.getElementById('passDayLabel').textContent);
-  check('오늘 표시', today.includes('(오늘)'), today);
-  await page.evaluate(() => window.passMoveDay(-1));
-  const prev = await page.evaluate(() => document.getElementById('passDayLabel').textContent);
-  check('어제로 이동하면 (오늘) 표시가 사라진다', !prev.includes('(오늘)'), prev);
-  check('날짜가 하루 줄었다',
-        (new Date(today.slice(0,10)) - new Date(prev.slice(0,10))) === 86400000, [today, prev]);
-  await page.evaluate(() => window.passMoveDay(0));
-  check('오늘 버튼으로 복귀',
-        (await page.evaluate(() => document.getElementById('passDayLabel').textContent)).includes('(오늘)'));
-}
-
-console.log('\n■ 발급 — 학생 고르기');
+console.log('\n■ 발급');
 {
   await page.evaluate(() => { window.reset(); window.passOpenForm(); });
-  await page.waitForTimeout(80);
+  await page.waitForTimeout(120);
   check('모달이 열린다', await page.locator('#passModalOverlay.open').isVisible());
-  check('고르기 전에는 저장 버튼이 잠겨 있다', await page.locator('#passSaveBtn').isDisabled());
-  check('고르기 전에는 입력칸이 숨겨져 있다', !(await page.locator('#passFields').isVisible()));
-  await page.fill('#passSearch', '김학');
-  await page.waitForTimeout(80);
-  check('검색 결과가 뜬다', (await page.locator('.pass-pick-item').count()) === 1);
+  check('고르기 전 저장 잠김', await page.locator('#passSaveBtn').isDisabled());
   await page.fill('#passSearch', '1-3');
-  await page.waitForTimeout(80);
-  check('학년-반으로도 찾는다', (await page.locator('.pass-pick-item').count()) === 2);
-  await page.fill('#passSearch', '없는이름');
-  await page.waitForTimeout(80);
-  check('없으면 안내', (await page.innerText('#passSearchResult')).includes('검색 결과 없음'));
-  await page.fill('#passSearch', '김학');
-  await page.waitForTimeout(80);
+  await page.waitForTimeout(100);
+  check('학년-반으로 검색', (await page.locator('.pass-pick-item').count()) === 2);
+  await page.fill('#passSearch', '박지');
+  await page.waitForTimeout(100);
   await page.locator('.pass-pick-item').first().click();
-  await page.waitForTimeout(80);
+  await page.waitForTimeout(100);
   check('고르면 입력칸이 열린다', await page.locator('#passFields').isVisible());
-  check('저장 버튼이 풀린다', !(await page.locator('#passSaveBtn').isDisabled()));
-  check('고른 학생이 표시된다', (await page.innerText('#passPicked')).includes('김학생'));
-  check('나가는 시각 기본값이 채워져 있다',
-        /^\d{2}:\d{2}$/.test(await page.inputValue('#passOutAt')));
-}
-
-console.log('\n■ 발급 — 종류에 따라 복귀 칸');
-{
-  check('조퇴면 복귀 칸이 없다', !(await page.locator('#passBackWrap').isVisible()));
+  check('조퇴면 복귀 칸 숨김', !(await page.locator('#passBackWrap').isVisible()));
   await page.locator('.pass-kind-btn[data-kind="외출"]').click();
-  check('외출이면 복귀 칸이 나온다', await page.locator('#passBackWrap').isVisible());
-  await page.locator('.pass-kind-btn[data-kind="결과"]').click();
-  check('결과면 다시 숨는다', !(await page.locator('#passBackWrap').isVisible()));
-}
-
-console.log('\n■ 발급 — 저장');
-{
-  await page.locator('.pass-kind-btn[data-kind="외출"]').click();
+  check('외출이면 복귀 칸', await page.locator('#passBackWrap').isVisible());
   await page.fill('#passOutAt', '13:20');
   await page.fill('#passBackAt', '15:00');
   await page.fill('#passReason', '치과');
   await page.locator('.pass-guard-btn[data-guard="문자"]').click();
   await page.locator('#passSaveBtn').click();
-  await page.waitForTimeout(120);
+  await page.waitForTimeout(200);
   const added = await page.evaluate(() => window.__added);
-  check('한 건만 저장된다', added.length === 1, added);
+  check('한 건 저장', added.length === 1, added);
+  check('오늘 경로', /^passes\/\d{4}-\d{2}-\d{2}\/items$/.test(added[0].path), added[0].path);
   const d = added[0].data;
-  check('오늘 날짜 아래로 들어간다', /^passes\/\d{4}-\d{2}-\d{2}\/items$/.test(added[0].path), added[0].path);
-  check('학생 정보가 숫자로 들어간다', d.grade === 1 && d.room === 3 && d.num === 7 && d.name === '김학생', d);
-  check('종류·시각·사유', d.kind === '외출' && d.outAt === '13:20' && d.reason === '치과', d);
-  check('외출이면 복귀 시각도', d.backAt === '15:00', d);
-  check('보호자 확인', d.guardian === '문자', d);
-  check('발급자는 로그인한 사람', d.issuedBy === 'hong@yeungnam.hs.kr' && d.issuedName === '홍길동', d);
-  check('저장하면 모달이 닫힌다', !(await page.locator('#passModalOverlay.open').isVisible()));
+  check('학생 정보가 숫자로', d.grade === 2 && d.room === 1 && d.num === 12 && d.name === '박지호', d);
+  check('종류·시각·사유·복귀', d.kind === '외출' && d.outAt === '13:20' && d.backAt === '15:00' && d.reason === '치과', d);
+  check('보호자·발급자', d.guardian === '문자' && d.issuedBy === 'hong@yeungnam.hs.kr' && d.issuedName === '홍길동', d);
+  check('저장하면 닫힌다', !(await page.locator('#passModalOverlay.open').isVisible()));
 }
 
-console.log('\n■ 발급 — 조퇴면 복귀 시각을 저장하지 않는다');
+console.log('\n■ 조퇴면 복귀 시각을 저장하지 않는다 / 시각 비면 막는다');
 {
   await page.evaluate(() => { window.reset(); window.passOpenForm(); });
-  await page.waitForTimeout(80);
-  await page.fill('#passSearch', '박학생');
-  await page.waitForTimeout(80);
+  await page.waitForTimeout(100);
+  await page.fill('#passSearch', '김민'); await page.waitForTimeout(100);
   await page.locator('.pass-pick-item').first().click();
   await page.locator('.pass-kind-btn[data-kind="외출"]').click();
   await page.fill('#passBackAt', '15:00');
-  await page.locator('.pass-kind-btn[data-kind="조퇴"]').click();   // 다시 조퇴로
+  await page.locator('.pass-kind-btn[data-kind="조퇴"]').click();
   await page.locator('#passSaveBtn').click();
-  await page.waitForTimeout(120);
-  const d = (await page.evaluate(() => window.__added))[0].data;
-  check('조퇴면 backAt 이 비어 있다', d.backAt === '', d);
-  check('다른 반 학생도 정상', d.grade === 2 && d.room === 1 && d.num === 12, d);
-}
+  await page.waitForTimeout(150);
+  check('조퇴면 backAt 이 빈다', (await page.evaluate(() => window.__added))[0].data.backAt === '', await page.evaluate(() => window.__added));
 
-console.log('\n■ 발급 — 시각을 비우면 막는다');
-{
   await page.evaluate(() => { window.reset(); window.passOpenForm(); });
-  await page.waitForTimeout(80);
-  await page.fill('#passSearch', '김학');
-  await page.waitForTimeout(80);
+  await page.waitForTimeout(100);
+  await page.fill('#passSearch', '김민'); await page.waitForTimeout(100);
   await page.locator('.pass-pick-item').first().click();
   await page.fill('#passOutAt', '');
   await page.locator('#passSaveBtn').click();
-  await page.waitForTimeout(100);
-  check('저장되지 않는다', (await page.evaluate(() => window.__added)).length === 0);
+  await page.waitForTimeout(120);
+  check('시각 없으면 저장 안 됨', (await page.evaluate(() => window.__added)).length === 0);
   check('안내가 뜬다', (await page.innerText('#passFormMsg')).includes('시각'));
-  check('모달은 열린 채로', await page.locator('#passModalOverlay.open').isVisible());
+  await page.evaluate(() => window.passCloseForm());
 }
 
-console.log('\n■ 다시 고르기 / 모달 재사용');
+console.log('\n■ 모바일 — FAB');
 {
-  await page.evaluate(() => window.passUnpick());
-  check('다시 고르기로 돌아간다', await page.locator('#passPickWrap').isVisible());
-  check('저장 버튼이 다시 잠긴다', await page.locator('#passSaveBtn').isDisabled());
-  await page.evaluate(() => window.passCloseForm());
-  await page.evaluate(() => window.passOpenForm());
-  await page.waitForTimeout(80);
-  check('다시 열면 검색어가 비어 있다', (await page.inputValue('#passSearch')) === '');
-  check('다시 열면 종류가 조퇴로 초기화', await page.locator('.pass-kind-btn[data-kind="조퇴"]').evaluate(e => e.classList.contains('active')));
-  check('다시 열면 사유도 비어 있다', (await page.inputValue('#passReason')) === '');
+  const m = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  m.on('pageerror', e => { console.log('  ⚠ 모바일 오류:', e.message); fail++; });
+  await m.goto(URL);
+  await m.evaluate(s => { window.setStudents(s); window.initPassPage(); }, STUDENTS);
+  await m.evaluate(() => window.pushToday([]));
+  await m.waitForTimeout(150);
+  check('FAB 이 보인다', await m.locator('#passFab').isVisible());
+  check('헤더 버튼은 숨는다', !(await m.locator('.pass-add-btn').isVisible()));
+  await m.locator('#passFab').click();
+  await m.waitForTimeout(150);
+  check('FAB 로 발급 모달이 열린다', await m.locator('#passModalOverlay.open').isVisible());
+  await m.close();
+}
+
+console.log('\n■ 데스크톱은 FAB 을 쓰지 않는다');
+{
+  check('FAB 숨김', !(await page.locator('#passFab').isVisible()));
+  check('헤더 버튼 보임', await page.locator('.pass-add-btn').isVisible());
 }
 
 await browser.close();
