@@ -21,7 +21,13 @@ const page = await browser.newPage({ viewport: { width: 1000, height: 900 } });
 page.on('pageerror', e => { console.log('  ⚠ 페이지 오류:', e.message); fail++; });
 await page.goto(URL);
 
-// 지난 날짜(한 번만 읽는 것) 준비
+// 지난 날짜·앞날 (한 번만 읽는 것) 준비
+await page.evaluate(({ f1 }) => {
+  window.__future = {
+    [f1]: [{ id:'f1', grade:1, room:4, num:2, name:'최도현', kind:'외출', outAt:'13:00', backAt:'14:20',
+             reason:'정기 검진', guardian:'전화', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동', createdAt:'2026-08-19T02:00:00Z' }]
+  };
+}, { f1: shift(1) });
 await page.evaluate(({ y1, y2 }) => {
   window.__past = {
     [y1]: [{ id:'p1', grade:3, room:5, num:5, name:'오지민', kind:'조퇴', outAt:'11:10',
@@ -138,12 +144,34 @@ console.log('\n■ 지난 날짜 삭제는 화면에서 직접 걷어낸다 (구
   await page.evaluate(() => { window.__admin = false; });
 }
 
+console.log('\n■ 예정 보기 (미래 건은 오늘 목록에 안 섞인다)');
+{
+  await page.evaluate(() => { window.reset(); });
+  const feed = await page.innerText('#passFeed');
+  check('앞날 건이 기본 목록에 없다', !feed.includes('최도현'), feed);
+  check('예정 칩이 보인다', (await page.locator('#passUpBtn').count()) === 1);
+  check('예정 건수', (await page.textContent('#passUpBtn')).replace(/\s+/g,'').includes('1건'));
+  await page.locator('#passUpBtn').click();
+  await page.waitForTimeout(150);
+  const up = await page.innerText('#passFeed');
+  check('예정 보기로 바뀐다', up.includes('최도현'), up);
+  check('예정에는 오늘 건이 없다', !up.includes('김민준'), up);
+  check('칩이 켜진 상태', await page.locator('#passUpBtn.on').isVisible());
+  await page.locator('#passUpBtn').click();
+  await page.waitForTimeout(150);
+  check('다시 누르면 최근 보기로', (await page.innerText('#passFeed')).includes('김민준'));
+}
+
 console.log('\n■ 발급');
 {
   await page.evaluate(() => { window.reset(); window.passOpenForm(); });
   await page.waitForTimeout(120);
   check('모달이 열린다', await page.locator('#passModalOverlay.open').isVisible());
   check('고르기 전 저장 잠김', await page.locator('#passSaveBtn').isDisabled());
+  check('학생을 고르기 전에도 칸이 다 보인다',
+        (await page.locator('#passKinds').isVisible()) && (await page.locator('#passReason').isVisible())
+        && (await page.locator('#passGuards').isVisible()) && (await page.locator('#passRepeats').isVisible()));
+  check('날짜 기본값은 오늘', (await page.inputValue('#passDate')) === ymd(new Date()));
   await page.fill('#passSearch', '1-3');
   await page.waitForTimeout(100);
   check('학년-반으로 검색', (await page.locator('.pass-pick-item').count()) === 2);
@@ -151,14 +179,16 @@ console.log('\n■ 발급');
   await page.waitForTimeout(100);
   await page.locator('.pass-pick-item').first().click();
   await page.waitForTimeout(100);
-  check('고르면 입력칸이 열린다', await page.locator('#passFields').isVisible());
+  check('고르면 학생 칸만 채워진다', await page.locator('#passPicked').isVisible());
+  check('검색창은 사라진다', !(await page.locator('#passPickWrap').isVisible()));
+  check('저장 버튼이 풀린다', !(await page.locator('#passSaveBtn').isDisabled()));
   check('조퇴면 복귀 칸 숨김', !(await page.locator('#passBackWrap').isVisible()));
-  await page.locator('.pass-kind-btn[data-kind="외출"]').click();
+  await page.locator('#passKinds .pass-slot[data-kind="외출"]').click();
   check('외출이면 복귀 칸', await page.locator('#passBackWrap').isVisible());
   await page.fill('#passOutAt', '13:20');
   await page.fill('#passBackAt', '15:00');
   await page.fill('#passReason', '치과');
-  await page.locator('.pass-guard-btn[data-guard="문자"]').click();
+  await page.locator('#passGuards .pass-slot[data-guard="문자"]').click();
   await page.locator('#passSaveBtn').click();
   await page.waitForTimeout(200);
   const added = await page.evaluate(() => window.__added);
@@ -177,9 +207,9 @@ console.log('\n■ 조퇴면 복귀 시각을 저장하지 않는다 / 시각 �
   await page.waitForTimeout(100);
   await page.fill('#passSearch', '김민'); await page.waitForTimeout(100);
   await page.locator('.pass-pick-item').first().click();
-  await page.locator('.pass-kind-btn[data-kind="외출"]').click();
+  await page.locator('#passKinds .pass-slot[data-kind="외출"]').click();
   await page.fill('#passBackAt', '15:00');
-  await page.locator('.pass-kind-btn[data-kind="조퇴"]').click();
+  await page.locator('#passKinds .pass-slot[data-kind="조퇴"]').click();
   await page.locator('#passSaveBtn').click();
   await page.waitForTimeout(150);
   check('조퇴면 backAt 이 빈다', (await page.evaluate(() => window.__added))[0].data.backAt === '', await page.evaluate(() => window.__added));
@@ -194,6 +224,85 @@ console.log('\n■ 조퇴면 복귀 시각을 저장하지 않는다 / 시각 �
   check('시각 없으면 저장 안 됨', (await page.evaluate(() => window.__added)).length === 0);
   check('안내가 뜬다', (await page.innerText('#passFormMsg')).includes('시각'));
   await page.evaluate(() => window.passCloseForm());
+}
+
+console.log('\n■ 날짜 지정 — 앞날 것을 미리 발급하면 예정에 들어간다');
+{
+  await page.evaluate(() => { window.reset(); window.passOpenForm(); });
+  await page.waitForTimeout(120);
+  await page.fill('#passSearch', '박지'); await page.waitForTimeout(100);
+  await page.locator('.pass-pick-item').first().click();
+  const d3 = (() => { const x = new Date(); x.setDate(x.getDate()+3); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; })();
+  await page.fill('#passDate', d3);
+  await page.fill('#passOutAt', '09:00');
+  await page.locator('#passSaveBtn').click();
+  await page.waitForTimeout(250);
+  const added = await page.evaluate(() => window.__added);
+  check('지정한 날짜 경로로 저장', added.length === 1 && added[0].path === `passes/${d3}/items`, added);
+  // 새로고침 없이 바로 보여야 한다
+  await page.locator('#passUpBtn').click();
+  await page.waitForTimeout(150);
+  check('새로고침 없이 예정 목록에 바로 뜬다', (await page.innerText('#passFeed')).includes('박지호'));
+  await page.locator('#passUpBtn').click();
+  await page.waitForTimeout(120);
+}
+
+console.log('\n■ 반복 발급');
+{
+  await page.evaluate(() => { window.reset(); window.passOpenForm(); });
+  await page.waitForTimeout(120);
+  await page.fill('#passSearch', '김민'); await page.waitForTimeout(100);
+  await page.locator('.pass-pick-item').first().click();
+  check('처음엔 반복 옵션이 숨어 있다', !(await page.locator('#passRepeatOpts').isVisible()));
+  await page.locator('#passRepeats .pass-slot[data-rep="daily"]').click();
+  check('매일을 고르면 종료일 칸이 열린다', await page.locator('#passRepeatOpts').isVisible());
+  check('매일에는 요일 칸이 없다', !(await page.locator('#passWdayWrap').isVisible()));
+  await page.locator('#passRepeats .pass-slot[data-rep="weekly"]').click();
+  check('요일을 고르면 요일 칸이 열린다', await page.locator('#passWdayWrap').isVisible());
+  check('요일 5개(월~금)', (await page.locator('#passWdays .pass-wday').count()) === 5);
+
+  // 월요일부터 2주, 월·수만
+  const mon = (() => { const x = new Date(); x.setDate(x.getDate() + ((8 - x.getDay()) % 7 || 7)); return x; })();
+  const f = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const end = new Date(mon); end.setDate(end.getDate() + 13);
+  await page.fill('#passDate', f(mon));
+  await page.fill('#passUntil', f(end));
+  await page.locator('#passWdays .pass-wday[data-wd="1"]').click();
+  await page.locator('#passWdays .pass-wday[data-wd="3"]').click();
+  await page.waitForTimeout(120);
+  check('만들어질 건수를 미리 알려준다', (await page.textContent('#passRepeatNote')).includes('4일치'),
+        await page.textContent('#passRepeatNote'));
+  await page.fill('#passOutAt', '10:00');
+  await page.locator('#passSaveBtn').click();
+  await page.waitForTimeout(400);
+  const added = await page.evaluate(() => window.__added);
+  check('월·수 4건이 만들어진다', added.length === 4, added.map(a => a.path));
+  const days = added.map(a => a.day);
+  check('전부 월요일 또는 수요일',
+        days.every(d => [1,3].includes(new Date(d + 'T00:00:00').getDay())), days);
+  check('모두 같은 내용', added.every(a => a.data.name === '김민준' && a.data.outAt === '10:00'));
+}
+
+console.log('\n■ 반복 — 주말은 건너뛴다');
+{
+  await page.evaluate(() => { window.reset(); window.passOpenForm(); });
+  await page.waitForTimeout(120);
+  await page.fill('#passSearch', '김민'); await page.waitForTimeout(100);
+  await page.locator('.pass-pick-item').first().click();
+  await page.locator('#passRepeats .pass-slot[data-rep="daily"]').click();
+  const f = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const mon = (() => { const x = new Date(); x.setDate(x.getDate() + ((8 - x.getDay()) % 7 || 7)); return x; })();
+  const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
+  await page.fill('#passDate', f(mon));
+  await page.fill('#passUntil', f(sun));
+  await page.fill('#passOutAt', '10:00');
+  await page.waitForTimeout(120);
+  check('월~일 이면 평일 5일치', (await page.textContent('#passRepeatNote')).includes('5일치'),
+        await page.textContent('#passRepeatNote'));
+  await page.locator('#passSaveBtn').click();
+  await page.waitForTimeout(400);
+  const days = (await page.evaluate(() => window.__added)).map(a => a.day);
+  check('토·일이 없다', days.every(d => ![0,6].includes(new Date(d + 'T00:00:00').getDay())), days);
 }
 
 console.log('\n■ 모바일 — FAB');
