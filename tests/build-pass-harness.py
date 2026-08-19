@@ -45,6 +45,9 @@ consts = '\n'.join([
     grab_line(r"^let passRepeat = 'none';$"),
     grab_line(r'^let passWdaySel = new Set\(\);$'),
     grab_line(r'^let passDetailCur = null;$'),
+    grab_line(r'^let passEditing = false;$'),
+    grab_line(r'^let passHits = \[\];$'),
+    grab_line(r'^let passHitIdx = -1;$'),
     grab_line(r'^const PASS_WD = .*$'),
     grab_line(r'^const passYmd = .*$'),
     grab_line(r'^const passToday_ = .*$'),
@@ -57,7 +60,8 @@ consts = '\n'.join([
 fns = ['passState','initPassPage','passStopWatch','passWatchToday','passLoadRange','passShift',
        'passThumb','passFaceHtml','passRender','passFind','passShowDetail','passCloseDetail',
        'passDelete','passOpenForm','passCloseForm','passRenderSearch','passPick',
-       'passUnpick','passRepeatDays','passUpdateRepeatNote','passSave']
+       'passUnpick','passRepeatDays','passUpdateRepeatNote','passSave',
+       'passMoveHit','passSearchKey','passSaveEdit']
 code = consts + '\n\n' + '\n\n'.join(grab_fn(f) for f in fns)
 
 a = s.index('<!-- 외출증 (조퇴·외출·결과) -->')
@@ -93,7 +97,8 @@ OUT.write_text(f'''<!doctype html><meta charset="utf-8">
 const escapeHtml = t => String(t ?? '').replace(/[&<>"']/g, c =>
   ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[c]));
 
-window.__added = []; window.__deleted = []; window.__snapCb = null;
+window.__added = []; window.__deleted = []; window.__updated = []; window.__snapCb = null;
+window.__big = null;
 window.__photos = {{}}; window.__past = {{}}; window.__future = {{}};
 window.__me = {{ email: 'hong@yeungnam.hs.kr', displayName: '홍길동' }};
 window.__admin = false; window.__confirm = true; window.__alerts = [];
@@ -105,6 +110,9 @@ const doc = (...a) => ({{ path: a.slice(1).join('/'), coll: a[1], day: a[2], id:
 let __seq = 0;
 const addDoc = async (ref, data) => {{ window.__added.push({{ path: ref.path, day: ref.day, data }}); return {{ id: 'new' + (++__seq) }}; }};
 const deleteDoc = async ref => {{ window.__deleted.push(ref.path); }};
+const setDoc = async (ref, data, opt) => {{ window.__updated.push({{ path: ref.path, data, opt }}); }};
+// 고화질 사진(R2). 테스트가 window.__big 에 넣어 두면 그것을 돌려준다.
+const s360BigPhoto = async s => window.__big || null;
 const getDocs = async ref => {{
   const rows = (window.__past[ref.day] || window.__future[ref.day] || []);
   return {{ empty: rows.length === 0, docs: rows.map(r => ({{ id: r.id, data: () => r }})) }};
@@ -130,12 +138,14 @@ window.passCloseForm = passCloseForm;
 window.passCloseDetail = passCloseDetail;
 window.passUnpick = passUnpick;
 window.passSave = passSave;
+window.passShowDetail = passShowDetail;
+window.passRenderSearch = passRenderSearch;
 window.setStudents = v => {{ allStudents = v; }};
 window.pushToday = rows => window.__snapCb({{ docs: rows.map(r => ({{ id: r.id, data: () => r }})) }});
 window.passState = passState;
 window.passRender = passRender;
 window.reset = () => {{
-  window.__added = []; window.__deleted = []; window.__alerts = [];
+  window.__added = []; window.__deleted = []; window.__updated = []; window.__alerts = [];
   for (const k in s360PhotoCache) delete s360PhotoCache[k];
   for (const k in passPhotoPending) delete passPhotoPending[k];
 }};

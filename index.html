@@ -3039,7 +3039,7 @@
   }
   .pass-input:focus{outline:none; border-color:var(--cal-500); box-shadow:0 0 0 3px rgba(var(--cal-glow),.20);}
   .pass-pick-list{
-    margin-top:6px; max-height:168px; overflow-y:auto;
+    margin-top:6px; max-height:260px; overflow-y:auto;
     border:1px solid var(--cal-line); border-radius:6px; background:var(--cal-bg);
   }
   .pass-pick-list:empty{display:none;}
@@ -3047,7 +3047,11 @@
     display:flex; align-items:center; gap:10px; width:100%; padding:9px 12px;
     border:none; background:transparent; cursor:pointer; font-family:inherit; text-align:left; color:var(--cal-text);
   }
-  .pass-pick-item:hover{background:var(--cal-bg-sub);}
+  .pass-pick-item:hover,
+  .pass-pick-item.on{background:var(--cal-bg-sub);}
+  .pass-pick-item.on{box-shadow:inset 2px 0 0 var(--cal-500);}
+  /* 검색 결과에도 얼굴을 띄운다 — 동명이인은 이름만으로 못 가린다 */
+  .pass-photo.sm, .pass-photo-none.sm{width:33px; height:44px; border-radius:4px; font-size:14px;}
   .pass-pick-empty{font-size:13px; color:var(--cal-text-2); padding:12px;}
   .pass-picked{
     display:flex; align-items:center; gap:12px;
@@ -3099,6 +3103,15 @@
   .pass-row .k{width:88px; flex:0 0 auto; font-size:13px; font-weight:600; color:var(--cal-text-2);}
   .pass-row .v{font-size:15px; font-weight:500; font-variant-numeric:tabular-nums;}
   .pass-row .v.big{font-family:'IBM Plex Mono'; font-size:20px; font-weight:700;}
+  /* 수정 모드 — 줄 구조는 그대로 두고 값 자리만 입력칸으로 바꾼다 */
+  .pass-row .v{flex:1; min-width:0;}
+  .pass-row .pass-edit{
+    width:100%; box-sizing:border-box;
+    border:1px solid var(--cal-line); border-radius:4px; padding:7px 10px;
+    font-size:15px; background:var(--cal-bg); color:var(--cal-text); font-family:'Noto Sans KR';
+  }
+  .pass-row .pass-edit:focus{outline:none; border-color:var(--cal-500); box-shadow:0 0 0 3px rgba(var(--cal-glow),.20);}
+  .pass-row.locked .v{color:var(--cal-text-2);}
 
   @media (max-width:700px){
     .pass-wrap{padding:14px 12px 96px;}
@@ -4239,7 +4252,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.74</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.75</div>
   </div>
 </div>
 
@@ -4375,7 +4388,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.74</div>
+    <div class="nav-version" title="Made by 박경환">ver6.75</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4633,7 +4646,6 @@
           </div>
           <div class="pass-tally" id="passTally"></div>
           <div class="pass-feed" id="passFeed"></div>
-          <p class="pass-hint">종이 외출증을 대신합니다. 나이스 출결 처리는 따로 하셔야 합니다.</p>
         </div>
       </div><!-- passPage 끝 -->
 
@@ -5780,7 +5792,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.74 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = 'ver6.75 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -8956,11 +8968,14 @@ function initPassPage(){
   if(!passInitialized){
     passInitialized = true;
     document.getElementById('passSearch').addEventListener('input', passRenderSearch);
+    document.getElementById('passSearch').addEventListener('keydown', passSearchKey);
     document.getElementById('passModalOverlay').addEventListener('click', e => {
       if(e.target.id === 'passModalOverlay') passCloseForm();
     });
     document.getElementById('passDetailOverlay').addEventListener('click', e => {
-      if(e.target.id === 'passDetailOverlay') passCloseDetail();
+      if(e.target.id !== 'passDetailOverlay') return;
+      if(passEditing) return;   // 수정 중에는 바깥을 눌러도 안 닫는다(적은 내용이 조용히 사라진다)
+      passCloseDetail();
     });
     document.querySelectorAll('#passKinds .pass-slot').forEach(b => b.addEventListener('click', () => {
       passKind = b.dataset.kind;
@@ -9043,7 +9058,8 @@ function passThumb(x){
         s360PhotoCache[ck] = d.photos || {};
         s360PhotoVer[ck]   = String(d.updatedAt || '');
         passRender();
-        if(passDetailCur) passShowDetail(passDetailCur.day, passDetailCur.id);
+        if(document.getElementById('passModalOverlay').classList.contains('open')) passRenderSearch();
+        if(passDetailCur && !passEditing) passShowDetail(passDetailCur.day, passDetailCur.id);
       }).catch(() => { /* 잠깐 끊긴 것뿐일 수 있다 — 캐시를 비워 두고 다음 렌더에서 다시 받는다 */ })
         .finally(() => { delete passPhotoPending[ck]; });
     }
@@ -9052,10 +9068,11 @@ function passThumb(x){
   return got[String(parseInt(x.num))] || got[String(x.num)] || null;
 }
 
-function passFaceHtml(x){
+function passFaceHtml(x, sz){
+  const cls = sz ? ' ' + sz : '';
   const src = passThumb(x);
-  return src ? `<img class="pass-photo" src="${src}" alt="">`
-             : `<div class="pass-photo-none">${escapeHtml((x.name || '?')[0])}</div>`;
+  return src ? `<img class="pass-photo${cls}" src="${src}" alt="">`
+             : `<div class="pass-photo-none${cls}">${escapeHtml((x.name || '?')[0])}</div>`;
 }
 
 function passRender(){
@@ -9099,8 +9116,11 @@ function passRender(){
     return;
   }
   feed.innerHTML = keys.map(key => {
+    // 아직 안 나간 것을 위로. 이미 나갔거나 끝난 건은 교문에서 더 볼 일이 없다.
+    // 그 안에서는 나가는 시각 순.
+    const rank = t => ({ '':0, 'now':1, 'done':2 })[passState(t, key).cls];
     const items = byDay[key].slice().sort((a,b) =>
-      String(a.outAt||'').localeCompare(String(b.outAt||'')));
+      rank(a) - rank(b) || String(a.outAt||'').localeCompare(String(b.outAt||'')));
     const isToday = key === today;
     return `
       <section class="pass-daygroup">
@@ -9142,13 +9162,41 @@ function passFind(day, id){
   return src.find(t => t.id === id) || null;
 }
 
-function passShowDetail(day, id){
+// 상세. 보기와 수정이 같은 틀을 쓴다 — 수정을 눌러도 모달의 모양은 그대로고
+// 값이 있던 자리만 입력칸으로 바뀐다. 다른 화면으로 넘어가는 느낌이 없어야 한다.
+//  · 학생과 날짜는 못 고친다. 학생이 바뀌면 그건 다른 외출증이고, 날짜는 문서가
+//    사는 컬렉션(passes/{날짜}/items)이라 옮기는 것은 수정이 아니라 재발급이다.
+//  · 수정은 발급한 사람만. 삭제는 발급자 + 관리자.
+let passEditing = false;
+
+function passShowDetail(day, id, editing){
   const x = passFind(day, id);
   if(!x) return;
   passDetailCur = { day, id };
+  passEditing = !!editing;
   const isToday = day === passToday_();
   const mine = String(x.issuedBy||'').toLowerCase() === (fbAuth.currentUser?.email || '').toLowerCase();
   const st = passState(x, day);
+  const opts = (list, cur) => list.map(v =>
+    `<option value="${escapeHtml(v)}"${v === cur ? ' selected' : ''}>${escapeHtml(v)}</option>`).join('');
+
+  const rows = passEditing ? `
+      <div class="pass-row locked"><span class="k">날짜</span><span class="v">${passDateLabel(day)} ${passWday(day)}${isToday ? ' (오늘)' : ''}</span></div>
+      <div class="pass-row"><span class="k">종류</span><span class="v"><select class="pass-edit" id="passEdKind">${opts(['조퇴','외출','결과'], x.kind)}</select></span></div>
+      <div class="pass-row"><span class="k">나가는 시각</span><span class="v"><input type="time" class="pass-edit" id="passEdOut" value="${escapeHtml(x.outAt||'')}"></span></div>
+      <div class="pass-row" id="passEdBackRow"${x.kind === '외출' ? '' : ' style="display:none;"'}><span class="k">복귀 예정</span><span class="v"><input type="time" class="pass-edit" id="passEdBack" value="${escapeHtml(x.backAt||'')}"></span></div>
+      <div class="pass-row"><span class="k">사유</span><span class="v"><input type="text" class="pass-edit" id="passEdReason" value="${escapeHtml(x.reason||'')}" placeholder="예: 병원 진료" autocomplete="off"></span></div>
+      <div class="pass-row"><span class="k">보호자 확인</span><span class="v"><select class="pass-edit" id="passEdGuard">${opts(['전화','문자','방문','미확인'], x.guardian)}</select></span></div>
+      <div class="pass-row locked"><span class="k">발급</span><span class="v">${escapeHtml(x.issuedName||'')}</span></div>`
+    : `
+      <div class="pass-row"><span class="k">날짜</span><span class="v">${passDateLabel(day)} ${passWday(day)}${isToday ? ' (오늘)' : ''}</span></div>
+      <div class="pass-row"><span class="k">나가는 시각</span><span class="v big">${escapeHtml(x.outAt||'')}</span></div>
+      ${x.kind === '외출' && x.backAt ? `<div class="pass-row"><span class="k">복귀 예정</span><span class="v big">${escapeHtml(x.backAt)}</span></div>` : ''}
+      <div class="pass-row"><span class="k">사유</span><span class="v">${x.reason ? escapeHtml(x.reason) : '—'}</span></div>
+      <div class="pass-row"><span class="k">보호자 확인</span><span class="v">${escapeHtml(x.guardian||'—')}</span></div>
+      <div class="pass-row"><span class="k">발급</span><span class="v">${escapeHtml(x.issuedName||'')}${
+        x.createdAt ? ' · ' + escapeHtml(String(x.createdAt).slice(11,16)) : ''}</span></div>`;
+
   document.getElementById('passDetailBody').innerHTML = `
     <div class="pass-detail-hero">
       ${passFaceHtml(x)}
@@ -9157,26 +9205,85 @@ function passShowDetail(day, id){
       <span class="pass-kind">${escapeHtml(x.kind)}</span>
       <span class="pass-state ${st.cls}">${escapeHtml(st.detail || st.label)}</span>
     </div>
-    <div class="pass-rows">
-      <div class="pass-row"><span class="k">날짜</span><span class="v">${passDateLabel(day)} ${passWday(day)}${isToday ? ' (오늘)' : ''}</span></div>
-      <div class="pass-row"><span class="k">나가는 시각</span><span class="v big">${escapeHtml(x.outAt||'')}</span></div>
-      ${x.kind === '외출' && x.backAt ? `<div class="pass-row"><span class="k">복귀 예정</span><span class="v big">${escapeHtml(x.backAt)}</span></div>` : ''}
-      <div class="pass-row"><span class="k">사유</span><span class="v">${x.reason ? escapeHtml(x.reason) : '—'}</span></div>
-      <div class="pass-row"><span class="k">보호자 확인</span><span class="v">${escapeHtml(x.guardian||'—')}</span></div>
-      <div class="pass-row"><span class="k">발급</span><span class="v">${escapeHtml(x.issuedName||'')}${
-        x.createdAt ? ' · ' + escapeHtml(String(x.createdAt).slice(11,16)) : ''}</span></div>
-    </div>`;
-  document.getElementById('passDetailFoot').innerHTML = `
-    <span class="pass-form-msg">나이스 출결은 따로 처리하세요</span>
-    ${mine || _IS_ADMIN() ? '<button type="button" class="pass-del-btn" id="passDelBtn">삭제</button>' : ''}
-    <button type="button" class="pass-ghost-btn" onclick="passCloseDetail()">닫기</button>`;
-  const del = document.getElementById('passDelBtn');
-  if(del) del.addEventListener('click', () => passDelete(day, id, x.name));
+    <div class="pass-rows">${rows}</div>`;
+
+  document.getElementById('passDetailFoot').innerHTML = passEditing
+    ? `<span id="passEdMsg" class="pass-form-msg"></span>
+       <button type="button" class="pass-ghost-btn" id="passEdCancel">취소</button>
+       <button type="button" class="pass-save-btn" id="passEdSave">저장</button>`
+    : `<span class="pass-form-msg"></span>
+       ${mine ? '<button type="button" class="pass-ghost-btn" id="passEditBtn">수정</button>' : ''}
+       ${mine || _IS_ADMIN() ? '<button type="button" class="pass-del-btn" id="passDelBtn">삭제</button>' : ''}
+       <button type="button" class="pass-ghost-btn" onclick="passCloseDetail()">닫기</button>`;
+
+  if(passEditing){
+    // 사진이 커서 그대로 두면 고칠 칸이 화면 밖에 있다. 틀은 그대로 두고 스크롤만 내린다.
+    document.querySelector('#passDetailBody .pass-rows')?.scrollIntoView({ block: 'nearest' });
+    document.getElementById('passEdOut')?.focus();
+    // 복귀 예정은 '외출'에만 의미가 있다 — 발급 폼과 같은 규칙
+    document.getElementById('passEdKind').addEventListener('change', e => {
+      document.getElementById('passEdBackRow').style.display = (e.target.value === '외출') ? '' : 'none';
+    });
+    document.getElementById('passEdCancel').addEventListener('click', () => passShowDetail(day, id));
+    document.getElementById('passEdSave').addEventListener('click', () => passSaveEdit(day, id));
+  }else{
+    const ed = document.getElementById('passEditBtn');
+    if(ed) ed.addEventListener('click', () => passShowDetail(day, id, true));
+    const del = document.getElementById('passDelBtn');
+    if(del) del.addEventListener('click', () => passDelete(day, id, x.name));
+  }
+
+  // 목록용 작은 사진(150×200)을 224px로 늘려 쓰면 흐리다. 먼저 그걸 띄워 기다림을
+  // 없애고, R2 고화질이 오면 바꿔 끼운다. 늦게 온 것이 다른 학생 위에 덮이지 않게
+  // 그 사이 모달이 바뀌지 않았는지 확인한다.
+  const img = document.querySelector('#passDetailBody img.pass-photo');
+  if(img && typeof s360BigPhoto === 'function'){
+    s360BigPhoto(x).then(big => {
+      if(!big) return;
+      if(!passDetailCur || passDetailCur.day !== day || passDetailCur.id !== id) return;
+      const cur = document.querySelector('#passDetailBody img.pass-photo');
+      if(cur) cur.src = big;
+    }).catch(() => {});
+  }
+
   document.getElementById('passDetailOverlay').classList.add('open');
 }
+
+// 고친 값만 덮어쓴다(merge). 발급자·학생·날짜는 손대지 않으므로 규칙의
+// '발급자를 바꾸지 못한다' 조건도 그대로 지켜진다.
+async function passSaveEdit(day, id){
+  const msg  = document.getElementById('passEdMsg');
+  const btn  = document.getElementById('passEdSave');
+  const kind = document.getElementById('passEdKind').value;
+  const outAt = document.getElementById('passEdOut').value;
+  if(!outAt){ msg.textContent = '나가는 시각을 입력하세요.'; return; }
+  const patch = {
+    kind,
+    outAt,
+    backAt: kind === '외출' ? document.getElementById('passEdBack').value : '',
+    reason: document.getElementById('passEdReason').value.trim(),
+    guardian: document.getElementById('passEdGuard').value
+  };
+  btn.disabled = true; msg.textContent = '저장 중…';
+  try{
+    await setDoc(doc(fbDb, 'passes', day, 'items', id), patch, { merge: true });
+    // 오늘 것은 구독이 알려주지만 지난·앞날은 구독이 없다 — 화면 것을 직접 고친다.
+    for(const bucket of [passToday, passPast[day], passFuture[day]]){
+      const t = (bucket || []).find(v => v.id === id);
+      if(t) Object.assign(t, patch);
+    }
+    passRender();
+    passShowDetail(day, id);
+  }catch(e){
+    msg.textContent = '저장 실패: ' + e.message;
+    btn.disabled = false;
+  }
+}
+
 function passCloseDetail(){
   document.getElementById('passDetailOverlay').classList.remove('open');
   passDetailCur = null;
+  passEditing = false;
 }
 
 async function passDelete(day, id, name){
@@ -9230,23 +9337,54 @@ function passCloseForm(){
   document.getElementById('passModalOverlay').classList.remove('open');
 }
 
+// 검색 결과. 화살표로 옮기고 Enter 로 고를 수 있어야 한다 — 동명이인이 있으면
+// 마우스로 짚는 것보다 이 편이 빠르고, 이름만 보고는 누구인지 가릴 수도 없어서
+// 얼굴을 함께 띄운다.
+let passHits = [];
+let passHitIdx = -1;
+
 function passRenderSearch(){
   const box = document.getElementById('passSearchResult');
   const q = document.getElementById('passSearch').value.trim().toLowerCase();
-  if(!q){ box.innerHTML = ''; return; }
-  const hits = (allStudents || []).filter(x =>
+  if(!q){ box.innerHTML = ''; passHits = []; passHitIdx = -1; return; }
+  passHits = (allStudents || []).filter(x =>
     (x.name||'').toLowerCase().includes(q) ||
     `${parseInt(x.grade)}-${parseInt(x.room)}`.includes(q)
   ).slice(0, 30);
-  if(!hits.length){ box.innerHTML = '<div class="pass-pick-empty">검색 결과 없음</div>'; return; }
-  box.innerHTML = hits.map((x, i) => `
-    <button type="button" class="pass-pick-item" data-i="${i}">
+  if(!passHits.length){
+    box.innerHTML = '<div class="pass-pick-empty">검색 결과 없음</div>';
+    passHitIdx = -1;
+    return;
+  }
+  // 결과가 하나면 그것을, 여럿이면 첫 번째를 미리 짚어 둔다. Enter 한 번에 끝나게.
+  passHitIdx = 0;
+  box.innerHTML = passHits.map((x, i) => `
+    <button type="button" class="pass-pick-item${i === 0 ? ' on' : ''}" data-i="${i}">
+      ${passFaceHtml(x, 'sm')}
       <span class="pass-cls">${parseInt(x.grade)}-${parseInt(x.room)} ${String(x.num).padStart(2,'0')}</span>
       <span class="pass-name" style="font-size:15px;">${escapeHtml(x.name)}</span>
     </button>`).join('');
   box.querySelectorAll('.pass-pick-item').forEach(el => {
-    el.addEventListener('click', () => passPick(hits[parseInt(el.dataset.i)]));
+    el.addEventListener('click', () => passPick(passHits[parseInt(el.dataset.i)]));
   });
+}
+
+function passMoveHit(d){
+  if(!passHits.length) return;
+  passHitIdx = (passHitIdx + d + passHits.length) % passHits.length;
+  const box = document.getElementById('passSearchResult');
+  box.querySelectorAll('.pass-pick-item').forEach((el, i) => el.classList.toggle('on', i === passHitIdx));
+  const on = box.querySelector('.pass-pick-item.on');
+  if(on) on.scrollIntoView({ block: 'nearest' });
+}
+
+function passSearchKey(e){
+  if(e.key === 'ArrowDown'){ e.preventDefault(); passMoveHit(1); return; }
+  if(e.key === 'ArrowUp'){   e.preventDefault(); passMoveHit(-1); return; }
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    if(passHitIdx >= 0 && passHits[passHitIdx]) passPick(passHits[passHitIdx]);
+  }
 }
 
 function passPick(x){
@@ -9269,7 +9407,10 @@ function passUnpick(){
   document.getElementById('passPickWrap').style.display = '';
   document.getElementById('passPicked').style.display = 'none';
   document.getElementById('passSaveBtn').disabled = true;
-  document.getElementById('passSearch').focus();
+  const box = document.getElementById('passSearch');
+  box.select();
+  box.focus();
+  passRenderSearch();
 }
 
 // 반복으로 만들어질 날짜들. 시작일부터 종료일까지, 매일 또는 고른 요일만.
