@@ -18,8 +18,14 @@ const src = [
   'let todayDay = null, currentPeriod = null;',
   // refreshCurrentView 대신 호출 횟수만 센다
   'let renders = 0; function refreshCurrentView(){ renders++; recomputeTimeState(); }',
+  // syncTimeState 는 현황판(위젯)도 챙긴다 — 그쪽은 여기서 호출 횟수만 센다.
+  // 자정 넘김 자체는 아래 별도 블록에서 따로 확인한다.
+  'let homes = 0; let homeInitialized = true; let _mealOffset = 0, _scheduleOffset = 0;',
+  'function initHomePage(){ homes++; }',
+  'const window = { _lastHomeDate: undefined, _renderHomeMyTt(){} };',
   'return { get todayDay(){return todayDay;}, get currentPeriod(){return currentPeriod;},',
-  '         get renders(){return renders;}, recomputeTimeState, syncTimeState };'
+  '         get renders(){return renders;}, get homes(){return homes;},',
+  '         recomputeTimeState, syncTimeState };'
 ].join('\n\n');
 
 const mk = new Function(src);
@@ -108,5 +114,74 @@ console.log('\n■ 자정을 넘겨 앱을 켜 둔 경우 (타이머가 얼었�
 }
 
 globalThis.Date = RealDate;
+// ── 자정 넘김 — 현황판/위젯이 어제 요일에 멈추지 않는가 ────────────────────
+// 컴퓨터를 켜 둔 채 밤을 넘기면 위젯에 어제 요일이 그대로 남았다.
+// syncTimeState 가 시간표 페이지만 다시 그리고 현황판은 손대지 않아서였다.
+// index.html 에서 그 함수를 그대로 떼어내 가짜 시계로 돌린다.
+{
+  const { execFileSync } = await import('node:child_process');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const fs2 = await import('node:fs');
+  const tmp = path.join(os.tmpdir(), 'sync-' + Date.now() + '.js');
+  execFileSync('python3', [new URL('./build-sync-harness.py', import.meta.url).pathname, tmp]);
+  const src = fs2.readFileSync(tmp, 'utf8');
+  fs2.unlinkSync(tmp);
+
+  console.log('\n■ 자정을 넘기면 현황판·위젯도 오늘 기준으로 다시 그린다');
+
+  // 함수가 참조하는 것들을 전부 쥐고 돌린다
+  function run({ dayChanges, periodChanges, dateStr, lastHomeDate, homeInit }){
+    const calls = { refreshCurrentView: 0, initHomePage: 0, renderHomeMyTt: 0 };
+    const win = { _lastHomeDate: lastHomeDate, _renderHomeMyTt: () => calls.renderHomeMyTt++ };
+    let todayDay = '수', currentPeriod = 3;
+    const ctx = {
+      get todayDay(){ return todayDay; }, get currentPeriod(){ return currentPeriod; },
+      recomputeTimeState(){ if(dayChanges) todayDay = '목'; if(periodChanges) currentPeriod = 1; },
+      refreshCurrentView(){ calls.refreshCurrentView++; },
+      initHomePage(){ calls.initHomePage++; },
+      homeInitialized: homeInit,
+      _mealOffset: 5, _scheduleOffset: -2,
+      window: win,
+      Date: class extends Date { toDateString(){ return dateStr; } }
+    };
+    const fn = new Function('ctx', `
+      let { todayDay, currentPeriod, homeInitialized, _mealOffset, _scheduleOffset } = ctx;
+      const { recomputeTimeState: _r, refreshCurrentView, initHomePage, window, Date } = ctx;
+      const recomputeTimeState = () => { _r(); todayDay = ctx.todayDay; currentPeriod = ctx.currentPeriod; };
+      ${src}
+      syncTimeState();
+      return { homeInitialized, _mealOffset, _scheduleOffset };
+    `);
+    const after = fn(ctx);
+    return { calls, win, after };
+  }
+
+  // 날짜가 그대로면 아무것도 재구성하지 않는다
+  let r = run({ dayChanges:false, periodChanges:true, dateStr:'Wed Aug 19 2026',
+                lastHomeDate:'Wed Aug 19 2026', homeInit:true });
+  check('같은 날 교시만 바뀌면 시간표만 다시 그린다', r.calls.refreshCurrentView === 1 && r.calls.initHomePage === 0, r.calls);
+  check('같은 날에도 현황판 시간표는 갱신한다', r.calls.renderHomeMyTt === 1, r.calls);
+
+  // 자정을 넘겼다 — 이게 위젯이 어제에 멈춰 있던 경우다
+  r = run({ dayChanges:true, periodChanges:true, dateStr:'Thu Aug 20 2026',
+            lastHomeDate:'Wed Aug 19 2026', homeInit:true });
+  check('날짜가 넘어가면 현황판을 통째로 다시 만든다', r.calls.initHomePage === 1, r.calls);
+  check('시간표 페이지도 함께', r.calls.refreshCurrentView === 1, r.calls);
+  check('급식·학사일정 오프셋을 오늘로 되돌린다',
+        r.after._mealOffset === 0 && r.after._scheduleOffset === 0, r.after);
+  check('_lastHomeDate 를 새 날짜로 옮긴다', r.win._lastHomeDate === 'Thu Aug 20 2026', r.win);
+
+  // 두 번 연달아 불러도 한 번만 재구성한다(현황판 자체 타이머와 겹쳐도 안전)
+  r = run({ dayChanges:true, periodChanges:false, dateStr:'Thu Aug 20 2026',
+            lastHomeDate:'Thu Aug 20 2026', homeInit:true });
+  check('이미 오늘로 맞춰져 있으면 다시 만들지 않는다', r.calls.initHomePage === 0, r.calls);
+
+  // 현황판을 한 번도 안 연 상태면 건드리지 않는다
+  r = run({ dayChanges:true, periodChanges:false, dateStr:'Thu Aug 20 2026',
+            lastHomeDate:'Wed Aug 19 2026', homeInit:false });
+  check('현황판을 연 적 없으면 초기화하지 않는다', r.calls.initHomePage === 0, r.calls);
+}
+
 console.log(`\n통과 ${pass} / 실패 ${fail}\n`);
 process.exit(fail ? 1 : 0);

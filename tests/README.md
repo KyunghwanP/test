@@ -6,7 +6,8 @@
 ## 바로 돌아가는 것 (설치 필요 없음)
 
 ```bash
-node tests/current-period.test.mjs     # 시간표의 '지금 이 교시' — 가짜 시계로 확인
+node tests/current-period.test.mjs     # 시간표의 '지금 이 교시' + 자정 넘김 — 가짜 시계로 확인
+node tests/sw-cache.test.mjs           # 서비스워커 캐시 전략 — Cache/fetch 를 스텁으로 물림
 node workers/teacher-api.test.mjs      # teacher-api 워커 — fetch 를 스텁으로 물림
 node workers/roster-split.test.mjs     # upload.html 분리 저장 → 워커 조회
 ```
