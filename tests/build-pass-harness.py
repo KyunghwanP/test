@@ -28,15 +28,21 @@ def grab_line(pat):
     return m.group(0)
 
 consts = '\n'.join([
-    grab_line(r'^const PASS_PAST_DAYS = .*$'),
+    grab_line(r'^const PASS_PAST_DAYS   = .*$'),
+    grab_line(r'^const PASS_FUTURE_DAYS = .*$'),
+    grab_line(r'^const PASS_REPEAT_MAX  = .*$'),
     grab_line(r'^let passInitialized = false;$'),
     grab_line(r'^let passUnsub = null;$'),
     grab_line(r'^let passToday = \[\];.*$'),
-    grab_line(r'^let passPast  = \{\};.*$'),
-    grab_line(r'^let passPastLoaded = false;$'),
+    grab_line(r'^let passPast   = \{\};.*$'),
+    grab_line(r'^let passFuture = \{\};.*$'),
+    grab_line(r'^let passLoaded = false;$'),
+    grab_line(r"^let passView = 'recent';.*$"),
     grab_line(r'^let passPickedStudent = null;$'),
     grab_line(r"^let passKind = '조퇴';$"),
     grab_line(r"^let passGuard = '전화';$"),
+    grab_line(r"^let passRepeat = 'none';$"),
+    grab_line(r'^let passWdaySel = new Set\(\);$'),
     grab_line(r'^let passDetailCur = null;$'),
     grab_line(r'^const PASS_WD = .*$'),
     grab_line(r'^const passYmd = .*$'),
@@ -45,10 +51,10 @@ consts = '\n'.join([
     grab_line(r'^const passWday = .*$'),
     grab_line(r'^const passPhotoPending = \{\};$'),
 ])
-fns = ['initPassPage','passStopWatch','passWatchToday','passLoadPast','passShift',
-       'passThumb','passFaceHtml','passRender','passShowDetail','passCloseDetail',
+fns = ['initPassPage','passStopWatch','passWatchToday','passLoadRange','passShift',
+       'passThumb','passFaceHtml','passRender','passFind','passShowDetail','passCloseDetail',
        'passDelete','passOpenForm','passCloseForm','passRenderSearch','passPick',
-       'passUnpick','passSave']
+       'passUnpick','passRepeatDays','passUpdateRepeatNote','passSave']
 code = consts + '\n\n' + '\n\n'.join(grab_fn(f) for f in fns)
 
 a = s.index('<!-- 외출증 (조퇴·외출·결과) -->')
@@ -74,7 +80,7 @@ const escapeHtml = t => String(t ?? '').replace(/[&<>"']/g, c =>
   ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[c]));
 
 window.__added = []; window.__deleted = []; window.__snapCb = null;
-window.__photos = {{}}; window.__past = {{}};
+window.__photos = {{}}; window.__past = {{}}; window.__future = {{}};
 window.__me = {{ email: 'hong@yeungnam.hs.kr', displayName: '홍길동' }};
 window.__admin = false; window.__confirm = true; window.__alerts = [];
 
@@ -82,10 +88,11 @@ const fbDb = {{}};
 const fbAuth = {{ get currentUser(){{ return window.__me; }} }};
 const collection = (...a) => ({{ path: a.slice(1).join('/'), day: a[2] }});
 const doc = (...a) => ({{ path: a.slice(1).join('/'), coll: a[1], day: a[2], id: a[4] }});
-const addDoc = async (ref, data) => {{ window.__added.push({{ path: ref.path, data }}); return {{ id: 'new' }}; }};
+let __seq = 0;
+const addDoc = async (ref, data) => {{ window.__added.push({{ path: ref.path, day: ref.day, data }}); return {{ id: 'new' + (++__seq) }}; }};
 const deleteDoc = async ref => {{ window.__deleted.push(ref.path); }};
 const getDocs = async ref => {{
-  const rows = window.__past[ref.day] || [];
+  const rows = (window.__past[ref.day] || window.__future[ref.day] || []);
   return {{ empty: rows.length === 0, docs: rows.map(r => ({{ id: r.id, data: () => r }})) }};
 }};
 const getDoc = async ref => {{
