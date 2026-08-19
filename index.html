@@ -5778,6 +5778,18 @@ function scheduleNextTimeUpdate(){
 }
 scheduleNextTimeUpdate();
 
+// 경계 시각에 거는 setTimeout만으로는 부족하다. 그 타이머는 몇 시간 뒤를 가리키는데,
+// 휴대폰이 잠들거나 탭이 백그라운드로 밀리면 브라우저가 타이머를 얼리거나 늦춘다.
+// 앱을 종일 켜 두는 선생님에게는 '아침에 연 시각'이 그대로 남는다.
+// 그래서 주기적으로 한 번 더 확인하되, 바뀐 게 없으면 아무것도 하지 않는다
+// (비교 몇 번이라 60초마다 돌아도 부담이 없고, 화면을 다시 그리는 건 하루 십여 번뿐).
+function syncTimeState(){
+  const prevDay = todayDay, prevPeriod = currentPeriod;
+  recomputeTimeState();
+  if(prevDay !== todayDay || prevPeriod !== currentPeriod) refreshCurrentView();
+}
+setInterval(syncTimeState, 60 * 1000);
+
 // ---- build class -> schedule reverse index, and class -> homeroom teacher ----
 const classSchedule = {};   // { '3-10': { '월':[{period,subject,teacher}], ... } }
 const classHomeroom = {};
@@ -7683,6 +7695,10 @@ onAuthStateChanged(fbAuth, async (user) => {
 document.addEventListener('visibilitychange', async () => {
   if(document.visibilityState !== 'visible') return;
   if(!appInitialized) return;
+  // 시각 갱신은 로그인·통신과 무관하게 먼저 한다. 화면에 다시 돌아온 순간이 '지금 교시'가
+  // 틀어져 있을 가능성이 가장 큰 시점인데, 아래 Firestore 로드가 실패하면 예전에는
+  // refreshCurrentView() 까지 가지도 못했다.
+  syncTimeState();
   const user = fbAuth.currentUser;
   if(!user || !user.email.endsWith(ALLOWED_EMAIL_DOMAIN)) return;
   try{
@@ -12639,6 +12655,10 @@ function navigateTo(page) {
   if(page === 'room') initRoomPage();
   if(page === 'home') { if(!homeInitialized) initHomePage(); else { renderHomeTaskSection(); loadHomeConsult(); } }
   if(page === 'timetable') {
+    // 탭에 들어올 때마다 '지금 교시'를 다시 계산한다. 아래 select()가 화면을 다시 그리지만
+    // 그때 쓰는 currentPeriod 는 recomputeTimeState() 가 갱신하는 값이라, 이게 없으면
+    // 앱을 처음 열었을 때의 교시가 그대로 강조된 채 남는다.
+    recomputeTimeState();
     // 본인(보기 모드면 선택한 교사) 시간표 자동 로드
     const _teacher = effTeacher();
     if(_teacher) select(_teacher);
