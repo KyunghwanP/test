@@ -2861,19 +2861,26 @@
     --cal-line:#E2E8F0; --cal-line-2:#CBD5E1; --cal-fill:#F1F5F9;
     --cal-accent-on:#0046B0;          /* 옅은 파랑 배경 위의 글자 */
     --cal-shadow:15,23,42;
+    --cal-glow:0,107,255;             /* 포커스 링·FAB 그림자 */
   }
+  /* 다크에서는 #006BFF 를 그대로 쓰면 어두운 바탕 위에서 형광펜처럼 튄다.
+     채도를 내리고 명도를 올린 같은 계열(210°)로 바꾼다 — 파랑 하나라는 원칙은 그대로. */
   html.dark #passPage, html.dark .pass-modal-overlay, html.dark .pass-fab{
-    --cal-50:rgba(0,107,255,.16); --cal-100:rgba(0,107,255,.26);
+    --cal-50:rgba(122,164,214,.15); --cal-100:rgba(122,164,214,.30);
+    --cal-500:#5D8AB8; --cal-600:#6E9AC6; --cal-700:#4C7AA6;
     --cal-bg:#111827; --cal-bg-sub:#0B1220;
     --cal-text:#E8EDF5; --cal-text-2:#9AA7BC; --cal-text-3:#6B7A90;
     --cal-line:#26324A; --cal-line-2:#38465F; --cal-fill:#1B2436;
-    --cal-accent-on:#7FB4FF;          /* 어두운 배경에선 파랑을 밝게 올려야 읽힌다 */
+    --cal-accent-on:#A8C6E4;          /* 어두운 배경에선 파랑을 밝게 올려야 읽힌다 */
     --cal-shadow:0,0,0;
+    --cal-glow:93,138,184;
   }
 
   #passPage{background:var(--cal-bg-sub); color:var(--cal-text);}
-  /* 넓은 화면에서는 내용을 가운데로 모은다 — 왼쪽에만 붙어 있으면 시선이 멀다 */
-  .pass-wrap{max-width:760px; margin:0 auto; padding:18px 0 40px;}
+  /* 넓은 화면에서는 가운데로 모으되, 한 줄짜리 카드가 760px 안에서만 놀면
+     양옆이 통째로 비어 버린다. 폭을 넓히고 카드를 다열로 깐다.
+     좌우 여백은 여기서만 준다(부모는 패딩이 없다) — 모바일은 12px 로 좁힌다. */
+  .pass-wrap{width:100%; max-width:1280px; margin:0 auto; padding:18px 22px 40px; box-sizing:border-box;}
   .pass-head{display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap;}
   .pass-head h2{font-family:'Pretendard','Noto Sans KR'; font-size:24px; font-weight:700; margin:0; letter-spacing:-.02em;}
   .pass-sub{font-size:13px; color:var(--cal-text-2); margin:3px 0 0;}
@@ -2911,7 +2918,12 @@
   .pass-dayhead.today .d{color:var(--cal-accent-on);}
   .pass-dayhead.today::before{content:''; width:6px; height:6px; border-radius:9999px; background:var(--cal-500); align-self:center;}
 
-  .pass-cards{display:flex; flex-direction:column; gap:8px;}
+  .pass-cards{display:grid; grid-template-columns:minmax(0,1fr); gap:8px;}
+  @media (min-width:900px){  .pass-cards{grid-template-columns:repeat(2,minmax(0,1fr));} }
+  @media (min-width:1400px){ .pass-cards{grid-template-columns:repeat(3,minmax(0,1fr));} }
+  /* 화면이 넓으면 카드 하나에 더 적는다(보호자 확인). 좁으면 이름·시각이 먼저다. */
+  .pass-wide-only{display:none;}
+  @media (min-width:900px){ .pass-wide-only{display:inline;} }
   .pass-card{
     display:flex; align-items:center; gap:14px; width:100%; text-align:left;
     padding:13px 15px; border:1px solid var(--cal-line); border-radius:12px;
@@ -2939,6 +2951,19 @@
     border:1px solid var(--cal-line-2); border-radius:9999px;
     font-size:12px; font-weight:600; color:var(--cal-text);
   }
+  /* 상태는 색만으로 구분하지 않는다 — 글자로 적고, 완료는 카드 전체를 가라앉힌다 */
+  .pass-state{
+    display:inline-flex; align-items:center; height:22px; padding:0 9px;
+    border-radius:9999px; font-size:12px; font-weight:600;
+    border:1px solid var(--cal-line-2); background:var(--cal-bg-sub); color:var(--cal-text-2);
+  }
+  .pass-state.now{border-color:transparent; background:var(--cal-50); color:var(--cal-accent-on);}
+  .pass-state.done{border-color:transparent; background:var(--cal-fill); color:var(--cal-text-2);}
+  .pass-card.done{background:var(--cal-fill); box-shadow:none;}
+  .pass-card.done:hover{box-shadow:0 2px 8px rgba(var(--cal-shadow),.08);}
+  .pass-card.done .pass-photo, .pass-card.done .pass-photo-none{opacity:.5;}
+  .pass-card.done .pass-name, .pass-card.done .pass-meta{color:var(--cal-text-2);}
+  .pass-card.done .pass-cls{background:transparent; border:1px solid var(--cal-line);}
   .pass-meta{display:block; margin-top:5px; font-size:14px; color:var(--cal-text); font-variant-numeric:tabular-nums;}
   .pass-meta b{font-family:'IBM Plex Mono'; font-weight:700;}
   .pass-issued{display:block; margin-top:3px; font-size:12px; color:var(--cal-text-2);}
@@ -2951,7 +2976,7 @@
     display:none; position:fixed; right:18px; bottom:calc(18px + env(safe-area-inset-bottom)); z-index:330;
     width:56px; height:56px; border:none; border-radius:9999px;
     background:var(--cal-500); color:#fff; font-size:26px; line-height:1; cursor:pointer;
-    box-shadow:0 8px 20px rgba(0,107,255,.36);
+    box-shadow:0 8px 20px rgba(var(--cal-glow),.36);
     align-items:center; justify-content:center;
   }
   .pass-fab:active{transform:scale(.94);}
@@ -3012,7 +3037,7 @@
     border:1px solid var(--cal-line); border-radius:6px; padding:10px 14px;
     font-size:15px; background:var(--cal-bg); color:var(--cal-text); font-family:'Noto Sans KR';
   }
-  .pass-input:focus{outline:none; border-color:var(--cal-500); box-shadow:0 0 0 3px rgba(0,107,255,.18);}
+  .pass-input:focus{outline:none; border-color:var(--cal-500); box-shadow:0 0 0 3px rgba(var(--cal-glow),.20);}
   .pass-pick-list{
     margin-top:6px; max-height:168px; overflow-y:auto;
     border:1px solid var(--cal-line); border-radius:6px; background:var(--cal-bg);
@@ -3051,11 +3076,13 @@
   .pass-repeat-note{margin-top:8px; font-size:12px; color:var(--cal-text-2);}
 
   /* 상세 — 세로로 쌓는다. 교문에서 보는 건 얼굴 → 누구인지 → 내용 순서다 */
+  /* 상세는 얼굴을 확인하러 여는 화면이다. 모달을 넓히고 사진을 크게 건다. */
+  #passDetailOverlay .pass-modal{max-width:540px;}
   .pass-detail-hero{text-align:center; margin-bottom:20px;}
   .pass-detail-hero .pass-photo,
   .pass-detail-hero .pass-photo-none{
     /* img 는 inline 이라 display:block 을 줘야 margin:auto 로 가운데 선다 */
-    display:block; width:160px; height:213px; border-radius:12px; margin:0 auto 16px; font-size:56px;
+    display:block; width:228px; height:304px; border-radius:12px; margin:0 auto 16px; font-size:76px;
   }
   .pass-detail-cls{
     display:inline-block; font-family:'IBM Plex Mono'; font-size:14px; font-weight:700;
@@ -3074,12 +3101,14 @@
   .pass-row .v.big{font-family:'IBM Plex Mono'; font-size:20px; font-weight:700;}
 
   @media (max-width:700px){
-    .pass-wrap{padding:14px 0 96px;}
+    .pass-wrap{padding:14px 12px 96px;}
     .pass-head .pass-add-btn{display:none;}
     .pass-fab{display:flex;}
     .pass-slots,.pass-slots.four{grid-template-columns:repeat(2,1fr);}
+    .pass-card{padding:12px 13px; gap:12px;}
+    .pass-modal-overlay{padding:12px;}
     .pass-detail-hero .pass-photo,
-    .pass-detail-hero .pass-photo-none{width:132px; height:176px; font-size:46px;}
+    .pass-detail-hero .pass-photo-none{width:min(72vw,200px); height:auto; aspect-ratio:3/4; font-size:62px;}
   }
 
   html.widget-mode #passPage, html.widget-mode .pass-modal-overlay,
@@ -4210,7 +4239,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.73</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.74</div>
   </div>
 </div>
 
@@ -4285,7 +4314,7 @@
       <span class="tab-item-icon">🎒</span>학생연락망
     </div>
     <div class="tab-item" data-page="pass">
-      <span class="tab-item-icon">🚸</span>외출증
+      <span class="tab-item-icon">🎫</span>외출증
     </div>
     <div class="tab-item" data-page="meal">
       <span class="tab-item-icon">🍱</span>식단표
@@ -4341,12 +4370,12 @@
         <span class="main-nav-icon">🎒</span>학생연락망
       </div>
       <div class="main-nav-item" data-page="pass">
-        <span class="main-nav-icon">🚸</span>외출증
+        <span class="main-nav-icon">🎫</span>외출증
       </div>
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.73</div>
+    <div class="nav-version" title="Made by 박경환">ver6.74</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5751,7 +5780,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.73 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = 'ver6.74 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -8881,6 +8910,7 @@ const PASS_FUTURE_DAYS = 14;    // 예정 보기 범위
 const PASS_REPEAT_MAX  = 60;    // 반복 한 번에 만들 수 있는 최대 건수(오타로 수백 건 만드는 사고 방지)
 let passInitialized = false;
 let passUnsub = null;
+let passTick = null;            // 상태(대기·나감·완료)를 1분마다 다시 계산
 let passToday = [];             // 오늘 (실시간)
 let passPast   = {};            // '날짜' → 목록 (한 번만 읽음)
 let passFuture = {};            // '날짜' → 목록 (앞날, 한 번만 읽음)
@@ -8901,6 +8931,25 @@ function passShift(n){
   return passYmd(d);
 }
 const passDateLabel = key => { const d = new Date(key + 'T00:00:00'); return `${d.getMonth()+1}월 ${d.getDate()}일`; };
+const passNowHm = () => { const n = new Date();
+  return `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`; };
+
+// 어디까지 진행됐는지. 교문에서 따로 찍지 않으므로 적힌 시각만으로 판단한다.
+//   예정(앞날) → 대기(아직 안 나감) → 나감(외출·복귀 전) → 완료
+// 외출인데 복귀 시각을 안 적었으면 끝을 알 수 없으므로 '나감'에 머문다.
+function passState(x, day){
+  const today = passToday_();
+  if(day > today) return { label:'예정', cls:'' };
+  if(day < today) return { label:'완료', cls:'done' };
+  const out = String(x.outAt || '');
+  if(!out || passNowHm() < out) return { label:'대기', cls:'' };
+  if(x.kind === '외출'){
+    const back = String(x.backAt || '');
+    if(!back || passNowHm() < back) return { label:'나감', cls:'now' };
+    return { label:'완료', cls:'done', detail:`복귀 예정 ${back} 지남` };
+  }
+  return { label:'완료', cls:'done' };
+}
 const passWday = key => PASS_WD[new Date(key + 'T00:00:00').getDay()] + '요일';
 
 function initPassPage(){
@@ -8941,10 +8990,15 @@ function initPassPage(){
   }
   passWatchToday();
   if(!passLoaded) passLoadRange();
+  // 시계가 넘어가면 '대기'가 '나감'이 되어야 한다. 새로고침을 기다리게 두지 않는다.
+  if(!passTick) passTick = setInterval(() => {
+    if(document.getElementById('passPage')?.classList.contains('active')) passRender();
+  }, 60 * 1000);
 }
 
 function passStopWatch(){
   if(passUnsub){ passUnsub(); passUnsub = null; }
+  if(passTick){ clearInterval(passTick); passTick = null; }
 }
 
 function passWatchToday(){
@@ -8990,7 +9044,8 @@ function passThumb(x){
         s360PhotoVer[ck]   = String(d.updatedAt || '');
         passRender();
         if(passDetailCur) passShowDetail(passDetailCur.day, passDetailCur.id);
-      }).catch(() => { s360PhotoCache[ck] = {}; });
+      }).catch(() => { /* 잠깐 끊긴 것뿐일 수 있다 — 캐시를 비워 두고 다음 렌더에서 다시 받는다 */ })
+        .finally(() => { delete passPhotoPending[ck]; });
     }
     return null;
   }
@@ -9011,9 +9066,13 @@ function passRender(){
 
   // 오늘 요약 + 예정 보기 전환
   const cnt = k => passToday.filter(x => x.kind === k).length;
+  const outNow = passToday.filter(x => passState(x, today).cls === 'now').length;
+  const doneNow = passToday.filter(x => passState(x, today).cls === 'done').length;
   document.getElementById('passTally').innerHTML =
     `<span class="pass-chip lead">오늘 <b>${passToday.length}</b>건</span>` +
     ['조퇴','외출','결과'].map(k => `<span class="pass-chip">${k} <b>${cnt(k)}</b></span>`).join('') +
+    (outNow  ? `<span class="pass-chip">나가 있음 <b>${outNow}</b></span>` : '') +
+    (doneNow ? `<span class="pass-chip">완료 <b>${doneNow}</b></span>` : '') +
     (upCount ? `<button type="button" class="pass-chip act${passView === 'upcoming' ? ' on' : ''}" id="passUpBtn">예정 <b>${upCount}</b>건</button>` : '');
   const upBtn = document.getElementById('passUpBtn');
   if(upBtn) upBtn.addEventListener('click', () => {
@@ -9051,22 +9110,23 @@ function passRender(){
           <span class="c">${items.length}건</span>
         </div>
         <div class="pass-cards">
-          ${items.map(x => `
-            <button type="button" class="pass-card" data-day="${key}" data-id="${escapeHtml(x.id)}">
+          ${items.map(x => { const st = passState(x, key); return `
+            <button type="button" class="pass-card${st.cls === 'done' ? ' done' : ''}" data-day="${key}" data-id="${escapeHtml(x.id)}">
               ${passFaceHtml(x)}
               <span class="pass-info">
                 <span class="pass-name-row">
                   <span class="pass-cls">${parseInt(x.grade)}-${parseInt(x.room)} ${String(x.num).padStart(2,'0')}</span>
                   <span class="pass-name">${escapeHtml(x.name)}</span>
                   <span class="pass-kind">${escapeHtml(x.kind)}</span>
+                  <span class="pass-state ${st.cls}">${st.label}</span>
                 </span>
                 <span class="pass-meta"><b>${escapeHtml(x.outAt||'')}</b>${
                   x.kind === '외출' && x.backAt ? ` → 복귀 <b>${escapeHtml(x.backAt)}</b>` : ''
                 }${x.reason ? ' · ' + escapeHtml(x.reason) : ''}</span>
-                <span class="pass-issued">${escapeHtml(x.issuedName||'')} 발급</span>
+                <span class="pass-issued"><span class="pass-wide-only">보호자 ${escapeHtml(x.guardian||'—')} · </span>${escapeHtml(x.issuedName||'')} 발급</span>
               </span>
               <svg class="pass-chev" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3.5 5 4.5-5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>`).join('')}
+            </button>`; }).join('')}
         </div>
       </section>`;
   }).join('') + `<p class="pass-feed-end">${endNote}</p>`;
@@ -9088,12 +9148,14 @@ function passShowDetail(day, id){
   passDetailCur = { day, id };
   const isToday = day === passToday_();
   const mine = String(x.issuedBy||'').toLowerCase() === (fbAuth.currentUser?.email || '').toLowerCase();
+  const st = passState(x, day);
   document.getElementById('passDetailBody').innerHTML = `
     <div class="pass-detail-hero">
       ${passFaceHtml(x)}
       <span class="pass-detail-cls">${parseInt(x.grade)}학년 ${parseInt(x.room)}반 ${parseInt(x.num)}번</span>
       <div class="pass-detail-name">${escapeHtml(x.name)}</div>
       <span class="pass-kind">${escapeHtml(x.kind)}</span>
+      <span class="pass-state ${st.cls}">${escapeHtml(st.detail || st.label)}</span>
     </div>
     <div class="pass-rows">
       <div class="pass-row"><span class="k">날짜</span><span class="v">${passDateLabel(day)} ${passWday(day)}${isToday ? ' (오늘)' : ''}</span></div>
