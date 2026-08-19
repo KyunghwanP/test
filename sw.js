@@ -4,7 +4,7 @@ const BASE = self.location.pathname.replace(/[^/]*$/, '');   // 예: '/ynhs/' ·
 // 캐시 저장소는 '경로'가 아니라 '출처' 단위로 공유된다 → /ynhs/ 와 /test/ 는 같은 출처라
 // 캐시 이름이 같으면 서로의 캐시를 지운다(한쪽 버전이 올라갈 때 activate가 삭제).
 // 그래서 이름에 BASE를 넣어 배포별로 분리한다. 예: 'ynhs:/ynhs/:v496'
-const CACHE_VER  = 'v521';
+const CACHE_VER  = 'v522';
 const CACHE_NAME = 'ynhs:' + BASE + ':' + CACHE_VER;
 const CACHE_MINE = 'ynhs:' + BASE + ':';                     // 이 배포가 소유한 캐시 접두사
 // 화면(HTML)을 네트워크에서 기다려 주는 최대 시간. 이 시간을 넘기면 캐시로 즉시 전환한다.
@@ -17,32 +17,39 @@ self.addEventListener('install', e => {
   self.skipWaiting();
 });
 
+// 활성화가 끝날 때까지 모든 요청이 대기열에 묶인다. 그래서 여기서는
+// '반드시 끝나야 하는 최소한'만 하고, 오래 걸릴 수 있는 일은 절대 넣지 않는다.
+//
+// 옛 캐시를 통째로 옮겨 담다가 이 규칙을 어겼었다(항목 수만큼 순차 복사).
+// 항목이 많으면 그동안 화면이 통째로 멈추고, 길어지면 ERR_TIMED_OUT 이 된다.
+// 지금은 껍데기(첫 화면) 두 개만 옮긴다 — 캐시가 비어 '오프라인' 안내가 뜨는 것을
+// 막는 데 필요한 것은 그것뿐이고, 나머지 자원은 쓰일 때 캐시 우선 경로가 알아서
+// 다시 채운다(그건 화면을 막지 않는다).
+const SHELL_PATHS = [BASE, BASE + 'index.html'];
+
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
-    const keys = await caches.keys();
-    // 내 배포의 옛 버전 + 구버전 공용 이름(ynhs-v###)만 정리한다.
-    // 다른 배포(/test/ ↔ /ynhs/)의 캐시는 건드리지 않는다.
-    const old = keys.filter(k => (k.startsWith(CACHE_MINE) && k !== CACHE_NAME) || /^ynhs-v\d+$/.test(k));
+    try {
+      const keys = await caches.keys();
+      // 내 배포의 옛 버전 + 구버전 공용 이름(ynhs-v###)만 정리한다.
+      // 다른 배포(/test/ ↔ /ynhs/)의 캐시는 건드리지 않는다.
+      const old = keys.filter(k => (k.startsWith(CACHE_MINE) && k !== CACHE_NAME) || /^ynhs-v\d+$/.test(k));
+      const cache = await caches.open(CACHE_NAME);
 
-    // 지우기 전에 옮겨 담는다.
-    //   그냥 지우면 배포 직후 캐시가 텅 빈 채로 시작한다. 그러면
-    //   · 모든 자원을 네트워크에서 새로 받아야 해서 첫 접속이 눈에 띄게 느리고,
-    //   · 망이 느려 15초(HARD_TIMEOUT)를 넘기면 돌려줄 것이 없어
-    //     '오프라인 상태이고 캐시된 내용이 없습니다'가 뜬다.
-    //   옛 자원이라도 손에 쥐고 있는 편이 낫다 — 화면(HTML)은 어차피 네트워크 우선이라
-    //   최신이 오면 그것을 쓰고, 안 오면 옛것이라도 띄운다.
-    const cache = await caches.open(CACHE_NAME);
-    for (const k of old) {
-      try {
-        const prev = await caches.open(k);
-        for (const req of await prev.keys()) {
-          if (await cache.match(req)) continue;      // 새 캐시에 이미 있으면 그대로 둔다
-          const res = await prev.match(req);
-          if (res) await cache.put(req, res).catch(() => {});
+      for (const path of SHELL_PATHS) {
+        const key = new Request(self.location.origin + path);
+        if (await cache.match(key)) continue;
+        for (const k of old) {
+          const prev = await caches.open(k);
+          const res = await prev.match(key);
+          if (res) { await cache.put(key, res).catch(() => {}); break; }
         }
-      } catch (e) { /* 한 캐시가 실패해도 나머지는 옮긴다 */ }
+      }
+      await Promise.all(old.map(k => caches.delete(k)));
+    } catch (err) {
+      // 저장소가 말썽이어도 활성화는 끝내야 한다. 여기서 멈추면 워커가
+      // 요청을 붙잡은 채 활성화되지 않아 페이지가 아예 안 열린다.
     }
-    await Promise.all(old.map(k => caches.delete(k)));
     await self.clients.claim();
   })());
 });
