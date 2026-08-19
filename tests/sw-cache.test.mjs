@@ -68,14 +68,15 @@ function loadSW({ seed = {}, fetchImpl, base = '/test/' } = {}){
 const VER = fs.readFileSync('sw.js', 'utf8').match(/CACHE_VER\s*=\s*'([^']+)'/)[1];
 const NAME = ver => `ynhs:/test/:${ver}`;
 
-console.log('\n■ activate — 버전이 올라가도 캐시를 통째로 버리지 않는다');
+console.log('\n■ activate — 껍데기는 살려서 넘기고, 오래 걸리는 일은 하지 않는다');
 {
-  // 이게 깨지면 배포 직후 첫 접속이 캐시 없이 시작하고, 망이 느리면
-  // '오프라인 상태이고 캐시된 내용이 없습니다' 가 뜬다. 실제로 그랬다.
+  // 캐시를 통째로 버리면 배포 직후 첫 접속이 캐시 없이 시작해 '오프라인' 안내가 뜬다.
+  // 반대로 통째로 옮기면 항목 수만큼 시간이 걸리는데, 활성화가 끝날 때까지 모든 요청이
+  // 대기열에 묶여 화면이 멈춘다. 그래서 '첫 화면'만 옮긴다.
   const old = NAME('v1');
   const { listeners, caches } = loadSW({ seed: {
     [old]: { 'https://x.io/test/': 'OLD_SHELL', 'https://x.io/test/a.png': 'OLD_PNG' },
-    'ynhs-v300': { 'https://x.io/test/legacy': 'LEGACY' },
+    'ynhs-v300': { 'https://x.io/test/index.html': 'OLD_INDEX' },
     'ynhs:/ynhs/:v9': { 'https://x.io/ynhs/': 'OTHER_DEPLOY' }
   }});
   const waits = [];
@@ -84,13 +85,30 @@ console.log('\n■ activate — 버전이 올라가도 캐시를 통째로 버�
 
   const cur = caches.store.get(NAME(VER));
   check('새 캐시가 만들어진다', !!cur);
-  check('옛 화면이 새 캐시로 옮겨진다', (await cur.match('https://x.io/test/'))?.body === 'OLD_SHELL');
-  check('옛 자원도 함께 옮겨진다',   (await cur.match('https://x.io/test/a.png'))?.body === 'OLD_PNG');
-  check('구버전 공용 캐시도 옮긴다', (await cur.match('https://x.io/test/legacy'))?.body === 'LEGACY');
+  check('옛 첫 화면은 살려서 넘긴다', (await cur.match('https://x.io/test/'))?.body === 'OLD_SHELL');
+  check('index.html 도 껍데기로 본다',
+        (await cur.match('https://x.io/test/index.html'))?.body === 'OLD_INDEX');
+  check('나머지 자원까지 옮기지는 않는다(활성화를 붙잡지 않으려고)',
+        (await cur.match('https://x.io/test/a.png')) === undefined);
   check('옛 캐시는 지운다', !caches.store.has(old) && !caches.store.has('ynhs-v300'));
   check('다른 배포(/ynhs/)의 캐시는 건드리지 않는다', caches.store.has('ynhs:/ynhs/:v9'));
   check('남의 캐시를 내 것으로 가져오지도 않는다',
         (await cur.match('https://x.io/ynhs/')) === undefined);
+}
+
+console.log('\n■ activate — 저장소가 말썽이어도 활성화는 끝낸다');
+{
+  // 여기서 멈추면 워커가 요청을 붙잡은 채 활성화되지 않아 페이지가 아예 안 열린다.
+  const { listeners, sandbox } = loadSW({ seed: {} });
+  sandbox.caches.keys = async () => { throw new Error('storage broken'); };
+  let claimed = false;
+  sandbox.self.clients.claim = async () => { claimed = true; };
+  const waits = [];
+  await listeners.activate({ waitUntil: p => waits.push(p) });
+  let threw = false;
+  try { await Promise.all(waits); } catch(e){ threw = true; }
+  check('예외로 끝나지 않는다', !threw);
+  check('그래도 클라이언트를 넘겨받는다', claimed);
 }
 
 console.log('\n■ activate — 새 캐시에 이미 있으면 옛것으로 덮지 않는다');
