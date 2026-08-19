@@ -321,6 +321,173 @@ console.log('\n■ 모바일 — FAB');
   await m.close();
 }
 
+console.log('\n■ 상태 — 대기 → 나감 → 완료');
+{
+  // 시계를 잡아 놓고 같은 자료를 다시 그린다. 시각만으로 갈리는 판단이라 이게 유일한 검사법이다.
+  const at = async hhmm => {
+    await page.evaluate(h => {
+      const d = new Date(); d.setHours(+h.slice(0,2), +h.slice(3,5), 0, 0);
+      window.__nowMs = d.getTime();
+    }, hhmm);
+    await page.evaluate(() => window.passRender());
+    await page.waitForTimeout(60);
+  };
+  const st = async i => (await page.locator('.pass-card').nth(i).locator('.pass-state').textContent()).trim();
+
+  await page.evaluate(() => {
+    window.reset(); window.__past = {}; window.__future = {};
+    window.pushToday([
+      { id:'e', grade:1, room:3, num:7, name:'김학생', kind:'조퇴', outAt:'13:00',
+        guardian:'전화', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' },
+      { id:'g', grade:1, room:3, num:8, name:'이학생', kind:'외출', outAt:'14:00', backAt:'15:30',
+        guardian:'문자', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' },
+      { id:'h', grade:2, room:1, num:12, name:'박학생', kind:'외출', outAt:'16:00',
+        guardian:'방문', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' }
+    ]);
+  });
+  await page.waitForTimeout(120);
+
+  await at('09:00');
+  check('나가기 전에는 대기', (await st(0)) === '대기' && (await st(1)) === '대기', [await st(0), await st(1)]);
+  check('대기는 가라앉히지 않는다',
+        !(await page.locator('.pass-card').nth(0).evaluate(e => e.classList.contains('done'))) &&
+        !(await page.locator('.pass-card').nth(1).evaluate(e => e.classList.contains('done'))));
+
+  await at('13:30');
+  check('조퇴는 나간 시각이 지나면 완료', (await st(0)) === '완료', await st(0));
+  check('완료 카드는 가라앉는다', (await page.locator('.pass-card').nth(0).evaluate(e => e.classList.contains('done'))));
+  check('아직 안 나간 외출은 대기', (await st(1)) === '대기', await st(1));
+
+  await at('14:30');
+  check('외출은 나간 뒤 복귀 전까지 나감', (await st(1)) === '나감', await st(1));
+  check('나감은 완료로 죽이지 않는다',
+        !(await page.locator('.pass-card').nth(1).evaluate(e => e.classList.contains('done'))));
+  const tally = async () => (await page.innerText('#passTally')).replace(/\s+/g, ' ');
+  check('요약에 나가 있음이 뜬다', (await tally()).includes('나가 있음 1'), await tally());
+
+  await at('15:45');
+  check('복귀 시각이 지나면 완료로 바뀐다', (await st(1)) === '완료', await st(1));
+  check('완료 카드는 배경에 묻히지 않는다', await page.evaluate(() => {
+    const c = document.querySelectorAll('.pass-card')[1];
+    return getComputedStyle(c).backgroundColor !== getComputedStyle(document.getElementById('passPage')).backgroundColor;
+  }));
+  check('카드 상태는 한 줄로 끝난다', await page.evaluate(() =>
+    [...document.querySelectorAll('.pass-state')].every(e => e.getBoundingClientRect().height < 30)));
+  check('요약에 완료 건수가 뜬다', (await tally()).includes('완료 2'), await tally());
+
+  await at('16:30');
+  check('복귀 시각을 안 적은 외출은 나감에 머문다', (await st(2)) === '나감', await st(2));
+
+  check('지난 날은 통째로 완료',
+        await page.evaluate(() => passState({ kind:'조퇴', outAt:'23:59' }, '2000-01-01').label === '완료'));
+  check('앞날은 예정',
+        await page.evaluate(() => passState({ kind:'조퇴', outAt:'00:01' }, '2999-01-01').label === '예정'));
+
+  await at('14:30');
+  await page.locator('.pass-card').nth(1).click();
+  await page.waitForTimeout(120);
+  check('상세에도 상태가 보인다', (await page.innerText('#passDetailBody')).includes('나감'),
+        await page.innerText('#passDetailBody'));
+  await page.evaluate(() => window.passCloseDetail());
+  await at('15:45');
+  await page.locator('.pass-card').nth(1).click();
+  await page.waitForTimeout(120);
+  check('상세에는 왜 완료인지까지 적는다',
+        (await page.innerText('#passDetailBody')).includes('복귀 예정 15:30 지남'),
+        await page.innerText('#passDetailBody'));
+  await page.evaluate(() => window.passCloseDetail());
+  await page.evaluate(() => { window.__nowMs = null; });
+}
+
+console.log('\n■ 상세 모달 — 사진을 크게');
+{
+  await page.evaluate(({ PX }) => {
+    window.reset();
+    window.__photos = { '1-3': { '7': PX } };
+    window.pushToday([{ id:'p', grade:1, room:3, num:7, name:'김학생', kind:'조퇴', outAt:'13:00',
+      guardian:'전화', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' }]);
+  }, { PX });
+  await page.waitForTimeout(150);
+  await page.waitForFunction(() => document.querySelectorAll('img.pass-photo').length > 0);
+  await page.locator('.pass-card').first().click();
+  await page.waitForTimeout(150);
+  const box = await page.locator('#passDetailBody .pass-photo').boundingBox();
+  check('상세 사진이 200px 이상', box.width >= 200, box);
+  check('세로가 가로보다 길다(증명사진 비율)', box.height > box.width, box);
+  const modal = await page.locator('#passDetailOverlay .pass-modal').boundingBox();
+  check('사진이 모달 안에서 가운데',
+        Math.abs((box.x + box.width/2) - (modal.x + modal.width/2)) < 2, [box, modal]);
+  await page.evaluate(() => window.passCloseDetail());
+}
+
+console.log('\n■ 넓은 화면 — 카드를 여러 열로 깐다');
+{
+  const rows = n => Array.from({ length: n }, (_, i) => ({
+    id: 'w' + i, grade: 1, room: 3, num: 7, name: '학생' + i, kind: '조퇴', outAt: '13:00',
+    guardian: '전화', issuedBy: 'hong@yeungnam.hs.kr', issuedName: '홍길동' }));
+  const cols = async () => page.evaluate(() =>
+    getComputedStyle(document.querySelector('.pass-cards')).gridTemplateColumns.split(' ').length);
+
+  await page.setViewportSize({ width: 1500, height: 900 });
+  await page.evaluate(r => { window.reset(); window.pushToday(r); }, rows(6));
+  await page.waitForTimeout(150);
+  check('1500px 에서 3열', (await cols()) === 3, await cols());
+  check('보호자 확인이 함께 보인다', await page.locator('.pass-wide-only').first().isVisible());
+  const wrapW = (await page.locator('.pass-wrap').boundingBox()).width;
+  check('넓은 화면에서 폭을 760px 에 가두지 않는다', wrapW > 1000, wrapW);
+
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await page.waitForTimeout(80);
+  check('1000px 에서 2열', (await cols()) === 2, await cols());
+
+  await page.setViewportSize({ width: 700, height: 900 });
+  await page.waitForTimeout(80);
+  check('700px 에서 1열', (await cols()) === 1, await cols());
+  check('좁은 화면에선 보호자 확인을 접는다', !(await page.locator('.pass-wide-only').first().isVisible()));
+
+  await page.setViewportSize({ width: 900, height: 900 });
+}
+
+console.log('\n■ 모바일 좌우 여백');
+{
+  const m = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  m.on('pageerror', e => { console.log('  ⚠ 모바일 오류:', e.message); fail++; });
+  await m.goto(URL);
+  await m.addStyleTag({ content: 'body{margin:0;}' });   // 하네스 body 여백 제거 — 앱에는 없다
+  await m.evaluate(s => { window.setStudents(s); window.initPassPage(); }, STUDENTS);
+  await m.evaluate(() => window.pushToday([
+    { id:'m', grade:1, room:3, num:7, name:'김학생', kind:'조퇴', outAt:'13:00',
+      guardian:'전화', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' }]));
+  await m.waitForTimeout(150);
+  const card = await m.locator('.pass-card').first().boundingBox();
+  check('좌우 여백이 12px 로 좁다', card.x === 12 && Math.round(card.x + card.width) === 378, card);
+  check('가로 스크롤이 생기지 않는다',
+        await m.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+  await m.close();
+}
+
+console.log('\n■ 다크 모드 — 파랑 채도를 낮춘다');
+{
+  const val = async v => page.evaluate(k =>
+    getComputedStyle(document.getElementById('passPage')).getPropertyValue(k).trim(), v);
+  const light = await val('--cal-500');
+  await page.evaluate(() => document.documentElement.classList.add('dark'));
+  await page.waitForTimeout(50);
+  const dark = await val('--cal-500');
+  check('라이트는 명세 그대로 #006BFF', light.toUpperCase() === '#006BFF', light);
+  check('다크는 다른 파랑을 쓴다', dark.toUpperCase() !== '#006BFF', dark);
+  const sat = hex => {                       // HSL 채도
+    const [r,g,b] = [1,3,5].map(i => parseInt(hex.slice(i, i+2), 16) / 255);
+    const mx = Math.max(r,g,b), mn = Math.min(r,g,b), l = (mx+mn)/2;
+    return mx === mn ? 0 : (mx-mn) / (1 - Math.abs(2*l - 1));
+  };
+  check('다크 파랑은 채도가 낮다', sat(dark) < 0.6, [dark, sat(dark)]);
+  check('그래도 같은 파랑 계열', (() => {                 // 파랑 성분이 가장 크다
+    const [r,g,b] = [1,3,5].map(i => parseInt(dark.slice(i, i+2), 16));
+    return b > r && b > g; })(), dark);
+  await page.evaluate(() => document.documentElement.classList.remove('dark'));
+}
+
 console.log('\n■ 데스크톱은 FAB 을 쓰지 않는다');
 {
   check('FAB 숨김', !(await page.locator('#passFab').isVisible()));

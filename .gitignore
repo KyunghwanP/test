@@ -7,3 +7,8 @@ _grades_src/
 
 # 위젯 빌드 산출물 (CI가 릴리스로 배포 — 저장소엔 커밋하지 않음)
 widget/*.exe
+
+# 테스트용 devDependencies (tests/README.md 대로 그때그때 npm i)
+node_modules/
+package-lock.json
+package.json

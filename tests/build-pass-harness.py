@@ -33,6 +33,7 @@ consts = '\n'.join([
     grab_line(r'^const PASS_REPEAT_MAX  = .*$'),
     grab_line(r'^let passInitialized = false;$'),
     grab_line(r'^let passUnsub = null;$'),
+    grab_line(r'^let passTick = null;.*$'),
     grab_line(r'^let passToday = \[\];.*$'),
     grab_line(r'^let passPast   = \{\};.*$'),
     grab_line(r'^let passFuture = \{\};.*$'),
@@ -48,10 +49,12 @@ consts = '\n'.join([
     grab_line(r'^const passYmd = .*$'),
     grab_line(r'^const passToday_ = .*$'),
     grab_line(r'^const passDateLabel = .*$'),
+    grab_line(r'^const passNowHm = .*$'),
+    grab_line(r"^  return `\$\{String\(n\.getHours.*$"),
     grab_line(r'^const passWday = .*$'),
     grab_line(r'^const passPhotoPending = \{\};$'),
 ])
-fns = ['initPassPage','passStopWatch','passWatchToday','passLoadRange','passShift',
+fns = ['passState','initPassPage','passStopWatch','passWatchToday','passLoadRange','passShift',
        'passThumb','passFaceHtml','passRender','passFind','passShowDetail','passCloseDetail',
        'passDelete','passOpenForm','passCloseForm','passRenderSearch','passPick',
        'passUnpick','passRepeatDays','passUpdateRepeatNote','passSave']
@@ -75,6 +78,17 @@ OUT.write_text(f'''<!doctype html><meta charset="utf-8">
 {css}
 </style>
 {markup}
+<script>
+// window.__nowMs 를 넣으면 그 시각으로 고정된다(안 넣으면 진짜 시계 그대로).
+(function(){{
+  const Real = Date;
+  window.__nowMs = null;
+  function D(...a){{ return (a.length === 0 && window.__nowMs != null) ? new Real(window.__nowMs) : new Real(...a); }}
+  D.now = () => (window.__nowMs != null ? window.__nowMs : Real.now());
+  D.parse = Real.parse; D.UTC = Real.UTC; D.prototype = Real.prototype;
+  window.Date = D;
+}})();
+</script>
 <script type="module">
 const escapeHtml = t => String(t ?? '').replace(/[&<>"']/g, c =>
   ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[c]));
@@ -118,9 +132,12 @@ window.passUnpick = passUnpick;
 window.passSave = passSave;
 window.setStudents = v => {{ allStudents = v; }};
 window.pushToday = rows => window.__snapCb({{ docs: rows.map(r => ({{ id: r.id, data: () => r }})) }});
+window.passState = passState;
+window.passRender = passRender;
 window.reset = () => {{
   window.__added = []; window.__deleted = []; window.__alerts = [];
   for (const k in s360PhotoCache) delete s360PhotoCache[k];
+  for (const k in passPhotoPending) delete passPhotoPending[k];
 }};
 </script>
 ''', encoding='utf-8')
