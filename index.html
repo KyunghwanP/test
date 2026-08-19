@@ -2845,6 +2845,136 @@
     text-align:center;padding:30px 0;
   }
 
+  /* ══════════════════════════════════════════
+     외출증 (조퇴·외출·결과)
+     ══════════════════════════════════════════ */
+  .pass-body{padding:14px 0 30px;}
+  .pass-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+  .pass-head h2{font-family:'Pretendard','Noto Sans KR';font-size:20px;font-weight:800;margin:0;}
+  .pass-daynav{display:flex;align-items:center;gap:6px;}
+  .pass-daynav button{
+    border:1.5px solid var(--rule);background:var(--paper-soft);color:var(--ink);
+    border-radius:8px;padding:5px 10px;cursor:pointer;font-size:14px;font-weight:700;
+  }
+  .pass-daynav button:hover{background:var(--rule);}
+  #passDayLabel{font-family:'IBM Plex Mono';font-size:14px;font-weight:700;min-width:132px;text-align:center;}
+  .pass-today-btn{font-size:12px !important;}
+  .pass-add-btn{
+    margin-left:auto;border:none;background:var(--wed);color:#fff;
+    border-radius:9px;padding:9px 16px;cursor:pointer;
+    font-family:'Noto Sans KR';font-weight:700;font-size:14px;
+  }
+  .pass-add-btn:hover{background:#254d52;}
+  .pass-list{display:flex;flex-direction:column;gap:8px;}
+  .pass-card{
+    display:flex;align-items:center;gap:12px;
+    border:1.5px solid var(--rule);border-radius:12px;padding:10px 12px;
+    background:var(--paper-soft);
+  }
+  /* 교문에서는 이름보다 얼굴이 빠르다 → 목록에 사진을 같이 띄운다 */
+  .pass-photo{
+    width:48px;height:64px;border-radius:7px;object-fit:cover;flex-shrink:0;
+    background:var(--rule);
+  }
+  .pass-photo-none{
+    width:48px;height:64px;border-radius:7px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--rule);color:var(--ink-soft);
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:20px;
+  }
+  .pass-info{flex:1;min-width:0;}
+  .pass-name-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+  .pass-cls{font-family:'IBM Plex Mono';font-size:13px;color:var(--ink-soft);font-weight:700;}
+  .pass-name{font-family:'Pretendard','Noto Sans KR';font-size:16px;font-weight:700;}
+  .pass-kind{
+    font-size:12px;font-weight:800;padding:2px 8px;border-radius:999px;
+    background:rgba(47,93,98,0.12);color:var(--wed);
+  }
+  .pass-kind.외출{background:rgba(176,141,87,0.16);color:var(--tue);}
+  .pass-kind.결과{background:rgba(59,81,112,0.14);color:var(--thu);}
+  .pass-meta{font-size:13px;color:var(--ink-soft);margin-top:3px;}
+  .pass-meta b{font-family:'IBM Plex Mono';color:var(--ink);font-weight:700;}
+  .pass-issued{font-size:11px;color:var(--ink-soft);opacity:0.8;margin-top:3px;}
+  .pass-del{
+    border:1.5px solid var(--rule);background:transparent;color:var(--ink-soft);
+    border-radius:7px;padding:4px 9px;cursor:pointer;font-size:12px;flex-shrink:0;
+  }
+  .pass-del:hover{border-color:#EF4444;color:#EF4444;}
+  .pass-empty{color:var(--ink-soft);text-align:center;padding:36px 0;font-size:14px;}
+  .pass-hint{font-size:12px;color:var(--ink-soft);margin-top:14px;}
+
+  /* 발급 모달 */
+  .pass-modal-overlay{
+    position:fixed;inset:0;background:rgba(20,24,18,0.55);z-index:420;
+    display:none;align-items:center;justify-content:center;padding:20px;
+  }
+  .pass-modal-overlay.open{display:flex;}
+  .pass-modal{
+    background:var(--paper);border-radius:14px;width:100%;max-width:420px;
+    max-height:88vh;display:flex;flex-direction:column;overflow:hidden;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,0.5);
+  }
+  .pass-modal-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 18px;background:var(--wed);color:#fff;
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:16px;
+  }
+  .pass-modal-close{
+    background:rgba(255,255,255,0.2);border:none;color:#fff;
+    width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:18px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .pass-modal-body{padding:16px 18px;overflow-y:auto;}
+  .pass-modal-foot{
+    display:flex;align-items:center;gap:10px;
+    padding:12px 18px;border-top:1.5px solid var(--rule);
+  }
+  .pass-form-msg{font-size:12px;color:var(--ink-soft);flex:1;}
+  .pass-save-btn{
+    border:none;background:var(--wed);color:#fff;border-radius:9px;
+    padding:9px 20px;cursor:pointer;font-family:'Noto Sans KR';font-weight:700;font-size:14px;
+  }
+  .pass-save-btn:disabled{background:var(--rule);color:var(--ink-soft);cursor:default;}
+  .pass-label{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin:12px 0 5px;}
+  .pass-modal-body > #passPickWrap > .pass-label:first-child{margin-top:0;}
+  .pass-input{
+    width:100%;box-sizing:border-box;
+    border:1.5px solid var(--rule);border-radius:9px;padding:9px 11px;
+    font-size:14px;background:var(--paper);color:var(--ink);
+    font-family:'Noto Sans KR';
+  }
+  .pass-input:focus{outline:none;border-color:var(--wed);}
+  /* 목록 자리를 미리 잡아 두면 검색할 때 모달 크기가 튀지 않는다 */
+  .pass-pick-list{margin-top:8px;max-height:180px;overflow-y:auto;}
+  .pass-pick-item{
+    display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:8px;cursor:pointer;
+  }
+  .pass-pick-item:hover{background:var(--paper-soft);}
+  .pass-pick-empty{font-size:13px;color:var(--ink-soft);padding:10px 2px;}
+  .pass-picked{
+    display:flex;align-items:center;gap:12px;
+    border:1.5px solid var(--wed);border-radius:10px;padding:9px 11px;
+    background:rgba(47,93,98,0.06);
+  }
+  .pass-picked .pass-change{
+    margin-left:auto;border:1.5px solid var(--rule);background:var(--paper);
+    color:var(--ink-soft);border-radius:7px;padding:4px 9px;cursor:pointer;font-size:12px;
+  }
+  .pass-kind-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .pass-kind-btn,.pass-guard-btn{
+    border:1.5px solid var(--rule);background:var(--paper);color:var(--ink-soft);
+    border-radius:8px;padding:7px 14px;cursor:pointer;
+    font-family:'Noto Sans KR';font-weight:700;font-size:13px;
+  }
+  .pass-kind-btn.active,.pass-guard-btn.active{
+    border-color:var(--wed);background:rgba(47,93,98,0.10);color:var(--wed);
+  }
+  .pass-time-row{display:flex;gap:10px;}
+  .pass-time-row > div{flex:1;}
+
+  /* 위젯·인쇄에는 외출증을 넣지 않는다 */
+  html.widget-mode #passPage, html.widget-mode .pass-modal-overlay{display:none !important;}
+
   /* 비상연락망 상세 팝업 */
   .cd-overlay{
     position:fixed;inset:0;background:rgba(20,24,18,0.55);
@@ -4044,6 +4174,9 @@
     <div class="tab-item" data-page="students">
       <span class="tab-item-icon">🎒</span>학생연락망
     </div>
+    <div class="tab-item" data-page="pass">
+      <span class="tab-item-icon">🚸</span>외출증
+    </div>
     <div class="tab-item" data-page="meal">
       <span class="tab-item-icon">🍱</span>식단표
     </div>
@@ -4096,6 +4229,9 @@
       </div>
       <div class="main-nav-item" data-page="students">
         <span class="main-nav-icon">🎒</span>학생연락망
+      </div>
+      <div class="main-nav-item" data-page="pass">
+        <span class="main-nav-icon">🚸</span>외출증
       </div>
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
@@ -4344,6 +4480,77 @@
       <!-- 특별실 예약 모달 -->
       <div class="room-modal-overlay" id="roomModalOverlay">
         <div class="room-modal" id="roomModal"></div>
+      </div>
+
+      <!-- 외출증 (조퇴·외출·결과) -->
+      <div class="page-view" id="passPage">
+        <div class="pass-body">
+          <div class="pass-head">
+            <h2>🚸 외출증</h2>
+            <div class="pass-daynav">
+              <button type="button" onclick="passMoveDay(-1)">‹</button>
+              <span id="passDayLabel"></span>
+              <button type="button" onclick="passMoveDay(1)">›</button>
+              <button type="button" class="pass-today-btn" onclick="passMoveDay(0)">오늘</button>
+            </div>
+            <button type="button" class="pass-add-btn" onclick="passOpenForm()">＋ 외출증 끊기</button>
+          </div>
+          <div id="passList" class="pass-list"></div>
+          <p class="pass-hint">종이 외출증을 대신합니다. 나이스 출결 처리는 따로 하셔야 합니다.</p>
+        </div>
+      </div><!-- passPage 끝 -->
+
+      <!-- 외출증 발급 모달 -->
+      <div class="pass-modal-overlay" id="passModalOverlay">
+        <div class="pass-modal">
+          <div class="pass-modal-head">
+            <span>외출증 끊기</span>
+            <button type="button" class="pass-modal-close" onclick="passCloseForm()">×</button>
+          </div>
+          <div class="pass-modal-body">
+            <div id="passPickWrap">
+              <label class="pass-label">학생</label>
+              <input type="text" id="passSearch" class="pass-input" placeholder="이름 또는 학년-반 (예: 김학생, 1-3)" autocomplete="off">
+              <div id="passSearchResult" class="pass-pick-list"></div>
+            </div>
+            <div id="passPicked" class="pass-picked" style="display:none;"></div>
+
+            <div id="passFields" style="display:none;">
+              <label class="pass-label">종류</label>
+              <div class="pass-kind-row">
+                <button type="button" class="pass-kind-btn active" data-kind="조퇴">조퇴</button>
+                <button type="button" class="pass-kind-btn" data-kind="외출">외출</button>
+                <button type="button" class="pass-kind-btn" data-kind="결과">결과</button>
+              </div>
+
+              <div class="pass-time-row">
+                <div>
+                  <label class="pass-label">나가는 시각</label>
+                  <input type="time" id="passOutAt" class="pass-input">
+                </div>
+                <div id="passBackWrap" style="display:none;">
+                  <label class="pass-label">복귀 예정</label>
+                  <input type="time" id="passBackAt" class="pass-input">
+                </div>
+              </div>
+
+              <label class="pass-label">사유</label>
+              <input type="text" id="passReason" class="pass-input" placeholder="예: 병원 진료" autocomplete="off">
+
+              <label class="pass-label">보호자 확인</label>
+              <div class="pass-kind-row">
+                <button type="button" class="pass-guard-btn active" data-guard="전화">전화</button>
+                <button type="button" class="pass-guard-btn" data-guard="문자">문자</button>
+                <button type="button" class="pass-guard-btn" data-guard="방문">방문</button>
+                <button type="button" class="pass-guard-btn" data-guard="미확인">미확인</button>
+              </div>
+            </div>
+          </div>
+          <div class="pass-modal-foot">
+            <span id="passFormMsg" class="pass-form-msg"></span>
+            <button type="button" class="pass-save-btn" id="passSaveBtn" onclick="passSave()" disabled>끊기</button>
+          </div>
+        </div>
       </div>
 
       <!-- 시간표 페이지 -->
@@ -8500,6 +8707,253 @@ function contactErrText(err){
   return '불러오지 못했습니다.';
 }
 
+// ══════════════════════════════════════════
+// 외출증 (조퇴·외출·결과) — 종이 쪽지를 대체한다
+//  · passes/{YYYY-MM-DD}/items/{자동ID} — 날짜별로 나눠 담는다. 상담 슬롯처럼 한 문서에
+//    학기 내내 쌓이면 1MB 한계에 부딪히고, 발급끼리 경합할 일도 없다.
+//  · 발급은 교사 누구나. 담임만으로 막으면 '담임이 자리에 없어 못 끊어주는' 문제가
+//    그대로 남는다 — 그게 이 기능을 만든 이유 중 하나다. 대신 발급자를 남긴다.
+//  · 나이스 출결은 건드리지 않는다. 여기까지 하면 이중 입력이 된다.
+// ══════════════════════════════════════════
+let passInitialized = false;
+let passUnsub = null;
+let passDayOffset = 0;          // 0 = 오늘
+let passItems = [];
+let passPickedStudent = null;
+let passKind = '조퇴';
+let passGuard = '전화';
+
+const passYmd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+function passCurrentDay(){
+  const d = new Date();
+  d.setDate(d.getDate() + passDayOffset);
+  return passYmd(d);
+}
+
+function initPassPage(){
+  if(!passInitialized){
+    passInitialized = true;
+    document.getElementById('passSearch').addEventListener('input', passRenderSearch);
+    document.getElementById('passModalOverlay').addEventListener('click', e => {
+      if(e.target.id === 'passModalOverlay') passCloseForm();
+    });
+    document.querySelectorAll('.pass-kind-btn').forEach(b => b.addEventListener('click', () => {
+      passKind = b.dataset.kind;
+      document.querySelectorAll('.pass-kind-btn').forEach(x => x.classList.toggle('active', x === b));
+      // 복귀 예정은 '외출'에만 의미가 있다(조퇴·결과는 그날 안 돌아오거나 수업만 빠진다)
+      document.getElementById('passBackWrap').style.display = (passKind === '외출') ? '' : 'none';
+    }));
+    document.querySelectorAll('.pass-guard-btn').forEach(b => b.addEventListener('click', () => {
+      passGuard = b.dataset.guard;
+      document.querySelectorAll('.pass-guard-btn').forEach(x => x.classList.toggle('active', x === b));
+    }));
+  }
+  passWatch();
+}
+
+function passStopWatch(){
+  if(passUnsub){ passUnsub(); passUnsub = null; }
+}
+
+function passWatch(){
+  passStopWatch();
+  const day = passCurrentDay();
+  document.getElementById('passDayLabel').textContent =
+    day + (passDayOffset === 0 ? ' (오늘)' : '');
+  document.getElementById('passList').innerHTML = '<div class="pass-empty">불러오는 중…</div>';
+  passUnsub = onSnapshot(collection(fbDb, 'passes', day, 'items'), snap => {
+    passItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // 나가는 시각 순. 같으면 발급 순.
+    passItems.sort((a,b) => String(a.outAt||'').localeCompare(String(b.outAt||''))
+                         || String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
+    passRenderList();
+  }, err => {
+    document.getElementById('passList').innerHTML =
+      `<div class="pass-empty">불러오지 못했습니다: ${escapeHtml(err.message)}</div>`;
+  });
+}
+
+function passMoveDay(dir){
+  passDayOffset = (dir === 0) ? 0 : passDayOffset + dir;
+  passWatch();
+}
+
+// 목록에 얼굴을 같이 띄운다 — 교문에서 '이 학생이 맞나'는 이름보다 사진이 빠르다.
+// 작은 사진(반별 Firestore 문서)만 쓴다. 고화질은 한 명씩 워커를 거쳐야 해서 목록엔 안 맞는다.
+// s360PhotoCache 를 그대로 재사용하므로 종합검색에서 이미 본 반은 다시 받지 않는다.
+const passPhotoPending = {};
+function passThumb(x){
+  const ck = `${parseInt(x.grade)}-${parseInt(x.room)}`;
+  const got = s360PhotoCache[ck];
+  if(got === undefined){
+    if(!passPhotoPending[ck]){
+      passPhotoPending[ck] = getDoc(doc(fbDb, 'studentPhotos', ck)).then(snap => {
+        const d = snap.exists() ? (snap.data() || {}) : {};
+        s360PhotoCache[ck] = d.photos || {};
+        s360PhotoVer[ck]   = String(d.updatedAt || '');
+        passRenderList();                       // 사진이 도착하면 그 자리만 다시 그린다
+      }).catch(() => { s360PhotoCache[ck] = {}; });
+    }
+    return null;
+  }
+  return got[String(parseInt(x.num))] || got[String(x.num)] || null;
+}
+
+function passRenderList(){
+  const el = document.getElementById('passList');
+  if(!el) return;
+  if(!passItems.length){
+    el.innerHTML = '<div class="pass-empty">이 날짜에 끊은 외출증이 없습니다.</div>';
+    return;
+  }
+  const myEmail = (fbAuth.currentUser?.email || '').toLowerCase();
+  el.innerHTML = passItems.map(x => {
+    const src  = passThumb(x);
+    const face = src
+      ? `<img class="pass-photo" src="${src}" alt="">`
+      : `<div class="pass-photo-none">${escapeHtml((x.name||'?')[0])}</div>`;
+    const back = (x.kind === '외출' && x.backAt) ? ` · 복귀 <b>${escapeHtml(x.backAt)}</b>` : '';
+    const mine = String(x.issuedBy||'').toLowerCase() === myEmail;
+    return `
+      <div class="pass-card">
+        ${face}
+        <div class="pass-info">
+          <div class="pass-name-row">
+            <span class="pass-cls">${parseInt(x.grade)}-${parseInt(x.room)} ${String(x.num).padStart(2,'0')}</span>
+            <span class="pass-name">${escapeHtml(x.name)}</span>
+            <span class="pass-kind ${escapeHtml(x.kind)}">${escapeHtml(x.kind)}</span>
+          </div>
+          <div class="pass-meta">
+            <b>${escapeHtml(x.outAt||'')}</b>${back}
+            ${x.reason ? ' · ' + escapeHtml(x.reason) : ''}
+            ${x.guardian ? ` · 보호자 ${escapeHtml(x.guardian)}` : ''}
+          </div>
+          <div class="pass-issued">${escapeHtml(x.issuedName||'')} 발급</div>
+        </div>
+        ${mine || _IS_ADMIN() ? `<button type="button" class="pass-del" onclick="passDelete('${x.id}')">삭제</button>` : ''}
+      </div>`;
+  }).join('');
+}
+
+async function passDelete(id){
+  const x = passItems.find(t => t.id === id);
+  if(!x) return;
+  if(!confirm(`${x.name} 학생의 외출증을 삭제할까요?`)) return;
+  try{
+    await deleteDoc(doc(fbDb, 'passes', passCurrentDay(), 'items', id));
+  }catch(e){ alert('삭제 실패: ' + e.message); }
+}
+
+// ── 발급 모달 ──
+function passOpenForm(){
+  passPickedStudent = null;
+  passKind = '조퇴'; passGuard = '전화';
+  document.getElementById('passSearch').value = '';
+  document.getElementById('passSearchResult').innerHTML = '';
+  document.getElementById('passPickWrap').style.display = '';
+  document.getElementById('passPicked').style.display = 'none';
+  document.getElementById('passFields').style.display = 'none';
+  document.getElementById('passBackWrap').style.display = 'none';
+  document.getElementById('passReason').value = '';
+  document.getElementById('passBackAt').value = '';
+  document.getElementById('passFormMsg').textContent = '';
+  document.getElementById('passSaveBtn').disabled = true;
+  document.querySelectorAll('.pass-kind-btn').forEach(x => x.classList.toggle('active', x.dataset.kind === '조퇴'));
+  document.querySelectorAll('.pass-guard-btn').forEach(x => x.classList.toggle('active', x.dataset.guard === '전화'));
+  // 나가는 시각 기본값 = 지금
+  const now = new Date();
+  document.getElementById('passOutAt').value =
+    `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  document.getElementById('passModalOverlay').classList.add('open');
+  // 명렬이 아직 없으면 받아 둔다(학생연락망을 한 번도 안 연 경우)
+  spotLoadData().then(() => passRenderSearch()).catch(() => {});
+  setTimeout(() => document.getElementById('passSearch').focus(), 50);
+}
+function passCloseForm(){
+  document.getElementById('passModalOverlay').classList.remove('open');
+}
+
+function passRenderSearch(){
+  const box = document.getElementById('passSearchResult');
+  const q = document.getElementById('passSearch').value.trim().toLowerCase();
+  if(!q){ box.innerHTML = '<div class="pass-pick-empty">이름이나 학년-반을 입력하세요.</div>'; return; }
+  const hits = (allStudents || []).filter(x =>
+    (x.name||'').toLowerCase().includes(q) ||
+    `${parseInt(x.grade)}-${parseInt(x.room)}`.includes(q)
+  ).slice(0, 30);
+  if(!hits.length){ box.innerHTML = '<div class="pass-pick-empty">검색 결과 없음</div>'; return; }
+  box.innerHTML = hits.map((x, i) => `
+    <div class="pass-pick-item" data-i="${i}">
+      <span class="pass-cls">${parseInt(x.grade)}-${parseInt(x.room)} ${String(x.num).padStart(2,'0')}</span>
+      <span class="pass-name" style="font-size:15px;">${escapeHtml(x.name)}</span>
+    </div>`).join('');
+  box.querySelectorAll('.pass-pick-item').forEach(el => {
+    el.addEventListener('click', () => passPick(hits[parseInt(el.dataset.i)]));
+  });
+}
+
+function passPick(x){
+  passPickedStudent = x;
+  const src = passThumb(x);
+  document.getElementById('passPickWrap').style.display = 'none';
+  const picked = document.getElementById('passPicked');
+  picked.style.display = '';
+  picked.innerHTML = `
+    ${src ? `<img class="pass-photo" src="${src}" alt="">`
+          : `<div class="pass-photo-none">${escapeHtml((x.name||'?')[0])}</div>`}
+    <div>
+      <div class="pass-cls">${parseInt(x.grade)}-${parseInt(x.room)} ${String(x.num).padStart(2,'0')}</div>
+      <div class="pass-name">${escapeHtml(x.name)}</div>
+    </div>
+    <button type="button" class="pass-change" onclick="passUnpick()">다시 고르기</button>`;
+  document.getElementById('passFields').style.display = '';
+  document.getElementById('passSaveBtn').disabled = false;
+}
+function passUnpick(){
+  passPickedStudent = null;
+  document.getElementById('passPickWrap').style.display = '';
+  document.getElementById('passPicked').style.display = 'none';
+  document.getElementById('passFields').style.display = 'none';
+  document.getElementById('passSaveBtn').disabled = true;
+  document.getElementById('passSearch').focus();
+}
+
+async function passSave(){
+  const x = passPickedStudent;
+  if(!x) return;
+  const btn = document.getElementById('passSaveBtn');
+  const msg = document.getElementById('passFormMsg');
+  const outAt = document.getElementById('passOutAt').value;
+  if(!outAt){ msg.textContent = '나가는 시각을 입력하세요.'; return; }
+  btn.disabled = true; msg.textContent = '저장 중…';
+  const me = fbAuth.currentUser;
+  try{
+    // 발급자는 규칙이 '자기 이메일'만 허용한다 — 남의 이름으로 끊지 못하게.
+    await addDoc(collection(fbDb, 'passes', passCurrentDay(), 'items'), {
+      grade: parseInt(x.grade), room: parseInt(x.room), num: parseInt(x.num),
+      name: x.name || '',
+      kind: passKind,
+      reason: document.getElementById('passReason').value.trim(),
+      outAt,
+      backAt: passKind === '외출' ? document.getElementById('passBackAt').value : '',
+      guardian: passGuard,
+      issuedBy: me?.email || '',
+      issuedName: effTeacher()?.name || me?.displayName || '',
+      createdAt: new Date().toISOString()
+    });
+    passCloseForm();
+  }catch(e){
+    msg.textContent = '저장 실패: ' + e.message;
+    btn.disabled = false;
+  }
+}
+window.passMoveDay = passMoveDay;
+window.passOpenForm = passOpenForm;
+window.passCloseForm = passCloseForm;
+window.passUnpick = passUnpick;
+window.passSave = passSave;
+window.passDelete = passDelete;
+
 // ---- 비상연락망 ----
 let contactsInitialized = false;
 let allContacts = [];
@@ -12646,13 +13100,16 @@ function navigateTo(page) {
   // 탭 전환
   document.querySelectorAll('.main-nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
   document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(t => t.classList.toggle('active', t.dataset.page === page));
-  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult','docs','grades','search','room'].forEach(p => {
+  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult','docs','grades','search','room','pass'].forEach(p => {
     const el = document.getElementById(p + 'Page');
     if(el) el.classList.toggle('active', p === page);
   });
   if(page !== 'consult') stopConsultWatch();
   if(page !== 'room') stopRoomWatch();
   if(page === 'room') initRoomPage();
+  // 외출증은 실시간 구독이라, 탭을 벗어나면 끊는다(다른 탭에서 계속 받을 이유가 없다)
+  if(page !== 'pass') passStopWatch();
+  if(page === 'pass') initPassPage();
   if(page === 'home') { if(!homeInitialized) initHomePage(); else { renderHomeTaskSection(); loadHomeConsult(); } }
   if(page === 'timetable') {
     // 탭에 들어올 때마다 '지금 교시'를 다시 계산한다. 아래 select()가 화면을 다시 그리지만

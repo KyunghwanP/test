@@ -178,6 +178,30 @@ service cloud.firestore {
     match /studentPhotos/{docId} {
       allow read, write: if isYnhsTeacher();
     }
+    // ── 외출증 (조퇴·외출·결과) — 종이 쪽지를 대체한다 ──
+    // passes/{YYYY-MM-DD}/items/{자동ID}
+    // 날짜별로 나눠 담는다. 상담 슬롯처럼 한 문서에 학기 내내 쌓이면 1MB 한계에
+    // 부딪히고, 발급과 조회가 서로 다른 문서를 건드려 동시 작업 경합도 없다.
+    //
+    // 발급은 교사 누구나 할 수 있게 둔다. 담임만으로 막으면 '담임이 자리에 없어
+    // 못 끊어주는' 문제가 그대로 남는데, 그게 이 기능을 만든 이유 중 하나다.
+    // 대신 누가 끊었는지(issuedBy)를 반드시 남기고, 남의 이름으로 못 쓰게 막는다.
+    match /passes/{day}/items/{passId} {
+      allow read: if isYnhsTeacher();
+      // 발급자를 자기 이메일로만 적을 수 있다(남의 이름으로 끊는 것 방지)
+      allow create: if isYnhsTeacher()
+                   && request.resource.data.issuedBy == request.auth.token.email;
+      // 잘못 끊은 것을 고치거나 지우는 건 발급자 본인과 관리자만.
+      // issuedBy 는 바꿀 수 없다 — 바꿀 수 있으면 발급자 기록이 의미가 없다.
+      allow update: if (isAppAdmin() || resource.data.issuedBy == request.auth.token.email)
+                   && request.resource.data.issuedBy == resource.data.issuedBy;
+      allow delete: if isAppAdmin() || resource.data.issuedBy == request.auth.token.email;
+    }
+    // 날짜 문서 자체는 쓰지 않는다(서브컬렉션만 쓴다). 실수로 만들지 못하게 막아 둔다.
+    match /passes/{day} {
+      allow read: if isYnhsTeacher();
+      allow write: if false;
+    }
     // ── 공통 함수 ──
     function isYnhsTeacher() {
       return request.auth != null
