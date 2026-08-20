@@ -202,7 +202,29 @@ SetBounds() {
     r := Buffer(16)
     NumPut("int", 0, r, 0), NumPut("int", 0, r, 4)
     NumPut("int", NumGet(rc, 8, "int"), r, 8), NumPut("int", NumGet(rc, 12, "int"), r, 12)
-    wvc.Bounds := r
+    ; 웹뷰가 이미 못 쓰는 상태면(브라우저 프로세스 종료·창 정리 중) 0x8007139F 가 난다.
+    ; 이걸 안 잡으면 창 크기가 바뀌는 것만으로 앱이 오류 창을 띄우고 꺼진다 —
+    ; 크기 조절 실패는 앱을 죽일 이유가 못 된다. 삼키되, 죽었다는 사실은 알린다.
+    try {
+        wvc.Bounds := r
+    } catch {
+        wvc := 0
+        OfferRestart()
+    }
+}
+
+; 웹뷰가 죽으면 화면이 멈춘 채로 남는다. 조용히 두면 '앱이 먹통'으로 보이므로 한 번 묻는다.
+; 플래그는 static 으로 둔다 — 전역 초기화를 함수 아래에 적으면 자동 실행 구역이
+; 첫 함수에서 끝나 그 줄이 아예 실행되지 않는다(위젯에서 실제로 겪은 함정).
+OfferRestart() {
+    static asked := false
+    if asked
+        return
+    asked := true
+    r := MsgBox("화면을 표시하는 구성요소가 종료되었습니다.`n`n앱을 다시 시작할까요?",
+                "영남고", 0x24)
+    if (r = "Yes")
+        Reload
 }
 
 OnNewWindow(sender, args) {

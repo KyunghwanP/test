@@ -944,7 +944,9 @@ SetWebViewBounds(wvc, hwnd, topOff) {
     r := Buffer(16)
     NumPut("int", 0, r, 0), NumPut("int", topOff, r, 4)
     NumPut("int", NumGet(rc, 8, "int"), r, 8), NumPut("int", NumGet(rc, 12, "int"), r, 12)
-    wvc.Bounds := r
+    ; 이미 닫힌 웹뷰면 0x8007139F 가 난다. 위젯 하나의 크기 조절 실패로
+    ; 스크립트 전체가 멈추면 나머지 위젯까지 같이 죽는다.
+    try wvc.Bounds := r
 }
 
 ; ── 위젯 '위쪽 가장자리'에 마우스를 올렸을 때만 손잡이 바를 겹쳐 표시 ──
