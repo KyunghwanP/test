@@ -77,7 +77,7 @@ global INPUT_PANELS := Map("memo", 1, "fulltt", 1)
 global WidgetWins := Map()   ; gui.hwnd -> {panel, opacity, gui, wvc, handleGui, ...}
 global HandleToWidget := Map()   ; 손잡이 바 hwnd -> 위젯 hwnd (드래그·호버 역참조)
 global dragHwnd := 0, grabOffX := 0, grabOffY := 0, dragW := 0, dragH := 0
-global pendingSaveHwnd := 0   ; 리사이즈 저장 디바운스 대상
+global pendingSaveHwnd := Map()   ; 리사이즈 저장 디바운스 대상(위젯별) — hwnd → 1
 global SNAP := 30       ; 자석 스냅 거리(px) — 이동·크기조절 모두 이 거리 안에서 착 붙음
 global GAP  := 8        ; 자석으로 붙었을 때 위젯 사이 '보이는' 간격(px) — 상하·좌우 모두 동일
 
@@ -519,11 +519,19 @@ CreateWidget(p) {
     hh := Integer(IniRead(CONFIG, "pos_" key, "h", p[6]))
     op := Integer(IniRead(CONFIG, "pos_" key, "opacity", DEF_OPACITY))
 
-    ; 예전 DPI 런어웨이 버그로 저장된 값이 화면보다 크게 부풀었을 수 있다 →
-    ;   비정상 크기는 이 패널의 기본 위치·크기로 되돌린다(한 번 정상 크기로 뜨면 이후엔 그대로 유지됨).
+    ; 예전 DPI 런어웨이 버그로 저장된 값이 화면보다 크게 부풀었을 수 있다 → 크기를 되돌린다.
+    ;
+    ; 크기가 이상하다고 위치까지 되돌리지는 않는다. 그러면 사용자가 옮겨 둔 자리를
+    ; 실행할 때마다 잃는다 — 학급 편성(한 줄짜리라 높이 104)이 아래 하한에 걸려
+    ; 매번 반대편 모니터의 기본 자리에서 뜨고 있었다.
+    ;
+    ; 하한도 낮춘다. 150/120 은 '납작한 위젯'을 손상으로 오인한다. 여기서 걸러야 하는
+    ; 것은 0 이나 음수 같은 못 쓰는 값이지, 사용자가 일부러 줄여 놓은 크기가 아니다.
     vsW := SysGet(78), vsH := SysGet(79)   ; SM_CXVIRTUALSCREEN / SM_CYVIRTUALSCREEN (전체 가상 화면)
-    if (ww < 150 || ww > vsW || hh < 120 || hh > vsH)
-        x := p[3], y := p[4], ww := p[5], hh := p[6]
+    if (ww < 60 || ww > vsW)
+        ww := p[5]
+    if (hh < 40 || hh > vsH)
+        hh := p[6]
 
     ; 위젯 본체 — 웹만 꽉 채우는 창(손잡이 컨트롤은 별도 창으로 겹쳐 띄운다 → 내용 안 밀림)
     ; -DPIScale: AHK의 GUI 자동 DPI 스케일을 끈다. 켜져 있으면 Show(w/h)는 배율만큼 확대되는데
@@ -605,7 +613,7 @@ CreateWidget(p) {
     ; 크기 조절 시 웹뷰 리사이즈 + 크기 저장(디바운스). 손잡이 폭은 표시될 때 재배치(PositionHandle)
     OnResize(gg, minmax, w, hgt) {
         SetWebViewBounds(wvc, g.hwnd, 0)
-        pendingSaveHwnd := g.hwnd
+        pendingSaveHwnd[g.hwnd] := 1
         SetTimer(FlushSave, -500)   ; 마지막 리사이즈 0.5초 후 1회 저장(같은 타이머로 디바운스)
     }
 }
@@ -638,9 +646,14 @@ PositionHandle(widgetHwnd) {
 }
 
 SetWidgetOpacity(hwnd, val) {
-    global WidgetWins, gGlass
-    if WidgetWins.Has(hwnd)
+    global WidgetWins, gGlass, pendingSaveHwnd
+    if WidgetWins.Has(hwnd) {
         WidgetWins[hwnd].opacity := val
+        ; 투명도는 여기서만 바뀐다. 저장하지 않으면 종료 저장에 기대게 되는데,
+        ; 그 종료 저장을 없앴으므로(아래 OnExitFn 주석) 여기서 직접 남긴다.
+        pendingSaveHwnd[hwnd] := 1
+        SetTimer(FlushSave, -500)     ; 슬라이더를 끄는 동안 매번 쓰지 않게 디바운스
+    }
     if (gGlass) {
         WinSetTransparent(255, "ahk_id " hwnd)
         if WidgetWins.Has(hwnd)
@@ -1303,6 +1316,8 @@ SaveWidget(hwnd) {
     }
 }
 
+; 지금 상태를 통째로 저장 — 트레이 '현재 위치·크기 저장' 과 Win+Alt+S 전용.
+;   사용자가 직접 시켰을 때만 부른다(종료 때 부르지 않는 이유는 OnExitFn 주석 참고).
 SaveAll() {
     global WidgetWins
     for hwnd, w in WidgetWins
@@ -1310,12 +1325,13 @@ SaveAll() {
 }
 
 ; 리사이즈 디바운스 저장 (같은 함수 참조라 SetTimer가 하나로 묶임)
+;   타이머는 하나로 묶어도 되지만 대상은 하나일 수 없다. 전에는 hwnd 를 전역 하나에
+;   담아서, 위젯 A 를 줄이고 0.5초 안에 B 를 건드리면 A 의 크기가 영영 저장되지 않았다.
 FlushSave() {
     global pendingSaveHwnd
-    if pendingSaveHwnd {
-        SaveWidget(pendingSaveHwnd)
-        pendingSaveHwnd := 0
-    }
+    for hwnd in pendingSaveHwnd.Clone()
+        SaveWidget(hwnd)
+    pendingSaveHwnd.Clear()
 }
 
 ; ── 전역 단축키 ────────────────────────────────────────────
@@ -1355,7 +1371,12 @@ FlushSave() {
 OnExit(OnExitFn)
 OnExitFn(*) {
     global DLL_PATH, WidgetWins
-    SaveAll()
+    ; 여기서 일괄 저장하지 않는다.
+    ;   창이 지금 있는 자리가 '사용자가 둔 자리'라는 보장이 없다. 모니터를 뽑거나
+    ;   노트북을 도킹에서 빼거나 절전에서 깨면, 윈도우가 사라진 화면의 창들을 남은
+    ;   화면으로 옮겨 놓는다. 그 상태에서 종료하면 그 옮겨진 좌표가 config 에 굳는다 —
+    ;   사용자 눈에는 '위치 저장이 안 된다'로 보인다(화면이 여럿일수록 자주 겪는다).
+    ;   사용자가 실제로 한 행동(이동·크기·투명도)은 그때그때 이미 저장된다.
     ; 각 위젯의 WebView2 컨트롤러를 명시적으로 닫아 msedgewebview2.exe가 즉시 정리되게 한다.
     ;   (안 닫으면 종료가 느리고, 세션 폴더가 한동안 잠겨 바로 재실행하면 안 뜬다)
     for hwnd, w in WidgetWins {
