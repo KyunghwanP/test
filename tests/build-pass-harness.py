@@ -41,7 +41,6 @@ consts = '\n'.join([
     grab_line(r"^let passView = 'recent';.*$"),
     grab_line(r'^let passPickedStudent = null;$'),
     grab_line(r"^let passKind = '조퇴';$"),
-    grab_line(r"^let passGuard = '전화';$"),
     grab_line(r"^let passRepeat = 'none';$"),
     grab_line(r'^let passWdaySel = new Set\(\);$'),
     grab_line(r'^let passDetailCur = null;$'),

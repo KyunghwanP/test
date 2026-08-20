@@ -25,15 +25,15 @@ await page.goto(URL);
 await page.evaluate(({ f1 }) => {
   window.__future = {
     [f1]: [{ id:'f1', grade:1, room:4, num:2, name:'최도현', kind:'외출', outAt:'13:00', backAt:'14:20',
-             reason:'정기 검진', guardian:'전화', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동', createdAt:'2026-08-19T02:00:00Z' }]
+             reason:'정기 검진',issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동', createdAt:'2026-08-19T02:00:00Z' }]
   };
 }, { f1: shift(1) });
 await page.evaluate(({ y1, y2 }) => {
   window.__past = {
     [y1]: [{ id:'p1', grade:3, room:5, num:5, name:'오지민', kind:'조퇴', outAt:'11:10',
-             reason:'발열', guardian:'전화', issuedBy:'kim@yeungnam.hs.kr', issuedName:'김교사', createdAt:'2026-08-18T01:58:00Z' }],
+             reason:'발열',issuedBy:'kim@yeungnam.hs.kr', issuedName:'김교사', createdAt:'2026-08-18T01:58:00Z' }],
     [y2]: [{ id:'p2', grade:2, room:2, num:21, name:'임건우', kind:'결과', outAt:'09:40',
-             reason:'대회 준비', guardian:'미확인', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동', createdAt:'2026-08-17T00:12:00Z' }]
+             reason:'대회 준비',issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동', createdAt:'2026-08-17T00:12:00Z' }]
   };
 }, { y1: shift(-1), y2: shift(-2) });
 
@@ -46,9 +46,9 @@ await page.evaluate(({ PX }) => {
   window.__photos = { '1-3': { '7': PX } };
   window.pushToday([
     { id:'a', grade:1, room:3, num:7, name:'김민준', kind:'조퇴', outAt:'14:30',
-      reason:'몸살', guardian:'문자', issuedBy:'kim@yeungnam.hs.kr', issuedName:'김교사', createdAt:'2026-08-19T05:12:00Z' },
+      reason:'몸살',issuedBy:'kim@yeungnam.hs.kr', issuedName:'김교사', createdAt:'2026-08-19T05:12:00Z' },
     { id:'b', grade:1, room:3, num:8, name:'이서연', kind:'외출', outAt:'10:00', backAt:'11:30',
-      reason:'치과 진료', guardian:'전화', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동', createdAt:'2026-08-19T00:41:00Z' }
+      reason:'치과 진료',issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동', createdAt:'2026-08-19T00:41:00Z' }
   ]);
 }, { PX });
 await page.waitForTimeout(200);
@@ -88,7 +88,7 @@ console.log('\n■ 카드 누르면 상세 모달');
   check('이름', body.includes('이서연'));
   check('나가는 시각', body.includes('10:00'));
   check('복귀 예정(외출)', body.includes('복귀 예정') && body.includes('11:30'));
-  check('사유·보호자', body.includes('치과 진료') && body.includes('전화'));
+  check('사유', body.includes('치과 진료'));
   check('발급자와 시각', body.includes('홍길동') && body.includes('00:41'), body);
   check('사진이 크게', (await page.locator('#passDetailBody .pass-photo, #passDetailBody .pass-photo-none')
         .first().evaluate(e => parseInt(getComputedStyle(e).width))) >= 88);
@@ -170,7 +170,7 @@ console.log('\n■ 발급');
   check('고르기 전 저장 잠김', await page.locator('#passSaveBtn').isDisabled());
   check('학생을 고르기 전에도 칸이 다 보인다',
         (await page.locator('#passKinds').isVisible()) && (await page.locator('#passReason').isVisible())
-        && (await page.locator('#passGuards').isVisible()) && (await page.locator('#passRepeats').isVisible()));
+        && (await page.locator('#passRepeats').isVisible()));
   check('날짜 기본값은 오늘', (await page.inputValue('#passDate')) === ymd(new Date()));
   await page.fill('#passSearch', '1-3');
   await page.waitForTimeout(100);
@@ -188,7 +188,6 @@ console.log('\n■ 발급');
   await page.fill('#passOutAt', '13:20');
   await page.fill('#passBackAt', '15:00');
   await page.fill('#passReason', '치과');
-  await page.locator('#passGuards .pass-slot[data-guard="문자"]').click();
   await page.locator('#passSaveBtn').click();
   await page.waitForTimeout(200);
   const added = await page.evaluate(() => window.__added);
@@ -197,7 +196,8 @@ console.log('\n■ 발급');
   const d = added[0].data;
   check('학생 정보가 숫자로', d.grade === 2 && d.room === 1 && d.num === 12 && d.name === '박지호', d);
   check('종류·시각·사유·복귀', d.kind === '외출' && d.outAt === '13:20' && d.backAt === '15:00' && d.reason === '치과', d);
-  check('보호자·발급자', d.guardian === '문자' && d.issuedBy === 'hong@yeungnam.hs.kr' && d.issuedName === '홍길동', d);
+  check('발급자', d.issuedBy === 'hong@yeungnam.hs.kr' && d.issuedName === '홍길동', d);
+  check('보호자 확인은 저장하지 않는다', !('guardian' in d), d);
   check('저장하면 닫힌다', !(await page.locator('#passModalOverlay.open').isVisible()));
 }
 
@@ -346,11 +346,11 @@ console.log('\n■ 상태 — 대기 → 나감 → 완료');
     window.reset(); window.__past = {}; window.__future = {};
     window.pushToday([
       { id:'e', grade:1, room:3, num:7, name:'김학생', kind:'조퇴', outAt:'13:00',
-        guardian:'전화', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' },
+       issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' },
       { id:'g', grade:1, room:3, num:8, name:'이학생', kind:'외출', outAt:'14:00', backAt:'15:30',
-        guardian:'문자', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' },
+       issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' },
       { id:'h', grade:2, room:1, num:12, name:'박학생', kind:'외출', outAt:'16:00',
-        guardian:'방문', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' }
+       issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' }
     ]);
   });
   await page.waitForTimeout(120);
@@ -424,7 +424,7 @@ console.log('\n■ 상세 모달 — 사진을 크게');
     window.reset();
     window.__photos = { '1-3': { '7': PX } };
     window.pushToday([{ id:'p', grade:1, room:3, num:7, name:'김학생', kind:'조퇴', outAt:'13:00',
-      guardian:'전화', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' }]);
+     issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' }]);
   }, { PX });
   await page.waitForTimeout(150);
   await page.waitForFunction(() => document.querySelectorAll('img.pass-photo').length > 0);
@@ -443,7 +443,7 @@ console.log('\n■ 넓은 화면 — 카드를 여러 열로 깐다');
 {
   const rows = n => Array.from({ length: n }, (_, i) => ({
     id: 'w' + i, grade: 1, room: 3, num: 7, name: '학생' + i, kind: '조퇴', outAt: '13:00',
-    guardian: '전화', issuedBy: 'hong@yeungnam.hs.kr', issuedName: '홍길동' }));
+   issuedBy: 'hong@yeungnam.hs.kr', issuedName: '홍길동' }));
   const cols = async () => page.evaluate(() =>
     getComputedStyle(document.querySelector('.pass-cards')).gridTemplateColumns.split(' ').length);
 
@@ -451,7 +451,6 @@ console.log('\n■ 넓은 화면 — 카드를 여러 열로 깐다');
   await page.evaluate(r => { window.reset(); window.pushToday(r); }, rows(6));
   await page.waitForTimeout(150);
   check('1500px 에서 3열', (await cols()) === 3, await cols());
-  check('보호자 확인이 함께 보인다', await page.locator('.pass-wide-only').first().isVisible());
   const wrapW = (await page.locator('.pass-wrap').boundingBox()).width;
   check('넓은 화면에서 폭을 760px 에 가두지 않는다', wrapW > 1000, wrapW);
 
@@ -462,7 +461,6 @@ console.log('\n■ 넓은 화면 — 카드를 여러 열로 깐다');
   await page.setViewportSize({ width: 700, height: 900 });
   await page.waitForTimeout(80);
   check('700px 에서 1열', (await cols()) === 1, await cols());
-  check('좁은 화면에선 보호자 확인을 접는다', !(await page.locator('.pass-wide-only').first().isVisible()));
 
   await page.setViewportSize({ width: 900, height: 900 });
 }
@@ -476,7 +474,7 @@ console.log('\n■ 모바일 좌우 여백');
   await m.evaluate(s => { window.setStudents(s); window.initPassPage(); }, STUDENTS);
   await m.evaluate(() => window.pushToday([
     { id:'m', grade:1, room:3, num:7, name:'김학생', kind:'조퇴', outAt:'13:00',
-      guardian:'전화', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' }]));
+     issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' }]));
   await m.waitForTimeout(150);
   const card = await m.locator('.pass-card').first().boundingBox();
   check('좌우 여백이 12px 로 좁다', card.x === 12 && Math.round(card.x + card.width) === 378, card);
@@ -588,7 +586,7 @@ console.log('\n■ 상세 사진 — 고화질로 바꿔 끼운다');
     window.__photos = { '1-3': { '7': PX } };
     window.__big = 'data:image/png;base64,BIGPHOTO';      // 워커가 준 고화질인 척
     window.pushToday([{ id:'q', grade:1, room:3, num:7, name:'김학생', kind:'조퇴', outAt:'13:00',
-      guardian:'전화', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' }]);
+     issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' }]);
   }, { PX });
   await page.waitForTimeout(120);
   await page.waitForFunction(() => document.querySelectorAll('.pass-card img.pass-photo').length > 0);
@@ -616,9 +614,9 @@ console.log('\n■ 수정·삭제 권한');
 {
   const put = rows => page.evaluate(r => { window.reset(); window.pushToday(r); }, rows);
   const MINE   = { id:'m1', grade:1, room:3, num:7, name:'김학생', kind:'조퇴', outAt:'13:00',
-                   reason:'병원', guardian:'전화', issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' };
+                   reason:'병원',issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동' };
   const OTHERS = { id:'o1', grade:1, room:3, num:8, name:'이학생', kind:'외출', outAt:'10:00', backAt:'11:30',
-                   reason:'치과', guardian:'문자', issuedBy:'kim@yeungnam.hs.kr', issuedName:'김교사' };
+                   reason:'치과',issuedBy:'kim@yeungnam.hs.kr', issuedName:'김교사' };
 
   await put([MINE, OTHERS]);
   await page.waitForTimeout(120);
@@ -675,7 +673,6 @@ console.log('\n■ 수정 — 저장');
   await page.fill('#passEdBack', '15:00');
   await page.fill('#passEdOut', '13:40');
   await page.fill('#passEdReason', '치과 진료');
-  await page.selectOption('#passEdGuard', '방문');
   await page.locator('#passEdSave').click();
   await page.waitForTimeout(150);
 
@@ -686,7 +683,7 @@ console.log('\n■ 수정 — 저장');
   check('바꾼 값이 담긴다',
         up[0].data.kind === '외출' && up[0].data.outAt === '13:40' &&
         up[0].data.backAt === '15:00' && up[0].data.reason === '치과 진료' &&
-        up[0].data.guardian === '방문', up[0].data);
+        true, up[0].data);
   check('발급자는 건드리지 않는다', !('issuedBy' in up[0].data) && !('issuedName' in up[0].data), up[0].data);
   check('학생도 건드리지 않는다',
         !('grade' in up[0].data) && !('num' in up[0].data) && !('name' in up[0].data), up[0].data);
@@ -694,7 +691,8 @@ console.log('\n■ 수정 — 저장');
   check('저장하면 보기로 돌아온다', (await page.locator('.pass-row .pass-edit').count()) === 0);
   check('모달은 열린 채', await page.locator('#passDetailOverlay.open').isVisible());
   const body = await page.innerText('#passDetailBody');
-  check('바뀐 내용이 상세에 보인다', body.includes('13:40') && body.includes('치과 진료') && body.includes('방문'), body);
+  check('바뀐 내용이 상세에 보인다', body.includes('13:40') && body.includes('치과 진료'), body);
+  check('상세에도 보호자 확인 줄이 없다', !body.includes('보호자'), body);
   const listTxt = await page.innerText('#passList, #passFeed');
   check('목록에도 바로 반영된다', listTxt.includes('13:40') && listTxt.includes('치과 진료'), listTxt);
 }
