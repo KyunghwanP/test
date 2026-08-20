@@ -1,6 +1,7 @@
 // 외출증 UI 검증 — 실제 Chromium 에서 DOM 을 본다.
 // 하네스는 index.html 에서 코드·마크업·CSS 를 그대로 떼어 온다(tests/build-pass-harness.py).
 import { chromium } from 'playwright';
+import fs from 'node:fs';
 const URL = 'file://' + process.env.PASS_HARNESS;
 
 const STUDENTS = [
@@ -20,6 +21,13 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 const page = await browser.newPage({ viewport: { width: 1000, height: 900 } });
 page.on('pageerror', e => { console.log('  ⚠ 페이지 오류:', e.message); fail++; });
 await page.goto(URL);
+// 시계를 오전 9시로 고정한다. 정렬이 상태(대기·나감·완료)를 보므로, 실제 시각에
+// 맡기면 컨테이너가 몇 시냐에 따라 통과했다 말았다 한다(실제로 그랬다).
+// 9시면 이 파일이 쓰는 자료가 모두 '대기'라 시각 순서만 남는다.
+const PIN = () => page.evaluate(() => {
+  const d = new Date(); d.setHours(9, 0, 0, 0); window.__nowMs = d.getTime();
+});
+await PIN();
 
 // 지난 날짜·앞날 (한 번만 읽는 것) 준비
 await page.evaluate(({ f1 }) => {
@@ -182,7 +190,11 @@ console.log('\n■ 발급');
   check('고르면 학생 칸만 채워진다', await page.locator('#passPicked').isVisible());
   check('검색창은 사라진다', !(await page.locator('#passPickWrap').isVisible()));
   check('저장 버튼이 풀린다', !(await page.locator('#passSaveBtn').isDisabled()));
-  check('조퇴면 복귀 칸 숨김', !(await page.locator('#passBackWrap').isVisible()));
+  // 기본 종류가 '외출'이다 — 대부분의 외출증이 외출이라 한 번 덜 누르게 한다
+  check('기본은 외출', await page.locator('.pass-kind-btn[data-kind="외출"], .pass-slot[data-kind="외출"]').first().evaluate(e => e.classList.contains('active')));
+  check('기본이 외출이라 복귀 칸이 처음부터 보인다', await page.locator('#passBackWrap').isVisible());
+  await page.locator('.pass-slot[data-kind="조퇴"]').click();
+  check('조퇴로 바꾸면 복귀 칸이 숨는다', !(await page.locator('#passBackWrap').isVisible()));
   await page.locator('#passKinds .pass-slot[data-kind="외출"]').click();
   check('외출이면 복귀 칸', await page.locator('#passBackWrap').isVisible());
   await page.fill('#passOutAt', '13:20');
@@ -415,7 +427,7 @@ console.log('\n■ 상태 — 대기 → 나감 → 완료');
         (await page.innerText('#passDetailBody')).includes('복귀 예정 15:30 지남'),
         await page.innerText('#passDetailBody'));
   await page.evaluate(() => window.passCloseDetail());
-  await page.evaluate(() => { window.__nowMs = null; });
+  await PIN();          // 상태 검사가 옮겨 둔 시계를 기본 고정값으로 되돌린다
 }
 
 console.log('\n■ 상세 모달 — 사진을 크게');
@@ -723,6 +735,42 @@ console.log('\n■ 수정 — 취소와 실수 방지');
   check('안내가 뜬다', (await page.innerText('#passEdMsg')).includes('시각'));
   await page.evaluate(() => { window.passEditing = false; window.passCloseDetail(); });
   await page.evaluate(() => window.passCloseDetail());
+}
+
+console.log('\n■ 발급 시각은 한국 시간으로 (UTC 문자열을 그대로 자르지 않는다)');
+{
+  // createdAt 은 toISOString() = UTC 다. 문자열을 slice 하면 9시간 어긋난다
+  // (19:07 에 끊은 것이 10:07 로 보였다). 저장은 UTC 그대로, 표시만 지역시로.
+  await page.evaluate(() => {
+    window.reset();
+    window.pushToday([{ id:'z', grade:1, room:3, num:7, name:'김민준', kind:'조퇴', outAt:'13:00',
+      issuedBy:'hong@yeungnam.hs.kr', issuedName:'홍길동',
+      createdAt: new Date(2026, 7, 19, 19, 7, 0).toISOString() }]);   // 지역시 19:07
+  });
+  await page.waitForTimeout(150);
+  await page.locator('.pass-card').first().click();
+  await page.waitForTimeout(150);
+  const body = await page.innerText('#passDetailBody');
+  check('끊은 시각이 19:07 로 보인다', body.includes('19:07'), body.split('\n').filter(l => l.includes('발급')));
+  check('UTC 시각(10:07)이 새어나오지 않는다', !body.includes('10:07'), body);
+  await page.evaluate(() => window.passCloseDetail());
+}
+
+console.log('\n■ 뒤로가기 — 모달이 닫힌다 (배경만 바뀌지 않게)');
+{
+  // popstate 처리기의 '열린 모달 닫기' 목록에 외출증이 빠져 있었다. 그래서 뒤로가기가
+  // 현황판 이동까지 흘러가, 모달은 남고 배경만 바뀌었다.
+  const src = fs.readFileSync(import.meta.dirname + '/../index.html', 'utf8');
+  const i = src.indexOf("window.addEventListener('popstate'");
+  const j = src.indexOf('// 2. 교체/보강 모달 뎁스', i);
+  const closers = src.slice(i, j);
+  check('상세 모달이 목록에 있다', /passDetailOverlay[\s\S]{0,80}passCloseDetail/.test(closers), closers.slice(-300));
+  check('발급 모달이 목록에 있다',  /passModalOverlay[\s\S]{0,80}passCloseForm/.test(closers), closers.slice(-300));
+  check('둘 다 가드를 다시 쌓는다',
+        (closers.match(/pass(Detail)?(Overlay|Modal)[\s\S]{0,120}armExitGuard/g) || []).length === 2, closers.slice(-300));
+  // 상세가 발급보다 먼저 검사돼야 한다(둘 다 열려 있으면 위에 있는 것부터 닫는다)
+  check('상세를 발급보다 먼저 본다',
+        closers.indexOf('passDetailOverlay') < closers.indexOf('passModalOverlay'));
 }
 
 console.log('\n■ 데스크톱은 FAB 을 쓰지 않는다');

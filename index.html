@@ -4247,7 +4247,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.82</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.83</div>
   </div>
 </div>
 
@@ -4383,7 +4383,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.82</div>
+    <div class="nav-version" title="Made by 박경환">ver6.83</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4667,8 +4667,8 @@
             <div class="pass-field">
               <label class="pass-label">종류</label>
               <div class="pass-slots" id="passKinds">
-                <button type="button" class="pass-slot active" data-kind="조퇴">조퇴</button>
-                <button type="button" class="pass-slot" data-kind="외출">외출</button>
+                <button type="button" class="pass-slot" data-kind="조퇴">조퇴</button>
+                <button type="button" class="pass-slot active" data-kind="외출">외출</button>
                 <button type="button" class="pass-slot" data-kind="결과">결과</button>
               </div>
             </div>
@@ -4683,7 +4683,7 @@
                 <label class="pass-label" for="passOutAt">나가는 시각</label>
                 <input type="time" id="passOutAt" class="pass-input">
               </div>
-              <div id="passBackWrap" style="display:none;">
+              <div id="passBackWrap">
                 <label class="pass-label" for="passBackAt">복귀 예정</label>
                 <input type="time" id="passBackAt" class="pass-input">
               </div>
@@ -5777,7 +5777,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.82 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = 'ver6.83 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -7474,6 +7474,9 @@ window.addEventListener('popstate', (e)=>{
   if (document.getElementById('jindanModal')?.classList.contains('open')) { closeJindanModal(); armExitGuard(); return; }
   if (document.getElementById('classOrgModal')?.classList.contains('open')) { closeClassOrgModal(); armExitGuard(); return; }
   if (document.getElementById('s360PhotoZoom')?.classList.contains('open')) { s360ClosePhotoZoom(); armExitGuard(); return; }
+  // 외출증 — 상세를 먼저 본다(상세 위에 발급이 겹칠 일은 없지만, 수정 중이면 상세가 위다)
+  if (document.getElementById('passDetailOverlay')?.classList.contains('open')) { passCloseDetail(); armExitGuard(); return; }
+  if (document.getElementById('passModalOverlay')?.classList.contains('open'))  { passCloseForm();   armExitGuard(); return; }
 
   // 2. 교체/보강 모달 뎁스
   const newDepth = st.modalDepth || 0;
@@ -8969,7 +8972,7 @@ let passFuture = {};            // '날짜' → 목록 (앞날, 한 번만 읽�
 let passLoaded = false;
 let passView = 'recent';        // 'recent' | 'upcoming'
 let passPickedStudent = null;
-let passKind = '조퇴';
+let passKind = '외출';
 let passRepeat = 'none';
 let passWdaySel = new Set();
 
@@ -8982,8 +8985,10 @@ function passShift(n){
   return passYmd(d);
 }
 const passDateLabel = key => { const d = new Date(key + 'T00:00:00'); return `${d.getMonth()+1}월 ${d.getDate()}일`; };
-const passNowHm = () => { const n = new Date();
-  return `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`; };
+const passHm = d => `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+const passNowHm = () => passHm(new Date());
+// 저장된 createdAt(UTC ISO) → 보는 사람의 시각. 문자열을 자르면 UTC 가 그대로 나온다.
+const passStampHm = iso => { const d = new Date(iso); return isNaN(d) ? '' : passHm(d); };
 // 'HH:MM' → 분. 문자열 비교로는 23:55 + 10분 같은 자정 넘김을 다룰 수 없다.
 const passMin = hm => { const p = String(hm).split(':'); return (+p[0] || 0) * 60 + (+p[1] || 0); };
 // 복귀 예정 시각이 지났다고 바로 회색으로 죽이지 않는다. 그 시각에 맞춰 들어오는
@@ -9233,7 +9238,7 @@ function passShowDetail(day, id, editing){
       ${x.kind === '외출' && x.backAt ? `<div class="pass-row"><span class="k">복귀 예정</span><span class="v big">${escapeHtml(x.backAt)}</span></div>` : ''}
       <div class="pass-row"><span class="k">사유</span><span class="v">${x.reason ? escapeHtml(x.reason) : '—'}</span></div>
       <div class="pass-row"><span class="k">발급</span><span class="v">${escapeHtml(x.issuedName||'')}${
-        x.createdAt ? ' · ' + escapeHtml(String(x.createdAt).slice(11,16)) : ''}</span></div>`;
+        x.createdAt ? ' · ' + escapeHtml(passStampHm(x.createdAt)) : ''}</span></div>`;
 
   document.getElementById('passDetailBody').innerHTML = `
     <div class="pass-detail-hero">
@@ -9342,13 +9347,13 @@ async function passDelete(day, id, name){
 // ── 발급 ──
 function passOpenForm(){
   passPickedStudent = null;
-  passKind = '조퇴'; passRepeat = 'none';
+  passKind = '외출'; passRepeat = 'none';
   passWdaySel = new Set();
   document.getElementById('passSearch').value = '';
   document.getElementById('passSearchResult').innerHTML = '';
   document.getElementById('passPickWrap').style.display = '';
   document.getElementById('passPicked').style.display = 'none';
-  document.getElementById('passBackWrap').style.display = 'none';
+  document.getElementById('passBackWrap').style.display = '';     // 기본이 '외출'이라 복귀 칸이 보인다
   document.getElementById('passRepeatOpts').style.display = 'none';
   document.getElementById('passWdayWrap').style.display = 'none';
   document.getElementById('passReason').value = '';
@@ -9357,7 +9362,7 @@ function passOpenForm(){
   document.getElementById('passRepeatNote').textContent = '';
   document.getElementById('passFormMsg').textContent = '';
   document.getElementById('passSaveBtn').disabled = true;
-  document.querySelectorAll('#passKinds .pass-slot').forEach(x => x.classList.toggle('active', x.dataset.kind === '조퇴'));
+  document.querySelectorAll('#passKinds .pass-slot').forEach(x => x.classList.toggle('active', x.dataset.kind === '외출'));
   document.querySelectorAll('#passRepeats .pass-slot').forEach(x => x.classList.toggle('active', x.dataset.rep === 'none'));
   document.querySelectorAll('#passWdays .pass-wday').forEach(x => x.classList.remove('active'));
   const now = new Date();
