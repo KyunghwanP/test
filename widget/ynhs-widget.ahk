@@ -77,7 +77,7 @@ global INPUT_PANELS := Map("memo", 1, "fulltt", 1)
 global WidgetWins := Map()   ; gui.hwnd -> {panel, opacity, gui, wvc, handleGui, ...}
 global HandleToWidget := Map()   ; 손잡이 바 hwnd -> 위젯 hwnd (드래그·호버 역참조)
 global dragHwnd := 0, grabOffX := 0, grabOffY := 0, dragW := 0, dragH := 0
-global pendingSaveHwnd := 0   ; 리사이즈 저장 디바운스 대상
+global pendingSaveHwnd := Map()   ; 리사이즈 저장 디바운스 대상(위젯별) — hwnd → 1
 global SNAP := 30       ; 자석 스냅 거리(px) — 이동·크기조절 모두 이 거리 안에서 착 붙음
 global GAP  := 8        ; 자석으로 붙었을 때 위젯 사이 '보이는' 간격(px) — 상하·좌우 모두 동일
 
@@ -519,11 +519,19 @@ CreateWidget(p) {
     hh := Integer(IniRead(CONFIG, "pos_" key, "h", p[6]))
     op := Integer(IniRead(CONFIG, "pos_" key, "opacity", DEF_OPACITY))
 
-    ; 예전 DPI 런어웨이 버그로 저장된 값이 화면보다 크게 부풀었을 수 있다 →
-    ;   비정상 크기는 이 패널의 기본 위치·크기로 되돌린다(한 번 정상 크기로 뜨면 이후엔 그대로 유지됨).
+    ; 예전 DPI 런어웨이 버그로 저장된 값이 화면보다 크게 부풀었을 수 있다 → 크기를 되돌린다.
+    ;
+    ; 크기가 이상하다고 위치까지 되돌리지는 않는다. 그러면 사용자가 옮겨 둔 자리를
+    ; 실행할 때마다 잃는다 — 학급 편성(한 줄짜리라 높이 104)이 아래 하한에 걸려
+    ; 매번 반대편 모니터의 기본 자리에서 뜨고 있었다.
+    ;
+    ; 하한도 낮춘다. 150/120 은 '납작한 위젯'을 손상으로 오인한다. 여기서 걸러야 하는
+    ; 것은 0 이나 음수 같은 못 쓰는 값이지, 사용자가 일부러 줄여 놓은 크기가 아니다.
     vsW := SysGet(78), vsH := SysGet(79)   ; SM_CXVIRTUALSCREEN / SM_CYVIRTUALSCREEN (전체 가상 화면)
-    if (ww < 150 || ww > vsW || hh < 120 || hh > vsH)
-        x := p[3], y := p[4], ww := p[5], hh := p[6]
+    if (ww < 60 || ww > vsW)
+        ww := p[5]
+    if (hh < 40 || hh > vsH)
+        hh := p[6]
 
     ; 위젯 본체 — 웹만 꽉 채우는 창(손잡이 컨트롤은 별도 창으로 겹쳐 띄운다 → 내용 안 밀림)
     ; -DPIScale: AHK의 GUI 자동 DPI 스케일을 끈다. 켜져 있으면 Show(w/h)는 배율만큼 확대되는데
@@ -605,7 +613,7 @@ CreateWidget(p) {
     ; 크기 조절 시 웹뷰 리사이즈 + 크기 저장(디바운스). 손잡이 폭은 표시될 때 재배치(PositionHandle)
     OnResize(gg, minmax, w, hgt) {
         SetWebViewBounds(wvc, g.hwnd, 0)
-        pendingSaveHwnd := g.hwnd
+        pendingSaveHwnd[g.hwnd] := 1
         SetTimer(FlushSave, -500)   ; 마지막 리사이즈 0.5초 후 1회 저장(같은 타이머로 디바운스)
     }
 }
@@ -1310,12 +1318,13 @@ SaveAll() {
 }
 
 ; 리사이즈 디바운스 저장 (같은 함수 참조라 SetTimer가 하나로 묶임)
+;   타이머는 하나로 묶어도 되지만 대상은 하나일 수 없다. 전에는 hwnd 를 전역 하나에
+;   담아서, 위젯 A 를 줄이고 0.5초 안에 B 를 건드리면 A 의 크기가 영영 저장되지 않았다.
 FlushSave() {
     global pendingSaveHwnd
-    if pendingSaveHwnd {
-        SaveWidget(pendingSaveHwnd)
-        pendingSaveHwnd := 0
-    }
+    for hwnd in pendingSaveHwnd.Clone()
+        SaveWidget(hwnd)
+    pendingSaveHwnd.Clear()
 }
 
 ; ── 전역 단축키 ────────────────────────────────────────────
