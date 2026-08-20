@@ -4247,7 +4247,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.83</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.84</div>
   </div>
 </div>
 
@@ -4383,7 +4383,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.83</div>
+    <div class="nav-version" title="Made by 박경환">ver6.84</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5777,7 +5777,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.83 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = 'ver6.84 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -6201,6 +6201,7 @@ function syncTimeState(){
     }
   }else if(changed){
     try { window._renderHomeMyTt?.(); } catch(e){}
+    try { window._renderHomeClassTt?.(); } catch(e){}
   }
 }
 setInterval(syncTimeState, 60 * 1000);
@@ -7976,6 +7977,18 @@ try { sessionStorage.removeItem('ttSem1'); } catch(e){}
 
 async function loadDataFromFirestore(){
   const fetchPromise = getDoc(doc(fbDb, 'appdata', 'main'));
+  // 운영표(요일 대체·시험·휴업)도 나란히 시작한다. 순서대로 받으면 왕복이 두 번이 되고,
+  // 현황판이 그려질 때까지 못 와서 기초시간표로 한 번 그렸다가 바뀌는 깜빡임이 생긴다.
+  const opPromise = getDoc(doc(fbDb, 'appdata', 'operating')).then(s => {
+    if(!s.exists()) return;
+    OPERATING = s.data();
+    const tp = document.getElementById('timetablePage');
+    if(tp && tp.classList.contains('active')) reRenderTimetable(mode, selectedKey);
+    // 현황판이 이미 그려진 뒤에 도착했으면 다시 그린다. 그리기 전이면 이 함수들이
+    // 아직 없어 아무 일도 안 하고, 어차피 처음부터 운영표로 그려진다.
+    try { window._renderHomeMyTt?.(); } catch(e){}
+    try { window._renderHomeClassTt?.(); } catch(e){}
+  }).catch(()=>{});
   const timeout = new Promise((_, reject) =>
     setTimeout(() => reject(new Error('데이터 로딩 시간 초과 (네트워크 확인)')), 10000)
   );
@@ -7984,13 +7997,9 @@ async function loadDataFromFirestore(){
     if(!snap.exists()) throw new Error('데이터를 찾을 수 없습니다.');
     _sem2Data = snap.data();
     applyAppData(_sem2Data);
-    // 학사 운영표(요일 대체) — 있으면 시간표 주간선택에서 치환에 사용 (없어도 정규표로 동작)
-    getDoc(doc(fbDb, 'appdata', 'operating')).then(s => {
-      if(s.exists()){ OPERATING = s.data();
-        const tp=document.getElementById('timetablePage');
-        if(tp && tp.classList.contains('active')) reRenderTimetable(mode, selectedKey);
-      }
-    }).catch(()=>{});
+    // 현황판을 그리기 전에 운영표를 잠깐 기다린다 — 이게 있어야 처음부터 운영표로 그린다.
+    // 오래 막지는 않는다. 못 받으면 그냥 진행하고, 늦게 오면 위 then 이 다시 그린다.
+    await Promise.race([opPromise, new Promise(r => setTimeout(r, 2500))]);
   } catch(e) {
     // 타임아웃이어도 원 요청은 백그라운드에서 계속 진행 중 —
     // 늦게라도 도착하면 데이터 반영 + 의존 UI 재렌더 (느린 회선 대응)
@@ -11639,6 +11648,7 @@ async function initHomePage() {
           initHomePage();
         } else {
           window._renderHomeMyTt();
+          try { window._renderHomeClassTt?.(); } catch(e){}
         }
       }, 60000);
 
@@ -11658,24 +11668,38 @@ async function initHomePage() {
       const classSection = document.getElementById('homeClassTimetable');
       classSection.style.display = '';
       document.getElementById('homeClassName').textContent = myTeacher.homeroom;
-      const classSched = classSchedule[myTeacher.homeroom] || {};
-      const _gradeH = ttGradeOf(myTeacher.homeroom);
-      const _opH = ttOpForDate(ttISO(new Date()));
-      const _crossH = ttDayCross(_opH, todayDay, _gradeH-1);
-      const classHtml = periods.map(b => {
-        const found = ttResolveCellOp(_opH, classSched, _gradeH, todayDay, b.period);
-        const isNow = nowMin >= toMinutes(b.start)-5 && nowMin <= toMinutes(b.end)+5;
-        const cls = ['home-tt-cell', isNow?'now':'', !found?'empty':'', (found&&found._sub)?'tt-sub':''].filter(Boolean).join(' ');
-        return `<div class="${cls}">
-          <div class="home-tt-period-bar">${b.period}교시</div>
-          <div class="home-tt-body">${found
-            ? `<div class="home-tt-subject">${found.subject}</div><div class="home-tt-class">${found.teacher||''}</div>`
-            : '<div class="home-tt-empty">·</div>'}</div>
-        </div>`;
-      }).join('');
-      document.getElementById('homeClassTt').innerHTML = classHtml;
-      const classTitleEl = document.querySelector('#homeClassTimetable .home-section-title');
-      if(classTitleEl){ const cd=_crossH?ttCrossDayOf(_opH, todayDay, _gradeH-1):null; if(cd && classTitleEl.querySelector('.home-op-tag')===null){ classTitleEl.insertAdjacentHTML('beforeend', ` <span class="home-op-tag">${cd}요일 운영</span>`); } }
+      // 내 시간표와 같이 '다시 그릴 수 있는' 함수로 둔다. 전에는 여기서 한 번 그리고
+      // 끝이라, 운영표(OPERATING)가 늦게 도착해도 반영되지 않았다 — 탭을 나갔다
+      // 들어오기 전까지 계속 기초시간표였다. 요일·시각도 부를 때마다 새로 잡는다.
+      window._renderHomeClassTt = function() {
+        const nowDate = new Date();
+        const todayDayC = days[nowDate.getDay()];
+        const nowMinC = nowDate.getHours()*60 + nowDate.getMinutes();
+        const classSched = classSchedule[myTeacher.homeroom] || {};
+        const _gradeH = ttGradeOf(myTeacher.homeroom);
+        const _opH = ttOpForDate(ttISO(nowDate));
+        const _crossH = ttDayCross(_opH, todayDayC, _gradeH-1);
+        const classHtml = periods.map(b => {
+          const found = ttResolveCellOp(_opH, classSched, _gradeH, todayDayC, b.period);
+          const isNow = nowMinC >= toMinutes(b.start)-5 && nowMinC <= toMinutes(b.end)+5;
+          const cls = ['home-tt-cell', isNow?'now':'', !found?'empty':'', (found&&found._sub)?'tt-sub':''].filter(Boolean).join(' ');
+          return `<div class="${cls}">
+            <div class="home-tt-period-bar">${b.period}교시</div>
+            <div class="home-tt-body">${found
+              ? `<div class="home-tt-subject">${found.subject}</div><div class="home-tt-class">${found.teacher||''}</div>`
+              : '<div class="home-tt-empty">·</div>'}</div>
+          </div>`;
+        }).join('');
+        document.getElementById('homeClassTt').innerHTML = classHtml;
+        const classTitleEl = document.querySelector('#homeClassTimetable .home-section-title');
+        if(classTitleEl){
+          // 다시 그릴 때마다 배지를 새로 판단한다 — 붙이기만 하면 운영일이 아니게 돼도 남는다
+          classTitleEl.querySelector('.home-op-tag')?.remove();
+          const cd = _crossH ? ttCrossDayOf(_opH, todayDayC, _gradeH-1) : null;
+          if(cd) classTitleEl.insertAdjacentHTML('beforeend', ` <span class="home-op-tag">${cd}요일 운영</span>`);
+        }
+      };
+      window._renderHomeClassTt();
 
       document.querySelector('[data-goto="timetable-class"]').addEventListener('click', () => {
         navigateTo('timetable');
