@@ -376,8 +376,18 @@ console.log('\n■ 상태 — 대기 → 나감 → 완료');
   const tally = async () => (await page.innerText('#passTally')).replace(/\s+/g, ' ');
   check('요약에 나가 있음이 뜬다', (await tally()).includes('나가 있음 1'), await tally());
 
+  // 복귀 예정 15:30 — 지났다고 바로 죽이지 않는다. 10분은 기다린다.
+  await at('15:32');
+  check('복귀 시각 직후에는 아직 나감', (await st('이학생')) === '나감', await st('이학생'));
+  check('아직 가라앉지 않는다', !(await done('이학생')));
+  await at('15:39');
+  check('9분 뒤에도 아직 나감', (await st('이학생')) === '나감', await st('이학생'));
+
+  await at('15:41');
+  check('복귀 시각 +10분이 지나면 완료', (await st('이학생')) === '완료', await st('이학생'));
+
   await at('15:45');
-  check('복귀 시각이 지나면 완료로 바뀐다', (await st('이학생')) === '완료', await st('이학생'));
+  check('그 뒤로도 완료', (await st('이학생')) === '완료', await st('이학생'));
   check('완료 카드는 배경에 묻히지 않는다', await card('이학생').evaluate(c =>
     getComputedStyle(c).backgroundColor !== getComputedStyle(document.getElementById('passPage')).backgroundColor));
   check('카드 상태는 한 줄로 끝난다', await page.evaluate(() =>

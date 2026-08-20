@@ -54,6 +54,8 @@ consts = '\n'.join([
     grab_line(r'^const passDateLabel = .*$'),
     grab_line(r'^const passNowHm = .*$'),
     grab_line(r"^  return `\$\{String\(n\.getHours.*$"),
+    grab_line(r'^const passMin = .*$'),
+    grab_line(r'^const PASS_DONE_GRACE = .*$'),
     grab_line(r'^const passWday = .*$'),
     grab_line(r'^const passPhotoPending = \{\};$'),
 ])
