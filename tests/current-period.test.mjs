@@ -183,5 +183,49 @@ globalThis.Date = RealDate;
   check('현황판을 연 적 없으면 초기화하지 않는다', r.calls.initHomePage === 0, r.calls);
 }
 
+// ── 운영시간표가 현황판에 언제 반영되는가 ────────────────────────────────
+// OPERATING 은 로그인 뒤 따로 받아온다. 도착했을 때 현황판을 다시 그리지 않으면
+// '내 시간표'는 자체 1분 타이머가 돌 때까지 기초로 남고, '우리반 시간표'는
+// 한 번만 그리는 구조라 아예 바뀌지 않았다. 배선이 걸렸는지 원본에서 확인한다.
+{
+  console.log('\n■ 운영시간표 도착 → 현황판 즉시 반영');
+  const i = html.indexOf("getDoc(doc(fbDb, 'appdata', 'operating'))");
+  const arrival = html.slice(i, html.indexOf('.catch', i));
+  check('운영표를 받는 곳이 있다', i > 0);
+
+  // 순서대로 받으면 왕복이 두 번이라, 현황판이 그려질 때까지 못 와서 기초로 한 번
+  // 그렸다가 바뀐다. 나란히 시작하고, 그리기 전에 잠깐 기다려야 처음부터 운영표로 뜬다.
+  const load = html.slice(html.indexOf('async function loadDataFromFirestore'),
+                          html.indexOf('} catch (e) {', html.indexOf('async function loadDataFromFirestore')));
+  check('appdata/main 과 나란히 시작한다',
+        load.indexOf("'operating'") < load.indexOf('await Promise.race([fetchPromise'), load.slice(0, 200));
+  check('현황판을 그리기 전에 잠깐 기다린다', /await Promise\.race\(\[opPromise/.test(load), load.slice(-400));
+  check('오래 막지는 않는다(상한이 있다)', /opPromise, new Promise\(r => setTimeout\(r, \d+\)\)/.test(load));
+  check('도착하면 내 시간표를 다시 그린다',   /_renderHomeMyTt/.test(arrival), arrival.slice(0, 300));
+  check('도착하면 우리반 시간표도 다시 그린다', /_renderHomeClassTt/.test(arrival), arrival.slice(0, 300));
+
+  check('우리반 시간표가 다시 그릴 수 있는 함수다',
+        /window\._renderHomeClassTt\s*=\s*function/.test(html));
+  check('우리반 시간표도 운영표를 본다',
+        /_renderHomeClassTt[\s\S]{0,900}ttResolveCellOp\(_opH/.test(html));
+  check('우리반 시간표가 부를 때마다 요일·시각을 새로 잡는다',
+        /_renderHomeClassTt[\s\S]{0,400}const nowDate = new Date\(\)/.test(html));
+
+  const timer = html.slice(html.indexOf('window._homeTtTimer = setInterval'),
+                           html.indexOf('}, 60000);') + 10);
+  check('1분 타이머가 둘 다 챙긴다',
+        /_renderHomeMyTt/.test(timer) && /_renderHomeClassTt/.test(timer), timer.slice(-400));
+
+  const sync = html.slice(html.indexOf('function syncTimeState'),
+                          html.indexOf('setInterval(syncTimeState'));
+  check('교시가 바뀔 때도 둘 다 챙긴다',
+        /_renderHomeMyTt/.test(sync) && /_renderHomeClassTt/.test(sync), sync.slice(-400));
+
+  // 배지를 붙이기만 하면 운영일이 아니게 돼도 남는다 → 다시 그릴 때 지우고 판단해야 한다
+  const cls = html.slice(html.indexOf('window._renderHomeClassTt = function'),
+                         html.indexOf('window._renderHomeClassTt();'));
+  check('운영 배지를 다시 그릴 때 정리한다', /home-op-tag'\)\?\.remove\(\)/.test(cls), cls.slice(-500));
+}
+
 console.log(`\n통과 ${pass} / 실패 ${fail}\n`);
 process.exit(fail ? 1 : 0);
