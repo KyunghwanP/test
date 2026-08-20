@@ -4,7 +4,7 @@ const BASE = self.location.pathname.replace(/[^/]*$/, '');   // 예: '/ynhs/' ·
 // 캐시 저장소는 '경로'가 아니라 '출처' 단위로 공유된다 → /ynhs/ 와 /test/ 는 같은 출처라
 // 캐시 이름이 같으면 서로의 캐시를 지운다(한쪽 버전이 올라갈 때 activate가 삭제).
 // 그래서 이름에 BASE를 넣어 배포별로 분리한다. 예: 'ynhs:/ynhs/:v496'
-const CACHE_VER  = 'v523';
+const CACHE_VER  = 'v524';
 const CACHE_NAME = 'ynhs:' + BASE + ':' + CACHE_VER;
 const CACHE_MINE = 'ynhs:' + BASE + ':';                     // 이 배포가 소유한 캐시 접두사
 // 화면(HTML)을 네트워크에서 기다려 주는 최대 시간. 이 시간을 넘기면 캐시로 즉시 전환한다.
@@ -13,8 +13,32 @@ const NAV_TIMEOUT = 3500;
 // 안내 응답을 돌려준다(브라우저가 무한 대기 끝에 타임아웃 페이지를 띄우는 것보다 낫다).
 const HARD_TIMEOUT = 15000;
 
+// 첫 화면을 여는 데 필요한 것들. 설치 단계에서 미리 받아 둔다.
+// 이걸 안 하면 '처음 온 기기'는 캐시가 빈 채로 남는다 — 첫 방문의 index.html 은
+// 워커가 생기기 전에 브라우저가 직접 받아서 캐시를 거치지 않고, activate 는 옛 캐시가
+// 있을 때만 옮겨오기 때문이다. 그 상태에서 다음 접속에 망이 흔들리면 곧장 오프라인 안내가 뜬다.
+// 아이콘은 넣지 않는다 — 오프라인 안내는 '화면(navigate) 요청'이 실패할 때만 뜨고,
+// 아이콘이 없다고 그 화면이 뜨지는 않는다. 배포마다 몇백 KB를 다시 받을 이유가 없다.
+// 서브페이지(career·jindan 등)도 같은 이유로 뺀다 — 한 번 열면 캐시 우선 경로가 알아서 담는다.
+const PRECACHE = [BASE, BASE + 'index.html', BASE + 'manifest.json'];
+
 self.addEventListener('install', e => {
   self.skipWaiting();
+  // 설치는 요청을 막지 않으므로 여기서 받아도 화면이 멈추지 않는다(activate 와 다른 점).
+  e.waitUntil((async () => {
+    try {
+      const cache = await caches.open(CACHE_NAME);
+      // addAll 은 하나만 실패해도 전부 무효가 된다 → 개별로 넣고 실패는 넘긴다.
+      await Promise.all(PRECACHE.map(async path => {
+        try {
+          const res = await fetch(new Request(self.location.origin + path, { cache: 'reload' }));
+          if (res && res.ok && res.status === 200 && !res.redirected) {
+            await cache.put(new Request(self.location.origin + path), res);
+          }
+        } catch (e) { /* 한 건 실패가 설치를 막지 않게 */ }
+      }));
+    } catch (e) { /* 저장소 문제로 설치가 멈추지 않게 */ }
+  })());
 });
 
 // 활성화가 끝날 때까지 모든 요청이 대기열에 묶인다. 그래서 여기서는
