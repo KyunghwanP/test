@@ -2921,9 +2921,6 @@
   .pass-cards{display:grid; grid-template-columns:minmax(0,1fr); gap:8px;}
   @media (min-width:900px){  .pass-cards{grid-template-columns:repeat(2,minmax(0,1fr));} }
   @media (min-width:1400px){ .pass-cards{grid-template-columns:repeat(3,minmax(0,1fr));} }
-  /* 화면이 넓으면 카드 하나에 더 적는다(보호자 확인). 좁으면 이름·시각이 먼저다. */
-  .pass-wide-only{display:none;}
-  @media (min-width:900px){ .pass-wide-only{display:inline;} }
   .pass-card{
     display:flex; align-items:center; gap:14px; width:100%; text-align:left;
     padding:13px 15px; border:1px solid var(--cal-line); border-radius:12px;
@@ -3059,7 +3056,6 @@
   }
   /* 시그니처: outline 1.5px 슬롯 버튼. 고르면 solid 로 채운다. 1px 로 줄이지 말 것 */
   .pass-slots{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
-  .pass-slots.four{grid-template-columns:repeat(4,1fr);}
   .pass-slot{
     padding:12px 6px; border-radius:4px;
     border:1.5px solid var(--cal-500); background:var(--cal-bg); color:var(--cal-500);
@@ -3068,7 +3064,6 @@
   }
   .pass-slot:hover{background:var(--cal-50);}
   .pass-slot.active{background:var(--cal-500); color:#fff;}
-  .pass-slots.four .pass-slot{padding:10px 2px; font-size:13px;}
   .pass-row2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
   .pass-wdays{display:grid; grid-template-columns:repeat(5,1fr); gap:6px;}
   .pass-wday{
@@ -3117,7 +3112,7 @@
     .pass-wrap{padding:14px 12px 96px;}
     .pass-head .pass-add-btn{display:none;}
     .pass-fab{display:flex;}
-    .pass-slots,.pass-slots.four{grid-template-columns:repeat(2,1fr);}
+    .pass-slots{grid-template-columns:repeat(2,1fr);}
     .pass-card{padding:12px 13px; gap:12px;}
     .pass-modal-overlay{padding:12px;}
     .pass-detail-hero .pass-photo,
@@ -4252,7 +4247,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.81</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.82</div>
   </div>
 </div>
 
@@ -4388,7 +4383,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.81</div>
+    <div class="nav-version" title="Made by 박경환">ver6.82</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -4697,16 +4692,6 @@
             <div class="pass-field">
               <label class="pass-label" for="passReason">사유</label>
               <input type="text" id="passReason" class="pass-input" placeholder="예: 병원 진료" autocomplete="off">
-            </div>
-
-            <div class="pass-field">
-              <label class="pass-label">보호자 확인</label>
-              <div class="pass-slots four" id="passGuards">
-                <button type="button" class="pass-slot active" data-guard="전화">전화</button>
-                <button type="button" class="pass-slot" data-guard="문자">문자</button>
-                <button type="button" class="pass-slot" data-guard="방문">방문</button>
-                <button type="button" class="pass-slot" data-guard="미확인">미확인</button>
-              </div>
             </div>
 
             <div class="pass-field">
@@ -5792,7 +5777,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.81 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = 'ver6.82 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -8985,7 +8970,6 @@ let passLoaded = false;
 let passView = 'recent';        // 'recent' | 'upcoming'
 let passPickedStudent = null;
 let passKind = '조퇴';
-let passGuard = '전화';
 let passRepeat = 'none';
 let passWdaySel = new Set();
 
@@ -9042,10 +9026,6 @@ function initPassPage(){
       document.querySelectorAll('#passKinds .pass-slot').forEach(x => x.classList.toggle('active', x === b));
       // 복귀 예정은 '외출'에만 의미가 있다(조퇴·결과는 그날 안 돌아오거나 수업만 빠진다)
       document.getElementById('passBackWrap').style.display = (passKind === '외출') ? '' : 'none';
-    }));
-    document.querySelectorAll('#passGuards .pass-slot').forEach(b => b.addEventListener('click', () => {
-      passGuard = b.dataset.guard;
-      document.querySelectorAll('#passGuards .pass-slot').forEach(x => x.classList.toggle('active', x === b));
     }));
     document.querySelectorAll('#passRepeats .pass-slot').forEach(b => b.addEventListener('click', () => {
       passRepeat = b.dataset.rep;
@@ -9203,7 +9183,7 @@ function passRender(){
                 <span class="pass-meta"><b>${escapeHtml(x.outAt||'')}</b>${
                   x.kind === '외출' && x.backAt ? ` → 복귀 <b>${escapeHtml(x.backAt)}</b>` : ''
                 }${x.reason ? ' · ' + escapeHtml(x.reason) : ''}</span>
-                <span class="pass-issued"><span class="pass-wide-only">보호자 ${escapeHtml(x.guardian||'—')} · </span>${escapeHtml(x.issuedName||'')} 발급</span>
+                <span class="pass-issued">${escapeHtml(x.issuedName||'')} 발급</span>
               </span>
               <svg class="pass-chev" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3.5 5 4.5-5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>`; }).join('')}
@@ -9246,14 +9226,12 @@ function passShowDetail(day, id, editing){
       <div class="pass-row"><span class="k">나가는 시각</span><span class="v"><input type="time" class="pass-edit" id="passEdOut" value="${escapeHtml(x.outAt||'')}"></span></div>
       <div class="pass-row" id="passEdBackRow"${x.kind === '외출' ? '' : ' style="display:none;"'}><span class="k">복귀 예정</span><span class="v"><input type="time" class="pass-edit" id="passEdBack" value="${escapeHtml(x.backAt||'')}"></span></div>
       <div class="pass-row"><span class="k">사유</span><span class="v"><input type="text" class="pass-edit" id="passEdReason" value="${escapeHtml(x.reason||'')}" placeholder="예: 병원 진료" autocomplete="off"></span></div>
-      <div class="pass-row"><span class="k">보호자 확인</span><span class="v"><select class="pass-edit" id="passEdGuard">${opts(['전화','문자','방문','미확인'], x.guardian)}</select></span></div>
       <div class="pass-row locked"><span class="k">발급</span><span class="v">${escapeHtml(x.issuedName||'')}</span></div>`
     : `
       <div class="pass-row"><span class="k">날짜</span><span class="v">${passDateLabel(day)} ${passWday(day)}${isToday ? ' (오늘)' : ''}</span></div>
       <div class="pass-row"><span class="k">나가는 시각</span><span class="v big">${escapeHtml(x.outAt||'')}</span></div>
       ${x.kind === '외출' && x.backAt ? `<div class="pass-row"><span class="k">복귀 예정</span><span class="v big">${escapeHtml(x.backAt)}</span></div>` : ''}
       <div class="pass-row"><span class="k">사유</span><span class="v">${x.reason ? escapeHtml(x.reason) : '—'}</span></div>
-      <div class="pass-row"><span class="k">보호자 확인</span><span class="v">${escapeHtml(x.guardian||'—')}</span></div>
       <div class="pass-row"><span class="k">발급</span><span class="v">${escapeHtml(x.issuedName||'')}${
         x.createdAt ? ' · ' + escapeHtml(String(x.createdAt).slice(11,16)) : ''}</span></div>`;
 
@@ -9321,8 +9299,7 @@ async function passSaveEdit(day, id){
     kind,
     outAt,
     backAt: kind === '외출' ? document.getElementById('passEdBack').value : '',
-    reason: document.getElementById('passEdReason').value.trim(),
-    guardian: document.getElementById('passEdGuard').value
+    reason: document.getElementById('passEdReason').value.trim()
   };
   btn.disabled = true; msg.textContent = '저장 중…';
   try{
@@ -9365,7 +9342,7 @@ async function passDelete(day, id, name){
 // ── 발급 ──
 function passOpenForm(){
   passPickedStudent = null;
-  passKind = '조퇴'; passGuard = '전화'; passRepeat = 'none';
+  passKind = '조퇴'; passRepeat = 'none';
   passWdaySel = new Set();
   document.getElementById('passSearch').value = '';
   document.getElementById('passSearchResult').innerHTML = '';
@@ -9381,7 +9358,6 @@ function passOpenForm(){
   document.getElementById('passFormMsg').textContent = '';
   document.getElementById('passSaveBtn').disabled = true;
   document.querySelectorAll('#passKinds .pass-slot').forEach(x => x.classList.toggle('active', x.dataset.kind === '조퇴'));
-  document.querySelectorAll('#passGuards .pass-slot').forEach(x => x.classList.toggle('active', x.dataset.guard === '전화'));
   document.querySelectorAll('#passRepeats .pass-slot').forEach(x => x.classList.toggle('active', x.dataset.rep === 'none'));
   document.querySelectorAll('#passWdays .pass-wday').forEach(x => x.classList.remove('active'));
   const now = new Date();
@@ -9521,7 +9497,6 @@ async function passSave(){
     reason: document.getElementById('passReason').value.trim(),
     outAt,
     backAt: passKind === '외출' ? document.getElementById('passBackAt').value : '',
-    guardian: passGuard,
     // 발급자는 규칙이 '자기 이메일'만 허용한다 — 남의 이름으로 끊지 못하게.
     issuedBy: me?.email || '',
     issuedName: effTeacher()?.name || me?.displayName || '',
