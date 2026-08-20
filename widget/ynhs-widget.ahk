@@ -646,9 +646,14 @@ PositionHandle(widgetHwnd) {
 }
 
 SetWidgetOpacity(hwnd, val) {
-    global WidgetWins, gGlass
-    if WidgetWins.Has(hwnd)
+    global WidgetWins, gGlass, pendingSaveHwnd
+    if WidgetWins.Has(hwnd) {
         WidgetWins[hwnd].opacity := val
+        ; 투명도는 여기서만 바뀐다. 저장하지 않으면 종료 저장에 기대게 되는데,
+        ; 그 종료 저장을 없앴으므로(아래 OnExitFn 주석) 여기서 직접 남긴다.
+        pendingSaveHwnd[hwnd] := 1
+        SetTimer(FlushSave, -500)     ; 슬라이더를 끄는 동안 매번 쓰지 않게 디바운스
+    }
     if (gGlass) {
         WinSetTransparent(255, "ahk_id " hwnd)
         if WidgetWins.Has(hwnd)
@@ -1311,6 +1316,8 @@ SaveWidget(hwnd) {
     }
 }
 
+; 지금 상태를 통째로 저장 — 트레이 '현재 위치·크기 저장' 과 Win+Alt+S 전용.
+;   사용자가 직접 시켰을 때만 부른다(종료 때 부르지 않는 이유는 OnExitFn 주석 참고).
 SaveAll() {
     global WidgetWins
     for hwnd, w in WidgetWins
@@ -1364,7 +1371,12 @@ FlushSave() {
 OnExit(OnExitFn)
 OnExitFn(*) {
     global DLL_PATH, WidgetWins
-    SaveAll()
+    ; 여기서 일괄 저장하지 않는다.
+    ;   창이 지금 있는 자리가 '사용자가 둔 자리'라는 보장이 없다. 모니터를 뽑거나
+    ;   노트북을 도킹에서 빼거나 절전에서 깨면, 윈도우가 사라진 화면의 창들을 남은
+    ;   화면으로 옮겨 놓는다. 그 상태에서 종료하면 그 옮겨진 좌표가 config 에 굳는다 —
+    ;   사용자 눈에는 '위치 저장이 안 된다'로 보인다(화면이 여럿일수록 자주 겪는다).
+    ;   사용자가 실제로 한 행동(이동·크기·투명도)은 그때그때 이미 저장된다.
     ; 각 위젯의 WebView2 컨트롤러를 명시적으로 닫아 msedgewebview2.exe가 즉시 정리되게 한다.
     ;   (안 닫으면 종료가 느리고, 세션 폴더가 한동안 잠겨 바로 재실행하면 안 뜬다)
     for hwnd, w in WidgetWins {
