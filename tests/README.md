@@ -27,6 +27,13 @@ python3 tests/build-pass-harness.py /tmp/ph.html   # index.html 에서 코드·�
 PASS_HARNESS=/tmp/ph.html node tests/pass-ui.test.mjs
 ```
 
+FAB(모바일 발급 버튼)은 `#passPage` 바깥의 `position:fixed` 라 하네스가 아니라
+따로 본다. 설치만 되어 있으면 바로 돌아간다.
+
+```bash
+node tests/pass-fab.test.mjs                       # FAB 이 외출증 화면에서만 뜨는지
+```
+
 가짜 Firestore를 물려 목록 렌더·사진 표시·발급 폼·저장 payload를 실제 DOM에서 본다.
 
 ### 보안 규칙 (Firestore 에뮬레이터)
