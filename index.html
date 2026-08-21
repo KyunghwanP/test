@@ -4247,7 +4247,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.84</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.85</div>
   </div>
 </div>
 
@@ -4383,7 +4383,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.84</div>
+    <div class="nav-version" title="Made by 박경환">ver6.85</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5777,7 +5777,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.84 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = 'ver6.85 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -6699,10 +6699,15 @@ function ttMaskTeacherSlot(op, baseSlot, pull, day, p){
   return baseSlot;
 }
 function ttOpForDate(iso){ return (OPERATING && OPERATING.dates) ? (OPERATING.dates[iso]||null) : null; }
-// 특정 날짜(op)의 교사별 역산 (요일 대체 날만) — 홈 '오늘 시간표'용
+// 특정 날짜(op)의 교사별 역산 — 교사별 시간표·현황판 '오늘 시간표'용
+//   전에는 ttDayCross(다른 요일에서 당겨온 칸이 있는 날)일 때만 만들었다. 그런데
+//   동아리를 7→6교시로 옮기는 것처럼 '같은 날 안에서의 이동'은 요일 표기가 아니라
+//   그 검사에 안 걸린다 → 맵이 통째로 비고, 옮겨온 창체를 아무 교사도 못 받았다.
+//   학급 시간표는 ttResolveCellOp 를 직접 부르므로 멀쩡했고 교사 것만 어긋났다.
+//   운영표가 있는 날이면 그냥 만든다. 바뀐 것이 없으면 _sub 가 안 붙어 화면도 그대로다.
 function ttTeacherDay(op, day){
   const top={};
-  if(!ttDayCross(op, day)) return top;
+  if(!op || !op.cells) return top;
   classList.forEach(cls=>{
     const g=ttGradeOf(cls); if(!g) return;
     const cs=classSchedule[cls]||{};
