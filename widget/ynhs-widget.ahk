@@ -536,6 +536,21 @@ CreateWidget(p) {
     if (hh < 40 || hh > vsH)
         hh := p[6]
 
+    ; 화면 밖에서 뜨는 것 막기 ─────────────────────────────
+    ; 노트북을 뽑은 채로 위젯을 다시 켜면, config 에 남은 외부 모니터 좌표(예: x=2560)
+    ; 그대로 떠서 아무 화면에도 안 걸린다. 손잡이 바도 같이 밖이라 끌어올 수 없고
+    ; 트레이에 되돌릴 항목도 없다 — config.ini 를 직접 고치는 수밖에 없었다.
+    ;
+    ; ★ config 에는 쓰지 않는다. 여기서 옮긴 자리를 저장해 버리면 원래 모니터의
+    ;   자리를 영영 잃는다. 다시 꽂고 켜면 저장된 좌표 그대로 제자리로 가야 한다.
+    if !RectOnAnyMonitor(x, y, ww, hh) {
+        try {
+            MonitorGetWorkArea(MonitorGetPrimary(), &wl, &wt, &wr, &wb)
+            x := Max(wl, Min(wl + 40, wr - ww))
+            y := Max(wt, Min(wt + 40, wb - hh))
+        }
+    }
+
     ; 위젯 본체 — 웹만 꽉 채우는 창(손잡이 컨트롤은 별도 창으로 겹쳐 띄운다 → 내용 안 밀림)
     ; -DPIScale: AHK의 GUI 자동 DPI 스케일을 끈다. 켜져 있으면 Show(w/h)는 배율만큼 확대되는데
     ;   WinGetPos는 물리 픽셀을 돌려줘 저장→복원마다 창이 배율만큼 커진다(런어웨이).
@@ -1299,6 +1314,26 @@ PanelToPage(panel) {
              "cal","schedule", "task","mytask", "consult","consult", "timetable","timetable",
              "classtt","timetable", "classorg","home", "ai","weekly")
     return m.Has(panel) ? m[panel] : "home"
+}
+
+; 저장된 자리가 '지금 붙어 있는' 모니터 중 하나와 쓸 만큼 겹치는가.
+; 한두 픽셀만 걸쳐 있으면 손잡이 바를 못 잡으므로 겹치는 걸로 치지 않는다.
+; 위젯이 그보다 작으면(납작한 학급편성 등) 그 크기를 기준으로 본다.
+RectOnAnyMonitor(x, y, w, h) {
+    ; 모니터 정보를 못 읽으면 '겹친다'로 본다. 이 함수는 RestoreSelected() 안에서
+    ; 불리므로, 여기서 예외가 새어 나가면 자동 실행 구역이 통째로 멈춘다
+    ; (gToastSeen 이 비어 터지던 것과 같은 사고). 판단을 포기할지언정 던지지 않는다.
+    try {
+        loop MonitorGetCount() {
+            MonitorGetWorkArea(A_Index, &l, &t, &r, &b)
+            iw := Min(x + w, r) - Max(x, l)
+            ih := Min(y + h, b) - Max(y, t)
+            if (iw >= Min(w, 80) && ih >= Min(h, 40))
+                return true
+        }
+    } catch
+        return true
+    return false
 }
 
 SaveWidget(hwnd) {
