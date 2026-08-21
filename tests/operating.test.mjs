@@ -24,7 +24,16 @@ const src = [
   pick(/^function ttGradeOf\(.*$/m),
   grab('ttDayCross'), grab('ttDayIsExam'), grab('ttResolveCellOp'),
   grab('ttTeacherDay'), grab('ttMaskTeacherSlot'),
-  'return { ttResolveCellOp, ttTeacherDay, ttMaskTeacherSlot, ttDayCross };'
+  // 교사별 '주간' 맵 — 시간표 화면(renderTeacher)이 실제로 쓰는 것.
+  // ttTeacherDay(하루치, 현황판·협의시간용)와 다른 함수다. 예전에 하루치만 고쳐서
+  // 화면은 그대로였다 → 둘 다 본다.
+  pick(/^const DAYS = .*$/m),
+  pick(/^let OPERATING = .*$/m),
+  pick(/^let ttWeekMon = .*$/m),
+  grab('ttMondayOf'), grab('ttISO'), grab('ttEnsureWeek'), grab('ttDateOf'),
+  grab('ttOpFor'), grab('ttResolveClass'), grab('ttTeacherOp'),
+  'return { ttResolveCellOp, ttTeacherDay, ttMaskTeacherSlot, ttDayCross, ttTeacherOp,'
+  + ' setWeek: (ops, mon) => { OPERATING = ops; ttWeekMon = mon; } };'
 ].join('\n\n');
 
 let pass = 0, fail = 0;
@@ -73,6 +82,32 @@ console.log('\n■ 동아리를 7교시 → 6교시로 옮긴 날 (같은 날 �
   check('교사 7교시는 비워진다', s7 === null, s7);
 }
 
+console.log('\n■ 교사별 시간표 화면(renderTeacher) 이 쓰는 주간 맵');
+{
+  // 화면은 ttTeacherDay(하루치)가 아니라 ttTeacherOp(주간)을 쓴다.
+  // 2026-08-26(수) 동아리 7→6교시. 요일 대체 표기는 없다.
+  const T2 = mk();
+  T2.setWeek({ dates: { '2026-08-26': { day:'수', cells: { 6: ['동아리활동'], 7: ['ㆍ'] } } } },
+             new Date(2026, 7, 24));            // 그 주 월요일
+  const wk = T2.ttTeacherOp();
+
+  check('그 날이 통째로 빠지지 않는다', Object.keys(wk).length > 0, wk);
+  check('동아리 담당이 수요일 6교시를 받는다',
+        !!(wk['박동아'] && wk['박동아']['수'] && wk['박동아']['수'][6]), wk['박동아']);
+  check('옮겨온 것으로 표시된다',
+        !!(wk['박동아'] && wk['박동아']['수'] && wk['박동아']['수'][6] && wk['박동아']['수'][6]._sub),
+        wk['박동아'] && wk['박동아']['수']);
+
+  // 박동아 선생님 화면의 실제 칸 — renderTeacher.getPeriod 와 같은 순서
+  const op    = { day:'수', cells: { 6: ['동아리활동'], 7: ['ㆍ'] } };
+  const pull6 = wk['박동아'] && wk['박동아']['수'] && wk['박동아']['수'][6];
+  const pull7 = wk['박동아'] && wk['박동아']['수'] && wk['박동아']['수'][7];
+  const s6 = T2.ttMaskTeacherSlot(op, null, pull6, '수', 6);
+  const s7 = T2.ttMaskTeacherSlot(op, classSchedule['1-1']['수'].find(x => x.period === 7), pull7, '수', 7);
+  check('화면 6교시에 동아리가 뜬다', !!(s6 && /동아/.test(s6.subject)), s6);
+  check('화면 7교시는 비워진다', s7 === null, s7);
+}
+
 console.log('\n■ 6교시에 원래 수업이 있던 교사');
 {
   const op = { day:'수', cells: { 6: ['동아리활동'], 7: ['ㆍ'] } };
@@ -110,6 +145,15 @@ console.log('\n■ 시험일·휴일');
   const holi = { day:'수', cells: { 6: ['추석'] } };
   check('휴일 칸은 빈칸',
         TT.ttResolveCellOp(holi, classSchedule['1-1'], 1, '수', 6) === null);
+}
+
+console.log('\n■ 같은 함정이 또 남아 있지 않은지');
+{
+  // 교사별 배정 맵을 만드는 함수가 ttDayCross 로 '날 자체'를 걸러 버리면 이 버그가 다시 난다.
+  // ttDayCross 는 다른 요일에서 당겨온 칸만 참이라, 같은 날 안에서 옮긴 창체를 못 본다.
+  // (배지·안내 문구에서 쓰는 것은 정상이다 — 여기서 보는 건 맵을 만드는 두 함수뿐이다.)
+  for (const f of ['ttTeacherDay', 'ttTeacherOp'])
+    check(f + ' 이 ttDayCross 로 날을 거르지 않는다', !/ttDayCross/.test(grab(f)));
 }
 
 console.log(`\n통과 ${pass} / 실패 ${fail}\n`);
