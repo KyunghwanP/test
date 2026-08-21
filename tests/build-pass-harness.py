@@ -69,6 +69,12 @@ code = consts + '\n\n' + '\n\n'.join(grab_fn(f) for f in fns)
 a = s.index('<!-- 외출증 (조퇴·외출·결과) -->')
 b = s.index('<!-- 시간표 페이지 -->', a)
 markup = s[a:b]
+# 실제 화면에서 #passPage 는 열려 있을 때 active 를 단다. FAB 은 #passPage 바깥의
+# position:fixed 라 '외출증 화면일 때만' 뜨도록 active 를 보고 켜진다(pass-fab.test.mjs).
+# 하네스도 열린 상태로 맞춰 둔다.
+markup = markup.replace('<div class="page-view" id="passPage">',
+                        '<div class="page-view active" id="passPage">', 1)
+assert 'id="passPage"' in markup and 'page-view active' in markup, 'passPage 열린 상태로 못 바꿈'
 
 ca = s.index('/* ══════════════════════════════════════════\n     외출증 (조퇴·외출·결과)')
 cb = s.index('/* 비상연락망 상세 팝업 */', ca)
