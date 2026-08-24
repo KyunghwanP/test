@@ -104,6 +104,27 @@ console.log('\n■ 조회를 새로 만들지 않는다 (읽기 사용량)');
   check('알림 구독이 캘린더와 나눠 쓴다', /window\._consultSlots = booked;/.test(html));
 }
 
+console.log('\n■ 가장(실제 권한으로 보기) 모드에서도 보인다');
+{
+  // 관리자 미리보기는 기능이 되는지 확인하려고 있는 화면이다. 예전에는 상담 구독이
+  // 알림 묶음(if(!isViewAs()){...}) 안에 있어서 미리보기에서 기능이 통째로 사라졌다.
+  const call = /startConsultNotifyWatch\(user, \{ notify: !isViewAs\(\) \}\);/;
+  check('구독은 가장 모드에서도 붙인다', call.test(html));
+
+  // 호출이 if(!isViewAs()) 블록 '밖'에 있어야 한다
+  const gate = html.indexOf('if(!isViewAs()){\n      initNotify();');
+  const at   = html.search(call);
+  check('알림 묶음 밖에서 부른다', at >= 0 && gate >= 0 && at < gate, { at, gate });
+
+  check('알림은 옵션으로 끈다',
+        (html.match(/if\(notify\) showAppNotify\(/g) || []).length === 2,
+        (html.match(/if\(notify\) showAppNotify\(/g) || []).length);
+  check('옵션을 안 주면 알림은 켜진 채다',
+        /const notify = !\(opts && opts\.notify === false\);/.test(html));
+  check('가장 모드에서 알림 감시는 그대로 뺀다',
+        /if\(!isViewAs\(\)\)\{\s*\n\s*initNotify\(\);\s*\n\s*startTaskNotifyWatch/.test(html));
+}
+
 console.log('\n■ 담임에게만 버튼이 보인다');
 {
   check('버튼이 기본 숨김', /id="calFilterConsult"[^>]*style="display:none;"/.test(html));

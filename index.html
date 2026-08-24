@@ -4257,7 +4257,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.90</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.91</div>
   </div>
 </div>
 
@@ -4393,7 +4393,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.90</div>
+    <div class="nav-version" title="Made by 박경환">ver6.91</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5814,7 +5814,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.90 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = 'ver6.91 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -5936,7 +5936,11 @@ function showAppNotify(title, body, opts){
 // ── 새 상담 예약 감시 (앱 켜져 있는 동안 상시) ──
 let consultNotifyUnsub = null;
 let consultNotifySeen = null;   // Map(slotId → {who,when}) — 취소 알림 문구용 (null=첫 로드 전)
-function startConsultNotifyWatch(user){
+// opts.notify=false 면 구독만 하고 알림은 띄우지 않는다.
+//   가장('실제 권한으로 보기') 모드에서 쓴다 — 업무 캘린더가 이 자료를 써야 하므로
+//   구독 자체는 붙여야 하지만, 관리자 브라우저에 남의 상담 알림이 뜨면 안 된다.
+function startConsultNotifyWatch(user, opts){
+  const notify = !(opts && opts.notify === false);
   // 담임 학급 결정 (관리자 테스트는 1-1)
   let classKey = getMyHomeroom ? getMyHomeroom() : null;
   if(!classKey && !isViewAs() && user.email === ADMIN_EMAIL) classKey = '1-1';
@@ -5975,7 +5979,7 @@ function startConsultNotifyWatch(user){
       if(!consultNotifySeen.has(s.id)){
         const b = brief(s);
         consultNotifySeen.set(s.id, b);
-        showAppNotify('새 상담 예약', `${b.who} · ${b.when}`, { type:'cal', id:'consult:'+s.id, goto:'consult' });
+        if(notify) showAppNotify('새 상담 예약', `${b.who} · ${b.when}`, { type:'cal', id:'consult:'+s.id, goto:'consult' });
       }
     });
     // 예약이 풀린 것 → 취소 알림.
@@ -5988,7 +5992,7 @@ function startConsultNotifyWatch(user){
       const b = consultNotifySeen.get(id);
       consultNotifySeen.delete(id);
       if(!slotIds.has(id)) return;
-      showAppNotify('상담 예약 취소', `${b.who} · ${b.when}`, { type:'deadline', id:'consultOff:'+id, goto:'consult' });
+      if(notify) showAppNotify('상담 예약 취소', `${b.who} · ${b.when}`, { type:'deadline', id:'consultOff:'+id, goto:'consult' });
     });
     // 홈 현황판 상담 섹션 실시간 갱신 (예약·삭제 즉시 반영)
     loadHomeConsult(slots);
@@ -8188,9 +8192,13 @@ onAuthStateChanged(fbAuth, async (user) => {
     loadGroups();
     loadClubMeta();   // 동아리 메타데이터 미리 로딩 (동아리별 그룹칩 표시용)
     // 알림 초기화 + 상담/업무 새 항목 감시 시작 (보기 모드에서는 알림 감시 안 함)
+    // 상담 구독은 가장 모드에서도 붙인다. 업무 캘린더의 🟣 상담 이 이 자료를 쓰는데,
+    // 예전엔 아래 알림 묶음에 얹혀 있어서 '실제 권한으로 보기' 에서 기능이 통째로
+    // 사라졌다 — 관리자가 확인할 수 없으면 미리보기의 의미가 없다.
+    // 알림만 끈다(남의 상담 알림이 관리자 브라우저에 뜨면 안 된다).
+    startConsultNotifyWatch(user, { notify: !isViewAs() });
     if(!isViewAs()){
       initNotify();
-      startConsultNotifyWatch(user);
       startTaskNotifyWatch(user);
       startNextClassNotifyWatch();
     }
