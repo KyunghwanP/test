@@ -104,6 +104,71 @@ console.log('\n■ 조회를 새로 만들지 않는다 (읽기 사용량)');
   check('알림 구독이 캘린더와 나눠 쓴다', /window\._consultSlots = booked;/.test(html));
 }
 
+console.log('\n■ 목록 보기에도 들어간다');
+{
+  check('모바일 목록에 칩', /data-filter="consult" id="listFilterConsult"/.test(html));
+  check('모바일 목록이 상담을 섞는다', /listFilters\.has\('consult'\) \? consultCalItems\(window\._consultSlots\)/.test(html));
+  check('PC 패널 목록이 상담을 섞는다', /buildPanelList\(tasks,\s*\n\s*panel\.showConsult \?/.test(html));
+  check('두 목록이 같은 줄 만들기를 쓴다',
+        (html.match(/consultListRow\(t\)/g) || []).length === 2,
+        (html.match(/consultListRow\(t\)/g) || []).length);
+  check('두 목록이 같은 섞기를 쓴다',
+        (html.match(/mergeListItems\(/g) || []).length >= 3,   // 정의 1 + 호출 2
+        (html.match(/mergeListItems\(/g) || []).length);
+  check('패널 목록에서도 상담 버튼이 뜬다',
+        /\$\{consultAvailable\(\) \? '<button class="mytask-filter-btn '/.test(html));
+  check('기간 필터를 업무와 같이 쓴다', /panel\.showConsult \? filterByPanelPeriod\(consultCalItems/.test(html));
+}
+
+console.log('\n■ 상담은 업무 상태와 섞이지 않는다');
+{
+  const mk = init => {
+    const box = { listFilters: new Set(init) };
+    const fn = new Function('state', `
+      let listFilters = state.listFilters;
+      ${grab('toggleListFilter').replace(/document\.querySelectorAll[\s\S]*?\}\);/, '')
+                                .replace(/renderMytaskList\(\);?/, '')}
+      return f => { toggleListFilter(f); state.listFilters = listFilters; };
+    `)(box);
+    return { box, toggle: fn };
+  };
+
+  let { box, toggle } = mk(['all']);
+  toggle('consult');
+  check("'전체' 에 상담을 얹어도 전체가 유지된다",
+        box.listFilters.has('all') && box.listFilters.has('consult'), [...box.listFilters]);
+
+  ({ box, toggle } = mk(['all', 'consult']));
+  toggle('all');
+  check("'전체' 를 다시 눌러도 상담은 남는다",
+        box.listFilters.has('consult'), [...box.listFilters]);
+
+  ({ box, toggle } = mk(['all', 'consult']));
+  toggle('todo');
+  check('상태를 고르면 전체는 빠지고 상담은 남는다',
+        !box.listFilters.has('all') && box.listFilters.has('todo') && box.listFilters.has('consult'),
+        [...box.listFilters]);
+
+  ({ box, toggle } = mk(['todo', 'consult']));
+  toggle('todo');
+  check('상태를 다 끄면 전체로 돌아간다(상담은 유지)',
+        box.listFilters.has('all') && box.listFilters.has('consult'), [...box.listFilters]);
+
+  ({ box, toggle } = mk(['all', 'consult']));
+  toggle('consult');
+  check('상담만 끌 수 있다',
+        box.listFilters.has('all') && !box.listFilters.has('consult'), [...box.listFilters]);
+}
+
+console.log('\n■ 목록용 상담 목록은 달을 안 가린다');
+{
+  const all = consultCalItems(slots);
+  check('ym 을 안 주면 전체 달', all.length === 4, all.map(x => x.id));
+  check('ym 을 주면 그 달만', consultCalItems(slots, '2026-08').length === 3);
+  check('기간 필터가 볼 수 있게 startDate/endDate 가 있다',
+        all.every(x => x.startDate === x.date && x.endDate === x.date), all[0]);
+}
+
 console.log('\n■ 가장(실제 권한으로 보기) 모드에서도 보인다');
 {
   // 관리자 미리보기는 기능이 되는지 확인하려고 있는 화면이다. 예전에는 상담 구독이
@@ -128,7 +193,9 @@ console.log('\n■ 가장(실제 권한으로 보기) 모드에서도 보인다'
 console.log('\n■ 담임에게만 버튼이 보인다');
 {
   check('버튼이 기본 숨김', /id="calFilterConsult"[^>]*style="display:none;"/.test(html));
-  check('구독이 붙는 자리에서만 켠다', /_cfBtn\.style\.display = '';/.test(html));
+  check('구독이 붙는 자리에서만 켠다',
+        /for \(const id of \['calFilterConsult', 'listFilterConsult'\]\)/.test(html));
+  check('목록 칩도 기본 숨김', /id="listFilterConsult"[^>]*style="display:none;"/.test(html));
   check('PC 패널 버튼도 같은 조건', (html.match(/consultAvailable\(\)/g) || []).length >= 3);
   check('판정은 구독이 붙었는지로 한다', /function consultAvailable\(\) \{ return Array\.isArray\(window\._consultSlots\); \}/.test(html));
   // startConsultNotifyWatch 는 담임(또는 관리자)이 아니면 구독 전에 return 한다
