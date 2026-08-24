@@ -55,16 +55,45 @@ check('date 없는 슬롯', consultCalItems([{ id:'x', status:'booked' }], '2026
 check('이름이 아무것도 없으면 학부모',
       consultCalItems([{ id:'x', date:'2026-08-24', time:'', status:'booked' }], '2026-08')[0].who === '학부모');
 
-console.log('\n■ 세 곳이 모두 같은 함수를 쓴다');
+console.log('\n■ 두 레이아웃이 모두 상담을 그린다');
 {
-  // 캘린더 칸 · 우클릭 팝업 · 날짜 상세. 한 곳만 고치는 실수를 막는다
-  // (운영표에서 ttTeacherDay 만 고치고 ttTeacherOp 를 빠뜨린 것과 같은 사고).
+  // 업무 페이지는 레이아웃이 둘이다. 모바일(#mytaskMobileBody → renderMytaskCalendar)과
+  // PC(#mytaskPanelContainer → renderRows/buildPanelCalendar). 처음엔 모바일만 고쳐서
+  // PC 에서는 버튼조차 안 보였다. 한쪽만 고치는 실수를 여기서 잡는다.
+  check('모바일 캘린더 칸',   /const consultItems = calFilters\.has\('consult'\)/.test(html));
+  check('모바일 우클릭 팝업', /const consultRows = calFilters\.has\('consult'\)/.test(html));
+  check('PC 패널 칸',         /const consultItems = panel\.showConsult \? consultCalItems\(/.test(html));
+  check('PC 패널 미리보기',   /const consultRows = \(panel && panel\.showConsult\)/.test(html));
+  check('날짜 상세(공용)',    /consultHtml = consultCalItems\(/.test(html));
+
   const cnt = (html.match(/consultCalItems\(/g) || []).length;
-  check(`consultCalItems 호출이 3곳 이상 (${cnt}곳)`, cnt >= 4, cnt);   // 정의 1 + 호출 3
-  check('캘린더 칸에서 쓴다',   /const consultItems = calFilters\.has\('consult'\)/.test(html));
-  check('우클릭 팝업에서 쓴다', /const consultRows = calFilters\.has\('consult'\)/.test(html));
-  check('날짜 상세에서 쓴다',   /consultHtml = consultCalItems\(/.test(html));
+  check(`consultCalItems 호출이 5곳 (${cnt - 1}곳)`, cnt - 1 >= 5, cnt - 1);   // 정의 1 제외
+
   check('빈 날 판정에 상담도 넣는다', /!scheduleHtml && !consultHtml && !taskHtml/.test(html));
+  check('패널 기본값에 showConsult', /showSchedule:false, showConsult:false/.test(html));
+  check('패널 토글 함수가 있다', /function togglePanelConsult\(/.test(html));
+  check('학사일정 토글 옆에 상담 토글', /togglePanelConsult\(/.test(html));
+}
+
+console.log('\n■ 날짜 상세는 어느 레이아웃에서 켰든 보인다');
+{
+  const { consultOn } = new Function(
+    'calFilters', 'rows',
+    grab('consultOn') + '\nreturn { consultOn };'
+  )(new Set(), [{ panels: [{ showConsult: true }] }]);
+  check('PC 패널만 켜져 있어도 참', consultOn() === true);
+
+  const off = new Function('calFilters', 'rows', grab('consultOn') + '\nreturn { consultOn };')(
+    new Set(), [{ panels: [{ showConsult: false }] }]);
+  check('둘 다 꺼져 있으면 거짓', off.consultOn() === false);
+
+  const mob = new Function('calFilters', 'rows', grab('consultOn') + '\nreturn { consultOn };')(
+    new Set(['consult']), []);
+  check('모바일만 켜져 있어도 참', mob.consultOn() === true);
+
+  const broken = new Function('calFilters', 'rows', grab('consultOn') + '\nreturn { consultOn };')(
+    new Set(), undefined);
+  check('rows 가 없어도 안 터진다', broken.consultOn() === false);
 }
 
 console.log('\n■ 조회를 새로 만들지 않는다 (읽기 사용량)');
@@ -79,6 +108,8 @@ console.log('\n■ 담임에게만 버튼이 보인다');
 {
   check('버튼이 기본 숨김', /id="calFilterConsult"[^>]*style="display:none;"/.test(html));
   check('구독이 붙는 자리에서만 켠다', /_cfBtn\.style\.display = '';/.test(html));
+  check('PC 패널 버튼도 같은 조건', (html.match(/consultAvailable\(\)/g) || []).length >= 3);
+  check('판정은 구독이 붙었는지로 한다', /function consultAvailable\(\) \{ return Array\.isArray\(window\._consultSlots\); \}/.test(html));
   // startConsultNotifyWatch 는 담임(또는 관리자)이 아니면 구독 전에 return 한다
   check('담임 아니면 구독 자체를 안 한다', /if\(!classKey\) return;/.test(grab('startConsultNotifyWatch')));
 }
