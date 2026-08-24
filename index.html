@@ -4159,6 +4159,7 @@
     background:var(--paper);border:1px solid var(--rule);border-radius:12px;
   }
   .cday{min-width:0;}
+  .cday.weekend .cday-head{color:var(--mon);}
   .cday-head{font-size:13.5px;font-weight:700;color:var(--ink-soft);text-align:center;padding:6px 0;border-bottom:1.5px solid var(--rule);margin-bottom:7px;}
   .cday-slots{display:flex;flex-direction:column;gap:6px;}
   .cslot{
@@ -4175,7 +4176,9 @@
   .cslot-open{color:var(--ink-soft);font-size:12px;}
   .cslot-empty{text-align:center;color:var(--rule);font-size:14px;padding:8px 0;}
   @media (max-width:680px){
-    .cweek-body{grid-template-columns:repeat(5,minmax(92px,1fr));overflow-x:auto;}
+    /* 좁은 화면에서는 칸 최소폭을 지키고 가로 스크롤. 칸 수는 JS 가 인라인으로 정하므로
+       여기서 열 개수를 다시 못박지 않는다(주말 칸이 있으면 6~7칸이 된다). */
+    .cweek-body{grid-auto-columns:minmax(92px,1fr);overflow-x:auto;}
   }
 
   /* 변경 모달 */
@@ -4258,7 +4261,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.92</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.93</div>
   </div>
 </div>
 
@@ -4394,7 +4397,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.92</div>
+    <div class="nav-version" title="Made by 박경환">ver6.93</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5116,6 +5119,10 @@
                         <span style="color:var(--ink-soft);">~</span>
                         <input type="date" id="consultDateEnd" min="2020-01-01" max="2099-12-31" style="flex:1;min-width:0;">
                       </div>
+                      <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:400;font-size:12.5px;color:var(--ink-soft);cursor:pointer;">
+                        <input type="checkbox" id="consultIncludeWeekend" style="margin:0;">
+                        주말도 포함 (수시 상담 등)
+                      </label>
                     </div>
                     <div>
                       <label>시작 시각</label>
@@ -5816,7 +5823,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.92 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = 'ver6.93 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -16280,15 +16287,18 @@ async function addConsultSlots(){
   const endDate = document.getElementById('consultDateEnd').value;
   const days = [];
   if(endDate && endDate >= date){
+    // 주말은 기본으로 건너뛴다(대부분 평일만 연다). 수시 상담처럼 주말에도 받아야 하면
+    // '주말도 포함' 을 켠다. 하루만 만들 때는 어느 요일이든 그대로 만든다.
+    const incWeekend = document.getElementById('consultIncludeWeekend')?.checked;
     for(let d = date; d <= endDate; d = consultAddDays(d, 1)){
       const wd = new Date(d + 'T00:00:00').getDay();
-      if(wd === 0 || wd === 6) continue;          // 주말 제외(상담 화면이 월~금)
+      if(!incWeekend && (wd === 0 || wd === 6)) continue;
       days.push(d);
     }
   } else {
     days.push(date);
   }
-  if(days.length === 0){ alert('선택한 기간에 평일이 없습니다.'); return; }
+  if(days.length === 0){ alert('선택한 기간에 만들 날이 없습니다. 주말만 골랐다면 \'주말도 포함\' 을 켜 주세요.'); return; }
 
   const btn = document.getElementById('consultAddBtn');
   btn.disabled = true;
@@ -16620,8 +16630,11 @@ function renderCaList(){
   const d = new Date(dateStr + 'T00:00:00');
   const dowIdx = d.getDay();
   const DAY_KR = ['일','월','화','수','목','금','토'];
+  // 이 목록은 '내 시간표의 공강' 에서 고르는 것이라 주말에는 만들 수가 없다.
+  // 주말 상담은 위쪽 '상담 시간 열기' 에서 시각을 직접 넣어 만든다.
   if(dowIdx < 1 || dowIdx > 5){
-    listEl.innerHTML = '<div class="ca-empty">평일을 선택하세요. (주말은 시간표가 없습니다)</div>';
+    listEl.innerHTML = '<div class="ca-empty">주말은 시간표가 없어 공강을 고를 수 없습니다.<br>'
+                     + '위 <b>➕ 상담 시간 열기</b> 에서 시각을 직접 넣어 만들어 주세요.</div>';
     return;
   }
   const dow = DAY_KR[dowIdx];
@@ -16778,11 +16791,18 @@ function renderConsultList(slots){
     <button class="cweek-navbtn" id="cwNext">다음주 ▶</button>
   </div>`;
 
-  html += `<div class="cweek-body">`;
-  for(let i=0;i<5;i++){
+  // 주말 칸은 그 주에 주말 슬롯이 있을 때만 낸다. 늘 7칸이면 평일만 쓰는 대부분에게
+  // 칸이 좁아지기만 한다. 슬롯을 만들면 그 주부터 칸이 생기므로 막히는 곳은 없다.
+  //   토=5, 일=6 (consultWeekStart 가 월요일부터 센다)
+  const hasSat = !!days[consultAddDays(wk, 5)];
+  const hasSun = !!days[consultAddDays(wk, 6)];
+  const dayCount = hasSun ? 7 : (hasSat ? 6 : 5);
+
+  html += `<div class="cweek-body" style="grid-template-columns:repeat(${dayCount},1fr);">`;
+  for(let i=0;i<dayCount;i++){
     const dStr = consultAddDays(wk, i);
     const daySlots = (days[dStr]||[]).slice().sort((a,b)=>a.time.localeCompare(b.time));
-    html += `<div class="cday">
+    html += `<div class="cday${i >= 5 ? ' weekend' : ''}">
       <div class="cday-head">${dStr.slice(5).replace('-','/')} (${CONSULT_WD2[i]})</div>
       <div class="cday-slots">`;
     if(daySlots.length === 0){
