@@ -975,6 +975,11 @@
   .mytask-cal-chip.todo{border-left-color:#6366F1;}
   .mytask-cal-chip.doing{border-left-color:#F59E0B;}
   .mytask-cal-chip.done{border-left-color:#10B981;color:var(--ink-soft);text-decoration:line-through;}
+  .mytask-cal-chip.consult{border-left-color:#8B5CF6;background:rgba(139,92,246,.10);}
+  .cpk-row{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--rule);font-size:14px;}
+  .cpk-row:last-child{border-bottom:none;}
+  .cpk-k{flex:0 0 68px;color:var(--ink-soft);}
+  .cpk-v{flex:1;font-weight:600;word-break:break-all;}
   .mytask-cal-more{font-size:10px;color:var(--ink-soft);padding:0 4px;}
 
   /* ── 데스크톱 패널 캘린더 (buildPanelCalendar) ── */
@@ -4250,7 +4255,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.88</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.89</div>
   </div>
 </div>
 
@@ -4386,7 +4391,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.88</div>
+    <div class="nav-version" title="Made by 박경환">ver6.89</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5302,6 +5307,7 @@
                 <button class="mytask-filter-btn active" data-filter="doing" onclick="toggleCalFilter('doing')">🟡 진행중</button>
                 <button class="mytask-filter-btn active" data-filter="done" onclick="toggleCalFilter('done')">🟢 완료</button>
                 <button class="mytask-filter-btn" data-filter="schedule" onclick="toggleCalFilter('schedule')">📆 학사일정</button>
+                <button class="mytask-filter-btn" data-filter="consult" id="calFilterConsult" style="display:none;" onclick="toggleCalFilter('consult')">🟣 상담</button>
               </div>
               <div class="mytask-cal">
                 <div class="mytask-cal-head">
@@ -5331,6 +5337,24 @@
 </div><!-- .app-shell 끝 -->
 
 <!-- 날짜 클릭 팝업 -->
+<!-- 상담 예약 상세(읽기 전용). 상담 페이지의 openConsultModal 은 변경·취소가 붙어 있고
+     consultClassKey 등 그 화면 상태에 기대므로, 캘린더에서는 보기만 하는 것을 따로 띄운다. -->
+<div class="mytask-modal" id="consultPeekModal" onclick="if(event.target===this) closeConsultPeek()">
+  <div class="mytask-modal-box" style="max-width:380px;">
+    <div class="mytask-modal-head">
+      <div class="mytask-modal-title" id="cpkTitle">상담 예약</div>
+      <button class="mytask-modal-close" onclick="closeConsultPeek()">×</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:12px 16px;">
+      <div id="cpkBody"></div>
+      <button onclick="closeConsultPeek(); navigateTo('consult');"
+        style="width:100%;margin-top:14px;padding:10px;border-radius:8px;border:1.5px solid var(--mon);background:transparent;color:var(--mon);font-weight:700;cursor:pointer;">
+        상담 관리에서 열기
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="mytask-modal" id="mytaskDayModal" onclick="closeMytaskDayModalOverlay(event)">
   <div class="mytask-modal-box" style="max-width:420px;">
     <div class="mytask-modal-head">
@@ -5788,7 +5812,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.88 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = 'ver6.89 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -5922,6 +5946,13 @@ function startConsultNotifyWatch(user){
     const data  = snap.exists() ? (snap.data()||{}) : {};
     const slots = Array.isArray(data.slots) ? data.slots : [];
     const booked = slots.filter(s => s.status === 'booked');
+
+    // 업무 캘린더도 이 구독을 같이 쓴다 — 따로 읽지 않으므로 Firestore 조회가 안 는다.
+    // 첫 로드에서 아래 consultNotifySeen 분기가 먼저 return 하므로 그 앞에 둔다.
+    window._consultSlots = booked;
+    const _cfBtn = document.getElementById('calFilterConsult');
+    if (_cfBtn) _cfBtn.style.display = '';        // 담임만 여기까지 온다(위에서 classKey 없으면 return)
+    try { if (calFilters.has('consult')) renderMytaskCalendar(); } catch(e){}
     // 알림 문구용 요약 — 예약이 사라진 뒤에도 "누구·언제"를 말해줄 수 있어야 해서 함께 보관한다
     const brief = s => ({
       who : s.studentName || s.bookedName || '학부모',
@@ -17105,6 +17136,43 @@ function getListTasks() {
   return expandRepeatTasks(base, '2000-01-01', '2099-12-31').filter(t => listFilters.has(t.status));
 }
 
+// 그 달(ym='2026-08')의 예약된 상담을 캘린더용으로 추린다.
+//   예약 안 된 빈 슬롯은 뺀다 — 캘린더에 띄울 '일정'이 아니다.
+//   이름은 앱의 다른 화면과 같은 순서로 고른다(studentName → bookedName).
+function consultCalItems(slots, ym) {
+  return (Array.isArray(slots) ? slots : [])
+    .filter(s => s && s.status === 'booked' && String(s.date || '').slice(0, 7) === ym)
+    .map(s => ({
+      _type: 'consult',
+      id   : s.id,
+      date : s.date,
+      time : s.time || '',
+      who  : s.studentName || s.bookedName || '학부모',
+      title: `${s.time || ''} ${s.studentName || s.bookedName || '학부모'}`.trim()
+    }))
+    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+}
+
+// 캘린더에서 상담 칩을 눌렀을 때 — 보기만 한다(변경은 상담 관리에서).
+function openConsultPeek(id) {
+  const s = (window._consultSlots || []).find(x => x && x.id === id);
+  if (!s) return;
+  const method = s.bookedType || s.type || 'face';
+  const row = (k, v) => v ? `<div class="cpk-row"><span class="cpk-k">${k}</span><span class="cpk-v">${escapeHtml(v)}</span></div>` : '';
+  document.getElementById('cpkTitle').textContent = `${s.date || ''} ${s.time || ''}`.trim() || '상담 예약';
+  document.getElementById('cpkBody').innerHTML =
+      row('학생',   (s.studentName || '') + (s.studentNum ? ` (${s.studentNum}번)` : ''))
+    + row('예약자', s.bookedName)
+    + row('연락처', s.bookedPhone)
+    + row('방식',   method === 'phone' ? '전화' : '대면')
+    + row('남긴 말', s.bookedMemo)
+    || '<div class="cpk-row"><span class="cpk-v">표시할 내용이 없습니다.</span></div>';
+  document.getElementById('consultPeekModal').classList.add('show');
+}
+function closeConsultPeek() {
+  document.getElementById('consultPeekModal').classList.remove('show');
+}
+
 // ── 캘린더 렌더링 ──
 function renderMytaskCalendar() {
   const title = document.getElementById('mytaskMonthTitleM');
@@ -17118,6 +17186,11 @@ function renderMytaskCalendar() {
   const calTasks  = getCalTasks();
 
   // 학사일정 데이터
+  // 상담 예약 — startConsultNotifyWatch 가 담아 둔 것을 그대로 쓴다(추가 조회 없음)
+  const consultItems = calFilters.has('consult')
+    ? consultCalItems(window._consultSlots, `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}`)
+    : [];
+
   let scheduleItems = [];
   if (calFilters.has('schedule')) {
     const ym = `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}`;
@@ -17142,7 +17215,8 @@ function renderMytaskCalendar() {
     const dateStr = date ? `${mytaskYear}-${String(mytaskMonth+1).padStart(2,'0')}-${String(date).padStart(2,'0')}` : '';
     const dayTasks = calTasks.filter(t => t.startDate <= dateStr && t.endDate >= dateStr);
     const daySchedule = scheduleItems.filter(s => s.date === dateStr);
-    const allItems = [...daySchedule.map(s=>({...s, _type:'schedule'})), ...dayTasks];
+      const dayConsult  = consultItems.filter(c => c.date === dateStr);
+      const allItems = [...daySchedule.map(s=>({...s, _type:'schedule'})), ...dayConsult, ...dayTasks];
 
     html += `<div class="mytask-cal-cell ${isOther?'other-month':''} ${isToday?'today':''}"
       ${date ? `ondragover="calDragOver(event)" ondrop="calDrop(event,'${dateStr}')" ondragleave="calDragLeave(event)"` : ''}
@@ -17153,6 +17227,8 @@ function renderMytaskCalendar() {
       </div>
       ${allItems.slice(0,2).map(t => t._type==='schedule'
         ? `<div class="mytask-cal-chip schedule" onclick="event.stopPropagation()">${escapeHtml(t.title||t.name||'')}</div>`
+        : t._type==='consult'
+        ? `<div class="mytask-cal-chip consult" onclick="event.stopPropagation();openConsultPeek('${t.id}')" style="cursor:pointer;">${escapeHtml(t.title)}</div>`
         : `<div class="mytask-cal-chip ${t.status}"
             draggable="true"
             ondragstart="calDragStart(event,'${t.id}','${t.ownerUid||''}')"
@@ -17183,8 +17259,14 @@ function renderMytaskCalendar() {
             .filter(e => String(e.date).padStart(2,'0') === dateStr.slice(8))
             .map(e => ({ text: e.content||e.title||'', style: 'background:#FEE2E2;color:#991B1B;' }))
         : [];
+      const consultRows = calFilters.has('consult')
+        ? consultCalItems(window._consultSlots, dateStr.slice(0,7))
+            .filter(c => c.date === dateStr)
+            .map(c => ({ text: '상담 ' + c.title, style: 'background:#EDE9FE;color:#5B21B6;' }))
+        : [];
       const items = [
         ...schedItems,
+        ...consultRows,
         ...dayTasks.map(t => ({
           text: t.title,
           style: t.status==='todo' ? 'background:#EEF2FF;color:#4F46E5;'
@@ -17295,6 +17377,19 @@ function mytaskDayClick(dateStr, e) {
     }
   }
 
+  // 상담 예약 — 누르면 읽기 전용 상세로
+  let consultHtml = '';
+  if (calFilters.has('consult')) {
+    consultHtml = consultCalItems(window._consultSlots, dateStr.slice(0, 7))
+      .filter(c => c.date === dateStr)
+      .map(c =>
+        `<div onclick="closeMytaskDayModal();openConsultPeek('${c.id}')"
+          style="padding:10px 12px;border-radius:8px;background:#EDE9FE;color:#5B21B6;font-size:14px;font-weight:700;margin-bottom:6px;cursor:pointer;">
+          🟣 상담 ${escapeHtml(c.title)}
+        </div>`
+      ).join('');
+  }
+
   document.getElementById('mytaskDayTitle').textContent = dateStr;
   const list = document.getElementById('mytaskDayList');
   const statusLabel = { todo:'시작전', doing:'진행중', done:'완료' };
@@ -17308,10 +17403,10 @@ function mytaskDayClick(dateStr, e) {
     </div>
   `).join('');
 
-  if (!scheduleHtml && !taskHtml) {
+  if (!scheduleHtml && !consultHtml && !taskHtml) {
     list.innerHTML = '<div style="color:var(--ink-soft);font-size:14px;padding:8px 0;">일정이 없습니다.</div>';
   } else {
-    list.innerHTML = scheduleHtml + taskHtml;
+    list.innerHTML = scheduleHtml + consultHtml + taskHtml;
   }
   document.getElementById('mytaskDayModal').classList.add('show');
 }

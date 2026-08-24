@@ -1,0 +1,149 @@
+// 업무 캘린더의 상담 예약 표시.
+// index.html 에서 실제 함수·마크업을 떼어 온다 — 여기 옮겨 적으면 검사가 아니라 장식이 된다.
+import { chromium } from 'playwright';
+import fs from 'node:fs';
+
+const html = fs.readFileSync(import.meta.dirname + '/../index.html', 'utf8');
+const grab = name => {
+  const m = new RegExp(`^function ${name}\\(`, 'm').exec(html);
+  if (!m) throw new Error('못 찾음: ' + name);
+  let i = html.indexOf('{', m.index), d = 0;
+  for (let j = i; j < html.length; j++) {
+    if (html[j] === '{') d++;
+    else if (html[j] === '}' && --d === 0) return html.slice(m.index, j + 1);
+  }
+  throw new Error('닫는 괄호 못 찾음: ' + name);
+};
+
+let pass = 0, fail = 0;
+const check = (n, c, x) => c ? (pass++, console.log('  ✅', n))
+                             : (fail++, console.log('  ❌', n, x !== undefined ? '\n       → ' + JSON.stringify(x) : ''));
+
+const { consultCalItems } = new Function(grab('consultCalItems') + '\nreturn { consultCalItems };')();
+
+// ── 학교 자료를 흉내낸다 ──────────────────────────────────────────
+const slots = [
+  { id:'a', date:'2026-08-24', time:'14:00', status:'booked', studentName:'김민준', studentNum:7,
+    bookedName:'김민준 학부모', bookedPhone:'010-0000-0000', bookedType:'face', bookedMemo:'진로 관련' },
+  { id:'b', date:'2026-08-24', time:'09:30', status:'booked', bookedName:'이서연 학부모', bookedType:'phone' },
+  { id:'c', date:'2026-08-26', time:'15:00', status:'booked', studentName:'박지호' },
+  { id:'d', date:'2026-08-25', time:'10:00', status:'open' },            // 빈 슬롯
+  { id:'e', date:'2026-09-01', time:'11:00', status:'booked', studentName:'다음달' }
+];
+
+console.log('\n■ 그 달의 예약만 추린다');
+{
+  const r = consultCalItems(slots, '2026-08');
+  check('예약된 것만 (빈 슬롯 제외)', r.length === 3, r.map(x => x.id));
+  check('다른 달은 안 들어온다', !r.some(x => x.id === 'e'), r.map(x => x.id));
+  check('날짜·시각 순', r.map(x => x.id).join('') === 'bac', r.map(x => x.id));
+}
+
+console.log('\n■ 이름은 앱의 다른 화면과 같은 순서로 고른다');
+{
+  const r = consultCalItems(slots, '2026-08');
+  const by = id => r.find(x => x.id === id);
+  check('studentName 이 있으면 그것', by('a').who === '김민준', by('a'));
+  check('없으면 bookedName', by('b').who === '이서연 학부모', by('b'));
+  check('칩 글자는 시각 + 이름', by('a').title === '14:00 김민준', by('a').title);
+}
+
+console.log('\n■ 자료가 없거나 이상해도 안 터진다');
+for (const [n, v] of [['undefined', undefined], ['null', null], ['배열 아님', {}], ['빈 배열', []]])
+  check(n, consultCalItems(v, '2026-08').length === 0);
+check('date 없는 슬롯', consultCalItems([{ id:'x', status:'booked' }], '2026-08').length === 0);
+check('이름이 아무것도 없으면 학부모',
+      consultCalItems([{ id:'x', date:'2026-08-24', time:'', status:'booked' }], '2026-08')[0].who === '학부모');
+
+console.log('\n■ 세 곳이 모두 같은 함수를 쓴다');
+{
+  // 캘린더 칸 · 우클릭 팝업 · 날짜 상세. 한 곳만 고치는 실수를 막는다
+  // (운영표에서 ttTeacherDay 만 고치고 ttTeacherOp 를 빠뜨린 것과 같은 사고).
+  const cnt = (html.match(/consultCalItems\(/g) || []).length;
+  check(`consultCalItems 호출이 3곳 이상 (${cnt}곳)`, cnt >= 4, cnt);   // 정의 1 + 호출 3
+  check('캘린더 칸에서 쓴다',   /const consultItems = calFilters\.has\('consult'\)/.test(html));
+  check('우클릭 팝업에서 쓴다', /const consultRows = calFilters\.has\('consult'\)/.test(html));
+  check('날짜 상세에서 쓴다',   /consultHtml = consultCalItems\(/.test(html));
+  check('빈 날 판정에 상담도 넣는다', /!scheduleHtml && !consultHtml && !taskHtml/.test(html));
+}
+
+console.log('\n■ 조회를 새로 만들지 않는다 (읽기 사용량)');
+{
+  // 이미 있는 두 구독(알림 감시 · 상담 화면)만 있어야 한다. 캘린더용으로 하나 더 붙이면 늘어난다.
+  const subs = (html.match(/onSnapshot\(doc\(fbDb, 'consultations'/g) || []).length;
+  check(`consultations 실시간 구독이 2곳 (${subs}곳)`, subs === 2, subs);
+  check('알림 구독이 캘린더와 나눠 쓴다', /window\._consultSlots = booked;/.test(html));
+}
+
+console.log('\n■ 담임에게만 버튼이 보인다');
+{
+  check('버튼이 기본 숨김', /id="calFilterConsult"[^>]*style="display:none;"/.test(html));
+  check('구독이 붙는 자리에서만 켠다', /_cfBtn\.style\.display = '';/.test(html));
+  // startConsultNotifyWatch 는 담임(또는 관리자)이 아니면 구독 전에 return 한다
+  check('담임 아니면 구독 자체를 안 한다', /if\(!classKey\) return;/.test(grab('startConsultNotifyWatch')));
+}
+
+// ── 상세 모달을 실제 브라우저에서 ────────────────────────────────
+console.log('\n■ 칩을 누르면 뜨는 상세 (실제 Chromium)');
+{
+  const a = html.indexOf('<div class="mytask-modal" id="consultPeekModal"');
+  const b = html.indexOf('<div class="mytask-modal" id="mytaskDayModal"');
+  if (a < 0 || b < 0) throw new Error('상세 모달 마크업 못 찾음');
+  const markup = html.slice(a, b);
+
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+  const page = await browser.newPage();
+  page.on('pageerror', e => { console.log('  ⚠ 페이지 오류:', e.message); fail++; });
+  await page.setContent(`<!doctype html><meta charset="utf-8">
+    <style>:root{--rule:#ddd;--ink-soft:#777;--mon:#3B5170;}
+      .mytask-modal{display:none;position:fixed;inset:0;}
+      .mytask-modal.show{display:flex;}
+    </style>${markup}
+    <script>
+      ${grab('escapeHtml')}
+      function navigateTo(){ window.__went = true; }
+      window._consultSlots = ${JSON.stringify(slots)};
+      ${grab('openConsultPeek')}
+      ${grab('closeConsultPeek')}
+    </script>`);
+
+  const shown = () => page.evaluate(() =>
+    document.getElementById('consultPeekModal').classList.contains('show'));
+  const body = () => page.evaluate(() => document.getElementById('cpkBody').textContent);
+  const title = () => page.evaluate(() => document.getElementById('cpkTitle').textContent);
+
+  check('처음엔 닫혀 있다', await shown() === false);
+
+  await page.evaluate(() => openConsultPeek('a'));
+  check('열린다', await shown() === true);
+  check('제목이 날짜·시각', (await title()) === '2026-08-24 14:00', await title());
+  const t = await body();
+  check('학생 이름과 번호', t.includes('김민준') && t.includes('7번'), t);
+  check('예약자',   t.includes('김민준 학부모'), t);
+  check('연락처',   t.includes('010-0000-0000'), t);
+  check('대면/전화', t.includes('대면'), t);
+  check('남긴 말',   t.includes('진로 관련'), t);
+
+  await page.evaluate(() => closeConsultPeek());
+  check('닫힌다', await shown() === false);
+
+  await page.evaluate(() => openConsultPeek('b'));
+  const t2 = await body();
+  check('학생 이름 없는 예약도 뜬다', t2.includes('이서연 학부모'), t2);
+  check('전화 예약은 전화로', t2.includes('전화'), t2);
+
+  await page.evaluate(() => closeConsultPeek());
+  await page.evaluate(() => openConsultPeek('없는id'));
+  check('없는 예약이면 안 열린다', await shown() === false);
+
+  // 이름에 태그를 넣어도 그대로 글자로 나와야 한다
+  await page.evaluate(() => { window._consultSlots = [{ id:'x', date:'2026-08-24', time:'14:00',
+    status:'booked', studentName:'<img src=x onerror=alert(1)>' }]; openConsultPeek('x'); });
+  check('이름의 태그가 실행되지 않는다',
+        await page.evaluate(() => document.querySelectorAll('#cpkBody img').length) === 0);
+
+  await browser.close();
+}
+
+console.log(`\n${fail === 0 ? '✅' : '❌'} 통과 ${pass} / 실패 ${fail}\n`);
+process.exit(fail === 0 ? 0 : 1);
