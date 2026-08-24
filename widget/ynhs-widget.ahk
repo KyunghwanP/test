@@ -100,6 +100,23 @@ if A_IsCompiled {
 global WV2ENV := ""      ; 모든 위젯이 공유하는 단일 WebView2 환경
 
 try DirCreate(SESSION)
+
+; ── 설정 폴더 ─────────────────────────────────────────────
+; config.ini 와 reset.flag 는 A_AppData\YnhsWidget 안에 있는데, 그 폴더를 만드는
+; 코드가 어디에도 없었다. IniWrite(WritePrivateProfileString)는 '파일'은 만들어도
+; '폴더'는 만들지 않는다. 폴더가 없으면 저장이 전부 실패하는데 호출부가 모두
+; try 로 감싸여 있어 아무 표시 없이 넘어간다 →
+;   · 켤 때마다 위젯 선택창이 뜬다 (selected 가 저장되지 않으니 매번 최초 실행)
+;   · 위치·크기가 하나도 남지 않는다
+;   · '설정 초기화'(reset.flag)도 아무 일이 일어나지 않는다
+; 웹뷰가 전용 세션(YnhsWidget\Session3)으로 물러난 사람은 그때 WebView2 가 폴더를
+; 만들어 줘서 정상 동작했다. 그래서 '되는 사람과 안 되는 사람'이 갈렸다.
+; RestoreSelected() 보다 반드시 앞에 있어야 한다.
+try DirCreate(A_AppData "\YnhsWidget")
+if !DirExist(A_AppData "\YnhsWidget")
+    MsgBox("설정 폴더를 만들지 못했습니다.`n`n" A_AppData "\YnhsWidget`n`n"
+         . "위젯 선택과 위치가 저장되지 않습니다. 백신이나 회사 정책이 막고 있을 수 있습니다.",
+           "영남고 위젯", 0x30)
 ; 참고: 세션 잠김(0x8007139F)은 EnsureEnv/CreateWidget이 '실패했을 때만' CleanupOrphanWebViews로
 ;   정리한다(매 실행마다 프로세스를 종료하지 않음 → 백신 행위 탐지를 덜 자극).
 OnMessage(0x201, OnLButtonDown)
