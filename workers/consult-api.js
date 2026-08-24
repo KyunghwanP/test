@@ -281,6 +281,16 @@ function findMine(slots, studentName, studentNum) {
     String(s.studentNum || '') === String(studentNum || '')
   ) || null;
 }
+// 생년월일 표기를 맞춘다. 엑셀에서 '2010.8.3' · '2010/08/03' 로 들어오는 일이 있어
+// 자릿수·구분자를 고르게 만든 뒤 비교한다(GAS 의 _cnormBirth 와 같은 규칙).
+function normBirth(v) {
+  if (v == null) return '';
+  const t = String(v).trim();
+  const p = t.replace(/[./]/g, '-').split('-');
+  if (p.length !== 3) return t;
+  return `${p[0]}-${String(p[1]).padStart(2, '0')}-${String(p[2]).padStart(2, '0')}`;
+}
+
 function mineView(s) {
   if (!s) return null;
   return {
@@ -299,13 +309,31 @@ async function handleVerify(env, body) {
   const birth = String(body.birth || '').trim();
   if (!grade || !room || !name || !birth) return { success: false, error: 'MISSING_FIELDS' };
 
-  const { data } = await fsGet(env, 'students', 'main');
-  const roster = (data && Array.isArray(data.students)) ? data.students : [];
+  // 명렬은 두 문서로 나뉘어 있다(upload.html 의 saveSplit).
+  //   students/main        — 학년·반·번호·이름 (교사 앱이 읽는다)
+  //   studentsContact/main — 생년월일·전화 (규칙이 allow read: if false 로 막고,
+  //                          워커만 서비스 계정으로 읽는다)
+  // 예전에는 students/main 의 s.birth 를 봤는데, 분리 후 그 필드가 사라져
+  // 언제나 '' 와 비교하게 되어 **모든 학부모가 NOT_FOUND** 였다.
+  // 두 배열은 길이·순서가 같고 grade/room/num 이 양쪽에 다 들어 있다.
+  const [{ data }, { data: contactDoc }] = await Promise.all([
+    fsGet(env, 'students', 'main'),
+    fsGet(env, 'studentsContact', 'main')
+  ]);
+  const roster  = (data && Array.isArray(data.students)) ? data.students : [];
+  const contact = (contactDoc && Array.isArray(contactDoc.students)) ? contactDoc.students : [];
+
+  const rowKey = s => `${parseInt(s.grade)}-${parseInt(s.room)}-${parseInt(s.num)}`;
+  const birthOf = new Map();
+  for (const c of contact) if (c && c.birth) birthOf.set(rowKey(c), normBirth(c.birth));
+
+  const want = normBirth(birth);
   const hit = roster.find(s =>
     String(parseInt(s.grade)) === String(parseInt(grade)) &&
     String(parseInt(s.room))  === String(parseInt(room))  &&
     String(s.name || '').trim() === name &&
-    String(s.birth || '').trim() === birth
+    // KEEP_CONTACT_IN_ROSTER 로 되돌린 경우 명렬에도 남아 있으므로 그것도 본다
+    ((normBirth(s.birth) || birthOf.get(rowKey(s)) || '') === want)
   );
   if (!hit) return { success: false, error: 'NOT_FOUND' };
 

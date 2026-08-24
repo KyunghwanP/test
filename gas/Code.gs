@@ -537,14 +537,32 @@ function cancelBooking_(e) {
 
 // ── 학생 명단 / 담임 조회 (Firestore: students/main, appdata/main) ──
 
+// 명렬은 두 문서로 나뉘어 있다(upload.html 의 saveSplit).
+//   students/main        — 학년·반·번호·이름
+//   studentsContact/main — 생년월일·전화 (규칙은 막혀 있고 서비스 계정만 읽는다)
+// 예전에는 students/main 의 s.birth 만 봤는데, 분리 후 그 필드가 사라져
+// 모든 학부모가 인증에 실패했다. 워커(consult-api handleVerify)와 같은 방식으로 고친다.
+// 두 배열은 길이·순서가 같고 grade/room/num 이 양쪽에 다 있다.
 function _findStudent(grade, room, name, birth) {
   var students = _readDocArray('students/main', 'students');
+  var contact  = _readDocArray('studentsContact/main', 'students');
+  var birthOf = {};
+  for (var c = 0; c < contact.length; c++) {
+    var ct = contact[c];
+    if (ct && ct.birth) {
+      birthOf[parseInt(ct.grade, 10) + '-' + parseInt(ct.room, 10) + '-' + parseInt(ct.num, 10)]
+        = _cnormBirth(ct.birth);
+    }
+  }
   for (var i = 0; i < students.length; i++) {
     var s = students[i];
+    var key = parseInt(s.grade, 10) + '-' + parseInt(s.room, 10) + '-' + parseInt(s.num, 10);
+    // 되돌림(KEEP_CONTACT_IN_ROSTER=true)이면 명렬에도 남아 있으므로 그것도 본다
+    var have = _cnormBirth(s.birth) || birthOf[key] || '';
     if (String(s.grade).trim() === grade
       && String(parseInt(s.room, 10)) === String(parseInt(room, 10))
       && String(s.name).trim().replace(/\s+/g, '') === name
-      && _cnormBirth(s.birth) === birth) {
+      && have === birth) {
       return s;
     }
   }

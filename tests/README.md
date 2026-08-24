@@ -12,6 +12,7 @@ node tests/operating.test.mjs          # 운영표(요일 대체·창체 이동�
 node tests/account-gate.test.mjs       # 학생 계정 차단 — 화면·규칙·워커가 같은 조건인지
 node workers/teacher-api.test.mjs      # teacher-api 워커 — fetch 를 스텁으로 물림
 node workers/roster-split.test.mjs     # upload.html 분리 저장 → 워커 조회
+node workers/parent-verify.test.mjs    # 학부모 인증 — 나뉜 명렬에서 생년월일 찾기
 ```
 
 ## 설치가 필요한 것
