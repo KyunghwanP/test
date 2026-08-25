@@ -488,8 +488,33 @@
   }
   /* 데스크톱 모드에서는 햄버거 버튼 숨김 */
   /* 데스크톱에서도 햄버거를 남겨 '사이드바 접기'로 쓴다.
-     (좁은 노트북에서 220px 사이드바가 본문을 크게 잡아먹는다) */
+     (좁은 노트북에서 220px 사이드바가 본문을 크게 잡아먹는다)
+     오버레이 때처럼 X 로 바뀌면 '닫기'로 읽힌다 → 햄버거는 그대로 두고
+     어느 쪽으로 접히는지 화살표로만 알려 준다. */
   .main-nav.desktop.collapsed{display:none !important;}
+  /* 햄버거 + 화살표를 따로 두지 않고 하나의 마크로 합친다.
+     가운데 줄을 짧게 줄이고 그 빈 자리에 화살촉을 넣는 형태(머티리얼 menu_open). */
+  .hamburger-btn.nav-toggle{position:relative;}
+  .hamburger-btn.nav-toggle span:nth-child(2){width:11px;align-self:flex-end;}
+  .hamburger-btn.nav-toggle::after{
+    content:'';position:absolute;top:50%;left:8px;
+    width:0;height:0;margin-top:-4px;
+    border-top:4px solid transparent;
+    border-bottom:4px solid transparent;
+    border-right:5px solid var(--ink);
+  }
+  /* 접힌 상태 = 좌우 반전(가운데 줄은 왼쪽, 화살촉은 오른쪽으로) */
+  .hamburger-btn.nav-toggle.is-collapsed span:nth-child(2){align-self:flex-start;}
+  .hamburger-btn.nav-toggle.is-collapsed::after{
+    left:auto;right:8px;
+    border-right:none;border-left:5px solid var(--ink);
+  }
+  .hamburger-btn.nav-toggle:hover::after{border-right-color:var(--mon);}
+  .hamburger-btn.nav-toggle.is-collapsed:hover::after{border-left-color:var(--mon);}
+  /* 접기 모드에서는 X 변형을 쓰지 않는다 */
+  .hamburger-btn.nav-toggle.open span:nth-child(1),
+  .hamburger-btn.nav-toggle.open span:nth-child(2),
+  .hamburger-btn.nav-toggle.open span:nth-child(3){transform:none;opacity:1;}
   .main-nav-item{
     display:flex;align-items:center;gap:10px;
     padding:14px 16px;border-radius:10px;cursor:pointer;
@@ -1435,13 +1460,21 @@
   .s360-3pane.panes-hidden .s360-pane-classes,
   .s360-3pane.panes-hidden .s360-pane-roster{display:none;}
   .s360-panes-tog{
-    flex:none;width:16px;align-self:stretch;padding:0;
+    flex:none;align-self:center;
+    width:15px;height:46px;padding:0;
     display:flex;align-items:center;justify-content:center;
-    border:none;border-right:1px solid var(--rule);
-    background:var(--paper-soft);color:var(--ink-soft);
-    font-size:12px;line-height:1;cursor:pointer;
+    border:none;border-radius:0 7px 7px 0;
+    background:var(--ink);color:var(--paper);
+    font-size:9px;line-height:1;cursor:pointer;
+    /* 폭을 실제로 키우면 상세 패널이 밀리니 transform 으로만 키운다(리플로우 없음) */
+    transform-origin:left center;
+    transition:transform .14s ease, background .14s ease, box-shadow .14s ease;
   }
-  .s360-panes-tog:hover{background:var(--rule);color:var(--mon);}
+  .s360-panes-tog:hover{
+    transform:scale(1.28);
+    background:var(--mon);
+    box-shadow:0 2px 8px rgba(15,23,42,.28);
+  }
   @media (max-width:900px){ .s360-panes-tog{display:none;} }
   .s360-cl-grade{font-size:12px;font-weight:900;color:var(--ink-soft);padding:8px 8px 4px;}
   .s360-cl-all{display:flex;align-items:center;gap:6px;width:100%;padding:9px 10px;margin-bottom:6px;border:1px solid var(--rule);border-radius:9px;background:var(--paper);font-family:inherit;font-size:12.5px;font-weight:800;color:var(--ink-soft);cursor:pointer;text-align:left;}
@@ -8311,7 +8344,7 @@ hamburgerBtn.addEventListener('click', () => {
   // 접은 상태는 기억해서 다음 접속에도 유지한다.
   if(mainNav.classList.contains('desktop')){
     const collapsed = mainNav.classList.toggle('collapsed');
-    hamburgerBtn.classList.toggle('open', !collapsed);
+    hamburgerBtn.classList.toggle('is-collapsed', collapsed);
     try{ localStorage.setItem('ynhs-nav-collapsed', collapsed ? '1' : '0'); }catch(e){}
     return;
   }
@@ -8351,11 +8384,14 @@ function updateNavMode() {
     let wasCollapsed = false;
     try{ wasCollapsed = localStorage.getItem('ynhs-nav-collapsed') === '1'; }catch(e){}
     mainNav.classList.toggle('collapsed', wasCollapsed);
-    hamburgerBtn.classList.toggle('open', !wasCollapsed);
+    hamburgerBtn.classList.add('nav-toggle');
+    hamburgerBtn.classList.remove('open');
+    hamburgerBtn.classList.toggle('is-collapsed', wasCollapsed);
   } else {
     // 여백 부족 → 오버레이(햄버거) 방식으로 복귀
     mainNav.classList.remove('desktop');
     mainNav.classList.remove('collapsed');   // 오버레이 모드에선 접힘 개념이 없다
+    hamburgerBtn.classList.remove('nav-toggle', 'is-collapsed');
     appShell.classList.remove('desktop-nav');
   }
 }
@@ -10611,9 +10647,11 @@ let s360Group = null;     // 선택된 그룹 { type, key, label } | null
 let s360View = 'groups';  // groups | list | detail | panes
 let s360PaneStudent = null;   // FHD 3열 모드에서 선택된 학생
 let s360OpenGrade = null;     // 3열 좌측 학반 아코디언에서 펼쳐진 학년
+let s360PanesHidden = false;  // 학급·명렬 접힘 상태 — 종합검색에 새로 들어오면 항상 펼침
 
 function initSearchPage(){
   const inp = document.getElementById('s360Input');
+  s360PanesHidden = false;   // 새로 들어올 때마다 학급·명렬 사이드바는 펼친 상태가 기본
   if (!s360Init){
     s360Init = true;
     inp.addEventListener('input', () => { s360Group = null; s360Render(); });
@@ -10795,7 +10833,7 @@ function s360RenderClassPanes(){
   body.innerHTML = `<div class="s360-3pane${hasStudent ? ' has-detail' : ''}">
     <div class="s360-pane s360-pane-classes" id="s360PaneClasses"></div>
     <div class="s360-pane s360-pane-roster" id="s360PaneRoster"></div>
-    ${hasStudent ? '<button class="s360-panes-tog" id="s360PanesTog" title="학급·명렬 목록 접기/펴기" aria-label="목록 접기/펴기">‹</button>' : ''}
+    ${hasStudent ? '<button class="s360-panes-tog" id="s360PanesTog" title="학급·명렬 목록 접기/펴기" aria-label="목록 접기/펴기">◂</button>' : ''}
     ${hasStudent ? '<div class="s360-pane s360-pane-detail" id="s360PaneDetail"></div>' : ''}
   </div>`;
   s360FillClassPane();
@@ -10883,12 +10921,10 @@ function s360BindPanesToggle(){
   tog.dataset.bound = '1';
   const apply = hide => {
     pane.classList.toggle('panes-hidden', hide);
-    tog.textContent = hide ? '›' : '‹';
-    try{ localStorage.setItem('ynhs-s360-panes-hidden', hide ? '1' : '0'); }catch(e){}
+    tog.textContent = hide ? '▸' : '◂';
+    s360PanesHidden = hide;   // 같은 화면에서 학생을 바꿔도(패널 재렌더) 접힘 상태는 유지
   };
-  let hidden = false;
-  try{ hidden = localStorage.getItem('ynhs-s360-panes-hidden') === '1'; }catch(e){}
-  apply(hidden);
+  apply(s360PanesHidden);
   tog.addEventListener('click', () => apply(!pane.classList.contains('panes-hidden')));
 }
 
