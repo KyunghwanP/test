@@ -33,16 +33,19 @@ const { consultWeekStart, consultAddDays } = new Function(
   grab('consultLocalYmd') + grab('consultWeekStart') + grab('consultAddDays') +
   '\nreturn { consultWeekStart, consultAddDays };')();
 
-console.log('\n■ 주 시작은 월요일이고 7일을 센다');
+console.log('\n■ 주는 일요일에 시작한다 (달력과 같은 순서)');
 {
-  // 2026-08-24 는 월요일
-  check('월요일 기준', consultWeekStart('2026-08-26') === '2026-08-24', consultWeekStart('2026-08-26'));
-  check('일요일도 그 주(월요일)로 묶인다', consultWeekStart('2026-08-30') === '2026-08-24', consultWeekStart('2026-08-30'));
-  check('토요일은 +5', consultAddDays('2026-08-24', 5) === '2026-08-29');
-  check('일요일은 +6', consultAddDays('2026-08-24', 6) === '2026-08-30');
+  // 2026-08-23 은 일요일, 08-24 는 월요일, 08-29 는 토요일
+  check('일요일 기준으로 묶는다', consultWeekStart('2026-08-26') === '2026-08-23', consultWeekStart('2026-08-26'));
+  check('일요일 자신은 그 주의 시작', consultWeekStart('2026-08-23') === '2026-08-23', consultWeekStart('2026-08-23'));
+  check('토요일도 같은 주', consultWeekStart('2026-08-29') === '2026-08-23', consultWeekStart('2026-08-29'));
+  check('다음 일요일은 다음 주', consultWeekStart('2026-08-30') === '2026-08-30', consultWeekStart('2026-08-30'));
+  check('요일 이름이 일요일부터', CONSULT_WD2[0] === '일' && CONSULT_WD2[6] === '토', CONSULT_WD2);
+  check('월=+1, 토=+6', consultAddDays('2026-08-23', 1) === '2026-08-24'
+                     && consultAddDays('2026-08-23', 6) === '2026-08-29');
 }
 
-console.log('\n■ 주간 보기가 월~일 7칸을 그리는가');
+console.log('\n■ 주간 보기가 일~토 7칸을 그리는가');
 {
   check('5칸으로 못박지 않는다', !/for\(let i=0;i<5;i\+\+\)\{/.test(html));
   check('항상 7칸이다', /const dayCount = 7;/.test(html));
@@ -50,8 +53,14 @@ console.log('\n■ 주간 보기가 월~일 7칸을 그리는가');
   check('칸 수만큼 돈다', /for\(let i=0;i<dayCount;i\+\+\)\{/.test(html));
   check('CSS 가 5칸으로 되돌리지 않는다',
         !/\.cweek-body\{grid-template-columns:repeat\(5,minmax/.test(html));
-  check('주말 칸을 구분 표시한다', /class="cday\$\{i >= 5 \? ' weekend' : ''\}"/.test(html));
-  check('7번째 칸이 일요일이다', CONSULT_WD2[6] === '일', CONSULT_WD2);
+  check('첫·끝 칸에 표시를 붙인다',
+        /class="cday\$\{i === 0 \? ' sun' : i === 6 \? ' sat' : ''\}"/.test(html));
+  check('첫 칸이 일요일, 끝 칸이 토요일', CONSULT_WD2[0] === '일' && CONSULT_WD2[6] === '토', CONSULT_WD2);
+  check('일요일 칸은 빨강, 토요일 칸은 파랑',
+        /\.cday\.sun \.cday-head\{color:#EF4444;\}/.test(html)
+     && /\.cday\.sat \.cday-head\{color:#3B82F6;\}/.test(html));
+  check('앱의 다른 달력과 같은 색을 쓴다',
+        /\.pc-date\.sun\{color:#EF4444;\}/.test(html) && /\.pc-date\.sat\{color:#3B82F6;\}/.test(html));
 }
 
 console.log('\n■ 헤더 날짜 범위가 실제 칸 수를 따라가는가');
@@ -60,9 +69,9 @@ console.log('\n■ 헤더 날짜 범위가 실제 칸 수를 따라가는가');
   check('금요일로 못박지 않는다', !/const wkEnd = consultAddDays\(wk, 4\);/.test(html));
   check('마지막 칸까지 센다', /const wkEnd = consultAddDays\(wk, dayCount - 1\);/.test(html));
 
-  // 7칸이므로 월요일 + 6 = 일요일
-  check('일요일까지 센다', consultAddDays('2026-08-24', 6) === '2026-08-30');
-  check('달을 넘겨도 맞다', consultAddDays('2026-08-31', 6) === '2026-09-06');
+  // 7칸이므로 일요일 + 6 = 토요일
+  check('토요일까지 센다', consultAddDays('2026-08-23', 6) === '2026-08-29');
+  check('달을 넘겨도 맞다', consultAddDays('2026-08-30', 6) === '2026-09-05');
 }
 
 console.log('\n■ 쓰기 전에 정의되는가 (TDZ)');
@@ -110,8 +119,8 @@ console.log('\n■ 기간 만들기에서 주말을 고를 수 있는가');
     }
     return out;
   };
-  check('기본은 평일만 (8/24~8/30 → 5일)', pick('2026-08-24', '2026-08-30', false).length === 5);
-  check('켜면 7일 전부',                  pick('2026-08-24', '2026-08-30', true).length === 7);
+  check('기본은 평일만 (8/23~8/29 → 5일)', pick('2026-08-23', '2026-08-29', false).length === 5);
+  check('켜면 7일 전부',                  pick('2026-08-23', '2026-08-29', true).length === 7);
   check('토요일 하루만 골라도 켜면 나온다', pick('2026-08-29', '2026-08-29', true).length === 1);
 }
 
@@ -144,8 +153,8 @@ console.log('\n■ 7칸일 때 실제 칸 폭과 글자 넘침 (Chromium)');
                    + `<span class="cslot-m face">대면</span></div>`;
   const grid = nm => `<div class="cweek-body" style="--cday-count:7;">`
     + Array.from({ length: 7 }, (_, i) =>
-        `<div class="cday${i >= 5 ? ' weekend' : ''}">`
-        + `<div class="cday-head">8/${24 + i} (${CONSULT_WD2[i]})</div>`
+        `<div class="cday${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}">`
+        + `<div class="cday-head">8/${23 + i} (${CONSULT_WD2[i]})</div>`
         + `<div class="cday-slots">${slot(nm)}</div></div>`).join('')
     + `</div>`;
   const doc = nm => `<!doctype html><meta charset="utf-8"><style>${css}</style>`
