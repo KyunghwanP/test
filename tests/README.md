@@ -12,6 +12,7 @@ node tests/operating.test.mjs          # 운영표(요일 대체·창체 이동�
 node tests/account-gate.test.mjs       # 학생 계정 차단 — 화면·규칙·워커가 같은 조건인지
 node tests/inline-handlers.test.mjs    # onclick 이 부르는 함수가 window 에 있는지
 node tests/widget-config.test.mjs      # 위젯이 설정 폴더를 만들고 쓰는지(.ahk 원본 확인)
+node tests/consult-weekend.test.mjs    # 상담 예약을 주말에도 열고 받는지
 node workers/teacher-api.test.mjs      # teacher-api 워커 — fetch 를 스텁으로 물림
 node workers/roster-split.test.mjs     # upload.html 분리 저장 → 워커 조회
 node workers/parent-verify.test.mjs    # 학부모 인증 — 나뉜 명렬에서 생년월일 찾기
