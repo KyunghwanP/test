@@ -12,3 +12,6 @@ widget/*.exe
 node_modules/
 package-lock.json
 package.json
+
+# Claude Code 로컬 권한 설정 (이 환경에서만 쓰는 값 — 공유 안 함)
+.claude/settings.local.json
