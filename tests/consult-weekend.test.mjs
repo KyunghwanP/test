@@ -4,6 +4,7 @@
 // 교사 앱만 두 곳에서 주말을 막고 있었다 —
 //   · 주간 보기가 월~금 5칸만 그림 (토·일 슬롯은 만들어도 안 보임)
 //   · 기간 만들기가 주말을 무조건 건너뜀
+import { chromium } from 'playwright';
 import fs from 'node:fs';
 
 const html   = fs.readFileSync(import.meta.dirname + '/../index.html', 'utf8');
@@ -26,6 +27,8 @@ const check = (n, c, x) => c ? (pass++, console.log('  ✅', n))
                              : (fail++, console.log('  ❌', n, x !== undefined ? '\n       → ' + JSON.stringify(x) : ''));
 
 // 날짜 계산은 실제 함수를 떼어 쓴다
+const CONSULT_WD2 = JSON.parse(/const CONSULT_WD2 = (\[[^\]]*\]);/.exec(html)[1].replace(/'/g, '"'));
+
 const { consultWeekStart, consultAddDays } = new Function(
   grab('consultLocalYmd') + grab('consultWeekStart') + grab('consultAddDays') +
   '\nreturn { consultWeekStart, consultAddDays };')();
@@ -39,24 +42,16 @@ console.log('\n■ 주 시작은 월요일이고 7일을 센다');
   check('일요일은 +6', consultAddDays('2026-08-24', 6) === '2026-08-30');
 }
 
-console.log('\n■ 주간 보기가 주말 칸을 낼 수 있는가');
+console.log('\n■ 주간 보기가 월~일 7칸을 그리는가');
 {
-  check('5칸으로 못박지 않는다', !/for\(let i=0;i<5;i\+\+\)\{\s*\n\s*const dStr = consultAddDays\(wk, i\);/.test(html));
-  check('칸 수를 계산한다', /const dayCount = hasSun \? 7 : \(hasSat \? 6 : 5\);/.test(html));
-  check('토·일 슬롯이 있는지 본다',
-        /const hasSat = !!days\[consultAddDays\(wk, 5\)\];/.test(html)
-     && /const hasSun = !!days\[consultAddDays\(wk, 6\)\];/.test(html));
-  check('그리드 열 수를 칸 수에 맞춘다', /style="--cday-count:\$\{dayCount\};"/.test(html));
+  check('5칸으로 못박지 않는다', !/for\(let i=0;i<5;i\+\+\)\{/.test(html));
+  check('항상 7칸이다', /const dayCount = 7;/.test(html));
+  check('되돌리는 법을 적어 뒀다', /되돌리려면 이 값만 5 로 바꾸면 된다/.test(html));
+  check('칸 수만큼 돈다', /for\(let i=0;i<dayCount;i\+\+\)\{/.test(html));
   check('CSS 가 5칸으로 되돌리지 않는다',
         !/\.cweek-body\{grid-template-columns:repeat\(5,minmax/.test(html));
   check('주말 칸을 구분 표시한다', /class="cday\$\{i >= 5 \? ' weekend' : ''\}"/.test(html));
-
-  // 칸 수 계산을 실제 식으로 돌려 본다
-  const count = (sat, sun) => sun ? 7 : (sat ? 6 : 5);
-  check('평일만 있으면 5칸', count(false, false) === 5);
-  check('토요일이 있으면 6칸', count(true, false) === 6);
-  check('일요일이 있으면 7칸', count(false, true) === 7);
-  check('둘 다 있으면 7칸', count(true, true) === 7);
+  check('7번째 칸이 일요일이다', CONSULT_WD2[6] === '일', CONSULT_WD2);
 }
 
 console.log('\n■ 헤더 날짜 범위가 실제 칸 수를 따라가는가');
@@ -65,10 +60,9 @@ console.log('\n■ 헤더 날짜 범위가 실제 칸 수를 따라가는가');
   check('금요일로 못박지 않는다', !/const wkEnd = consultAddDays\(wk, 4\);/.test(html));
   check('마지막 칸까지 센다', /const wkEnd = consultAddDays\(wk, dayCount - 1\);/.test(html));
 
-  const wkEnd = n => consultAddDays('2026-08-24', n - 1);
-  check('평일만이면 금요일까지', wkEnd(5) === '2026-08-28', wkEnd(5));
-  check('토요일 칸이 있으면 토요일까지', wkEnd(6) === '2026-08-29', wkEnd(6));
-  check('일요일 칸이 있으면 일요일까지', wkEnd(7) === '2026-08-30', wkEnd(7));
+  // 7칸이므로 월요일 + 6 = 일요일
+  check('일요일까지 센다', consultAddDays('2026-08-24', 6) === '2026-08-30');
+  check('달을 넘겨도 맞다', consultAddDays('2026-08-31', 6) === '2026-09-06');
 }
 
 console.log('\n■ 쓰기 전에 정의되는가 (TDZ)');
@@ -81,11 +75,9 @@ console.log('\n■ 쓰기 전에 정의되는가 (TDZ)');
   check('consultRangeLabel 호출을 찾았다', use >= 0);
   check('정의가 사용보다 앞이다', def >= 0 && use >= 0 && def < use, { def, use });
 
-  for (const name of ['hasSat', 'hasSun', 'dayCount']) {
-    const d = fn.indexOf(`const ${name} =`);
-    const u = fn.indexOf(`\${${name === 'dayCount' ? 'dayCount' : name}}`);
-    check(`${name} 은 선언 뒤에 쓰인다`, d >= 0 && (u < 0 || d < u), { d, u });
-  }
+  const d = fn.indexOf('const dayCount =');
+  const u = fn.indexOf('${dayCount}');
+  check('dayCount 은 선언 뒤에 쓰인다', d >= 0 && (u < 0 || d < u), { d, u });
 }
 
 console.log('\n■ 좁은 화면에서 칸이 찌그러지지 않는가');
@@ -139,6 +131,69 @@ console.log('\n■ 공강 고르기는 평일만 (시간표가 없다)');
 {
   check('주말 가드는 남아 있다', /if\(dowIdx < 1 \|\| dowIdx > 5\)\{/.test(html));
   check('대신 어디서 만드는지 알려준다', /상담 시간 열기<\/b> 에서 시각을 직접 넣어/.test(html));
+}
+
+// ── 실제 브라우저에서 칸 폭을 잰다 ────────────────────────────────
+// 7칸으로 늘리기로 한 근거가 '좁아져도 쓸 만하다' 이므로, 산수로 단언하지 않고
+// index.html 의 <style> 을 그대로 물려 Chromium 에서 재 본다.
+console.log('\n■ 7칸일 때 실제 칸 폭과 글자 넘침 (Chromium)');
+{
+  const css = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n');
+  const slot = nm => `<div class="cslot booked"><span class="cslot-t">14:00</span>`
+                   + `<span class="cslot-name">${nm}</span>`
+                   + `<span class="cslot-m face">대면</span></div>`;
+  const grid = nm => `<div class="cweek-body" style="--cday-count:7;">`
+    + Array.from({ length: 7 }, (_, i) =>
+        `<div class="cday${i >= 5 ? ' weekend' : ''}">`
+        + `<div class="cday-head">8/${24 + i} (${CONSULT_WD2[i]})</div>`
+        + `<div class="cday-slots">${slot(nm)}</div></div>`).join('')
+    + `</div>`;
+  const doc = nm => `<!doctype html><meta charset="utf-8"><style>${css}</style>`
+    + `<div class="page-view active" id="consultPage"><div class="consult-wrap"><div class="consult-cols">`
+    + `<div class="consult-section consult-col-make">왼쪽</div>`
+    + `<div class="consult-section consult-col-status"><div id="consultList">${grid(nm)}</div></div>`
+    + `</div></div></div>`;
+
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+  const page = await browser.newPage();
+  page.on('pageerror', e => { console.log('  ⚠ 페이지 오류:', e.message); fail++; });
+
+  const measure = async (w, nm) => {
+    await page.setViewportSize({ width: w, height: 900 });
+    await page.setContent(doc(nm));
+    return page.evaluate(() => {
+      const day = document.querySelector('.cday');
+      const box = document.querySelector('.cweek-body');
+      const nameEl = document.querySelector('.cslot-name');
+      return {
+        cols  : document.querySelectorAll('.cday').length,
+        col   : Math.round(day.getBoundingClientRect().width),
+        over  : nameEl.scrollWidth > nameEl.clientWidth + 1
+             || nameEl.getBoundingClientRect().width > day.getBoundingClientRect().width,
+        scroll: box.scrollWidth > box.clientWidth + 1
+      };
+    });
+  };
+
+  // 칸이 7개 나오는지 + 최소폭이 무너지지 않는지
+  for (const w of [1920, 1440, 1280, 1024, 768]) {
+    const r = await measure(w, '김민준');
+    check(`${w}px — 7칸, 칸 ${r.col}px`, r.cols === 7 && r.col >= 88, r);
+  }
+
+  // 폰: 최소폭 92px 을 지키고 대신 가로 스크롤이 걸려야 한다
+  for (const w of [430, 360]) {
+    const r = await measure(w, '김민준');
+    check(`${w}px — 칸 ${r.col}px 유지 + 가로 스크롤`, r.col >= 92 && r.scroll, r);
+  }
+
+  // 긴 이름도 칸 밖으로 삐져나오지 않아야 한다(줄바꿈은 허용)
+  for (const nm of ['김민준', '남궁민수', '박서연 학부모']) {
+    const r = await measure(1024, nm);   // 가장 좁은 데스크탑 조건
+    check(`1024px · "${nm}" 글자가 안 넘친다`, !r.over, r);
+  }
+
+  await browser.close();
 }
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} 통과 ${pass} / 실패 ${fail}\n`);

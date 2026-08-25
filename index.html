@@ -4263,7 +4263,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.93</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.94</div>
   </div>
 </div>
 
@@ -4399,7 +4399,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.93</div>
+    <div class="nav-version" title="Made by 박경환">ver6.94</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5825,7 +5825,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.93 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = 'ver6.94 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -16783,14 +16783,15 @@ function renderConsultList(slots){
   const days = {};
   weekSlots.forEach(s => { (days[s.date] = days[s.date] || []).push(s); });
 
-  // 주말 칸은 그 주에 주말 슬롯이 있을 때만 낸다. 늘 7칸이면 평일만 쓰는 대부분에게
-  // 칸이 좁아지기만 한다. 슬롯을 만들면 그 주부터 칸이 생기므로 막히는 곳은 없다.
-  //   토=5, 일=6 (consultWeekStart 가 월요일부터 센다)
-  const hasSat = !!days[consultAddDays(wk, 5)];
-  const hasSun = !!days[consultAddDays(wk, 6)];
-  const dayCount = hasSun ? 7 : (hasSat ? 6 : 5);
-  // 헤더의 날짜 범위도 실제로 그리는 마지막 칸까지 — 예전에는 +4(금)로 고정돼 있어
-  // 일요일 칸을 보여 주면서 제목은 '8/24~8/28' 이라고 적었다.
+  // 월~일 7칸을 항상 그린다. 주말 슬롯이 있을 때만 칸을 내는 방식도 써 봤는데,
+  // 수시 상담처럼 주말을 계속 쓰는 기간에는 '없으니까 안 보이는' 것이 오히려 헷갈린다.
+  // 좁아지는 정도는 실제로 재 봤다(Chromium):
+  //   1920→185px · 1440→120px · 1280→99px · 1024/768→91px
+  //   폰(≤680px)은 최소폭 92px + 가로 스크롤이라 칸 폭이 아예 안 줄고 스크롤만 길어진다.
+  //   제일 좁은 91px 에서도 칩 글자가 넘치지 않는다(칩이 시각/이름/방식 세로 배치).
+  // 되돌리려면 이 값만 5 로 바꾸면 된다.
+  const dayCount = 7;
+  // 헤더의 날짜 범위도 실제로 그리는 마지막 칸까지.
   const wkEnd = consultAddDays(wk, dayCount - 1);
 
   let html = `<div class="cweek-nav">
