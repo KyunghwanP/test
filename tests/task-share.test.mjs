@@ -100,6 +100,18 @@ console.log('\n■ 실제로 그려지는 내용 (Chromium)');
   check('작성자를 모르면 그렇게 적는다', r.text.includes('알 수 없음'), r.text);
   check('메모 없으면 그 줄이 없다', !r.text.includes('메모'), r.text);
 
+  // 줄바꿈 — 원본의 줄바꿈이 살아 있어야 한다(HTML 은 그냥 두면 공백으로 접는다)
+  const multi = '8월 27일 - 3차 운영위원회 개최\n9월 1일 - 학부모 안내 SNS 발송\n9월 3일 - 가정통신문 배부';
+  r = await render({ ...base, memo: multi });
+  check('메모의 줄바꿈이 살아 있다', r.text.includes('개최\n9월 1일'), JSON.stringify(r.text.slice(0, 200)));
+  const lines = await page.evaluate(() => {
+    const el = document.querySelector('.mrv-text');
+    return { cls: !!el, ws: el ? getComputedStyle(el).whiteSpace : '', h: el ? el.getBoundingClientRect().height : 0 };
+  });
+  check('메모 줄에 mrv-text 를 붙인다', lines.cls, lines);
+  check('white-space 가 pre-wrap', lines.ws === 'pre-wrap', lines);
+  check('세 줄이라 한 줄보다 높다', lines.h > 40, lines);
+
   // 제목에 태그를 넣어도 실행되지 않아야 한다
   r = await render({ ...base, title:'<img src=x onerror=alert(1)>' });
   check('제목의 태그가 실행되지 않는다', r.imgs === 0, r.imgs);
