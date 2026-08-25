@@ -1258,6 +1258,14 @@
   .mytask-status-btn.active.todo{background:#EEF2FF;border-color:#6366F1;color:#4F46E5;}
   .mytask-status-btn.active.doing{background:#FEF3C7;border-color:#F59E0B;color:#D97706;}
   .mytask-status-btn.active.done{background:#D1FAE5;border-color:#10B981;color:#065F46;}
+  #mytaskRecvInfo{padding:0 0 4px;}
+  .mrv-title{font-size:17px;font-weight:800;color:var(--ink);margin-bottom:10px;line-height:1.35;word-break:keep-all;}
+  .mrv-row{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--rule);font-size:14px;}
+  .mrv-row:last-child{border-bottom:none;}
+  .mrv-k{flex:0 0 92px;color:var(--ink-soft);}
+  .mrv-v{flex:1;font-weight:600;display:flex;flex-wrap:wrap;gap:5px;align-items:center;word-break:break-word;}
+  .mrv-chip{background:var(--paper-soft);border:1px solid var(--rule);border-radius:999px;padding:2px 9px;font-size:12.5px;font-weight:700;}
+  .mrv-none{color:var(--ink-soft);font-weight:400;}
   .mytask-share-chip{
     display:flex;align-items:center;gap:4px;
     padding:3px 8px;border-radius:20px;
@@ -4264,7 +4272,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.95</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.96</div>
   </div>
 </div>
 
@@ -4400,7 +4408,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.95</div>
+    <div class="nav-version" title="Made by 박경환">ver6.96</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5394,6 +5402,10 @@
       <input type="text" style="display:none;" autocomplete="username">
       <input type="password" style="display:none;" autocomplete="current-password">
 
+      <!-- 공유받은 사람에게 보이는 요약. 아래 mytaskOwnerSection 은 작성자에게만 보이므로,
+           받은 사람은 제목·기간·누가 보냈는지·누구와 함께 받았는지를 볼 방법이 없었다. -->
+      <div id="mytaskRecvInfo" style="display:none;"></div>
+
       <!-- 본인만 편집 가능한 영역 -->
       <div id="mytaskOwnerSection">
         <div class="mytask-modal-field">
@@ -5826,7 +5838,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.95 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = 'ver6.96 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -15484,7 +15496,8 @@ function _makeHomeTaskRow(t, todayStr, statusColor) {
     <div style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;"></div>
     <div onclick="openMytaskModal('${t.id}','${t.ownerUid||''}')" style="flex:1;min-width:0;cursor:pointer;">
       <div style="font-size:15px;font-weight:600;color:${isPast&&t.status!=='done'?'#EF4444':'var(--ink)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(t.title)}">
-        ${isShared?'<span style="font-size:13px;margin-right:3px;">👥</span>':''}${escapeHtml(t.title)}
+        ${isShared?'<span style="font-size:13px;margin-right:3px;">👥</span>':''}${escapeHtml(t.title)}${
+          isShared && t.ownerName ? ` <span style="font-size:11px;color:var(--ink-soft);font-weight:400;">[${escapeHtml(t.ownerName)}]</span>` : ''}
       </div>
       <div style="font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:4px;margin-top:2px;">
         ${dday}
@@ -17985,6 +17998,33 @@ function hideMytaskShareSug() {
   }, 200);
 }
 
+// 공유받은 일정의 요약(읽기 전용). 작성자 화면에는 원래 입력칸이 다 있으므로 쓰지 않는다.
+//   '나'는 이름 대신 (나) 로 적어 목록에서 자기를 금방 찾게 한다.
+function renderMytaskRecvInfo(t){
+  const el = document.getElementById('mytaskRecvInfo');
+  if (!el) return;
+  const user    = fbAuth.currentUser;
+  const myEmail = user?.email || '';
+  const myName  = TEACHERS.find(x => x.email === myEmail)?.name || user?.displayName || '';
+  const owner   = t.ownerName
+               || TEACHERS.find(x => x.uid && x.uid === t.ownerUid)?.name
+               || '알 수 없음';
+  const others = (t.sharedWith || []).map(v => {
+    const nm = v.includes('@') ? (TEACHERS.find(x => x.email === v)?.name || v.split('@')[0]) : v;
+    return (v === myEmail || v === myName) ? `${nm} (나)` : nm;
+  });
+  const row = (k, v) => `<div class="mrv-row"><span class="mrv-k">${k}</span><span class="mrv-v">${v}</span></div>`;
+  el.innerHTML =
+      `<div class="mrv-title">${escapeHtml(t.title || '')}</div>`
+    + row('기간', escapeHtml(formatMytaskDateRange(t)))
+    + row('공유한 사람', escapeHtml(owner))
+    + row('함께 받은 사람', others.length
+        ? others.map(n => `<span class="mrv-chip">${escapeHtml(n)}</span>`).join('')
+        : '<span class="mrv-none">나만 받았습니다</span>')
+    + (t.memo ? row('메모', escapeHtml(t.memo)) : '');
+  el.style.display = 'block';
+}
+
 function renderMytaskSharedList() {
   const el  = document.getElementById('mytaskSharedList');
   const box = document.getElementById('mytaskShareBox');
@@ -18163,6 +18203,9 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
   delBtn.style.display   = (id && isOwner) ? 'block' : 'none';
   if (leaveBtn) leaveBtn.style.display = (id && !isOwner) ? 'block' : 'none';
   ownerSec.style.display = isOwner ? 'block' : 'none';
+  // 받은 사람에게는 위 영역이 통째로 숨겨져 제목조차 안 보였다 → 요약을 대신 낸다
+  const recvInfo = document.getElementById('mytaskRecvInfo');
+  if (recvInfo) recvInfo.style.display = 'none';
   commentSec.style.display = id ? 'block' : 'none';
   saveBtn.textContent    = isOwner ? '저장' : '상태 저장';
 
@@ -18194,6 +18237,7 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
       setMytaskRepeat(repeatType);
       document.getElementById('mytaskRepeatUntil').value = t.repeat?.until || '';
       renderMytaskSharedList();
+      if (!isOwner) renderMytaskRecvInfo(t);
       renderMytaskComments(t.comments || []);
     }
   } else {
