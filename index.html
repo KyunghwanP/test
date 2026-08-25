@@ -4162,7 +4162,8 @@
     background:var(--paper);border:1px solid var(--rule);border-radius:12px;
   }
   .cday{min-width:0;}
-  .cday.weekend .cday-head{color:var(--mon);}
+  .cday.sun .cday-head{color:#EF4444;}
+  .cday.sat .cday-head{color:#3B82F6;}
   .cday-head{font-size:13.5px;font-weight:700;color:var(--ink-soft);text-align:center;padding:6px 0;border-bottom:1.5px solid var(--rule);margin-bottom:7px;}
   .cday-slots{display:flex;flex-direction:column;gap:6px;}
   .cslot{
@@ -4263,7 +4264,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.94</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.95</div>
   </div>
 </div>
 
@@ -4399,7 +4400,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.94</div>
+    <div class="nav-version" title="Made by 박경환">ver6.95</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5825,7 +5826,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.94 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = 'ver6.95 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -16737,10 +16738,11 @@ function consultLocalYmd(d){
 }
 
 // 날짜(yyyy-mm-dd) → 그 주 월요일 yyyy-mm-dd
+// 주는 일요일에 시작한다(달력과 같은 순서: 일 월 화 수 목 금 토).
+//   consultCurWeek 은 메모리에만 있으므로(저장 안 함) 옛 값 이관은 필요 없다.
 function consultWeekStart(dateStr){
   const d = new Date(dateStr + 'T00:00:00');
-  const dow = (d.getDay() + 6) % 7; // 월=0
-  d.setDate(d.getDate() - dow);
+  d.setDate(d.getDate() - d.getDay());   // 일=0
   return consultLocalYmd(d);
 }
 function consultAddDays(dateStr, n){
@@ -16748,7 +16750,7 @@ function consultAddDays(dateStr, n){
   d.setDate(d.getDate() + n);
   return consultLocalYmd(d);
 }
-const CONSULT_WD2 = ['월','화','수','목','금','토','일'];
+const CONSULT_WD2 = ['일','월','화','수','목','금','토'];   // 주 시작이 일요일
 
 function renderConsultList(slots){
   consultSlots = slots.slice();
@@ -16783,7 +16785,7 @@ function renderConsultList(slots){
   const days = {};
   weekSlots.forEach(s => { (days[s.date] = days[s.date] || []).push(s); });
 
-  // 월~일 7칸을 항상 그린다. 주말 슬롯이 있을 때만 칸을 내는 방식도 써 봤는데,
+  // 일~토 7칸을 항상 그린다(달력과 같은 순서). 주말 슬롯이 있을 때만 칸을 내는 방식도 써 봤는데,
   // 수시 상담처럼 주말을 계속 쓰는 기간에는 '없으니까 안 보이는' 것이 오히려 헷갈린다.
   // 좁아지는 정도는 실제로 재 봤다(Chromium):
   //   1920→185px · 1440→120px · 1280→99px · 1024/768→91px
@@ -16807,7 +16809,7 @@ function renderConsultList(slots){
   for(let i=0;i<dayCount;i++){
     const dStr = consultAddDays(wk, i);
     const daySlots = (days[dStr]||[]).slice().sort((a,b)=>a.time.localeCompare(b.time));
-    html += `<div class="cday${i >= 5 ? ' weekend' : ''}">
+    html += `<div class="cday${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}">
       <div class="cday-head">${dStr.slice(5).replace('-','/')} (${CONSULT_WD2[i]})</div>
       <div class="cday-slots">`;
     if(daySlots.length === 0){
@@ -16862,7 +16864,7 @@ function consultRangeLabel(wk, wkEnd){
   const month = d.getMonth()+1;
   // 그 달의 몇째 주
   const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
-  const weekNum = Math.ceil((d.getDate() + ((firstDay.getDay()+6)%7)) / 7);
+  const weekNum = Math.ceil((d.getDate() + firstDay.getDay()) / 7);   // 일요일 시작
   const s = wk.slice(5).replace('-','/');
   const e = wkEnd.slice(5).replace('-','/');
   return `${month}월 ${weekNum}주 (${s}~${e})`;
