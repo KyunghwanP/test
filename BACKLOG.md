@@ -502,14 +502,17 @@ Firestore는 지금 요금제에서 **시점 복구(PITR)가 안 되고 문서 �
 
 ### `accessLogs` TTL 정책 — **하기로 함 (콘솔 설정 대기)**
 
-Firebase 콘솔 → Firestore → **TTL** → 컬렉션 `accessLogs`, 필드 `expireAt`.
-설정은 1분이고 코드는 이미 준비돼 있다(`LOG_KEEP_DAYS = 400`, 문서마다 `expireAt`).
+**Firebase 콘솔에는 TTL 이 없다.** Google Cloud 콘솔 기능이다 — 처음에 여기에
+'Firebase 콘솔 → Firestore → TTL' 이라고 적었다가 찾지 못해 헤맸다.
+코드는 이미 준비돼 있다(`LOG_KEEP_DAYS = 400`, 문서마다 `expireAt`).
 
 **용량 때문은 아니다.** 문서 하나가 `사람 × 날짜` 이고 내용이 짧다
 (`target` 이 `S 1-3-7` · `T 김민준` 수준). 문서 구조에서 계산하면 하루 20명 조회에
-약 3KB, 상한(100명)까지 써도 13KB다. 교사 한 명이 **매일** 20명씩 찾아본다고 쳐도
-1년 0.6MB, 교사 60명이면 연 40MB 정도 — Firestore 무료 한도 1GiB 에 한참 못 미친다.
-몇 년 쌓여도 안 찬다.
+약 3KB, 상한(100명)까지 써도 13KB다.
+
+실제 데이터를 콘솔에서 확인해 보니 이 계산도 **과대추정**이었다 — 문서 대부분이
+`count: 1` · `items` 1건짜리라 수백 바이트 수준이고, 일주일치가 20개 남짓이었다.
+용량은 논외다.
 
 **남는 찜찜함은 용량이 아니라 내용이다.** `items` 에 "누가 누구 연락처를 언제 봤는지"가
 그대로 있다. 연락처 유출을 막으려고 만든 기록이 무한정 쌓이면 지키려던 것과 반대가 된다.
@@ -518,13 +521,19 @@ Firebase 콘솔 → Firestore → **TTL** → 컬렉션 `accessLogs`, 필드 `ex
 
 **그래서 켜기로 했다.** 콘솔 작업이라 코드로는 못 한다.
 
-    Firebase 콘솔 → Firestore Database → 상단 탭 TTL → 정책 만들기
+    Firebase 콘솔 Firestore 화면 상단 → 'Google Cloud의 추가 기능 ▾' → GCP 콘솔로
+      또는 직접: console.cloud.google.com/firestore/databases/-default-/ttl
+    좌측 메뉴 TTL → 정책 만들기
       컬렉션 그룹  : accessLogs
       타임스탬프 필드: expireAt      ← teacher-api.js 가 쓰는 이름 그대로
+      만료 오프셋   : 0             ← 그대로 둔다
 
 켜면 기존 문서도 `expireAt` 이 지난 것부터 순차 삭제된다. 코드 변경은 없다.
 확인되면 이 항목은 지워도 된다.
 
+- **주의**: '만료 오프셋'은 `expireAt` **값에 더하는** 기간이다. `expireAt` 에 이미
+  '기록시각 + 400일'이 들어 있으므로 0 이어야 한다. 여기에 400 을 넣으면 800일이 된다.
+  보관기간을 바꾸려면 콘솔이 아니라 `LOG_KEEP_DAYS` 를 고치고 워커를 재배포한다
 - **주의**: 필드 이름을 다르게 넣으면 아무 일도 안 일어난다(오류도 안 난다).
   `LOG_KEEP_DAYS` 를 바꾸면 그 뒤에 쓰이는 문서부터만 적용된다 — 이미 쌓인
   문서의 `expireAt` 은 그대로다
