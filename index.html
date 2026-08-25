@@ -4155,7 +4155,10 @@
   .cwn-title{font-size:17px;font-weight:800;}
   .cwn-sub{font-size:13px;color:var(--ink-soft);margin-top:3px;}
   .cweek-body{
-    display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:12px;
+    /* --cday-count 는 JS 가 인라인으로 넣는다(주말 슬롯이 있으면 6~7). 인라인으로
+       grid-template-columns 를 직접 주면 아래 미디어쿼리의 최소폭이 죽어서
+       좁은 화면에서 7칸이 44px 씩으로 찌그러진다 — 변수만 넘기고 규칙은 CSS 가 갖는다. */
+    display:grid;grid-template-columns:repeat(var(--cday-count,5),1fr);gap:8px;padding:12px;
     background:var(--paper);border:1px solid var(--rule);border-radius:12px;
   }
   .cday{min-width:0;}
@@ -4176,9 +4179,8 @@
   .cslot-open{color:var(--ink-soft);font-size:12px;}
   .cslot-empty{text-align:center;color:var(--rule);font-size:14px;padding:8px 0;}
   @media (max-width:680px){
-    /* 좁은 화면에서는 칸 최소폭을 지키고 가로 스크롤. 칸 수는 JS 가 인라인으로 정하므로
-       여기서 열 개수를 다시 못박지 않는다(주말 칸이 있으면 6~7칸이 된다). */
-    .cweek-body{grid-auto-columns:minmax(92px,1fr);overflow-x:auto;}
+    /* 좁은 화면에서는 칸 최소폭(92px)을 지키고 넘치면 가로 스크롤 */
+    .cweek-body{grid-template-columns:repeat(var(--cday-count,5),minmax(92px,1fr));overflow-x:auto;}
   }
 
   /* 변경 모달 */
@@ -16771,7 +16773,6 @@ function renderConsultList(slots){
   }
 
   const wk = consultCurWeek;
-  const wkEnd = consultAddDays(wk, 4); // 월~금
 
   // 이 주의 슬롯만
   const weekSlots = slots.filter(s => consultWeekStart(s.date) === wk);
@@ -16782,6 +16783,16 @@ function renderConsultList(slots){
   const days = {};
   weekSlots.forEach(s => { (days[s.date] = days[s.date] || []).push(s); });
 
+  // 주말 칸은 그 주에 주말 슬롯이 있을 때만 낸다. 늘 7칸이면 평일만 쓰는 대부분에게
+  // 칸이 좁아지기만 한다. 슬롯을 만들면 그 주부터 칸이 생기므로 막히는 곳은 없다.
+  //   토=5, 일=6 (consultWeekStart 가 월요일부터 센다)
+  const hasSat = !!days[consultAddDays(wk, 5)];
+  const hasSun = !!days[consultAddDays(wk, 6)];
+  const dayCount = hasSun ? 7 : (hasSat ? 6 : 5);
+  // 헤더의 날짜 범위도 실제로 그리는 마지막 칸까지 — 예전에는 +4(금)로 고정돼 있어
+  // 일요일 칸을 보여 주면서 제목은 '8/24~8/28' 이라고 적었다.
+  const wkEnd = consultAddDays(wk, dayCount - 1);
+
   let html = `<div class="cweek-nav">
     <button class="cweek-navbtn" id="cwPrev">◀ 이전주</button>
     <div class="cweek-navlabel">
@@ -16791,14 +16802,7 @@ function renderConsultList(slots){
     <button class="cweek-navbtn" id="cwNext">다음주 ▶</button>
   </div>`;
 
-  // 주말 칸은 그 주에 주말 슬롯이 있을 때만 낸다. 늘 7칸이면 평일만 쓰는 대부분에게
-  // 칸이 좁아지기만 한다. 슬롯을 만들면 그 주부터 칸이 생기므로 막히는 곳은 없다.
-  //   토=5, 일=6 (consultWeekStart 가 월요일부터 센다)
-  const hasSat = !!days[consultAddDays(wk, 5)];
-  const hasSun = !!days[consultAddDays(wk, 6)];
-  const dayCount = hasSun ? 7 : (hasSat ? 6 : 5);
-
-  html += `<div class="cweek-body" style="grid-template-columns:repeat(${dayCount},1fr);">`;
+  html += `<div class="cweek-body" style="--cday-count:${dayCount};">`;
   for(let i=0;i<dayCount;i++){
     const dStr = consultAddDays(wk, i);
     const daySlots = (days[dStr]||[]).slice().sort((a,b)=>a.time.localeCompare(b.time));

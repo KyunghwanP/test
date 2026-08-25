@@ -46,7 +46,7 @@ console.log('\n■ 주간 보기가 주말 칸을 낼 수 있는가');
   check('토·일 슬롯이 있는지 본다',
         /const hasSat = !!days\[consultAddDays\(wk, 5\)\];/.test(html)
      && /const hasSun = !!days\[consultAddDays\(wk, 6\)\];/.test(html));
-  check('그리드 열 수를 칸 수에 맞춘다', /grid-template-columns:repeat\(\$\{dayCount\},1fr\)/.test(html));
+  check('그리드 열 수를 칸 수에 맞춘다', /style="--cday-count:\$\{dayCount\};"/.test(html));
   check('CSS 가 5칸으로 되돌리지 않는다',
         !/\.cweek-body\{grid-template-columns:repeat\(5,minmax/.test(html));
   check('주말 칸을 구분 표시한다', /class="cday\$\{i >= 5 \? ' weekend' : ''\}"/.test(html));
@@ -57,6 +57,48 @@ console.log('\n■ 주간 보기가 주말 칸을 낼 수 있는가');
   check('토요일이 있으면 6칸', count(true, false) === 6);
   check('일요일이 있으면 7칸', count(false, true) === 7);
   check('둘 다 있으면 7칸', count(true, true) === 7);
+}
+
+console.log('\n■ 헤더 날짜 범위가 실제 칸 수를 따라가는가');
+{
+  // +4(금)로 고정돼 있어, 일요일 칸을 보여 주면서 제목은 '8/24~8/28' 이라고 적었다.
+  check('금요일로 못박지 않는다', !/const wkEnd = consultAddDays\(wk, 4\);/.test(html));
+  check('마지막 칸까지 센다', /const wkEnd = consultAddDays\(wk, dayCount - 1\);/.test(html));
+
+  const wkEnd = n => consultAddDays('2026-08-24', n - 1);
+  check('평일만이면 금요일까지', wkEnd(5) === '2026-08-28', wkEnd(5));
+  check('토요일 칸이 있으면 토요일까지', wkEnd(6) === '2026-08-29', wkEnd(6));
+  check('일요일 칸이 있으면 일요일까지', wkEnd(7) === '2026-08-30', wkEnd(7));
+}
+
+console.log('\n■ 쓰기 전에 정의되는가 (TDZ)');
+{
+  // const 는 선언 전에 쓰면 ReferenceError 로 상담 화면이 통째로 안 그려진다.
+  const fn = grab('renderConsultList');
+  const def = fn.indexOf('const wkEnd =');
+  const use = fn.indexOf('consultRangeLabel(wk, wkEnd)');
+  check('wkEnd 정의를 찾았다', def >= 0);
+  check('consultRangeLabel 호출을 찾았다', use >= 0);
+  check('정의가 사용보다 앞이다', def >= 0 && use >= 0 && def < use, { def, use });
+
+  for (const name of ['hasSat', 'hasSun', 'dayCount']) {
+    const d = fn.indexOf(`const ${name} =`);
+    const u = fn.indexOf(`\${${name === 'dayCount' ? 'dayCount' : name}}`);
+    check(`${name} 은 선언 뒤에 쓰인다`, d >= 0 && (u < 0 || d < u), { d, u });
+  }
+}
+
+console.log('\n■ 좁은 화면에서 칸이 찌그러지지 않는가');
+{
+  // 인라인으로 grid-template-columns 를 직접 주면 미디어쿼리의 minmax(92px) 가 죽는다
+  // (인라인이 이긴다). 7칸이면 360px 폰에서 한 칸 44px 이 된다.
+  check('인라인으로 열을 직접 정하지 않는다',
+        !/style="grid-template-columns:repeat\(\$\{dayCount\}/.test(html));
+  check('칸 수만 변수로 넘긴다', /style="--cday-count:\$\{dayCount\};"/.test(html));
+  check('기본 규칙이 변수를 쓴다',
+        /\.cweek-body\{[\s\S]{0,400}?grid-template-columns:repeat\(var\(--cday-count,5\),1fr\)/.test(html));
+  check('좁은 화면 규칙이 최소폭을 지킨다',
+        /\.cweek-body\{grid-template-columns:repeat\(var\(--cday-count,5\),minmax\(92px,1fr\)\);overflow-x:auto;\}/.test(html));
 }
 
 console.log('\n■ 기간 만들기에서 주말을 고를 수 있는가');
