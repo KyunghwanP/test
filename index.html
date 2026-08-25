@@ -499,16 +499,19 @@
   /* 줄을 굵게(2→3px). 3px×3 + 5px 간격×2 = 19px 이 28px 안에 들어가
      가운데 줄의 중심이 버튼 정중앙(18px)에 정확히 놓인다. */
   .hamburger-btn.nav-toggle span{height:3px;}
-  .hamburger-btn.nav-toggle span:nth-child(2){width:14px;margin-right:6px;}
+  .hamburger-btn.nav-toggle span:nth-child(2){width:13px;margin-right:7px;}
+  /* 위·아래 줄은 x 8~28, 가운데 줄은 x 8~21. */
   .hamburger-btn.nav-toggle::after{
-    content:'';position:absolute;top:50%;left:22px;
+    content:'';position:absolute;top:50%;left:21px;
     width:0;height:0;margin-top:-4px;          /* 높이 8px 의 절반 → 꼭지점이 정확히 18px */
     border-top:4px solid transparent;
     border-bottom:4px solid transparent;
-    border-right:5px solid var(--ink);   /* ◁ 왼쪽을 가리킴, 꼭지점이 줄 끝에 닿음 */
+    border-right:5px solid var(--ink);   /* ◁ 꼭지점이 가운데 줄 끝(21)에 닿음 */
   }
+  /* ▷ 는 줄과 2px 띄우고(21→23), 오른쪽 꼭지점을 위·아래 줄 끝(28)에 맞춘다 */
   .hamburger-btn.nav-toggle.is-collapsed::after{
-    border-right:none;border-left:5px solid var(--ink);   /* ▷ 오른쪽을 가리킴 */
+    left:23px;
+    border-right:none;border-left:5px solid var(--ink);
   }
   .hamburger-btn.nav-toggle:hover::after{border-right-color:var(--mon);}
   .hamburger-btn.nav-toggle.is-collapsed:hover::after{border-left-color:var(--mon);}
