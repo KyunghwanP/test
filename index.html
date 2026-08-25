@@ -1265,6 +1265,9 @@
   .mrv-k{flex:0 0 92px;color:var(--ink-soft);}
   .mrv-v{flex:1;font-weight:600;display:flex;flex-wrap:wrap;gap:5px;align-items:center;word-break:break-word;}
   .mrv-chip{background:var(--paper-soft);border:1px solid var(--rule);border-radius:999px;padding:2px 9px;font-size:12.5px;font-weight:700;}
+  /* 메모는 칩이 아니라 글이다. .mrv-v 는 칩을 늘어놓으려고 flex 라서 줄바꿈이
+     공백으로 접힌다 — 원본에 줄바꿈이 있어도 한 줄로 뭉쳐 보였다. */
+  .mrv-v.mrv-text{display:block;white-space:pre-wrap;word-break:break-word;line-height:1.65;font-weight:500;}
   .mrv-none{color:var(--ink-soft);font-weight:400;}
   .mytask-share-chip{
     display:flex;align-items:center;gap:4px;
@@ -1285,7 +1288,8 @@
     font-weight:700;font-size:11px;color:var(--mon);margin-bottom:3px;
     font-family:'IBM Plex Mono';
   }
-  .mytask-comment-text{color:var(--ink);line-height:1.5;}
+  /* 여러 줄로 쓴 댓글이 한 줄로 접히던 것 — 메모와 같은 이유 */
+  .mytask-comment-text{color:var(--ink);line-height:1.5;white-space:pre-wrap;word-break:break-word;}
   .mytask-comment-time{font-size:10px;color:var(--ink-soft);margin-top:2px;}
   .mytask-month-divider{
     font-family:'IBM Plex Mono';font-weight:700;font-size:12px;
@@ -4272,7 +4276,7 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.96</div>
+    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.97</div>
   </div>
 </div>
 
@@ -4408,7 +4412,7 @@
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.96</div>
+    <div class="nav-version" title="Made by 박경환">ver6.97</div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -5838,7 +5842,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.96 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = 'ver6.97 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -18013,7 +18017,7 @@ function renderMytaskRecvInfo(t){
     const nm = v.includes('@') ? (TEACHERS.find(x => x.email === v)?.name || v.split('@')[0]) : v;
     return (v === myEmail || v === myName) ? `${nm} (나)` : nm;
   });
-  const row = (k, v) => `<div class="mrv-row"><span class="mrv-k">${k}</span><span class="mrv-v">${v}</span></div>`;
+  const row = (k, v, cls) => `<div class="mrv-row"><span class="mrv-k">${k}</span><span class="mrv-v${cls ? ' ' + cls : ''}">${v}</span></div>`;
   el.innerHTML =
       `<div class="mrv-title">${escapeHtml(t.title || '')}</div>`
     + row('기간', escapeHtml(formatMytaskDateRange(t)))
@@ -18021,7 +18025,7 @@ function renderMytaskRecvInfo(t){
     + row('함께 받은 사람', others.length
         ? others.map(n => `<span class="mrv-chip">${escapeHtml(n)}</span>`).join('')
         : '<span class="mrv-none">나만 받았습니다</span>')
-    + (t.memo ? row('메모', escapeHtml(t.memo)) : '');
+    + (t.memo ? row('메모', escapeHtml(t.memo), 'mrv-text') : '');
   el.style.display = 'block';
 }
 
