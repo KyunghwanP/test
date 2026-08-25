@@ -487,7 +487,9 @@
     top:auto;bottom:auto;
   }
   /* 데스크톱 모드에서는 햄버거 버튼 숨김 */
-  .app-shell.desktop-nav .hamburger-btn{display:none;}
+  /* 데스크톱에서도 햄버거를 남겨 '사이드바 접기'로 쓴다.
+     (좁은 노트북에서 220px 사이드바가 본문을 크게 잡아먹는다) */
+  .main-nav.desktop.collapsed{display:none !important;}
   .main-nav-item{
     display:flex;align-items:center;gap:10px;
     padding:14px 16px;border-radius:10px;cursor:pointer;
@@ -1427,7 +1429,20 @@
      배경은 상세 패널처럼 어둡게 해서 가운데 카드가 도드라지게 */
   .s360-3pane:not(.has-detail) .s360-pane-roster{width:auto;flex:1;padding:16px 16px 28px;background:var(--bg-base);}
   /* 명렬(2열, 학급 선택)은 기존 목록 그대로의 rich 행 사용 (.spot-row 기본 스타일) */
-  .s360-pane-detail{flex:1;min-width:0;background:var(--bg-base);padding:16px;}
+  .s360-pane-detail{flex:1;min-width:0;background:var(--bg-base);padding:16px;position:relative;}
+  /* 학급·명렬 패널 접기 — 상세를 볼 때 좌측 394px 이 통째로 남아 화면을 잡아먹는다.
+     접어도 다시 꺼낼 수 있게 상세 패널 왼쪽 가장자리에 작은 손잡이를 둔다. */
+  .s360-3pane.panes-hidden .s360-pane-classes,
+  .s360-3pane.panes-hidden .s360-pane-roster{display:none;}
+  .s360-panes-tog{
+    flex:none;width:16px;align-self:stretch;padding:0;
+    display:flex;align-items:center;justify-content:center;
+    border:none;border-right:1px solid var(--rule);
+    background:var(--paper-soft);color:var(--ink-soft);
+    font-size:12px;line-height:1;cursor:pointer;
+  }
+  .s360-panes-tog:hover{background:var(--rule);color:var(--mon);}
+  @media (max-width:900px){ .s360-panes-tog{display:none;} }
   .s360-cl-grade{font-size:12px;font-weight:900;color:var(--ink-soft);padding:8px 8px 4px;}
   .s360-cl-all{display:flex;align-items:center;gap:6px;width:100%;padding:9px 10px;margin-bottom:6px;border:1px solid var(--rule);border-radius:9px;background:var(--paper);font-family:inherit;font-size:12.5px;font-weight:800;color:var(--ink-soft);cursor:pointer;text-align:left;}
   .s360-cl-all:hover{color:var(--mon);border-color:var(--mon);}
@@ -8292,6 +8307,14 @@ updateMobileNavTop();
 window.addEventListener('resize', updateMobileNavTop);
 
 hamburgerBtn.addEventListener('click', () => {
+  // 데스크톱(인라인 사이드바)에서는 오버레이가 아니라 '접기/펴기'로 동작한다.
+  // 접은 상태는 기억해서 다음 접속에도 유지한다.
+  if(mainNav.classList.contains('desktop')){
+    const collapsed = mainNav.classList.toggle('collapsed');
+    hamburgerBtn.classList.toggle('open', !collapsed);
+    try{ localStorage.setItem('ynhs-nav-collapsed', collapsed ? '1' : '0'); }catch(e){}
+    return;
+  }
   updateMobileNavTop();
   const open = mainNav.classList.toggle('open');
   hamburgerBtn.classList.toggle('open', open);
@@ -8324,9 +8347,15 @@ function updateNavMode() {
     hamburgerBtn.classList.remove('open');
     navOverlay.classList.remove('open');
     appShell.classList.add('desktop-nav');
+    // 지난번에 접어 뒀으면 그대로 접힌 채로 시작
+    let wasCollapsed = false;
+    try{ wasCollapsed = localStorage.getItem('ynhs-nav-collapsed') === '1'; }catch(e){}
+    mainNav.classList.toggle('collapsed', wasCollapsed);
+    hamburgerBtn.classList.toggle('open', !wasCollapsed);
   } else {
     // 여백 부족 → 오버레이(햄버거) 방식으로 복귀
     mainNav.classList.remove('desktop');
+    mainNav.classList.remove('collapsed');   // 오버레이 모드에선 접힘 개념이 없다
     appShell.classList.remove('desktop-nav');
   }
 }
@@ -10766,6 +10795,7 @@ function s360RenderClassPanes(){
   body.innerHTML = `<div class="s360-3pane${hasStudent ? ' has-detail' : ''}">
     <div class="s360-pane s360-pane-classes" id="s360PaneClasses"></div>
     <div class="s360-pane s360-pane-roster" id="s360PaneRoster"></div>
+    ${hasStudent ? '<button class="s360-panes-tog" id="s360PanesTog" title="학급·명렬 목록 접기/펴기" aria-label="목록 접기/펴기">‹</button>' : ''}
     ${hasStudent ? '<div class="s360-pane s360-pane-detail" id="s360PaneDetail"></div>' : ''}
   </div>`;
   s360FillClassPane();
@@ -10845,8 +10875,26 @@ function s360FillRosterPane(){
     s360FillDetailPane();
   }));
 }
+// 학급·명렬 목록 접기. 상세 패널은 내용이 통째로 갈리므로 손잡이는 그 바깥(형제)에 둔다.
+function s360BindPanesToggle(){
+  const tog = document.getElementById('s360PanesTog');
+  const pane = tog && tog.closest('.s360-3pane');
+  if(!tog || !pane || tog.dataset.bound) return;
+  tog.dataset.bound = '1';
+  const apply = hide => {
+    pane.classList.toggle('panes-hidden', hide);
+    tog.textContent = hide ? '›' : '‹';
+    try{ localStorage.setItem('ynhs-s360-panes-hidden', hide ? '1' : '0'); }catch(e){}
+  };
+  let hidden = false;
+  try{ hidden = localStorage.getItem('ynhs-s360-panes-hidden') === '1'; }catch(e){}
+  apply(hidden);
+  tog.addEventListener('click', () => apply(!pane.classList.contains('panes-hidden')));
+}
+
 function s360FillDetailPane(){
   const el = document.getElementById('s360PaneDetail'); if (!el) return;
+  s360BindPanesToggle();
   if (!s360PaneStudent){ el.innerHTML = `<div class="s360-pane-hint">학생을 선택하면 상세가 표시됩니다.</div>`; return; }
   s360ShowDetail(s360PaneStudent, el);
 }
@@ -11003,7 +11051,14 @@ function s360RenderCharts(history){
         label, data,
         borderColor: color, backgroundColor: gradient, borderWidth: 3,
         pointBackgroundColor: '#ffffff', pointBorderColor: color, pointBorderWidth: 2,
-        pointRadius: 5, pointHoverRadius: 7, fill: true, tension: 0.4
+        pointRadius: 5, pointHoverRadius: 7, fill: true, tension: 0.4,
+        // 응시하지 않은 회차(null)에서 선을 끊지 않고 점선으로 이어 추세를 보여준다.
+        // 이어진 구간만 점선·연한 색이라 실제 값과 건너뛴 구간이 구분된다.
+        spanGaps: true,
+        segment: {
+          borderDash:  c => (c.p0.skip || c.p1.skip) ? [6, 6] : undefined,
+          borderColor: c => (c.p0.skip || c.p1.skip) ? `rgba(${rgb}, 0.55)` : undefined
+        }
       }]},
       options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, ...yExtra } } }
     }));
