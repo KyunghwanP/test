@@ -27,7 +27,8 @@ console.log('\n■ 배선');
   check('요약 자리를 owner 영역 밖에 뒀다',
         html.indexOf('<div id="mytaskRecvInfo"') < html.indexOf('<div id="mytaskOwnerSection">'));
   check('열 때 기본은 숨김', /if \(recvInfo\) recvInfo\.style\.display = 'none';/.test(html));
-  check('받은 사람일 때만 그린다', /if \(!isOwner\) renderMytaskRecvInfo\(t\);/.test(html));
+  check('받은 사람에게, 그리고 작성자의 읽기 화면에서 그린다',
+        /if \(!isOwner \|\| viewFirst\) renderMytaskRecvInfo\(t, isOwner\);/.test(html));
   check('현황판 행에 작성자 이름', /isShared && t\.ownerName \? ` <span[^`]*\$\{escapeHtml\(t\.ownerName\)\}\]/.test(html));
 }
 

@@ -1280,6 +1280,12 @@
     font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;cursor:pointer;
     margin-right:auto;
   }
+  .mytask-btn-edit{
+    padding:9px 18px;border-radius:8px;border:1.5px solid var(--mon);
+    background:var(--paper);color:var(--mon);
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;cursor:pointer;
+  }
+  .mytask-btn-edit:hover{background:var(--mon);color:#fff;}
   .mytask-status-btn{
     flex:1;padding:8px 0;border-radius:8px;border:1.5px solid var(--rule);
     background:var(--paper);font-family:'Pretendard','Noto Sans KR';
@@ -5458,8 +5464,10 @@
       <input type="text" style="display:none;" autocomplete="username">
       <input type="password" style="display:none;" autocomplete="current-password">
 
-      <!-- 공유받은 사람에게 보이는 요약. 아래 mytaskOwnerSection 은 작성자에게만 보이므로,
-           받은 사람은 제목·기간·누가 보냈는지·누구와 함께 받았는지를 볼 방법이 없었다. -->
+      <!-- 읽기 요약. 두 경우에 쓴다.
+           ① 공유받은 사람 — mytaskOwnerSection 이 작성자 전용이라 제목조차 못 보던 문제
+           ② 작성자가 기존 일정을 열었을 때 — 읽으려고 눌렀는데 입력창이 뜨던 문제.
+              '수정'을 눌러야 아래 편집 폼으로 바뀐다. -->
       <div id="mytaskRecvInfo" style="display:none;"></div>
 
       <!-- 본인만 편집 가능한 영역 -->
@@ -5592,6 +5600,7 @@
       <button class="mytask-btn-delete" id="mytaskDeleteBtn" onclick="deleteMytask()" style="display:none;">삭제</button>
       <button class="mytask-btn-delete" id="mytaskLeaveBtn" onclick="leaveMytaskShare()" style="display:none;">삭제(공유 나가기)</button>
       <button class="mytask-btn-cancel" onclick="closeMytaskModal()">취소</button>
+      <button class="mytask-btn-edit" id="mytaskEditBtn" onclick="mytaskEnterEdit()" style="display:none;">수정</button>
       <button class="mytask-btn-save" id="mytaskSaveBtn" onclick="saveMytask()">저장</button>
     </div>
   </div>
@@ -18099,7 +18108,10 @@ function hideMytaskShareSug() {
 
 // 공유받은 일정의 요약(읽기 전용). 작성자 화면에는 원래 입력칸이 다 있으므로 쓰지 않는다.
 //   '나'는 이름 대신 (나) 로 적어 목록에서 자기를 금방 찾게 한다.
-function renderMytaskRecvInfo(t){
+const MYTASK_REPEAT_LABEL = { daily:'매일', weekly:'매주', monthly:'매월' };
+
+// 일정 읽기 요약. 수신자는 '누가 보냈나'가, 작성자는 '누구에게 보냈나'가 궁금하다.
+function renderMytaskRecvInfo(t, isOwner = false){
   const el = document.getElementById('mytaskRecvInfo');
   if (!el) return;
   const user    = fbAuth.currentUser;
@@ -18108,21 +18120,45 @@ function renderMytaskRecvInfo(t){
   const owner   = t.ownerName
                || TEACHERS.find(x => x.uid && x.uid === t.ownerUid)?.name
                || '알 수 없음';
+  const nameOf = v => v.includes('@') ? (TEACHERS.find(x => x.email === v)?.name || v.split('@')[0]) : v;
   const others = (t.sharedWith || []).map(v => {
-    const nm = v.includes('@') ? (TEACHERS.find(x => x.email === v)?.name || v.split('@')[0]) : v;
-    return (v === myEmail || v === myName) ? `${nm} (나)` : nm;
+    const nm = nameOf(v);
+    return (!isOwner && (v === myEmail || v === myName)) ? `${nm} (나)` : nm;
   });
   const row = (k, v, cls) => `<div class="mrv-row"><span class="mrv-k">${k}</span><span class="mrv-v${cls ? ' ' + cls : ''}">${v}</span></div>`;
-  el.innerHTML =
-      `<div class="mrv-title">${escapeHtml(t.title || '')}</div>`
-    + row('기간', escapeHtml(formatMytaskDateRange(t)))
-    + row('공유한 사람', escapeHtml(owner))
-    + row('함께 받은 사람', others.length
-        ? others.map(n => `<span class="mrv-chip">${escapeHtml(n)}</span>`).join('')
-        : '<span class="mrv-none">나만 받았습니다</span>')
-    + (t.memo ? row('메모', escapeHtml(t.memo), 'mrv-text') : '');
+  const chips = names => names.map(n => `<span class="mrv-chip">${escapeHtml(n)}</span>`).join('');
+  const rep   = t.repeat?.type && t.repeat.type !== 'none' ? t.repeat.type : null;
+
+  let html = `<div class="mrv-title">${escapeHtml(t.title || '')}</div>`
+           + row('기간', escapeHtml(formatMytaskDateRange(t)));
+  if (isOwner) {
+    html += row('공유 담당자', others.length ? chips(others) : '<span class="mrv-none">공유 안 함</span>');
+  } else {
+    html += row('공유한 사람', escapeHtml(owner))
+          + row('함께 받은 사람', others.length ? chips(others) : '<span class="mrv-none">나만 받았습니다</span>');
+  }
+  if (rep) {
+    const until = t.repeat.until ? ` (${escapeHtml(t.repeat.until)} 까지)` : '';
+    html += row('반복', escapeHtml(MYTASK_REPEAT_LABEL[rep] || rep) + until);
+  }
+  if (t.memo) html += row('메모', escapeHtml(t.memo), 'mrv-text');
+  el.innerHTML = html;
   el.style.display = 'block';
 }
+
+// 요약 → 편집 폼. 작성자가 '수정'을 눌렀을 때만.
+function mytaskEnterEdit(){
+  const info = document.getElementById('mytaskRecvInfo');
+  if (info) info.style.display = 'none';
+  document.getElementById('mytaskOwnerSection').style.display = 'block';
+  document.getElementById('mytaskEditBtn').style.display = 'none';
+  document.getElementById('mytaskSaveBtn').textContent = '저장';
+  document.getElementById('mytaskModalTitle').textContent = '일정 수정';
+  // 접혀 있던 제목칸 높이를 내용에 맞춘다 (숨은 동안 scrollHeight 가 0이었다)
+  const el = document.getElementById('mytaskTitle');
+  if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; el.focus(); }
+}
+window.mytaskEnterEdit = mytaskEnterEdit;
 
 function renderMytaskSharedList() {
   const el  = document.getElementById('mytaskSharedList');
@@ -18298,15 +18334,23 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
   const ownerSec  = document.getElementById('mytaskOwnerSection');
   const commentSec= document.getElementById('mytaskCommentSection');
 
+  // 작성자가 기존 일정을 열면 먼저 읽기 요약을 보여주고, '수정'을 눌러야 편집 폼이 나온다.
+  // 새 일정은 읽을 내용이 없으니 바로 편집.
+  const viewFirst = !!id && isOwner;
+  const editBtn   = document.getElementById('mytaskEditBtn');
+
   document.getElementById('mytaskModalTitle').textContent = id ? '일정 상세' : '일정 추가';
   delBtn.style.display   = (id && isOwner) ? 'block' : 'none';
   if (leaveBtn) leaveBtn.style.display = (id && !isOwner) ? 'block' : 'none';
-  ownerSec.style.display = isOwner ? 'block' : 'none';
+  ownerSec.style.display = (isOwner && !viewFirst) ? 'block' : 'none';
+  if (editBtn) editBtn.style.display = viewFirst ? 'block' : 'none';
   // 받은 사람에게는 위 영역이 통째로 숨겨져 제목조차 안 보였다 → 요약을 대신 낸다
   const recvInfo = document.getElementById('mytaskRecvInfo');
   if (recvInfo) recvInfo.style.display = 'none';
   commentSec.style.display = id ? 'block' : 'none';
-  saveBtn.textContent    = isOwner ? '저장' : '상태 저장';
+  // 요약 화면에서도 상태 버튼은 살아 있다 — 현황판에서 제일 잦은 동작이 상태 바꾸기라
+  // '수정 → 상태 → 저장' 3단계로 만들면 오히려 불편해진다.
+  saveBtn.textContent    = (isOwner && !viewFirst) ? '저장' : '상태 저장';
 
   mytaskCurrentShared = [];
   mytaskCurrentStatus = 'todo';
@@ -18336,7 +18380,7 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
       setMytaskRepeat(repeatType);
       document.getElementById('mytaskRepeatUntil').value = t.repeat?.until || '';
       renderMytaskSharedList();
-      if (!isOwner) renderMytaskRecvInfo(t);
+      if (!isOwner || viewFirst) renderMytaskRecvInfo(t, isOwner);
       renderMytaskComments(t.comments || []);
     }
   } else {
@@ -18368,12 +18412,14 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
   }
   setMytaskStatusBtn(mytaskCurrentStatus);
   modal.classList.add('show');
-  if (isOwner) document.getElementById('mytaskTitle').focus();
-  // textarea 높이 초기화
-  ['mytaskTitle'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
-  });
+  // 요약 화면에서는 제목칸이 숨어 있다 — 포커스도 높이 계산도 의미가 없고,
+  // 숨은 상태의 scrollHeight 는 0이라 높이를 잘못 잡는다. 수정 진입 때 다시 잰다.
+  if (isOwner && !viewFirst) {
+    const titleEl = document.getElementById('mytaskTitle');
+    titleEl.focus();
+    titleEl.style.height = 'auto';
+    titleEl.style.height = titleEl.scrollHeight + 'px';
+  }
 }
 
 function autoFormatDateInput(el) {
