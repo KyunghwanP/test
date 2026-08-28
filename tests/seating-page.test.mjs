@@ -332,9 +332,14 @@ await pg.evaluate(() => window.__buildPrintExtras && window.__buildPrintExtras()
 await pg.emulateMedia({ media: 'print' });
 const pm = await pg.evaluate(() => {
   const w = el => Math.round(el.getBoundingClientRect().width);
-  const r = document.querySelector('#printRoster'), b = document.querySelector('.board');
+  // .board 는 인쇄에서 display:contents 라 상자가 없다 — 자리판(.grid)을 잰다
+  const r = document.querySelector('#printRoster'), b = document.querySelector('.grid');
   return {
-    page: w(document.querySelector('.wrap')), roster: w(r), board: w(b),
+    page: w(document.querySelector('.wrap')),
+    // .wrap 은 종이 여백(padding)을 포함한다 — 실제로 쓸 수 있는 폭과 견줘야 한다
+    inner: (() => { const el = document.querySelector('.wrap'), cs = getComputedStyle(el);
+      return Math.round(el.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); })(),
+    roster: w(r), board: w(b),
     tall: Math.round(document.querySelector('.grid').getBoundingClientRect().height),
     ui:   getComputedStyle(document.querySelector('#barMain')).display,
     title: document.querySelector('#printTitle').textContent,
@@ -343,7 +348,26 @@ const pm = await pg.evaluate(() => {
     numBg:  getComputedStyle(document.querySelector('.s-num')).backgroundColor
   };
 });
-say('명렬표 + 자리판이 종이 폭을 채운다', pm.roster + pm.board >= pm.page * 0.93, pm);
+say('명렬표 + 자리판이 종이 폭을 채운다', pm.roster + pm.board >= pm.inner * 0.93, pm);
+
+// 명렬을 자리판 첫 줄/끝 줄에 맞추기
+const alignTops = async () => pg.evaluate(() => {
+  const r = document.querySelector('#printRoster').getBoundingClientRect();
+  const seats = [...document.querySelectorAll('.seat')].map(e => e.getBoundingClientRect());
+  return { rTop: Math.round(r.top), rBot: Math.round(r.bottom),
+           sTop: Math.round(Math.min(...seats.map(s => s.top))),
+           sBot: Math.round(Math.max(...seats.map(s => s.bottom))) };
+});
+const a1 = await alignTops();
+say('첫 줄에 맞추면 명렬 위가 첫 줄 위와 같다', Math.abs(a1.rTop - a1.sTop) <= 2, a1);
+await pg.emulateMedia({ media: 'screen' });
+await pg.selectOption('#rosterAlign', 'last');
+await pg.emulateMedia({ media: 'print' });
+const a2 = await alignTops();
+say('끝 줄에 맞추면 명렬 아래가 끝 줄 아래와 같다', Math.abs(a2.rBot - a2.sBot) <= 2, a2);
+await pg.emulateMedia({ media: 'screen' });
+await pg.selectOption('#rosterAlign', 'first');
+await pg.emulateMedia({ media: 'print' });
 say('자리판이 종이 높이를 쓴다', pm.tall > 300, pm);
 say('화면 UI 는 인쇄에서 빠진다', pm.ui === 'none', pm.ui);
 say('인쇄물에 제목이 붙는다', /2학년 3반 자리 배치도/.test(pm.title), pm.title);
@@ -369,6 +393,39 @@ const contrastOnWhite = await pg.evaluate(() => {
 for (const [k, v] of Object.entries(contrastOnWhite))
   say(`${k} 글씨가 흰 종이에서도 읽힌다 (대비 ${v})`, v !== null && v >= 4.5, contrastOnWhite);
 say('색 인쇄를 요청해 둔다', /print-color-adjust:exact/.test(html));
+
+// 흑백 프린터로 나가도 바탕과 글씨가 갈려야 한다. 색을 되살리면서
+// 명도까지 같아지면 회색 위 회색이 되어 아무것도 안 보인다.
+const gray = await pg.evaluate(() => {
+  const lum = c => {
+    const m = c.match(/\d+/g); if (!m) return null;
+    const [r, g, b] = m.slice(0,3).map(v => { v = v/255;
+      return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); });
+    return 0.2126*r + 0.7152*g + 0.0722*b;
+  };
+  // 투명 배경은 rgba(0,0,0,0) 이라 그냥 읽으면 '검정'이 된다 — 실제로 뒤에 깔린
+  // 배경을 찾아 올라간다. 이걸 안 하면 흰 바탕을 검정으로 재서 헛짚는다.
+  const bgOf = el => {
+    for (let n = el; n; n = n.parentElement) {
+      const c = getComputedStyle(n).backgroundColor;
+      const m = c.match(/rgba?\(([^)]+)\)/);
+      if (!m) continue;
+      const parts = m[1].split(',').map(Number);
+      if (parts.length < 4 || parts[3] > 0) return c;
+    }
+    return 'rgb(255,255,255)';
+  };
+  const pair = sel => {
+    const el = document.querySelector(sel); if (!el) return null;
+    const bg = lum(bgOf(el)), fg = lum(getComputedStyle(el).color);
+    const [hi, lo] = bg > fg ? [bg, fg] : [fg, bg];
+    return Math.round(((hi + 0.05) / (lo + 0.05)) * 10) / 10;
+  };
+  return { num: pair('.s-num'), desk: pair('.desk'), chalk: pair('.chalk'),
+           cap: pair('.pr-cap'), memo: pair('.memo-print') };
+});
+for (const [k, v] of Object.entries(gray))
+  say(`${k} 는 흑백에서도 바탕과 갈린다 (명도비 ${v})`, v !== null && v >= 4.5, gray);
 // 칠판은 벽, 교탁은 그 앞 — 학생과 칠판 사이에 교탁이 있어야 한다
 const front = await pg.evaluate(() => {
   const y = s => document.querySelector(s).getBoundingClientRect().top;

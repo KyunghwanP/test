@@ -342,7 +342,7 @@ console.log('\n■ 화면 배선 — JS 가 부르는 id 가 실제로 있나');
   check('이력은 최근 것만 남긴다', /slice\(-HIST_KEEP\)/.test(html));
   check('명렬 원본은 안 건드린다', !/setDoc\(doc\(db, 'students'/.test(html));
   check('인쇄에서 선택·고름·hover 표시를 지운다',
-        /@media print[\s\S]*\.seat\.sel,\.seat\.pick,\.seat:hover\{border:1\.2px solid #7E8DA0;box-shadow:none/.test(html));
+        /@media print[\s\S]*\.seat\.sel,\.seat\.pick,\.seat:hover\{border:1\.2px solid #7593BA;box-shadow:none/.test(html));
   check('자리판 기본은 5분단 6줄',
         /id="nCols"[^>]*value="5"/.test(html) && /id="nRows"[^>]*value="6"/.test(html) &&
         /cols:5, rows:6/.test(html) && /cols: d\.cols \|\| 5, rows: d\.rows \|\| 6/.test(html));
@@ -355,6 +355,18 @@ console.log('\n■ 화면 배선 — JS 가 부르는 id 가 실제로 있나');
         !/apart\.some\(p => p\.a ===/.test(html) && !/apart\.filter\(p => p\.a !==/.test(html));
   check('학생을 빼면 묶음에서도 빠진다', /apartMembers\(p\)\.filter\(k => k !== key\)/.test(html));
   check('혼자 남은 묶음은 지운다', /filter\(p => p\.ks\.length >= 2\)/.test(html));
+  check('명렬 맞춤이 저장된다', /rosterAlign: ST\.rosterAlign/.test(html));
+  // 정렬이 실제로 맞는지는 seating-page 에서 좌표를 재서 본다. 여기서는 장치가 있는지만.
+  check('첫 줄 맞춤은 교탁·칠판 높이만큼 비켜 준다',
+        /#printRoster\{--front-h:\d+pt;align-self:start;\}/.test(html) &&
+        /\.pcol:not\(\.pflip\) #printRoster\{margin-top:var\(--front-h\)/.test(html));
+  check('끝 줄 맞춤은 명렬을 자리판 줄에만 건다',
+        /\.pcol\.rlast #printRoster\{[^}]*align-self:end[^}]*grid-row:board-start \/ board-end/.test(html));
+  check('인쇄 .board 는 화면 여백을 물려받지 않는다',
+        /@media print[\s\S]*\.board\{grid-area:board;[^}]*padding:0/.test(html));
+  check('지난 기록을 지울 수 있다', /data-histdel/.test(html) && /function saveHistoryOnly/.test(html));
+  check('기록만 지울 때 새로 쌓지 않는다',
+        /setDoc\(doc\(db, 'seating', CLASSKEY\), \{ history: ST\.history \}, \{ merge: true \}\)/.test(html));
   check('분단 묶음이 저장된다', /group: ST\.group/.test(html) && /group: d\.group \|\| 1/.test(html));
   check('분단마다 격자를 따로 만든다', /class="aisle"/.test(html));
   check('번호순 순서가 저장된다', /ordStart: ST\.ordStart, ordDir: ST\.ordDir/.test(html));
