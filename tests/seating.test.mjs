@@ -191,7 +191,10 @@ console.log('\n■ 화면 배선 — JS 가 부르는 id 가 실제로 있나');
   check('지난 배치는 본인 것만 (관리자는 전부)', /ME === ADMIN_EMAIL \|\| h\.by === ME/.test(html));
   check('이력은 최근 것만 남긴다', /slice\(-HIST_KEEP\)/.test(html));
   check('명렬 원본은 안 건드린다', !/setDoc\(doc\(db, 'students'/.test(html));
-  check('인쇄에서 선택 표시를 지운다', /@media print[\s\S]*\.seat\.sel\{border:1px solid #000/.test(html));
+  check('인쇄에서 선택·hover 표시를 지운다', /@media print[\s\S]*\.seat\.sel,\.seat:hover\{border:1px solid #000/.test(html));
+  check('교탁 아래 버전이 있다', /\.board\.flip\{flex-direction:column-reverse;\}/.test(html) && /function rowOrder\(\)/.test(html));
+  check('표 복사도 교탁 방향을 따른다', /if \(!ST\.flip\) t \+= desk;/.test(html) && /if \(ST\.flip\) t \+= desk;/.test(html));
+  check('교탁 방향은 문서에 저장된다', /flip: !!ST\.flip/.test(html) && /flip: !!d\.flip/.test(html));
   check('인쇄에서 화면 UI 를 뺀다', /@media print[\s\S]*\.noprint\{display:none !important;\}/.test(html));
   check('인쇄는 A4 가로', /@page\{ size:A4 landscape;/.test(html));
   check('저장은 seating 문서에만', (html.match(/setDoc\(doc\(db, '([a-zA-Z]+)'/g) || [])

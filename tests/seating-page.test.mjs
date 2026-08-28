@@ -79,6 +79,28 @@ say('저장 내용에 seats 가 있다', !!saved.seats && Object.keys(saved.seat
 say('이력이 한 장 쌓였다', Array.isArray(saved.history) && saved.history.length === 1, saved.history?.length);
 say('이력에 저장자가 남는다', saved.history[0].by === 'kim@yeungnam.hs.kr', saved.history[0].by);
 say('저장 알림', (await pg.$eval('#ok', e => e.textContent)).includes('저장'));
+say('교탁 방향도 저장된다', 'flip' in saved, Object.keys(saved));
+
+// 교탁 위/아래 — 그리는 방향만 바뀌고 자리 데이터는 그대로여야 한다
+await pg.click('#bOrder');
+const topFirst = await pg.$eval('.grid .seat .s-name', e => e.textContent);
+const seatsBefore = await pg.evaluate(() => JSON.stringify(
+  [...document.querySelectorAll('.grid .seat')].map(s => s.dataset.cell + ':' + (s.querySelector('.s-name')?.textContent || ''))
+    .sort()));
+await pg.click('#bFlip');
+say('교탁이 아래로 간다', await pg.$eval('.board', e => e.classList.contains('flip')));
+say('버튼 글자가 바뀐다', (await pg.$eval('#bFlip', e => e.textContent)).includes('아래'));
+const bottomFirst = await pg.$eval('.grid .seat .s-name', e => e.textContent);
+say('처음 그려지는 학생이 달라진다(뒷줄부터)', topFirst !== bottomFirst, { topFirst, bottomFirst });
+const seatsAfter = await pg.evaluate(() => JSON.stringify(
+  [...document.querySelectorAll('.grid .seat')].map(s => s.dataset.cell + ':' + (s.querySelector('.s-name')?.textContent || ''))
+    .sort()));
+say('자리 데이터는 그대로다', seatsBefore === seatsAfter);
+// 뒤집으면 앞줄(0행)이 맨 나중에 그려진다 — 그래야 교탁 옆에 붙는다
+const lastRow = await pg.$$eval('.grid .seat', e => e[e.length - 1].dataset.cell.split(',')[0]);
+say('뒤집으면 앞줄이 맨 나중에 그려진다', lastRow === '0', { lastRow });
+await pg.click('#bFlip');
+say('다시 누르면 교탁이 위로', !(await pg.$eval('.board', e => e.classList.contains('flip'))));
 
 // 학생 추가
 await pg.fill('#addNum', '31'); await pg.fill('#addName', '전입생');

@@ -64,9 +64,13 @@
   .sep{width:1px;align-self:stretch;background:var(--rule);margin:0 3px;}
 
   /* ── 자리판 ── */
-  .board{background:var(--paper);border:1px solid var(--rule);border-radius:14px;padding:18px;margin-bottom:14px;}
+  /* 교탁을 아래로 내리는 건 그리는 방향만 바꾸는 것이다. 자리 데이터는 그대로라
+     번호순은 여전히 '교탁 쪽 왼쪽부터'다. 줄 순서는 JS 가 뒤집는다. */
+  .board{background:var(--paper);border:1px solid var(--rule);border-radius:14px;padding:18px;margin-bottom:14px;
+    display:flex;flex-direction:column;gap:16px;}
+  .board.flip{flex-direction:column-reverse;}
   .teacher{text-align:center;font-size:12.5px;font-weight:900;color:var(--ink-soft);
-    letter-spacing:.22em;border:2px dashed var(--rule);border-radius:9px;padding:7px;margin-bottom:16px;}
+    letter-spacing:.22em;border:2px dashed var(--rule);border-radius:9px;padding:7px;}
   .grid{display:grid;gap:8px;}
   .seat{
     position:relative;min-height:62px;border:1.5px solid var(--rule);border-radius:10px;
@@ -122,14 +126,15 @@
     .seat{min-height:0;background:#fff !important;border:1px solid #000;border-radius:0;padding:4px 2px;}
     .seat.off{border:1px dashed #bbb;background:#fff !important;}
     .seat.empty{border:1px dashed #bbb;}
-    /* 고르던 자리 표시는 화면용이다 — 인쇄물에 파란 테두리가 남으면 안 된다 */
-    .seat.sel{border:1px solid #000;background:#fff !important;}
+    /* 고르던 자리·마우스 올린 자리 표시는 화면용이다 — 인쇄물에 색 테두리가 남으면 안 된다 */
+    .seat.sel,.seat:hover{border:1px solid #000;background:#fff !important;}
     .seat.pick{outline:none;}
     .s-name{font-size:12pt;}
     .s-num{font-size:8.5pt;color:#000;}
     .s-duty{background:transparent;color:#000;border:none;font-size:8.5pt;padding:0;}
     .s-tags{display:none;}
-    .teacher{border:2px solid #000;color:#000;padding:5px;margin-bottom:10px;}
+    .board{display:flex;gap:10px;}
+    .teacher{border:2px solid #000;color:#000;padding:5px;}
     .head h1{font-size:14pt;}
     .head .cls{background:transparent;color:#000;border:1px solid #000;}
   }
@@ -163,6 +168,8 @@
     <button class="btn" id="mApart">분리</button>
     <button class="btn" id="mDuty">임무</button>
     <button class="btn" id="mOff">빈칸</button>
+    <span class="sep"></span>
+    <button class="btn" id="bFlip" title="교탁을 위에 그릴지 아래에 그릴지 — 자리는 그대로입니다">교탁 ↑ 위</button>
   </div>
 
   <div class="bar noprint" id="barGrid">
@@ -382,7 +389,8 @@ let ROSTER = [];                    // [{ key, num, name, extra }]
 let ST = {                          // 이 반 문서
   cols:4, rows:6, off:[], seats:{},
   fixed:{}, front:{}, apart:[], frontRows:2,
-  duty:{}, memo:'', extra:[], removed:[], history:[]
+  duty:{}, memo:'', extra:[], removed:[], history:[],
+  flip:false                        // true 면 교탁을 아래에 그린다(그리기만, 자리 데이터는 그대로)
 };
 let MODE = 'move';
 let PICK = null;                    // 자리 옮기기: 먼저 고른 자리
@@ -418,12 +426,20 @@ async function loadRoster(){
 }
 
 /* ── 자리판 ── */
+// 그리는 줄 순서. 교탁이 아래면 뒤에서부터 그려야 앞줄이 교탁 옆에 온다.
+function rowOrder(){
+  const rs = Array.from({ length: ST.rows }, (_, i) => i);
+  return ST.flip ? rs.reverse() : rs;
+}
 function renderGrid(){
   const off = new Set(ST.off);
   const el  = $('grid');
+  document.querySelector('.board').classList.toggle('flip', !!ST.flip);
+  const fb = $('bFlip');
+  if (fb) { fb.textContent = ST.flip ? '교탁 ↓ 아래' : '교탁 ↑ 위'; fb.classList.toggle('on', !!ST.flip); }
   el.style.gridTemplateColumns = `repeat(${ST.cols}, minmax(0,1fr))`;
   let html = '';
-  for (let r = 0; r < ST.rows; r++) for (let c = 0; c < ST.cols; c++) {
+  for (const r of rowOrder()) for (let c = 0; c < ST.cols; c++) {
     const cell = seatRC(r, c);
     if (off.has(cell)) { html += `<div class="seat off" data-cell="${cell}"></div>`; continue; }
     const k = ST.seats[cell];
@@ -614,7 +630,8 @@ async function load(){
       seats: d.seats || {}, fixed: d.fixed || {}, front: d.front || {},
       apart: d.apart || [], frontRows: d.frontRows || 2,
       duty: d.duty || {}, memo: d.memo || '',
-      extra: d.extra || [], removed: d.removed || [], history: d.history || []
+      extra: d.extra || [], removed: d.removed || [], history: d.history || [],
+      flip: !!d.flip
     };
   }
   $('nCols').value = ST.cols; $('nRows').value = ST.rows; $('nFront').value = ST.frontRows;
@@ -635,7 +652,7 @@ async function save(){
     await setDoc(doc(db, 'seating', CLASSKEY), {
       cols: ST.cols, rows: ST.rows, off: ST.off, seats: ST.seats,
       fixed: ST.fixed, front: ST.front, apart: ST.apart, frontRows: ST.frontRows,
-      duty: ST.duty, memo: ST.memo, extra: ST.extra, removed: ST.removed,
+      duty: ST.duty, memo: ST.memo, extra: ST.extra, removed: ST.removed, flip: !!ST.flip,
       history: hist, updatedAt: now, updatedBy: ME
     });
     ST.history = hist; DIRTY = false;
@@ -653,8 +670,9 @@ async function copyTable(){
   clearSay();
   const off = new Set(ST.off);
   let t = `<table border="1" style="border-collapse:collapse;text-align:center;">`;
-  t += `<tr><td colspan="${ST.cols}" style="padding:6px;font-weight:bold;">${esc(CLASSKEY)} 자리 배치 — 교탁</td></tr>`;
-  for (let r = 0; r < ST.rows; r++) {
+  const desk = `<tr><td colspan="${ST.cols}" style="padding:6px;font-weight:bold;">${esc(CLASSKEY)} 자리 배치 — 교탁</td></tr>`;
+  if (!ST.flip) t += desk;
+  for (const r of rowOrder()) {
     t += '<tr>';
     for (let c = 0; c < ST.cols; c++) {
       const cell = seatRC(r, c), k = ST.seats[cell];
@@ -665,6 +683,7 @@ async function copyTable(){
     }
     t += '</tr>';
   }
+  if (ST.flip) t += desk;
   t += '</table>';
   if (ST.memo || $('memo').value) t += `<p>${esc($('memo').value || ST.memo)}</p>`;
   try {
@@ -745,6 +764,7 @@ function bindRest(){
     for (const k in ST.front) ST.front[k] = ST.frontRows;
     touch();
   });
+  $('bFlip').addEventListener('click', () => { ST.flip = !ST.flip; touch(); });
   $('bSave').addEventListener('click', save);
   $('bCopy').addEventListener('click', copyTable);
   $('bPrint').addEventListener('click', () => {
