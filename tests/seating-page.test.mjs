@@ -277,6 +277,14 @@ say('전입생이 명렬에 들어간다',
   say('다시 누르면 빠진다', (await pg.$eval('#bApartMake', e => e.textContent)).includes('2명'));
   await pg.click(`.seat[data-cell="${seats[2]}"]`);
   await pg.click(`.seat[data-cell="${seats[3]}"]`);
+  say('기본은 이웃 금지', await pg.$eval('#apartD2', e => e.classList.contains('on')));
+  say('버튼 글에 거리가 보인다',
+      (await pg.$eval('#bApartMake', e => e.textContent)).includes('이웃 안 되게'),
+      await pg.$eval('#bApartMake', e => e.textContent));
+  await pg.click('#apartD3');
+  say("'멀리'로 바꾸면 글도 바뀐다",
+      (await pg.$eval('#bApartMake', e => e.textContent)).includes('멀리'));
+  await pg.click('#apartD2');
   await pg.click('#bApartMake');
   const cons = await pg.$eval('#consList', e => e.textContent);
   say('제약 목록에 4명 묶음으로 들어간다', /분리\s*4명/.test(cons), cons.slice(0, 120));
