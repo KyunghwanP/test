@@ -8,203 +8,243 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500;700&display=swap">
 <style>
+  /* ── 색 ─────────────────────────────────────────────────────────────────
+     자리 배치도는 교실 벽에 붙는 인쇄물이다. 화면도 그 종이를 만드는 작업대처럼
+     보이는 편이 맞다 — 도구는 물러서고 종이가 앞에 오게. */
   :root{
-    --paper:#fff; --paper-soft:#F6F7F9; --bg:#EEF1F5;
-    --ink:#16202B; --ink-soft:#6B7885; --rule:#DDE3EA;
-    --mon:#2E8B7A; --mon-soft:#E3F2EE;      /* 자리 배치도는 인쇄물에 가깝다 — 앱 파랑 대신 청록 */
-    --desk:#C89B6A; --board-g:#2E8B7A;
-    --warn:#D97706; --warn-soft:#FEF3C7;
-    --stop:#DC2626; --stop-soft:#FEE2E2;
-    --ok:#0F766E; --ok-soft:#CCFBF1;
+    --paper:#FFFFFF; --paper-soft:#F5F7FA; --bg:#EDF0F5; --sunk:#E4E9F0;
+    --ink:#16202B; --ink-mid:#4C5A6B;
+    --ink-soft:#7B8798; --rule:#DDE3EC; --rule-soft:#EBEFF5;
+    --mon:#2E5AAC; --mon-deep:#234785; --mon-soft:#E8EEFA;
+    --desk:#C89B6A;
+    --warn:#B0740C; --warn-soft:#FBF0DA;
+    --stop:#C2453B; --stop-soft:#FBE6E4;
+    --ok:#0F766E;   --ok-soft:#D6F0EC;
+    --shadow-1:0 1px 2px rgba(22,32,43,.05), 0 2px 8px -4px rgba(22,32,43,.10);
+    --shadow-2:0 2px 4px rgba(22,32,43,.06), 0 10px 22px -10px rgba(22,32,43,.22);
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --paper:#1B2530; --paper-soft:#212D3A; --bg:#141C25;
-      --ink:#E8EDF3; --ink-soft:#94A3B4; --rule:#33414F;
-      --mon:#5FC4AC; --mon-soft:#1E3A34;
-      --desk:#A9825A; --board-g:#3E9C8A;
-      --warn:#FBBF24; --warn-soft:#3A2F14;
-      --stop:#F87171; --stop-soft:#3B1D1D;
-      --ok:#5EEAD4; --ok-soft:#123C38;
+      --paper:#1B2530; --paper-soft:#212C39; --bg:#131B24; --sunk:#1A242F;
+      --ink:#E8EDF3; --ink-mid:#B6C2D0;
+      --ink-soft:#8794A6; --rule:#32404F; --rule-soft:#28333F;
+      --mon:#7FA6E8; --mon-deep:#A8C4F0; --mon-soft:#22304A;
+      --desk:#B08858;
+      --warn:#E3B056; --warn-soft:#3A2E12;
+      --stop:#E88A81; --stop-soft:#3B1E1B;
+      --ok:#6FD3BE;   --ok-soft:#123830;
+      --shadow-1:0 1px 2px rgba(0,0,0,.30);
+      --shadow-2:0 2px 6px rgba(0,0,0,.34), 0 12px 26px -12px rgba(0,0,0,.6);
     }
   }
   *{box-sizing:border-box;}
   body{
     margin:0; background:var(--bg); color:var(--ink);
     font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-    font-size:14px; line-height:1.5;
+    font-size:14px; line-height:1.55; -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:1180px;margin:0 auto;padding:16px 16px 64px;}
+  .wrap{max-width:1240px;margin:0 auto;padding:30px 26px 80px;}
 
   /* ── 머리 ── */
-  .head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
-  .head h1{font-size:19px;font-weight:900;margin:0;letter-spacing:-.02em;}
-  .head .cls{font-family:'IBM Plex Mono';font-weight:700;color:var(--mon);background:var(--mon-soft);
-    padding:3px 11px;border-radius:999px;font-size:14px;}
-  .head .who{margin-left:auto;font-size:12.5px;color:var(--ink-soft);}
+  .head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:22px;}
+  .head h1{font-size:25px;font-weight:900;margin:0;letter-spacing:-.035em;color:var(--ink);}
+  .head .cls{font-size:16px;font-weight:800;color:var(--mon);letter-spacing:-.01em;}
+  .head .who{margin-left:auto;font-size:12.5px;color:var(--ink-soft);align-self:center;}
 
-  .note{padding:10px 13px;border-radius:10px;font-size:13px;font-weight:500;margin-bottom:12px;line-height:1.6;}
+  .note{padding:11px 15px;border-radius:11px;font-size:13.5px;font-weight:600;
+    margin-bottom:12px;line-height:1.65;}
   .note.warn{background:var(--warn-soft);color:var(--warn);}
   .note.stop{background:var(--stop-soft);color:var(--stop);}
   .note.ok{background:var(--ok-soft);color:var(--ok);}
   .note:empty{display:none;}
 
-  /* ── 도구 막대 ── */
-  .bar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;
-    background:var(--paper);border:1px solid var(--rule);border-radius:12px;padding:10px 12px;margin-bottom:12px;}
-  .bar + .bar{margin-top:-4px;}
-  .bar-label{font-size:12px;font-weight:700;color:var(--ink-soft);margin-right:2px;}
-  button{font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;}
-  .btn{padding:7px 13px;border-radius:8px;border:1.5px solid var(--rule);background:var(--paper);color:var(--ink);}
-  .btn:hover{border-color:var(--mon);color:var(--mon);}
+  /* ── 도구 막대: 종이보다 조용하게. 알약 버튼을 늘어놓지 않고 묶음으로 만든다 ── */
+  .bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+  .bar + .bar{margin-bottom:20px;}
+  .bar-label{font-size:11px;font-weight:800;color:var(--ink-soft);
+    letter-spacing:.11em;text-transform:uppercase;}
+  .sep{flex:1;}
+  button{font-family:inherit;cursor:pointer;}
+
+  /* 한 무리로 붙인 버튼들 — 낱개 알약보다 훨씬 조용하다 */
+  .seg{display:inline-flex;background:var(--sunk);border-radius:11px;padding:3px;gap:2px;}
+  .seg .btn{border:none;background:transparent;box-shadow:none;
+    padding:7px 13px;border-radius:8px;font-size:13px;font-weight:700;color:var(--ink-mid);}
+  .seg .btn:hover{background:var(--paper);color:var(--ink);}
+  .seg .btn.on{background:var(--paper);color:var(--mon);box-shadow:var(--shadow-1);}
+
+  .btn{padding:8px 15px;border-radius:10px;border:1px solid var(--rule);
+    background:var(--paper);color:var(--ink-mid);font-size:13px;font-weight:700;
+    box-shadow:var(--shadow-1);transition:color .12s,border-color .12s,background .12s;}
+  .btn:hover{color:var(--mon);border-color:var(--mon);}
   .btn.on{background:var(--mon);border-color:var(--mon);color:#fff;}
   .btn.pri{background:var(--mon);border-color:var(--mon);color:#fff;}
-  .btn.pri:hover{filter:brightness(1.08);color:#fff;}
-  .btn:disabled{opacity:.45;cursor:not-allowed;}
-  .num{width:52px;padding:6px 8px;border:1.5px solid var(--rule);border-radius:8px;
-    background:var(--paper);color:var(--ink);font-family:'IBM Plex Mono';font-weight:700;text-align:center;font-size:13px;}
-  .sep{width:1px;align-self:stretch;background:var(--rule);margin:0 3px;}
+  .btn.pri:hover{background:var(--mon-deep);border-color:var(--mon-deep);color:#fff;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;}
+  .num{width:56px;padding:7px 8px;border:1px solid var(--rule);border-radius:9px;
+    background:var(--paper);color:var(--ink);font-family:'IBM Plex Mono';
+    font-weight:700;text-align:center;font-size:13px;box-shadow:var(--shadow-1);}
+  .num:focus{outline:none;border-color:var(--mon);}
+  label{font-size:12.5px;font-weight:700;color:var(--ink-mid);
+    display:inline-flex;align-items:center;gap:6px;}
 
-  /* ── 자리판 ── */
-  /* 교탁을 아래로 내리는 건 그리는 방향만 바꾸는 것이다. 자리 데이터는 그대로라
-     번호순은 여전히 '교탁 쪽 왼쪽부터'다. 줄 순서는 JS 가 뒤집는다. */
-  /* 자리판은 바닥을 한 톤 낮추고 자리를 흰 카드로 띄운다 — 자리가 눈에 먼저 들어오게. */
-  .board{background:var(--bg);border:1px solid var(--rule);border-radius:16px;padding:20px;margin-bottom:14px;
-    display:flex;flex-direction:column;gap:18px;}
+  /* ── 자리판: 이 페이지의 주인공. 여백을 아끼지 않는다 ── */
+  .board{background:var(--paper);border-radius:20px;padding:34px 30px 30px;
+    margin-bottom:16px;box-shadow:var(--shadow-2);
+    display:flex;flex-direction:column;gap:30px;}
   .board.flip{flex-direction:column-reverse;}
-  /* 교탁과 칠판 — 어느 쪽이 앞인지 한눈에 보이게 */
-  /* 칠판은 벽이고 교탁은 그 앞이다 — 순서는 언제나 [학생 … 교탁 … 칠판].
-     교탁이 위면 위에서부터 칠판·교탁, 교탁이 아래면 교탁·칠판. */
-  .front{display:flex;flex-direction:column-reverse;align-items:center;gap:0;}
-  .board.flip .front{flex-direction:column;}
-  .desk{background:var(--desk);color:#fff;font-size:13px;font-weight:800;letter-spacing:.18em;
-    padding:8px 34px;border-radius:0 0 8px 8px;box-shadow:0 2px 5px -2px rgba(16,24,40,.3);z-index:1;}
-  .board.flip .desk{border-radius:8px 8px 0 0;}
-  .chalk{background:var(--board-g);color:#fff;font-size:13px;font-weight:800;letter-spacing:.18em;
-    width:min(560px,86%);text-align:center;padding:11px;border-radius:6px;
-    box-shadow:0 2px 6px -2px rgba(16,24,40,.3);}
-  /* 분단마다 따로 격자를 만들고 사이를 벌린다 — 실제 교실이 그렇게 생겼다.
-     줄 높이는 flex stretch 로 분단끼리 저절로 맞는다. */
-  .grid{display:flex;gap:26px;align-items:stretch;}
-  .aisle{flex:1;display:grid;gap:22px 9px;grid-auto-rows:1fr;}
+  .grid{display:flex;gap:34px;align-items:stretch;}
+  .aisle{flex:1;display:grid;gap:26px 12px;grid-auto-rows:1fr;}
+
   .seat{
-    position:relative;min-height:64px;border:1px solid var(--rule);border-radius:11px;
-    background:var(--paper);padding:10px 6px 9px;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-    cursor:pointer;user-select:none;
-    box-shadow:0 2px 6px -2px rgba(16,24,40,.14);
-    transition:border-color .12s,box-shadow .12s,transform .12s;
+    position:relative;min-height:82px;border-radius:14px;
+    background:var(--paper);border:1px solid var(--rule-soft);
+    padding:14px 8px 12px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    cursor:pointer;user-select:none;box-shadow:var(--shadow-1);
+    transition:box-shadow .15s,transform .15s,border-color .15s;
   }
-  .seat:hover{border-color:var(--mon);box-shadow:0 6px 14px -4px rgba(16,24,40,.24);transform:translateY(-1px);}
-  /* 번호는 자리를 찾는 첫 단서다. 카드 위에 얹은 꼬리표로 빼서 이름과 안 다투게 한다. */
+  .seat:hover{box-shadow:var(--shadow-2);transform:translateY(-2px);border-color:var(--mon-soft);}
+  /* 번호는 카드 위에 걸친 꼬리표. 이름과 자리를 다투지 않으면서 멀리서도 읽힌다. */
   .s-num{
-    position:absolute;top:-13px;left:9px;
+    position:absolute;top:-11px;left:50%;transform:translateX(-50%);
     background:var(--mon);color:#fff;
-    font-family:'IBM Plex Mono';font-size:12px;font-weight:700;letter-spacing:.02em;
-    padding:2px 9px 3px;border-radius:7px 7px 3px 3px;
-    box-shadow:0 1px 3px rgba(16,24,40,.18);
+    font-family:'IBM Plex Mono';font-size:11.5px;font-weight:700;letter-spacing:.04em;
+    padding:2px 11px 3px;border-radius:7px;box-shadow:var(--shadow-1);white-space:nowrap;
   }
-  .s-name{font-size:17px;font-weight:700;line-height:1.25;text-align:center;word-break:keep-all;letter-spacing:-.01em;}
-  .s-duty{font-size:11.5px;font-weight:700;color:var(--mon);background:var(--mon-soft);
-    border-radius:999px;padding:2px 9px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .seat.empty{background:transparent;border-style:dashed;box-shadow:none;opacity:.55;}
-  .seat.empty:hover{transform:none;}
-  .seat.off{background:repeating-linear-gradient(45deg,transparent,transparent 6px,var(--rule) 6px,var(--rule) 7px);
-    border-style:dotted;box-shadow:none;opacity:.5;}
-  .seat.off:hover{transform:none;}
-  .seat.sel{border-color:var(--mon);box-shadow:0 0 0 2px var(--mon) inset;}
-  .seat.pick{box-shadow:0 0 0 2px var(--warn) inset;}
-  .s-tags{position:absolute;top:5px;right:6px;display:flex;gap:3px;font-size:10px;}
-  .s-tag{border-radius:999px;padding:1px 6px;font-weight:800;line-height:1.5;}
+  .s-name{font-size:18px;font-weight:700;line-height:1.2;text-align:center;
+    word-break:keep-all;letter-spacing:-.02em;color:var(--ink);}
+  .s-duty{font-size:11px;font-weight:700;color:var(--mon);background:var(--mon-soft);
+    border-radius:999px;padding:2px 10px;max-width:100%;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .seat.empty{background:transparent;border:1.5px dashed var(--rule);box-shadow:none;}
+  .seat.empty:hover{transform:none;box-shadow:none;border-color:var(--mon);}
+  .seat.off{background:var(--sunk);border:none;box-shadow:none;opacity:.55;}
+  .seat.off:hover{transform:none;box-shadow:none;}
+  .seat.sel{border-color:var(--mon);box-shadow:0 0 0 2px var(--mon), var(--shadow-2);}
+  .seat.pick{border-color:var(--warn);box-shadow:0 0 0 2px var(--warn), var(--shadow-2);}
+  .s-tags{position:absolute;top:7px;right:8px;display:flex;gap:3px;font-size:9.5px;}
+  .s-tag{border-radius:999px;padding:1px 6px;font-weight:800;line-height:1.6;}
   .s-tag.fix{background:var(--stop-soft);color:var(--stop);}
   .s-tag.fr{background:var(--warn-soft);color:var(--warn);}
   .s-tag.ap{background:var(--ok-soft);color:var(--ok);}
 
-  /* ── 옆 패널 ── */
-  .cols{display:grid;grid-template-columns:1fr 320px;gap:14px;align-items:start;}
-  @media (max-width:900px){ .cols{grid-template-columns:1fr;} }
-  .card{background:var(--paper);border:1px solid var(--rule);border-radius:14px;padding:14px 16px;margin-bottom:12px;}
-  .card h2{font-size:13.5px;font-weight:900;margin:0 0 10px;display:flex;align-items:center;gap:6px;}
-  .card h2 .cnt{font-weight:700;color:var(--ink-soft);font-size:12px;}
-  .hint{font-size:12px;color:var(--ink-soft);line-height:1.6;margin:0 0 10px;}
-  .list{display:flex;flex-direction:column;gap:5px;}
-  /* 30명 명렬이 그대로 늘어나면 페이지가 한참 길어진다 — 넘치면 안에서 스크롤 */
-  .list.scroll{max-height:330px;overflow-y:auto;padding-right:2px;}
-  .row{display:flex;align-items:center;gap:7px;font-size:13px;padding:5px 7px;border-radius:7px;background:var(--paper-soft);}
-  .row .nm{flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .row .mono{font-family:'IBM Plex Mono';font-size:11.5px;color:var(--ink-soft);}
-  .x{border:none;background:transparent;color:var(--ink-soft);font-size:15px;line-height:1;padding:2px 4px;border-radius:5px;}
+  /* 칠판은 벽, 교탁은 그 앞. 순서는 언제나 [학생 … 교탁 … 칠판] */
+  .front{display:flex;flex-direction:column-reverse;align-items:center;gap:0;}
+  .board.flip .front{flex-direction:column;}
+  .desk{background:var(--desk);color:#fff;font-size:12.5px;font-weight:800;
+    letter-spacing:.28em;text-indent:.28em;padding:9px 40px;
+    border-radius:0 0 10px 10px;box-shadow:var(--shadow-1);z-index:1;}
+  .board.flip .desk{border-radius:10px 10px 0 0;}
+  .chalk{background:var(--mon);color:#fff;font-size:12.5px;font-weight:800;
+    letter-spacing:.28em;text-indent:.28em;width:min(600px,80%);text-align:center;
+    padding:13px;border-radius:8px;box-shadow:var(--shadow-1);}
+
+  /* ── 옆 패널: 테두리 대신 여백으로 나눈다 ── */
+  .cols{display:grid;grid-template-columns:minmax(0,1fr) 316px;gap:22px;align-items:start;}
+  @media (max-width:960px){ .cols{grid-template-columns:minmax(0,1fr);} }
+  .card{background:var(--paper);border-radius:16px;padding:18px 20px;margin-bottom:14px;
+    box-shadow:var(--shadow-1);}
+  .card h2{font-size:11px;font-weight:800;margin:0 0 12px;letter-spacing:.11em;
+    text-transform:uppercase;color:var(--ink-soft);display:flex;align-items:center;gap:8px;}
+  .card h2 .cnt{font-weight:700;color:var(--mon);letter-spacing:0;text-transform:none;font-size:12px;}
+  .hint{font-size:12.5px;color:var(--ink-soft);line-height:1.7;margin:0 0 12px;}
+  .list{display:flex;flex-direction:column;gap:1px;}
+  .list.scroll{max-height:322px;overflow-y:auto;margin:0 -6px;padding:0 6px;}
+  .row{display:flex;align-items:center;gap:9px;font-size:13.5px;padding:7px 8px;
+    border-radius:8px;}
+  .row:hover{background:var(--paper-soft);}
+  .row .nm{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .row .mono{font-family:'IBM Plex Mono';font-size:11.5px;font-weight:700;color:var(--ink-soft);
+    min-width:22px;}
+  .x{border:none;background:transparent;color:var(--rule);font-size:16px;line-height:1;
+    padding:3px 5px;border-radius:6px;}
+  .row:hover .x{color:var(--ink-soft);}
   .x:hover{background:var(--stop-soft);color:var(--stop);}
-  .none{font-size:12.5px;color:var(--ink-soft);padding:4px 2px;}
-  .txt{width:100%;padding:9px 11px;border:1.5px solid var(--rule);border-radius:9px;
+  .none{font-size:12.5px;color:var(--ink-soft);padding:6px 2px;}
+  .txt{width:100%;padding:10px 13px;border:1px solid var(--rule);border-radius:10px;
     background:var(--paper);color:var(--ink);font-family:inherit;font-size:13.5px;outline:none;}
   .txt:focus{border-color:var(--mon);}
-  textarea.txt{min-height:88px;resize:vertical;line-height:1.65;}
+  textarea.txt{min-height:92px;resize:vertical;line-height:1.7;}
   .memo-print{white-space:pre-wrap;}
   .print-only{display:none;}
 
-  /* ── 인쇄 ── */
+  /* ── 인쇄 ────────────────────────────────────────────────────────────────
+     교실 벽에 붙는 종이다. 여기가 이 페이지의 결과물이고 화면은 그걸 만드는
+     작업대일 뿐이다.
+
+     색을 쓰되 '진한 바탕 + 흰 글씨'는 피한다. 브라우저가 배경을 안 찍으면
+     흰 글씨가 흰 종이에서 통째로 사라지기 때문이다. 연한 바탕 · 진한 글씨 ·
+     테두리로 만들면 배경이 빠져도 글씨와 구조가 그대로 남는다.
+     print-color-adjust 로 색을 요청하되, 그것에 기대지는 않는다.          */
   @media print{
-    @page{ size:A4 landscape; margin:11mm 10mm; }
+    @page{ size:A4 landscape; margin:10mm 9mm; }
+    *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     html,body{height:100%;}
-    body{background:#fff;color:#000;font-size:11pt;}
-    /* 자리판이 A4 한 장을 채우게 편다 — 위쪽 절반만 쓰면 멀리서 안 읽힌다.
-       flex 로 늘리므로 줄이 많아도 칸이 줄어들 뿐 두 장으로 넘어가지 않는다. */
+    body{background:#fff;color:#1A2432;font-size:10.5pt;}
     .wrap{max-width:none;padding:0;display:flex;flex-direction:column;height:100vh;}
     .noprint{display:none !important;}
-    /* 화면용 .cols 는 align-items:start 인데, flex 를 세로로 돌리면 그게 가로 정렬이 되어
-       자리판 폭이 내용만큼 쪼그라든다. 인쇄에서는 다시 stretch 로 편다. */
-    .cols{display:flex;flex-direction:column;align-items:stretch;flex:1;min-height:0;}
-    .cols > div:first-child{flex:1;min-height:0;}
-    .board{min-height:0;display:flex;flex-direction:column;}
-    .grid{flex:1;min-height:0;}
-    .aisle{grid-auto-rows:1fr;}
-    .board{border:none;padding:0;margin:0;}
+    .head{display:none;}                   /* 인쇄에는 아래 큰 제목이 대신 나온다 */
     .print-only{display:block;}
-    /* 종이는 [명렬표 | 자리판] 두 칸으로 쓴다 — 이름을 번호로 찾는 일이 잦다 */
-    .head{display:none;}                 /* 인쇄에는 아래 큰 제목이 대신 나온다 */
-    .cols > div:first-child{display:grid;grid-template-columns:116px 1fr;
+
+    /* 화면용 .cols 는 align-items:start 다. flex 를 세로로 돌리면 그게 가로 정렬이
+       되어 자리판이 종이의 1/3 로 쪼그라든다 — stretch 로 되돌린다. */
+    .cols{display:flex;flex-direction:column;align-items:stretch;flex:1;min-height:0;}
+    /* 종이는 [명렬표 | 자리판] 두 칸. 이름을 번호로 찾는 일이 잦다. */
+    .cols > div:first-child{
+      flex:1;min-height:0;display:grid;
+      grid-template-columns:auto 1fr;   /* 명렬 단 수에 따라 좌측 폭이 늘어난다 */
       grid-template-rows:auto 1fr auto;
       grid-template-areas:"title title" "roster board" "roster memo";
-      column-gap:12px;row-gap:8px;}
-    #printTitle{grid-area:title;text-align:center;font-size:17pt;font-weight:900;
-      color:#000;letter-spacing:-.02em;padding-bottom:2mm;}
+      column-gap:14px;row-gap:9px;}
+
+    #printTitle{grid-area:title;text-align:center;font-size:19pt;font-weight:900;
+      color:#2E5AAC;letter-spacing:-.035em;padding:0 0 1mm;}
     #printRoster{grid-area:roster;}
     .board{grid-area:board;}
     #memoCard{grid-area:memo;}
-    .pr-tbl{width:100%;border-collapse:collapse;font-size:8.5pt;}
-    .pr-tbl th{background:#eee;border:1px solid #666;padding:2px;font-weight:800;}
-    .pr-tbl td{border:1px solid #999;padding:1.6px 3px;text-align:center;}
-    .pr-tbl td.nm{text-align:left;}
-    .pr-cap{border:1px solid #666;border-bottom:none;padding:3px;text-align:center;
-      font-weight:800;font-size:9pt;background:#eee;}
-    .card{border:1px solid #999;border-radius:0;padding:5px 8px;margin:0;break-inside:avoid;}
-    #memoCard h2{font-size:9pt;margin:0 0 2px;}
-    .memo-print{font-size:9.5pt;line-height:1.5;}
-    /* 배경색은 기본적으로 인쇄되지 않는다 — 흰 글씨가 흰 종이에 사라지면 안 된다 */
-    .desk,.chalk{background:#fff !important;color:#000 !important;border:1.5px solid #000;
-      box-shadow:none;padding:5pt 20pt;}
-    .chalk{width:min(70%,420pt);}
-    .s-num{background:#fff !important;color:#000 !important;border:1px solid #000;
-      box-shadow:none;border-radius:4px;padding:0 4px;}
-    .grid{gap:19pt;}
-    .aisle{gap:15pt 5pt;}
-    .board{background:#fff;border:none;}
-    .seat{min-height:0;background:#fff !important;border:1px solid #000;border-radius:0;
-      padding:13pt 3pt 4pt;box-shadow:none;transform:none;}
-    .seat.off{border:1px dashed #bbb;background:#fff !important;}
-    .seat.empty{border:1px dashed #bbb;}
-    /* 고르던 자리·마우스 올린 자리 표시는 화면용이다 — 인쇄물에 색 테두리가 남으면 안 된다 */
-    .seat.sel,.seat:hover{border:1px solid #000;background:#fff !important;box-shadow:none;transform:none;}
-    .seat.pick{outline:none;box-shadow:none;}
-    .s-name{font-size:13pt;font-weight:700;}
-    .s-num{font-size:9.5pt;color:#000;top:3pt;left:4pt;}
-    .s-duty{background:transparent;color:#000;border:none;font-size:9pt;padding:0;}
-    .s-tags{display:none;}
-    .board{display:flex;gap:10px;}
-    .teacher{border:2px solid #000;color:#000;padding:5px;}
-    .head h1{font-size:14pt;}
-    .head .cls{background:transparent;color:#000;border:1px solid #000;}
+
+    /* 명렬표 */
+    .pr-cap{background:#E8EEFA;color:#2E5AAC;border:1px solid #A9C0E6;border-bottom:none;
+      border-radius:6px 6px 0 0;padding:4px;text-align:center;font-weight:800;font-size:9pt;}
+    .pr-cols{display:flex;gap:5px;align-items:flex-start;}
+    .pr-tbl{width:106px;border-collapse:collapse;font-size:8.5pt;}
+    .pr-tbl th{background:#F2F6FC;color:#3B5B8C;border:1px solid #C9D8EE;
+      padding:2.5px;font-weight:800;}
+    .pr-tbl td{border:1px solid #D8E2F0;padding:1.7px 4px;text-align:center;color:#1A2432;}
+    .pr-tbl td.nm{text-align:left;font-weight:600;}
+
+    /* 자리판 */
+    .board{background:#fff;border:none;border-radius:0;padding:0;margin:0;
+      box-shadow:none;display:flex;flex-direction:column;gap:9pt;}
+    .grid{flex:1;min-height:0;gap:17pt;}
+    .aisle{gap:var(--rowgap,13pt) 6pt;grid-auto-rows:1fr;}
+    .seat{min-height:0;background:#fff;border:1px solid #C7D4E6;border-radius:7px;
+      padding:var(--seatpad,9pt) 3pt 4pt;box-shadow:none;transform:none;gap:1pt;}
+    .seat.empty{border:1px dashed #D5DEEA;background:#fff;}
+    .seat.off{background:#F1F4F8;border:1px solid #E4EAF2;}
+    /* 고르던 자리·마우스 올린 자리는 화면용 표시다 */
+    .seat.sel,.seat.pick,.seat:hover{border:1px solid #C7D4E6;box-shadow:none;transform:none;}
+    /* 번호 꼬리표 — 연한 바탕에 진한 파랑이라 배경이 안 찍혀도 읽힌다 */
+    .s-num{top:-6.5pt;background:#E8EEFA;color:#2E5AAC;border:1px solid #A9C0E6;
+      border-radius:5px;padding:0.5pt 6pt 1pt;font-size:8.5pt;box-shadow:none;}
+    .s-name{font-size:12.5pt;font-weight:700;color:#111C29;}
+    .s-duty{background:#F2F6FC;color:#3B5B8C;border:1px solid #D8E2F0;
+      font-size:8pt;padding:0 5pt;}
+    .s-tags{display:none;}                 /* 제약 배지는 작업용이다 */
+
+    /* 교탁·칠판 */
+    .desk{background:#F6EDE1;color:#8A5F2E;border:1px solid #D9B183;
+      padding:4pt 24pt;font-size:9.5pt;box-shadow:none;}
+    .chalk{background:#E8EEFA;color:#2E5AAC;border:1px solid #A9C0E6;
+      width:min(58%,360pt);padding:6pt;font-size:9.5pt;box-shadow:none;}
+
+    /* 메모 — 붙여 둔 쪽지처럼 */
+    .card{background:#FDFAEC;border:1px solid #E4D9A9;border-radius:8px;
+      padding:6pt 10pt;margin:0;box-shadow:none;break-inside:avoid;}
+    #memoCard h2{font-size:8pt;margin:0 0 2pt;color:#8A7526;letter-spacing:.1em;}
+    .memo-print{font-size:9.5pt;line-height:1.55;color:#4A4114;}
+    #memoCard:has(.memo-print:empty){display:none;}
   }
 </style>
 </head>
@@ -223,19 +263,24 @@
 
   <div class="bar noprint" id="barMain">
     <span class="bar-label">배정</span>
-    <button class="btn" id="bOrder">번호순</button>
-    <button class="btn" id="bRandom">랜덤</button>
-    <button class="btn" id="bPartial" title="고른 학생들끼리만 다시 섞습니다">부분 랜덤</button>
-    <button class="btn" id="bClear">전부 비우기</button>
-    <button class="btn" id="bUndo" disabled>되돌리기</button>
+    <div class="seg">
+      <button class="btn" id="bOrder">번호순</button>
+      <button class="btn" id="bRandom">랜덤</button>
+      <button class="btn" id="bPartial" title="고른 학생들끼리만 다시 섞습니다">부분 랜덤</button>
+      <button class="btn" id="bClear">전부 비우기</button>
+      <button class="btn" id="bUndo" disabled>되돌리기</button>
+    </div>
     <span class="sep"></span>
     <span class="bar-label">모드</span>
-    <button class="btn on" id="mMove">자리 옮기기</button>
-    <button class="btn" id="mFix">고정석</button>
-    <button class="btn" id="mFront">앞자리</button>
-    <button class="btn" id="mApart">분리</button>
-    <button class="btn" id="mDuty">임무</button>
-    <button class="btn" id="mOff">빈칸</button>
+    <!-- 하나만 켜지는 성격이라 낱개 버튼이 아니라 묶음 컨트롤로 둔다 -->
+    <div class="seg">
+      <button class="btn on" id="mMove">자리 옮기기</button>
+      <button class="btn" id="mFix">고정석</button>
+      <button class="btn" id="mFront">앞자리</button>
+      <button class="btn" id="mApart">분리</button>
+      <button class="btn" id="mDuty">임무</button>
+      <button class="btn" id="mOff">빈칸</button>
+    </div>
     <span class="sep"></span>
     <button class="btn" id="bFlip" title="교실을 180도 돌려 봅니다. 자리는 그대로이고 보는 방향만 바뀝니다.">학생 입장 (교탁 ↑)</button>
   </div>
@@ -537,6 +582,9 @@ function renderGrid(){
       ${ST.duty[k] ? `<span class="s-duty">${esc(ST.duty[k])}</span>` : ''}
     </div>`;
   };
+  // 줄이 많으면 인쇄에서 줄 간격만으로 종이를 넘긴다 — 줄 수에 맞춰 좁힌다.
+  el.style.setProperty('--rowgap',  ST.rows >= 10 ? '5pt' : ST.rows >= 8 ? '9pt' : '13pt');
+  el.style.setProperty('--seatpad', ST.rows >= 10 ? '7pt' : '9pt');
   // 분단(묶음)마다 격자를 따로 만들어 사이를 벌린다
   const cols = colOrder(), rows = rowOrder(), g = Math.max(1, ST.group || 1);
   let html = '';
@@ -754,14 +802,20 @@ async function save(){
 }
 
 // 인쇄물에만 넣는 제목과 명렬표. 이름을 번호로 찾는 일이 잦아 옆에 두면 쓸모가 있다.
+const PR_CHUNK = 22;   // 한 단에 넣을 줄 수. 넘치면 단을 늘린다.
+
 function buildPrintExtras(){
   const [g, r] = CLASSKEY.split('-');
   $('printTitle').textContent = `${g}학년 ${r}반 자리 배치도`;
+  // 명렬이 길면 한 단으로는 종이 높이를 넘어 두 장이 된다 — 단을 나눈다.
+  const parts = [];
+  for (let i = 0; i < ROSTER.length; i += PR_CHUNK) parts.push(ROSTER.slice(i, i + PR_CHUNK));
   $('printRoster').innerHTML =
     `<div class="pr-cap">${g}-${r} 명렬</div>` +
-    `<table class="pr-tbl"><tr><th>번호</th><th>이름</th></tr>` +
-    ROSTER.map(s => `<tr><td>${s.num}</td><td class="nm">${esc(s.name)}</td></tr>`).join('') +
-    `</table>`;
+    `<div class="pr-cols">` + (parts.length ? parts : [[]]).map(part =>
+      `<table class="pr-tbl"><tr><th>번호</th><th>이름</th></tr>` +
+      part.map(s => `<tr><td>${s.num}</td><td class="nm">${esc(s.name)}</td></tr>`).join('') +
+      `</table>`).join('') + `</div>`;
 }
 
 window.__buildPrintExtras = buildPrintExtras;   // 인쇄 모습 검사에서 부른다

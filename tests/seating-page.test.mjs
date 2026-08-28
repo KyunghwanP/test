@@ -160,9 +160,27 @@ say('자리판이 종이 높이를 쓴다', pm.tall > 300, pm);
 say('화면 UI 는 인쇄에서 빠진다', pm.ui === 'none', pm.ui);
 say('인쇄물에 제목이 붙는다', /2학년 3반 자리 배치도/.test(pm.title), pm.title);
 say('인쇄물에 명렬표가 붙는다', pm.rows > 20, pm.rows);
-// 브라우저는 기본으로 배경색을 인쇄하지 않는다 — 흰 글씨가 흰 종이에 사라지면 안 된다
-say('교탁은 배경색에 기대지 않는다', pm.deskBg === 'rgb(255, 255, 255)', pm.deskBg);
-say('번호 꼬리표도 배경색에 안 기댄다', pm.numBg === 'rgb(255, 255, 255)', pm.numBg);
+// 인쇄물은 색을 쓰되 배경색에 기대면 안 된다. 브라우저가 배경을 안 찍는 설정이면
+// 진한 바탕 위 흰 글씨는 흰 종이에서 통째로 사라진다.
+// 그러니 '배경이 흰가'가 아니라 '배경이 빠져도 글씨가 읽히는가'를 잰다.
+const contrastOnWhite = await pg.evaluate(() => {
+  const lum = c => {
+    const [r, g, b] = c.match(/\d+/g).slice(0, 3).map(v => {
+      v = v / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = sel => {
+    const el = document.querySelector(sel); if (!el) return null;
+    const L = lum(getComputedStyle(el).color);
+    return Math.round(((1.05) / (L + 0.05)) * 10) / 10;   // 흰 바탕 대비
+  };
+  return { desk: ratio('.desk'), chalk: ratio('.chalk'), num: ratio('.s-num'),
+           name: ratio('.s-name'), cap: ratio('.pr-cap'), title: ratio('#printTitle') };
+});
+for (const [k, v] of Object.entries(contrastOnWhite))
+  say(`${k} 글씨가 흰 종이에서도 읽힌다 (대비 ${v})`, v !== null && v >= 4.5, contrastOnWhite);
+say('색 인쇄를 요청해 둔다', /print-color-adjust:exact/.test(html));
 // 칠판은 벽, 교탁은 그 앞 — 학생과 칠판 사이에 교탁이 있어야 한다
 const front = await pg.evaluate(() => {
   const y = s => document.querySelector(s).getBoundingClientRect().top;
