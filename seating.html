@@ -360,6 +360,9 @@
       <div class="card">
         <h2>아직 안 앉은 학생 <span class="cnt" id="unseatedCnt"></span></h2>
         <p class="hint" id="modeHint">자리를 눌러 학생을 고르고, 다른 자리를 누르면 서로 바뀝니다.</p>
+        <div id="apartBar" style="display:none;margin-bottom:12px;">
+          <button class="btn pri" id="bApartMake" style="width:100%;">선택한 학생 묶기</button>
+        </div>
         <div class="list scroll" id="unseated"></div>
       </div>
 
@@ -448,12 +451,18 @@ function seatShuffle(arr, rand){
   return a;
 }
 // k 를 cell 에 앉혀도 분리 조건이 지켜지나 (이미 앉은 상대만 본다)
+// 분리는 '묶음'이다. 한 묶음에 든 학생끼리는 서로 다 떨어져 앉는다.
+// 5명을 떼어놓으려고 짝 10개를 만들게 하면 목록도 지저분하고 지우기도 번거롭다.
+// 예전 짝 형태({a,b})도 그대로 읽는다.
+function apartMembers(p){ return p.ks || [p.a, p.b].filter(Boolean); }
+
 function seatFits(seats, cell, k, apart){
   for (const p of apart) {
-    const other = p.a === k ? p.b : (p.b === k ? p.a : null);
-    if (!other) continue;
+    const ks = apartMembers(p);
+    if (!ks.includes(k)) continue;
+    const d = p.d || 2;
     for (const c in seats)
-      if (seats[c] === other && seatDist(cell, c) < (p.d || 2)) return false;
+      if (ks.includes(seats[c]) && seats[c] !== k && seatDist(cell, c) < d) return false;
   }
   return true;
 }
@@ -463,10 +472,13 @@ function seatViolations(seats, front, apart, nameOf){
   const nm = nameOf || (k => k), msgs = [];
   for (const k in front)
     if (at[k] && seatParse(at[k]).r >= front[k]) msgs.push(nm(k) + ' 앞자리');
-  for (const p of apart)
-    if (at[p.a] && at[p.b] && seatDist(at[p.a], at[p.b]) < (p.d || 2))
-      msgs.push(nm(p.a) + '·' + nm(p.b) + ' 분리');
-  return msgs.length ? msgs : null;
+  for (const p of apart) {
+    const ks = apartMembers(p).filter(k => at[k]);
+    const d  = p.d || 2;
+    for (let i = 0; i < ks.length; i++) for (let j = i + 1; j < ks.length; j++)
+      if (seatDist(at[ks[i]], at[ks[j]]) < d) msgs.push(nm(ks[i]) + '·' + nm(ks[j]) + ' 분리');
+  }
+  return msgs.length ? [...new Set(msgs)] : null;
 }
 // 애초에 말이 되는 제약인지. 안 되는 걸 800번 돌려봐야 시간만 버리고,
 // '못 찾았습니다'만 뜨면 무엇이 문제인지 알 수가 없다.
@@ -488,9 +500,13 @@ function seatDiagnose(roster, cells, fixed, front, apart, nameOf){
     if (byLimit[lim] > room)
       return `앞 ${lim}줄 자리는 ${room}개인데 앞자리 우선이 ${byLimit[lim]}명입니다.`;
   }
-  for (const p of apart)
-    if (fixed[p.a] && fixed[p.b] && seatDist(fixed[p.a], fixed[p.b]) < (p.d || 2))
-      return `${nm(p.a)}와 ${nm(p.b)}는 분리인데 고정석이 서로 붙어 있습니다.`;
+  for (const p of apart) {
+    const ks = apartMembers(p).filter(k => fixed[k]);
+    const d  = p.d || 2;
+    for (let i = 0; i < ks.length; i++) for (let j = i + 1; j < ks.length; j++)
+      if (seatDist(fixed[ks[i]], fixed[ks[j]]) < d)
+        return `${nm(ks[i])}와 ${nm(ks[j])}는 분리인데 고정석이 서로 붙어 있습니다.`;
+  }
   return null;
 }
 // 배치 만들기.
@@ -579,7 +595,7 @@ let ST = {                          // 이 반 문서
 };
 let MODE = 'move';
 let PICK = null;                    // 자리 옮기기: 먼저 고른 자리
-let APART_A = null;                 // 분리: 먼저 고른 학생
+let APART_SEL = new Set();          // 분리로 묶는 중인 학생들
 let PARTIAL = new Set();            // 부분 랜덤 대상 학생
 let DIRTY = false;
 let UNDO = null;
@@ -640,7 +656,7 @@ function renderGrid(){
     const cls = [ 'seat',
       PICK === cell ? 'sel' : '',
       PARTIAL.has(k) ? 'pick' : '',
-      APART_A === k ? 'pick' : '' ].filter(Boolean).join(' ');
+      APART_SEL.has(k) ? 'pick' : '' ].filter(Boolean).join(' ');
     return `<div class="${cls}" data-cell="${cell}" draggable="${CANEDIT}">
       ${tags ? `<span class="s-tags">${tags}</span>` : ''}
       <span class="s-num">${String(numOf(k)).padStart(2,'0')}</span>
@@ -694,12 +710,9 @@ function onSeat(cell){
     touch(); return;
   }
   if (MODE === 'apart') {
-    if (APART_A === null) { APART_A = k; renderGrid(); renderCons(); return; }
-    if (APART_A === k) { APART_A = null; renderGrid(); renderCons(); return; }
-    const a = APART_A, b = k; APART_A = null;
-    const has = ST.apart.findIndex(p => (p.a===a&&p.b===b)||(p.a===b&&p.b===a));
-    if (has >= 0) ST.apart.splice(has, 1); else ST.apart.push({ a, b, d: 3 });
-    touch(); return;
+    // 두 명씩 짝지을 필요 없다 — 떼어놓을 사람을 다 고른 뒤 한 묶음으로 만든다.
+    if (APART_SEL.has(k)) APART_SEL.delete(k); else APART_SEL.add(k);
+    renderGrid(); renderApartBar(); return;
   }
   if (MODE === 'duty') {
     const cur = ST.duty[k] || '';
@@ -739,6 +752,19 @@ function renderSide(){
   renderHist();
   renderRosterEdit();
 }
+// 분리 모드에서만 뜨는 '묶기' 줄
+function renderApartBar(){
+  const bar = $('apartBar'), btn = $('bApartMake');
+  if (!bar) return;
+  const on = MODE === 'apart' && CANEDIT;
+  bar.style.display = on ? 'block' : 'none';
+  if (!on) return;
+  const n = APART_SEL.size;
+  btn.disabled = n < 2;
+  btn.textContent = n < 2 ? '떼어놓을 학생을 2명 이상 고르세요'
+                          : `고른 ${n}명을 서로 떨어뜨리기`;
+}
+
 function renderCons(){
   const bits = [];
   for (const k in ST.fixed)
@@ -747,10 +773,12 @@ function renderCons(){
   for (const k in ST.front)
     bits.push(`<div class="row"><span class="mono">앞 ${ST.front[k]}줄</span><span class="nm">${esc(nameOf(k))}</span>
       <button class="x" data-drop="front:${esc(k)}">×</button></div>`);
-  ST.apart.forEach((p, i) =>
-    bits.push(`<div class="row"><span class="mono">분리</span>
-      <span class="nm">${esc(nameOf(p.a))} · ${esc(nameOf(p.b))}</span>
-      <button class="x" data-drop="apart:${i}">×</button></div>`));
+  ST.apart.forEach((p, i) => {
+    const ks = apartMembers(p);
+    bits.push(`<div class="row"><span class="mono">분리${ks.length > 2 ? ' '+ks.length+'명' : ''}</span>
+      <span class="nm">${ks.map(k => esc(nameOf(k))).join(' · ')}</span>
+      <button class="x" data-drop="apart:${i}">×</button></div>`);
+  });
   $('consList').innerHTML = bits.length ? bits.join('')
     : '<div class="none">없습니다. 위 모드를 골라 자리를 누르면 추가됩니다.</div>';
   $('consList').querySelectorAll('[data-drop]').forEach(b =>
@@ -902,7 +930,8 @@ async function load(){
     ST = {
       cols: d.cols || 4, rows: d.rows || 6, off: d.off || [],
       seats: d.seats || {}, fixed: d.fixed || {}, front: d.front || {},
-      apart: d.apart || [], frontRows: d.frontRows || 2,
+      apart: (d.apart || []).map(p => p.ks ? p : { ks: [p.a, p.b].filter(Boolean), d: p.d || 3 }),
+      frontRows: d.frontRows || 2,
       duty: d.duty || {}, memo: d.memo || '',
       extra: d.extra || [], removed: d.removed || [], history: d.history || [],
       flip: !!d.flip, group: d.group || 1,
@@ -1002,18 +1031,18 @@ function bindModes(){
     move : '자리를 끌어다 놓거나, 눌러 고른 뒤 다른 자리를 누르면 서로 바뀝니다. 오른쪽 목록의 학생도 끌어다 앉힐 수 있습니다.',
     fix  : '자리를 누르면 그 학생이 고정됩니다. 랜덤을 돌려도 안 움직입니다.',
     front: `자리를 누르면 그 학생을 앞 ${ST.frontRows}줄 안에 앉힙니다.`,
-    apart: '떼어놓을 두 학생을 차례로 누르세요. 서로 멀리 앉힙니다.',
+    apart: '떼어놓을 학생들을 모두 누른 뒤 아래 버튼으로 묶으세요. 묶음 안에서 서로 멀리 앉습니다.',
     duty : '자리를 누르면 임무를 적을 수 있습니다. 반장·주번·청소구역 등 자유롭게.',
     off  : '자리를 누르면 빈칸(자리 아님)이 됩니다. 통로나 결원 자리에 쓰세요.',
     partial: '다시 섞을 학생들을 누르세요. 고른 학생들끼리만 자리를 바꿉니다.'
   };
   const setMode = m => {
-    MODE = m; PICK = null; APART_A = null;
+    MODE = m; PICK = null; APART_SEL.clear();
     if (m !== 'partial') PARTIAL.clear();
     Object.entries(modes).forEach(([id, v]) => $(id).classList.toggle('on', v === m));
     $('bPartial').classList.toggle('on', m === 'partial');
     $('modeHint').textContent = hints[m] || '';
-    renderGrid();
+    renderGrid(); renderApartBar();
   };
   Object.entries(modes).forEach(([id, m]) => $(id).addEventListener('click', () => setMode(m)));
   $('bPartial').addEventListener('click', () => {
@@ -1069,6 +1098,13 @@ function bindRest(){
     $('nFront').value = ST.frontRows;
     for (const k in ST.front) ST.front[k] = ST.frontRows;
     touch();
+  });
+  $('bApartMake').addEventListener('click', () => {
+    if (APART_SEL.size < 2) return;
+    ST.apart.push({ ks: [...APART_SEL], d: 3 });
+    APART_SEL.clear();
+    touch(); renderApartBar();
+    say('ok', '묶었습니다. 랜덤을 돌리면 서로 떨어져 앉습니다.');
   });
   $('bFlip').addEventListener('click', () => { ST.flip = !ST.flip; touch(); });
   $('bSave').addEventListener('click', save);

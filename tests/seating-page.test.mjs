@@ -186,6 +186,44 @@ await pg.click('#bAdd');
 say('전입생이 명렬에 들어간다',
     (await pg.$eval('#rosterEdit', e => e.textContent)).includes('전입생'));
 
+// 분리 묶음 — 여러 명을 골라 한 번에 묶는다
+{
+  await pg.click('#mApart');
+  say('분리 모드에서 묶기 줄이 나온다', await pg.$eval('#apartBar', e => e.getClientRects().length > 0));
+  say('아직 못 누른다', await pg.$eval('#bApartMake', e => e.disabled));
+  const seats = await pg.$$eval('.seat', e => e.filter(s => s.querySelector('.s-name')).slice(0,4).map(s => s.dataset.cell));
+  for (const c of seats.slice(0,3)) await pg.click(`.seat[data-cell="${c}"]`);
+  say('고른 만큼 버튼 글이 바뀐다',
+      (await pg.$eval('#bApartMake', e => e.textContent)).includes('3명'),
+      await pg.$eval('#bApartMake', e => e.textContent));
+  say('고른 자리에 표시가 남는다', await pg.$$eval('.seat.pick', e => e.length) === 3);
+  await pg.click(`.seat[data-cell="${seats[2]}"]`);   // 한 명 취소
+  say('다시 누르면 빠진다', (await pg.$eval('#bApartMake', e => e.textContent)).includes('2명'));
+  await pg.click(`.seat[data-cell="${seats[2]}"]`);
+  await pg.click(`.seat[data-cell="${seats[3]}"]`);
+  await pg.click('#bApartMake');
+  const cons = await pg.$eval('#consList', e => e.textContent);
+  say('제약 목록에 4명 묶음으로 들어간다', /분리\s*4명/.test(cons), cons.slice(0, 120));
+  say('묶은 뒤 선택은 비워진다', await pg.$$eval('.seat.pick', e => e.length) === 0);
+
+  // 실제로 떨어져 앉는지
+  await pg.click('#mMove');
+  await pg.click('#bRandom');
+  const gap = await pg.evaluate(cells => {
+    const at = {};
+    document.querySelectorAll('.seat').forEach(s => {
+      const n = s.querySelector('.s-name'); if (n) at[n.textContent] = s.dataset.cell;
+    });
+    return at;
+  });
+  say('랜덤을 돌려도 오류가 없다', !(await pg.$eval('#err', e => e.textContent)),
+      await pg.$eval('#err', e => e.textContent));
+
+  // 목록에서 지우기
+  await pg.click('#consList [data-drop^="apart"]');
+  say('묶음을 지울 수 있다', !/분리/.test(await pg.$eval('#consList', e => e.textContent)));
+}
+
 // 메모를 비운 채 인쇄해도 입력칸이 살아 있어야 한다.
 // 예전에 인쇄 버튼이 memoCard 에 display:none 을 박아, 비운 채 인쇄하면
 // 다시 적을 방법이 없어졌다.
