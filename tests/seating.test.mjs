@@ -322,6 +322,9 @@ console.log('\n■ 화면 배선 — JS 가 부르는 id 가 실제로 있나');
   check('명렬 원본은 안 건드린다', !/setDoc\(doc\(db, 'students'/.test(html));
   check('인쇄에서 선택·고름·hover 표시를 지운다',
         /@media print[\s\S]*\.seat\.sel,\.seat\.pick,\.seat:hover\{border:1\.2px solid #7E8DA0;box-shadow:none/.test(html));
+  check('자리판 기본은 5분단 6줄',
+        /id="nCols"[^>]*value="5"/.test(html) && /id="nRows"[^>]*value="6"/.test(html) &&
+        /cols:5, rows:6/.test(html) && /cols: d\.cols \|\| 5, rows: d\.rows \|\| 6/.test(html));
   check('분단 묶음이 저장된다', /group: ST\.group/.test(html) && /group: d\.group \|\| 1/.test(html));
   check('분단마다 격자를 따로 만든다', /class="aisle"/.test(html));
   check('번호순 순서가 저장된다', /ordStart: ST\.ordStart, ordDir: ST\.ordDir/.test(html));

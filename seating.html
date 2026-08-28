@@ -315,7 +315,7 @@
 
   <div class="bar noprint" id="barGrid">
     <span class="bar-label">자리판</span>
-    <label>분단 <input class="num" type="number" id="nCols" min="1" max="12" value="4"></label>
+    <label>분단 <input class="num" type="number" id="nCols" min="1" max="12" value="5"></label>
     <label>줄 <input class="num" type="number" id="nRows" min="1" max="12" value="6"></label>
     <label title="몇 칸씩 한 분단으로 묶을지. 1이면 안 묶습니다.">묶음 <input class="num" type="number" id="nGroup" min="1" max="6" value="1"></label>
     <span class="bar-label" style="margin-left:6px;">번호순</span>
@@ -591,7 +591,7 @@ const EMBED    = P.get('embed') === '1';
 let ME = null, MYNAME = '', CANEDIT = false;
 let ROSTER = [];                    // [{ key, num, name, extra }]
 let ST = {                          // 이 반 문서
-  cols:4, rows:6, off:[], seats:{},
+  cols:5, rows:6, off:[], seats:{},
   fixed:{}, front:{}, apart:[], frontRows:2,
   duty:{}, memo:'', extra:[], removed:[], history:[],
   flip:false,                       // true 면 교탁을 아래에 그린다(그리기만, 자리 데이터는 그대로)
@@ -969,7 +969,7 @@ async function load(){
   if (snap.exists()) {
     const d = snap.data();
     ST = {
-      cols: d.cols || 4, rows: d.rows || 6, off: d.off || [],
+      cols: d.cols || 5, rows: d.rows || 6, off: d.off || [],
       seats: d.seats || {}, fixed: d.fixed || {}, front: d.front || {},
       apart: (d.apart || []).map(p => p.ks ? p : { ks: [p.a, p.b].filter(Boolean), d: p.d || 3 }),
       frontRows: d.frontRows || 2,
@@ -1113,7 +1113,7 @@ function bindRest(){
     UNDO = null; $('bUndo').disabled = true; touch();
   });
   const resize = () => {
-    const c = Math.min(12, Math.max(1, parseInt($('nCols').value) || 4));
+    const c = Math.min(12, Math.max(1, parseInt($('nCols').value) || 5));
     const r = Math.min(12, Math.max(1, parseInt($('nRows').value) || 6));
     $('nCols').value = c; $('nRows').value = r;
     ST.cols = c; ST.rows = r;
