@@ -21,7 +21,22 @@ node workers/parent-verify.test.mjs    # 학부모 인증 — 나뉜 명렬에�
 
 ```bash
 npm i -D playwright @firebase/rules-unit-testing firebase firebase-tools
+npm i -D xlsx@0.18.5            # 편성표 검사 — upload.html 이 쓰는 그 버전
 ```
+
+### 편성표 업로드 (실제 편성표 파일 필요)
+
+`students/main` 을 통째로 갈아치우는 데다 되돌릴 수단이 없어서(시점 복구 불가),
+'돌아간다'가 아니라 **무엇이 저장되는지**를 값으로 확인한다.
+
+```bash
+PS_FILE=/경로/편성표.xlsx node tests/upload-pyeonseong.test.mjs       # 파싱·병합·막는 조건
+PS_FILE=/경로/편성표.xlsx node tests/upload-pyeonseong-page.test.mjs  # 실제 화면에서 저장까지
+```
+
+파일이 없으면 조용히 건너뛴다(개인정보라 저장소에 안 둔다). 화면 검사는
+`prev-students.json` · `prev-contact.json` 로 기존 명렬을 흉내내야 한다 —
+같은 폴더의 파서로 편성표에서 만들어 쓰면 된다.
 
 ### 외출증 화면 (Chromium)
 
