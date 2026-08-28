@@ -166,6 +166,27 @@ console.log('\n■ 분리 묶음 — 여러 명을 한꺼번에 떼어놓기');
     return /못 찾았습니다/.test(r.error || '');
   })());
 
+  // 실제 교실 크기에서 어디까지 되는가 — 기본값을 '이웃 금지'로 정한 근거다.
+  // 5분단 6줄 30자리, 27명 기준으로 200판씩 돌려 봤다.
+  const rate = (g, d) => {
+    let ok = 0;
+    for (let s = 0; s < 60; s++) {
+      const r = seatAssign({ grid: grid(5, 6), roster: roster(27), mode: 'random',
+        cons: { apart: [{ ks: roster(g), d }] }, rand: mulberry(s) });
+      if (!r.error) ok++;
+    }
+    return ok / 60;
+  };
+  check('이웃 금지는 5명도 늘 된다', rate(5, 2) === 1, rate(5, 2));
+  check('이웃 금지는 8명도 늘 된다', rate(8, 2) === 1, rate(8, 2));
+  check("'멀리'는 5명부터 안 된다", rate(5, 3) === 0, rate(5, 3));
+  check("'멀리'도 4명까지는 된다", rate(4, 3) === 1, rate(4, 3));
+  check("못 찾으면 '멀리'가 원인일 수 있다고 짚는다", (() => {
+    const r = seatAssign({ grid: grid(5, 6), roster: roster(27), mode: 'random',
+      cons: { apart: [{ ks: roster(6), d: 3 }] }, rand: mulberry(1) });
+    return /'멀리'로 묶은 6명/.test(r.error || '');
+  })());
+
   check('번호순은 못 지킨 묶음을 알려준다', (() => {
     const r = seatAssign({ grid: grid(6, 6), roster: roster(30), mode: 'order',
       cons: { apart: [{ ks: five, d: 3 }] } });
