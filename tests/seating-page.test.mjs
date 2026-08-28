@@ -81,6 +81,21 @@ say('이력에 저장자가 남는다', saved.history[0].by === 'kim@yeungnam.hs
 say('저장 알림', (await pg.$eval('#ok', e => e.textContent)).includes('저장'));
 say('교탁 방향도 저장된다', 'flip' in saved, Object.keys(saved));
 
+// 분단 묶음 — 2칸씩 묶으면 격자가 분단 수만큼 쪼개진다
+await pg.fill('#nCols', '6'); await pg.dispatchEvent('#nCols', 'change');
+await pg.fill('#nGroup', '2'); await pg.dispatchEvent('#nGroup', 'change');
+say('6칸을 2씩 묶으면 분단 3개', await pg.$$eval('.aisle', e => e.length) === 3);
+const gaps = await pg.evaluate(() => {
+  const xs = [...document.querySelectorAll('.aisle')].map(e => e.getBoundingClientRect());
+  const seats = [...document.querySelectorAll('.aisle:first-child .seat')].map(e => e.getBoundingClientRect());
+  const inner = seats.length > 1 ? seats[1].left - seats[0].right : 0;
+  return { between: Math.round(xs[1].left - xs[0].right), inner: Math.round(inner) };
+});
+say('분단 사이가 칸 사이보다 넓다', gaps.between > gaps.inner, gaps);
+await pg.fill('#nGroup', '1'); await pg.dispatchEvent('#nGroup', 'change');
+say('1로 두면 안 묶는다', await pg.$$eval('.aisle', e => e.length) === 6);
+await pg.fill('#nGroup', '2'); await pg.dispatchEvent('#nGroup', 'change');
+
 // 교탁 위/아래 — 그리는 방향만 바뀌고 자리 데이터는 그대로여야 한다
 await pg.click('#bOrder');
 const topFirst = await pg.$eval('.grid .seat .s-name', e => e.textContent);
@@ -125,16 +140,37 @@ say('전입생이 명렬에 들어간다',
 // 인쇄 모습 — 인쇄해봐야 보이는 것들이라 여기서 재 둔다.
 // 화면용 .cols 의 align-items:start 가 인쇄 flex 에 새어 들어와 자리판 폭이
 // 종이의 1/3 로 쪼그라든 적이 있다. 눈으로는 멀쩡해 보였다.
+await pg.evaluate(() => window.__buildPrintExtras && window.__buildPrintExtras());
 await pg.emulateMedia({ media: 'print' });
-const pm = await pg.evaluate(() => ({
-  page:  Math.round(document.querySelector('.wrap').getBoundingClientRect().width),
-  board: Math.round(document.querySelector('.board').getBoundingClientRect().width),
-  tall:  Math.round(document.querySelector('.grid').getBoundingClientRect().height),
-  ui:    getComputedStyle(document.querySelector('#barMain')).display
-}));
-say('자리판이 종이 폭을 다 쓴다', pm.board >= pm.page * 0.95, pm);
+const pm = await pg.evaluate(() => {
+  const w = el => Math.round(el.getBoundingClientRect().width);
+  const r = document.querySelector('#printRoster'), b = document.querySelector('.board');
+  return {
+    page: w(document.querySelector('.wrap')), roster: w(r), board: w(b),
+    tall: Math.round(document.querySelector('.grid').getBoundingClientRect().height),
+    ui:   getComputedStyle(document.querySelector('#barMain')).display,
+    title: document.querySelector('#printTitle').textContent,
+    rows:  document.querySelectorAll('#printRoster tr').length,
+    deskBg: getComputedStyle(document.querySelector('.desk')).backgroundColor,
+    numBg:  getComputedStyle(document.querySelector('.s-num')).backgroundColor
+  };
+});
+say('명렬표 + 자리판이 종이 폭을 채운다', pm.roster + pm.board >= pm.page * 0.93, pm);
 say('자리판이 종이 높이를 쓴다', pm.tall > 300, pm);
 say('화면 UI 는 인쇄에서 빠진다', pm.ui === 'none', pm.ui);
+say('인쇄물에 제목이 붙는다', /2학년 3반 자리 배치도/.test(pm.title), pm.title);
+say('인쇄물에 명렬표가 붙는다', pm.rows > 20, pm.rows);
+// 브라우저는 기본으로 배경색을 인쇄하지 않는다 — 흰 글씨가 흰 종이에 사라지면 안 된다
+say('교탁은 배경색에 기대지 않는다', pm.deskBg === 'rgb(255, 255, 255)', pm.deskBg);
+say('번호 꼬리표도 배경색에 안 기댄다', pm.numBg === 'rgb(255, 255, 255)', pm.numBg);
+// 칠판은 벽, 교탁은 그 앞 — 학생과 칠판 사이에 교탁이 있어야 한다
+const front = await pg.evaluate(() => {
+  const y = s => document.querySelector(s).getBoundingClientRect().top;
+  const seatBottom = Math.max(...[...document.querySelectorAll('.seat')].map(e => e.getBoundingClientRect().bottom));
+  return { desk: y('.desk'), chalk: y('.chalk'), seatBottom, flip: document.querySelector('.board').classList.contains('flip') };
+});
+say('교탁이 학생과 칠판 사이에 있다',
+    front.flip ? (front.desk < front.chalk) : (front.chalk < front.desk), front);
 await pg.emulateMedia({ media: 'screen' });
 
 console.log(errs.length ? '\n❌ 런타임 오류:\n' + errs.join('\n') : '\n✅ 런타임 오류 없음');

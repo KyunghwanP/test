@@ -11,7 +11,8 @@
   :root{
     --paper:#fff; --paper-soft:#F6F7F9; --bg:#EEF1F5;
     --ink:#16202B; --ink-soft:#6B7885; --rule:#DDE3EA;
-    --mon:#2E5AAC; --mon-soft:#E8EEFA;
+    --mon:#2E8B7A; --mon-soft:#E3F2EE;      /* 자리 배치도는 인쇄물에 가깝다 — 앱 파랑 대신 청록 */
+    --desk:#C89B6A; --board-g:#2E8B7A;
     --warn:#D97706; --warn-soft:#FEF3C7;
     --stop:#DC2626; --stop-soft:#FEE2E2;
     --ok:#0F766E; --ok-soft:#CCFBF1;
@@ -20,7 +21,8 @@
     :root:not([data-theme="light"]){
       --paper:#1B2530; --paper-soft:#212D3A; --bg:#141C25;
       --ink:#E8EDF3; --ink-soft:#94A3B4; --rule:#33414F;
-      --mon:#7FA6E8; --mon-soft:#24344C;
+      --mon:#5FC4AC; --mon-soft:#1E3A34;
+      --desk:#A9825A; --board-g:#3E9C8A;
       --warn:#FBBF24; --warn-soft:#3A2F14;
       --stop:#F87171; --stop-soft:#3B1D1D;
       --ok:#5EEAD4; --ok-soft:#123C38;
@@ -70,24 +72,37 @@
   .board{background:var(--bg);border:1px solid var(--rule);border-radius:16px;padding:20px;margin-bottom:14px;
     display:flex;flex-direction:column;gap:18px;}
   .board.flip{flex-direction:column-reverse;}
-  .teacher{text-align:center;font-size:13px;font-weight:900;color:var(--ink-soft);
-    letter-spacing:.3em;background:var(--paper);border:1px solid var(--rule);
-    border-radius:10px;padding:9px;}
-  .grid{display:grid;gap:9px;}
+  /* 교탁과 칠판 — 어느 쪽이 앞인지 한눈에 보이게 */
+  /* 칠판은 벽이고 교탁은 그 앞이다 — 순서는 언제나 [학생 … 교탁 … 칠판].
+     교탁이 위면 위에서부터 칠판·교탁, 교탁이 아래면 교탁·칠판. */
+  .front{display:flex;flex-direction:column-reverse;align-items:center;gap:0;}
+  .board.flip .front{flex-direction:column;}
+  .desk{background:var(--desk);color:#fff;font-size:13px;font-weight:800;letter-spacing:.18em;
+    padding:8px 34px;border-radius:0 0 8px 8px;box-shadow:0 2px 5px -2px rgba(16,24,40,.3);z-index:1;}
+  .board.flip .desk{border-radius:8px 8px 0 0;}
+  .chalk{background:var(--board-g);color:#fff;font-size:13px;font-weight:800;letter-spacing:.18em;
+    width:min(560px,86%);text-align:center;padding:11px;border-radius:6px;
+    box-shadow:0 2px 6px -2px rgba(16,24,40,.3);}
+  /* 분단마다 따로 격자를 만들고 사이를 벌린다 — 실제 교실이 그렇게 생겼다.
+     줄 높이는 flex stretch 로 분단끼리 저절로 맞는다. */
+  .grid{display:flex;gap:26px;align-items:stretch;}
+  .aisle{flex:1;display:grid;gap:22px 9px;grid-auto-rows:1fr;}
   .seat{
-    position:relative;min-height:76px;border:1px solid var(--rule);border-radius:12px;
-    background:var(--paper);padding:20px 6px 8px;
+    position:relative;min-height:64px;border:1px solid var(--rule);border-radius:11px;
+    background:var(--paper);padding:10px 6px 9px;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
     cursor:pointer;user-select:none;
-    box-shadow:0 1px 2px rgba(16,24,40,.05);
+    box-shadow:0 2px 6px -2px rgba(16,24,40,.14);
     transition:border-color .12s,box-shadow .12s,transform .12s;
   }
-  .seat:hover{border-color:var(--mon);box-shadow:0 3px 10px -3px rgba(16,24,40,.18);transform:translateY(-1px);}
-  /* 번호는 자리를 찾는 첫 단서다. 이름 위에 얹지 말고 모서리에 또렷하게 둔다. */
+  .seat:hover{border-color:var(--mon);box-shadow:0 6px 14px -4px rgba(16,24,40,.24);transform:translateY(-1px);}
+  /* 번호는 자리를 찾는 첫 단서다. 카드 위에 얹은 꼬리표로 빼서 이름과 안 다투게 한다. */
   .s-num{
-    position:absolute;top:6px;left:7px;
-    font-family:'IBM Plex Mono';font-size:13px;font-weight:700;
-    color:var(--ink-soft);letter-spacing:.02em;
+    position:absolute;top:-13px;left:9px;
+    background:var(--mon);color:#fff;
+    font-family:'IBM Plex Mono';font-size:12px;font-weight:700;letter-spacing:.02em;
+    padding:2px 9px 3px;border-radius:7px 7px 3px 3px;
+    box-shadow:0 1px 3px rgba(16,24,40,.18);
   }
   .s-name{font-size:17px;font-weight:700;line-height:1.25;text-align:center;word-break:keep-all;letter-spacing:-.01em;}
   .s-duty{font-size:11.5px;font-weight:700;color:var(--mon);background:var(--mon-soft);
@@ -126,6 +141,7 @@
   .txt:focus{border-color:var(--mon);}
   textarea.txt{min-height:88px;resize:vertical;line-height:1.65;}
   .memo-print{white-space:pre-wrap;}
+  .print-only{display:none;}
 
   /* ── 인쇄 ── */
   @media print{
@@ -139,11 +155,40 @@
     /* 화면용 .cols 는 align-items:start 인데, flex 를 세로로 돌리면 그게 가로 정렬이 되어
        자리판 폭이 내용만큼 쪼그라든다. 인쇄에서는 다시 stretch 로 편다. */
     .cols{display:flex;flex-direction:column;align-items:stretch;flex:1;min-height:0;}
-    .cols > div:first-child{display:flex;flex-direction:column;flex:1;min-height:0;}
-    .board{flex:1;min-height:0;}
-    .grid{flex:1;min-height:0;grid-auto-rows:1fr;}
+    .cols > div:first-child{flex:1;min-height:0;}
+    .board{min-height:0;display:flex;flex-direction:column;}
+    .grid{flex:1;min-height:0;}
+    .aisle{grid-auto-rows:1fr;}
     .board{border:none;padding:0;margin:0;}
-    .card{border:1px solid #999;border-radius:0;padding:6px 8px;margin:8px 0 0;break-inside:avoid;}
+    .print-only{display:block;}
+    /* 종이는 [명렬표 | 자리판] 두 칸으로 쓴다 — 이름을 번호로 찾는 일이 잦다 */
+    .head{display:none;}                 /* 인쇄에는 아래 큰 제목이 대신 나온다 */
+    .cols > div:first-child{display:grid;grid-template-columns:116px 1fr;
+      grid-template-rows:auto 1fr auto;
+      grid-template-areas:"title title" "roster board" "roster memo";
+      column-gap:12px;row-gap:8px;}
+    #printTitle{grid-area:title;text-align:center;font-size:17pt;font-weight:900;
+      color:#000;letter-spacing:-.02em;padding-bottom:2mm;}
+    #printRoster{grid-area:roster;}
+    .board{grid-area:board;}
+    #memoCard{grid-area:memo;}
+    .pr-tbl{width:100%;border-collapse:collapse;font-size:8.5pt;}
+    .pr-tbl th{background:#eee;border:1px solid #666;padding:2px;font-weight:800;}
+    .pr-tbl td{border:1px solid #999;padding:1.6px 3px;text-align:center;}
+    .pr-tbl td.nm{text-align:left;}
+    .pr-cap{border:1px solid #666;border-bottom:none;padding:3px;text-align:center;
+      font-weight:800;font-size:9pt;background:#eee;}
+    .card{border:1px solid #999;border-radius:0;padding:5px 8px;margin:0;break-inside:avoid;}
+    #memoCard h2{font-size:9pt;margin:0 0 2px;}
+    .memo-print{font-size:9.5pt;line-height:1.5;}
+    /* 배경색은 기본적으로 인쇄되지 않는다 — 흰 글씨가 흰 종이에 사라지면 안 된다 */
+    .desk,.chalk{background:#fff !important;color:#000 !important;border:1.5px solid #000;
+      box-shadow:none;padding:5pt 20pt;}
+    .chalk{width:min(70%,420pt);}
+    .s-num{background:#fff !important;color:#000 !important;border:1px solid #000;
+      box-shadow:none;border-radius:4px;padding:0 4px;}
+    .grid{gap:19pt;}
+    .aisle{gap:15pt 5pt;}
     .board{background:#fff;border:none;}
     .seat{min-height:0;background:#fff !important;border:1px solid #000;border-radius:0;
       padding:13pt 3pt 4pt;box-shadow:none;transform:none;}
@@ -199,6 +244,7 @@
     <span class="bar-label">자리판</span>
     <label>분단 <input class="num" type="number" id="nCols" min="1" max="12" value="4"></label>
     <label>줄 <input class="num" type="number" id="nRows" min="1" max="12" value="6"></label>
+    <label title="몇 칸씩 한 분단으로 묶을지. 1이면 안 묶습니다.">묶음 <input class="num" type="number" id="nGroup" min="1" max="6" value="2"></label>
     <span class="bar-label" style="margin-left:6px;">앞자리 기준</span>
     <label>앞 <input class="num" type="number" id="nFront" min="1" max="12" value="2"> 줄</label>
     <span class="sep"></span>
@@ -209,8 +255,12 @@
 
   <div class="cols">
     <div>
+      <!-- 인쇄물에만 나오는 제목과 명렬표. 화면에는 이미 머리글과 옆 패널이 있다. -->
+      <div class="print-only" id="printTitle"></div>
+      <div class="print-only" id="printRoster"></div>
+
       <div class="board">
-        <div class="teacher">교 탁</div>
+        <div class="front"><div class="desk">교 탁</div><div class="chalk">칠 판</div></div>
         <div class="grid" id="grid"></div>
       </div>
       <div class="card" id="memoCard">
@@ -413,7 +463,8 @@ let ST = {                          // 이 반 문서
   cols:4, rows:6, off:[], seats:{},
   fixed:{}, front:{}, apart:[], frontRows:2,
   duty:{}, memo:'', extra:[], removed:[], history:[],
-  flip:false                        // true 면 교탁을 아래에 그린다(그리기만, 자리 데이터는 그대로)
+  flip:false,                       // true 면 교탁을 아래에 그린다(그리기만, 자리 데이터는 그대로)
+  group:2                           // 몇 칸씩 한 분단으로 묶을지 (1이면 안 묶음)
 };
 let MODE = 'move';
 let PICK = null;                    // 자리 옮기기: 먼저 고른 자리
@@ -467,13 +518,10 @@ function renderGrid(){
   document.querySelector('.board').classList.toggle('flip', !!ST.flip);
   const fb = $('bFlip');
   if (fb) { fb.textContent = ST.flip ? '교사 입장 (교탁 ↓)' : '학생 입장 (교탁 ↑)'; fb.classList.toggle('on', !!ST.flip); }
-  el.style.gridTemplateColumns = `repeat(${ST.cols}, minmax(0,1fr))`;
-  let html = '';
-  for (const r of rowOrder()) for (const c of colOrder()) {
-    const cell = seatRC(r, c);
-    if (off.has(cell)) { html += `<div class="seat off" data-cell="${cell}"></div>`; continue; }
+  const seatHtml = cell => {
+    if (off.has(cell)) return `<div class="seat off" data-cell="${cell}"></div>`;
     const k = ST.seats[cell];
-    if (!k) { html += `<div class="seat empty" data-cell="${cell}"></div>`; continue; }
+    if (!k) return `<div class="seat empty" data-cell="${cell}"></div>`;
     const tags =
       (ST.fixed[k] ? '<span class="s-tag fix">고정</span>' : '') +
       (ST.front[k] ? '<span class="s-tag fr">앞</span>' : '') +
@@ -482,12 +530,21 @@ function renderGrid(){
       PICK === cell ? 'sel' : '',
       PARTIAL.has(k) ? 'pick' : '',
       APART_A === k ? 'pick' : '' ].filter(Boolean).join(' ');
-    html += `<div class="${cls}" data-cell="${cell}">
+    return `<div class="${cls}" data-cell="${cell}">
       ${tags ? `<span class="s-tags">${tags}</span>` : ''}
       <span class="s-num">${String(numOf(k)).padStart(2,'0')}</span>
       <span class="s-name">${esc(nameOf(k))}</span>
       ${ST.duty[k] ? `<span class="s-duty">${esc(ST.duty[k])}</span>` : ''}
     </div>`;
+  };
+  // 분단(묶음)마다 격자를 따로 만들어 사이를 벌린다
+  const cols = colOrder(), rows = rowOrder(), g = Math.max(1, ST.group || 1);
+  let html = '';
+  for (let i = 0; i < cols.length; i += g) {
+    const part = cols.slice(i, i + g);
+    html += `<div class="aisle" style="grid-template-columns:repeat(${part.length},minmax(0,1fr));">`;
+    for (const r of rows) for (const c of part) html += seatHtml(seatRC(r, c));
+    html += '</div>';
   }
   el.innerHTML = html;
   el.querySelectorAll('.seat').forEach(s =>
@@ -661,10 +718,11 @@ async function load(){
       apart: d.apart || [], frontRows: d.frontRows || 2,
       duty: d.duty || {}, memo: d.memo || '',
       extra: d.extra || [], removed: d.removed || [], history: d.history || [],
-      flip: !!d.flip
+      flip: !!d.flip, group: d.group || 2
     };
   }
   $('nCols').value = ST.cols; $('nRows').value = ST.rows; $('nFront').value = ST.frontRows;
+  $('nGroup').value = ST.group;
   $('memo').value = ST.memo;
 }
 async function save(){
@@ -682,7 +740,7 @@ async function save(){
     await setDoc(doc(db, 'seating', CLASSKEY), {
       cols: ST.cols, rows: ST.rows, off: ST.off, seats: ST.seats,
       fixed: ST.fixed, front: ST.front, apart: ST.apart, frontRows: ST.frontRows,
-      duty: ST.duty, memo: ST.memo, extra: ST.extra, removed: ST.removed, flip: !!ST.flip,
+      duty: ST.duty, memo: ST.memo, extra: ST.extra, removed: ST.removed, flip: !!ST.flip, group: ST.group,
       history: hist, updatedAt: now, updatedBy: ME
     });
     ST.history = hist; DIRTY = false;
@@ -694,6 +752,19 @@ async function save(){
       : '저장하지 못했습니다: ' + e.message);
   }
 }
+
+// 인쇄물에만 넣는 제목과 명렬표. 이름을 번호로 찾는 일이 잦아 옆에 두면 쓸모가 있다.
+function buildPrintExtras(){
+  const [g, r] = CLASSKEY.split('-');
+  $('printTitle').textContent = `${g}학년 ${r}반 자리 배치도`;
+  $('printRoster').innerHTML =
+    `<div class="pr-cap">${g}-${r} 명렬</div>` +
+    `<table class="pr-tbl"><tr><th>번호</th><th>이름</th></tr>` +
+    ROSTER.map(s => `<tr><td>${s.num}</td><td class="nm">${esc(s.name)}</td></tr>`).join('') +
+    `</table>`;
+}
+
+window.__buildPrintExtras = buildPrintExtras;   // 인쇄 모습 검사에서 부른다
 
 /* ── 표 복사 — Word·한글에 붙여넣으면 표 모양 그대로 들어간다 ── */
 async function copyTable(){
@@ -786,6 +857,10 @@ function bindRest(){
     ST.off = ST.off.filter(inside);
     touch();
   };
+  $('nGroup').addEventListener('change', () => {
+    ST.group = Math.min(6, Math.max(1, parseInt($('nGroup').value) || 1));
+    $('nGroup').value = ST.group; touch();
+  });
   $('nCols').addEventListener('change', resize);
   $('nRows').addEventListener('change', resize);
   $('nFront').addEventListener('change', () => {
@@ -798,6 +873,7 @@ function bindRest(){
   $('bSave').addEventListener('click', save);
   $('bCopy').addEventListener('click', copyTable);
   $('bPrint').addEventListener('click', () => {
+    buildPrintExtras();
     // 인쇄에는 입력칸 대신 글로 낸다 — textarea 는 넘치는 부분이 잘린다
     $('memoPrint').textContent = $('memo').value;
     $('memoPrint').style.display = $('memo').value.trim() ? 'block' : 'none';
