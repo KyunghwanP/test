@@ -198,8 +198,14 @@
       grid-template-areas:"title title" "roster board" "roster memo";
       column-gap:14px;row-gap:9px;}
 
-    #printTitle{grid-area:title;text-align:center;font-size:19pt;font-weight:900;
-      color:#2E5AAC;letter-spacing:-.035em;padding:0 0 1mm;}
+    /* 좌우 1fr 가운데 auto — 로고가 있어도 제목이 종이 가운데에 그대로 온다 */
+    #printHead{grid-area:title;display:grid;grid-template-columns:1fr auto 1fr;
+      align-items:center;padding:0 0 1mm;}
+    #printTitle{text-align:center;font-size:19pt;font-weight:900;
+      color:#2E5AAC;letter-spacing:-.035em;white-space:nowrap;}
+    .brand{display:flex;align-items:center;gap:6pt;justify-self:start;}
+    .brand img{width:26pt;height:26pt;object-fit:contain;}
+    .brand span{font-size:10pt;font-weight:800;color:#3B5B8C;letter-spacing:-.02em;}
     #printRoster{grid-area:roster;}
     .board{grid-area:board;}
     #memoCard{grid-area:memo;}
@@ -207,11 +213,15 @@
     /* 명렬표 */
     .pr-cap{background:#E8EEFA;color:#2E5AAC;border:1px solid #A9C0E6;border-bottom:none;
       border-radius:6px 6px 0 0;padding:4px;text-align:center;font-weight:800;font-size:9pt;}
+    .pr-n{font-weight:700;color:#6C86AE;font-size:8pt;}
     .pr-cols{display:flex;gap:5px;align-items:flex-start;}
     .pr-tbl{width:106px;border-collapse:collapse;font-size:8.5pt;}
+    /* 32명을 한 단에 담으려면 줄이 촘촘해야 한다. 기본 line-height(1.55)로는
+       줄당 22px 이라 종이를 넘어 두 장이 된다. */
     .pr-tbl th{background:#F2F6FC;color:#3B5B8C;border:1px solid #C9D8EE;
-      padding:2.5px;font-weight:800;}
-    .pr-tbl td{border:1px solid #D8E2F0;padding:1.7px 4px;text-align:center;color:#1A2432;}
+      padding:2px;font-weight:800;line-height:1.25;}
+    .pr-tbl td{border:1px solid #D8E2F0;padding:0.8px 4px;text-align:center;
+      color:#1A2432;line-height:1.2;}
     .pr-tbl td.nm{text-align:left;font-weight:600;}
 
     /* 자리판 */
@@ -301,7 +311,14 @@
   <div class="cols">
     <div>
       <!-- 인쇄물에만 나오는 제목과 명렬표. 화면에는 이미 머리글과 옆 패널이 있다. -->
-      <div class="print-only" id="printTitle"></div>
+      <div class="print-only" id="printHead">
+        <div class="brand">
+          <img src="icon-180.png" alt="">
+          <span>영남고등학교</span>
+        </div>
+        <div id="printTitle"></div>
+        <div></div>
+      </div>
       <div class="print-only" id="printRoster"></div>
 
       <div class="board">
@@ -802,16 +819,18 @@ async function save(){
 }
 
 // 인쇄물에만 넣는 제목과 명렬표. 이름을 번호로 찾는 일이 잦아 옆에 두면 쓸모가 있다.
-const PR_CHUNK = 22;   // 한 단에 넣을 줄 수. 넘치면 단을 늘린다.
+const PR_ONE_COL = 32;   // 이 인원까지는 명렬을 한 단으로 (대부분의 학급)
+const PR_CHUNK   = 25;   // 넘으면 이만큼씩 단을 나눈다
 
 function buildPrintExtras(){
   const [g, r] = CLASSKEY.split('-');
   $('printTitle').textContent = `${g}학년 ${r}반 자리 배치도`;
-  // 명렬이 길면 한 단으로는 종이 높이를 넘어 두 장이 된다 — 단을 나눈다.
+  // 명렬이 아주 길면 한 단으로는 종이 높이를 넘는다 — 그때만 단을 나눈다.
+  const size  = ROSTER.length > PR_ONE_COL ? PR_CHUNK : Math.max(1, ROSTER.length);
   const parts = [];
-  for (let i = 0; i < ROSTER.length; i += PR_CHUNK) parts.push(ROSTER.slice(i, i + PR_CHUNK));
+  for (let i = 0; i < ROSTER.length; i += size) parts.push(ROSTER.slice(i, i + size));
   $('printRoster').innerHTML =
-    `<div class="pr-cap">${g}-${r} 명렬</div>` +
+    `<div class="pr-cap">${g}-${r} 명렬 <span class="pr-n">${ROSTER.length}명</span></div>` +
     `<div class="pr-cols">` + (parts.length ? parts : [[]]).map(part =>
       `<table class="pr-tbl"><tr><th>번호</th><th>이름</th></tr>` +
       part.map(s => `<tr><td>${s.num}</td><td class="nm">${esc(s.name)}</td></tr>`).join('') +
