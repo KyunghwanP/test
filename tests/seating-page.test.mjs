@@ -8,7 +8,8 @@ import fs from 'node:fs';
 const PAGE = import.meta.dirname + '/../seating.html';
 const html = fs.readFileSync(PAGE, 'utf8');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
-const pg = await b.newPage();
+// 끌어놓기 검사는 대상 자리가 화면 안에 있어야 한다 — 짧은 창이면 빈 자리가 접힌 아래로 간다
+const pg = await b.newPage({ viewport: { width: 1280, height: 1500 } });
 
 const errs = [];
 pg.on('pageerror', e => errs.push('pageerror: ' + e.message));
@@ -81,6 +82,54 @@ say('이력에 저장자가 남는다', saved.history[0].by === 'kim@yeungnam.hs
 say('저장 알림', (await pg.$eval('#ok', e => e.textContent)).includes('저장'));
 say('교탁 방향도 저장된다', 'flip' in saved, Object.keys(saved));
 
+// 끌어놓기 — 정적 검사로는 '배선이 있다'까지만 알 수 있다. 실제로 끌어본다.
+{
+  await pg.fill('#nCols','5'); await pg.dispatchEvent('#nCols','change');
+  await pg.fill('#nRows','7'); await pg.dispatchEvent('#nRows','change');
+  await pg.click('#bOrder');
+  const nameAt = c => pg.$eval(`.seat[data-cell="${c}"]`, e => e.querySelector('.s-name')?.textContent || '');
+  // 앞 단계에서 만들어 둔 '빈칸'을 피해 실제로 앉은 자리 두 곳을 고른다
+  const [c1, c2] = await pg.$$eval('.seat', e => e
+    .filter(s => s.querySelector('.s-name')).slice(0, 2).map(s => s.dataset.cell));
+  const a = await nameAt(c1), b = await nameAt(c2);
+  await pg.dragAndDrop(`.seat[data-cell="${c1}"]`, `.seat[data-cell="${c2}"]`);
+  say('자리끼리 끌면 서로 바뀐다',
+      (await nameAt(c1)) === b && (await nameAt(c2)) === a, { c1, c2, a, b, now: await nameAt(c1) });
+
+  // 빈 자리로 끌면 그냥 옮겨진다 (35자리 · 30명이라 뒤가 비어 있다)
+  const empty = await pg.$eval('.seat.empty', e => e.dataset.cell);
+  const moving = await nameAt(c1);
+  await pg.dragAndDrop(`.seat[data-cell="${c1}"]`, `.seat[data-cell="${empty}"]`);
+  say('빈 자리로 끌면 옮겨진다', (await nameAt(empty)) === moving && (await nameAt(c1)) === '',
+      { empty, moving, there: await nameAt(empty) });
+
+  // 자리에서 목록으로 끌면 빠진다
+  const before = await pg.$eval('#unseatedCnt', e => e.textContent);
+  await pg.dragAndDrop(`.seat[data-cell="${empty}"]`, '#unseated');
+  const after = await pg.$eval('#unseatedCnt', e => e.textContent);
+  say('목록으로 끌면 자리에서 빠진다', before !== after && (await nameAt(empty)) === '', { before, after });
+
+  // 목록에서 자리로 끌면 앉는다
+  const who = await pg.$eval('#unseated .stu .nm', e => e.textContent);
+  await pg.dragAndDrop('#unseated .stu', `.seat[data-cell="${empty}"]`);
+  say('목록에서 끌면 그 자리에 앉는다', (await nameAt(empty)) === who, { who, there: await nameAt(empty) });
+}
+
+// 번호순 시작·방향
+{
+  await pg.selectOption('#ordStart', 'BR');
+  await pg.selectOption('#ordDir', 'col');
+  await pg.click('#bOrder');
+  const cells = await pg.$$eval('.seat', e => e.map(s => [s.dataset.cell, s.querySelector('.s-name')?.textContent || '']));
+  const at = c => (cells.find(x => x[0] === c) || [])[1];
+  const rows = await pg.$eval('#nRows', e => +e.value), cols = await pg.$eval('#nCols', e => +e.value);
+  const one = at(`${rows-1},${cols-1}`);
+  say('1번이 뒤 오른쪽 모서리에', !!one, { corner: `${rows-1},${cols-1}`, who: one });
+  say('세로로 번호가 이어진다', !!at(`${rows-2},${cols-1}`), at(`${rows-2},${cols-1}`));
+  await pg.selectOption('#ordStart', 'FL'); await pg.selectOption('#ordDir', 'row');
+  await pg.click('#bOrder');
+}
+
 // 분단 묶음 — 2칸씩 묶으면 격자가 분단 수만큼 쪼개진다
 await pg.fill('#nCols', '6'); await pg.dispatchEvent('#nCols', 'change');
 await pg.fill('#nGroup', '2'); await pg.dispatchEvent('#nGroup', 'change');
@@ -136,6 +185,23 @@ await pg.fill('#addNum', '31'); await pg.fill('#addName', '전입생');
 await pg.click('#bAdd');
 say('전입생이 명렬에 들어간다',
     (await pg.$eval('#rosterEdit', e => e.textContent)).includes('전입생'));
+
+// 메모를 비운 채 인쇄해도 입력칸이 살아 있어야 한다.
+// 예전에 인쇄 버튼이 memoCard 에 display:none 을 박아, 비운 채 인쇄하면
+// 다시 적을 방법이 없어졌다.
+{
+  await pg.fill('#memo', '');
+  await pg.evaluate(() => { window.print = () => {}; });   // 인쇄 대화상자는 막는다
+  await pg.click('#bPrint');
+  say('메모 없이 인쇄해도 입력칸이 남는다',
+      await pg.$eval('#memo', e => e.getClientRects().length > 0));
+  say('메모 카드도 화면에 남는다',
+      await pg.$eval('#memoCard', e => e.getClientRects().length > 0));
+  await pg.fill('#memo', '청소 구역 안내');
+  say('다시 적을 수 있다', (await pg.$eval('#memo', e => e.value)) === '청소 구역 안내');
+  await pg.click('#bPrint');
+  say('적고 인쇄해도 입력칸은 그대로', await pg.$eval('#memo', e => e.getClientRects().length > 0));
+}
 
 // 인쇄 모습 — 인쇄해봐야 보이는 것들이라 여기서 재 둔다.
 // 화면용 .cols 의 align-items:start 가 인쇄 flex 에 새어 들어와 자리판 폭이

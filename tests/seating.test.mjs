@@ -208,6 +208,36 @@ console.log('\n■ 경계');
   check('아무리 돌려도 안 되면 그렇게 말한다', /못 찾았습니다/.test(hard.error || ''), hard.error);
 }
 
+console.log('\n■ 번호 매기는 순서');
+{
+  const g = grid(4, 3);
+  const first = o => seatCells(g, o)[0];
+  const last  = o => seatCells(g, o).at(-1);
+  check('기본은 앞왼쪽에서 가로로', seatCells(g).slice(0,5).join(' ') === '0,0 0,1 0,2 0,3 1,0');
+  check('앞오른쪽 시작', first({ start:'FR' }) === '0,3', first({ start:'FR' }));
+  check('뒤왼쪽 시작',   first({ start:'BL' }) === '2,0', first({ start:'BL' }));
+  check('뒤오른쪽 시작', first({ start:'BR' }) === '2,3', first({ start:'BR' }));
+  check('세로 진행이면 한 분단을 먼저 훑는다',
+        seatCells(g, { dir:'col' }).slice(0,4).join(' ') === '0,0 1,0 2,0 0,1',
+        seatCells(g, { dir:'col' }).slice(0,4));
+  check('뒤오른쪽 + 세로', seatCells(g, { start:'BR', dir:'col' }).slice(0,4).join(' ') === '2,3 1,3 0,3 2,2');
+  check('어느 순서든 자리 수는 같다',
+        ['FL','FR','BL','BR'].every(st => ['row','col'].every(d => seatCells(g,{start:st,dir:d}).length === 12)));
+  check('빈칸은 어느 순서에서도 빠진다',
+        seatCells(grid(4,3,['0,0','2,3']), { start:'BR', dir:'col' }).length === 10);
+
+  // 번호순이 실제로 그 순서를 따르는가
+  const r = seatAssign({ grid: grid(4,3), roster: roster(12), mode:'order', ord:{ start:'BR', dir:'col' } });
+  check('번호순 1번이 시작 모서리에', r.seats['2,3'] === '2-3-1', r.seats['2,3']);
+  check('번호순 2번이 그 앞자리에', r.seats['1,3'] === '2-3-2', r.seats['1,3']);
+
+  // 앞에서부터 채우기도 같은 순서를 따른다
+  const p = seatAssign({ grid: grid(4,3), roster: roster(10), mode:'random',
+                         ord:{ start:'BR', dir:'col' }, rand: mulberry(1) });
+  const tail = seatCells(grid(4,3), { start:'BR', dir:'col' }).slice(10);
+  check('남는 자리는 그 순서의 끝에 몰린다', tail.every(c => !p.seats[c]), tail.filter(c => p.seats[c]));
+}
+
 console.log('\n■ 화면 배선 — JS 가 부르는 id 가 실제로 있나');
 {
   // 알고리즘 테스트는 UI 절반을 못 본다. id 오타는 눌러봐야 알게 되는데,
@@ -228,9 +258,13 @@ console.log('\n■ 화면 배선 — JS 가 부르는 id 가 실제로 있나');
   check('이력은 최근 것만 남긴다', /slice\(-HIST_KEEP\)/.test(html));
   check('명렬 원본은 안 건드린다', !/setDoc\(doc\(db, 'students'/.test(html));
   check('인쇄에서 선택·고름·hover 표시를 지운다',
-        /@media print[\s\S]*\.seat\.sel,\.seat\.pick,\.seat:hover\{border:1px solid #C7D4E6;box-shadow:none/.test(html));
-  check('분단 묶음이 저장된다', /group: ST\.group/.test(html) && /group: d\.group \|\| 2/.test(html));
+        /@media print[\s\S]*\.seat\.sel,\.seat\.pick,\.seat:hover\{border:1\.2px solid #7E8DA0;box-shadow:none/.test(html));
+  check('분단 묶음이 저장된다', /group: ST\.group/.test(html) && /group: d\.group \|\| 1/.test(html));
   check('분단마다 격자를 따로 만든다', /class="aisle"/.test(html));
+  check('번호순 순서가 저장된다', /ordStart: ST\.ordStart, ordDir: ST\.ordDir/.test(html));
+  check('끌어놓기가 배선돼 있다', /addEventListener\('dragstart'/.test(html) && /function dropOnSeat/.test(html));
+  check('목록으로 끌면 자리에서 뺀다', /function bindUnseatDrop/.test(html));
+  check('클릭으로 바꾸는 길도 남겨 뒀다', /s\.addEventListener\('click', \(\) => onSeat/.test(html));
   check('교탁 아래 버전이 있다', /\.board\.flip\{flex-direction:column-reverse;\}/.test(html) && /function rowOrder\(\)/.test(html));
   check('표 복사도 교탁 방향을 따른다', /if \(!ST\.flip\) t \+= desk;/.test(html) && /if \(ST\.flip\) t \+= desk;/.test(html));
   check('교탁 방향은 문서에 저장된다', /flip: !!ST\.flip/.test(html) && /flip: !!d\.flip/.test(html));
