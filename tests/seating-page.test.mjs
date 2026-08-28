@@ -122,6 +122,21 @@ await pg.click('#bAdd');
 say('전입생이 명렬에 들어간다',
     (await pg.$eval('#rosterEdit', e => e.textContent)).includes('전입생'));
 
+// 인쇄 모습 — 인쇄해봐야 보이는 것들이라 여기서 재 둔다.
+// 화면용 .cols 의 align-items:start 가 인쇄 flex 에 새어 들어와 자리판 폭이
+// 종이의 1/3 로 쪼그라든 적이 있다. 눈으로는 멀쩡해 보였다.
+await pg.emulateMedia({ media: 'print' });
+const pm = await pg.evaluate(() => ({
+  page:  Math.round(document.querySelector('.wrap').getBoundingClientRect().width),
+  board: Math.round(document.querySelector('.board').getBoundingClientRect().width),
+  tall:  Math.round(document.querySelector('.grid').getBoundingClientRect().height),
+  ui:    getComputedStyle(document.querySelector('#barMain')).display
+}));
+say('자리판이 종이 폭을 다 쓴다', pm.board >= pm.page * 0.95, pm);
+say('자리판이 종이 높이를 쓴다', pm.tall > 300, pm);
+say('화면 UI 는 인쇄에서 빠진다', pm.ui === 'none', pm.ui);
+await pg.emulateMedia({ media: 'screen' });
+
 console.log(errs.length ? '\n❌ 런타임 오류:\n' + errs.join('\n') : '\n✅ 런타임 오류 없음');
 await b.close();
 process.exit(errs.length ? 1 : 0);

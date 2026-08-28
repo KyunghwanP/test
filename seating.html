@@ -66,30 +66,41 @@
   /* ── 자리판 ── */
   /* 교탁을 아래로 내리는 건 그리는 방향만 바꾸는 것이다. 자리 데이터는 그대로라
      번호순은 여전히 '교탁 쪽 왼쪽부터'다. 줄 순서는 JS 가 뒤집는다. */
-  .board{background:var(--paper);border:1px solid var(--rule);border-radius:14px;padding:18px;margin-bottom:14px;
-    display:flex;flex-direction:column;gap:16px;}
+  /* 자리판은 바닥을 한 톤 낮추고 자리를 흰 카드로 띄운다 — 자리가 눈에 먼저 들어오게. */
+  .board{background:var(--bg);border:1px solid var(--rule);border-radius:16px;padding:20px;margin-bottom:14px;
+    display:flex;flex-direction:column;gap:18px;}
   .board.flip{flex-direction:column-reverse;}
-  .teacher{text-align:center;font-size:12.5px;font-weight:900;color:var(--ink-soft);
-    letter-spacing:.22em;border:2px dashed var(--rule);border-radius:9px;padding:7px;}
-  .grid{display:grid;gap:8px;}
+  .teacher{text-align:center;font-size:13px;font-weight:900;color:var(--ink-soft);
+    letter-spacing:.3em;background:var(--paper);border:1px solid var(--rule);
+    border-radius:10px;padding:9px;}
+  .grid{display:grid;gap:9px;}
   .seat{
-    position:relative;min-height:62px;border:1.5px solid var(--rule);border-radius:10px;
-    background:var(--paper-soft);padding:6px 5px 5px;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
-    cursor:pointer;user-select:none;transition:border-color .12s,background .12s;
+    position:relative;min-height:76px;border:1px solid var(--rule);border-radius:12px;
+    background:var(--paper);padding:20px 6px 8px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    cursor:pointer;user-select:none;
+    box-shadow:0 1px 2px rgba(16,24,40,.05);
+    transition:border-color .12s,box-shadow .12s,transform .12s;
   }
-  .seat:hover{border-color:var(--mon);}
-  .seat.empty{background:transparent;border-style:dashed;opacity:.5;}
-  .seat.off{background:repeating-linear-gradient(45deg,transparent,transparent 5px,var(--rule) 5px,var(--rule) 6px);
-    border-style:dotted;opacity:.55;}
-  .seat.sel{border-color:var(--mon);border-width:2.5px;background:var(--mon-soft);}
-  .seat.pick{outline:2.5px solid var(--warn);outline-offset:1px;}
-  .s-num{font-family:'IBM Plex Mono';font-size:11px;font-weight:700;color:var(--ink-soft);}
-  .s-name{font-size:14px;font-weight:700;line-height:1.2;text-align:center;word-break:keep-all;}
-  .s-duty{font-size:10.5px;font-weight:700;color:var(--mon);background:var(--mon-soft);
-    border-radius:999px;padding:1px 6px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .s-tags{position:absolute;top:3px;right:4px;display:flex;gap:2px;font-size:9.5px;}
-  .s-tag{border-radius:999px;padding:0 4px;font-weight:900;line-height:1.5;}
+  .seat:hover{border-color:var(--mon);box-shadow:0 3px 10px -3px rgba(16,24,40,.18);transform:translateY(-1px);}
+  /* 번호는 자리를 찾는 첫 단서다. 이름 위에 얹지 말고 모서리에 또렷하게 둔다. */
+  .s-num{
+    position:absolute;top:6px;left:7px;
+    font-family:'IBM Plex Mono';font-size:13px;font-weight:700;
+    color:var(--ink-soft);letter-spacing:.02em;
+  }
+  .s-name{font-size:17px;font-weight:700;line-height:1.25;text-align:center;word-break:keep-all;letter-spacing:-.01em;}
+  .s-duty{font-size:11.5px;font-weight:700;color:var(--mon);background:var(--mon-soft);
+    border-radius:999px;padding:2px 9px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .seat.empty{background:transparent;border-style:dashed;box-shadow:none;opacity:.55;}
+  .seat.empty:hover{transform:none;}
+  .seat.off{background:repeating-linear-gradient(45deg,transparent,transparent 6px,var(--rule) 6px,var(--rule) 7px);
+    border-style:dotted;box-shadow:none;opacity:.5;}
+  .seat.off:hover{transform:none;}
+  .seat.sel{border-color:var(--mon);box-shadow:0 0 0 2px var(--mon) inset;}
+  .seat.pick{box-shadow:0 0 0 2px var(--warn) inset;}
+  .s-tags{position:absolute;top:5px;right:6px;display:flex;gap:3px;font-size:10px;}
+  .s-tag{border-radius:999px;padding:1px 6px;font-weight:800;line-height:1.5;}
   .s-tag.fix{background:var(--stop-soft);color:var(--stop);}
   .s-tag.fr{background:var(--warn-soft);color:var(--warn);}
   .s-tag.ap{background:var(--ok-soft);color:var(--ok);}
@@ -102,6 +113,8 @@
   .card h2 .cnt{font-weight:700;color:var(--ink-soft);font-size:12px;}
   .hint{font-size:12px;color:var(--ink-soft);line-height:1.6;margin:0 0 10px;}
   .list{display:flex;flex-direction:column;gap:5px;}
+  /* 30명 명렬이 그대로 늘어나면 페이지가 한참 길어진다 — 넘치면 안에서 스크롤 */
+  .list.scroll{max-height:330px;overflow-y:auto;padding-right:2px;}
   .row{display:flex;align-items:center;gap:7px;font-size:13px;padding:5px 7px;border-radius:7px;background:var(--paper-soft);}
   .row .nm{flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .row .mono{font-family:'IBM Plex Mono';font-size:11.5px;color:var(--ink-soft);}
@@ -117,21 +130,31 @@
   /* ── 인쇄 ── */
   @media print{
     @page{ size:A4 landscape; margin:11mm 10mm; }
+    html,body{height:100%;}
     body{background:#fff;color:#000;font-size:11pt;}
-    .wrap{max-width:none;padding:0;}
+    /* 자리판이 A4 한 장을 채우게 편다 — 위쪽 절반만 쓰면 멀리서 안 읽힌다.
+       flex 로 늘리므로 줄이 많아도 칸이 줄어들 뿐 두 장으로 넘어가지 않는다. */
+    .wrap{max-width:none;padding:0;display:flex;flex-direction:column;height:100vh;}
     .noprint{display:none !important;}
-    .cols{display:block;}
+    /* 화면용 .cols 는 align-items:start 인데, flex 를 세로로 돌리면 그게 가로 정렬이 되어
+       자리판 폭이 내용만큼 쪼그라든다. 인쇄에서는 다시 stretch 로 편다. */
+    .cols{display:flex;flex-direction:column;align-items:stretch;flex:1;min-height:0;}
+    .cols > div:first-child{display:flex;flex-direction:column;flex:1;min-height:0;}
+    .board{flex:1;min-height:0;}
+    .grid{flex:1;min-height:0;grid-auto-rows:1fr;}
     .board{border:none;padding:0;margin:0;}
     .card{border:1px solid #999;border-radius:0;padding:6px 8px;margin:8px 0 0;break-inside:avoid;}
-    .seat{min-height:0;background:#fff !important;border:1px solid #000;border-radius:0;padding:4px 2px;}
+    .board{background:#fff;border:none;}
+    .seat{min-height:0;background:#fff !important;border:1px solid #000;border-radius:0;
+      padding:13pt 3pt 4pt;box-shadow:none;transform:none;}
     .seat.off{border:1px dashed #bbb;background:#fff !important;}
     .seat.empty{border:1px dashed #bbb;}
     /* 고르던 자리·마우스 올린 자리 표시는 화면용이다 — 인쇄물에 색 테두리가 남으면 안 된다 */
-    .seat.sel,.seat:hover{border:1px solid #000;background:#fff !important;}
-    .seat.pick{outline:none;}
-    .s-name{font-size:12pt;}
-    .s-num{font-size:8.5pt;color:#000;}
-    .s-duty{background:transparent;color:#000;border:none;font-size:8.5pt;padding:0;}
+    .seat.sel,.seat:hover{border:1px solid #000;background:#fff !important;box-shadow:none;transform:none;}
+    .seat.pick{outline:none;box-shadow:none;}
+    .s-name{font-size:13pt;font-weight:700;}
+    .s-num{font-size:9.5pt;color:#000;top:3pt;left:4pt;}
+    .s-duty{background:transparent;color:#000;border:none;font-size:9pt;padding:0;}
     .s-tags{display:none;}
     .board{display:flex;gap:10px;}
     .teacher{border:2px solid #000;color:#000;padding:5px;}
@@ -201,7 +224,7 @@
       <div class="card">
         <h2>아직 안 앉은 학생 <span class="cnt" id="unseatedCnt"></span></h2>
         <p class="hint" id="modeHint">자리를 눌러 학생을 고르고, 다른 자리를 누르면 서로 바뀝니다.</p>
-        <div class="list" id="unseated"></div>
+        <div class="list scroll" id="unseated"></div>
       </div>
 
       <div class="card">
@@ -223,7 +246,7 @@
           <input class="txt" id="addName" placeholder="이름" style="flex:1;">
           <button class="btn" id="bAdd">추가</button>
         </div>
-        <div class="list" id="rosterEdit"></div>
+        <div class="list scroll" id="rosterEdit"></div>
       </div>
     </div>
   </div>
