@@ -41,14 +41,17 @@ await pg.waitForFunction(() => document.querySelectorAll('.seat').length > 0, nu
 
 const say = (n, c, x) => console.log(c ? '  ✅ ' + n : '  ❌ ' + n + (x!==undefined?'\n       → '+JSON.stringify(x):''));
 
-say('자리판이 그려졌다', await pg.$$eval('.seat', e => e.length) === 24);
+// 기본 자리판(5분단 × 6줄 = 30자리)
+say('자리판이 그려졌다', await pg.$$eval('.seat', e => e.length) === 30,
+    await pg.$$eval('.seat', e => e.length));
 say('편집 가능 표시', (await pg.$eval('#who', e => e.textContent)).includes('편집'));
 say('아직 안 앉은 학생 30명', (await pg.$eval('#unseatedCnt', e => e.textContent)) === '30명');
 
-// 30명 > 24자리 → 진단이 떠야 한다
+// 자리를 줄여 30명 > 20자리 → 진단이 떠야 한다
+await pg.fill('#nRows', '4'); await pg.dispatchEvent('#nRows', 'change');
 await pg.click('#bOrder');
 const err1 = await pg.$eval('#err', e => e.textContent);
-say('자리보다 학생이 많으면 이유를 말한다', /자리가 24개인데 학생이 30명/.test(err1), err1);
+say('자리보다 학생이 많으면 이유를 말한다', /자리가 20개인데 학생이 30명/.test(err1), err1);
 
 // 판을 넓히면 배정된다
 await pg.fill('#nRows', '8'); await pg.dispatchEvent('#nRows', 'change');
@@ -232,6 +235,24 @@ say('전입생이 명렬에 들어간다',
   say('앉기 전에 건 제약으로 배정된다', !(await pg.$eval('#err', e => e.textContent)),
       await pg.$eval('#err', e => e.textContent));
   say('전원 착석', (await pg.$eval('#unseatedCnt', e => e.textContent)) === '없음');
+  // 신고된 흐름 그대로: 분리를 먼저 걸고 → 랜덤을 돌린 뒤 → 자리에 '분리' 표시가 나야 한다.
+  // 짝 → 묶음으로 바꾸면서 자리판의 배지 검사만 옛 형태로 남아, 표시가 안 났다.
+  {
+    const names = await pg.$$eval('.seat', e => e
+      .filter(s => s.querySelector('.s-name')).slice(0, 3)
+      .map(s => s.querySelector('.s-name').textContent));
+    say('자리에 분리 배지가 뜬다', await pg.$$eval('.seat .s-tag.ap', e => e.length) >= 2,
+        await pg.$$eval('.seat .s-tag.ap', e => e.length));
+    await pg.click('#bRandom');
+    const badges = await pg.$$eval('.seat .s-tag.ap', e => e.length);
+    say('랜덤을 돌려도 분리 배지가 남는다', badges >= 2, badges);
+    const who = await pg.$$eval('.seat', e => e
+      .filter(s => s.querySelector('.s-tag.ap'))
+      .map(s => s.querySelector('.s-name').textContent));
+    say('배지가 묶은 그 학생들에게 붙는다',
+        who.length >= 2 && who.every(n => typeof n === 'string' && n.length > 0), who);
+  }
+
   // 제약 정리하고 다음 검사로. 하나 지울 때마다 목록을 다시 그리므로 매번 새로 찾는다.
   for (let i = 0; i < 20; i++) {
     const b = await pg.$('#consList [data-drop]');
