@@ -178,11 +178,14 @@
      테두리로 만들면 배경이 빠져도 글씨와 구조가 그대로 남는다.
      print-color-adjust 로 색을 요청하되, 그것에 기대지는 않는다.          */
   @media print{
-    @page{ size:A4 landscape; margin:10mm 9mm; }
+    /* 여백을 0으로 두면 크롬이 날짜·주소·페이지번호(머리글/바닥글)를 기본적으로 안 붙인다.
+       대신 종이 여백은 .wrap 의 padding 으로 우리가 직접 준다. 프린터가 못 찍는
+       가장자리(보통 5mm 안쪽)보다 넉넉하게 잡는다. */
+    @page{ size:A4 landscape; margin:0; }
     *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     html,body{height:100%;}
     body{background:#fff;color:#1A2432;font-size:10.5pt;}
-    .wrap{max-width:none;padding:0;display:flex;flex-direction:column;height:100vh;}
+    .wrap{max-width:none;padding:10mm 9mm;display:flex;flex-direction:column;height:100vh;}
     .noprint{display:none !important;}
     .head{display:none;}                   /* 인쇄에는 아래 큰 제목이 대신 나온다 */
     .print-only{display:block;}
@@ -304,7 +307,7 @@
     <label>앞 <input class="num" type="number" id="nFront" min="1" max="12" value="2"> 줄</label>
     <span class="sep"></span>
     <button class="btn pri" id="bSave">저장</button>
-    <button class="btn" id="bPrint">인쇄</button>
+    <button class="btn" id="bPrint" title="인쇄 대화상자에서 색상을 '컬러'로 두어야 색이 나옵니다">인쇄</button>
     <button class="btn" id="bCopy">표 복사</button>
   </div>
 
@@ -469,10 +472,24 @@ function seatAssign(opt){
   const cons   = opt.cons || {};
   const fixed  = cons.fixed || {}, front = cons.front || {}, apart = cons.apart || [];
   const roster = opt.roster || [], keep = opt.keep || {}, nameOf = opt.nameOf;
-  const cells  = seatCells(grid);
+  const all = seatCells(grid);
 
-  const bad = seatDiagnose(roster, cells, fixed, front, apart, nameOf);
+  const bad = seatDiagnose(roster, all, fixed, front, apart, nameOf);
   if (bad) return { error: bad };
+
+  // 자리가 학생보다 많으면 앞에서부터 채운다. 가운데가 군데군데 뚫린 배치도는
+  // 실제 교실과 다르고 보기에도 얼룩이 된다. 일부러 비우려면 '빈칸' 모드를 쓴다.
+  //   고정석과 '안 움직일 학생'의 자리는 뒤쪽이어도 반드시 남긴다.
+  const allCells = new Set(all);
+  const must = new Set();
+  for (const k in fixed) if (roster.includes(k) && allCells.has(fixed[k])) must.add(fixed[k]);
+  for (const k in keep)  if (roster.includes(k) && allCells.has(keep[k]))  must.add(keep[k]);
+  const cells = all.filter(c => must.has(c));
+  for (const c of all) {
+    if (cells.length >= roster.length) break;
+    if (!must.has(c)) cells.push(c);
+  }
+  cells.sort((a, b) => all.indexOf(a) - all.indexOf(b));   // 다시 앞→뒤 순서로
 
   const base = {}, used = new Set(), placed = new Set(), cellSet = new Set(cells);
   for (const k in fixed) {
@@ -947,6 +964,8 @@ function bindRest(){
   $('bCopy').addEventListener('click', copyTable);
   $('bPrint').addEventListener('click', () => {
     buildPrintExtras();
+    // 대화상자 설정은 우리가 못 건드린다 — 색이 안 나오는 이유를 알려만 준다.
+    say('ok', '인쇄 대화상자에서 색상을 «컬러»로 두세요. 날짜·주소가 같이 찍히면 «머리글 및 바닥글»을 꺼 주세요.');
     // 인쇄에는 입력칸 대신 글로 낸다 — textarea 는 넘치는 부분이 잘린다
     $('memoPrint').textContent = $('memo').value;
     $('memoPrint').style.display = $('memo').value.trim() ? 'block' : 'none';
