@@ -15,12 +15,12 @@ const grab = name => {
   }
   throw new Error('닫는 괄호 못 찾음: ' + name);
 };
-const SRC = ['seatRC','seatParse','seatDist','seatCells','seatShuffle','seatFits',
+const SRC = ['seatRC','seatParse','seatDist','seatCells','seatShuffle','apartMembers','seatFits',
              'seatViolations','seatDiagnose','seatAssign'].map(grab).join('\n');
 const TRIES = /const SEAT_TRIES\s*=\s*\d+;/.exec(html)[0];
 const { seatAssign, seatCells, seatDist, seatParse, seatDiagnose } =
   await import('data:text/javascript,' + encodeURIComponent(
-    TRIES + '\n' + SRC + '\nexport { seatRC, seatParse, seatDist, seatCells, seatFits, seatViolations, seatDiagnose, seatAssign };'));
+    TRIES + '\n' + SRC + '\nexport { seatRC, seatParse, seatDist, seatCells, apartMembers, seatFits, seatViolations, seatDiagnose, seatAssign };'));
 
 let pass = 0, fail = 0;
 const check = (n, c, x) => c ? (pass++, console.log('  ✅', n))
@@ -113,6 +113,69 @@ console.log('\n■ 부분 랜덤 — 고른 학생만 움직인다');
   const stayed = Object.keys(keep).every(k => seatOf(r.seats, k) === keep[k]);
   check('안 고른 학생은 그대로', stayed);
   check('고른 학생도 다 앉았다', [...move].every(k => !!seatOf(r.seats, k)));
+}
+
+console.log('\n■ 분리 묶음 — 여러 명을 한꺼번에 떼어놓기');
+{
+  // 5명을 떼어놓으려고 짝 10개를 만들게 하면 안 된다. 묶음 하나로 끝나야 한다.
+  const five = ['2-3-1','2-3-2','2-3-3','2-3-4','2-3-5'];
+  let ok = 0, fails = [];
+  for (let s = 0; s < 30; s++) {
+    const r = seatAssign({ grid: grid(6, 6), roster: roster(30), mode: 'random',
+      cons: { apart: [{ ks: five, d: 2 }] }, rand: mulberry(s) });
+    if (r.error) { fails.push(r.error); continue; }
+    const at = k => seatOf(r.seats, k);
+    let good = true;
+    for (let i = 0; i < five.length; i++) for (let j = i + 1; j < five.length; j++)
+      if (seatDist(at(five[i]), at(five[j])) < 2) good = false;
+    if (good) ok++;
+  }
+  check('5명 묶음 30판 모두 서로 안 붙는다', ok === 30, { ok, fails: fails.slice(0,1) });
+
+  const far = seatAssign({ grid: grid(6, 6), roster: roster(30), mode: 'random',
+    cons: { apart: [{ ks: ['2-3-1','2-3-2','2-3-3'], d: 3 }] }, rand: mulberry(5) });
+  check('거리 3 묶음도 지켜진다', !far.error &&
+    [['2-3-1','2-3-2'],['2-3-1','2-3-3'],['2-3-2','2-3-3']]
+      .every(([a,b]) => seatDist(seatOf(far.seats,a), seatOf(far.seats,b)) >= 3), far.error);
+
+  check('묶음 두 개도 각각 지켜진다', (() => {
+    const r = seatAssign({ grid: grid(6, 6), roster: roster(30), mode: 'random',
+      cons: { apart: [{ ks:['2-3-1','2-3-2','2-3-3'], d:2 }, { ks:['2-3-4','2-3-5'], d:3 }] },
+      rand: mulberry(8) });
+    if (r.error) return false;
+    return seatDist(seatOf(r.seats,'2-3-1'), seatOf(r.seats,'2-3-2')) >= 2 &&
+           seatDist(seatOf(r.seats,'2-3-4'), seatOf(r.seats,'2-3-5')) >= 3;
+  })());
+
+  // 같은 묶음에 속하지 않은 학생끼리는 붙어도 된다
+  check('묶음 밖 학생은 제약을 안 받는다', (() => {
+    const r = seatAssign({ grid: grid(3, 2), roster: roster(6), mode: 'random',
+      cons: { apart: [{ ks:['2-3-1','2-3-2'], d:2 }] }, rand: mulberry(2) });
+    return !r.error && Object.keys(r.seats).length === 6;
+  })());
+
+  check('예전 짝 형태({a,b})도 그대로 읽는다', (() => {
+    const r = seatAssign({ grid: grid(6, 6), roster: roster(30), mode: 'random',
+      cons: { apart: [{ a:'2-3-1', b:'2-3-2', d:3 }] }, rand: mulberry(4) });
+    return !r.error && seatDist(seatOf(r.seats,'2-3-1'), seatOf(r.seats,'2-3-2')) >= 3;
+  })());
+
+  check('한 묶음이 자리보다 크면 이유를 말한다', (() => {
+    const r = seatAssign({ grid: grid(2, 2), roster: roster(4), mode: 'random',
+      cons: { apart: [{ ks: roster(4), d: 2 }] }, rand: mulberry(1) });
+    return /못 찾았습니다/.test(r.error || '');
+  })());
+
+  check('번호순은 못 지킨 묶음을 알려준다', (() => {
+    const r = seatAssign({ grid: grid(6, 6), roster: roster(30), mode: 'order',
+      cons: { apart: [{ ks: five, d: 3 }] } });
+    return Array.isArray(r.warn) && r.warn.length > 0;
+  })());
+  check('그 알림에 같은 짝이 두 번 안 나온다', (() => {
+    const r = seatAssign({ grid: grid(6, 6), roster: roster(30), mode: 'order',
+      cons: { apart: [{ ks: five, d: 3 }] } });
+    return new Set(r.warn).size === r.warn.length;
+  })());
 }
 
 console.log('\n■ 앞에서부터 채운다 (남는 자리는 뒤로)');
