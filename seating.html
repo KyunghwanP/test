@@ -657,7 +657,7 @@ function renderGrid(){
     const tags =
       (ST.fixed[k] ? '<span class="s-tag fix">고정</span>' : '') +
       (ST.front[k] ? '<span class="s-tag fr">앞</span>' : '') +
-      (ST.apart.some(p => p.a === k || p.b === k) ? '<span class="s-tag ap">분리</span>' : '');
+      (ST.apart.some(p => apartMembers(p).includes(k)) ? '<span class="s-tag ap">분리</span>' : '');
     const cls = [ 'seat',
       PICK === cell ? 'sel' : '',
       PARTIAL.has(k) ? 'pick' : '',
@@ -845,7 +845,10 @@ function renderRosterEdit(){
       if (!ST.extra.some(e => e.key === key)) ST.removed = [...new Set([...(ST.removed||[]), key])];
       for (const c in ST.seats) if (ST.seats[c] === key) delete ST.seats[c];
       delete ST.fixed[key]; delete ST.front[key]; delete ST.duty[key];
-      ST.apart = ST.apart.filter(p => p.a !== key && p.b !== key);
+      // 묶음에서 그 학생만 빼고, 혼자 남은 묶음은 의미가 없으니 지운다
+      ST.apart = ST.apart
+        .map(p => ({ ...p, ks: apartMembers(p).filter(k => k !== key), a: undefined, b: undefined }))
+        .filter(p => p.ks.length >= 2);
       await loadRoster(); touch();
     }));
 }

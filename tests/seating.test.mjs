@@ -325,6 +325,15 @@ console.log('\n■ 화면 배선 — JS 가 부르는 id 가 실제로 있나');
   check('자리판 기본은 5분단 6줄',
         /id="nCols"[^>]*value="5"/.test(html) && /id="nRows"[^>]*value="6"/.test(html) &&
         /cols:5, rows:6/.test(html) && /cols: d\.cols \|\| 5, rows: d\.rows \|\| 6/.test(html));
+  // 짝 → 묶음으로 바꿀 때 자리판의 배지 검사를 빠뜨려, 분리를 걸어도 자리에 표시가 안 났다
+  check('자리판 분리 배지가 묶음을 본다',
+        /ST\.apart\.some\(p => apartMembers\(p\)\.includes\(k\)\)/.test(html));
+  check('목록 분리 배지도 묶음을 본다',
+        /ST\.apart\.some\(p => apartMembers\(p\)\.includes\(s\.key\)\)/.test(html));
+  check('옛 짝 형태를 보는 곳이 남아 있지 않다',
+        !/apart\.some\(p => p\.a ===/.test(html) && !/apart\.filter\(p => p\.a !==/.test(html));
+  check('학생을 빼면 묶음에서도 빠진다', /apartMembers\(p\)\.filter\(k => k !== key\)/.test(html));
+  check('혼자 남은 묶음은 지운다', /filter\(p => p\.ks\.length >= 2\)/.test(html));
   check('분단 묶음이 저장된다', /group: ST\.group/.test(html) && /group: d\.group \|\| 1/.test(html));
   check('분단마다 격자를 따로 만든다', /class="aisle"/.test(html));
   check('번호순 순서가 저장된다', /ordStart: ST\.ordStart, ordDir: ST\.ordDir/.test(html));
