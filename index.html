@@ -1500,7 +1500,14 @@
   .s360-cl-item.active{background:var(--mon);color:#fff;}
   .s360-cl-cnt{font-size:12px;font-weight:700;color:var(--ink-soft);}
   .s360-cl-item.active .s360-cl-cnt{color:#fff;opacity:.85;}
-  .s360-roster-head{position:sticky;top:0;background:var(--paper);z-index:1;padding:12px 14px;font-size:13px;font-weight:900;color:var(--ink);border-bottom:1px solid var(--rule);}
+  .s360-seat-btn{
+    margin-left:auto;flex-shrink:0;
+    border:1px solid var(--mon);background:var(--paper);color:var(--mon);
+    font-family:inherit;font-size:12px;font-weight:800;
+    padding:4px 10px;border-radius:8px;cursor:pointer;
+  }
+  .s360-seat-btn:hover{background:var(--mon);color:#fff;}
+  .s360-roster-head{display:flex;align-items:center;gap:8px;position:sticky;top:0;background:var(--paper);z-index:1;padding:12px 14px;font-size:13px;font-weight:900;color:var(--ink);border-bottom:1px solid var(--rule);}
   .s360-rs-item{display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;border:none;border-bottom:1px solid var(--rule);background:transparent;color:var(--ink);font-family:inherit;cursor:pointer;text-align:left;}
   .s360-rs-item:hover{background:var(--paper-soft);}
   .s360-rs-item.active{background:#eef2ff;box-shadow:inset 3px 0 0 var(--mon);}
@@ -5723,6 +5730,16 @@
   </div>
 </div>
 
+<!-- 교실 자리 배치(seating.html) — 진단 모달과 같은 껍데기를 쓴다. 본체는 별도 페이지라
+     index.html 에는 여는 버튼과 이 iframe 만 있다. -->
+<div class="jd-overlay" id="seatModal">
+  <div class="jd-box">
+    <button class="jd-close" id="seatModalClose" title="닫기">✕</button>
+    <button class="jd-open" id="seatOpenBtn" title="새 페이지로 크게 보기">⛶ 페이지로</button>
+    <iframe id="seatFrame" title="교실 자리 배치"></iframe>
+  </div>
+</div>
+
 <!-- 협의 시간 찾기 — #timetablePage 바깥에 둔다(위젯이 시간표 페이지를 늘려도 영향 없게) -->
 <div class="modal-overlay" id="ttMeetModal">
   <div class="meet-box">
@@ -7602,6 +7619,35 @@ function closeJindanModal(){
   document.getElementById('jindanFrame').src = 'about:blank'; // iframe 메모리 해제
 }
 
+// ── 교실 자리 배치 (seating.html) ──
+// 본체는 별도 페이지다. 여기 있는 건 '누가 열 수 있나'와 iframe 을 띄우는 것뿐.
+// 담임 판정은 화면 편의일 뿐이고, 저장은 firestore.rules 의 isHomeroomOf 가 다시 막는다.
+function canSeatClass(classKey){
+  if (isViewAs()) return false;                       // 가장 모드에서는 남의 반을 저장하면 안 된다
+  if (fbAuth.currentUser?.email === ADMIN_EMAIL) return true;
+  const hr = getMyHomeroom();
+  return !!hr && sameClassKey(hr, classKey);
+}
+// '2-03' 과 '2-3' 을 같게 본다 — 시간표 표기와 명렬 표기가 다르다
+function sameClassKey(a, b){
+  const n = v => String(v || '').split('-').map(x => parseInt(x, 10)).join('-');
+  return !!a && !!b && n(a) === n(b);
+}
+function openSeatModal(classKey){
+  clearTimeout(exitArmTimer);
+  const hr = fbAuth.currentUser?.email === ADMIN_EMAIL ? classKey : (getMyHomeroom() || '');
+  document.getElementById('seatFrame').src =
+    `${REMOTE_BASE}seating.html?class=${encodeURIComponent(classKey)}&hr=${encodeURIComponent(hr)}&embed=1`;
+  document.getElementById('seatModal').classList.add('open');
+}
+function closeSeatModal(){
+  document.getElementById('seatModal').classList.remove('open');
+  document.getElementById('seatFrame').src = 'about:blank';
+}
+window.canSeatClass = canSeatClass;
+window.openSeatModal = openSeatModal;
+window.closeSeatModal = closeSeatModal;
+
 function openSwapModal(teacherObj, day, period, entry){
   clearTimeout(exitArmTimer); // 팝업을 여는 동안에는 무장 타이머가 끼어들지 않도록
   popupTab = 'swap';
@@ -7628,6 +7674,7 @@ window.addEventListener('popstate', (e)=>{
   if (document.getElementById('ptsDetailModal')?.classList.contains('show')) { closePtsDetailBtn(); armExitGuard(); return; }
   if (document.querySelector('.cd-overlay.open')) { document.querySelector('.cd-overlay.open').classList.remove('open'); armExitGuard(); return; }
   if (document.getElementById('jindanModal')?.classList.contains('open')) { closeJindanModal(); armExitGuard(); return; }
+  if (document.getElementById('seatModal')?.classList.contains('open')) { closeSeatModal(); armExitGuard(); return; }
   if (document.getElementById('classOrgModal')?.classList.contains('open')) { closeClassOrgModal(); armExitGuard(); return; }
   if (document.getElementById('s360PhotoZoom')?.classList.contains('open')) { s360ClosePhotoZoom(); armExitGuard(); return; }
   // 외출증 — 상세를 먼저 본다(상세 위에 발급이 겹칠 일은 없지만, 수정 중이면 상세가 위다)
@@ -7705,6 +7752,18 @@ document.getElementById('jindanOpenBtn').addEventListener('click', () => {
 });
 document.getElementById('jindanModal').addEventListener('click', e=>{ if(e.target.id==='jindanModal') closeJindanModal(); });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeJindanModal(); });
+
+// 자리 배치 모달 — 진단 모달과 같은 배선
+let _seatQuery = '';
+document.getElementById('seatModalClose').addEventListener('click', closeSeatModal);
+document.getElementById('seatOpenBtn').addEventListener('click', () => {
+  const src = document.getElementById('seatFrame').src;
+  if (!src || src === 'about:blank') return;
+  closeSeatModal();
+  window.open(src.replace('&embed=1', ''), '_blank');
+});
+document.getElementById('seatModal').addEventListener('click', e=>{ if(e.target.id==='seatModal') closeSeatModal(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeSeatModal(); });
 
 card.addEventListener('click', e=>{
   const cell = e.target.closest('.gt-cell.swappable');
@@ -10912,12 +10971,19 @@ function s360FillRosterPane(){
       <span class="spot-cell spot-cell-pts">${ptsBadge}</span>
     </div>`;
   }).join('');
+  // 자리 배치는 그 반 담임(과 관리자)만 연다 — 남의 반 자리를 건드릴 일이 없다.
+  const seatBtn = canSeatClass(s360Group.key)
+    ? `<button type="button" class="s360-seat-btn" data-seat="${s360Group.key}">🪑 자리 배치</button>` : '';
   if (compact) {
-    el.innerHTML = `<div class="s360-roster-head">${s360Group.label} · ${students.length}명</div>${rows}`;
+    el.innerHTML = `<div class="s360-roster-head">${s360Group.label} · ${students.length}명${seatBtn}</div>${rows}`;
   } else {
     // 기존 목록 그대로: max-width 가운데 정렬(좌우 여백) + 카드 박스
-    el.innerHTML = `<div class="s360-list-head" style="padding:2px 4px 10px;font-size:14px;font-weight:900;color:var(--ink);">${s360Group.label} · ${students.length}명</div><div class="s360-list-box">${rows}</div>`;
+    el.innerHTML = `<div class="s360-list-head" style="padding:2px 4px 10px;font-size:14px;font-weight:900;color:var(--ink);display:flex;align-items:center;">${s360Group.label} · ${students.length}명${seatBtn}</div><div class="s360-list-box">${rows}</div>`;
   }
+  el.querySelectorAll('[data-seat]').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    openSeatModal(b.dataset.seat);
+  }));
   el.querySelectorAll('.spot-row, .s360-rs-item').forEach(b=>b.addEventListener('click',()=>{
     const first = !s360PaneStudent;   // 처음 학생 선택이면 상세 패널을 새로 생성(2열→3열)
     s360PaneStudent = students[parseInt(b.dataset.i)];

@@ -53,6 +53,13 @@ service cloud.firestore {
       allow read: if isAppAdmin();
       allow write: if false;
     }
+    // 교실 자리 배치 — 문서 ID 는 '학년-반'(예: 2-3).
+    // 조회는 전 교사(수업 들어갈 때 이름을 봐야 한다), 저장은 그 반 담임과 관리자만.
+    // 담임 판정은 학부모 상담이 쓰는 acl/gradeRoles.homerooms 를 그대로 재사용한다.
+    match /seating/{classKey} {
+      allow read:  if isYnhsTeacher();
+      allow write: if isHomeroomOf(classKey) || isAppAdmin();
+    }
     // 동아리 메타데이터 (지도교사·전공·교실·정원·학년) — 교사 읽기/쓰기
     match /clubs/{docId} {
       allow read, write: if request.auth != null
