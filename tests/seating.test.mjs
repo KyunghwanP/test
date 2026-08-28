@@ -115,6 +115,42 @@ console.log('\n■ 부분 랜덤 — 고른 학생만 움직인다');
   check('고른 학생도 다 앉았다', [...move].every(k => !!seatOf(r.seats, k)));
 }
 
+console.log('\n■ 앞에서부터 채운다 (남는 자리는 뒤로)');
+{
+  // 자리 30, 학생 24 → 앞 24칸이 차고 뒤 6칸이 비어야 한다.
+  // 랜덤이 전체에 흩뿌리면 가운데가 군데군데 뚫린 얼룩이 된다.
+  const cells = seatCells(grid(5, 6));
+  const front24 = new Set(cells.slice(0, 24));
+  let allPacked = true, holes = [];
+  for (let s = 0; s < 40; s++) {
+    const r = seatAssign({ grid: grid(5, 6), roster: roster(24), mode: 'random', rand: mulberry(s) });
+    const taken = Object.keys(r.seats);
+    if (taken.length !== 24 || !taken.every(c => front24.has(c))) {
+      allPacked = false; holes = taken.filter(c => !front24.has(c)); break;
+    }
+  }
+  check('랜덤 40판 모두 앞 24칸에만 앉는다', allPacked, holes);
+  const last = seatAssign({ grid: grid(5, 6), roster: roster(24), mode: 'random', rand: mulberry(3) });
+  check('마지막 줄이 비어 있다', !cells.slice(24).some(c => last.seats[c]));
+
+  const ord = seatAssign({ grid: grid(5, 6), roster: roster(24), mode: 'order' });
+  check('번호순도 앞 24칸', Object.keys(ord.seats).every(c => front24.has(c)));
+
+  // 뒤쪽 고정석은 예외 — 그 자리는 비우면 안 된다
+  const backFix = seatAssign({ grid: grid(5, 6), roster: roster(24), mode: 'random',
+                               cons: { fixed: { '2-3-1': '5,4' } }, rand: mulberry(9) });
+  check('뒤쪽 고정석은 그대로 지킨다', backFix.seats['5,4'] === '2-3-1', backFix.error || backFix.seats['5,4']);
+  check('고정석 때문에 앞 한 칸이 대신 빈다',
+        Object.keys(backFix.seats).length === 24 &&
+        cells.slice(0, 24).filter(c => !backFix.seats[c]).length === 1);
+
+  // 빈칸(off)은 애초에 자리가 아니므로 앞에서부터 채우기와 함께 동작해야 한다
+  const withOff = seatAssign({ grid: grid(5, 6, ['0,0','0,1']), roster: roster(20), mode: 'random', rand: mulberry(4) });
+  check('빈칸을 건너뛰고 앞에서부터', !withOff.error &&
+        Object.keys(withOff.seats).every(c => seatCells(grid(5,6,['0,0','0,1'])).slice(0,20).includes(c)),
+        withOff.error);
+}
+
 console.log('\n■ 빈칸 자리에는 안 앉힌다');
 {
   const off = ['0,0', '0,1', '2,2'];
