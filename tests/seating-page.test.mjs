@@ -186,6 +186,61 @@ await pg.click('#bAdd');
 say('전입생이 명렬에 들어간다',
     (await pg.$eval('#rosterEdit', e => e.textContent)).includes('전입생'));
 
+// 처음 열면 아무도 안 앉아 있다. 그 상태에서 제약을 걸 수 있어야 한다 —
+// 자리를 눌러야만 고를 수 있게 해두면 누를 자리가 없어서 아무것도 못 한다.
+{
+  pg.once('dialog', d => d.accept());     // 확인 대화상자는 클릭 '전에' 받아 둬야 한다
+  await pg.click('#bClear');
+  await pg.waitForFunction(() => document.querySelectorAll('.seat .s-name').length === 0, null, { timeout: 3000 });
+  const unseated = await pg.$$eval('#unseated .stu', e => e.length);
+  say('전부 비우면 목록에 다 나온다', unseated > 20, unseated);
+
+  await pg.click('#mApart');
+  await pg.click('#unseated .stu:nth-child(1)');
+  await pg.click('#unseated .stu:nth-child(2)');
+  await pg.click('#unseated .stu:nth-child(3)');
+  say('앉기 전에도 목록에서 고를 수 있다',
+      (await pg.$eval('#bApartMake', e => e.textContent)).includes('3명'),
+      await pg.$eval('#bApartMake', e => e.textContent));
+  say('고른 학생이 목록에 표시된다', await pg.$$eval('#unseated .stu.on', e => e.length) === 3);
+  await pg.click('#unseated .stu:nth-child(2)');
+  say('다시 누르면 빠진다', (await pg.$eval('#bApartMake', e => e.textContent)).includes('2명'));
+  await pg.click('#unseated .stu:nth-child(2)');
+  await pg.click('#bApartMake');
+  say('앉기 전에 묶은 것도 제약에 들어간다', /분리\s*3명/.test(await pg.$eval('#consList', e => e.textContent)));
+
+  // 앞자리·임무도 목록에서
+  await pg.click('#mFront');
+  await pg.click('#unseated .stu:nth-child(5)');
+  say('앞자리도 목록에서 걸린다', /앞\s*2줄/.test(await pg.$eval('#consList', e => e.textContent)),
+      await pg.$eval('#consList', e => e.textContent).then(t => t.slice(0,120)));
+  await pg.click('#mDuty');
+  pg.once('dialog', d => d.accept('반장'));
+  await pg.click('#unseated .stu:nth-child(6)');
+  say('임무도 목록에서 적힌다', /반장/.test(await pg.$eval('#unseated', e => e.textContent)));
+
+  // 고정석은 자리가 필요하다 — 그걸 알려줘야 한다
+  await pg.click('#mFix');
+  await pg.click('#unseated .stu:nth-child(1)');
+  say('고정석은 자리가 필요하다고 알려준다',
+      /자리를 눌러 지정/.test(await pg.$eval('#warn', e => e.textContent)),
+      await pg.$eval('#warn', e => e.textContent));
+
+  // 이 제약들을 안고 배정이 되는지
+  await pg.click('#mMove');
+  await pg.click('#bRandom');
+  say('앉기 전에 건 제약으로 배정된다', !(await pg.$eval('#err', e => e.textContent)),
+      await pg.$eval('#err', e => e.textContent));
+  say('전원 착석', (await pg.$eval('#unseatedCnt', e => e.textContent)) === '없음');
+  // 제약 정리하고 다음 검사로. 하나 지울 때마다 목록을 다시 그리므로 매번 새로 찾는다.
+  for (let i = 0; i < 20; i++) {
+    const b = await pg.$('#consList [data-drop]');
+    if (!b) break;
+    await b.click();
+  }
+  say('제약을 모두 지웠다', (await pg.$$('#consList [data-drop]')).length === 0);
+}
+
 // 분리 묶음 — 여러 명을 골라 한 번에 묶는다
 {
   await pg.click('#mApart');

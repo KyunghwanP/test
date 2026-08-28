@@ -129,7 +129,12 @@
   .seat.pick{border-color:var(--warn);box-shadow:0 0 0 2px var(--warn), var(--shadow-2);}
   .seat.dragging,.row.dragging{opacity:.4;}
   .seat.over{border-color:var(--mon);box-shadow:0 0 0 3px var(--mon-soft), var(--shadow-2);transform:translateY(-2px);}
-  .row.stu{cursor:grab;}
+  .row.stu{cursor:pointer;}
+  .row.stu.on{background:var(--mon-soft);box-shadow:inset 2px 0 0 var(--mon);}
+  .row-tags{display:flex;gap:3px;flex-shrink:0;}
+  .row-tags .s-tag{font-size:9.5px;}
+  .s-tag.dt{background:var(--mon-soft);color:var(--mon);max-width:70px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .row.stu:active{cursor:grabbing;}
   .list.over{outline:2px dashed var(--mon);outline-offset:3px;border-radius:8px;}
   .s-tags{position:absolute;top:7px;right:8px;display:flex;gap:3px;font-size:9.5px;}
@@ -712,7 +717,7 @@ function onSeat(cell){
   if (MODE === 'apart') {
     // 두 명씩 짝지을 필요 없다 — 떼어놓을 사람을 다 고른 뒤 한 묶음으로 만든다.
     if (APART_SEL.has(k)) APART_SEL.delete(k); else APART_SEL.add(k);
-    renderGrid(); renderApartBar(); return;
+    renderGrid(); renderSide(); renderApartBar(); return;
   }
   if (MODE === 'duty') {
     const cur = ST.duty[k] || '';
@@ -741,17 +746,53 @@ function renderSide(){
   const seated = new Set(Object.values(ST.seats));
   const un = ROSTER.filter(s => !seated.has(s.key));
   $('unseatedCnt').textContent = un.length ? `${un.length}명` : '없음';
+  // 제약은 자리를 눌러 고르게 돼 있었는데, 처음 열면 아무도 안 앉아 있어 누를 자리가 없다.
+  // 배정 전에 제약부터 걸고 싶은 게 보통이라 이 목록에서도 고를 수 있어야 한다.
   $('unseated').innerHTML = un.length
-    ? un.map(s => `<div class="row stu" data-stu="${esc(s.key)}" draggable="${CANEDIT}">
+    ? un.map(s => {
+        const tag = (ST.fixed[s.key] ? '<span class="s-tag fix">고정</span>' : '')
+                  + (ST.front[s.key] ? '<span class="s-tag fr">앞</span>' : '')
+                  + (ST.apart.some(p => apartMembers(p).includes(s.key)) ? '<span class="s-tag ap">분리</span>' : '')
+                  + (ST.duty[s.key] ? `<span class="s-tag dt">${esc(ST.duty[s.key])}</span>` : '');
+        return `<div class="row stu${APART_SEL.has(s.key) ? ' on' : ''}" data-stu="${esc(s.key)}" draggable="${CANEDIT}">
         <span class="mono">${String(s.num).padStart(2,'0')}</span>
-        <span class="nm">${esc(s.name)}</span>${s.extra?'<span class="mono">추가</span>':''}</div>`).join('')
+        <span class="nm">${esc(s.name)}</span>${s.extra?'<span class="mono">추가</span>':''}
+        <span class="row-tags">${tag}</span></div>`;
+      }).join('')
     : '<div class="none">모두 앉았습니다.</div>';
-  $('unseated').querySelectorAll('.stu').forEach(bindDrag);
+  $('unseated').querySelectorAll('.stu').forEach(el => {
+    bindDrag(el);
+    el.addEventListener('click', () => onStudent(el.dataset.stu));
+  });
   bindUnseatDrop();
   renderCons();
   renderHist();
   renderRosterEdit();
 }
+// 목록에서 학생을 눌렀을 때. 자리가 필요 없는 제약(분리·앞자리·임무)은 여기서도 건다.
+// 고정석은 '어느 자리에' 가 있어야 하므로 자리를 눌러야 한다.
+function onStudent(k){
+  if (!CANEDIT || !k) return;
+  clearSay();
+  if (MODE === 'apart') {
+    if (APART_SEL.has(k)) APART_SEL.delete(k); else APART_SEL.add(k);
+    renderSide(); renderGrid(); renderApartBar(); return;
+  }
+  if (MODE === 'front') {
+    if (ST.front[k]) delete ST.front[k]; else ST.front[k] = ST.frontRows;
+    touch(); return;
+  }
+  if (MODE === 'duty') {
+    const v = prompt(`${nameOf(k)} 임무 (비우면 지웁니다)`, ST.duty[k] || '');
+    if (v === null) return;
+    if (v.trim()) ST.duty[k] = v.trim().slice(0, 20); else delete ST.duty[k];
+    touch(); return;
+  }
+  if (MODE === 'fix')  { say('warn', '고정석은 자리를 눌러 지정합니다. 먼저 앉힌 뒤 그 자리를 누르세요.'); return; }
+  if (MODE === 'off')  { say('warn', '빈칸은 자리판에서 지정합니다.'); return; }
+  say('warn', '이 학생을 앉히려면 자리로 끌어다 놓으세요.');
+}
+
 // 분리 모드에서만 뜨는 '묶기' 줄
 function renderApartBar(){
   const bar = $('apartBar'), btn = $('bApartMake');
@@ -1029,10 +1070,10 @@ function bindModes(){
   const modes = { mMove:'move', mFix:'fix', mFront:'front', mApart:'apart', mDuty:'duty', mOff:'off' };
   const hints = {
     move : '자리를 끌어다 놓거나, 눌러 고른 뒤 다른 자리를 누르면 서로 바뀝니다. 오른쪽 목록의 학생도 끌어다 앉힐 수 있습니다.',
-    fix  : '자리를 누르면 그 학생이 고정됩니다. 랜덤을 돌려도 안 움직입니다.',
-    front: `자리를 누르면 그 학생을 앞 ${ST.frontRows}줄 안에 앉힙니다.`,
-    apart: '떼어놓을 학생들을 모두 누른 뒤 아래 버튼으로 묶으세요. 묶음 안에서 서로 멀리 앉습니다.',
-    duty : '자리를 누르면 임무를 적을 수 있습니다. 반장·주번·청소구역 등 자유롭게.',
+    fix  : '자리를 누르면 그 학생이 고정됩니다. 랜덤을 돌려도 안 움직입니다. (앉은 학생만 됩니다)',
+    front: `학생을 누르면 앞 ${ST.frontRows}줄 안에 앉힙니다. 자리판에서도, 아래 목록에서도 됩니다.`,
+    apart: '떼어놓을 학생들을 모두 누른 뒤 아래 버튼으로 묶으세요. 아직 안 앉은 학생은 이 목록에서 바로 고를 수 있습니다.',
+    duty : '학생을 누르면 임무를 적을 수 있습니다. 자리판에서도, 아래 목록에서도 됩니다.',
     off  : '자리를 누르면 빈칸(자리 아님)이 됩니다. 통로나 결원 자리에 쓰세요.',
     partial: '다시 섞을 학생들을 누르세요. 고른 학생들끼리만 자리를 바꿉니다.'
   };
