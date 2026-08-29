@@ -144,6 +144,21 @@ if ('serviceWorker' in navigator) {
   .db-item .phone{font-family:'IBM Plex Mono';font-size:12px;color:var(--wed);}
   .db-item .ext{font-family:'IBM Plex Mono';font-size:11.5px;color:var(--gold);margin-left:auto;}
 
+  /* 동아리 개별 입력 — 목록을 그대로 쓰되 마지막 칸이 입력칸이다 */
+  .sc-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+  .sc-chk{display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap;}
+  .sc-find{
+    flex:1;min-width:160px;font-family:inherit;font-size:13px;
+    padding:7px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--paper);color:var(--ink);
+  }
+  .sc-in{
+    margin-left:auto;flex:0 0 168px;font-family:inherit;font-size:12.5px;
+    padding:5px 8px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);
+  }
+  .sc-in:focus{outline:2px solid var(--mon);outline-offset:-1px;}
+  .sc-item.sc-dirty{background:#FFF3E0;}
+  .sc-item.sc-dirty .sc-in{border-color:var(--gold);font-weight:700;}
+
   .auth-gate{
     position:fixed;inset:0;background:var(--bg);
     display:flex;align-items:center;justify-content:center;z-index:200;
@@ -412,6 +427,29 @@ if ('serviceWorker' in navigator) {
         <button class="btn btn-secondary" id="stRefreshDbBtn">🔄 새로고침</button>
         <button class="btn btn-secondary" id="stDownloadBtn">⬇️ 엑셀 다운로드</button>
       </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">🎪 동아리 개별 입력</div>
+      <div class="section-desc">
+        편성표로 명렬을 갱신하면 <b>새로 전입한 학생은 동아리가 비어 있습니다</b> —
+        편성표에 동아리 열이 없어서 기존 값을 그대로 두기 때문입니다.
+        그 학생들만 여기서 채워 넣으세요.<br>
+        <b>동아리 칸만 바꾸고 나머지는 건드리지 않습니다</b> — 연락처 문서도 손대지 않습니다.
+      </div>
+      <div class="sc-tools">
+        <button class="btn btn-secondary" id="scLoadBtn">🔄 불러오기</button>
+        <label class="sc-chk"><input type="checkbox" id="scOnlyEmpty" checked> 동아리 없는 학생만</label>
+        <input type="search" id="scFind" class="sc-find" placeholder="이름 또는 2-3 으로 찾기" spellcheck="false">
+      </div>
+      <div class="stat-chips" id="scStats"></div>
+      <div class="db-list" id="scList"><div style="color:var(--ink-soft);font-size:13px;">「불러오기」를 눌러주세요.</div></div>
+      <datalist id="scClubList"></datalist>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="scSaveBtn" disabled>☁️ 바뀐 것만 저장</button>
+        <button class="btn btn-secondary" id="scResetBtn" disabled>되돌리기</button>
+      </div>
+      <div id="scStatus"></div>
     </div>
   </div>
 
@@ -1758,6 +1796,12 @@ function psRender() {
              · 사진명렬을 다시 올려야 합니다 — 안 올리면 그 학생만 사진이 안 뜹니다<br>
              · 상벌점도 다시 올려야 맞습니다<br>
              · <b>상담 예약이 걸려 있으면 학부모가 못 봅니다</b> — 해당 학급 예약을 확인하세요</div></div>`
+        : '')
+    // 새로 들어온 학생은 편성표에 동아리 열이 없어 빈 채로 저장된다. 갈 곳을 알려 준다.
+    + (d.added.length
+        ? `<div class="status info" style="margin:8px 0;font-size:13px;line-height:1.8;">
+             새로 들어온 <b>${d.added.length}명</b>은 <b>동아리가 비어 있습니다</b>.
+             저장한 뒤 <b>🎒 학생연락망 → 🎪 동아리 개별 입력</b> 에서 채워 넣으세요.</div>`
         : '');
 
   const fixedBirth = rows.filter(r => String(r._birthRaw || '') !== r.birth).length;
@@ -2202,6 +2246,168 @@ document.getElementById('stDownloadBtn').addEventListener('click', () => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '학생연락망');
   XLSX.writeFile(wb, `영남고_학생연락망_${new Date().toLocaleDateString('ko-KR').replace(/\.\s/g,'-')}.xlsx`);
+});
+
+// ════════════════════════════════════
+// ── 동아리 개별 입력 ──
+// ════════════════════════════════════
+// 편성표에는 동아리 열이 없다. 그래서 편성표로 명렬을 갱신하면 새로 전입한
+// 학생만 동아리가 비어 있다. 그 몇 명 때문에 학생연락망 전체를 다시 만들지
+// 않게 하려는 화면이다.
+//
+// 여기서 쓰는 것은 students/main 의 club 뿐이다. 연락처 문서는 건드리지 않는다.
+// 저장 직전에 문서를 다시 읽는다 — 불러온 뒤 편성표 업로드가 끼어들 수 있고,
+// 그때 화면에 들고 있던 옛 명렬을 그대로 쓰면 그 사이 변경이 통째로 날아간다.
+const scKey = s => `${parseInt(s.grade)}-${parseInt(s.room)}-${parseInt(s.num)}`;
+let scAll  = null;              // 불러온 시점의 students 배열
+let scEdit = new Map();         // key → 새 동아리 (바꾼 것만)
+
+const scEl = id => document.getElementById(id);
+const scNorm = v => String(v ?? '').trim();
+
+async function scLoad() {
+  const list = scEl('scList');
+  list.innerHTML = '<div style="color:var(--ink-soft);font-size:13px;">불러오는 중...</div>';
+  clearStatus('scStatus');
+  try {
+    const [a, c] = await Promise.all([
+      getDoc(doc(db, 'students', 'main')),
+      getDoc(doc(db, 'clubs', 'main')).catch(() => null),
+    ]);
+    scAll  = a.exists() ? (a.data().students || []) : [];
+    scEdit = new Map();
+    // 입력칸 자동완성 — 동아리 명단 + 이미 학생에게 붙어 있는 이름
+    const names = new Set();
+    if (c && c.exists()) for (const x of (c.data().clubs || [])) if (scNorm(x.name)) names.add(scNorm(x.name));
+    for (const s of scAll) if (scNorm(s.club)) names.add(scNorm(s.club));
+    scEl('scClubList').innerHTML =
+      [...names].sort().map(n => `<option value="${psEsc(n)}">`).join('');
+    scRender();
+  } catch (e) {
+    list.innerHTML = `<div style="color:#B71C1C;font-size:13px;">불러오기 실패: ${psEsc(e.message)}</div>`;
+  }
+}
+
+const SC_MAX_ROWS = 300;        // 1020명을 다 그리면 느리다. 찾기로 좁혀 쓰는 화면이다.
+
+function scRender() {
+  if (!scAll) return;
+  const onlyEmpty = scEl('scOnlyEmpty').checked;
+  const q = scNorm(scEl('scFind').value);
+  const hit = s => {
+    // 걸러내는 기준은 '원래' 값이다. 방금 채워 넣은 학생이 눈앞에서 사라지면
+    // 오타를 고칠 수도, 무엇을 했는지 볼 수도 없다.
+    if (onlyEmpty && scNorm(s.club) && !scEdit.has(scKey(s))) return false;
+    if (!q) return true;
+    return s.name.includes(q) || scKey(s).startsWith(q) || `${s.grade}-${s.room}`.startsWith(q);
+  };
+  const rows = scAll.filter(hit);
+  const empty = scAll.filter(s => !scNorm(s.club)).length;
+
+  scEl('scStats').innerHTML =
+    `<div class="stat-chip">전체 <b>${scAll.length}</b>명</div>`
+  + `<div class="stat-chip">동아리 없음 <b>${empty}</b>명</div>`
+  + `<div class="stat-chip">보이는 중 <b>${Math.min(rows.length, SC_MAX_ROWS)}</b>명</div>`
+  + (scEdit.size ? `<div class="stat-chip">바꾼 것 <b>${scEdit.size}</b>명</div>` : '');
+
+  scEl('scList').innerHTML = rows.length
+    ? rows.slice(0, SC_MAX_ROWS).map(s => {
+        const k = scKey(s);
+        const val = scEdit.has(k) ? scEdit.get(k) : scNorm(s.club);
+        return `<div class="db-item sc-item${scEdit.has(k) ? ' sc-dirty' : ''}" data-sc="${psEsc(k)}">
+          <span class="name">${psEsc(s.name)}</span>
+          <span class="dept">${psEsc(s.grade)}-${psEsc(s.room)} ${psEsc(s.num)}번</span>
+          <input class="sc-in" list="scClubList" data-sc-in="${psEsc(k)}"
+                 value="${psEsc(val)}" placeholder="동아리" spellcheck="false">
+        </div>`;
+      }).join('')
+      + (rows.length > SC_MAX_ROWS
+          ? `<div style="color:var(--ink-soft);font-size:12.5px;padding:8px 12px;">
+               … 외 ${rows.length - SC_MAX_ROWS}명. 찾기로 좁혀 주세요.</div>` : '')
+    : '<div style="color:var(--ink-soft);font-size:13px;">해당하는 학생이 없습니다.</div>';
+
+  scEl('scList').querySelectorAll('[data-sc-in]').forEach(inp => {
+    // 목록을 다시 그리면 입력 중이던 칸이 날아간다. 그래서 다 치고 나갈 때만 반영한다.
+    inp.addEventListener('change', () => {
+      const k = inp.dataset.scIn;
+      const was = scNorm((scAll.find(s => scKey(s) === k) || {}).club);
+      const now = scNorm(inp.value);
+      if (now === was) scEdit.delete(k); else scEdit.set(k, now);
+      inp.closest('.sc-item').classList.toggle('sc-dirty', scEdit.has(k));
+      scUpdateBtns();
+      scRenderStatsOnly();
+    });
+  });
+  scUpdateBtns();
+}
+
+// 입력 중에 목록을 통째로 다시 그리면 포커스가 튄다 — 칩만 따로 갱신한다.
+function scRenderStatsOnly() {
+  if (!scAll) return;
+  const empty = scAll.filter(s => !scNorm(s.club)).length;
+  const shown = scEl('scList').querySelectorAll('[data-sc-in]').length;
+  scEl('scStats').innerHTML =
+    `<div class="stat-chip">전체 <b>${scAll.length}</b>명</div>`
+  + `<div class="stat-chip">동아리 없음 <b>${empty}</b>명</div>`
+  + `<div class="stat-chip">보이는 중 <b>${shown}</b>명</div>`
+  + (scEdit.size ? `<div class="stat-chip">바꾼 것 <b>${scEdit.size}</b>명</div>` : '');
+}
+
+function scUpdateBtns() {
+  scEl('scSaveBtn').disabled  = scEdit.size === 0;
+  scEl('scResetBtn').disabled = scEdit.size === 0;
+  scEl('scSaveBtn').textContent = scEdit.size
+    ? `☁️ 바뀐 ${scEdit.size}명 저장` : '☁️ 바뀐 것만 저장';
+}
+
+scEl('scLoadBtn').addEventListener('click', scLoad);
+scEl('scOnlyEmpty').addEventListener('change', scRender);
+scEl('scFind').addEventListener('input', scRender);
+scEl('scResetBtn').addEventListener('click', () => { scEdit = new Map(); scRender(); });
+
+scEl('scSaveBtn').addEventListener('click', async () => {
+  if (!scEdit.size) return;
+  const btn = scEl('scSaveBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>저장 중...';
+  setStatus('scStatus', '☁️ 저장하는 중...', 'loading');
+  try {
+    // 불러온 뒤 편성표 업로드가 끼어들었을 수 있다. 지금 문서를 다시 읽어 그 위에 얹는다.
+    const snap = await getDoc(doc(db, 'students', 'main'));
+    const data = snap.exists() ? snap.data() : {};
+    const now  = data.students || [];
+    const want = new Map(scEdit);
+    let changed = 0;
+    const next = now.map(s => {
+      const k = scKey(s);
+      if (!want.has(k)) return s;
+      const v = want.get(k);
+      want.delete(k);
+      if (scNorm(s.club) === v) return s;
+      changed++;
+      return v ? { ...s, club: v } : (() => { const o = { ...s }; delete o.club; return o; })();
+    });
+    // 남은 것 = 그 사이 자리가 없어진 학생. 조용히 흘리지 않는다.
+    const gone = [...want.keys()];
+    await setDoc(doc(db, 'students', 'main'), {
+      ...data, students: next, count: next.length,
+      updatedAt: new Date().toISOString(), updatedBy: auth.currentUser?.email || '',
+    });
+    scEdit = new Map();
+    await scLoad();               // 먼저 다시 읽는다 — scLoad 가 상태줄을 비우기 때문이다
+    loadDbStudents();
+    setStatus('scStatus',
+      `✅ ${changed}명 저장 완료!` + (gone.length
+        ? `\n※ ${gone.length}명은 그 사이 명렬에서 사라져 반영하지 못했습니다 (${gone.slice(0,5).join(', ')}). 다시 불러와 확인하세요.`
+        : ''), gone.length ? 'warn' : 'ok');
+  } catch (e) {
+    setStatus('scStatus', PS_DENIED.test(e.message || '')
+      ? '권한이 없습니다 — 관리자 계정으로 로그인했는지 확인하세요.'
+      : '저장 실패: ' + e.message, 'err');
+  } finally {
+    btn.innerHTML = '☁️ 바뀐 것만 저장';
+    scUpdateBtns();
+  }
 });
 
 // ════════════════════════════════════
