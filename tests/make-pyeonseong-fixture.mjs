@@ -19,19 +19,31 @@ const here = import.meta.dirname;
 const OUT  = process.argv[2] || '/tmp';
 const XLSX = createRequire(path.join(here, '..', 'package.json'))('xlsx');
 
-const HEAD   = ['연번','신반','신번호','성명','생년월일','연락처(본인)','연락처(부)','연락처(모)'];
+// 신원 열 — 여기까지가 명렬. 마지막 '주소' 가 '여기부터 과목' 을 알리는 칸막이다.
+const HEAD   = ['연번','신반','신번호','성명','생년월일','연락처(본인)','연락처(부)','연락처(모)','주소'];
 const GRADES = [[1,343],[2,322],[3,355]];
 const DROP   = [18, 18, 19];        // 합 55 — 신반·신번호가 빈 줄(실제 파일에선 빨간 음영)
 const ROOMS  = 11;
 
-let seq = 0, gapRooms = 0, zeroFix = 0;
+// 주소 뒤의 과목 열. '단위수' 로 이번학년 블록이 끝나고, 빈 열 하나 뒤가 직전학년이다.
+// 1학년은 직전학년이 없다 — 그래도 형태는 같다.
+const SUBJ = {
+  1: { now: ['통합과학','통합사회','정보','한문Ⅰ'],              prev: [] },
+  2: { now: ['물리학Ⅰ','화학Ⅰ','생명과학Ⅰ','지구과학Ⅰ'],        prev: ['통합과학','통합사회','정보'] },
+  3: { now: ['물리학Ⅱ','화학Ⅱ','생명과학Ⅱ'],                    prev: ['물리학Ⅰ','화학Ⅰ','생명과학Ⅰ','지구과학Ⅰ'] },
+};
+
+let seq = 0, gapRooms = 0, zeroFix = 0, sciN = 0;
 const pad = n => String(n).padStart(4, '0');
 const wb  = XLSX.utils.book_new();
 
 for (const [gi, [grade, total]] of GRADES.entries()) {
   const per = Array(ROOMS).fill(Math.floor(total / ROOMS));
   for (let i = 0; i < total % ROOMS; i++) per[i]++;
-  const aoa = [['2026학년도 편성표'], [], HEAD];
+  const s = SUBJ[grade];
+  // 주소 ‖ 이번학년 과목… | 단위수 | (빈 열) | 직전학년 과목… | 비고
+  const head = [...HEAD, ...s.now, '단위수', '', ...s.prev, '비고'];
+  const aoa  = [['2026학년도 편성표'], [], head];
 
   for (let room = 1; room <= ROOMS; room++) {
     // 번호를 재사용하지 않는 반 — 마지막 번호가 인원보다 크다
@@ -48,10 +60,15 @@ for (const [gi, [grade, total]] of GRADES.entries()) {
       if (seq % 53 === 0) phone = '';                                                     // 편성표에 본인 번호가 빔
       const father = seq % 40 === 0 ? '없음' : '010' + pad(seq + 1000).padEnd(8, '0');
       const mother = seq % 61 === 0 ? '-'    : '010' + pad(seq + 2000).padEnd(8, '0');
-      aoa.push([seq, room, num, `학생${pad(seq)}`, birth, phone, father, mother]);
+      // 주소는 파서가 값을 읽지 않는다(칸막이로만 쓴다). 그래도 실제처럼 채워 둔다.
+      const addr = `대구광역시 ○○구 ○○로 ${100 + (seq % 400)}`;
+      const mark = (list, off) => list.map((_, k) => ((seq + k + off) % 3 === 0) ? 'O' : '');
+      const sci  = seq % 44 === 0; if (sci) sciN++;
+      aoa.push([seq, room, num, `학생${pad(seq)}`, birth, phone, father, mother, addr,
+                ...mark(s.now, 0), '', '', ...mark(s.prev, 1), sci ? '과학중점' : '']);
     }
   }
-  for (let i = 0; i < DROP[gi]; i++) aoa.push(['', '', '', `전출${grade}_${i}`, '', '', '', '']);
+  for (let i = 0; i < DROP[gi]; i++) aoa.push(['', '', '', `전출${grade}_${i}`]);
 
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), `${grade}학년`);
 }
@@ -85,5 +102,5 @@ rows.forEach((r, i) => {
 fs.writeFileSync(path.join(OUT, 'prev-students.json'), JSON.stringify(roster));
 fs.writeFileSync(path.join(OUT, 'prev-contact.json'),  JSON.stringify(contact));
 
-console.log(`${xlsxPath}  ${seq}명 · 제외 ${DROP.reduce((a,b)=>a+b)} · 앞0보정 ${zeroFix} · 번호구멍 ${gapRooms}반`);
+console.log(`${xlsxPath}  ${seq}명 · 제외 ${DROP.reduce((a,b)=>a+b)} · 앞0보정 ${zeroFix} · 번호구멍 ${gapRooms}반 · 과학중점 ${sciN}명`);
 console.log(`${OUT}/prev-students.json, prev-contact.json  (반이 바뀐 학생: ${rows[0].name} 1-11-99 → ${rows[0].grade}-${rows[0].room}-${rows[0].num})`);
