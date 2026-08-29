@@ -12,6 +12,7 @@ import fs from 'node:fs';
 const HTML  = import.meta.dirname + '/../upload.html';
 const SCRAP = '/tmp/claude-0/-home-user-ynhs/6d75d3ff-7eaa-5fb8-9dbb-3fcab9344eea/scratchpad';
 
+const scNormJs = v => String(v ?? '').trim();
 let pass = 0, fail = 0;
 const check = (n, c, x) => c ? (pass++, console.log('  ✅', n))
                              : (fail++, console.log('  ❌', n, x !== undefined ? '\n       → ' + JSON.stringify(x).slice(0,400) : ''));
@@ -198,6 +199,38 @@ console.log('\n■ 지우기 — 빈 값으로 바꾸면 동아리 필드가 빠
   check('빈 동아리는 필드째 빠진다', !('club' in now), now);
   check('그 학생의 다른 값은 남는다', now.name === one.name && now.hasPhone === one.hasPhone, now);
   await p2.close();
+}
+
+console.log('\n■ 그 사이 반이 재편성되면 엉뚱한 학생에게 붙이지 않는다');
+{
+  // 학년-반-번호는 고유 번호가 아니다. 불러온 뒤 편성표 업로드가 끼어들면
+  // 같은 자리에 다른 학생이 앉는다. 그대로 얹으면 남의 동아리가 된다.
+  const p3 = await openPage();
+  const target = EMPTY[0];
+  const key = `${+target.grade}-${+target.room}-${+target.num}`;
+  await p3.fill(`[data-sc-in="${key}"]`, '바둑부');
+  await p3.click('#scStats');
+
+  // 저장 직전에 그 자리 학생을 다른 사람으로 바꿔치기한다(= 편성표 업로드가 끼어든 상황)
+  await p3.evaluate(k => {
+    window.__PREV = window.__PREV.map(s =>
+      `${+s.grade}-${+s.room}-${+s.num}` === k ? { ...s, name: '전입한다른학생' } : s);
+  }, key);
+
+  await p3.click('#scSaveBtn');
+  await p3.waitForFunction(() => /저장 완료/.test(document.getElementById('scStatus').innerText),
+                           null, { timeout: 20000 });
+
+  const saved = (await p3.evaluate(() => window.__writes)).at(-1)[2].students;
+  const seat  = saved.find(s => `${+s.grade}-${+s.room}-${+s.num}` === key);
+  check('그 자리 학생에게 동아리를 붙이지 않는다', !scNormJs(seat.club), seat);
+  check('이름이 어긋난 것을 알린다',
+        /다른 학생이 들어와/.test(await p3.$eval('#scStatus', e => e.innerText)),
+        await p3.$eval('#scStatus', e => e.innerText));
+  check('0명 저장으로 끝난다',
+        /0명 저장 완료/.test(await p3.$eval('#scStatus', e => e.innerText)),
+        await p3.$eval('#scStatus', e => e.innerText));
+  await p3.close();
 }
 
 console.log('\n■ 편성표 탭이 여기로 안내한다');

@@ -2260,7 +2260,8 @@ document.getElementById('stDownloadBtn').addEventListener('click', () => {
 // 그때 화면에 들고 있던 옛 명렬을 그대로 쓰면 그 사이 변경이 통째로 날아간다.
 const scKey = s => `${parseInt(s.grade)}-${parseInt(s.room)}-${parseInt(s.num)}`;
 let scAll  = null;              // 불러온 시점의 students 배열
-let scEdit = new Map();         // key → 새 동아리 (바꾼 것만)
+let scEdit = new Map();         // key → { club, name } (바꾼 것만)
+                                //   이름을 같이 들고 있는 이유는 아래 저장부 주석 참고.
 
 const scEl = id => document.getElementById(id);
 const scNorm = v => String(v ?? '').trim();
@@ -2313,7 +2314,7 @@ function scRender() {
   scEl('scList').innerHTML = rows.length
     ? rows.slice(0, SC_MAX_ROWS).map(s => {
         const k = scKey(s);
-        const val = scEdit.has(k) ? scEdit.get(k) : scNorm(s.club);
+        const val = scEdit.has(k) ? scEdit.get(k).club : scNorm(s.club);
         return `<div class="db-item sc-item${scEdit.has(k) ? ' sc-dirty' : ''}" data-sc="${psEsc(k)}">
           <span class="name">${psEsc(s.name)}</span>
           <span class="dept">${psEsc(s.grade)}-${psEsc(s.room)} ${psEsc(s.num)}번</span>
@@ -2330,9 +2331,11 @@ function scRender() {
     // 목록을 다시 그리면 입력 중이던 칸이 날아간다. 그래서 다 치고 나갈 때만 반영한다.
     inp.addEventListener('change', () => {
       const k = inp.dataset.scIn;
-      const was = scNorm((scAll.find(s => scKey(s) === k) || {}).club);
+      const who = scAll.find(s => scKey(s) === k) || {};
+      const was = scNorm(who.club);
       const now = scNorm(inp.value);
-      if (now === was) scEdit.delete(k); else scEdit.set(k, now);
+      // 지금 화면에서 고른 학생이 누구였는지 이름까지 남긴다(저장할 때 대조용).
+      if (now === was) scEdit.delete(k); else scEdit.set(k, { club: now, name: scNorm(who.name) });
       inp.closest('.sc-item').classList.toggle('sc-dirty', scEdit.has(k));
       scUpdateBtns();
       scRenderStatsOnly();
@@ -2378,11 +2381,16 @@ scEl('scSaveBtn').addEventListener('click', async () => {
     const now  = data.students || [];
     const want = new Map(scEdit);
     let changed = 0;
+    // 학년-반-번호는 학생의 고유 번호가 아니다. 불러온 뒤 편성표 업로드로 반이
+    // 재편성되면 같은 자리에 다른 학생이 앉아 있을 수 있다. 그대로 얹으면
+    // 엉뚱한 사람에게 동아리가 붙는다 — 이름이 다르면 건너뛰고 알린다.
+    const moved = [];
     const next = now.map(s => {
       const k = scKey(s);
       if (!want.has(k)) return s;
-      const v = want.get(k);
+      const { club: v, name } = want.get(k);
       want.delete(k);
+      if (name && scNorm(s.name) !== name) { moved.push(`${k} ${name}→${s.name}`); return s; }
       if (scNorm(s.club) === v) return s;
       changed++;
       return v ? { ...s, club: v } : (() => { const o = { ...s }; delete o.club; return o; })();
@@ -2397,9 +2405,14 @@ scEl('scSaveBtn').addEventListener('click', async () => {
     await scLoad();               // 먼저 다시 읽는다 — scLoad 가 상태줄을 비우기 때문이다
     loadDbStudents();
     setStatus('scStatus',
-      `✅ ${changed}명 저장 완료!` + (gone.length
+      `✅ ${changed}명 저장 완료!`
+      + (gone.length
         ? `\n※ ${gone.length}명은 그 사이 명렬에서 사라져 반영하지 못했습니다 (${gone.slice(0,5).join(', ')}). 다시 불러와 확인하세요.`
-        : ''), gone.length ? 'warn' : 'ok');
+        : '')
+      + (moved.length
+        ? `\n※ ${moved.length}명은 그 사이 그 자리에 다른 학생이 들어와 반영하지 않았습니다 (${moved.slice(0,5).join(', ')}). 다시 불러와 확인하세요.`
+        : ''),
+      (gone.length || moved.length) ? 'warn' : 'ok');
   } catch (e) {
     setStatus('scStatus', PS_DENIED.test(e.message || '')
       ? '권한이 없습니다 — 관리자 계정으로 로그인했는지 확인하세요.'
