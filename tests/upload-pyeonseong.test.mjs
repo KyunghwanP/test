@@ -45,6 +45,7 @@ const src = `
   ${grab('psParseSheet')}
   ${grab('psParseBook')}
   ${constOf('PS_FIELDS')}
+  ${constOf('PS_KEEP_IF_BLANK')}
   ${constOf('psKey')}
   ${grab('psMerge')}
   ${grab('psDiff')}
@@ -148,6 +149,48 @@ console.log('\n■ 필드 단위 덮어쓰기 — 동아리가 살아남아야 �
         Object.keys(merged[0]));
 }
 
+console.log('\n■ 반이 바뀐 학생 — 자리로는 못 찾는다');
+{
+  // 편성표 기준 1반 학생 하나를 '원래 다른 반이었다'로 만든다.
+  // psMerge 가 자리(학년-반-번호)로만 찾으면 여기서 동아리가 사라진다.
+  const moved = out.rows[0];
+  const prev = out.rows.map(r => ({ ...r, club: '과학탐구부' }));
+  const idx = prev.findIndex(p => psKey(p) === psKey(moved));
+  prev[idx] = { ...prev[idx], room: 99, num: 99 };          // 옛 자리는 다른 반
+
+  const merged = psMerge(out.rows, prev);
+  const got = merged.find(m => m.name === moved.name && m.birth === moved.birth);
+  check('반이 바뀌어도 동아리가 따라온다', got && got.club === '과학탐구부', got);
+  check('새 자리 값은 편성표 기준', got && String(got.room) === String(moved.room)
+                                       && String(got.num)  === String(moved.num), got);
+  check('전원 동아리 유지', merged.filter(m => m.club === '과학탐구부').length === merged.length,
+        merged.filter(m => m.club !== '과학탐구부').slice(0,3).map(m => m.name));
+
+  // 이름만 같고 생일이 다른 사람에게 붙으면 안 된다
+  const stranger = psMerge([{ ...moved, room: 1, num: 1, birth: '1900-01-01' }], prev);
+  check('이름만 같은 남의 동아리를 가져오지 않는다', !('club' in stranger[0]), stranger[0]);
+}
+
+console.log('\n■ 편성표의 빈 연락처가 기존 번호를 지우면 안 된다');
+{
+  const r0 = { ...out.rows[0], phone: '', fatherPhone: '', motherPhone: '' };
+  const prev = [{ ...out.rows[0], phone: '01011112222',
+                  fatherPhone: '01033334444', motherPhone: '01055556666', club: '밴드부' }];
+  const [m] = psMerge([r0], prev);
+  check('본인 번호가 남는다',   m.phone === '01011112222', m);
+  check('아버지 번호가 남는다', m.fatherPhone === '01033334444', m);
+  check('어머니 번호가 남는다', m.motherPhone === '01055556666', m);
+
+  // 편성표에 값이 있으면 그건 갈아끼운다 — 최신 파일이 이겨야 한다
+  const [m2] = psMerge([{ ...out.rows[0], phone: '01099998888' }], prev);
+  check('편성표에 값이 있으면 덮어쓴다', m2.phone === '01099998888', m2);
+
+  // 지우기가 아니라 '비었을 때만' 이다. 이름·반·번호는 빈 값도 그대로 반영돼야 한다.
+  check('연락처 외 필드는 보존 예외가 아니다',
+        !constOf('PS_KEEP_IF_BLANK').includes("'name'")
+        && !constOf('PS_KEEP_IF_BLANK').includes("'room'"));
+}
+
 console.log('\n■ 대조 — 자리 주인이 바뀐 곳을 잡아내나');
 {
   const prev = out.rows.map(r => ({ ...r }));
@@ -203,11 +246,17 @@ console.log('\n■ 화면 배선');
   check('탭 버튼과 탭 본문이 짝을 이룬다',
         /data-tab="pyeonseong"/.test(html) && /id="tab-pyeonseong"/.test(html));
 
+  // .status 는 기본이 display:none 이다. 종류별 규칙이 없으면 그 경고는 통째로 안 보인다.
+  const used = new Set([...html.matchAll(/status (ok|err|info|warn|loading)\b/g)].map(m => m[1]));
+  const styled = new Set([...html.matchAll(/\.status\.([a-z]+)\{/g)].map(m => m[1]));
+  check(`쓰이는 status 종류 ${used.size}개에 다 CSS 가 있다`,
+        [...used].every(c => styled.has(c)), [...used].filter(c => !styled.has(c)));
+
   // 저장 경로가 학생연락망과 같은 함수를 쓰는가 — 연락처 분리 규칙이 갈리면 안 된다
   check('저장은 saveSplit 을 통한다',
         /psSaveBtn[\s\S]{0,1500}saveSplit\('students', 'students', 'studentsContact'/.test(html));
   check('저장 직전에 psMerge 를 거친다',
-        /psSaveBtn[\s\S]{0,1200}psMerge\(psRows, psPrev\)/.test(html));
+        /psSaveBtn[\s\S]{0,1200}psMerge\(psRows, psPrevFull\(\)\)/.test(html));
   check('막는 조건을 저장 직전에 다시 본다',
         /psSaveBtn[\s\S]{0,400}psBlockers\(psParsed, psRows\)/.test(html));
   check('백업 전에는 저장 못 한다',

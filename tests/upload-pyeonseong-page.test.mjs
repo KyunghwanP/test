@@ -68,6 +68,9 @@ check('인원이 표시된다', /편성표 1020명/.test(stats) && /제외 55명
 check('막는 조건 없음', (await pg.$eval('#psBlock', e => e.innerText)) === '', await pg.$eval('#psBlock', e => e.innerText));
 const diff = await pg.$eval('#psDiffBox', e => e.innerText);
 check('자리 변동을 보여준다', diff.length > 0, diff.slice(0, 200));
+// 반이 바뀐 학생은 warn 으로만 뜬다. CSS 가 없으면 화면에서 통째로 사라진다.
+check('반·번호가 바뀐 학생이 화면에 뜬다', /반·번호가 바뀜/.test(diff), diff.slice(0, 200));
+check('상담예약 확인 안내가 같이 뜬다', /상담 예약이 걸려 있으면/.test(diff), diff.slice(0, 300));
 check('동아리는 안 건드린다고 알린다', /동아리는 건드리지 않습니다/.test(await pg.$eval('#psFixBox', e => e.innerText)));
 
 console.log('\n■ 백업 없이는 저장 못 한다');
@@ -100,9 +103,26 @@ console.log('\n■ 실제로 저장되는 값');
   check('명렬 1020명', roster.length === 1020, roster.length);
   check('연락처도 같은 길이', contact.length === roster.length);
 
-  check('동아리가 살아남았다',
-        roster.filter(s => s.club).length >= STU.filter(s => s.club).length - 5,
+  check('동아리가 전원 살아남았다',
+        roster.filter(s => s.club).length === STU.filter(s => s.club).length,
         { 저장후: roster.filter(s => s.club).length, 저장전: STU.filter(s => s.club).length });
+  // 반이 바뀐 학생 — 자리로는 옛 기록을 못 찾는다. 여기서 동아리가 사라지면 안 된다.
+  {
+    const moved = STU[0];
+    const now = roster.find(s => s.name === moved.name);
+    check('반이 바뀐 학생도 동아리를 지켰다', now && now.club === moved.club, { moved, now });
+    check('반이 바뀐 학생의 자리는 편성표 기준',
+          now && `${now.grade}-${now.room}-${now.num}` !== `${moved.grade}-${moved.room}-${moved.num}`, now);
+  }
+  // 편성표에 연락처가 빈 학생 — DB 에 있던 번호가 지워지면 안 된다
+  {
+    // 연락처 문서에는 이름이 안 실린다(자리 + 연락처뿐). 자리로 찾는다.
+    const key = x => `${x.grade}-${x.room}-${x.num}`;
+    const nowByKey = new Map(contact.map(x => [key(x), x]));
+    const keep = CONT.filter(c => c.phone === '01077770000');   // 편성표가 빈 학생들
+    const lost = keep.filter(c => nowByKey.get(key(c))?.phone !== c.phone);
+    check(`편성표에 없던 번호 ${keep.length}건이 안 지워졌다`, lost.length === 0, lost.slice(0, 3));
+  }
   check('명렬에 연락처가 안 섞였다', roster.every(s => !s.phone && !s.birth),
         roster.filter(s => s.phone || s.birth).slice(0,2));
   check('연락처 문서에 생년월일이 있다', contact.every(c => 'birth' in c));

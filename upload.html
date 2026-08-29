@@ -102,6 +102,9 @@ if ('serviceWorker' in navigator) {
   .status.err{background:#FFEBEE;color:#B71C1C;display:block;}
   .status.info{background:#E3F2FD;color:#0D47A1;display:block;}
   .status.loading{background:#FFF8E1;color:#E65100;display:block;}
+  /* warn 이 없으면 .status 의 display:none 이 남는다 —
+     '반·번호가 바뀜' 같은 경고가 통째로 안 보인다. */
+  .status.warn{background:#FFF3E0;color:#E65100;display:block;}
 
   .format-box{
     background:var(--paper-soft);border:1px solid var(--rule);border-radius:8px;
@@ -1575,20 +1578,41 @@ function psParseBook(wb) {
 // '동아리를 잊지 말고 되살리자' 식으로 두면 필드가 하나 늘 때마다 또 까먹는다.
 const PS_FIELDS = ['grade','room','num','name','birth','phone','fatherPhone','motherPhone'];
 
+// 편성표에서 비어 있어도 기존 값을 지우면 안 되는 필드.
+// 편성표의 연락처 칸은 비어 있는 학생이 있는데, 그걸 그대로 덮어쓰면
+// 학생연락망으로 채워 둔 번호가 조용히 사라진다.
+const PS_KEEP_IF_BLANK = ['phone', 'fatherPhone', 'motherPhone'];
+
 const psKey = s => `${parseInt(s.grade)}-${parseInt(s.room)}-${parseInt(s.num)}`;
 
 // 편성표 + 기존 명렬 → 저장할 명렬. 편성표가 가진 필드만 갈아끼운다.
 function psMerge(rows, prevList) {
-  const prev = new Map((prevList || []).map(s => [psKey(s), s]));
+  const byKey = new Map((prevList || []).map(s => [psKey(s), s]));
+  // 반이 바뀐 학생은 자리(학년-반-번호)로 못 찾는다. 그대로 두면 동아리가 조용히 사라진다.
+  // 사람(이름+생일)으로 한 번 더 찾는다.
+  const byPerson = new Map();
+  for (const s of prevList || []) {
+    const nm = String(s.name || '').trim();
+    if (nm && s.birth) byPerson.set(`${nm}|${psBirth(s.birth)}`, s);
+  }
   return rows.map(r => {
-    const old = prev.get(psKey(r)) || {};
+    const old = byKey.get(psKey(r)) || byPerson.get(`${r.name}|${r.birth}`) || {};
     const out = {};
     // 동아리 등 기존 필드 보존. 단 '_' 로 시작하는 건 파서가 들고 다니는 내부 값이라
     // 저장 대상이 아니다 — 한 번 들어가면 다음 업로드마다 그대로 따라다닌다.
     for (const k of Object.keys(old)) if (!k.startsWith('_')) out[k] = old[k];
-    for (const f of PS_FIELDS) out[f] = r[f];     // 편성표가 가진 것만 덮어씀
+    for (const f of PS_FIELDS) {
+      if (PS_KEEP_IF_BLANK.includes(f) && !r[f] && old[f]) continue;   // 빈 칸으로 지우지 않는다
+      out[f] = r[f];
+    }
     return out;
   });
+}
+
+// 기존 명렬은 연락처가 분리돼 있다. 대조·병합에는 생년월일이 필요하므로 합쳐 본다.
+function psPrevFull() {
+  const cmap = new Map((psPrevContact || []).map(c => [psKey(c), c]));
+  return (psPrev || []).map(s => ({ ...s, ...(cmap.get(psKey(s)) || {}) }));
 }
 
 // 편성표 ↔ 기존 명렬 대조. 자리(학년-반-번호)를 기준으로 본다.
@@ -1597,15 +1621,17 @@ function psMerge(rows, prevList) {
 function psDiff(rows, prevList) {
   const now  = new Map(rows.map(s => [psKey(s), s]));
   const prev = new Map((prevList || []).map(s => [psKey(s), s]));
+  // 생일 표기가 DB('2010.08.30.')와 편성표('2010-08-30')로 다를 수 있다.
+  // 정규화하지 않으면 반이 바뀐 학생이 '전출 1명 + 전입 1명' 으로 잘못 보인다.
   const byPerson = new Map();                      // 이름+생일 → 옛 자리
-  for (const s of prevList || []) byPerson.set(`${s.name}|${s.birth || ''}`, s);
+  for (const s of prevList || []) byPerson.set(`${String(s.name||'').trim()}|${psBirth(s.birth)}`, s);
 
   const same = [], added = [], removed = [], reseated = [], renamed = [];
   for (const [k, s] of now) {
     const o = prev.get(k);
     if (!o) {
       // 이 사람이 다른 자리에 있었나 (반변경) — 이름+생일로 찾는다
-      const was = byPerson.get(`${s.name}|${s.birth || ''}`);
+      const was = byPerson.get(`${s.name}|${psBirth(s.birth)}`);
       if (was && psKey(was) !== k) reseated.push({ from: psKey(was), to: k, name: s.name });
       else added.push(s);
     } else if (String(o.name || '').trim() !== s.name) {
@@ -1614,7 +1640,7 @@ function psDiff(rows, prevList) {
   }
   for (const [k, o] of prev) {
     if (now.has(k)) continue;
-    const stillHere = rows.some(s => s.name === o.name && (s.birth || '') === (o.birth || ''));
+    const stillHere = rows.some(s => s.name === String(o.name||'').trim() && s.birth === psBirth(o.birth));
     if (!stillHere) removed.push(o);
   }
   // 자리 주인이 바뀐 곳 — 여기서만 사진·상벌점이 남의 것으로 붙는다
@@ -1685,9 +1711,7 @@ async function psHandleFile(file) {
 
 function psRender() {
   const rows = psRows || [];
-  // 기존 명렬은 연락처가 분리돼 있다. 대조에는 생년월일이 필요하므로 합쳐 본다.
-  const cmap = new Map(psPrevContact.map(c => [psKey(c), c]));
-  const prevFull = psPrev.map(s => ({ ...s, ...(cmap.get(psKey(s)) || {}) }));
+  const prevFull = psPrevFull();
 
   const blockers = psBlockers(psParsed, rows);
   const d = psDiff(rows, prevFull);
@@ -1773,7 +1797,7 @@ document.getElementById('psSaveBtn').addEventListener('click', async () => {
   setStatus('psStatus', '☁️ 저장하는 중...', 'loading');
   try {
     // 편성표가 가진 필드만 갈아끼운다 — 동아리 등은 기존 값이 그대로 실려 온다
-    const merged = psMerge(psRows, psPrev);
+    const merged = psMerge(psRows, psPrevFull());
     await saveSplit('students', 'students', 'studentsContact', merged,
                     STU_CONTACT_FIELDS, ['grade', 'room', 'num']);
     setStatus('psStatus', `✅ ${merged.length}명 저장 완료!`, 'ok');
