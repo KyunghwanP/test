@@ -229,10 +229,8 @@ if ('serviceWorker' in navigator) {
   <button class="tab-nav-btn" data-tab="operating">📆 운영표 업로드</button>
   <button class="tab-nav-btn" data-tab="contacts">📞 비상연락망 업로드</button>
   <button class="tab-nav-btn" data-tab="students">🎒 학생연락망 업로드</button>
-  <button class="tab-nav-btn" data-tab="pyeonseong">🏫 편성표로 명렬 갱신</button>
+  <button class="tab-nav-btn" data-tab="pyeonseong">🏫 편성표 업로드</button>
   <button class="tab-nav-btn" data-tab="clubs">🎪 동아리 업로드</button>
-  <button class="tab-nav-btn" data-tab="sheets">📊 편성·명렬표 업로드</button>
-  <button class="tab-nav-btn" data-tab="electives">📚 선택과목 업로드</button>
   <button class="tab-nav-btn" data-tab="photos">📷 사진명렬 업로드</button>
   <button class="tab-nav-btn" data-tab="staffdir">🪪 교원 명렬 업로드</button>
 </div>
@@ -307,42 +305,6 @@ if ('serviceWorker' in navigator) {
       </div>
 
       <div class="status" id="opStatus"></div>
-    </div>
-  </div>
-
-  <!-- ══ 선택과목 탭 ══ -->
-  <div class="tab-panel" id="tab-electives">
-    <div class="section">
-      <div class="section-title">📚 학생 선택과목 업로드 (교육과정 현황)</div>
-      <div class="section-desc">학년별 선택과목 현황 엑셀(탭 <code>1학년 · 2학년 · 3학년</code>)을 올리면 <code>electives</code> 컬렉션에 저장됩니다.
-        학생종합검색(360)의 <b>선택과목</b> 배지에 반영됩니다. 기존 데이터는 덮어씁니다.</div>
-      <div class="format-box">
-        <b>엑셀 형식</b> — 학년마다 탭 하나(<code>1학년/2학년/3학년</code>). 각 탭에서 <code>주소</code> 열이 있는 행이 헤더.
-        신원 열(<code>신반 · 신번호 · 성명</code>) + 주소 뒤로 과목 헤더가 이어집니다. 과목 헤더가 채워진 열에 학생 행 값이 있으면 그 과목 선택.
-        <code>단위수</code> 헤더가 나오면 <b>이번학년</b> 블록 종료 → 빈 열 하나 뒤부터 <b>직전학년</b> 블록. <code>비고</code>란 '과학중점' 표기 시 과학중점 플래그.
-      </div>
-
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-body">
-          <div class="step-label">엑셀 파일 선택</div>
-          <label class="file-label" for="elFileInput">📂 파일 선택…</label>
-          <input type="file" id="elFileInput" accept=".xlsx,.xls" style="display:none;" disabled>
-          <div class="file-name" id="elFileName">파일을 선택해주세요</div>
-        </div>
-      </div>
-
-      <hr>
-
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-body">
-          <div class="step-label">Firestore에 업로드</div>
-          <button class="btn btn-primary" id="elUploadBtn" disabled>선택과목 업로드</button>
-        </div>
-      </div>
-
-      <div class="status" id="elStatus"></div>
     </div>
   </div>
 
@@ -508,23 +470,31 @@ if ('serviceWorker' in navigator) {
   <!-- ══ 편성표 탭 ══ -->
   <div class="tab-panel" id="tab-pyeonseong">
     <div class="section">
-      <div class="section-title">🏫 편성표로 명렬 갱신</div>
+      <div class="section-title">🏫 편성표 업로드</div>
       <div class="section-desc">
-        학년별 편성표(.xlsx) 하나로 <code>students/main</code>·<code>studentsContact/main</code> 을 갱신합니다.
-        <b>1학년·2학년·3학년 시트</b>를 모두 읽습니다.<br>
+        편성표(.xlsx) <b>하나</b>로 세 가지를 한꺼번에 갱신합니다 — <b>명렬 · 선택과목 · 원본 파일</b>.
+        같은 <b>1·2·3학년 시트</b>의 왼쪽(신원)과 오른쪽(과목)을 각각 읽습니다.<br>
         <b>동아리는 건드리지 않습니다</b> — 편성표에 동아리 열이 없어서, 기존 값을 그대로 둡니다.
         동아리는 <b>🎒 학생연락망 업로드</b>에서 계속 관리하세요.
       </div>
       <div class="format-box">
-        <b>읽는 방식</b><br>
-        · 열 위치가 아니라 <b>헤더 이름</b>으로 찾습니다 (<code>신반</code> <code>신번호</code> <code>성명</code>
-          <code>생년월일</code> <code>연락처(본인)</code> <code>연락처(모)</code> <code>연락처(부)</code>).
-          학년마다 열이 달라도 됩니다.<br>
+        <b>읽는 방식</b> — 열 위치가 아니라 <b>헤더 이름</b>으로 찾습니다. 학년마다 열이 달라도 됩니다.<br><br>
+        <b>① 명렬</b> (<code>students/main</code> · <code>studentsContact/main</code>)<br>
+        · <code>신반</code> <code>신번호</code> <code>성명</code> <code>생년월일</code>
+          <code>연락처(본인)</code> <code>연락처(모)</code> <code>연락처(부)</code><br>
         · <b>신반·신번호가 빈 행은 제외</b>합니다 — 전출·자퇴 학생입니다.
           (빨간 음영과 정확히 일치하는 것을 실제 파일로 확인했습니다)<br>
         · 생년월일 <code>2010.08.30.</code> → <code>2010-08-30</code> 으로 바꿉니다.
           <b>이걸 안 하면 학부모 상담 인증이 전교생 실패합니다.</b><br>
-        · 연락처는 형식에 맞는 것만 넣습니다(앞자리 0 복원, <code>없음</code>·<code>-</code> 은 빈칸).
+        · 연락처는 형식에 맞는 것만 넣습니다(앞자리 0 복원, <code>없음</code>·<code>-</code> 은 빈칸).<br><br>
+        <b>② 선택과목</b> (<code>electives</code>)<br>
+        · <code>주소</code> 열이 <b>칸막이</b>입니다 — 그 <b>다음 열부터 과목</b>으로 봅니다.
+          주소 값 자체는 읽지도 저장하지도 않습니다.<br>
+        · <code>단위수</code> 가 나오면 이번학년 블록 끝, 빈 열 하나 뒤부터 직전학년.
+          <code>비고</code> 에 '과학중점' 이 있으면 과학중점 표시.<br><br>
+        <b>③ 원본 파일</b> (<code>docsSheets/list2026</code>)<br>
+        · 파일을 <b>파싱하지 않고 그대로</b> 저장합니다. 앱의 <b>업무자료 → 📊 편성·명렬표</b>
+          뷰어가 서식까지 재현해 보여줍니다(주소 포함 — 교사 전용).
       </div>
       <div class="dropzone" id="psDropzone">
         <div class="dropzone-icon">📂</div>
@@ -536,6 +506,7 @@ if ('serviceWorker' in navigator) {
       <div id="psResult" style="display:none;">
         <div class="stat-chips" id="psStats"></div>
         <div id="psBlock"></div>
+        <div id="psPickBox"></div>
         <div id="psDiffBox"></div>
         <div id="psFixBox"></div>
         <div class="btn-row">
@@ -544,7 +515,15 @@ if ('serviceWorker' in navigator) {
           <button class="btn btn-secondary" id="psClearBtn">취소</button>
         </div>
         <div class="section-desc" id="psSaveNote" style="margin-top:8px;"></div>
+        <div id="psProgress"></div>
       </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">📋 현재 저장된 원본 파일</div>
+      <div class="section-desc">앱 뷰어가 내려받는 <code>docsSheets/list2026</code> 입니다.</div>
+      <div class="stat-chips" id="shDbStats"><div class="stat-chip">새로고침을 눌러주세요</div></div>
+      <div class="btn-row"><button class="btn btn-secondary" id="shRefreshBtn">🔄 새로고침</button></div>
     </div>
   </div>
 
@@ -597,28 +576,6 @@ if ('serviceWorker' in navigator) {
     </div>
   </div>
 
-  <!-- ══ 편성·명렬표 탭 ══ -->
-  <div class="tab-panel" id="tab-sheets">
-    <div class="section">
-      <div class="section-title">📊 편성·명렬표 업로드</div>
-      <div class="section-desc">엑셀 원본 파일을 <b>그대로</b> Firestore(<code>docsSheets/list2026</code>)에 저장합니다. 앱의 <b>업무자료 → 📊 2026학년도 편성·명렬표</b> 뷰어가 이 파일을 서식까지 재현해 보여줍니다. 기존 파일은 덮어씁니다.<br><span style="color:var(--ink-soft);">※ 학생 개인정보 포함 — 저장소(GitHub)에 파일로 올리지 않고 교사 전용 규칙의 Firestore에만 저장합니다.</span></div>
-      <div class="dropzone" id="shDropzone">
-        <div class="dropzone-icon">📂</div>
-        <div class="dropzone-text"><b>파일을 드래그하거나 클릭</b><br>xlsx 지원</div>
-        <input type="file" id="shFileInput" accept=".xlsx" style="display:none;">
-      </div>
-      <div class="status" id="shStatus"></div>
-    </div>
-
-    <div class="section">
-      <div class="section-title">📋 현재 저장된 편성·명렬표</div>
-      <div class="section-desc">Firestore에 저장된 파일 정보입니다.</div>
-      <div class="stat-chips" id="shDbStats"><div class="stat-chip">새로고침을 눌러주세요</div></div>
-      <div class="btn-row"><button class="btn btn-secondary" id="shRefreshBtn">🔄 새로고침</button></div>
-    </div>
-  </div>
-
-  <!-- ══ 사진명렬 탭 ══ -->
   <div class="tab-panel" id="tab-photos">
     <div class="section">
       <div class="section-title">📷 사진명렬 업로드</div>
@@ -687,7 +644,7 @@ document.querySelectorAll('.tab-nav-btn').forEach(btn => {
     if (btn.dataset.tab === 'contacts') loadDbContacts();
     if (btn.dataset.tab === 'students') loadDbStudents();
     if (btn.dataset.tab === 'clubs') loadDbClubs();
-    if (btn.dataset.tab === 'sheets') loadDbSheets();
+    if (btn.dataset.tab === 'pyeonseong') loadDbSheets();
   });
 });
 
@@ -823,8 +780,6 @@ onAuthStateChanged(auth, user => {
     if (ttParsedData) document.getElementById('ttUploadBtn').disabled = false;
     document.getElementById('opFileInput').disabled = false;
     if (opParsedData) document.getElementById('opUploadBtn').disabled = false;
-    document.getElementById('elFileInput').disabled = false;
-    if (elParsedData) document.getElementById('elUploadBtn').disabled = false;
     document.getElementById('sdFileInput').disabled = false;
     if (sdParsedData) document.getElementById('sdUploadBtn').disabled = false;
   } else {
@@ -1054,11 +1009,8 @@ async function parseOperatingExcel(file) {
 //  파싱 규칙은 scripts/sync-grades.js(구글시트 동기화)와 동일 — 이제 이 업로드가 단일 소스.
 //  탭 '1학년/2학년/3학년', '주소' 열이 있는 행이 헤더, '단위수'로 이번학년/직전학년 블록 분리.
 // ════════════════════════════════════════════════════════════
-const elFileInput = document.getElementById('elFileInput');
-const elFileNameEl = document.getElementById('elFileName');
-const elUploadBtn  = document.getElementById('elUploadBtn');
-let elParsedData = null;
-
+//  올리는 파일은 편성표와 같은 워크북이다 — 왼쪽이 명렬, '주소' 오른쪽이 과목.
+//  그래서 화면은 🏫 편성표 업로드 탭 하나뿐이고, 여기 있는 건 파서와 저장 함수다.
 function parseElectivesExcel(wb) {
   const hcell = h => String(h ?? '').trim();
   const cell  = (row, c) => { const v = row ? row[c] : undefined; return (v===undefined||v===null) ? '' : v; };
@@ -1126,53 +1078,43 @@ function parseElectivesExcel(wb) {
   return { tree: elTree, classes: elClasses, sci: elSci, perTab, classIds: Object.keys(elClasses) };
 }
 
-elFileInput.addEventListener('change', async () => {
-  const file = elFileInput.files[0];
-  if (!file) { elParsedData = null; return; }
-  elFileNameEl.textContent = file.name;
-  setStatus('elStatus', '파일 분석 중...', 'loading');
-  try {
-    const buf = await file.arrayBuffer();
-    const wb  = XLSX.read(buf, { type:'array' });
-    elParsedData = parseElectivesExcel(wb);
-    if (!elParsedData.classIds.length) throw new Error('인식된 학생이 없습니다. 탭 이름(1학년/2학년/3학년)·헤더(주소 열)를 확인하세요.');
-    setStatus('elStatus',
-      '파일 분석 완료\n  ' + elParsedData.perTab.join('\n  ') +
-      `\n  → 반 ${elParsedData.classIds.length}개\n\n이상 없으면 「선택과목 업로드」를 눌러주세요.`, 'ok');
-    if (currentUser) elUploadBtn.disabled = false;
-  } catch (e) {
-    elParsedData = null; elUploadBtn.disabled = true;
-    setStatus('elStatus', '파일 분석 실패:\n' + e.message, 'err');
-  }
-});
+// 저장을 막아야 하는 조건. 명렬과 달리 여기서 걸리는 건 '조용한 삭제'다.
+//   '주소' 열을 못 찾으면 그 학년을 건너뛰는데, 저장은 '이번에 없는 반' 문서를 지운다.
+//   즉 못 읽은 학년의 선택과목이 통째로 사라진다. 화면에 안 뜨면 아무도 모른다.
+function elBlockers(el, rows) {
+  if (!el) return ['선택과목을 아직 읽지 못했습니다.'];
+  const out = [];
+  for (const t of el.perTab)
+    if (/탭 없음|못 찾음|비어있음/.test(t)) out.push(`${t} → 그 학년 선택과목이 통째로 지워집니다`);
+  if (!el.classIds.length) out.push('인식된 반이 없습니다. 탭 이름(1·2·3학년)과 헤더의 주소 열을 확인하세요.');
+  const n = elCount(el);
+  if (rows && rows.length && n < rows.length)
+    out.push(`선택과목에서 읽은 학생이 ${n}명뿐입니다(명렬 ${rows.length}명). 빠진 학생은 선택과목이 사라집니다.`);
+  return out;
+}
+const elCount = el => !el ? 0
+  : el.classIds.reduce((a, id) => a + Object.keys(el.classes[id]).length, 0);
 
-elUploadBtn.addEventListener('click', async () => {
-  if (!elParsedData || !currentUser) return;
-  elUploadBtn.disabled = true;
-  setStatus('elStatus', '☁️ Firestore에 업로드 중...', 'loading');
-  try {
-    const t = new Date().toISOString();
-    await setDoc(doc(db, 'electives', 'index'), { t, tree: elParsedData.tree, sci: elParsedData.sci });
-    for (const id of elParsedData.classIds) {
-      await setDoc(doc(db, 'electives', id), { t, students: elParsedData.classes[id] });
-    }
-    // 이번 업로드에 없는 옛 반 문서 정리(stale) — index 제외
-    let removed = 0;
-    try {
-      const snap = await getDocs(collection(db, 'electives'));
-      for (const d of snap.docs) {
-        if (d.id !== 'index' && !elParsedData.classes[d.id]) { await deleteDoc(doc(db, 'electives', d.id)); removed++; }
-      }
-    } catch (e) { /* 목록 조회 실패는 무시 */ }
-    setStatus('elStatus',
-      `✅ 업로드 완료! (electives)\n\n  반 ${elParsedData.classIds.length}개 저장${removed?`, 옛 문서 ${removed}개 삭제`:''}\n\n학생종합검색의 선택과목 배지에 반영됩니다.`, 'ok');
-    elUploadBtn.disabled = false;
-  } catch (e) {
-    setStatus('elStatus', '❌ 업로드 실패:\n' + (e.code || '') + '\n' + e.message +
-      (e.code === 'permission-denied' ? '\n\n※ electives 쓰기 권한(파이어베이스 규칙) 배포가 필요할 수 있습니다.' : ''), 'err');
-    elUploadBtn.disabled = false;
+// electives 저장. 반마다 문서 하나라 배치로 못 묶는다(500개·1MiB 한도).
+// 중간에 끊기면 일부만 바뀐다 — 그래서 부르는 쪽이 어디까지 됐는지 보여 준다.
+async function elSaveParsed(el, onStep) {
+  const t = new Date().toISOString();
+  await setDoc(doc(db, 'electives', 'index'), { t, tree: el.tree, sci: el.sci });
+  let i = 0;
+  for (const id of el.classIds) {
+    await setDoc(doc(db, 'electives', id), { t, students: el.classes[id] });
+    if (onStep) onStep(++i, el.classIds.length);
   }
-});
+  // 이번 업로드에 없는 옛 반 문서 정리(stale) — index 제외
+  let removed = 0;
+  try {
+    const snap = await getDocs(collection(db, 'electives'));
+    for (const d of snap.docs) {
+      if (d.id !== 'index' && !el.classes[d.id]) { await deleteDoc(doc(db, 'electives', d.id)); removed++; }
+    }
+  } catch (e) { /* 목록 조회 실패는 무시 */ }
+  return `반 ${el.classIds.length}개 저장${removed ? `, 옛 문서 ${removed}개 삭제` : ''}`;
+}
 
 async function parseTimetableExcel(file) {
   const buf  = await file.arrayBuffer();
@@ -1671,7 +1613,16 @@ function psBlockers(parsed, rows) {
 }
 
 // ── 편성표 탭 배선 ──────────────────────────────────────────────────────
+// 파일 하나로 세 가지를 갱신한다. 항목마다 막는 조건이 따로 있고, 하나가 막혀도
+// 나머지는 올릴 수 있어야 한다 — 그래서 '전체 통과/실패' 가 아니라 항목별 체크다.
+const PS_ITEMS = [
+  { key: 'roster',    icon: '🎒', label: '명렬 갱신',     where: 'students/main · studentsContact/main' },
+  { key: 'electives', icon: '📚', label: '선택과목',      where: 'electives' },
+  { key: 'raw',       icon: '📊', label: '원본 파일 저장', where: 'docsSheets/list2026 — 앱 뷰어' },
+];
 let psRows = null, psPrev = null, psPrevContact = null, psParsed = null, psBackedUp = false;
+let psFile = null, psEl = null;
+let psPick = { roster: true, electives: true, raw: true };
 
 const psDropzone = document.getElementById('psDropzone');
 const psFileInput = document.getElementById('psFileInput');
@@ -1692,12 +1643,17 @@ const PS_DENIED = /insufficient permissions|permission-denied|PERMISSION_DENIED/
 
 async function psHandleFile(file) {
   psBackedUp = false;
+  psPick = { roster: true, electives: true, raw: true };
   document.getElementById('psResult').style.display = 'none';
+  document.getElementById('psProgress').innerHTML = '';
   setStatus('psStatus', '📖 편성표를 읽는 중...', 'loading');
   try {
+    // 워크북은 한 번만 읽는다. 같은 시트의 왼쪽이 명렬, '주소' 오른쪽이 과목이다.
     const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    psFile   = file;
     psParsed = psParseBook(wb);
-    psRows = psParsed.rows;
+    psRows   = psParsed.rows;
+    psEl     = parseElectivesExcel(wb);
 
     setStatus('psStatus', '☁️ 현재 명렬과 대조하는 중...', 'loading');
     // 연락처 문서(studentsContact)는 규칙상 관리자만 읽는다. 이걸 못 읽으면
@@ -1712,7 +1668,7 @@ async function psHandleFile(file) {
     psRender();
     clearStatus('psStatus');
   } catch (e) {
-    psRows = psParsed = null;
+    psRows = psParsed = psEl = psFile = null;
     setStatus('psStatus', PS_DENIED.test(e.message || '')
       ? '연락처 문서를 읽을 권한이 없습니다.\n\n'
         + 'firestore.rules 의 studentsContact 가 아직 "allow read: if false" 입니다. '
@@ -1722,11 +1678,29 @@ async function psHandleFile(file) {
   }
 }
 
+// 항목별 막는 조건. 하나가 막혀도 나머지는 올릴 수 있어야 한다.
+function psItemBlockers() {
+  const rows = psRows || [];
+  return {
+    roster:    psParsed ? psBlockers(psParsed, rows) : ['파일을 아직 읽지 못했습니다.'],
+    electives: elBlockers(psEl, rows),
+    raw:       !psFile ? ['파일이 없습니다.']
+             : psFile.size > SHEETS_MAX ? [`${(psFile.size/1048576).toFixed(1)}MB — 40MB 이하만 저장됩니다.`] : [],
+  };
+}
+// 항목별 요약 한 줄
+function psItemSummary(key) {
+  const rows = psRows || [];
+  if (key === 'roster')    return `${rows.length}명 · 제외 ${psParsed ? psParsed.dropped.length : 0}명(전출·자퇴)`;
+  if (key === 'electives') return psEl ? `${elCount(psEl)}명 · 반 ${psEl.classIds.length}개 · ` + psEl.perTab.join(' / ') : '-';
+  return psFile ? `${psFile.name} · ${(psFile.size/1048576).toFixed(1)}MB` : '-';
+}
+
 function psRender() {
   const rows = psRows || [];
   const prevFull = psPrevFull();
 
-  const blockers = psBlockers(psParsed, rows);
+  const blocks = psItemBlockers();
   const d = psDiff(rows, prevFull);
 
   document.getElementById('psResult').style.display = '';
@@ -1735,10 +1709,34 @@ function psRender() {
      [`제외 ${psParsed.dropped.length}명`, '전출·자퇴']]
     .map(([a, b]) => `<div class="stat-chip">${psEsc(a)}${b ? ` <span style="opacity:.6">${psEsc(b)}</span>` : ''}</div>`).join('');
 
-  document.getElementById('psBlock').innerHTML = blockers.length
-    ? `<div class="status err" style="margin:12px 0;"><b>저장할 수 없습니다</b><ul style="margin:6px 0 0 18px;">`
-      + blockers.map(m => `<li>${psEsc(m)}</li>`).join('') + '</ul></div>'
-    : '';
+  // psBlock 은 '무엇을 골라도 못 넘어가는 것'만 — 지금은 명렬 읽기 실패뿐이다.
+  document.getElementById('psBlock').innerHTML = '';
+
+  document.getElementById('psPickBox').innerHTML =
+    `<div class="format-box" style="margin:12px 0;">
+       <b>무엇을 갱신할지 고르세요</b> — 막힌 항목은 끄고 나머지만 올릴 수 있습니다.
+       <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px;">`
+    + PS_ITEMS.map(it => {
+        const bl = blocks[it.key];
+        const on = psPick[it.key] && !bl.length;
+        return `<label style="display:flex;gap:9px;align-items:flex-start;${bl.length?'opacity:.75;':''}">
+          <input type="checkbox" data-ps-item="${it.key}" ${on?'checked':''} ${bl.length?'disabled':''}
+                 style="margin-top:3px;flex-shrink:0;">
+          <span>
+            <b>${it.icon} ${psEsc(it.label)}</b>
+            <span style="opacity:.6"> ${psEsc(it.where)}</span><br>
+            <span style="font-size:12px;opacity:.85">${psEsc(psItemSummary(it.key))}</span>
+            ${bl.length ? `<span style="display:block;margin-top:4px;color:#B71C1C;font-size:12px;">`
+              + bl.map(m => `· ${psEsc(m)}`).join('<br>') + `</span>` : ''}
+          </span></label>`;
+      }).join('')
+    + `</div></div>`;
+
+  document.getElementById('psPickBox').querySelectorAll('[data-ps-item]').forEach(cb =>
+    cb.addEventListener('change', () => {
+      psPick[cb.dataset.psItem] = cb.checked;
+      psUpdateSaveBtn();
+    }));
 
   const list = (title, arr, fmt, cls) => !arr.length ? '' :
     `<div class="status ${cls}" style="margin:8px 0;"><b>${psEsc(title)} ${arr.length}명</b>`
@@ -1771,55 +1769,124 @@ function psRender() {
        · 연락처 <b>${fixedPhone}명</b> 정리 (형식에 안 맞으면 빈칸)<br>
        · <b>동아리는 건드리지 않습니다</b> — 기존 값 그대로</div>`;
 
-  psUpdateSaveBtn(blockers.length === 0);
+  psUpdateSaveBtn();
 }
 
-function psUpdateSaveBtn(ok) {
+// 실제로 저장할 항목 — 켜져 있고 막는 조건이 없는 것만.
+function psChosen() {
+  const bl = psItemBlockers();
+  return PS_ITEMS.filter(it => psPick[it.key] && !bl[it.key].length);
+}
+
+function psUpdateSaveBtn() {
+  const chosen = psChosen();
   const btn = document.getElementById('psSaveBtn');
-  btn.disabled = !(ok && psBackedUp);
-  document.getElementById('psSaveNote').innerHTML = !ok ? ''
-    : (psBackedUp ? '백업을 받았습니다. 저장할 수 있습니다.'
-                  : '<b>백업을 먼저 받아야 저장할 수 있습니다.</b> Firestore는 지금 요금제에서 시점 복구가 안 되어, 이 파일이 유일한 되돌리기 수단입니다.');
+  btn.disabled = !(chosen.length && psBackedUp);
+  document.getElementById('psSaveNote').innerHTML = !chosen.length
+    ? '<b>고른 항목이 없습니다.</b>'
+    : (psBackedUp
+        ? `백업을 받았습니다. <b>${chosen.map(c => c.label).join(' · ')}</b> 을(를) 저장합니다.`
+        : '<b>백업을 먼저 받아야 저장할 수 있습니다.</b> Firestore는 지금 요금제에서 시점 복구가 안 되어, 이 파일이 유일한 되돌리기 수단입니다.');
 }
 
-document.getElementById('psBackupBtn').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify({
-    savedAt: new Date().toISOString(),
-    students: psPrev, studentsContact: psPrevContact
-  }, null, 1)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `명렬백업_${new Date().toISOString().slice(0,10)}.json`;
-  a.click(); URL.revokeObjectURL(a.href);
-  psBackedUp = true;
-  psUpdateSaveBtn(psBlockers(psParsed, psRows).length === 0);
+// 백업 — 덮어쓸 것을 전부 담는다. 선택과목도 통째로 갈아치우므로 같이 받는다.
+document.getElementById('psBackupBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('psBackupBtn');
+  btn.disabled = true;
+  const before = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner"></span>백업 만드는 중...';
+  try {
+    let electives = null;
+    try {
+      const snap = await getDocs(collection(db, 'electives'));
+      electives = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) { electives = { error: e.message }; }   // 못 받아도 명렬 백업은 내려준다
+    const blob = new Blob([JSON.stringify({
+      savedAt: new Date().toISOString(),
+      students: psPrev, studentsContact: psPrevContact, electives
+    }, null, 1)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `명렬백업_${new Date().toISOString().slice(0,10)}.json`;
+    a.click(); URL.revokeObjectURL(a.href);
+    psBackedUp = true;
+    psUpdateSaveBtn();
+  } finally {
+    btn.disabled = false; btn.innerHTML = before;
+  }
 });
 
 document.getElementById('psClearBtn').addEventListener('click', () => {
-  psRows = psParsed = null; psBackedUp = false;
+  psRows = psParsed = psEl = psFile = null; psBackedUp = false;
   document.getElementById('psResult').style.display = 'none';
+  document.getElementById('psProgress').innerHTML = '';
   psFileInput.value = '';
 });
 
+// 진행 상황. 항목마다 문서를 여러 개 쓰기 때문에 중간에 끊길 수 있다.
+// 어디까지 됐는지 남겨야 다시 눌렀을 때 무엇을 켜고 끌지 알 수 있다.
+function psProgress(done, now) {
+  document.getElementById('psProgress').innerHTML =
+    `<div class="status info" style="margin:10px 0;font-size:13px;line-height:1.9;">`
+    + done.map(([label, ok, msg]) =>
+        `${ok ? '✅' : '❌'} <b>${psEsc(label)}</b> — ${psEsc(msg)}`).join('<br>')
+    + (now ? `${done.length ? '<br>' : ''}<span class="spinner"></span> <b>${psEsc(now)}</b> 진행 중…` : '')
+    + `</div>`;
+}
+
 document.getElementById('psSaveBtn').addEventListener('click', async () => {
-  const blockers = psBlockers(psParsed, psRows);
-  if (blockers.length || !psBackedUp) return;
+  const chosen = psChosen();
+  if (!chosen.length || !psBackedUp) return;
   const btn = document.getElementById('psSaveBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>저장 중...';
-  setStatus('psStatus', '☁️ 저장하는 중...', 'loading');
-  try {
-    // 편성표가 가진 필드만 갈아끼운다 — 동아리 등은 기존 값이 그대로 실려 온다
-    const merged = psMerge(psRows, psPrevFull());
-    await saveSplit('students', 'students', 'studentsContact', merged,
-                    STU_CONTACT_FIELDS, ['grade', 'room', 'num']);
-    setStatus('psStatus', `✅ ${merged.length}명 저장 완료!`, 'ok');
-    document.getElementById('psResult').style.display = 'none';
-    loadDbStudents();
-  } catch (e) {
-    setStatus('psStatus', '저장 실패: ' + e.message, 'err');
-  } finally {
-    btn.innerHTML = '☁️ Firestore에 저장';
+  clearStatus('psStatus');
+
+  // 순서가 있다. 명렬이 먼저여야 선택과목·사진이 붙을 자리가 맞는다.
+  const runners = {
+    roster: async () => {
+      // 편성표가 가진 필드만 갈아끼운다 — 동아리 등은 기존 값이 그대로 실려 온다
+      const merged = psMerge(psRows, psPrevFull());
+      await saveSplit('students', 'students', 'studentsContact', merged,
+                      STU_CONTACT_FIELDS, ['grade', 'room', 'num']);
+      loadDbStudents();
+      return `${merged.length}명 저장`;
+    },
+    electives: () => elSaveParsed(psEl, (i, n) =>
+      psProgress(done, `선택과목 ${i}/${n}반`)),
+    raw: () => uploadSheetFile(psFile, (i, n) =>
+      psProgress(done, `원본 파일 ${i}/${n}청크`)),
+  };
+
+  const done = [];
+  let failed = null;
+  for (const it of chosen) {
+    psProgress(done, it.label);
+    try {
+      done.push([it.label, true, await runners[it.key]()]);
+      psPick[it.key] = false;          // 끝난 것은 꺼 둔다 — 다시 눌러도 두 번 안 쓴다
+    } catch (e) {
+      done.push([it.label, false, (e.code ? e.code + ' — ' : '') + e.message]);
+      failed = it;
+      break;                            // 뒤엣것을 그대로 밀어 넣으면 어긋난 상태가 쌓인다
+    }
+  }
+  psProgress(done);
+  btn.innerHTML = '☁️ Firestore에 저장';
+
+  if (failed) {
+    const rest = chosen.slice(chosen.indexOf(failed)).map(c => c.label).join(' · ');
+    const why  = done[done.length - 1][2];
+    setStatus('psStatus',
+      `${failed.label} 에서 멈췄습니다. 남은 항목(${rest})은 저장되지 않았습니다.\n`
+      + `원인을 고친 뒤 다시 「저장」을 누르면 남은 것만 올라갑니다.`
+      + (PS_DENIED.test(why) ? '\n※ 권한 문제입니다 — firestore.rules 게시를 확인하세요.' : ''), 'err');
+    psRender();                          // 남은 항목만 켜진 상태로 다시 그린다
+  } else {
+    setStatus('psStatus', `✅ ${done.map(d => d[0]).join(' · ')} 저장 완료!`, 'ok');
+    document.getElementById('psPickBox').innerHTML = '';
+    document.getElementById('psSaveNote').innerHTML = '';
+    document.getElementById('psSaveBtn').disabled = true;
   }
 });
 
@@ -2142,24 +2209,13 @@ document.getElementById('stDownloadBtn').addEventListener('click', () => {
 // ════════════════════════════════════
 // 앱(index.html)의 업무자료 뷰어가 이 문서를 내려받아 ExcelJS로 서식까지 재현한다.
 const SHEETS_FSID = 'list2026';
-const shDropzone  = document.getElementById('shDropzone');
-const shFileInput = document.getElementById('shFileInput');
+const SHEETS_MAX  = 40 * 1024 * 1024;
 
-shDropzone.addEventListener('click', () => shFileInput.click());
-shDropzone.addEventListener('dragover', e => { e.preventDefault(); shDropzone.classList.add('drag-over'); });
-shDropzone.addEventListener('dragleave', () => shDropzone.classList.remove('drag-over'));
-shDropzone.addEventListener('drop', e => {
-  e.preventDefault();
-  shDropzone.classList.remove('drag-over');
-  if (e.dataTransfer.files[0]) uploadSheetFile(e.dataTransfer.files[0]);
-});
-shFileInput.addEventListener('change', () => { if (shFileInput.files[0]) uploadSheetFile(shFileInput.files[0]); });
-
-async function uploadSheetFile(file) {
-  if (!currentUser) { setStatus('shStatus', '로그인이 필요합니다.', 'err'); return; }
-  try {
-    if (file.size > 40 * 1024 * 1024) { setStatus('shStatus', '40MB 이하 파일만 가능합니다.', 'err'); return; }
-    setStatus('shStatus', '📂 파일 읽는 중...', 'loading');
+// 원본 파일 저장. 부르는 곳은 🏫 편성표 업로드 탭 하나뿐이다.
+// 진행 상황은 onStep 으로 넘긴다 — 청크가 수십 개라 말없이 멈춘 것처럼 보인다.
+async function uploadSheetFile(file, onStep) {
+  {
+    if (file.size > SHEETS_MAX) throw new Error('40MB 이하 파일만 가능합니다.');
     const buf = new Uint8Array(await file.arrayBuffer());
     let bin = '';
     for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
@@ -2169,7 +2225,7 @@ async function uploadSheetFile(file) {
     try { const os = await getDoc(doc(db, 'docsSheets', SHEETS_FSID)); if (os.exists()) oldMeta = os.data(); } catch(e) {}
     const CH = 700000, n = Math.ceil(b64.length / CH);   // base64 ASCII → 1자=1바이트, 문서 1MiB 한도 대응
     for (let i = 0; i < n; i++) {
-      setStatus('shStatus', `☁️ 저장 중… ${i + 1}/${n}`, 'loading');
+      if (onStep) onStep(i + 1, n);
       await setDoc(doc(db, 'docsSheets', `${SHEETS_FSID}_c${i}`), { b64: b64.slice(i * CH, (i + 1) * CH) });
     }
     await setDoc(doc(db, 'docsSheets', SHEETS_FSID), {
@@ -2179,12 +2235,8 @@ async function uploadSheetFile(file) {
     if (oldMeta && oldMeta.chunks > n) {
       for (let c = n; c < oldMeta.chunks; c++) { try { await deleteDoc(doc(db, 'docsSheets', `${SHEETS_FSID}_c${c}`)); } catch(e) {} }
     }
-    setStatus('shStatus', `✅ 업로드 완료! (${(buf.length / 1048576).toFixed(1)}MB · ${n}청크)\n앱의 업무자료 뷰어를 새로고침하면 반영됩니다.`, 'ok');
     loadDbSheets();
-  } catch(e) {
-    setStatus('shStatus', e.code === 'permission-denied' ? '권한 없음 — 교사 계정 필요' : '업로드 실패: ' + e.message, 'err');
-  } finally {
-    shFileInput.value = '';
+    return `${(buf.length / 1048576).toFixed(1)}MB · ${n}청크`;
   }
 }
 

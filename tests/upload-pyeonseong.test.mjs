@@ -258,10 +258,12 @@ console.log('\n■ 화면 배선');
   check('저장 직전에 psMerge 를 거친다',
         /psSaveBtn[\s\S]{0,1200}psMerge\(psRows, psPrevFull\(\)\)/.test(html));
   check('막는 조건을 저장 직전에 다시 본다',
-        /psSaveBtn[\s\S]{0,400}psBlockers\(psParsed, psRows\)/.test(html));
+        /psSaveBtn'\)\.addEventListener[\s\S]{0,200}const chosen = psChosen\(\);/.test(html)
+        && /function psChosen\(\)[\s\S]{0,200}psItemBlockers\(\)/.test(html));
   check('백업 전에는 저장 못 한다',
-        /btn\.disabled = !\(ok && psBackedUp\)/.test(html));
-  check('취소하면 상태가 비워진다', /psClearBtn[\s\S]{0,300}psRows = psParsed = null/.test(html));
+        /btn\.disabled = !\(chosen\.length && psBackedUp\)/.test(html));
+  check('취소하면 상태가 비워진다',
+        /psClearBtn[\s\S]{0,300}psRows = psParsed = psEl = psFile = null/.test(html));
   check('화면에 넣는 값은 이스케이프한다', /const psEsc = /.test(html)
         && !/psDiffBox'\)\.innerHTML[\s\S]{0,600}\$\{x\.name\}/.test(html));
 }
@@ -286,7 +288,56 @@ console.log('\n■ 연락처 문서 읽기 권한 — 열되, 관리자에게만
   // 무엇을 고쳐야 하는지 알려 주는가. 그리고 반쯤 읽은 상태로 남지 않는가.
   check('권한 오류를 알아본다', /const PS_DENIED = /.test(html) && /PS_DENIED\.test\(/.test(html));
   check('무엇을 고쳐야 하는지 말해 준다', /studentsContact 가 아직/.test(html));
-  check('막혔으면 파싱 결과를 버린다', /catch \(e\) \{\n    psRows = psParsed = null;/.test(html));
+  check('막혔으면 파싱 결과를 버린다',
+        /catch \(e\) \{\n    psRows = psParsed = psEl = psFile = null;/.test(html));
+}
+
+console.log('\n■ 세 업로드를 한 탭으로 — 같은 파일을 세 번 올리지 않는다');
+{
+  // 선택과목·편성명렬표 탭은 편성표 탭으로 흡수됐다. 남아 있으면 '어느 걸로 올리지' 가 남는다.
+  check('선택과목 탭이 없어졌다',  !/data-tab="electives"/.test(html) && !/id="tab-electives"/.test(html));
+  check('편성·명렬표 탭이 없어졌다', !/data-tab="sheets"/.test(html) && !/id="tab-sheets"/.test(html));
+  check('탭 버튼과 탭 본문 개수가 맞는다', (() => {
+    const btns   = [...html.matchAll(/data-tab="([a-z]+)"/g)].map(m => m[1]);
+    const panels = [...html.matchAll(/id="tab-([a-z]+)"/g)].map(m => m[1]);
+    return btns.length === panels.length && btns.every(b => panels.includes(b));
+  })(), { btns: [...html.matchAll(/data-tab="([a-z]+)"/g)].map(m => m[1]),
+          panels: [...html.matchAll(/id="tab-([a-z]+)"/g)].map(m => m[1]) });
+
+  // 파일을 한 번만 읽고 두 파서에 넘긴다
+  check('워크북을 한 번 읽어 두 파서에 넘긴다',
+        /const wb = XLSX\.read\(await file\.arrayBuffer\(\)[\s\S]{0,300}psParseBook\(wb\)[\s\S]{0,120}parseElectivesExcel\(wb\)/.test(html));
+  check('원본 저장용으로 파일 자체를 들고 있는다', /psFile\s+= file;/.test(html));
+
+  // 항목별 체크 — 하나가 막혀도 나머지는 올릴 수 있어야 한다
+  check('항목이 셋이다', /const PS_ITEMS = \[[\s\S]{0,400}'roster'[\s\S]{0,400}'electives'[\s\S]{0,400}'raw'/.test(html));
+  check('항목별로 막는 조건을 따로 본다',
+        /function psItemBlockers\(\)[\s\S]{0,600}roster:[\s\S]{0,200}electives:[\s\S]{0,200}raw:/.test(html));
+  check('막힌 항목은 체크 자체가 안 된다', /\$\{bl\.length\?'disabled':''\}/.test(html));
+
+  // 저장 순서 — 명렬이 먼저여야 선택과목·사진이 붙을 자리가 맞는다
+  check('명렬 → 선택과목 → 원본 순서', (() => {
+    const m = /const PS_ITEMS = \[([\s\S]*?)\];/.exec(html)[1];
+    return m.indexOf("'roster'") < m.indexOf("'electives'")
+        && m.indexOf("'electives'") < m.indexOf("'raw'");
+  })());
+  check('한 항목이 실패하면 뒤엣것을 안 민다', /failed = it;\s*\n\s*break;/.test(html));
+  check('끝난 항목은 꺼 둔다(두 번 안 쓴다)', /psPick\[it\.key\] = false;/.test(html));
+  check('어디까지 됐는지 화면에 남긴다', /function psProgress\(/.test(html) && /id="psProgress"/.test(html));
+
+  // 선택과목은 '이번에 없는 반' 을 지운다 — 못 읽은 학년이 있으면 막아야 한다
+  check('주소 열을 못 찾으면 저장을 막는다',
+        /function elBlockers[\s\S]{0,500}탭 없음\|못 찾음\|비어있음[\s\S]{0,120}통째로 지워집니다/.test(html));
+  check('선택과목 인원이 명렬보다 적으면 막는다',
+        /function elBlockers[\s\S]{0,700}n < rows\.length/.test(html));
+  check('삭제 로직이 그대로 남아 있다(그래서 막는 것이다)',
+        /!el\.classes\[d\.id\][\s\S]{0,60}deleteDoc/.test(html));
+
+  // 백업 — 선택과목도 통째로 갈아치우므로 같이 받아야 되돌릴 수 있다
+  check('백업에 선택과목도 담는다',
+        /psBackupBtn[\s\S]{0,700}collection\(db, 'electives'\)[\s\S]{0,400}electives\s*\}/.test(html));
+  check('선택과목 백업 실패해도 명렬 백업은 내려준다',
+        /electives = \{ error: e\.message \};/.test(html));
 }
 
 console.log('\n■ 기존 탭을 건드리지 않았다');
@@ -295,6 +346,8 @@ console.log('\n■ 기존 탭을 건드리지 않았다');
         /club:\s*String\(r\[8\]\|\|''\)\.trim\(\)/.test(html));
   check('학생연락망 탭이 남아 있다', /data-tab="students"/.test(html));
   check('동아리 탭이 남아 있다', /data-tab="clubs"/.test(html));
+  check('원본 파일 조회는 편성표 탭에서 이어간다',
+        /id="shDbStats"/.test(html) && /btn\.dataset\.tab === 'pyeonseong'\) loadDbSheets\(\)/.test(html));
 }
 
 console.log(`\n${fail ? '❌' : '✅'} 통과 ${pass} / 실패 ${fail}`);
