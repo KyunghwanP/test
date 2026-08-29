@@ -55,6 +55,17 @@ PS_FILE=/tmp/pyeonseong.xlsx node tests/upload-pyeonseong-page.test.mjs
 으로 취급돼 **선택과목이 통째로 삭제**되므로, 그 항목만 잠기고 명렬은 그대로
 저장돼야 한다.
 
+### 동아리 개별 입력
+
+```bash
+node tests/upload-club-per-student.test.mjs      # 편성표 파일 필요 없음
+```
+
+편성표에 동아리 열이 없어서, 명렬을 갱신하면 새로 전입한 학생만 동아리가 빈다.
+그 몇 명을 채우는 화면인데 `students/main` 을 통째로 다시 쓰므로,
+**동아리 말고는 한 글자도 안 바뀌는지**를 저장된 배열과 원본을 필드 단위로 비교해
+확인한다. 연락처 문서(`studentsContact`)는 아예 안 건드려야 한다.
+
 ### 외출증 화면 (Chromium)
 
 ```bash
