@@ -32,14 +32,23 @@ service cloud.firestore {
       allow write: if isAppAdmin();
     }
     // ── 연락처 원본 ────────────────────────────────────────────────────
-    // 브라우저는 절대 못 읽는다(read: false). teacher-api 워커가 서비스 계정으로만
-    // 읽어서 '한 번에 1명분'씩 내주고, 그 조회를 accessLogs 에 남긴다.
+    // 교사 브라우저는 못 읽는다. teacher-api 워커가 서비스 계정으로만 읽어서
+    // '한 번에 1명분'씩 내주고, 그 조회를 accessLogs 에 남긴다.
     //   왜: 예전에는 앱이 students/main · contacts/main 을 통째로 받아, 화면에는
     //   한 반만 보여주면서 전교생 연락처를 브라우저로 내려보내고 있었다. 개발자
     //   도구 없이 '페이지 저장' 한 번으로 전체가 유출되는 상태였다.
     // 쓰기는 명렬 업로드(upload.html)뿐이라 관리자만.
+    //
+    // 읽기가 관리자 한 명에게만 열려 있는 이유: upload.html 의 편성표 갱신이
+    // 이 문서를 **덮어쓰기 전에 먼저 읽어야** 한다.
+    //   · 저장 전 백업 — 되돌릴 수단이 이것뿐이다(Spark 요금제라 시점 복구가 없다)
+    //   · 편성표에 빈 연락처가 기존 번호를 지우지 않게 대조
+    //   · 반이 바뀐 학생을 이름+생년월일로 찾기(생년월일이 이 문서에 있다)
+    // 같은 계정이 write 로 이미 통째로 갈아치울 수 있다. 읽기만 막으면 얻는 것 없이
+    // '백업 없이 덮어쓰기' 만 남는다.
+    // 교사 전체에는 절대 열지 말 것 — 그러면 위의 '페이지 저장 한 번' 으로 돌아간다.
     match /studentsContact/{docId} {
-      allow read: if false;
+      allow read:  if isAppAdmin();
       allow write: if isAppAdmin();
     }
     match /contactsPhone/{docId} {

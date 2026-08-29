@@ -30,13 +30,24 @@ npm i -D xlsx@0.18.5            # 편성표 검사 — upload.html 이 쓰는 �
 '돌아간다'가 아니라 **무엇이 저장되는지**를 값으로 확인한다.
 
 ```bash
-PS_FILE=/경로/편성표.xlsx node tests/upload-pyeonseong.test.mjs       # 파싱·병합·막는 조건
-PS_FILE=/경로/편성표.xlsx node tests/upload-pyeonseong-page.test.mjs  # 실제 화면에서 저장까지
+PS_FILE=/경로/편성표.xlsx node tests/upload-pyeonseong.test.mjs        # 파싱·병합·막는 조건
+PS_FILE=/경로/편성표.xlsx node tests/upload-pyeonseong-worker.test.mjs # 저장될 값으로 워커를 돌려 봄
+PS_FILE=/경로/편성표.xlsx node tests/upload-pyeonseong-page.test.mjs   # 실제 화면에서 저장까지
 ```
 
-파일이 없으면 조용히 건너뛴다(개인정보라 저장소에 안 둔다). 화면 검사는
-`prev-students.json` · `prev-contact.json` 로 기존 명렬을 흉내내야 한다 —
-같은 폴더의 파서로 편성표에서 만들어 쓰면 된다.
+파일이 없으면 조용히 건너뛴다(개인정보라 저장소에 안 둔다). 진짜 파일이 없을 때는
+같은 지문(1020명 / 제외 55 / 343·322·355 / 앞 0 3건 / 번호 구멍 13반)을 재현한
+대체 파일을 만들어 쓴다. 화면 검사가 쓰는 `prev-students.json` · `prev-contact.json`
+(기존 DB 흉내)도 여기서 같이 나온다.
+
+```bash
+node tests/make-pyeonseong-fixture.mjs /tmp
+PS_FILE=/tmp/pyeonseong.xlsx node tests/upload-pyeonseong-page.test.mjs
+```
+
+`upload-pyeonseong-worker` 는 `consult-api` 의 `handleVerify` 판정식과 `teacher-api` 의
+`photoKey` 를 **워커 소스에서 그대로 떼어** 저장될 명렬에 돌린다. 학부모 인증이
+전원 통과하는지, 사진 자리에 남의 얼굴이 붙지 않는지를 업로드 전에 값으로 본다.
 
 ### 외출증 화면 (Chromium)
 
