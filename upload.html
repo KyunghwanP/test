@@ -1686,6 +1686,10 @@ psFileInput.addEventListener('change', e => { if (e.target.files[0]) psHandleFil
 
 const psEsc = v => String(v ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+// Firestore 규칙에 막혔을 때의 메시지. 원문이 'Missing or insufficient permissions.' 라
+// 무슨 일인지 알 수가 없어서, 무엇을 고쳐야 하는지로 바꿔 준다.
+const PS_DENIED = /insufficient permissions|permission-denied|PERMISSION_DENIED/i;
+
 async function psHandleFile(file) {
   psBackedUp = false;
   document.getElementById('psResult').style.display = 'none';
@@ -1696,6 +1700,9 @@ async function psHandleFile(file) {
     psRows = psParsed.rows;
 
     setStatus('psStatus', '☁️ 현재 명렬과 대조하는 중...', 'loading');
+    // 연락처 문서(studentsContact)는 규칙상 관리자만 읽는다. 이걸 못 읽으면
+    // 백업도 못 뜨고, 빈 연락처가 기존 번호를 지우는지도 알 수 없다.
+    // 그래서 '읽고 나서 조심하기' 가 아니라 아예 진행을 막는다.
     const [a, b] = await Promise.all([
       getDoc(doc(db, 'students', 'main')),
       getDoc(doc(db, 'studentsContact', 'main')),
@@ -1705,7 +1712,13 @@ async function psHandleFile(file) {
     psRender();
     clearStatus('psStatus');
   } catch (e) {
-    setStatus('psStatus', '읽기 실패: ' + e.message, 'err');
+    psRows = psParsed = null;
+    setStatus('psStatus', PS_DENIED.test(e.message || '')
+      ? '연락처 문서를 읽을 권한이 없습니다.\n\n'
+        + 'firestore.rules 의 studentsContact 가 아직 "allow read: if false" 입니다. '
+        + '관리자만 읽도록 바꾼 뒤 Firebase 콘솔에 게시하세요.\n'
+        + '(이걸 못 읽으면 저장 전 백업을 못 만듭니다 — 되돌릴 방법이 없어집니다)'
+      : '읽기 실패: ' + e.message, 'err');
   }
 }
 

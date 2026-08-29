@@ -266,6 +266,29 @@ console.log('\n■ 화면 배선');
         && !/psDiffBox'\)\.innerHTML[\s\S]{0,600}\$\{x\.name\}/.test(html));
 }
 
+console.log('\n■ 연락처 문서 읽기 권한 — 열되, 관리자에게만');
+{
+  const rules = fs.readFileSync(import.meta.dirname + '/../firestore.rules', 'utf8');
+  const blockOf = coll =>
+    new RegExp(`match /${coll}/\\{docId\\} \\{[\\s\\S]*?\\n    \\}`).exec(rules)?.[0] || '';
+  const stu = blockOf('studentsContact');
+
+  // 편성표 탭은 저장 전에 이 문서를 읽어야 한다 — 백업, 연락처 보존, 반변경 찾기.
+  check('관리자는 읽을 수 있다',   /allow read:\s*if isAppAdmin\(\);/.test(stu), stu);
+  check('쓰기는 그대로 관리자만', /allow write:\s*if isAppAdmin\(\);/.test(stu), stu);
+  // 여기가 교사 전체로 열리면 '페이지 저장 한 번에 전교생 연락처' 로 되돌아간다.
+  check('교사 전체에는 열려 있지 않다',
+        !/allow read:[^;]*isYnhsTeacher/.test(stu) && !/allow read:\s*if true/.test(stu), stu);
+  check('교직원 연락처는 여전히 아무도 못 읽는다',
+        /allow read:\s*if false;/.test(blockOf('contactsPhone')), blockOf('contactsPhone'));
+
+  // 규칙을 아직 안 올렸을 때 원문('Missing or insufficient permissions.') 대신
+  // 무엇을 고쳐야 하는지 알려 주는가. 그리고 반쯤 읽은 상태로 남지 않는가.
+  check('권한 오류를 알아본다', /const PS_DENIED = /.test(html) && /PS_DENIED\.test\(/.test(html));
+  check('무엇을 고쳐야 하는지 말해 준다', /studentsContact 가 아직/.test(html));
+  check('막혔으면 파싱 결과를 버린다', /catch \(e\) \{\n    psRows = psParsed = null;/.test(html));
+}
+
 console.log('\n■ 기존 탭을 건드리지 않았다');
 {
   check('학생연락망 업로드는 그대로 동아리(I열)를 읽는다',
