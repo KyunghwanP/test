@@ -499,6 +499,35 @@ say('교탁이 학생과 칠판 사이에 있다',
     front.flip ? (front.desk < front.chalk) : (front.chalk < front.desk), front);
 await pg.emulateMedia({ media: 'screen' });
 
+// 화면 폭을 얼마나 쓰는가. 예전에 .wrap 이 1240px 로 묶여 있어
+// FHD 에서 자리판이 484px(화면의 25%)밖에 안 됐다.
+console.log('\n■ 넓은 화면에서 자리판이 폭을 가져가는가');
+{
+  const measure = async W => {
+    await pg.setViewportSize({ width: W, height: 1080 });
+    await pg.waitForTimeout(150);
+    return pg.evaluate(() => {
+      const r = e => e.getBoundingClientRect();
+      const s = r(document.querySelector('.seat'));
+      return { wrap: Math.round(r(document.querySelector('.wrap')).width),
+               board: Math.round(r(document.querySelector('.board')).width),
+               seatW: Math.round(s.width), ratio: s.width / s.height,
+               scrollX: document.documentElement.scrollWidth > window.innerWidth };
+    });
+  };
+  const fhd = await measure(1920);
+  say('FHD 에서 화면을 꽉 쓴다', fhd.wrap >= 1900, fhd);
+  say('자리판이 화면의 절반을 넘는다', fhd.board > 960, fhd);
+  // 폭만 늘고 높이가 그대로면 납작한 막대가 된다
+  say('자리 비율이 책상 같다 (1.2~2.2:1)', fhd.ratio > 1.2 && fhd.ratio < 2.2, fhd.ratio.toFixed(2));
+  say('가로 스크롤이 안 생긴다', !fhd.scrollX);
+
+  const lap = await measure(1366);
+  say('노트북에서도 가로 스크롤 없음', !lap.scrollX, lap);
+  say('좁아져도 자리가 안 찌그러진다', lap.seatW >= 70, lap);
+  await pg.setViewportSize({ width: 1280, height: 1500 });
+}
+
 console.log(errs.length ? '\n❌ 런타임 오류:\n' + errs.join('\n') : '\n✅ 런타임 오류 없음');
 await b.close();
 process.exit(errs.length ? 1 : 0);
