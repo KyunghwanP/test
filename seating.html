@@ -181,17 +181,31 @@
   .txt:focus{border-color:var(--mon);}
   textarea.txt{min-height:92px;resize:vertical;line-height:1.7;}
 
-  /* 제약·임무 입력 줄 — [학생] / [종류][임무][추가] */
-  .cons-add{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:9px;}
-  .cons-add #cWho{flex:1 1 100%;min-width:0;}
-  .cons-add #cKind{flex:0 0 auto;}
-  .cons-add #cDuty{flex:1 1 90px;min-width:0;width:auto;padding:7px 10px;
-    font-size:12.5px;border-radius:9px;}
-  .cons-add #cAdd{flex:0 0 auto;margin-left:auto;}
-  .cons-apart{border-top:1px solid var(--rule);margin:12px 0;padding-top:12px;}
-  .cons-apart > .btn{width:100%;}
-  .cons-cap{font-size:11px;font-weight:800;margin:14px 0 7px;letter-spacing:.11em;
-    text-transform:uppercase;color:var(--ink-soft);}
+  /* 학생별 설정 표 — 한 줄에 한 학생. 반 전체가 한 화면에 들어와야 한다. */
+  .stu-front{margin-left:auto;font-size:12px;letter-spacing:0;text-transform:none;}
+  .stu-front .num{width:52px;}
+  .stu-apart{display:inline-flex;gap:6px;align-items:center;letter-spacing:0;text-transform:none;}
+  .stu-apart .sel{padding:5px 7px;font-size:12px;}
+  .stu-apart .btn{padding:5px 12px;font-size:12px;}
+  .stu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));
+    gap:4px 14px;margin-bottom:6px;}
+  .stu-row{display:flex;align-items:center;gap:6px;padding:5px 7px;border-radius:9px;}
+  .stu-row:hover{background:var(--paper-soft);}
+  .stu-row .mono{flex:0 0 22px;font-family:'IBM Plex Mono';font-size:11.5px;color:var(--ink-soft);}
+  .stu-row .nm{flex:0 0 62px;font-size:13px;font-weight:700;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .stu-row .tog{padding:3px 8px;font-size:11.5px;font-weight:800;border-radius:7px;
+    border:1px solid var(--rule);background:var(--paper);color:var(--ink-soft);
+    font-family:inherit;cursor:pointer;flex:0 0 auto;}
+  .stu-row .tog:hover{border-color:var(--mon);color:var(--mon);}
+  .stu-row .tog.on{background:var(--mon);border-color:var(--mon);color:#fff;}
+  .stu-row .tog:disabled{opacity:.4;cursor:not-allowed;}
+  .stu-row .tog.on.sel-apart{background:var(--gold);border-color:var(--gold);}
+  .stu-row .duty{flex:1 1 60px;min-width:0;padding:4px 8px;font-size:12px;
+    border:1px solid var(--rule);border-radius:7px;background:var(--paper);
+    color:var(--ink);font-family:inherit;outline:none;}
+  .stu-row .duty:focus{border-color:var(--mon);}
+  .stu-row .duty:not(:placeholder-shown){font-weight:700;background:var(--mon-soft);}
   .memo-print{white-space:pre-wrap;}
   .print-only{display:none;}
 
@@ -325,11 +339,10 @@
     <span class="sep"></span>
     <span class="bar-label">모드</span>
     <!-- 하나만 켜지는 성격이라 낱개 버튼이 아니라 묶음 컨트롤로 둔다.
-         고정석·앞자리·임무는 모드가 아니라 오른쪽 「제약·임무」 칸에서 넣는다.
-         여기 남은 셋은 '자리판을 눌러야만' 되는 것들이다. -->
+         고정석·앞자리·분리·임무는 모드가 아니라 아래 「학생별 설정」 표에서 켠다.
+         여기 남은 둘은 '자리판을 눌러야만' 되는 것들이다. -->
     <div class="seg">
       <button class="btn on" id="mMove">자리 옮기기</button>
-      <button class="btn" id="mApart">분리 고르기</button>
       <button class="btn" id="mOff">빈칸</button>
     </div>
     <span class="sep"></span>
@@ -380,6 +393,30 @@
         <div class="front"><div class="desk">교 탁</div><div class="chalk">칠 판</div></div>
         <div class="grid" id="grid"></div>
       </div>
+      <!-- 학생별 설정 — 반 전체가 한 화면에 뜨고 그 줄에서 바로 켜고 끈다.
+           모드를 바꾼 뒤 자리를 누르거나 드롭다운에서 학생을 찾는 것보다,
+           '누구에게 무엇이 걸려 있는지'가 한눈에 보이는 편이 낫다. -->
+      <div class="card noprint" id="stuCard">
+        <h2>학생별 설정
+          <span class="cnt" id="stuCnt"></span>
+          <label class="stu-front">앞자리 <input class="num" type="number" id="nFront" min="1" max="12" value="2"> 줄</label>
+          <span class="stu-apart">
+            <select class="sel" id="apartD" title="떨어뜨릴 정도">
+              <option value="2">이웃 금지</option>
+              <option value="3">멀리</option>
+            </select>
+            <button class="btn pri" id="bApartMake" disabled>묶기</button>
+          </span>
+        </h2>
+        <p class="hint">
+          <b>고정</b> 랜덤을 돌려도 그 자리 그대로 · <b>앞</b> 앞줄 안에 앉히기 ·
+          <b>분리</b> 둘 이상 켜고 「묶기」 — 서로 안 붙게 배정합니다.
+          임무는 이름 옆 칸에 적으면 자리표와 인쇄물에 같이 나옵니다.
+        </p>
+        <div class="stu-grid" id="stuGrid"></div>
+        <div class="list" id="consList"></div>
+      </div>
+
       <div class="card" id="memoCard">
         <h2>메모</h2>
         <textarea class="txt noprint" id="memo" placeholder="청소 구역, 유의사항 등 — 인쇄물 아래에 같이 나옵니다."></textarea>
@@ -392,43 +429,6 @@
         <h2>아직 안 앉은 학생 <span class="cnt" id="unseatedCnt"></span></h2>
         <p class="hint" id="modeHint">자리를 눌러 학생을 고르고, 다른 자리를 누르면 서로 바뀝니다.</p>
         <div class="list scroll" id="unseated"></div>
-      </div>
-
-      <!-- 제약과 임무를 한곳에서 넣고 지운다.
-           예전에는 상단 모드를 바꾼 뒤 자리를 눌러야 했고, 이 카드는 결과만 보여줬다.
-           '어디서 넣는지'가 안 보이는 게 가장 불편한 점이었다. -->
-      <div class="card">
-        <h2>제약 · 임무</h2>
-        <div class="cons-add">
-          <select class="sel" id="cWho" title="학생"></select>
-          <select class="sel" id="cKind" title="무엇을 걸지">
-            <option value="fix">고정석</option>
-            <option value="front">앞자리</option>
-            <option value="duty">임무</option>
-          </select>
-          <input class="txt" id="cDuty" placeholder="예: 주번" maxlength="20" style="display:none;">
-          <!-- 앞자리 줄 수는 이 제약에만 쓰인다. 상단 자리판 줄에 있으면 여기와 떨어져 안 보인다. -->
-          <label id="cFrontWrap" style="display:none;">앞
-            <input class="num" type="number" id="nFront" min="1" max="12" value="2"> 줄</label>
-          <button class="btn pri" id="cAdd">추가</button>
-        </div>
-        <p class="hint" id="cHint"></p>
-
-        <!-- 분리는 둘 이상을 골라야 해서 드롭다운 하나로 안 된다.
-             자리판에서 고르는 모드로 넘겨준다. -->
-        <div class="cons-apart">
-          <button class="btn" id="cApartStart" title="둘 이상을 떼어놓습니다. 자리판이나 목록에서 학생을 고르세요.">여러 명 떼어놓기</button>
-          <div id="apartBar" style="display:none;margin-top:8px;">
-            <div class="seg" style="width:100%;margin-bottom:7px;">
-              <button class="btn on" id="apartD2" style="flex:1;" title="옆·앞뒤·대각 어디로도 안 붙습니다. 사이에 최소 한 자리.">이웃 금지</button>
-              <button class="btn" id="apartD3" style="flex:1;" title="사이에 최소 두 자리. 인원이 많으면 자리가 안 나올 수 있습니다.">멀리</button>
-            </div>
-            <button class="btn pri" id="bApartMake" style="width:100%;">선택한 학생 묶기</button>
-          </div>
-        </div>
-
-        <h3 class="cons-cap">걸어 둔 것</h3>
-        <div class="list" id="consList"></div>
       </div>
 
       <div class="card">
@@ -776,11 +776,6 @@ function onSeat(cell){
     renderGrid(); return;
   }
   if (!k) { say('warn', '빈 자리입니다. 학생이 앉은 자리를 눌러 주세요.'); return; }
-  if (MODE === 'apart') {
-    // 두 명씩 짝지을 필요 없다 — 떼어놓을 사람을 다 고른 뒤 한 묶음으로 만든다.
-    if (APART_SEL.has(k)) APART_SEL.delete(k); else APART_SEL.add(k);
-    renderGrid(); renderSide(); renderApartBar(); return;
-  }
   if (MODE === 'partial') {
     if (PARTIAL.has(k)) PARTIAL.delete(k); else PARTIAL.add(k);
     renderGrid(); return;
@@ -824,108 +819,98 @@ function renderSide(){
   renderHist();
   renderRosterEdit();
 }
-// 목록에서 학생을 눌렀을 때. 분리 고르기만 여기서 받는다 —
-// 고정석·앞자리·임무는 오른쪽 「제약·임무」 칸에서 넣는다.
+// 안 앉은 학생 목록에서 눌렀을 때. 제약은 「학생별 설정」 표에서 켠다.
 function onStudent(k){
   if (!CANEDIT || !k) return;
   clearSay();
-  if (MODE === 'apart') {
-    if (APART_SEL.has(k)) APART_SEL.delete(k); else APART_SEL.add(k);
-    renderSide(); renderGrid(); renderApartBar(); return;
-  }
-  if (MODE === 'off')  { say('warn', '빈칸은 자리판에서 지정합니다.'); return; }
+  if (MODE === 'off') { say('warn', '빈칸은 자리판에서 지정합니다.'); return; }
   say('warn', '이 학생을 앉히려면 자리로 끌어다 놓으세요.');
 }
 
-// 분리 모드에서만 뜨는 '묶기' 줄
+// 묶기 버튼 — 표에서 '분리'를 둘 이상 켜야 열린다
 function renderApartBar(){
-  const bar = $('apartBar'), btn = $('bApartMake');
-  if (!bar) return;
-  const on = MODE === 'apart' && CANEDIT;
-  bar.style.display = on ? 'block' : 'none';
-  const start = $('cApartStart');
-  if (start) {
-    start.classList.toggle('on', on);
-    start.textContent = on ? '고르기 그만두기' : '여러 명 떼어놓기';
-  }
-  if (!on) return;
-  $('apartD2').classList.toggle('on', APART_D === 2);
-  $('apartD3').classList.toggle('on', APART_D === 3);
+  const btn = $('bApartMake');
+  if (!btn) return;
   const n = APART_SEL.size;
-  btn.disabled = n < 2;
-  btn.textContent = n < 2 ? '떼어놓을 학생을 2명 이상 고르세요'
-                          : `고른 ${n}명을 ${APART_D === 3 ? '멀리' : '이웃 안 되게'} 묶기`;
+  btn.disabled = !CANEDIT || n < 2;
+  btn.textContent = n < 2 ? '묶기' : `${n}명 묶기`;
+  if ($('apartD')) $('apartD').disabled = !CANEDIT;
 }
 
 // 지금 어느 자리에 앉아 있나. 고정석은 '어느 칸에' 가 있어야 걸 수 있다.
 const seatOf = k => Object.keys(ST.seats).find(c => ST.seats[c] === k) || null;
 
+// 걸어 둔 분리 묶음만 여기 남는다 — 고정·앞자리·임무는 표에 그대로 보인다.
 function renderCons(){
-  const bits = [];
-  for (const k in ST.fixed)
-    bits.push(`<div class="row"><span class="mono">고정</span><span class="nm">${esc(nameOf(k))}</span>
-      <button class="x" data-drop="fix:${esc(k)}">×</button></div>`);
-  for (const k in ST.front)
-    bits.push(`<div class="row"><span class="mono">앞 ${ST.front[k]}줄</span><span class="nm">${esc(nameOf(k))}</span>
-      <button class="x" data-drop="front:${esc(k)}">×</button></div>`);
-  for (const k in ST.duty)
-    bits.push(`<div class="row"><span class="mono">임무</span><span class="nm">${esc(nameOf(k))}</span>
-      <span class="s-duty">${esc(ST.duty[k])}</span>
-      <button class="x" data-drop="duty:${esc(k)}">×</button></div>`);
-  ST.apart.forEach((p, i) => {
+  $('consList').innerHTML = ST.apart.map((p, i) => {
     const ks = apartMembers(p);
-    bits.push(`<div class="row"><span class="mono">분리${ks.length > 2 ? ' '+ks.length+'명' : ''}${(p.d||2) >= 3 ? '·멀리' : ''}</span>
+    return `<div class="row"><span class="mono">분리${(p.d||2) >= 3 ? '·멀리' : ''}</span>
       <span class="nm">${ks.map(k => esc(nameOf(k))).join(' · ')}</span>
-      <button class="x" data-drop="apart:${i}">×</button></div>`);
-  });
-  $('consList').innerHTML = bits.length ? bits.join('')
-    : '<div class="none">아직 없습니다. 위에서 학생과 종류를 골라 「추가」를 누르세요.</div>';
+      <button class="x" data-drop="${i}" title="이 묶음을 지웁니다">×</button></div>`;
+  }).join('');
   $('consList').querySelectorAll('[data-drop]').forEach(b =>
-    b.addEventListener('click', () => {
-      const [kind, val] = b.dataset.drop.split(/:(.+)/);
-      if (kind === 'fix') delete ST.fixed[val];
-      else if (kind === 'front') delete ST.front[val];
-      else if (kind === 'duty') delete ST.duty[val];
-      else ST.apart.splice(Number(val), 1);
+    b.addEventListener('click', () => { ST.apart.splice(Number(b.dataset.drop), 1); touch(); }));
+  renderStuGrid();
+}
+
+// 학생별 설정 표. 한 줄에 한 학생, 그 자리에서 켜고 끈다.
+// 다시 그릴 때 입력 중인 임무 칸이 날아가면 안 되므로 change 에서만 반영한다.
+function renderStuGrid(){
+  const g = $('stuGrid');
+  if (!g) return;
+  const on = (c, yes) => yes ? c + ' on' : c;
+  g.innerHTML = ROSTER.map(s => {
+    const k = s.key, seated = !!seatOf(k);
+    return `<div class="stu-row" data-row="${esc(k)}">
+      <span class="mono">${String(s.num).padStart(2,'0')}</span>
+      <span class="nm" title="${esc(s.name)}">${esc(s.name)}</span>
+      <button class="${on('tog', !!ST.fixed[k])}" data-tog="fix" data-k="${esc(k)}"
+        ${seated ? '' : 'disabled'} title="${seated ? '랜덤을 돌려도 이 자리 그대로' : '먼저 자리에 앉혀야 고정할 수 있습니다'}">고정</button>
+      <button class="${on('tog', !!ST.front[k])}" data-tog="front" data-k="${esc(k)}"
+        title="앞 ${ST.frontRows}줄 안에 앉힙니다">앞</button>
+      <button class="${on('tog sel-apart', APART_SEL.has(k))}" data-tog="apart" data-k="${esc(k)}"
+        title="떼어놓을 학생으로 고릅니다. 둘 이상 고른 뒤 위 「묶기」">분리</button>
+      <input class="duty" data-duty="${esc(k)}" value="${esc(ST.duty[k] || '')}"
+        placeholder="임무" maxlength="20" spellcheck="false" ${CANEDIT ? '' : 'disabled'}>
+    </div>`;
+  }).join('');
+
+  if (!CANEDIT) g.querySelectorAll('button').forEach(b => b.disabled = true);
+
+  g.querySelectorAll('[data-tog]').forEach(b => b.addEventListener('click', () => {
+    if (!CANEDIT) return;
+    const k = b.dataset.k;
+    clearSay();
+    if (b.dataset.tog === 'fix') {
+      if (ST.fixed[k]) delete ST.fixed[k];
+      else {
+        const cell = seatOf(k);
+        if (!cell) { say('warn', `${nameOf(k)} 학생이 아직 안 앉았습니다. 먼저 앉힌 뒤 고정하세요.`); return; }
+        ST.fixed[k] = cell;
+      }
       touch();
-    }));
-  renderConsAdd();
-}
+    } else if (b.dataset.tog === 'front') {
+      if (ST.front[k]) delete ST.front[k]; else ST.front[k] = ST.frontRows;
+      touch();
+    } else {
+      // 분리는 아직 '고르는 중'이라 저장 상태가 아니다 — 표시만 바꾸고 묶기 버튼을 연다
+      if (APART_SEL.has(k)) APART_SEL.delete(k); else APART_SEL.add(k);
+      b.classList.toggle('on', APART_SEL.has(k));
+      renderApartBar(); renderGrid();
+    }
+  }));
 
-// 입력 줄. 고른 학생을 기억해 둔다 — 다시 그릴 때 선택이 튀면 연속으로 못 넣는다.
-function renderConsAdd(){
-  const who = $('cWho'), kind = $('cKind').value, keep = who.value;
-  who.innerHTML = ROSTER.map(s =>
-    `<option value="${esc(s.key)}">${String(s.num).padStart(2,'0')} ${esc(s.name)}</option>`).join('');
-  if (keep && ROSTER.some(s => s.key === keep)) who.value = keep;
-  $('cDuty').style.display      = kind === 'duty'  ? '' : 'none';
-  $('cFrontWrap').style.display = kind === 'front' ? '' : 'none';
-  $('cHint').textContent =
-    kind === 'fix'   ? '랜덤을 돌려도 지금 앉은 자리에서 안 움직입니다. 앉은 학생만 됩니다.'
-  : kind === 'front' ? '정한 줄 수 안에 앉힙니다. 줄 수를 바꾸면 이미 걸어 둔 앞자리에도 같이 적용됩니다.'
-  :                    '자리표와 인쇄물에 함께 나옵니다. 예: 주번, 칠판, 우유.';
-  const dis = !CANEDIT || !ROSTER.length;
-  ['cWho','cKind','cDuty','cAdd','cApartStart'].forEach(id => { if ($(id)) $(id).disabled = dis; });
-}
+  g.querySelectorAll('[data-duty]').forEach(inp => inp.addEventListener('change', () => {
+    if (!CANEDIT) return;
+    const k = inp.dataset.duty, v = inp.value.trim().slice(0, 20);
+    if (v) ST.duty[k] = v; else delete ST.duty[k];
+    touch();
+  }));
 
-function addCons(){
-  if (!CANEDIT) return;
-  clearSay();
-  const k = $('cWho').value, kind = $('cKind').value;
-  if (!k) return;
-  if (kind === 'fix') {
-    const cell = seatOf(k);
-    if (!cell) { say('warn', `${nameOf(k)} 학생이 아직 안 앉았습니다. 먼저 자리에 앉힌 뒤 고정하세요.`); return; }
-    ST.fixed[k] = cell;
-  } else if (kind === 'front') {
-    ST.front[k] = ST.frontRows;
-  } else {
-    const v = $('cDuty').value.trim().slice(0, 20);
-    if (!v) { say('warn', '임무를 적어 주세요.'); $('cDuty').focus(); return; }
-    ST.duty[k] = v;
-    $('cDuty').value = '';
-  }
-  touch();
+  const nCons = Object.keys(ST.fixed).length + Object.keys(ST.front).length
+              + Object.keys(ST.duty).length + ST.apart.length;
+  $('stuCnt').textContent = ROSTER.length ? `${ROSTER.length}명${nCons ? ` · 걸어 둔 것 ${nCons}` : ''}` : '';
+  renderApartBar();
 }
 function renderRosterEdit(){
   $('rosterEdit').innerHTML = ROSTER.map(s =>
@@ -1055,6 +1040,16 @@ function bindUnseatDrop(){
 function touch(){ DIRTY = true; renderGrid(); renderSide(); }
 
 /* ── 배정 ── */
+// 「앞 왼쪽부터」는 선생님이 지금 보고 있는 화면 기준이어야 한다.
+// 앞/뒤는 교탁 쪽이라 두 화면에서 같지만, 교사 입장은 180도 돌아가 있어
+// 좌우가 반대로 그려진다. 그래서 왼/오만 바꿔서 넘긴다.
+// (배정 엔진 seatCells 는 늘 물리적 좌표로만 생각한다 — 화면을 모른다.)
+function ordForView(){
+  const s = ST.ordStart || 'FL';
+  if (!ST.flip) return s;
+  return s[0] + (s[1] === 'L' ? 'R' : 'L');
+}
+
 function runAssign(mode, keep){
   clearSay();
   UNDO = JSON.parse(JSON.stringify(ST.seats));
@@ -1062,7 +1057,7 @@ function runAssign(mode, keep){
   const res = seatAssign({
     grid: grid(), roster: ROSTER.map(s => s.key),
     cons: { fixed: ST.fixed, front: ST.front, apart: ST.apart },
-    ord: { start: ST.ordStart, dir: ST.ordDir },
+    ord: { start: ordForView(), dir: ST.ordDir },
     mode, keep, nameOf
   });
   if (res.error) { say('err', res.error); return; }
@@ -1195,16 +1190,15 @@ async function copyTable(){
 /* ── 시작 ── */
 function bindModes(){
   // 남은 모드는 '자리판을 눌러야만' 되는 것들뿐이다.
-  // 고정석·앞자리·임무는 오른쪽 「제약·임무」 칸에서 넣는다.
-  const modes = { mMove:'move', mApart:'apart', mOff:'off' };
+  // 고정석·앞자리·분리·임무는 아래 「학생별 설정」 표에서 켠다.
+  const modes = { mMove:'move', mOff:'off' };
   const hints = {
     move : '자리를 끌어다 놓거나, 눌러 고른 뒤 다른 자리를 누르면 서로 바뀝니다. 오른쪽 목록의 학생도 끌어다 앉힐 수 있습니다.',
-    apart: '떼어놓을 학생들을 모두 누른 뒤 오른쪽 「제약·임무」에서 묶으세요. 이웃 금지는 서로 안 붙게, 멀리는 사이에 두 자리를 둡니다. 멀리는 5명 넘으면 자리가 안 나올 수 있습니다.',
     off  : '자리를 누르면 빈칸(자리 아님)이 됩니다. 통로나 결원 자리에 쓰세요.',
     partial: '다시 섞을 학생들을 누르세요. 고른 학생들끼리만 자리를 바꿉니다.'
   };
   const setMode = m => {
-    MODE = m; PICK = null; APART_SEL.clear();
+    MODE = m; PICK = null;
     if (m !== 'partial') PARTIAL.clear();
     Object.entries(modes).forEach(([id, v]) => $(id).classList.toggle('on', v === m));
     $('bPartial').classList.toggle('on', m === 'partial');
@@ -1213,12 +1207,6 @@ function bindModes(){
   };
   Object.entries(modes).forEach(([id, m]) => $(id).addEventListener('click', () => setMode(m)));
 
-  // 제약·임무 입력 줄
-  $('cKind').addEventListener('change', renderConsAdd);
-  $('cAdd').addEventListener('click', addCons);
-  $('cDuty').addEventListener('keydown', e => { if (e.key === 'Enter') addCons(); });
-  // 분리는 여럿을 골라야 해서 자리판을 눌러야 한다 — 그 모드로 넘겨준다.
-  $('cApartStart').addEventListener('click', () => setMode(MODE === 'apart' ? 'move' : 'apart'));
   $('bPartial').addEventListener('click', () => {
     if (MODE !== 'partial') { setMode('partial'); return; }
     if (!PARTIAL.size) { say('warn', '섞을 학생을 먼저 고르세요.'); return; }
@@ -1274,14 +1262,13 @@ function bindRest(){
     for (const k in ST.front) ST.front[k] = ST.frontRows;
     touch();
   });
-  $('apartD2').addEventListener('click', () => { APART_D = 2; renderApartBar(); });
-  $('apartD3').addEventListener('click', () => { APART_D = 3; renderApartBar(); });
+  $('apartD').addEventListener('change', () => { APART_D = +$('apartD').value || 2; });
   $('bApartMake').addEventListener('click', () => {
     if (APART_SEL.size < 2) return;
     const n = APART_SEL.size;
     ST.apart.push({ ks: [...APART_SEL], d: APART_D });
     APART_SEL.clear();
-    touch(); renderApartBar();
+    touch();
     // '멀리'는 사이에 두 자리를 요구해서, 인원이 조금만 많아도 자리가 안 나온다.
     // 5분단 30자리 기준으로 이웃 금지는 8명까지 되지만 멀리는 4명이 한계다.
     say(APART_D === 3 && n >= 5 ? 'warn' : 'ok',
