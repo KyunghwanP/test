@@ -422,6 +422,14 @@ console.log('\n■ 화면 배선 — JS 가 부르는 id 가 실제로 있나');
   check('묶은 것은 목록에 남고 지울 수 있다',
         /ST\.apart\.map\(\(p, i\) =>/.test(html) && /ST\.apart\.splice\(Number\(b\.dataset\.drop\), 1\)/.test(html));
   check('브라우저 prompt 는 안 쓴다', !/\bprompt\(/.test(html));
+  // 아래로 내려가 여러 단이 될 때, 격자로 채우면 번호가 가로로 읽힌다.
+  // 명렬은 세로로 이어져야 눈으로 따라간다 — multi-column 을 쓴다.
+  check('내려가면 명렬이 세로로 이어진다',
+        /\.stucol \.stu-grid\{display:block;columns:310px/.test(html)
+        && /\.stucol \.stu-row\{break-inside:avoid/.test(html));
+  // 인쇄 명렬에 비고 칸 — 임무를 찍어 내보내되, 없어도 손으로 적을 칸은 남긴다
+  check('인쇄 명렬에 비고 칸이 있다', /<th>번호<\/th><th>이름<\/th><th>비고<\/th>/.test(html));
+  check('비고에 임무가 들어간다', /class="note">\$\{esc\(ST\.duty\[s\.key\] \|\| .{2}\)\}/.test(html));
 
   // 「앞 왼쪽부터」는 화면에 보이는 대로여야 한다. 교사 입장은 좌우가 뒤집혀 보인다.
   check('번호순 시작점을 보는 방향으로 옮긴다', /function ordForView\(\)/.test(html)

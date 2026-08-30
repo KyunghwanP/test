@@ -531,7 +531,35 @@ console.log('\n■ 넓은 화면에서 자리판이 폭을 가져가는가');
     say(W + 'px 에서 가로 스크롤 없음', !m.scrollX, m);
     say(W + 'px 에서 자리가 안 찌그러진다', m.seatW >= 100, m);
   }
+  // 아래로 내려간 상태에서 명렬이 세로로 이어져야 한다 —
+  // 격자로 채우면 01 02 03 / 04 05 06 처럼 가로로 읽힌다.
+  await pg.setViewportSize({ width: 1440, height: 1400 });
+  await pg.waitForTimeout(200);
+  const firstCol = await pg.evaluate(() => {
+    const box = e => e.getBoundingClientRect();
+    const rows = [...document.querySelectorAll('#stuGrid .stu-row')];
+    const left = Math.min(...rows.map(r => box(r).left));
+    return rows.filter(r => Math.abs(box(r).left - left) < 4)
+               .map(r => +r.querySelector('.mono').textContent);
+  });
+  say('내려가도 첫 단이 1번부터 차례로', firstCol.length > 3
+      && firstCol.every((n, i) => n === i + 1), firstCol);
   await pg.setViewportSize({ width: 1280, height: 1500 });
+}
+
+// 인쇄 명렬의 비고 칸 — 임무를 찍어 내보내되, 없어도 칸은 남는다
+console.log('\n■ 인쇄 명렬 비고');
+{
+  await pg.evaluate(() => window.__buildPrintExtras());
+  const head = await pg.$$eval('#printRoster .pr-tbl th', e => e.map(x => x.textContent));
+  say('머리글이 번호·이름·비고', head.slice(0, 3).join(',') === '번호,이름,비고', head);
+  const notes = await pg.$$eval('#printRoster .pr-tbl td.note', e => e.length);
+  const names = await pg.$$eval('#printRoster .pr-tbl td.nm', e => e.length);
+  say('학생마다 비고 칸이 하나씩', notes === names && notes > 0, { notes, names });
+  const filled = await pg.$$eval('#printRoster .pr-tbl td.note',
+    e => e.map(x => x.textContent).filter(Boolean));
+  say('임무가 적힌 학생은 비고에 찍힌다', filled.includes('반장'), filled);
+  say('임무가 없어도 칸은 남는다', notes - filled.length > 0, { notes, 채워진칸: filled.length });
 }
 
 console.log(errs.length ? '\n❌ 런타임 오류:\n' + errs.join('\n') : '\n✅ 런타임 오류 없음');

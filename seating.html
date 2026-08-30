@@ -181,7 +181,11 @@
   @media (max-width:1560px){
     .cols{grid-template-columns:minmax(0,1fr) 316px;}
     .stucol{grid-column:1 / -1;grid-row:2;}
-    .stucol .stu-grid{grid-template-columns:repeat(auto-fill,minmax(310px,1fr));}
+    /* 아래로 내려가면 여러 단이 된다. 격자로 채우면 01 02 03 / 04 05 06 처럼
+       가로로 읽히는데, 명렬은 번호가 세로로 이어져야 눈으로 따라간다.
+       multi-column 은 한 단을 다 채우고 다음 단으로 넘어간다. */
+    .stucol .stu-grid{display:block;columns:310px;column-gap:16px;}
+    .stucol .stu-row{break-inside:avoid;-webkit-column-break-inside:avoid;}
   }
   @media (max-width:960px){ .cols{grid-template-columns:minmax(0,1fr);} }
   .card{background:var(--paper);border-radius:16px;padding:18px 20px;margin-bottom:14px;
@@ -304,7 +308,8 @@
       border-radius:5px 5px 0 0;padding:4px;text-align:center;font-weight:800;font-size:9pt;}
     .pr-n{font-weight:700;color:#456594;font-size:8pt;}
     .pr-cols{display:flex;gap:5px;align-items:flex-start;}
-    .pr-tbl{width:106px;border-collapse:collapse;font-size:8.5pt;}
+    .pr-tbl{width:176px;border-collapse:collapse;font-size:8.5pt;table-layout:fixed;}
+    .pr-tbl col.c-num{width:30px;} .pr-tbl col.c-nm{width:66px;}
     /* 32명을 한 단에 담으려면 줄이 촘촘해야 한다. 기본 line-height(1.55)로는
        줄당 22px 이라 종이를 넘어 두 장이 된다. */
     .pr-tbl th{background:#EDF3FB;color:#1E4A8C;border:1.2px solid #5C82BC;
@@ -312,6 +317,9 @@
     .pr-tbl td{border:1px solid #A8C0DF;padding:0.8px 4px;text-align:center;
       color:#141C26;line-height:1.2;}
     .pr-tbl td.nm{text-align:left;font-weight:600;}
+    /* 비고 — 임무가 있으면 찍히고, 없으면 손으로 적을 빈칸으로 남는다 */
+    .pr-tbl td.note{text-align:left;color:#16407A;font-weight:600;
+      overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
 
     /* 자리판 */
     .grid{flex:1;min-height:0;gap:17pt;}
@@ -1202,9 +1210,14 @@ function buildPrintExtras(){
   for (let i = 0; i < ROSTER.length; i += size) parts.push(ROSTER.slice(i, i + size));
   $('printRoster').innerHTML =
     `<div class="pr-cap">${g}-${r} 명렬 <span class="pr-n">${ROSTER.length}명</span></div>` +
+    // 비고 칸에는 임무를 적어 내보낸다. 임무가 없어도 칸은 남긴다 —
+    // 인쇄물에 손으로 적어 넣을 자리가 있어야 쓸모가 있다.
     `<div class="pr-cols">` + (parts.length ? parts : [[]]).map(part =>
-      `<table class="pr-tbl"><tr><th>번호</th><th>이름</th></tr>` +
-      part.map(s => `<tr><td>${s.num}</td><td class="nm">${esc(s.name)}</td></tr>`).join('') +
+      `<table class="pr-tbl">`
+      + `<colgroup><col class="c-num"><col class="c-nm"><col></colgroup>`
+      + `<tr><th>번호</th><th>이름</th><th>비고</th></tr>` +
+      part.map(s => `<tr><td>${s.num}</td><td class="nm">${esc(s.name)}</td>`
+                  + `<td class="note">${esc(ST.duty[s.key] || '')}</td></tr>`).join('') +
       `</table>`).join('') + `</div>`;
 }
 
