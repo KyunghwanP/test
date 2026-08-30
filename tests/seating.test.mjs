@@ -375,7 +375,38 @@ console.log('\n■ 화면 배선 — JS 가 부르는 id 가 실제로 있나');
   check('클릭으로 바꾸는 길도 남겨 뒀다', /s\.addEventListener\('click', \(\) => onSeat/.test(html));
   check('교탁 아래 버전이 있다', /\.board\.flip\{flex-direction:column-reverse;\}/.test(html) && /function rowOrder\(\)/.test(html));
   check('표 복사도 교탁 방향을 따른다', /if \(!ST\.flip\) t \+= desk;/.test(html) && /if \(ST\.flip\) t \+= desk;/.test(html));
-  check('교탁 방향은 문서에 저장된다', /flip: !!ST\.flip/.test(html) && /flip: !!d\.flip/.test(html));
+  check('교탁 방향은 문서에 저장된다', /flip: !!ST\.flip/.test(html)
+        && /flip: d\.flip === undefined \? true : !!d\.flip/.test(html));
+  // 자리표를 만드는 사람은 교탁에 서서 본다. 기본이 학생 입장이면 늘 한 번 뒤집어야 했다.
+  check('기본이 교사 입장(교탁 아래)', /^\s*flip:true,\s*$/m.test(html));
+  // 그리기만 바꾸는 값이다 — 번호순 배정(seatCells)이 이걸 보면 물리적 배치가 달라진다
+  check('번호순 배정은 교탁 방향과 무관',
+        !grab('seatCells').includes('flip') && !grab('seatCells').includes('rowOrder'));
+  // 제약·임무는 모드를 바꾼 뒤 자리를 누르는 게 아니라 오른쪽 입력 칸에서 넣는다.
+  // '어디서 넣는지'가 안 보이는 게 가장 불편한 점이었다.
+  check('고정석·앞자리·임무 모드는 없앴다',
+        !/id="mFix"/.test(html) && !/id="mFront"/.test(html) && !/id="mDuty"/.test(html));
+  check('남은 모드는 자리판을 눌러야 하는 것뿐',
+        /const modes = \{ mMove:'move', mApart:'apart', mOff:'off' \};/.test(html));
+  check('입력 칸이 있다', /id="cWho"/.test(html) && /id="cKind"/.test(html)
+        && /id="cDuty"/.test(html) && /id="cAdd"/.test(html));
+  check('세 가지를 고를 수 있다',
+        /value="fix">고정석/.test(html) && /value="front">앞자리/.test(html) && /value="duty">임무/.test(html));
+  check('학생 목록이 명렬에서 채워진다', /who\.innerHTML = ROSTER\.map/.test(html));
+  check('고른 학생을 기억한다(연속 입력)', /if \(keep && ROSTER\.some\(s => s\.key === keep\)\) who\.value = keep;/.test(html));
+  check('임무일 때만 입력칸이 보인다', /\$\('cDuty'\)\.style\.display\s+= kind === 'duty'\s+\? '' : 'none';/.test(html));
+  check('앞자리 줄 수도 이 칸으로 옮겼다',
+        /id="cFrontWrap"[\s\S]{0,120}id="nFront"/.test(html)
+        && /\$\('cFrontWrap'\)\.style\.display = kind === 'front'/.test(html));
+  // 고정석은 '어느 칸에' 가 필요하다. 안 앉은 학생에게 걸면 조용히 무시되면 안 된다.
+  check('안 앉은 학생은 고정석을 못 건다',
+        /const cell = seatOf\(k\);[\s\S]{0,160}안 앉았습니다[\s\S]{0,40}return;/.test(html));
+  check('임무를 안 적으면 안 넣는다', /if \(!v\) \{ say\('warn', '임무를 적어 주세요\.'\)/.test(html));
+  check('임무도 제약 목록에 뜨고 지울 수 있다',
+        /for \(const k in ST\.duty\)/.test(html) && /kind === 'duty'\) delete ST\.duty\[val\]/.test(html));
+  check('분리는 여전히 여럿 고르기로 간다',
+        /cApartStart'\)\.addEventListener\('click', \(\) => setMode\(MODE === 'apart' \? 'move' : 'apart'\)\)/.test(html));
+  check('브라우저 prompt 는 안 쓴다', !/\bprompt\(/.test(html));
   check('인쇄에서 화면 UI 를 뺀다', /@media print[\s\S]*\.noprint\{display:none !important;\}/.test(html));
   check('인쇄는 A4 가로', /@page\{ size:A4 landscape;/.test(html));
   check('저장은 seating 문서에만', (html.match(/setDoc\(doc\(db, '([a-zA-Z]+)'/g) || [])
