@@ -57,7 +57,9 @@ say('자리보다 학생이 많으면 이유를 말한다', /자리가 20개인�
 await pg.fill('#nRows', '8'); await pg.dispatchEvent('#nRows', 'change');
 await pg.click('#bOrder');
 say('줄을 늘리면 번호순이 된다', await pg.$$eval('.seat .s-name', e => e.length) === 30);
-say('1번이 맨 앞 왼쪽', (await pg.$eval('.seat .s-name', e => e.textContent)) === '학생1');
+// 그리는 순서는 보는 방향(교사/학생 입장)에 따라 뒤집힌다. 자리 자체로 확인한다.
+say('1번이 맨 앞 왼쪽(0,0)',
+    (await pg.$eval('.seat[data-cell="0,0"] .s-name', e => e.textContent)) === '학생1');
 say('전원 착석', (await pg.$eval('#unseatedCnt', e => e.textContent)) === '없음');
 
 await pg.click('#bRandom');
@@ -148,40 +150,42 @@ await pg.fill('#nGroup', '1'); await pg.dispatchEvent('#nGroup', 'change');
 say('1로 두면 안 묶는다', await pg.$$eval('.aisle', e => e.length) === 6);
 await pg.fill('#nGroup', '2'); await pg.dispatchEvent('#nGroup', 'change');
 
-// 교탁 위/아래 — 그리는 방향만 바뀌고 자리 데이터는 그대로여야 한다
+// 교탁 위/아래 — 그리는 방향만 바뀌고 자리 데이터는 그대로여야 한다.
+// 기본은 교사 입장(교탁 아래)이다. 자리표를 만드는 사람이 교탁에 서서 보는 방향.
 await pg.click('#bOrder');
-const topFirst = await pg.$eval('.grid .seat .s-name', e => e.textContent);
+say('기본이 교사 입장이다', await pg.$eval('.board', e => e.classList.contains('flip')));
+say('버튼도 교사 입장으로 뜬다', (await pg.$eval('#bFlip', e => e.textContent)).includes('교사 입장'));
+
+const order = () => pg.$$eval('.grid .seat', e => e.map(s => s.dataset.cell));
+const dims = await pg.evaluate(() => ({
+  rows: +document.getElementById('nRows').value, cols: +document.getElementById('nCols').value }));
+const lastCell = `${dims.rows - 1},${dims.cols - 1}`;
 const seatsBefore = await pg.evaluate(() => JSON.stringify(
   [...document.querySelectorAll('.grid .seat')].map(s => s.dataset.cell + ':' + (s.querySelector('.s-name')?.textContent || ''))
     .sort()));
+const flipped = await order();
+const teacherFirst = await pg.$eval('.grid .seat .s-name', e => e.textContent);
+say('맨 나중에 그려지는 칸이 앞줄 맨 왼쪽(0,0)', flipped.at(-1) === '0,0', flipped.slice(-3));
+say('맨 처음 그려지는 칸이 뒷줄 맨 오른쪽', flipped[0] === lastCell, { 처음: flipped[0], 기대: lastCell });
+
 await pg.click('#bFlip');
-say('교탁이 아래로 간다', await pg.$eval('.board', e => e.classList.contains('flip')));
-say('버튼 글자가 바뀐다', (await pg.$eval('#bFlip', e => e.textContent)).includes('교사 입장'));
-const bottomFirst = await pg.$eval('.grid .seat .s-name', e => e.textContent);
-say('처음 그려지는 학생이 달라진다(뒷줄부터)', topFirst !== bottomFirst, { topFirst, bottomFirst });
+say('누르면 학생 입장(교탁 위)으로', !(await pg.$eval('.board', e => e.classList.contains('flip'))));
+say('버튼 글자가 바뀐다', (await pg.$eval('#bFlip', e => e.textContent)).includes('학생 입장'));
+const studentFirst = await pg.$eval('.grid .seat .s-name', e => e.textContent);
+say('처음 그려지는 학생이 달라진다', teacherFirst !== studentFirst, { teacherFirst, studentFirst });
 const seatsAfter = await pg.evaluate(() => JSON.stringify(
   [...document.querySelectorAll('.grid .seat')].map(s => s.dataset.cell + ':' + (s.querySelector('.s-name')?.textContent || ''))
     .sort()));
 say('자리 데이터는 그대로다', seatsBefore === seatsAfter);
+
 // 보는 사람이 바뀌면 180도 회전이어야 한다 — 거울이 아니라.
 // 상하만 뒤집으면 왼쪽·오른쪽이 반대가 되어 한쪽 화면이 거짓말을 한다.
-const order = () => pg.$$eval('.grid .seat', e => e.map(s => s.dataset.cell));
-const flipped = await order();
-const dims = await pg.evaluate(() => ({
-  rows: +document.getElementById('nRows').value, cols: +document.getElementById('nCols').value }));
-const lastCell = `${dims.rows - 1},${dims.cols - 1}`;
-say('맨 나중에 그려지는 칸이 앞줄 맨 왼쪽(0,0)', flipped.at(-1) === '0,0', flipped.slice(-3));
-say('맨 처음 그려지는 칸이 뒷줄 맨 오른쪽', flipped[0] === lastCell, { 처음: flipped[0], 기대: lastCell });
-await pg.click('#bFlip');
 const normal = await order();
-say('되돌리면 원래 순서', normal[0] === '0,0' && normal.at(-1) === lastCell, [normal[0], normal.at(-1)]);
+say('학생 입장은 앞줄 왼쪽부터', normal[0] === '0,0' && normal.at(-1) === lastCell, [normal[0], normal.at(-1)]);
 say('두 순서는 정확히 뒤집힌 관계 (회전이지 거울이 아니다)',
     JSON.stringify(normal.slice().reverse()) === JSON.stringify(flipped));
 await pg.click('#bFlip');   // 다시 교사 입장으로 (아래 검사가 이어짐)
-say('버튼 이름이 보는 사람으로 표시된다',
-    (await pg.$eval('#bFlip', e => e.textContent)).includes('교사 입장'));
-await pg.click('#bFlip');
-say('다시 누르면 학생 입장으로', !(await pg.$eval('.board', e => e.classList.contains('flip'))));
+say('다시 누르면 교사 입장으로', await pg.$eval('.board', e => e.classList.contains('flip')));
 
 // 학생 추가
 await pg.fill('#addNum', '31'); await pg.fill('#addName', '전입생');
@@ -212,22 +216,33 @@ say('전입생이 명렬에 들어간다',
   await pg.click('#bApartMake');
   say('앉기 전에 묶은 것도 제약에 들어간다', /분리\s*3명/.test(await pg.$eval('#consList', e => e.textContent)));
 
-  // 앞자리·임무도 목록에서
-  await pg.click('#mFront');
-  await pg.click('#unseated .stu:nth-child(5)');
-  say('앞자리도 목록에서 걸린다', /앞\s*2줄/.test(await pg.$eval('#consList', e => e.textContent)),
-      await pg.$eval('#consList', e => e.textContent).then(t => t.slice(0,120)));
-  await pg.click('#mDuty');
-  pg.once('dialog', d => d.accept('반장'));
-  await pg.click('#unseated .stu:nth-child(6)');
-  say('임무도 목록에서 적힌다', /반장/.test(await pg.$eval('#unseated', e => e.textContent)));
+  // 앞자리·임무는 모드가 아니라 「제약·임무」 입력 칸에서 넣는다
+  const pickWho = async n => pg.selectOption('#cWho', { index: n });
+  await pg.selectOption('#cKind', 'front');
+  await pickWho(4);
+  await pg.click('#cAdd');
+  say('앞자리를 입력 칸에서 건다', /앞\s*2줄/.test(await pg.$eval('#consList', e => e.textContent)),
+      await pg.$eval('#consList', e => e.textContent).then(t => t.slice(0,160)));
+
+  await pg.selectOption('#cKind', 'duty');
+  say('임무를 고르면 입력칸이 나타난다', await pg.isVisible('#cDuty'));
+  await pickWho(5);
+  await pg.fill('#cDuty', '반장');
+  await pg.click('#cAdd');
+  say('임무가 제약 목록에 들어간다', /임무[\s\S]{0,40}반장/.test(await pg.$eval('#consList', e => e.textContent)),
+      await pg.$eval('#consList', e => e.textContent).then(t => t.slice(0,200)));
+  say('임무는 목록의 학생에게도 붙는다', /반장/.test(await pg.$eval('#unseated', e => e.textContent)));
+  say('적고 나면 입력칸이 비워진다', (await pg.inputValue('#cDuty')) === '');
 
   // 고정석은 자리가 필요하다 — 그걸 알려줘야 한다
-  await pg.click('#mFix');
-  await pg.click('#unseated .stu:nth-child(1)');
-  say('고정석은 자리가 필요하다고 알려준다',
-      /자리를 눌러 지정/.test(await pg.$eval('#warn', e => e.textContent)),
+  await pg.selectOption('#cKind', 'fix');
+  await pickWho(0);
+  await pg.click('#cAdd');
+  say('고정석은 앉아야 된다고 알려준다',
+      /안 앉았습니다/.test(await pg.$eval('#warn', e => e.textContent)),
       await pg.$eval('#warn', e => e.textContent));
+  say('안 앉은 학생을 고정으로 넣지 않는다',
+      !/고정/.test(await pg.$eval('#consList', e => e.textContent)));
 
   // 이 제약들을 안고 배정이 되는지
   await pg.click('#mMove');
