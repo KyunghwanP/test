@@ -5353,6 +5353,16 @@
         <iframe id="gradesFrame" data-src="career.html" title="진로진학 상담" style="flex:1;width:100%;border:0;background:#f1f5f9;"></iframe>
       </div>
 
+      <!-- 교실 자리 배치 — 모달에서 「페이지로」 를 누르면 여기로 온다.
+           새 브라우저 탭이 아니라 이 앱 화면 안에서 크게 본다. -->
+      <div class="page-view" id="seatPage">
+        <div id="seatPageHead" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;">
+          <button class="sg-back-btn" id="seatBackBtn">← 돌아가기</button>
+          <span id="seatPageTitle" style="font-size:13px;font-weight:800;color:var(--ink-soft);"></span>
+        </div>
+        <iframe id="seatPageFrame" title="교실 자리 배치" style="flex:1;width:100%;border:0;background:#eef1f5;"></iframe>
+      </div>
+
       <!-- 학생 종합검색 페이지 (테스터 전용) -->
       <div class="page-view" id="searchPage">
         <div class="s360-top">
@@ -5735,7 +5745,7 @@
 <div class="jd-overlay" id="seatModal">
   <div class="jd-box">
     <button class="jd-close" id="seatModalClose" title="닫기">✕</button>
-    <button class="jd-open" id="seatOpenBtn" title="새 페이지로 크게 보기">⛶ 페이지로</button>
+    <button class="jd-open" id="seatOpenBtn" title="이 화면 안에서 크게 봅니다. 「돌아가기」로 되돌아옵니다.">⛶ 크게 보기</button>
     <iframe id="seatFrame" title="교실 자리 배치"></iframe>
   </div>
 </div>
@@ -7756,14 +7766,38 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeJindanModal(
 // 자리 배치 모달 — 진단 모달과 같은 배선
 let _seatQuery = '';
 document.getElementById('seatModalClose').addEventListener('click', closeSeatModal);
-document.getElementById('seatOpenBtn').addEventListener('click', () => {
+// 「페이지로」 — 새 브라우저 탭이 아니라 이 앱 화면 안에서 크게 본다.
+// 새 탭으로 띄우면 로그인 상태만 같을 뿐 앱을 벗어나서, 돌아올 길이 브라우저
+// 뒤로가기밖에 없었다. 여기서는 「돌아가기」로 보던 탭으로 되돌아온다.
+let _seatBackTo = 'search';
+function openSeatPage(){
   const src = document.getElementById('seatFrame').src;
   if (!src || src === 'about:blank') return;
+  _seatBackTo = document.querySelector('.page-view.active')?.id?.replace('Page','') || 'search';
+  // new URL() 은 주소 모양이 조금만 달라도 던진다 — 클릭 핸들러 안에서 던지면
+  // 아무 일도 안 일어난 것처럼 보인다. 반 이름만 뽑는 데 그럴 이유가 없다.
+  const cls = decodeURIComponent((/[?&]class=([^&]*)/.exec(src) || [])[1] || '');
+  document.getElementById('seatPageTitle').textContent = cls ? `${cls} 자리 배치` : '자리 배치';
   closeSeatModal();
-  window.open(src.replace('&embed=1', ''), '_blank');
-});
+  document.getElementById('seatPageFrame').src = src;
+  navigateTo('seat');
+}
+function closeSeatPage(){
+  // 프레임을 비워야 다음에 다른 반을 열 때 이전 반이 잠깐 스쳐 보이지 않는다
+  document.getElementById('seatPageFrame').src = 'about:blank';
+  navigateTo(_seatBackTo === 'seat' ? 'search' : _seatBackTo);
+}
+window.openSeatPage = openSeatPage;
+window.closeSeatPage = closeSeatPage;
+
+document.getElementById('seatOpenBtn').addEventListener('click', openSeatPage);
+document.getElementById('seatBackBtn').addEventListener('click', closeSeatPage);
 document.getElementById('seatModal').addEventListener('click', e=>{ if(e.target.id==='seatModal') closeSeatModal(); });
-document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeSeatModal(); });
+document.addEventListener('keydown', e=>{
+  if (e.key !== 'Escape') return;
+  if (document.getElementById('seatPage')?.classList.contains('active')) { closeSeatPage(); return; }
+  closeSeatModal();
+});
 
 card.addEventListener('click', e=>{
   const cell = e.target.closest('.gt-cell.swappable');
@@ -14017,10 +14051,17 @@ function navigateTo(page) {
   // 탭 전환
   document.querySelectorAll('.main-nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
   document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(t => t.classList.toggle('active', t.dataset.page === page));
-  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult','docs','grades','search','room','pass'].forEach(p => {
+  // 'seat' 은 탭 버튼이 없는 화면이다 — 자리 배치 모달의 「페이지로」로만 들어온다.
+  // 여기 목록에 없으면 다른 탭으로 옮겨도 안 닫힌다.
+  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult','docs','grades','search','room','pass','seat'].forEach(p => {
     const el = document.getElementById(p + 'Page');
     if(el) el.classList.toggle('active', p === page);
   });
+  // 다른 탭으로 나가면 자리 배치 프레임을 비운다(뒤에서 계속 돌 이유가 없다)
+  if (page !== 'seat') {
+    const sf = document.getElementById('seatPageFrame');
+    if (sf && sf.src && sf.src !== 'about:blank') sf.src = 'about:blank';
+  }
   if(page !== 'consult') stopConsultWatch();
   if(page !== 'room') stopRoomWatch();
   if(page === 'room') initRoomPage();
