@@ -116,6 +116,18 @@
     font-family:'IBM Plex Mono';font-size:11.5px;font-weight:700;letter-spacing:.04em;
     padding:2px 11px 3px;border-radius:7px;box-shadow:var(--shadow-1);white-space:nowrap;
   }
+  /* 고정 자물쇠 — 번호 배지 바로 옆. 자리에서 바로 켜고 끈다. */
+  .s-pin{
+    position:absolute;top:-11px;left:50%;margin-left:26px;
+    width:22px;height:21px;padding:0;line-height:1;
+    border:1px solid var(--rule);border-radius:7px;background:var(--paper);
+    font-size:11px;cursor:pointer;box-shadow:var(--shadow-1);
+    opacity:.35;transition:opacity .12s;
+  }
+  .seat:hover .s-pin{opacity:1;}
+  .s-pin:hover{border-color:var(--stop);}
+  .s-pin.on{opacity:1;background:var(--stop-soft);border-color:var(--stop);}
+  .s-pin:disabled{display:none;}
   .s-name{font-size:18px;font-weight:700;line-height:1.2;text-align:center;
     word-break:keep-all;letter-spacing:-.02em;color:var(--ink);}
   .s-duty{font-size:11px;font-weight:700;color:var(--mon);background:var(--mon-soft);
@@ -155,7 +167,14 @@
     padding:13px;border-radius:8px;box-shadow:var(--shadow-1);}
 
   /* ── 옆 패널: 테두리 대신 여백으로 나눈다 ── */
-  .cols{display:grid;grid-template-columns:minmax(0,1fr) 316px;gap:22px;align-items:start;}
+  /* [학생별 설정 | 자리판 | 옆 패널] — 자리판을 보면서 왼쪽 줄을 바로 건드린다 */
+  .cols{display:grid;grid-template-columns:344px minmax(0,1fr) 316px;gap:22px;align-items:start;}
+  /* 좁아지면 학생별 설정을 자리판 아래 전체 폭으로 내리고 여러 단으로 편다 */
+  @media (max-width:1360px){
+    .cols{grid-template-columns:minmax(0,1fr) 316px;}
+    .stucol{grid-column:1 / -1;grid-row:2;}
+    .stucol .stu-grid{grid-template-columns:repeat(auto-fill,minmax(310px,1fr));}
+  }
   @media (max-width:960px){ .cols{grid-template-columns:minmax(0,1fr);} }
   .card{background:var(--paper);border-radius:16px;padding:18px 20px;margin-bottom:14px;
     box-shadow:var(--shadow-1);}
@@ -182,26 +201,31 @@
   textarea.txt{min-height:92px;resize:vertical;line-height:1.7;}
 
   /* 학생별 설정 표 — 한 줄에 한 학생. 반 전체가 한 화면에 들어와야 한다. */
+  #stuCard h2{flex-wrap:wrap;row-gap:6px;}
   .stu-front{margin-left:auto;font-size:12px;letter-spacing:0;text-transform:none;}
   .stu-front .num{width:52px;}
   .stu-apart{display:inline-flex;gap:6px;align-items:center;letter-spacing:0;text-transform:none;}
   .stu-apart .sel{padding:5px 7px;font-size:12px;}
   .stu-apart .btn{padding:5px 12px;font-size:12px;}
-  .stu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));
-    gap:4px 14px;margin-bottom:6px;}
-  .stu-row{display:flex;align-items:center;gap:6px;padding:5px 7px;border-radius:9px;}
+  /* 왼쪽 열에서는 한 단으로 쭉 세운다 */
+  /* min-width:0 이 없으면 격자 칸이 내용만큼 벌어져 임무 칸이 카드 밖으로 나간다 */
+  .stu-grid{display:grid;grid-template-columns:1fr;gap:2px;margin-bottom:6px;min-width:0;}
+  .stu-row{display:flex;align-items:center;gap:5px;padding:5px 6px;border-radius:9px;min-width:0;}
   .stu-row:hover{background:var(--paper-soft);}
-  .stu-row .mono{flex:0 0 22px;font-family:'IBM Plex Mono';font-size:11.5px;color:var(--ink-soft);}
-  .stu-row .nm{flex:0 0 62px;font-size:13px;font-weight:700;
+  .stu-row .mono{flex:0 0 20px;font-family:'IBM Plex Mono';font-size:11.5px;color:var(--ink-soft);}
+  .stu-row .nm{flex:0 0 54px;font-size:13px;font-weight:700;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .stu-row .tog{padding:3px 8px;font-size:11.5px;font-weight:800;border-radius:7px;
+  .stu-row .tog{padding:3px 7px;font-size:11.5px;font-weight:800;border-radius:7px;
     border:1px solid var(--rule);background:var(--paper);color:var(--ink-soft);
-    font-family:inherit;cursor:pointer;flex:0 0 auto;}
+    font-family:inherit;cursor:pointer;flex:0 0 auto;white-space:nowrap;}
   .stu-row .tog:hover{border-color:var(--mon);color:var(--mon);}
   .stu-row .tog.on{background:var(--mon);border-color:var(--mon);color:#fff;}
   .stu-row .tog:disabled{opacity:.4;cursor:not-allowed;}
   .stu-row .tog.on.sel-apart{background:var(--gold);border-color:var(--gold);}
-  .stu-row .duty{flex:1 1 60px;min-width:0;padding:4px 8px;font-size:12px;
+  /* 이미 묶여 있는 학생 — '고르는 중'(금색)과 구분해서 조용한 초록으로 둔다 */
+  .stu-row .tog.tied{background:var(--ok-soft);border-color:var(--ok);color:var(--ok);}
+  .stu-row .tog.tied.on{background:var(--gold);border-color:var(--gold);color:#fff;}
+  .stu-row .duty{flex:1 1 40px;min-width:0;width:0;padding:4px 7px;font-size:12px;
     border:1px solid var(--rule);border-radius:7px;background:var(--paper);
     color:var(--ink);font-family:inherit;outline:none;}
   .stu-row .duty:focus{border-color:var(--mon);}
@@ -233,8 +257,9 @@
     /* 화면용 .cols 는 align-items:start 다. flex 를 세로로 돌리면 그게 가로 정렬이
        되어 자리판이 종이의 1/3 로 쪼그라든다 — stretch 로 되돌린다. */
     .cols{display:flex;flex-direction:column;align-items:stretch;flex:1;min-height:0;}
-    /* 종이는 [명렬표 | 자리판] 두 칸. 이름을 번호로 찾는 일이 잦다. */
-    .cols > div:first-child{
+    /* 종이는 [명렬표 | 자리판] 두 칸. 이름을 번호로 찾는 일이 잦다.
+       화면에서 자리판이 몇 번째 칸이든 상관없게 클래스로 잡는다. */
+    .boardcol{
       flex:1;min-height:0;display:grid;
       grid-template-columns:auto 1fr;   /* 명렬 단 수에 따라 좌측 폭이 늘어난다 */
       grid-template-rows:auto 1fr auto;
@@ -377,22 +402,9 @@
   </div>
 
   <div class="cols">
-    <div>
-      <!-- 인쇄물에만 나오는 제목과 명렬표. 화면에는 이미 머리글과 옆 패널이 있다. -->
-      <div class="print-only" id="printHead">
-        <div class="brand">
-          <img src="icon-180.png" alt="">
-          <span>영남고등학교</span>
-        </div>
-        <div id="printTitle"></div>
-        <div></div>
-      </div>
-      <div class="print-only" id="printRoster"></div>
-
-      <div class="board">
-        <div class="front"><div class="desk">교 탁</div><div class="chalk">칠 판</div></div>
-        <div class="grid" id="grid"></div>
-      </div>
+    <!-- 학생별 설정은 자리판 왼쪽에 세로로 세운다. 자리판을 보면서 그 줄을
+         바로 켜고 끄는 게 아래로 내려가 찾는 것보다 짧다. -->
+    <div class="stucol noprint">
       <!-- 학생별 설정 — 반 전체가 한 화면에 뜨고 그 줄에서 바로 켜고 끈다.
            모드를 바꾼 뒤 자리를 누르거나 드롭다운에서 학생을 찾는 것보다,
            '누구에게 무엇이 걸려 있는지'가 한눈에 보이는 편이 낫다. -->
@@ -415,6 +427,24 @@
         </p>
         <div class="stu-grid" id="stuGrid"></div>
         <div class="list" id="consList"></div>
+      </div>
+    </div>
+
+    <div class="boardcol">
+      <!-- 인쇄물에만 나오는 제목과 명렬표. 화면에는 이미 머리글과 옆 패널이 있다. -->
+      <div class="print-only" id="printHead">
+        <div class="brand">
+          <img src="icon-180.png" alt="">
+          <span>영남고등학교</span>
+        </div>
+        <div id="printTitle"></div>
+        <div></div>
+      </div>
+      <div class="print-only" id="printRoster"></div>
+
+      <div class="board">
+        <div class="front"><div class="desk">교 탁</div><div class="chalk">칠 판</div></div>
+        <div class="grid" id="grid"></div>
       </div>
 
       <div class="card" id="memoCard">
@@ -515,6 +545,15 @@ function seatShuffle(arr, rand){
 // 5명을 떼어놓으려고 짝 10개를 만들게 하면 목록도 지저분하고 지우기도 번거롭다.
 // 예전 짝 형태({a,b})도 그대로 읽는다.
 function apartMembers(p){ return p.ks || [p.a, p.b].filter(Boolean); }
+// 묶음이 여럿이면 '분리' 표시만으로는 누가 누구와 묶였는지 알 수 없다.
+// 순서대로 A·B·C… 이름표를 붙여 목록·자리·표에서 같은 글자로 부른다.
+const apartTag = i => i < 26 ? String.fromCharCode(65 + i) : String(i + 1);
+// 이 학생이 속한 묶음들의 이름표. 보통 하나지만 여러 묶음에 낄 수 있다.
+function apartTagsOf(list, k){
+  const out = [];
+  (list || []).forEach((p, i) => { if (apartMembers(p).includes(k)) out.push(apartTag(i)); });
+  return out;
+}
 
 function seatFits(seats, cell, k, apart){
   for (const p of apart) {
@@ -712,7 +751,7 @@ function renderGrid(){
   const el  = $('grid');
   document.querySelector('.board').classList.toggle('flip', !!ST.flip);
   // 인쇄 격자용 — 교탁 방향과 명렬 맞춤은 인쇄 레이아웃이 알아야 한다
-  const pcol = document.querySelector('.cols > div');
+  const pcol = document.querySelector('.boardcol');
   if (pcol) {
     pcol.classList.add('pcol');
     pcol.classList.toggle('pflip', !!ST.flip);
@@ -724,17 +763,21 @@ function renderGrid(){
     if (off.has(cell)) return `<div class="seat off" data-cell="${cell}"></div>`;
     const k = ST.seats[cell];
     if (!k) return `<div class="seat empty" data-cell="${cell}"></div>`;   // 빈 자리도 받는다
+    const ap = apartTagsOf(ST.apart, k);
     const tags =
-      (ST.fixed[k] ? '<span class="s-tag fix">고정</span>' : '') +
       (ST.front[k] ? '<span class="s-tag fr">앞</span>' : '') +
-      (ST.apart.some(p => apartMembers(p).includes(k)) ? '<span class="s-tag ap">분리</span>' : '');
+      (ap.length ? `<span class="s-tag ap">분리 ${ap.join('·')}</span>` : '');
     const cls = [ 'seat',
       PICK === cell ? 'sel' : '',
       PARTIAL.has(k) ? 'pick' : '',
       APART_SEL.has(k) ? 'pick' : '' ].filter(Boolean).join(' ');
+    // 고정은 번호 옆 자물쇠로 — 자리에서 바로 켜고 끄는 게 가장 짧은 길이다.
     return `<div class="${cls}" data-cell="${cell}" draggable="${CANEDIT}">
       ${tags ? `<span class="s-tags">${tags}</span>` : ''}
       <span class="s-num">${String(numOf(k)).padStart(2,'0')}</span>
+      <button class="s-pin${ST.fixed[k] ? ' on' : ''} noprint" data-pin="${esc(k)}"
+        title="${ST.fixed[k] ? '고정을 풉니다' : '이 자리에 고정합니다 — 랜덤을 돌려도 안 움직입니다'}"
+        ${CANEDIT ? '' : 'disabled'}>${ST.fixed[k] ? '🔒' : '🔓'}</button>
       <span class="s-name">${esc(nameOf(k))}</span>
       ${ST.duty[k] ? `<span class="s-duty">${esc(ST.duty[k])}</span>` : ''}
     </div>`;
@@ -756,6 +799,16 @@ function renderGrid(){
     s.addEventListener('click', () => onSeat(s.dataset.cell));
     bindDrag(s);
   });
+  // 자물쇠는 자리 클릭(고르기·교환)과 겹치면 안 된다
+  el.querySelectorAll('[data-pin]').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    if (!CANEDIT) return;
+    const k = b.dataset.pin;
+    clearSay();
+    if (ST.fixed[k]) delete ST.fixed[k];
+    else ST.fixed[k] = Object.keys(ST.seats).find(c => ST.seats[c] === k);
+    touch();
+  }));
 }
 
 /* ── 자리 클릭: 모드마다 하는 일이 다르다 ── */
@@ -802,7 +855,8 @@ function renderSide(){
     ? un.map(s => {
         const tag = (ST.fixed[s.key] ? '<span class="s-tag fix">고정</span>' : '')
                   + (ST.front[s.key] ? '<span class="s-tag fr">앞</span>' : '')
-                  + (ST.apart.some(p => apartMembers(p).includes(s.key)) ? '<span class="s-tag ap">분리</span>' : '')
+                  + (apartTagsOf(ST.apart, s.key).length
+                      ? `<span class="s-tag ap">분리 ${apartTagsOf(ST.apart, s.key).join('·')}</span>` : '')
                   + (ST.duty[s.key] ? `<span class="s-tag dt">${esc(ST.duty[s.key])}</span>` : '');
         return `<div class="row stu${APART_SEL.has(s.key) ? ' on' : ''}" data-stu="${esc(s.key)}" draggable="${CANEDIT}">
         <span class="mono">${String(s.num).padStart(2,'0')}</span>
@@ -844,7 +898,8 @@ const seatOf = k => Object.keys(ST.seats).find(c => ST.seats[c] === k) || null;
 function renderCons(){
   $('consList').innerHTML = ST.apart.map((p, i) => {
     const ks = apartMembers(p);
-    return `<div class="row"><span class="mono">분리${(p.d||2) >= 3 ? '·멀리' : ''}</span>
+    return `<div class="row"><span class="s-tag ap">분리 ${apartTag(i)}</span>
+      <span class="mono">${(p.d||2) >= 3 ? '멀리' : '이웃 금지'}</span>
       <span class="nm">${ks.map(k => esc(nameOf(k))).join(' · ')}</span>
       <button class="x" data-drop="${i}" title="이 묶음을 지웁니다">×</button></div>`;
   }).join('');
@@ -861,6 +916,9 @@ function renderStuGrid(){
   const on = (c, yes) => yes ? c + ' on' : c;
   g.innerHTML = ROSTER.map(s => {
     const k = s.key, seated = !!seatOf(k);
+    // 이미 묶여 있으면 어느 묶음인지(A·B…)를 버튼에 그대로 보여 준다
+    const tags = apartTagsOf(ST.apart, k);
+    const apLabel = tags.length ? `분리 ${tags.join('·')}` : '분리';
     return `<div class="stu-row" data-row="${esc(k)}">
       <span class="mono">${String(s.num).padStart(2,'0')}</span>
       <span class="nm" title="${esc(s.name)}">${esc(s.name)}</span>
@@ -868,8 +926,10 @@ function renderStuGrid(){
         ${seated ? '' : 'disabled'} title="${seated ? '랜덤을 돌려도 이 자리 그대로' : '먼저 자리에 앉혀야 고정할 수 있습니다'}">고정</button>
       <button class="${on('tog', !!ST.front[k])}" data-tog="front" data-k="${esc(k)}"
         title="앞 ${ST.frontRows}줄 안에 앉힙니다">앞</button>
-      <button class="${on('tog sel-apart', APART_SEL.has(k))}" data-tog="apart" data-k="${esc(k)}"
-        title="떼어놓을 학생으로 고릅니다. 둘 이상 고른 뒤 위 「묶기」">분리</button>
+      <button class="${on('tog sel-apart', APART_SEL.has(k))}${tags.length ? ' tied' : ''}"
+        data-tog="apart" data-k="${esc(k)}"
+        title="${tags.length ? `묶음 ${tags.join('·')} 에 들어 있습니다. 새로 묶으려면 눌러 고르세요.`
+                             : '떼어놓을 학생으로 고릅니다. 둘 이상 고른 뒤 위 「묶기」'}">${apLabel}</button>
       <input class="duty" data-duty="${esc(k)}" value="${esc(ST.duty[k] || '')}"
         placeholder="임무" maxlength="20" spellcheck="false" ${CANEDIT ? '' : 'disabled'}>
     </div>`;
@@ -1078,8 +1138,10 @@ async function load(){
       frontRows: d.frontRows || 2,
       duty: d.duty || {}, memo: d.memo || '',
       extra: d.extra || [], removed: d.removed || [], history: d.history || [],
-      // 저장해 둔 값이 있으면 그대로 따른다. 값이 아예 없는 옛 문서만 새 기본값(교사 입장).
-      flip: d.flip === undefined ? true : !!d.flip,
+      // 열 때는 늘 교사 입장(교탁 아래)으로 시작한다. 자리표를 만드는 사람이
+      // 교탁에 서서 보는 방향이라, 저장돼 있던 방향을 따르면 매번 한 번씩 뒤집게 된다.
+      // 보는 방향은 자리 데이터가 아니라 화면 설정이라 저장값을 무시해도 잃는 게 없다.
+      flip: true,
       group: d.group || 1,
       ordStart: d.ordStart || 'FL', ordDir: d.ordDir || 'row',
       rosterAlign: d.rosterAlign || 'first'
