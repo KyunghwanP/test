@@ -382,31 +382,45 @@ console.log('\n■ 화면 배선 — JS 가 부르는 id 가 실제로 있나');
   // 그리기만 바꾸는 값이다 — 번호순 배정(seatCells)이 이걸 보면 물리적 배치가 달라진다
   check('번호순 배정은 교탁 방향과 무관',
         !grab('seatCells').includes('flip') && !grab('seatCells').includes('rowOrder'));
-  // 제약·임무는 모드를 바꾼 뒤 자리를 누르는 게 아니라 오른쪽 입력 칸에서 넣는다.
-  // '어디서 넣는지'가 안 보이는 게 가장 불편한 점이었다.
-  check('고정석·앞자리·임무 모드는 없앴다',
-        !/id="mFix"/.test(html) && !/id="mFront"/.test(html) && !/id="mDuty"/.test(html));
+  // 제약·임무는 모드를 바꾼 뒤 자리를 누르는 것도, 드롭다운에서 학생을 찾는 것도 아니다.
+  // 반 전체가 한 줄씩 뜨는 「학생별 설정」 표에서 그 자리에서 켠다.
+  check('고정석·앞자리·분리·임무 모드는 없앴다',
+        !/id="mFix"/.test(html) && !/id="mFront"/.test(html)
+        && !/id="mDuty"/.test(html) && !/id="mApart"/.test(html));
   check('남은 모드는 자리판을 눌러야 하는 것뿐',
-        /const modes = \{ mMove:'move', mApart:'apart', mOff:'off' \};/.test(html));
-  check('입력 칸이 있다', /id="cWho"/.test(html) && /id="cKind"/.test(html)
-        && /id="cDuty"/.test(html) && /id="cAdd"/.test(html));
-  check('세 가지를 고를 수 있다',
-        /value="fix">고정석/.test(html) && /value="front">앞자리/.test(html) && /value="duty">임무/.test(html));
-  check('학생 목록이 명렬에서 채워진다', /who\.innerHTML = ROSTER\.map/.test(html));
-  check('고른 학생을 기억한다(연속 입력)', /if \(keep && ROSTER\.some\(s => s\.key === keep\)\) who\.value = keep;/.test(html));
-  check('임무일 때만 입력칸이 보인다', /\$\('cDuty'\)\.style\.display\s+= kind === 'duty'\s+\? '' : 'none';/.test(html));
-  check('앞자리 줄 수도 이 칸으로 옮겼다',
-        /id="cFrontWrap"[\s\S]{0,120}id="nFront"/.test(html)
-        && /\$\('cFrontWrap'\)\.style\.display = kind === 'front'/.test(html));
+        /const modes = \{ mMove:'move', mOff:'off' \};/.test(html));
+  check('학생을 찾는 드롭다운은 없앴다', !/id="cWho"/.test(html) && !/id="cKind"/.test(html));
+  check('표가 있다', /id="stuGrid"/.test(html) && /function renderStuGrid\(\)/.test(html));
+  check('한 줄이 명렬 한 명', /g\.innerHTML = ROSTER\.map\(s => \{/.test(html));
+  check('줄마다 고정·앞·분리·임무가 다 있다',
+        /data-tog="fix"/.test(html) && /data-tog="front"/.test(html)
+        && /data-tog="apart"/.test(html) && /data-duty=/.test(html));
+  check('임무는 이름 옆 칸에 바로 적는다',
+        /<input class="duty" data-duty="\$\{esc\(k\)\}" value="\$\{esc\(ST\.duty\[k\] \|\| ''\)\}"/.test(html));
+  // 다시 그릴 때마다 반영하면 한 글자 칠 때마다 표가 새로 그려져 커서가 튄다
+  check('임무는 다 치고 나갈 때 반영한다',
+        /\[data-duty\]'\)\.forEach\(inp => inp\.addEventListener\('change'/.test(html));
+  check('임무를 지우면 필드째 뺀다', /if \(v\) ST\.duty\[k\] = v; else delete ST\.duty\[k\];/.test(html));
+  check('앞자리 줄 수는 표 머리에 있다', /id="stuCard"[\s\S]{0,700}id="nFront"/.test(html));
   // 고정석은 '어느 칸에' 가 필요하다. 안 앉은 학생에게 걸면 조용히 무시되면 안 된다.
-  check('안 앉은 학생은 고정석을 못 건다',
-        /const cell = seatOf\(k\);[\s\S]{0,160}안 앉았습니다[\s\S]{0,40}return;/.test(html));
-  check('임무를 안 적으면 안 넣는다', /if \(!v\) \{ say\('warn', '임무를 적어 주세요\.'\)/.test(html));
-  check('임무도 제약 목록에 뜨고 지울 수 있다',
-        /for \(const k in ST\.duty\)/.test(html) && /kind === 'duty'\) delete ST\.duty\[val\]/.test(html));
-  check('분리는 여전히 여럿 고르기로 간다',
-        /cApartStart'\)\.addEventListener\('click', \(\) => setMode\(MODE === 'apart' \? 'move' : 'apart'\)\)/.test(html));
+  check('안 앉은 학생은 고정 버튼이 잠긴다', /\$\{seated \? '' : 'disabled'\}/.test(html));
+  check('눌러도 이유를 알려준다',
+        /const cell = seatOf\(k\);[\s\S]{0,120}안 앉았습니다[\s\S]{0,40}return;/.test(html));
+  check('분리는 표에서 고르고 「묶기」로 확정',
+        /data-tog="apart"/.test(html)
+        && /if \(APART_SEL\.has\(k\)\) APART_SEL\.delete\(k\); else APART_SEL\.add\(k\);/.test(html)
+        && /ST\.apart\.push\(\{ ks: \[\.\.\.APART_SEL\], d: APART_D \}\)/.test(html));
+  check('묶기는 둘 이상이라야 열린다', /btn\.disabled = !CANEDIT \|\| n < 2;/.test(html));
+  check('묶은 것은 목록에 남고 지울 수 있다',
+        /ST\.apart\.map\(\(p, i\) =>/.test(html) && /ST\.apart\.splice\(Number\(b\.dataset\.drop\), 1\)/.test(html));
   check('브라우저 prompt 는 안 쓴다', !/\bprompt\(/.test(html));
+
+  // 「앞 왼쪽부터」는 화면에 보이는 대로여야 한다. 교사 입장은 좌우가 뒤집혀 보인다.
+  check('번호순 시작점을 보는 방향으로 옮긴다', /function ordForView\(\)/.test(html)
+        && /return s\[0\] \+ \(s\[1\] === 'L' \? 'R' : 'L'\);/.test(html));
+  check('배정에 그 값을 넘긴다', /ord: \{ start: ordForView\(\), dir: ST\.ordDir \}/.test(html));
+  check('앞뒤는 두 화면에서 같다 — 좌우만 바꾼다',
+        /if \(!ST\.flip\) return s;/.test(html) && !/s\[0\] === 'F'/.test(grab('ordForView')));
   check('인쇄에서 화면 UI 를 뺀다', /@media print[\s\S]*\.noprint\{display:none !important;\}/.test(html));
   check('인쇄는 A4 가로', /@page\{ size:A4 landscape;/.test(html));
   check('저장은 seating 문서에만', (html.match(/setDoc\(doc\(db, '([a-zA-Z]+)'/g) || [])

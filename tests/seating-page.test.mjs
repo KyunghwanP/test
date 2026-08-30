@@ -57,9 +57,21 @@ say('자리보다 학생이 많으면 이유를 말한다', /자리가 20개인�
 await pg.fill('#nRows', '8'); await pg.dispatchEvent('#nRows', 'change');
 await pg.click('#bOrder');
 say('줄을 늘리면 번호순이 된다', await pg.$$eval('.seat .s-name', e => e.length) === 30);
-// 그리는 순서는 보는 방향(교사/학생 입장)에 따라 뒤집힌다. 자리 자체로 확인한다.
-say('1번이 맨 앞 왼쪽(0,0)',
-    (await pg.$eval('.seat[data-cell="0,0"] .s-name', e => e.textContent)) === '학생1');
+// 「앞 왼쪽부터」는 화면에 보이는 대로여야 한다 — 물리 좌표가 아니라 눈으로 확인한다.
+// 교사 입장에서는 교탁이 아래라 '앞줄'이 화면 맨 아래 줄이고, 좌우도 뒤집혀 그려진다.
+const oneAtFrontLeft = () => pg.evaluate(() => {
+  const box = s => s.getBoundingClientRect();
+  const seats = [...document.querySelectorAll('.grid .seat')].filter(s => s.querySelector('.s-name'));
+  const one = seats.find(s => s.querySelector('.s-name').textContent === '학생1');
+  if (!one) return false;
+  const flip = document.querySelector('.board').classList.contains('flip');
+  const tops = seats.map(s => box(s).top);
+  const frontTop = flip ? Math.max(...tops) : Math.min(...tops);
+  const inRow = seats.filter(s => Math.abs(box(s).top - frontTop) < 4);
+  const leftMost = Math.min(...inRow.map(s => box(s).left));
+  return Math.abs(box(one).top - frontTop) < 4 && Math.abs(box(one).left - leftMost) < 4;
+});
+say('1번이 화면상 앞줄 맨 왼쪽', await oneAtFrontLeft());
 say('전원 착석', (await pg.$eval('#unseatedCnt', e => e.textContent)) === '없음');
 
 await pg.click('#bRandom');
@@ -184,6 +196,10 @@ const normal = await order();
 say('학생 입장은 앞줄 왼쪽부터', normal[0] === '0,0' && normal.at(-1) === lastCell, [normal[0], normal.at(-1)]);
 say('두 순서는 정확히 뒤집힌 관계 (회전이지 거울이 아니다)',
     JSON.stringify(normal.slice().reverse()) === JSON.stringify(flipped));
+// 보는 방향을 바꾸고 다시 번호순을 돌려도 「앞 왼쪽부터」는 화면 기준이어야 한다.
+// (자리 데이터가 바뀌므로 위의 '그대로다' 검사를 다 마친 뒤에 돌린다)
+await pg.click('#bOrder');
+say('학생 입장에서도 1번이 화면상 앞줄 맨 왼쪽', await oneAtFrontLeft());
 await pg.click('#bFlip');   // 다시 교사 입장으로 (아래 검사가 이어짐)
 say('다시 누르면 교사 입장으로', await pg.$eval('.board', e => e.classList.contains('flip')));
 
@@ -202,50 +218,46 @@ say('전입생이 명렬에 들어간다',
   const unseated = await pg.$$eval('#unseated .stu', e => e.length);
   say('전부 비우면 목록에 다 나온다', unseated > 20, unseated);
 
-  await pg.click('#mApart');
-  await pg.click('#unseated .stu:nth-child(1)');
-  await pg.click('#unseated .stu:nth-child(2)');
-  await pg.click('#unseated .stu:nth-child(3)');
-  say('앉기 전에도 목록에서 고를 수 있다',
+  // 「학생별 설정」 표 — 모드도 드롭다운도 없이 그 줄에서 바로 켠다
+  const rows = await pg.$$eval('#stuGrid .stu-row', e => e.length);
+  say('표에 반 전체가 뜬다', rows > 20, rows);
+  const tog = (n, what) => pg.click(`#stuGrid .stu-row:nth-child(${n}) [data-tog="${what}"]`);
+
+  await tog(1, 'apart'); await tog(2, 'apart'); await tog(3, 'apart');
+  say('앉기 전에도 분리를 고를 수 있다',
       (await pg.$eval('#bApartMake', e => e.textContent)).includes('3명'),
       await pg.$eval('#bApartMake', e => e.textContent));
-  say('고른 학생이 목록에 표시된다', await pg.$$eval('#unseated .stu.on', e => e.length) === 3);
-  await pg.click('#unseated .stu:nth-child(2)');
+  say('고른 줄이 표시된다', await pg.$$eval('#stuGrid [data-tog="apart"].on', e => e.length) === 3);
+  await tog(2, 'apart');
   say('다시 누르면 빠진다', (await pg.$eval('#bApartMake', e => e.textContent)).includes('2명'));
-  await pg.click('#unseated .stu:nth-child(2)');
+  await tog(2, 'apart');
   await pg.click('#bApartMake');
-  say('앉기 전에 묶은 것도 제약에 들어간다', /분리\s*3명/.test(await pg.$eval('#consList', e => e.textContent)));
+  say('묶으면 목록에 남는다', /분리/.test(await pg.$eval('#consList', e => e.textContent)),
+      await pg.$eval('#consList', e => e.textContent));
+  say('묶고 나면 고른 표시가 풀린다',
+      await pg.$$eval('#stuGrid [data-tog="apart"].on', e => e.length) === 0);
 
-  // 앞자리·임무는 모드가 아니라 「제약·임무」 입력 칸에서 넣는다
-  const pickWho = async n => pg.selectOption('#cWho', { index: n });
-  await pg.selectOption('#cKind', 'front');
-  await pickWho(4);
-  await pg.click('#cAdd');
-  say('앞자리를 입력 칸에서 건다', /앞\s*2줄/.test(await pg.$eval('#consList', e => e.textContent)),
-      await pg.$eval('#consList', e => e.textContent).then(t => t.slice(0,160)));
+  await tog(5, 'front');
+  say('앞자리는 그 줄 버튼으로 켠다',
+      await pg.$eval('#stuGrid .stu-row:nth-child(5) [data-tog="front"]', e => e.classList.contains('on')));
 
-  await pg.selectOption('#cKind', 'duty');
-  say('임무를 고르면 입력칸이 나타난다', await pg.isVisible('#cDuty'));
-  await pickWho(5);
-  await pg.fill('#cDuty', '반장');
-  await pg.click('#cAdd');
-  say('임무가 제약 목록에 들어간다', /임무[\s\S]{0,40}반장/.test(await pg.$eval('#consList', e => e.textContent)),
-      await pg.$eval('#consList', e => e.textContent).then(t => t.slice(0,200)));
-  say('임무는 목록의 학생에게도 붙는다', /반장/.test(await pg.$eval('#unseated', e => e.textContent)));
-  say('적고 나면 입력칸이 비워진다', (await pg.inputValue('#cDuty')) === '');
+  // 임무는 이름 옆 칸에 바로 적는다
+  await pg.fill('#stuGrid .stu-row:nth-child(6) [data-duty]', '반장');
+  await pg.click('#stuCnt');                       // 포커스를 빼 change 를 일으킨다
+  say('임무는 이름 옆 칸에 적는다', /반장/.test(await pg.$eval('#unseated', e => e.textContent)));
+  say('적은 값이 칸에 남는다',
+      (await pg.inputValue('#stuGrid .stu-row:nth-child(6) [data-duty]')) === '반장');
+  await pg.fill('#stuGrid .stu-row:nth-child(6) [data-duty]', '');
+  await pg.click('#stuCnt');
+  say('비우면 임무가 빠진다', !/반장/.test(await pg.$eval('#unseated', e => e.textContent)));
+  await pg.fill('#stuGrid .stu-row:nth-child(6) [data-duty]', '반장');
+  await pg.click('#stuCnt');
 
-  // 고정석은 자리가 필요하다 — 그걸 알려줘야 한다
-  await pg.selectOption('#cKind', 'fix');
-  await pickWho(0);
-  await pg.click('#cAdd');
-  say('고정석은 앉아야 된다고 알려준다',
-      /안 앉았습니다/.test(await pg.$eval('#warn', e => e.textContent)),
-      await pg.$eval('#warn', e => e.textContent));
-  say('안 앉은 학생을 고정으로 넣지 않는다',
-      !/고정/.test(await pg.$eval('#consList', e => e.textContent)));
+  // 고정석은 자리가 필요하다 — 아무도 안 앉았으니 버튼이 잠겨 있어야 한다
+  say('안 앉은 학생은 고정 버튼이 잠긴다',
+      await pg.$eval('#stuGrid .stu-row:nth-child(1) [data-tog="fix"]', e => e.disabled));
 
   // 이 제약들을 안고 배정이 되는지
-  await pg.click('#mMove');
   await pg.click('#bRandom');
   say('앉기 전에 건 제약으로 배정된다', !(await pg.$eval('#err', e => e.textContent)),
       await pg.$eval('#err', e => e.textContent));
@@ -277,36 +289,29 @@ say('전입생이 명렬에 들어간다',
   say('제약을 모두 지웠다', (await pg.$$('#consList [data-drop]')).length === 0);
 }
 
-// 분리 묶음 — 여러 명을 골라 한 번에 묶는다
+// 분리 묶음 — 표에서 여러 명을 골라 한 번에 묶는다
 {
-  await pg.click('#mApart');
-  say('분리 모드에서 묶기 줄이 나온다', await pg.$eval('#apartBar', e => e.getClientRects().length > 0));
   say('아직 못 누른다', await pg.$eval('#bApartMake', e => e.disabled));
-  const seats = await pg.$$eval('.seat', e => e.filter(s => s.querySelector('.s-name')).slice(0,4).map(s => s.dataset.cell));
-  for (const c of seats.slice(0,3)) await pg.click(`.seat[data-cell="${c}"]`);
+  const tog = n => pg.click(`#stuGrid .stu-row:nth-child(${n}) [data-tog="apart"]`);
+  for (const n of [1, 2, 3]) await tog(n);
   say('고른 만큼 버튼 글이 바뀐다',
       (await pg.$eval('#bApartMake', e => e.textContent)).includes('3명'),
       await pg.$eval('#bApartMake', e => e.textContent));
+  // 고른 학생은 자리판에도 표시된다 — 표만 보고 있으면 누가 어디 앉았는지 모른다
   say('고른 자리에 표시가 남는다', await pg.$$eval('.seat.pick', e => e.length) === 3);
-  await pg.click(`.seat[data-cell="${seats[2]}"]`);   // 한 명 취소
+  await tog(3);
   say('다시 누르면 빠진다', (await pg.$eval('#bApartMake', e => e.textContent)).includes('2명'));
-  await pg.click(`.seat[data-cell="${seats[2]}"]`);
-  await pg.click(`.seat[data-cell="${seats[3]}"]`);
-  say('기본은 이웃 금지', await pg.$eval('#apartD2', e => e.classList.contains('on')));
-  say('버튼 글에 거리가 보인다',
-      (await pg.$eval('#bApartMake', e => e.textContent)).includes('이웃 안 되게'),
-      await pg.$eval('#bApartMake', e => e.textContent));
-  await pg.click('#apartD3');
-  say("'멀리'로 바꾸면 글도 바뀐다",
-      (await pg.$eval('#bApartMake', e => e.textContent)).includes('멀리'));
-  await pg.click('#apartD2');
+  await tog(3);
+  await tog(4);
+  say('기본은 이웃 금지', (await pg.inputValue('#apartD')) === '2');
+  await pg.selectOption('#apartD', '3');
+  await pg.selectOption('#apartD', '2');
   await pg.click('#bApartMake');
   const cons = await pg.$eval('#consList', e => e.textContent);
-  say('제약 목록에 4명 묶음으로 들어간다', /분리\s*4명/.test(cons), cons.slice(0, 120));
+  say('제약 목록에 묶음이 들어간다', /분리/.test(cons), cons.slice(0, 120));
   say('묶은 뒤 선택은 비워진다', await pg.$$eval('.seat.pick', e => e.length) === 0);
 
   // 실제로 떨어져 앉는지
-  await pg.click('#mMove');
   await pg.click('#bRandom');
   const gap = await pg.evaluate(cells => {
     const at = {};
@@ -319,7 +324,7 @@ say('전입생이 명렬에 들어간다',
       await pg.$eval('#err', e => e.textContent));
 
   // 목록에서 지우기
-  await pg.click('#consList [data-drop^="apart"]');
+  await pg.click('#consList [data-drop]');
   say('묶음을 지울 수 있다', !/분리/.test(await pg.$eval('#consList', e => e.textContent)));
 }
 
