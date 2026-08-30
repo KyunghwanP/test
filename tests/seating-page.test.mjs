@@ -515,16 +515,22 @@ console.log('\n■ 넓은 화면에서 자리판이 폭을 가져가는가');
                scrollX: document.documentElement.scrollWidth > window.innerWidth };
     });
   };
+  // 끝까지 채우지는 않는다 — 여백이 조금 남는 편이 읽기 편하다.
+  // 대신 자리판이 화면의 절반 가까이는 나와야 한다.
   const fhd = await measure(1920);
-  say('FHD 에서 화면을 꽉 쓴다', fhd.wrap >= 1900, fhd);
-  say('자리판이 화면의 절반을 넘는다', fhd.board > 960, fhd);
+  say('FHD 에서 넉넉히 쓴다 (1600~1800)', fhd.wrap >= 1600 && fhd.wrap <= 1800, fhd);
+  say('자리판이 900px 을 넘는다', fhd.board > 900, fhd);
   // 폭만 늘고 높이가 그대로면 납작한 막대가 된다
   say('자리 비율이 책상 같다 (1.2~2.2:1)', fhd.ratio > 1.2 && fhd.ratio < 2.2, fhd.ratio.toFixed(2));
   say('가로 스크롤이 안 생긴다', !fhd.scrollX);
 
-  const lap = await measure(1366);
-  say('노트북에서도 가로 스크롤 없음', !lap.scrollX, lap);
-  say('좁아져도 자리가 안 찌그러진다', lap.seatW >= 70, lap);
+  // 1366 노트북이 3단에 걸리면 자리판이 610px 로 쪼그라들었다 —
+  // 2단으로 내려가 오히려 넓어지는 지점이라, 그 구간을 없앴다.
+  for (const W of [1512, 1440, 1366, 1280]) {
+    const m = await measure(W);
+    say(W + 'px 에서 가로 스크롤 없음', !m.scrollX, m);
+    say(W + 'px 에서 자리가 안 찌그러진다', m.seatW >= 100, m);
+  }
   await pg.setViewportSize({ width: 1280, height: 1500 });
 }
 

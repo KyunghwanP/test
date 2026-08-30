@@ -43,9 +43,10 @@
     font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     font-size:14px; line-height:1.55; -webkit-font-smoothing:antialiased;
   }
-  /* 자리판이 주인공이라 화면을 최대한 쓴다. 1240px 로 묶여 있을 때
-     FHD 에서 자리판이 484px(화면의 25%)밖에 안 됐다. */
-  .wrap{max-width:1920px;margin:0 auto;padding:30px 26px 80px;}
+  /* 자리판이 주인공이라 넓게 쓴다. 1240px 로 묶여 있을 때 FHD 에서
+     자리판이 484px(화면의 25%)밖에 안 됐다. 끝까지 채우지는 않는다 —
+     보통 쓰는 FHD 에서 양옆에 여백이 조금 남는 편이 읽기 편하다. */
+  .wrap{max-width:1680px;margin:0 auto;padding:30px 26px 80px;}
 
   /* ── 머리 ── */
   .head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:22px;}
@@ -105,7 +106,7 @@
   .seat{
     /* 화면이 넓어지면 칸도 같이 커진다. 높이를 82px 로 두면 폭만 늘어나
        납작한 막대가 된다 — 책상은 가로가 조금 긴 정도다. */
-    position:relative;min-height:clamp(82px, 5.6vw, 118px);border-radius:14px;
+    position:relative;min-height:clamp(82px, 5.3vw, 104px);border-radius:14px;
     background:var(--paper);border:1px solid var(--rule-soft);
     padding:14px 8px 12px;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
@@ -174,8 +175,10 @@
   /* [학생별 설정 | 자리판 | 옆 패널] — 자리판을 보면서 왼쪽 줄을 바로 건드린다.
      양옆은 고정 폭이라, 화면이 넓어지면 늘어난 만큼 전부 자리판이 가져간다. */
   .cols{display:grid;grid-template-columns:344px minmax(0,1fr) 316px;gap:22px;align-items:start;}
-  /* 좁아지면 학생별 설정을 자리판 아래 전체 폭으로 내리고 여러 단으로 편다 */
-  @media (max-width:1360px){
+  /* 좁아지면 학생별 설정을 자리판 아래 전체 폭으로 내리고 여러 단으로 편다.
+     1560px 아래에서 3단을 유지하면 자리판이 600~750px 로 쪼그라들어,
+     오히려 2단일 때보다 좁아진다(1366 노트북이 여기 걸렸다). */
+  @media (max-width:1560px){
     .cols{grid-template-columns:minmax(0,1fr) 316px;}
     .stucol{grid-column:1 / -1;grid-row:2;}
     .stucol .stu-grid{grid-template-columns:repeat(auto-fill,minmax(310px,1fr));}
