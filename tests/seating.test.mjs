@@ -347,10 +347,18 @@ console.log('\n■ 화면 배선 — JS 가 부르는 id 가 실제로 있나');
         /id="nCols"[^>]*value="5"/.test(html) && /id="nRows"[^>]*value="6"/.test(html) &&
         /cols:5, rows:6/.test(html) && /cols: d\.cols \|\| 5, rows: d\.rows \|\| 6/.test(html));
   // 짝 → 묶음으로 바꿀 때 자리판의 배지 검사를 빠뜨려, 분리를 걸어도 자리에 표시가 안 났다
-  check('자리판 분리 배지가 묶음을 본다',
-        /ST\.apart\.some\(p => apartMembers\(p\)\.includes\(k\)\)/.test(html));
-  check('목록 분리 배지도 묶음을 본다',
-        /ST\.apart\.some\(p => apartMembers\(p\)\.includes\(s\.key\)\)/.test(html));
+  // 묶음이 여럿이면 '분리'만으로는 누가 누구와 묶였는지 모른다. A·B… 이름표를 붙인다.
+  check('묶음에 이름표를 붙인다', /const apartTag = i =>/.test(html)
+        && /function apartTagsOf\(list, k\)/.test(html));
+  check('자리판 배지에 묶음 이름표가 뜬다',
+        /const ap = apartTagsOf\(ST\.apart, k\);/.test(html)
+        && /분리 \$\{ap\.join\('·'\)\}/.test(html));
+  check('목록 배지에도 이름표가 뜬다', /apartTagsOf\(ST\.apart, s\.key\)/.test(html));
+  check('묶음 목록이 이름표와 거리를 같이 보여준다',
+        /분리 \$\{apartTag\(i\)\}/.test(html)
+        && /\(p\.d\|\|2\) >= 3 \? '멀리' : '이웃 금지'/.test(html));
+  check('표의 분리 버튼도 어느 묶음인지 보여준다',
+        /const apLabel = tags\.length \? `분리 \$\{tags\.join\('·'\)\}` : '분리';/.test(html));
   check('옛 짝 형태를 보는 곳이 남아 있지 않다',
         !/apart\.some\(p => p\.a ===/.test(html) && !/apart\.filter\(p => p\.a !==/.test(html));
   check('학생을 빼면 묶음에서도 빠진다', /apartMembers\(p\)\.filter\(k => k !== key\)/.test(html));
@@ -375,10 +383,10 @@ console.log('\n■ 화면 배선 — JS 가 부르는 id 가 실제로 있나');
   check('클릭으로 바꾸는 길도 남겨 뒀다', /s\.addEventListener\('click', \(\) => onSeat/.test(html));
   check('교탁 아래 버전이 있다', /\.board\.flip\{flex-direction:column-reverse;\}/.test(html) && /function rowOrder\(\)/.test(html));
   check('표 복사도 교탁 방향을 따른다', /if \(!ST\.flip\) t \+= desk;/.test(html) && /if \(ST\.flip\) t \+= desk;/.test(html));
-  check('교탁 방향은 문서에 저장된다', /flip: !!ST\.flip/.test(html)
-        && /flip: d\.flip === undefined \? true : !!d\.flip/.test(html));
-  // 자리표를 만드는 사람은 교탁에 서서 본다. 기본이 학생 입장이면 늘 한 번 뒤집어야 했다.
+  check('교탁 방향은 문서에 저장된다', /flip: !!ST\.flip/.test(html));
+  // 자리표를 만드는 사람은 교탁에 서서 본다. 저장된 방향을 따르면 매번 한 번씩 뒤집게 된다.
   check('기본이 교사 입장(교탁 아래)', /^\s*flip:true,\s*$/m.test(html));
+  check('열 때는 저장값과 무관하게 교사 입장', /flip: true,\s*\n\s*group: d\.group \|\| 1,/.test(html));
   // 그리기만 바꾸는 값이다 — 번호순 배정(seatCells)이 이걸 보면 물리적 배치가 달라진다
   check('번호순 배정은 교탁 방향과 무관',
         !grab('seatCells').includes('flip') && !grab('seatCells').includes('rowOrder'));

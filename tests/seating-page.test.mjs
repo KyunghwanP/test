@@ -256,12 +256,32 @@ say('전입생이 명렬에 들어간다',
   // 고정석은 자리가 필요하다 — 아무도 안 앉았으니 버튼이 잠겨 있어야 한다
   say('안 앉은 학생은 고정 버튼이 잠긴다',
       await pg.$eval('#stuGrid .stu-row:nth-child(1) [data-tog="fix"]', e => e.disabled));
+  say('안 앉았으면 자리판 자물쇠도 없다', await pg.$$eval('#grid [data-pin]', e => e.length) === 0);
 
   // 이 제약들을 안고 배정이 되는지
   await pg.click('#bRandom');
   say('앉기 전에 건 제약으로 배정된다', !(await pg.$eval('#err', e => e.textContent)),
       await pg.$eval('#err', e => e.textContent));
   say('전원 착석', (await pg.$eval('#unseatedCnt', e => e.textContent)) === '없음');
+
+  // 자리판의 자물쇠 — 번호 옆에서 바로 고정을 켜고 끈다
+  {
+    const pins   = await pg.$$eval('#grid [data-pin]', e => e.length);
+    const seated = await pg.$$eval('#grid .seat .s-name', e => e.length);
+    say('앉은 자리마다 자물쇠가 하나씩', pins === seated && pins > 0, { pins, seated });
+    const who = await pg.$eval('#grid [data-pin]', e => e.dataset.pin);
+    await pg.click('#grid [data-pin]');
+    say('자물쇠를 누르면 고정된다',
+        await pg.$eval('#grid [data-pin]', e => e.classList.contains('on')));
+    say('표의 고정 버튼도 같이 켜진다',
+        await pg.$eval(`#stuGrid [data-tog="fix"][data-k="${who}"]`, e => e.classList.contains('on')));
+    // 자물쇠 클릭이 자리 클릭(고르기·교환)까지 일으키면 엉뚱한 자리가 선택된다
+    say('자리가 선택 상태로 바뀌지 않는다', await pg.$$eval('#grid .seat.sel', e => e.length) === 0);
+    await pg.click('#grid [data-pin]');
+    say('다시 누르면 풀린다',
+        !(await pg.$eval('#grid [data-pin]', e => e.classList.contains('on')))
+        && !(await pg.$eval(`#stuGrid [data-tog="fix"][data-k="${who}"]`, e => e.classList.contains('on'))));
+  }
   // 신고된 흐름 그대로: 분리를 먼저 걸고 → 랜덤을 돌린 뒤 → 자리에 '분리' 표시가 나야 한다.
   // 짝 → 묶음으로 바꾸면서 자리판의 배지 검사만 옛 형태로 남아, 표시가 안 났다.
   {
@@ -310,6 +330,29 @@ say('전입생이 명렬에 들어간다',
   const cons = await pg.$eval('#consList', e => e.textContent);
   say('제약 목록에 묶음이 들어간다', /분리/.test(cons), cons.slice(0, 120));
   say('묶은 뒤 선택은 비워진다', await pg.$$eval('.seat.pick', e => e.length) === 0);
+
+  // 묶음이 둘 이상이면 '분리' 표시만으로는 누가 누구와 묶였는지 알 수 없다
+  await pg.selectOption('#apartD', '3');
+  for (const n of [6, 7]) await tog(n);
+  await pg.click('#bApartMake');
+  const cons2 = await pg.$eval('#consList', e => e.textContent);
+  say('두 묶음이 A·B 로 갈린다', /분리 A/.test(cons2) && /분리 B/.test(cons2), cons2.slice(0, 200));
+  say('묶음마다 거리도 같이 보인다', /이웃 금지/.test(cons2) && /멀리/.test(cons2), cons2.slice(0, 200));
+  say('자리 배지에도 A·B 가 붙는다',
+      /분리 A/.test(await pg.$eval('#grid', e => e.textContent))
+      && /분리 B/.test(await pg.$eval('#grid', e => e.textContent)));
+  {
+    // A 4명 + B 2명 = 6명에게 이름표가 붙어야 한다
+    const labels = (await pg.$$eval('#stuGrid [data-tog="apart"]', e => e.map(b => b.textContent)))
+      .filter(t => t !== '분리');
+    say('표의 분리 버튼에도 어느 묶음인지 뜬다',
+        labels.filter(t => t === '분리 A').length === 4
+        && labels.filter(t => t === '분리 B').length === 2, labels);
+  }
+  // 나중에 만든 B 묶음만 지우면 A 는 그대로 A 여야 한다
+  await pg.click('#consList .row:last-child [data-drop]');
+  say('B 를 지워도 A 는 그대로', /분리 A/.test(await pg.$eval('#consList', e => e.textContent))
+      && !/분리 B/.test(await pg.$eval('#consList', e => e.textContent)));
 
   // 실제로 떨어져 앉는지
   await pg.click('#bRandom');
