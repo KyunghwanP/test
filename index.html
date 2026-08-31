@@ -8599,6 +8599,28 @@ const weeklyOpenLink     = document.getElementById('weeklyOpenLink');
 let weeklyCurrentUrl = SITES_BASE;
 let weeklyInitialized = false;
 
+// ── 주차 칩 자동 갱신 ──
+// 주간교육활동은 GitHub Action 이 긁어 weeklyData/index 에 넣는다. 한 번만 읽으면
+// 앱을 열어 둔 사이에 새 주차가 올라와도 새로고침해야 보였다. 스냅샷으로 받는다.
+let weeklyIndexUnsub = null;
+let weeklyWeeksSig   = '';        // 지금 그려 둔 주차 목록. 같으면 다시 안 그린다.
+function watchWeeklyIndex(){
+  if (weeklyIndexUnsub) return;
+  weeklyIndexUnsub = onSnapshot(doc(fbDb, 'weeklyData', 'index'), snap => {
+    const weeks = snap.exists() ? (snap.data().weeks || []) : [];
+    if (!weeks.length) return;
+    const sig = weeks.map(w => w.href).join('|');
+    if (sig === weeklyWeeksSig) return;   // 같은 목록에 다시 그리면 칩이 깜빡인다
+    weeklyWeeksSig = sig;
+    renderWeekChipsFromFirestore(weeks);
+    weeklyWeekBar.style.display = '';
+  }, () => {});                            // 읽기 실패는 조용히 — 칩만 안 늘어난다
+}
+function stopWeeklyWatch(){
+  if (weeklyIndexUnsub) { weeklyIndexUnsub(); weeklyIndexUnsub = null; }
+}
+
+
 async function fetchViaProxy(url) {
   const res = await fetch(APPS_SCRIPT_PROXY + '?url=' + encodeURIComponent(url),
     {signal: AbortSignal.timeout(15000)});
@@ -8615,15 +8637,9 @@ async function initWeeklyPage(){
   weeklyWeekBar.style.display = 'none';
   weeklyPageContent.innerHTML = '';
   try{
-    // Firestore에서 주차 목록만 읽어 칩 렌더링
-    const indexSnap = await getDoc(doc(fbDb, 'weeklyData', 'index'));
-    if(indexSnap.exists()){
-      const { weeks } = indexSnap.data();
-      if(weeks && weeks.length > 0){
-        renderWeekChipsFromFirestore(weeks);
-        weeklyWeekBar.style.display = '';
-      }
-    }
+    // 주차 칩은 스냅샷으로 본다 — 스크래핑(GitHub Action)이 새 주차를 올리면
+    // 새로고침 없이 칩이 늘어난다. 내용은 그대로 두고 칩만 갈아 끼운다.
+    watchWeeklyIndex();
     // 현재 주차: Firestore 캐시 확인
     const mainCacheSnap = await getDoc(doc(fbDb, 'weeklyData', 'cache-current'));
     const ONE_HOUR = 60 * 60 * 1000;
@@ -8681,9 +8697,13 @@ function formatWeekChipText(text) {
 
 function renderWeekChipsFromFirestore(weeks){
   weeklyWeekBar.innerHTML = '';
+  // 새 주차가 올라와 다시 그릴 때, 보고 있던 주차가 그대로 켜져 있어야 한다.
+  // 무조건 첫 칩을 켜면 읽던 주차가 눈앞에서 바뀐 것처럼 보인다.
+  const picked = weeks.slice(0,20).some(w => w.href === weeklyCurrentUrl);
   weeks.slice(0,20).forEach((week, i) => {
     const chip = document.createElement('button');
-    chip.className = 'weekly-week-chip' + (i === 0 ? ' active' : '');
+    chip.className = 'weekly-week-chip'
+      + ((picked ? week.href === weeklyCurrentUrl : i === 0) ? ' active' : '');
     chip.textContent = formatWeekChipText(week.text);
     chip.addEventListener('click', async () => {
       weeklyWeekBar.querySelectorAll('.weekly-week-chip').forEach(c=>c.classList.remove('active'));
@@ -14078,7 +14098,10 @@ function navigateTo(page) {
     const _teacher = effTeacher();
     if(_teacher) select(_teacher);
   }
-  if(page === 'weekly' && !weeklyInitialized) initWeeklyPage();
+  // 주차 칩 구독은 탭에 들어올 때 켜고 나갈 때 끈다(다른 탭에서 받을 이유가 없다).
+  // initWeeklyPage 는 한 번만 도니, 다시 들어왔을 때를 위해 여기서도 켠다.
+  if(page === 'weekly'){ if(!weeklyInitialized) initWeeklyPage(); else watchWeeklyIndex(); }
+  else stopWeeklyWatch();
   if(page === 'meal' && !mealInitialized) initMealPage();
   if(page === 'contacts' && !contactsInitialized) initContactsPage();
   if(page === 'students' && !studentsInitialized) initStudentsPage();
