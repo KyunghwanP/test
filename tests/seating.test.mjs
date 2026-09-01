@@ -429,7 +429,7 @@ console.log('\n■ 화면 배선 — JS 가 부르는 id 가 실제로 있나');
         && /\.stucol \.stu-row\{break-inside:avoid/.test(html));
   // 인쇄 명렬에 비고 칸 — 임무를 찍어 내보내되, 없어도 손으로 적을 칸은 남긴다
   check('인쇄 명렬에 비고 칸이 있다', /<th>번호<\/th><th>이름<\/th><th>비고<\/th>/.test(html));
-  check('비고에 임무가 들어간다', /class="note">\$\{esc\(ST\.duty\[s\.key\] \|\| .{2}\)\}/.test(html));
+  check('비고에 임무가 들어간다', /class="rmk">\$\{esc\(ST\.duty\[s\.key\] \|\| .{2}\)\}/.test(html));
 
   // 「앞 왼쪽부터」는 화면에 보이는 대로여야 한다. 교사 입장은 좌우가 뒤집혀 보인다.
   check('번호순 시작점을 보는 방향으로 옮긴다', /function ordForView\(\)/.test(html)

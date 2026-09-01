@@ -553,10 +553,10 @@ console.log('\n■ 인쇄 명렬 비고');
   await pg.evaluate(() => window.__buildPrintExtras());
   const head = await pg.$$eval('#printRoster .pr-tbl th', e => e.map(x => x.textContent));
   say('머리글이 번호·이름·비고', head.slice(0, 3).join(',') === '번호,이름,비고', head);
-  const notes = await pg.$$eval('#printRoster .pr-tbl td.note', e => e.length);
+  const notes = await pg.$$eval('#printRoster .pr-tbl td.rmk', e => e.length);
   const names = await pg.$$eval('#printRoster .pr-tbl td.nm', e => e.length);
   say('학생마다 비고 칸이 하나씩', notes === names && notes > 0, { notes, names });
-  const filled = await pg.$$eval('#printRoster .pr-tbl td.note',
+  const filled = await pg.$$eval('#printRoster .pr-tbl td.rmk',
     e => e.map(x => x.textContent).filter(Boolean));
   say('임무가 적힌 학생은 비고에 찍힌다', filled.includes('반장'), filled);
   say('임무가 없어도 칸은 남는다', notes - filled.length > 0, { notes, 채워진칸: filled.length });
