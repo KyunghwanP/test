@@ -317,8 +317,10 @@
     .pr-tbl td{border:1px solid #A8C0DF;padding:0.8px 4px;text-align:center;
       color:#141C26;line-height:1.2;}
     .pr-tbl td.nm{text-align:left;font-weight:600;}
-    /* 비고 — 임무가 있으면 찍히고, 없으면 손으로 적을 빈칸으로 남는다 */
-    .pr-tbl td.note{text-align:left;color:#16407A;font-weight:600;
+    /* 비고 — 임무가 있으면 찍히고, 없으면 손으로 적을 빈칸으로 남는다.
+       클래스를 note 로 두면 안 된다. 화면 쪽 .note:empty{display:none} 에 걸려
+       임무가 빈 칸은 통째로 사라지고, 그 줄만 선이 안 그려진다. */
+    .pr-tbl td.rmk{text-align:left;color:#16407A;font-weight:600;
       overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
 
     /* 자리판 */
@@ -1217,7 +1219,7 @@ function buildPrintExtras(){
       + `<colgroup><col class="c-num"><col class="c-nm"><col></colgroup>`
       + `<tr><th>번호</th><th>이름</th><th>비고</th></tr>` +
       part.map(s => `<tr><td>${s.num}</td><td class="nm">${esc(s.name)}</td>`
-                  + `<td class="note">${esc(ST.duty[s.key] || '')}</td></tr>`).join('') +
+                  + `<td class="rmk">${esc(ST.duty[s.key] || '')}</td></tr>`).join('') +
       `</table>`).join('') + `</div>`;
 }
 

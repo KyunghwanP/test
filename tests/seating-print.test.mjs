@@ -43,5 +43,38 @@ for (const [cols, rows, n] of [[6,6,32],[4,8,32],[4,10,32],[3,11,32],[6,7,40],[4
 let bad = 0;
 for (const r of RESULTS) if (r.pages !== 1) bad++;
 console.log(`\n${bad ? '❌' : '✅'} ${RESULTS.length}가지 조합 중 한 장이 아닌 것 ${bad}개`);
+
+// 비고 칸 — 임무가 없는 줄에도 선이 그어져 있어야 손으로 적는다.
+// 한 번 놓쳤다: 칸 이름을 note 로 두는 바람에 화면 쪽 .note:empty{display:none}
+// 에 걸려, 임무가 빈 줄은 칸이 통째로 사라지고 선도 같이 없어졌다.
+console.log('\n■ 비고 칸');
+await pg.goto(`file://${PAGE}?class=2-3&hr=2-3&n=8`, { waitUntil:'networkidle' });
+await pg.waitForFunction(() => document.querySelectorAll('.seat').length > 0);
+await pg.evaluate(() => {                       // 1번만 임무를 적는다 — 나머지는 빈칸
+  const i = document.querySelector('[data-duty]');
+  i.value = '칠판'; i.dispatchEvent(new Event('change', { bubbles:true }));
+});
+await pg.evaluate(() => window.__buildPrintExtras());
+await pg.emulateMedia({ media:'print' });
+const rmk = await pg.$$eval('.pr-tbl tr', trs => trs.slice(1).map(tr => {
+  const c = tr.children[2];
+  if (!c) return { missing:true };
+  const cs = getComputedStyle(c);
+  return { text:c.textContent, disp:cs.display, w:c.getBoundingClientRect().width,
+           bw:parseFloat(cs.borderBottomWidth), fs:cs.fontSize };
+}));
+const cells = await pg.$$eval('.pr-tbl tr td.rmk', e => e.length);
+const filled = rmk.filter(c => c.text === '칠판').length;
+const drawn  = rmk.filter(c => !c.missing && c.disp !== 'none' && c.w > 20 && c.bw > 0).length;
+const big    = rmk.filter(c => parseFloat(c.fs) > 13).length;
+const ck = (n, ok, x) => { if (!ok) bad++; console.log(`  ${ok?'✅':'❌'} ${n}`,
+  ok ? '' : '\n       → ' + JSON.stringify(x).slice(0,300)); };
+ck('학생 수만큼 비고 칸이 있다', cells === 8 && rmk.length === 8, { cells, rows: rmk.length });
+ck('임무를 적은 줄엔 임무가 찍힌다', filled === 1, rmk.map(c => c.text));
+ck('임무가 없어도 모든 줄에 선이 있다', drawn === 8, rmk);
+ck('명렬 글씨 크기를 벗어나지 않는다', big === 0, rmk.map(c => c.fs));
+await pg.emulateMedia({ media:'screen' });
+
+console.log(`\n${bad ? '❌' : '✅'} 실패 ${bad}개`);
 await b.close();
 process.exit(bad ? 1 : 0);
