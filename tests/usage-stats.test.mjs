@@ -48,10 +48,16 @@ const grabConst = (name, src = HTML) => {
 
 console.log('\n■ 배선 (정적)');
 check('화면은 별도 파일이다', /function renderUsage/.test(PAGE) && !/function renderUsage/.test(HTML));
-check('전 교사에게 내려가는 파일에는 화면이 없다',
-      !/id="usagePage"/.test(HTML) && !/function loadUsage/.test(HTML));
+check('전 교사에게 내려가는 파일에는 화면 코드가 없다',
+      !/function loadUsage/.test(HTML) && !/function renderUsage/.test(HTML)
+      && !/ug-chip\{/.test(HTML));
 check('탭 버튼도 없다', !/data-page="usage"/.test(HTML));
-check('5연타는 그 파일로 보낸다', /_ugClicks = 0; location\.href = 'usage\.html'/.test(HTML));
+check('5연타는 앱 안 화면을 연다', /_ugClicks = 0; openUsagePage\(\);/.test(HTML));
+check('앱을 벗어나지 않고 iframe 으로 띄운다',
+      /id="usagePageFrame"/.test(HTML) && /usagePageFrame'\)\.src = 'usage\.html\?in=1'/.test(HTML));
+check('돌아가기 버튼이 있다', /id="usageBackBtn"/.test(HTML) && /function closeUsagePage/.test(HTML));
+check('다른 탭으로 나가면 프레임을 비운다',
+      /page !== 'usage'\)\s*\{[\s\S]{0,180}usagePageFrame[\s\S]{0,120}about:blank/.test(HTML));
 check('관리자가 아니면 5연타가 아무 일도 안 한다', /if\(!usageIsAdmin\(\)\) return;/.test(HTML));
 check('세는 코드는 index 에 남아 있다',
       /function usageStart/.test(HTML) && /function usageFlush/.test(HTML));
@@ -78,7 +84,7 @@ console.log('\n■ 부르는 함수가 원본에 있는가');
     'Number','String','Object','Array','Math','Date','Promise','JSON','Set','Map','parseInt',
     'parseFloat','isNaN','setTimeout','clearTimeout','require','await','new','RegExp',
     'var', 'confirm', 'alert', 'getComputedStyle', 'setInterval', 'clearInterval',
-    'async', 'else', 'do']);
+    'async', 'else', 'do', 'URLSearchParams']);
   // firebase 에서 들여온 이름(getDoc·doc 등)도 '있는' 것이다
   const imported = new Set([...PAGE.matchAll(/^import \{([^}]+)\}\s*from/gm)]
     .flatMap(m => m[1].split(',').map(x => x.trim().split(/\s+as\s+/).pop())));
@@ -100,6 +106,9 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   <textarea id="someMemo"></textarea>
 </div>
 <div class="page-view" id="usagePage">
+  <iframe id="usagePageFrame"></iframe>
+</div>
+<div id="offscreen" style="display:none">
   <input type="month" id="usageMonth"><span id="usageNote"></span><div id="usageBody"></div>
 </div>
 <script>
@@ -159,13 +168,16 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   ${grab('watchReloadSignal')}
   let _ugClicks = 0, _ugTimer = null;
   ${grab('initUsageEasterEgg')}
+  let _usageBackTo = 'home';
+  ${grab('openUsagePage')}
+  ${grab('closeUsagePage')}
   ${grab('usagePeople', PAGE)}
   let _usageBusy = false;
   ${grab('loadUsage', PAGE)}
   ${grab('renderUsage', PAGE)}
 
   Object.assign(window, { usageStart, usageTab, usageFlush, usageDate, loadUsage,
-                          renderUsage, initUsageEasterEgg,
+                          renderUsage, initUsageEasterEgg, closeUsagePage,
                           watchReloadSignal, isBusyTyping, APP_VER,
                           saveResumePoint, applyResumePoint });
   window.__armed = () => { watchReloadSignal(); };
@@ -195,27 +207,29 @@ const active = () => pg.evaluate(() => document.querySelector('.page-view.active
 
 console.log('\n■ 관리자 말고는 못 들어간다');
 {
-  const at = () => pg.url().replace('https://ynhs.test/', '');
+  const src = () => pg.$eval('#usagePageFrame', e => e.getAttribute('src') || '');
   await pg.evaluate(() => window.__setWho('kim@yeungnam.hs.kr'));
   await tap(7);
-  await pg.waitForTimeout(200);
-  check('다른 교사가 눌러도 아무 일 없다', at() === 'h.html', at());
+  check('다른 교사가 눌러도 아무 일 없다', (await active()) === 'homePage', await active());
+  check('프레임도 안 채운다', !(await src()), await src());
 
   // 보기 모드(관리자가 남의 화면을 볼 때)도 막는다 — 남의 이름으로 남는다
   await pg.evaluate(() => window.__setWho('pkh910518@yeungnam.hs.kr', true));
   await tap(6);
-  await pg.waitForTimeout(200);
-  check('보기 모드에서도 안 열린다', at() === 'h.html', at());
+  check('보기 모드에서도 안 열린다', (await active()) === 'homePage', await active());
 
   await pg.evaluate(() => window.__setWho('pkh910518@yeungnam.hs.kr'));
   await tap(4);
-  await pg.waitForTimeout(200);
-  check('4번으로는 안 열린다', at() === 'h.html', at());
+  check('4번으로는 안 열린다', (await active()) === 'homePage');
   await tap(1);
-  await pg.waitForURL('**/usage.html', { timeout: 5000 }).catch(() => {});
-  check('5번째에 사용 현황 페이지로 간다', at() === 'usage.html', at());
+  check('5번째에 앱 안에서 열린다', (await active()) === 'usagePage', await active());
+  check('브라우저는 그대로 (앱을 안 벗어난다)',
+        pg.url().endsWith('/h.html'), pg.url());
+  check('프레임이 usage.html 을 가리킨다', (await src()) === 'usage.html?in=1', await src());
 
-  await pg.goto('https://ynhs.test/h.html');       // 나머지 검사를 위해 돌아온다
+  await pg.evaluate(() => window.closeUsagePage());
+  check('돌아가기로 원래 화면', (await active()) === 'homePage', await active());
+  check('나가면 프레임을 비운다', (await src()) === 'about:blank', await src());
 }
 
 console.log('\n■ 앱을 연 횟수·탭 이동을 센다');
@@ -497,11 +511,16 @@ console.log('\n■ usage.html 을 실제로 띄워 본다');
   check('모두 새로고침이 번호를 올린다',
         wrote.some(w => w[0] === 'appNotice/reload' && w[1].n === 42), wrote);
 
-  // 관리자가 아니면 게이트가 안 열린다
-  const up2 = await b.newPage();
-  await up2.route('https://fonts.googleapis.com/**', r => r.fulfill({ body: '' }));
-  await up2.route('https://www.gstatic.com/firebasejs/**', route => up.route === null ? null : route.fallback());
-  await up2.close();
+  // 앱 안(iframe)으로 열렸을 때 — '대시보드' 버튼이 살아 있으면 프레임 안이
+  // 앱으로 바뀌어 앱 속에 앱이 뜬다.
+  check('따로 열면 대시보드 버튼이 보인다', !(await up.$eval('#homeBtn', e => e.hidden)));
+  await up.goto('https://ynhs.test/usage.html?in=1');
+  await up.waitForTimeout(700);
+  check('앱 안에서는 대시보드 버튼을 숨긴다', await up.$eval('#homeBtn', e => e.hidden));
+  check('앱 안에서는 제목줄도 접는다',
+        (await up.$eval('body', e => e.className)).includes('in-app'));
+  check('앱 안에서도 내용은 그대로',
+        (await up.$eval('#usageBody', e => e.innerText)).length > 100);
   await up.close();
 }
 

@@ -5355,6 +5355,17 @@
 
       <!-- 교실 자리 배치 — 모달에서 「페이지로」 를 누르면 여기로 온다.
            새 브라우저 탭이 아니라 이 앱 화면 안에서 크게 본다. -->
+      <!-- 🥚 사용 현황 — 탭 버튼이 없다. 현황판의 '📝 빠른 메모' 제목 5연타로만 들어온다.
+           내용은 usage.html 이 갖는다. 여기 있는 것은 껍데기뿐이라, 관리자 혼자 보는
+           화면의 코드가 전 교사에게 내려가지 않는다. -->
+      <div class="page-view" id="usagePage">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;">
+          <button class="sg-back-btn" id="usageBackBtn">← 돌아가기</button>
+          <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">📊 사용 현황</span>
+        </div>
+        <iframe id="usagePageFrame" title="사용 현황" style="flex:1;width:100%;border:0;background:#F2ECDD;"></iframe>
+      </div>
+
       <div class="page-view" id="seatPage">
         <div id="seatPageHead" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;">
           <button class="sg-back-btn" id="seatBackBtn">← 돌아가기</button>
@@ -7854,7 +7865,7 @@ function initAppUI(){
   // 바탕화면 위젯 클릭 딥링크: 지정된 탭으로 이동 (마지막 화면 복원보다 우선)
   const _gotoTarget = launchGotoTarget();
   // 사용 현황은 이제 별도 페이지다. 좁은 화면에서 5연타할 자리가 없을 때 쓰는 통로.
-  if (_gotoTarget === 'usage') { if (usageIsAdmin()) location.href = 'usage.html'; }
+  if (_gotoTarget === 'usage') openUsagePage();
   else if (_gotoTarget) navigateTo(_gotoTarget);
   // 조용한 새로고침으로 다시 뜬 것이면 보던 탭·스크롤로 돌아간다(위젯 딥링크가 우선).
   else applyResumePoint();
@@ -8072,13 +8083,16 @@ function watchReloadSignal(){
 /* 🥚 사용 현황 — '📝 빠른 메모' 제목 5연타로 usage.html 을 연다.
    ────────────────────────────────────────────────────────────────────────
    화면 자체는 이 파일에 두지 않는다. index.html 은 전 교사에게 내려가므로
-   여기 두면 관리자 혼자 보는 화면의 코드와 껍데기가 모두에게 실린다.
+   여기 두면 관리자 혼자 보는 화면의 코드가 모두에게 실린다. 여기에는 iframe
+   껍데기만 둔다.
    자료를 지키는 것은 여전히 규칙이다(usage 읽기 = 관리자) — 파일을 나눈 것은
    굳이 안 내려보내려는 것이지 그것으로 막는 것이 아니다.
 
    현황판 3단(빠른 메모)은 1400px 이상에서만 뜨므로, 좁은 화면에서는
-   usage.html 로 바로 들어간다.                                             */
+   ?goto=usage 로 들어온다.                                             */
 const usageIsAdmin = () => fbAuth.currentUser?.email === ADMIN_EMAIL && !isViewAs();
+
+document.getElementById('usageBackBtn').addEventListener('click', () => closeUsagePage());
 
 let _ugClicks = 0, _ugTimer = null;
 function initUsageEasterEgg(){
@@ -8090,8 +8104,21 @@ function initUsageEasterEgg(){
     _ugClicks++;
     clearTimeout(_ugTimer);
     _ugTimer = setTimeout(() => { _ugClicks = 0; }, 1500);
-    if(_ugClicks >= 5){ _ugClicks = 0; location.href = 'usage.html'; }
+    if(_ugClicks >= 5){ _ugClicks = 0; openUsagePage(); }
   });
+}
+
+// 앱을 벗어나지 않고 이 화면 안에서 크게 본다(자리 배치와 같은 방식).
+let _usageBackTo = 'home';
+function openUsagePage(){
+  if(!usageIsAdmin()) return;
+  _usageBackTo = document.querySelector('.page-view.active')?.id?.replace('Page','') || 'home';
+  document.getElementById('usagePageFrame').src = 'usage.html?in=1';
+  navigateTo('usage');
+}
+function closeUsagePage(){
+  document.getElementById('usagePageFrame').src = 'about:blank';
+  navigateTo(_usageBackTo === 'usage' ? 'home' : _usageBackTo);
 }
 
 // 🥚 학기 라벨을 빠르게 5번 클릭하면 1학기 아카이브 ↔ 2학기 토글 (숨겨진 기능)
@@ -8116,8 +8143,8 @@ function initSemEasterEgg(){
 //   - 브라우저: URL ?goto=<탭>
 //   - Neutralino 앱: 실행 인자 --goto=<탭>  (AHK 위젯이 클릭 시 이 인자로 앱을 실행)
 function launchGotoTarget(){
-  // 'usage' 는 탭이 아니라 별도 페이지(usage.html)로 보낸다. 현황판 3단(빠른 메모)이
-  // 1400px 이상에서만 떠서 좁은 화면에서는 5연타할 자리가 없다 — 그때 쓰는 통로.
+  // 'usage' 는 탭 버튼이 없는 숨은 화면이다. 현황판 3단(빠른 메모)이 1400px 이상에서만
+  // 떠서 좁은 화면에서는 5연타할 자리가 없다 — 그때 쓰는 통로.
   const VALID = ['home','weekly','schedule','mytask','grades','search','timetable','points','consult','docs','contacts','students','meal','usage'];
   let t = null;
   try { t = new URLSearchParams(location.search).get('goto'); } catch(e){}
@@ -14314,7 +14341,7 @@ function navigateTo(page) {
   document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(t => t.classList.toggle('active', t.dataset.page === page));
   // 'seat' 은 탭 버튼이 없는 화면이다 — 자리 배치 모달의 「페이지로」로만 들어온다.
   // 여기 목록에 없으면 다른 탭으로 옮겨도 안 닫힌다.
-  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult','docs','grades','search','room','pass','seat'].forEach(p => {
+  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult','docs','grades','search','room','pass','seat','usage'].forEach(p => {
     const el = document.getElementById(p + 'Page');
     if(el) el.classList.toggle('active', p === page);
   });
@@ -14322,6 +14349,10 @@ function navigateTo(page) {
   if (page !== 'seat') {
     const sf = document.getElementById('seatPageFrame');
     if (sf && sf.src && sf.src !== 'about:blank') sf.src = 'about:blank';
+  }
+  if (page !== 'usage') {
+    const uf = document.getElementById('usagePageFrame');
+    if (uf && uf.src && uf.src !== 'about:blank') uf.src = 'about:blank';
   }
   if(page !== 'consult') stopConsultWatch();
   if(page !== 'room') stopRoomWatch();

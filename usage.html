@@ -34,6 +34,9 @@
     border:1px solid var(--rule);border-radius:9px;background:#fff;color:inherit;}
   #usageNote{font-size:11.5px;color:var(--ink-soft);margin-left:auto;}
   #usageBody{padding:16px;}
+  /* 앱 안에서 열리면 바깥에 이미 제목줄이 있다 — 여기 제목은 접는다 */
+  body.in-app .head .ttl{display:none;}
+  body.in-app .head{padding:9px 14px;}
 
   /* 로그인 게이트 */
   .gate{position:fixed;inset:0;background:var(--bg);display:flex;
@@ -336,6 +339,11 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   try { await signInWithPopup(fbAuth, provider); }
   catch(e) { document.getElementById('gateErr').textContent = '로그인 실패: ' + e.message; }
 });
+// 앱 안에서 iframe 으로 열렸을 때(?in=1)는 '대시보드' 버튼을 숨긴다.
+// 그대로 두면 프레임 안이 앱으로 바뀌어 앱 속에 앱이 뜬다. 나가는 것은
+// 바깥의 '← 돌아가기' 가 한다.
+const IN_APP = new URLSearchParams(location.search).get('in') === '1' || window.top !== window.self;
+if (IN_APP) { document.getElementById('homeBtn').hidden = true; document.body.classList.add('in-app'); }
 document.getElementById('homeBtn').addEventListener('click', () => { location.href = 'index.html'; });
 document.getElementById('usageReloadBtn').addEventListener('click', () => loadUsage());
 document.getElementById('usageMonth').addEventListener('change', () => loadUsage());
