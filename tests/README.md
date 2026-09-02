@@ -110,12 +110,24 @@ FAB(모바일 발급 버튼)은 `#passPage` 바깥의 `position:fixed` 라 하�
 node tests/pass-fab.test.mjs                       # FAB 이 외출증 화면에서만 뜨는지
 node tests/seat-inpage.test.mjs                    # 자리 배치 '크게 보기' → 앱 안 화면 + 돌아가기
 node tests/weekly-chips-live.test.mjs              # 주차 칩이 새로고침 없이 늘어나는지
+node tests/usage-stats.test.mjs                    # 사용 현황 — 세는 값·저장·관리자만
 node tests/consult-weekend.test.mjs                # 상담 주말 슬롯 + 7칸 폭 측정
 node tests/task-share.test.mjs                     # 공유받은 업무에 작성자·함께 받은 사람
 node tests/cal-consult.test.mjs                    # 업무 캘린더의 상담 예약 표시·상세
 ```
 
 가짜 Firestore를 물려 목록 렌더·사진 표시·발급 폼·저장 payload를 실제 DOM에서 본다.
+
+### 사용 현황 (🥚 빠른 메모 제목 5연타)
+
+로그인 이벤트로는 사용량을 못 센다 — 세션이 유지돼 한 번 로그인하면 몇 달씩 다시
+안 뜬다. 그래서 **앱을 연 횟수**와 **탭을 연 횟수**를 센다. 한 사람 한 달치가 문서
+하나(`usage/{이메일}/m/{YYYY-MM}`)라, 잘못 쓰면 그 달 전체가 날아간다.
+
+- 세는 게 맞는가 — 앱 열기·탭 이동·다시 열었을 때 이어지기
+- 저장이 **그날 줄만** 건드리는가(merge), 탭마다 저장하지 않고 모아서 보내는가
+- 관리자 말고는 못 들어가는가 — 다른 교사·보기 모드에서 5연타해도 안 열린다
+- 화면 집계가 맞는가 — 사람 수·횟수·날짜별 막대·기능 순위·안 쓴 사람
 
 ### 보안 규칙 (Firestore 에뮬레이터)
 

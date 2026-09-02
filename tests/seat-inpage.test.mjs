@@ -37,8 +37,9 @@ console.log('\n■ 원본 배선 (정적)');
 check('새 브라우저 탭으로 안 띄운다', !/seatOpenBtn[\s\S]{0,300}window\.open/.test(HTML));
 check('페이지 화면이 있다', /id="seatPage"/.test(HTML) && /id="seatPageFrame"/.test(HTML));
 check('돌아가기 버튼이 있다', /id="seatBackBtn"/.test(HTML) && /돌아가기/.test(HTML));
+// 목록 끝을 못 박으면 탭이 하나 늘 때마다 깨진다. 들어 있는지만 본다.
 check('탭 목록에 seat 이 들어 있다',
-      /'search','room','pass','seat'\]/.test(HTML));
+      /\['home',(?:'[a-z]+',)*'seat'[,\]]/.test(HTML));
 check('다른 탭으로 나가면 프레임을 비운다',
       /page !== 'seat'[\s\S]{0,200}seatPageFrame[\s\S]{0,120}about:blank/.test(HTML));
 check('ESC 는 페이지면 돌아가기, 아니면 모달 닫기',

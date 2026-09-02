@@ -70,6 +70,14 @@ service cloud.firestore {
       allow read: if isAppAdmin();
       allow write: if false;
     }
+    // ── 사용량 (누가 앱을 얼마나 쓰는지) ──────────────────────────────
+    // 한 사람 한 달치를 문서 하나에 담는다. 자기 문서에만 쓸 수 있고(경로에 이메일이
+    // 들어간다), 읽기는 관리자만. 남는 것은 연 횟수와 탭 이름·횟수뿐이다 —
+    // 무엇을 검색했는지 같은 내용은 담지 않는다(연락처 조회는 위 accessLogs).
+    match /usage/{email}/m/{ym} {
+      allow read:  if isAppAdmin();
+      allow write: if isYnhsTeacher() && request.auth.token.email == email;
+    }
     // 교실 자리 배치 — 문서 ID 는 '학년-반'(예: 2-3).
     // 조회는 전 교사(수업 들어갈 때 이름을 봐야 한다), 저장은 그 반 담임과 관리자만.
     // 담임 판정은 학부모 상담이 쓰는 acl/gradeRoles.homerooms 를 그대로 재사용한다.
