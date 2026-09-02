@@ -8073,7 +8073,7 @@ async function loadUsage(){
     note.textContent = `${ym} · 교직원 ${rows.length}명`;
     renderUsage(rows, ym);
   } catch(e){
-    body.innerHTML = `<div style="padding:24px;color:var(--stop,#B71C1C);font-size:13px;">불러오기 실패: ${esc(e.message)}</div>`;
+    body.innerHTML = `<div style="padding:24px;color:#B71C1C;font-size:13px;">불러오기 실패: ${escapeHtml(e.message)}</div>`;
   } finally { _usageBusy = false; }
 }
 
@@ -8132,7 +8132,7 @@ function renderUsage(rows, ym){
   // ── 탭별 막대 ──────────────────────────────────────────────────────────
   const tabBars = tabRank.length ? tabRank.map(([k, v]) => `
     <div class="ug-trow">
-      <span class="ug-tname">${esc(USAGE_TABS[k] || k)}</span>
+      <span class="ug-tname">${escapeHtml(USAGE_TABS[k] || k)}</span>
       <span class="ug-tbar"><i style="width:${Math.max(2, Math.round(v/tabMax*100))}%"></i></span>
       <span class="ug-tnum">${v.toLocaleString()}<em>${pct(v, clickAll)}%</em></span>
     </div>`).join('')
@@ -8141,12 +8141,12 @@ function renderUsage(rows, ym){
   // ── 사람별 표 ──────────────────────────────────────────────────────────
   const used = people.filter(p => p.used), idle = people.filter(p => !p.used);
   const rowHtml = p => `<tr>
-    <td class="nm">${esc(p.name)}</td>
+    <td class="nm">${escapeHtml(p.name)}</td>
     <td class="num">${p.opens || ''}</td>
     <td class="num">${p.used || ''}</td>
     <td class="num">${p.clicks || ''}</td>
-    <td class="dim">${esc(p.last)}</td>
-    <td class="dim">${p.top.map(t => `${esc(USAGE_TABS[t[0]] || t[0])} ${t[1]}`).join(' · ')}</td>
+    <td class="dim">${escapeHtml(p.last)}</td>
+    <td class="dim">${p.top.map(t => `${escapeHtml(USAGE_TABS[t[0]] || t[0])} ${t[1]}`).join(' · ')}</td>
   </tr>`;
 
   document.getElementById('usageBody').innerHTML = `
@@ -8175,7 +8175,7 @@ function renderUsage(rows, ym){
           <tbody>${used.map(rowHtml).join('') || '<tr><td colspan="6" class="dim">기록 없음</td></tr>'}</tbody>
         </table></div>
         ${idle.length ? `<div class="ug-idle"><b>이 달에 안 쓴 ${idle.length}명</b>
-          <div>${idle.map(p => esc(p.name)).join(' · ')}</div></div>` : ''}
+          <div>${idle.map(p => escapeHtml(p.name)).join(' · ')}</div></div>` : ''}
       </div>
     </div>
 

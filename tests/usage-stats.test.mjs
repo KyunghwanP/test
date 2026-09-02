@@ -57,6 +57,32 @@ check('화면을 내리면 보낸다',
 check('규칙: 자기 문서에만 쓰고 관리자만 읽는다',
       /match \/usage\/\{email\}\/m\/\{ym\} \{[\s\S]{0,200}allow read:\s+if isAppAdmin\(\);[\s\S]{0,120}request\.auth\.token\.email == email/.test(RULES));
 
+// 하네스가 없는 함수를 대신 만들어 주면, 원본에 없어도 검사는 통과한다.
+// 실제로 그렇게 통과시켰다 — esc() 는 index.html 에 없고 escapeHtml() 이 맞는데,
+// 하네스가 esc 를 정의해 버려서 화면이 '불러오는 중…' 에서 멈추는 걸 못 잡았다.
+// 그래서 이 구간이 부르는 이름이 원본에 실제로 있는지 따로 본다.
+console.log('\n■ 부르는 함수가 원본에 있는가');
+{
+  // 시작점을 '사용 현황 —' 로 잡으면 화면 마크업의 주석에 먼저 걸려 127KB를 훑는다.
+  const A = HTML.indexOf("/* 🥚 사용 현황 —"), B = HTML.indexOf("// 🥚 학기 라벨을 빠르게");
+  check('사용 현황 코드 구간을 찾았다', A > 0 && B > A && B - A < 20000, { A, B, len: B - A });
+  const seg = HTML.slice(A, B);
+  const called = [...new Set([...seg.matchAll(/(?<![A-Za-z0-9_$.])([a-zA-Z_$][\w$]*)\s*\(/g)]
+    .map(m => m[1]))];
+  const BUILTIN = new Set(['if','for','while','switch','catch','return','typeof','function',
+    'Number','String','Object','Array','Math','Date','Promise','JSON','Set','Map','parseInt',
+    'parseFloat','isNaN','setTimeout','clearTimeout','require','await','new','RegExp',
+    'var']);   // var(--…) 는 CSS 다
+  // firebase 에서 들여온 이름(getDoc·doc 등)도 '있는' 것이다
+  const imported = new Set([...HTML.matchAll(/^import \{([^}]+)\} from/gm)]
+    .flatMap(m => m[1].split(',').map(x => x.trim().split(/\s+as\s+/).pop())));
+  const missing = called.filter(n => !BUILTIN.has(n) && !imported.has(n)
+    && !new RegExp(`(?:function|const|let|var)\\s+${n}\\b|${n}\\s*[:=]\\s*(?:async\\s*)?(?:function|\\()`).test(HTML));
+  check('없는 함수를 부르지 않는다', missing.length === 0, missing);
+  check('문자열은 원본의 escapeHtml 로 감싼다',
+        /escapeHtml\(/.test(seg) && !/(?<![A-Za-z0-9_$.])esc\(/.test(seg));
+}
+
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const pg = await b.newPage({ viewport: { width: 1500, height: 900 } });
 const errs = [];
@@ -71,7 +97,7 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
 </div>
 <script>
   const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
-  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  ${grab('escapeHtml')}
   const TEACHERS = [];
   let _who = ADMIN_EMAIL, _viewAs = false;
   const fbAuth = { get currentUser(){ return _who ? { email: _who } : null; } };
