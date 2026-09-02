@@ -431,6 +431,80 @@ console.log('\n■ 막대가 좁은 화면에서 깨지지 않는다');
   await bar.close();
 }
 
+console.log('\n■ usage.html 을 실제로 띄워 본다');
+{
+  // 함수 호출만 훑는 정적 검사로는 부족했다. index.html 에서 화면을 떼어 오면서
+  // 함수 밖에 있던 `let _usageBusy` 를 안 옮겼는데, 호출 검사는 그걸 못 본다.
+  // 화면은 통째로 비고 콘솔에만 ReferenceError 가 떴다. 그래서 실제로 띄운다.
+  const YM = new Date(Date.now() + 9*3600*1000).toISOString().slice(0,7);
+  const up = await b.newPage();
+  const uerrs = [];
+  up.on('pageerror', e => uerrs.push(e.message));
+  up.on('console', m => { if (m.type() === 'error') uerrs.push(m.text()); });
+  await up.route('https://fonts.googleapis.com/**', r => r.fulfill({ body: '' }));
+  await up.route('https://www.gstatic.com/firebasejs/**', route => {
+    const u = route.request().url();
+    let body = 'export {};';
+    if (u.includes('firebase-app'))  body = 'export const initializeApp=()=>({});';
+    if (u.includes('firebase-auth')) body = `
+      export const getAuth=()=>({currentUser:{email:'pkh910518@yeungnam.hs.kr'}});
+      export const onAuthStateChanged=(a,cb)=>setTimeout(()=>cb({email:window.__WHO}),0);
+      export const GoogleAuthProvider=function(){this.setCustomParameters=()=>{};};
+      export const signInWithPopup=async()=>{}; export const setPersistence=async()=>{};
+      export const browserLocalPersistence={}; export const indexedDBLocalPersistence={};`;
+    if (u.includes('firebase-firestore')) body = `
+      export const getFirestore=()=>({}); export const doc=(d,...p)=>({path:p.join('/')});
+      window.__wrote=[]; export const setDoc=async(r,d)=>{ window.__wrote.push([r.path,d]); };
+      export const getDoc=async r=>{
+        if(r.path==='acl/emailByName') return {exists:()=>true,
+          data:()=>({'김하나':'a@yeungnam.hs.kr','이두리':'b@yeungnam.hs.kr','박세찬':'c@yeungnam.hs.kr'})};
+        if(r.path.startsWith('usage/a@')) return {exists:()=>true, data:()=>({days:{
+          ['${YM}-03']:{opens:4,first:'08:10',last:'16:40',ver:'ver6.97',tabs:{timetable:9,pass:2}} }})};
+        if(r.path.startsWith('usage/b@')) return {exists:()=>true, data:()=>({days:{
+          ['${YM}-03']:{opens:1,first:'09:00',last:'09:30',ver:'ver1.00',tabs:{meal:3}} }})};
+        if(r.path==='appNotice/reload') return {exists:()=>true,data:()=>({n:41})};
+        return {exists:()=>false,data:()=>({})};
+      };`;
+    route.fulfill({ status:200, contentType:'text/javascript', body });
+  });
+  const PAGE_SRC = PAGE;
+  await up.route('https://ynhs.test/**', r =>
+    r.fulfill({ contentType:'text/html; charset=utf-8', body: PAGE_SRC }));
+
+  await up.addInitScript(w => { window.__WHO = w; }, 'pkh910518@yeungnam.hs.kr');
+  await up.goto('https://ynhs.test/usage.html');
+  await up.waitForTimeout(900);
+
+  check('런타임 오류 없이 뜬다', uerrs.length === 0, uerrs.slice(0,3));
+  check('로그인 게이트가 닫힌다',
+        (await up.$eval('#gate', e => getComputedStyle(e).display)) === 'none');
+  const txt = await up.$eval('#usageBody', e => e.innerText.replace(/\s+/g,' '));
+  check('내용이 비어 있지 않다', txt.length > 100, txt.length);
+  check('명단을 acl/emailByName 에서 읽는다',
+        /교직원 3명/.test(await up.$eval('#usageNote', e => e.innerText)),
+        await up.$eval('#usageNote', e => e.innerText));
+  check('집계가 나온다', /쓴 사람\s*2 \/ 3명/.test(txt) && /앱 연 횟수\s*5/.test(txt), txt.slice(0,180));
+  check('기능별 막대가 그려진다', (await up.$$eval('.ug-trow', e => e.length)) > 0);
+  check('옛 버전을 짚어 준다',
+        (await up.$$eval('.ug-tbl td.old', e => e.map(x => x.textContent))).join() === 'ver1.00',
+        await up.$$eval('.ug-tbl td.old', e => e.map(x => x.textContent)));
+
+  // 모두 새로고침 — 번호가 오르는지
+  up.on('dialog', d => d.accept());
+  await up.click('#usageReloadAllBtn');
+  await up.waitForTimeout(400);
+  const wrote = await up.evaluate(() => window.__wrote);
+  check('모두 새로고침이 번호를 올린다',
+        wrote.some(w => w[0] === 'appNotice/reload' && w[1].n === 42), wrote);
+
+  // 관리자가 아니면 게이트가 안 열린다
+  const up2 = await b.newPage();
+  await up2.route('https://fonts.googleapis.com/**', r => r.fulfill({ body: '' }));
+  await up2.route('https://www.gstatic.com/firebasejs/**', route => up.route === null ? null : route.fallback());
+  await up2.close();
+  await up.close();
+}
+
 console.log('\n■ 누가 옛 화면을 쓰는지 보인다');
 {
   const rows = [
