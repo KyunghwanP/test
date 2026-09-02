@@ -10,46 +10,51 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
-const HTML = fs.readFileSync(import.meta.dirname + '/../index.html', 'utf8');
+const HTML  = fs.readFileSync(import.meta.dirname + '/../index.html', 'utf8');
+const PAGE  = fs.readFileSync(import.meta.dirname + '/../usage.html', 'utf8');
 const RULES = fs.readFileSync(import.meta.dirname + '/../firestore.rules', 'utf8');
 
 let pass = 0, fail = 0;
 const check = (n, c, x) => c ? (pass++, console.log('  ✅', n))
                              : (fail++, console.log('  ❌', n, x !== undefined ? '\n       → ' + JSON.stringify(x).slice(0,400) : ''));
 
-const grab = name => {
-  const m = new RegExp(`^(?:async )?function ${name}\\(`, 'm').exec(HTML);
+const grab = (name, src = HTML) => {
+  const m = new RegExp(`^(?:async )?function ${name}\\(`, 'm').exec(src);
   if (!m) throw new Error('못 찾음: ' + name);
-  let i = HTML.indexOf('{', m.index), d = 0;
-  for (let j = i; j < HTML.length; j++) {
-    if (HTML[j] === '{') d++;
-    else if (HTML[j] === '}' && --d === 0) return HTML.slice(m.index, j + 1);
+  let i = src.indexOf('{', m.index), d = 0;
+  for (let j = i; j < src.length; j++) {
+    if (src[j] === '{') d++;
+    else if (src[j] === '}' && --d === 0) return src.slice(m.index, j + 1);
   }
   throw new Error('닫는 괄호 못 찾음: ' + name);
 };
 // const NAME = … ;  — 괄호 깊이를 보고 최상위 세미콜론에서 끊는다.
 // '다음 const 앞까지' 같은 방식은 뒤에 오는 document.… 줄까지 삼켜서
 // 하네스가 통째로 깨진다. 실제로 한 번 그렇게 깨졌다.
-const grabConst = name => {
-  const m = new RegExp(`^const ${name} = `, 'm').exec(HTML);
+const grabConst = (name, src = HTML) => {
+  const m = new RegExp(`^const ${name} = `, 'm').exec(src);
   if (!m) throw new Error('못 찾음(const): ' + name);
   let d = 0, q = null;
-  for (let j = m.index; j < HTML.length; j++) {
-    const c = HTML[j];
+  for (let j = m.index; j < src.length; j++) {
+    const c = src[j];
     if (q) { if (c === '\\') j++; else if (c === q) q = null; continue; }
     if (c === '"' || c === "'" || c === '`') { q = c; continue; }
     if ('{[('.includes(c)) d++;
     else if (')]}'.includes(c)) d--;
-    else if (c === ';' && d === 0) return HTML.slice(m.index, j + 1);
+    else if (c === ';' && d === 0) return src.slice(m.index, j + 1);
   }
   throw new Error('끝을 못 찾음(const): ' + name);
 };
 
 console.log('\n■ 배선 (정적)');
-check('사용량 화면이 있다', /id="usagePage"/.test(HTML));
-check('탭 버튼은 없다 — 5연타로만 들어온다',
-      !/data-page="usage"/.test(HTML));
-check('탭 전환 목록에 들어 있다', /'pass','seat','usage'\]/.test(HTML));
+check('화면은 별도 파일이다', /function renderUsage/.test(PAGE) && !/function renderUsage/.test(HTML));
+check('전 교사에게 내려가는 파일에는 화면이 없다',
+      !/id="usagePage"/.test(HTML) && !/function loadUsage/.test(HTML));
+check('탭 버튼도 없다', !/data-page="usage"/.test(HTML));
+check('5연타는 그 파일로 보낸다', /_ugClicks = 0; location\.href = 'usage\.html'/.test(HTML));
+check('관리자가 아니면 5연타가 아무 일도 안 한다', /if\(!usageIsAdmin\(\)\) return;/.test(HTML));
+check('세는 코드는 index 에 남아 있다',
+      /function usageStart/.test(HTML) && /function usageFlush/.test(HTML));
 check('탭을 누를 때 센다', /usageTab\(page\);/.test(HTML));
 check('앱을 열 때 센다', /usageStart\(user\.email\);/.test(HTML));
 check('화면을 내리면 보낸다',
@@ -64,20 +69,21 @@ check('규칙: 자기 문서에만 쓰고 관리자만 읽는다',
 console.log('\n■ 부르는 함수가 원본에 있는가');
 {
   // 시작점을 '사용 현황 —' 로 잡으면 화면 마크업의 주석에 먼저 걸려 127KB를 훑는다.
-  const A = HTML.indexOf("/* 🥚 사용 현황 —"), B = HTML.indexOf("// 🥚 학기 라벨을 빠르게");
-  check('사용 현황 코드 구간을 찾았다', A > 0 && B > A && B - A < 20000, { A, B, len: B - A });
-  const seg = HTML.slice(A, B);
+  // usage.html 의 <script> 전체를 본다 — 여기가 화면 코드가 사는 곳이다.
+  const seg = PAGE.slice(PAGE.indexOf('<script type="module">'));
+  check('사용 현황 코드를 찾았다', seg.length > 3000, seg.length);
   const called = [...new Set([...seg.matchAll(/(?<![A-Za-z0-9_$.])([a-zA-Z_$][\w$]*)\s*\(/g)]
     .map(m => m[1]))];
   const BUILTIN = new Set(['if','for','while','switch','catch','return','typeof','function',
     'Number','String','Object','Array','Math','Date','Promise','JSON','Set','Map','parseInt',
     'parseFloat','isNaN','setTimeout','clearTimeout','require','await','new','RegExp',
-    'var', 'confirm', 'alert', 'getComputedStyle', 'setInterval', 'clearInterval']);
+    'var', 'confirm', 'alert', 'getComputedStyle', 'setInterval', 'clearInterval',
+    'async', 'else', 'do']);
   // firebase 에서 들여온 이름(getDoc·doc 등)도 '있는' 것이다
-  const imported = new Set([...HTML.matchAll(/^import \{([^}]+)\} from/gm)]
+  const imported = new Set([...PAGE.matchAll(/^import \{([^}]+)\}\s*from/gm)]
     .flatMap(m => m[1].split(',').map(x => x.trim().split(/\s+as\s+/).pop())));
   const missing = called.filter(n => !BUILTIN.has(n) && !imported.has(n)
-    && !new RegExp(`(?:function|const|let|var)\\s+${n}\\b|${n}\\s*[:=]\\s*(?:async\\s*)?(?:function|\\()`).test(HTML));
+    && !new RegExp(`(?:function|const|let|var)\\s+${n}\\b|${n}\\s*[:=]\\s*(?:async\\s*)?(?:function|\\()`).test(PAGE));
   check('없는 함수를 부르지 않는다', missing.length === 0, missing);
   check('문자열은 원본의 escapeHtml 로 감싼다',
         /escapeHtml\(/.test(seg) && !/(?<![A-Za-z0-9_$.])esc\(/.test(seg));
@@ -137,7 +143,7 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   ${grab('usageTab')}
   ${grab('usageMark')}
   ${grab('usageFlush')}
-  ${grabConst('USAGE_TABS')}
+  ${grabConst('USAGE_TABS', PAGE)}
   ${grabConst('usageIsAdmin')}
   ${grabConst('APP_VER')}
   ${grabConst('RELOAD_SEEN_KEY')}
@@ -153,16 +159,13 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   ${grab('watchReloadSignal')}
   let _ugClicks = 0, _ugTimer = null;
   ${grab('initUsageEasterEgg')}
-  let _usageBackTo = 'home';
-  ${grab('openUsagePage')}
-  ${grab('closeUsagePage')}
-  ${grab('usagePeople')}
+  ${grab('usagePeople', PAGE)}
   let _usageBusy = false;
-  ${grab('loadUsage')}
-  ${grab('renderUsage')}
+  ${grab('loadUsage', PAGE)}
+  ${grab('renderUsage', PAGE)}
 
   Object.assign(window, { usageStart, usageTab, usageFlush, usageDate, loadUsage,
-                          renderUsage, initUsageEasterEgg, openUsagePage,
+                          renderUsage, initUsageEasterEgg,
                           watchReloadSignal, isBusyTyping, APP_VER,
                           saveResumePoint, applyResumePoint });
   window.__armed = () => { watchReloadSignal(); };
@@ -177,6 +180,10 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
 // 다시 도는데, 그게 실제 동작과 같다.
 let serves = 0;
 await pg.route('https://ynhs.test/**', r => {
+  const u = r.request().url();
+  if (u.endsWith('/usage.html'))
+    return r.fulfill({ contentType: 'text/html; charset=utf-8',
+                       body: '<!doctype html><meta charset="utf-8"><title>usage</title>' });
   serves++;
   r.fulfill({ contentType: 'text/html; charset=utf-8', body: HARNESS });
 });
@@ -188,21 +195,27 @@ const active = () => pg.evaluate(() => document.querySelector('.page-view.active
 
 console.log('\n■ 관리자 말고는 못 들어간다');
 {
+  const at = () => pg.url().replace('https://ynhs.test/', '');
   await pg.evaluate(() => window.__setWho('kim@yeungnam.hs.kr'));
   await tap(7);
-  check('다른 교사가 눌러도 아무 일 없다', (await active()) === 'homePage', await active());
-  check('탭 자체가 안 뜬다', await pg.evaluate(() => !document.querySelector('[data-page="usage"]')));
+  await pg.waitForTimeout(200);
+  check('다른 교사가 눌러도 아무 일 없다', at() === 'h.html', at());
 
   // 보기 모드(관리자가 남의 화면을 볼 때)도 막는다 — 남의 이름으로 남는다
   await pg.evaluate(() => window.__setWho('pkh910518@yeungnam.hs.kr', true));
   await tap(6);
-  check('보기 모드에서도 안 열린다', (await active()) === 'homePage', await active());
+  await pg.waitForTimeout(200);
+  check('보기 모드에서도 안 열린다', at() === 'h.html', at());
 
   await pg.evaluate(() => window.__setWho('pkh910518@yeungnam.hs.kr'));
   await tap(4);
-  check('4번으로는 안 열린다', (await active()) === 'homePage');
+  await pg.waitForTimeout(200);
+  check('4번으로는 안 열린다', at() === 'h.html', at());
   await tap(1);
-  check('5번째에 열린다', (await active()) === 'usagePage', await active());
+  await pg.waitForURL('**/usage.html', { timeout: 5000 }).catch(() => {});
+  check('5번째에 사용 현황 페이지로 간다', at() === 'usage.html', at());
+
+  await pg.goto('https://ynhs.test/h.html');       // 나머지 검사를 위해 돌아온다
 }
 
 console.log('\n■ 앱을 연 횟수·탭 이동을 센다');
@@ -300,7 +313,9 @@ check('규칙: 읽기는 교사, 쓰기는 관리자만',
 check('전 교사가 쓸 수 있는 appdata 에 두지 않았다',
       !/appdata', 'reload'|appdata', 'appVersion/.test(HTML));
 check('로그인하면 신호를 듣는다', /watchReloadSignal\(\);/.test(HTML));
-check('보낸 뒤 번호가 오르는 방식', /n = \(Number\(snap\.exists\(\) \? snap\.data\(\)\.n : 0\) \|\| 0\) \+ 1/.test(HTML));
+check('보내는 쪽은 사용 현황 페이지에 있다',
+      /async function broadcastReload/.test(PAGE) && !/broadcastReload/.test(HTML));
+check('보낸 뒤 번호가 오른다', /n = \(Number\(snap\.exists\(\) \? snap\.data\(\)\.n : 0\) \|\| 0\) \+ 1/.test(PAGE));
 {
   await pg.evaluate(() => {
     try { localStorage.removeItem('ynhsReloadSeen'); } catch(e){}
@@ -346,10 +361,8 @@ console.log('\n■ 새로고침해도 보던 자리에 그대로');
   check('보던 탭을 적어 둔다', saved && saved.page === 'usage', saved);
   check('스크롤 위치도 같이', saved && typeof saved.top === 'number', saved);
 
-  // 돌아올 때: usage 는 숨은 화면이라 되돌리지 않는다
-  await pg.evaluate(() => window.__nav.length = 0);
-  const back1 = await pg.evaluate(() => window.applyResumePoint());
-  check('숨은 화면으로는 안 되돌린다', back1 === false, back1);
+  check('위젯은 자리를 안 적는다 — 탭이 없는 한 장짜리 화면이다',
+        /widget-mode'\)\) saveResumePoint\(\)/.test(HTML));
 
   // 보통 탭이면 그 탭으로 돌아간다
   await pg.evaluate(() => { sessionStorage.setItem('ynhsResumeView',

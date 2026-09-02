@@ -3386,55 +3386,6 @@
     display:flex;align-items:center;gap:10px;
     padding:4px 0 8px;flex-shrink:0;
   }
-  /* 📊 사용 현황 (🥚 빠른 메모 제목 5연타 · 관리자만) */
-  #usagePage{flex-direction:column;}
-  .ug-chips{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px;}
-  .ug-chip{background:var(--paper,#fff);border:1px solid var(--rule);border-radius:11px;
-    padding:9px 15px;display:flex;flex-direction:column;gap:2px;min-width:104px;}
-  .ug-chip span{font-size:11px;color:var(--ink-soft);letter-spacing:.02em;}
-  .ug-chip b{font-size:19px;font-weight:800;line-height:1.15;}
-  .ug-chip b small{font-size:12px;font-weight:600;color:var(--ink-soft);}
-  .ug-card{background:var(--paper,#fff);border:1px solid var(--rule);border-radius:13px;
-    padding:15px 17px;margin-bottom:13px;min-width:0;}
-  .ug-h{font-size:13px;font-weight:800;margin-bottom:12px;}
-  .ug-h small{font-weight:600;color:var(--ink-soft);font-size:11.5px;margin-left:5px;}
-  .ug-two{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:13px;align-items:start;}
-  @media (max-width:900px){ .ug-two{grid-template-columns:1fr;} }
-
-  /* 날짜별 — 막대가 곧 그래프다. 라이브러리 없이 CSS 로만 그린다. */
-  .ug-bars{display:flex;gap:2px;align-items:flex-end;height:104px;}
-  .ug-bar{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;
-    justify-content:flex-end;align-items:center;gap:3px;position:relative;}
-  .ug-bar-fill{width:78%;background:var(--accent,#2F5D62);border-radius:3px 3px 0 0;min-height:0;}
-  .ug-bar.today .ug-bar-fill{background:var(--mon,#8C2F39);}
-  .ug-bar.zero .ug-bar-fill{background:var(--rule);height:2px !important;min-height:2px;}
-  .ug-bar-lab{font-size:8.5px;color:var(--ink-soft);line-height:1;}
-  .ug-bar-lab.wk{color:var(--mon,#8C2F39);}
-
-  /* 기능별 — 이름 · 막대 · 숫자 */
-  .ug-trow{display:grid;grid-template-columns:96px minmax(0,1fr) 62px;gap:9px;
-    align-items:center;padding:3.5px 0;font-size:12px;}
-  .ug-tname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .ug-tbar{background:var(--rule);border-radius:4px;height:9px;overflow:hidden;}
-  .ug-tbar i{display:block;height:100%;background:var(--accent,#2F5D62);border-radius:4px;}
-  .ug-tnum{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;}
-  .ug-tnum em{font-style:normal;font-weight:600;color:var(--ink-soft);font-size:10.5px;margin-left:4px;}
-
-  .ug-tblwrap{overflow-x:auto;}
-  .ug-tbl{width:100%;border-collapse:collapse;font-size:12px;}
-  .ug-tbl th{text-align:left;font-weight:700;color:var(--ink-soft);font-size:11px;
-    border-bottom:1px solid var(--rule);padding:5px 7px;white-space:nowrap;}
-  .ug-tbl td{padding:4.5px 7px;border-bottom:1px solid rgba(0,0,0,.05);white-space:nowrap;}
-  .ug-tbl td.nm{font-weight:700;}
-  .ug-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}
-  .ug-tbl td.dim{color:var(--ink-soft);}
-  /* 옛 화면을 쓰는 사람 — 이 칸 하나 보려고 버전을 남긴다 */
-  .ug-tbl td.old{color:#B71C1C;font-weight:700;}
-  .ug-idle{margin-top:11px;padding-top:10px;border-top:1px solid var(--rule);
-    font-size:11.5px;color:var(--ink-soft);line-height:1.75;}
-  .ug-empty{font-size:12.5px;color:var(--ink-soft);padding:10px 0;}
-  .ug-foot{font-size:11.5px;color:var(--ink-soft);line-height:1.7;padding:2px 2px 18px;}
-
   .sg-back-btn{
     font-family:'Noto Sans KR';font-weight:700;font-size:13px;
     border:1.5px solid var(--rule);background:var(--paper);color:var(--ink-soft);
@@ -5404,20 +5355,6 @@
 
       <!-- 교실 자리 배치 — 모달에서 「페이지로」 를 누르면 여기로 온다.
            새 브라우저 탭이 아니라 이 앱 화면 안에서 크게 본다. -->
-      <!-- 🥚 사용 현황 — 탭 버튼이 없다. 현황판의 '📝 빠른 메모' 제목 5연타로만 들어온다.
-           관리자만 열리고, 데이터도 규칙이 관리자에게만 열어 준다. -->
-      <div class="page-view" id="usagePage">
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;flex-wrap:wrap;">
-          <button class="sg-back-btn" id="usageBackBtn">← 돌아가기</button>
-          <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">📊 사용 현황</span>
-          <input type="month" id="usageMonth" style="font-size:13px;padding:4px 8px;border:1px solid var(--rule);border-radius:7px;background:#fff;color:inherit;">
-          <button class="sg-back-btn" id="usageReloadBtn">↻ 새로고침</button>
-          <button class="sg-back-btn" id="usageReloadAllBtn" title="열려 있는 모든 선생님 화면에 새로고침을 보냅니다">📣 모두 새로고침</button>
-          <span id="usageNote" style="font-size:11.5px;color:var(--ink-soft);margin-left:auto;"></span>
-        </div>
-        <div id="usageBody" style="flex:1;overflow:auto;padding:16px;"></div>
-      </div>
-
       <div class="page-view" id="seatPage">
         <div id="seatPageHead" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;">
           <button class="sg-back-btn" id="seatBackBtn">← 돌아가기</button>
@@ -7916,8 +7853,8 @@ function initAppUI(){
   initUsageEasterEgg();
   // 바탕화면 위젯 클릭 딥링크: 지정된 탭으로 이동 (마지막 화면 복원보다 우선)
   const _gotoTarget = launchGotoTarget();
-  // usage 는 그냥 넘기면 빈 화면이 뜬다 — 관리자 확인과 자료 읽기를 같이 하는 통로로 보낸다.
-  if (_gotoTarget === 'usage') openUsagePage();
+  // 사용 현황은 이제 별도 페이지다. 좁은 화면에서 5연타할 자리가 없을 때 쓰는 통로.
+  if (_gotoTarget === 'usage') { if (usageIsAdmin()) location.href = 'usage.html'; }
   else if (_gotoTarget) navigateTo(_gotoTarget);
   // 조용한 새로고침으로 다시 뜬 것이면 보던 탭·스크롤로 돌아간다(위젯 딥링크가 우선).
   else applyResumePoint();
@@ -8098,7 +8035,6 @@ function applyResumePoint(){
   } catch(e){}
   // 오래된 것은 무시한다 — 어제 보던 자리로 끌고 가면 그게 더 이상하다.
   if (!d || !d.page || Date.now() - (d.at || 0) > 120000) return false;
-  if (d.page === 'usage') return false;             // 숨은 화면으로 되돌리지 않는다
   navigateTo(d.page);
   const el = document.getElementById(d.page + 'Page');
   if (el && d.top) requestAnimationFrame(() => { el.scrollTop = d.top; });
@@ -8108,7 +8044,9 @@ function applyResumePoint(){
 // 조용히 새로고침한다 — 막대도 안 띄운다. 다만 적는 중이면 절대 안 한다.
 function silentReload(){
   if (isBusyTyping()) { showReloadBar('새 버전이 있습니다.', 0); return; }
-  saveResumePoint();
+  // 위젯은 탭이 없는 한 장짜리 화면이다. 자리를 적어 두면 돌아와서 엉뚱한 탭으로
+  // 넘어갈 수 있으니 그냥 다시 뜨게만 한다.
+  if (!document.documentElement.classList.contains('widget-mode')) saveResumePoint();
   location.reload();
 }
 
@@ -8131,52 +8069,16 @@ function watchReloadSignal(){
   }, () => {});
 }
 
-// 관리자만 — 열려 있는 모든 화면에 새로고침을 건다.
-async function broadcastReload(){
-  if (fbAuth.currentUser?.email !== ADMIN_EMAIL || isViewAs()) return;
-  const btn = document.getElementById('usageReloadAllBtn');
-  const ref = doc(fbDb, 'appNotice', 'reload');
-  try {
-    btn.disabled = true;
-    const snap = await getDoc(ref);
-    const n = (Number(snap.exists() ? snap.data().n : 0) || 0) + 1;
-    await _fsSetDoc(ref, { n, at: new Date().toISOString(),
-                           by: fbAuth.currentUser.email, ver: APP_VER });
-    // 내 화면은 스냅샷으로 나에게도 돌아온다 — 번호만 적어 두고 넘긴다.
-    _reloadSeen = String(n);
-    try { localStorage.setItem(RELOAD_SEEN_KEY, String(n)); } catch(e){}
-    document.getElementById('usageNote').textContent =
-      `열려 있는 화면에 새로고침을 보냈습니다 (#${n}).`;
-  } catch(e) {
-    document.getElementById('usageNote').textContent = '보내기 실패: ' + (e.message || e);
-  } finally { btn.disabled = false; }
-}
-
-/* 🥚 사용 현황 — '📝 빠른 메모' 제목 5연타. 관리자만 열린다.
+/* 🥚 사용 현황 — '📝 빠른 메모' 제목 5연타로 usage.html 을 연다.
    ────────────────────────────────────────────────────────────────────────
-   탭 버튼을 두지 않는 이유: 이 화면은 관리자 혼자 보는 것이고, 탭으로 두면
-   모든 교사의 화면에 '내가 얼마나 쓰는지 보는 곳'이 늘 보인다.
-   보안은 이 5연타가 아니라 규칙이 한다 — usage 읽기는 관리자에게만 열려 있어서,
-   다른 사람이 이 화면을 억지로 열어도 아무것도 안 나온다.
-   현황판 3단(빠른 메모)은 1400px 이상에서만 뜨므로, 좁은 화면에서는
-   주소에 ?goto=usage 를 붙여 들어온다.                                      */
-const USAGE_TABS = {
-  home:'🏠 현황판', weekly:'📋 주간교육활동', schedule:'📆 학사일정',
-  mytask:'📌 업무캘린더', grades:'🎓 진로진학 상담', search:'🔍 학생 종합검색',
-  timetable:'📅 시간표', points:'📝 상벌점', pass:'🎫 외출증',
-  consult:'🗓️ 학부모상담', room:'🚪 특별실 예약', docs:'📋 업무자료',
-  contacts:'📞 교원연락망', students:'🎒 학생연락망', meal:'🍱 식단표',
-  seat:'🪑 자리 배치', usage:'📊 사용 현황',
-};
-const usageIsAdmin = () => fbAuth.currentUser?.email === ADMIN_EMAIL && !isViewAs();
+   화면 자체는 이 파일에 두지 않는다. index.html 은 전 교사에게 내려가므로
+   여기 두면 관리자 혼자 보는 화면의 코드와 껍데기가 모두에게 실린다.
+   자료를 지키는 것은 여전히 규칙이다(usage 읽기 = 관리자) — 파일을 나눈 것은
+   굳이 안 내려보내려는 것이지 그것으로 막는 것이 아니다.
 
-document.getElementById('usageBackBtn').addEventListener('click', () => closeUsagePage());
-document.getElementById('usageReloadBtn').addEventListener('click', () => loadUsage());
-document.getElementById('usageMonth').addEventListener('change', () => loadUsage());
-document.getElementById('usageReloadAllBtn').addEventListener('click', () => {
-  if (confirm('열려 있는 모든 선생님 화면에 새로고침을 보냅니다.\n\n'
-    + '뭔가 적고 있는 분에게는 강제로 하지 않고 안내 막대만 뜹니다.\n계속할까요?')) broadcastReload();
-});
+   현황판 3단(빠른 메모)은 1400px 이상에서만 뜨므로, 좁은 화면에서는
+   usage.html 로 바로 들어간다.                                             */
+const usageIsAdmin = () => fbAuth.currentUser?.email === ADMIN_EMAIL && !isViewAs();
 
 let _ugClicks = 0, _ugTimer = null;
 function initUsageEasterEgg(){
@@ -8188,170 +8090,8 @@ function initUsageEasterEgg(){
     _ugClicks++;
     clearTimeout(_ugTimer);
     _ugTimer = setTimeout(() => { _ugClicks = 0; }, 1500);
-    if(_ugClicks >= 5){ _ugClicks = 0; openUsagePage(); }
+    if(_ugClicks >= 5){ _ugClicks = 0; location.href = 'usage.html'; }
   });
-}
-
-let _usageBackTo = 'home';
-function openUsagePage(){
-  if(!usageIsAdmin()) return;
-  _usageBackTo = document.querySelector('.page-view.active')?.id?.replace('Page','') || 'home';
-  const m = document.getElementById('usageMonth');
-  if(!m.value) m.value = usageDate().slice(0, 7);
-  navigateTo('usage');
-  loadUsage();
-}
-function closeUsagePage(){ navigateTo(_usageBackTo === 'usage' ? 'home' : _usageBackTo); }
-
-// 이름 → 이메일. 시간표(TEACHERS)에는 수업 없는 교장·교감이 없어서
-// acl/emailByName 을 함께 본다. 한쪽만 보면 명단에서 사람이 통째로 빠진다.
-async function usagePeople(){
-  const byEmail = new Map();
-  TEACHERS.forEach(t => { if(t && t.email) byEmail.set(t.email, t.name || t.email); });
-  try {
-    const snap = await getDoc(doc(fbDb, 'acl', 'emailByName'));
-    if(snap.exists()) Object.entries(snap.data() || {}).forEach(([n, e]) => {
-      if(typeof e === 'string' && e.includes('@') && !byEmail.has(e)) byEmail.set(e, n);
-    });
-  } catch(e){}
-  return [...byEmail].map(([email, name]) => ({ email, name }));
-}
-
-let _usageBusy = false;
-async function loadUsage(){
-  if(_usageBusy) return;
-  _usageBusy = true;
-  const body = document.getElementById('usageBody');
-  const note = document.getElementById('usageNote');
-  const ym   = document.getElementById('usageMonth').value || usageDate().slice(0, 7);
-  body.innerHTML = '<div style="padding:24px;color:var(--ink-soft);font-size:13px;">불러오는 중…</div>';
-  try {
-    const people = await usagePeople();
-    // 사람마다 문서 하나. 60명이면 읽기 60번 — 하루 한도(5만)에 견주면 무시할 수준이다.
-    const rows = await Promise.all(people.map(async p => {
-      let days = {};
-      try {
-        const snap = await getDoc(doc(fbDb, 'usage', p.email, 'm', ym));
-        if(snap.exists()) days = snap.data().days || {};
-      } catch(e){}
-      return { ...p, days };
-    }));
-    note.textContent = `${ym} · 교직원 ${rows.length}명`;
-    renderUsage(rows, ym);
-  } catch(e){
-    body.innerHTML = `<div style="padding:24px;color:#B71C1C;font-size:13px;">불러오기 실패: ${escapeHtml(e.message)}</div>`;
-  } finally { _usageBusy = false; }
-}
-
-function renderUsage(rows, ym){
-  const [y, mo] = ym.split('-').map(Number);
-  const nDays = new Date(y, mo, 0).getDate();
-  const dstr  = d => `${ym}-${String(d).padStart(2,'0')}`;
-
-  // ── 집계 ───────────────────────────────────────────────────────────────
-  const perDay = Array.from({length:nDays}, () => ({ users:0, opens:0 }));
-  const tabTot = {};
-  let opensAll = 0, usersAll = 0;
-  const people = rows.map(r => {
-    let opens = 0, used = 0, last = '', tabs = {}, ver = '';
-    for(let d = 1; d <= nDays; d++){
-      const row = r.days[dstr(d)];
-      if(!row) continue;
-      const o = Number(row.opens) || 0;
-      opens += o; used++;
-      if(row.ver) ver = row.ver;                 // 마지막으로 쓴 화면 버전
-      perDay[d-1].users++; perDay[d-1].opens += o;
-      if(row.date || row.last) last = `${dstr(d).slice(5)} ${row.last || ''}`.trim();
-      Object.entries(row.tabs || {}).forEach(([k, v]) => {
-        tabs[k] = (tabs[k] || 0) + (Number(v) || 0);
-        tabTot[k] = (tabTot[k] || 0) + (Number(v) || 0);
-      });
-    }
-    opensAll += opens;
-    if(used) usersAll++;
-    const top = Object.entries(tabs).sort((a,b) => b[1]-a[1]).slice(0,3);
-    return { ...r, opens, used, last, tabs, top, ver, clicks: Object.values(tabs).reduce((a,b)=>a+b,0) };
-  }).sort((a,b) => b.opens - a.opens || b.used - a.used || a.name.localeCompare(b.name,'ko'));
-
-  const daysWithUse = perDay.filter(d => d.users).length;
-  const avgUsers = daysWithUse ? (perDay.reduce((a,d)=>a+d.users,0) / daysWithUse) : 0;
-  const tabRank = Object.entries(tabTot).sort((a,b) => b[1]-a[1]);
-  const tabMax  = tabRank.length ? tabRank[0][1] : 0;
-  const dayMax  = Math.max(1, ...perDay.map(d => d.users));
-  const clickAll = tabRank.reduce((a,t) => a + t[1], 0);
-
-  const chip = (l, v) => `<div class="ug-chip"><span>${l}</span><b>${v}</b></div>`;
-  const pct  = (n, d) => d ? Math.round(n / d * 100) : 0;
-
-  // ── 일자별 막대 ────────────────────────────────────────────────────────
-  const today = usageDate();
-  const bars = perDay.map((d, i) => {
-    const ds = dstr(i+1);
-    const dow = new Date(y, mo-1, i+1).getDay();
-    const h = Math.round(d.users / dayMax * 100);
-    return `<div class="ug-bar${d.users ? '' : ' zero'}${ds === today ? ' today' : ''}"
-                 title="${ds} · ${d.users}명 · ${d.opens}회">
-      <div class="ug-bar-fill" style="height:${d.users ? Math.max(4, h) : 0}%"></div>
-      <span class="ug-bar-lab${dow === 0 || dow === 6 ? ' wk' : ''}">${i+1}</span>
-    </div>`;
-  }).join('');
-
-  // ── 탭별 막대 ──────────────────────────────────────────────────────────
-  const tabBars = tabRank.length ? tabRank.map(([k, v]) => `
-    <div class="ug-trow">
-      <span class="ug-tname">${escapeHtml(USAGE_TABS[k] || k)}</span>
-      <span class="ug-tbar"><i style="width:${Math.max(2, Math.round(v/tabMax*100))}%"></i></span>
-      <span class="ug-tnum">${v.toLocaleString()}<em>${pct(v, clickAll)}%</em></span>
-    </div>`).join('')
-    : '<div class="ug-empty">아직 기록이 없습니다.</div>';
-
-  // ── 사람별 표 ──────────────────────────────────────────────────────────
-  const used = people.filter(p => p.used), idle = people.filter(p => !p.used);
-  const rowHtml = p => `<tr>
-    <td class="nm">${escapeHtml(p.name)}</td>
-    <td class="num">${p.opens || ''}</td>
-    <td class="num">${p.used || ''}</td>
-    <td class="num">${p.clicks || ''}</td>
-    <td class="dim">${escapeHtml(p.last)}</td>
-    <td class="${p.ver && p.ver !== APP_VER ? 'old' : 'dim'}">${escapeHtml(p.ver)}</td>
-    <td class="dim">${p.top.map(t => `${escapeHtml(USAGE_TABS[t[0]] || t[0])} ${t[1]}`).join(' · ')}</td>
-  </tr>`;
-
-  document.getElementById('usageBody').innerHTML = `
-    <div class="ug-chips">
-      ${chip('쓴 사람', `${usersAll}<small> / ${people.length}명</small>`)}
-      ${chip('앱 연 횟수', opensAll.toLocaleString())}
-      ${chip('탭 이동', clickAll.toLocaleString())}
-      ${chip('사용한 날', `${daysWithUse}일`)}
-      ${chip('하루 평균', `${avgUsers.toFixed(1)}명`)}
-      ${(() => { const old_ = people.filter(p => p.ver && p.ver !== APP_VER).length;
-                 return chip('옛 버전', old_ ? `<span style="color:#B71C1C">${old_}명</span>` : '없음'); })()}
-    </div>
-
-    <div class="ug-card">
-      <div class="ug-h">날짜별 사용자</div>
-      <div class="ug-bars">${bars}</div>
-    </div>
-
-    <div class="ug-two">
-      <div class="ug-card">
-        <div class="ug-h">기능별 사용량 <small>탭을 연 횟수</small></div>
-        ${tabBars}
-      </div>
-      <div class="ug-card">
-        <div class="ug-h">사람별</div>
-        <div class="ug-tblwrap"><table class="ug-tbl">
-          <thead><tr><th>이름</th><th>연 횟수</th><th>쓴 날</th><th>탭 이동</th><th>마지막</th><th>버전</th><th>많이 쓴 기능</th></tr></thead>
-          <tbody>${used.map(rowHtml).join('') || '<tr><td colspan="7" class="dim">기록 없음</td></tr>'}</tbody>
-        </table></div>
-        ${idle.length ? `<div class="ug-idle"><b>이 달에 안 쓴 ${idle.length}명</b>
-          <div>${idle.map(p => escapeHtml(p.name)).join(' · ')}</div></div>` : ''}
-      </div>
-    </div>
-
-    <div class="ug-foot">기록은 <b>앱을 연 횟수</b>와 <b>탭 이름·횟수</b>뿐입니다.
-      무엇을 검색했는지·누구를 조회했는지 같은 내용은 담지 않습니다.
-      (연락처 조회는 법에 따라 따로 남습니다.)</div>`;
 }
 
 // 🥚 학기 라벨을 빠르게 5번 클릭하면 1학기 아카이브 ↔ 2학기 토글 (숨겨진 기능)
@@ -8376,8 +8116,8 @@ function initSemEasterEgg(){
 //   - 브라우저: URL ?goto=<탭>
 //   - Neutralino 앱: 실행 인자 --goto=<탭>  (AHK 위젯이 클릭 시 이 인자로 앱을 실행)
 function launchGotoTarget(){
-  // 'usage' 는 관리자 전용 숨은 화면이다. 현황판 3단(빠른 메모)이 1400px 이상에서만
-  // 떠서 좁은 화면에서는 5연타할 자리가 없다 — 그때 쓰는 통로.
+  // 'usage' 는 탭이 아니라 별도 페이지(usage.html)로 보낸다. 현황판 3단(빠른 메모)이
+  // 1400px 이상에서만 떠서 좁은 화면에서는 5연타할 자리가 없다 — 그때 쓰는 통로.
   const VALID = ['home','weekly','schedule','mytask','grades','search','timetable','points','consult','docs','contacts','students','meal','usage'];
   let t = null;
   try { t = new URLSearchParams(location.search).get('goto'); } catch(e){}
@@ -14574,7 +14314,7 @@ function navigateTo(page) {
   document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(t => t.classList.toggle('active', t.dataset.page === page));
   // 'seat' 은 탭 버튼이 없는 화면이다 — 자리 배치 모달의 「페이지로」로만 들어온다.
   // 여기 목록에 없으면 다른 탭으로 옮겨도 안 닫힌다.
-  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult','docs','grades','search','room','pass','seat','usage'].forEach(p => {
+  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult','docs','grades','search','room','pass','seat'].forEach(p => {
     const el = document.getElementById(p + 'Page');
     if(el) el.classList.toggle('active', p === page);
   });
