@@ -5,7 +5,7 @@
 // 그 파일을 고쳐 다시 올리면 저장이 통째로 덮어쓰기라 전 교직원의 번호가
 // 한 번에 날아간다. 시점 복구가 없어(Spark) 되돌릴 수단도 없다.
 //
-// 번호는 못 읽지만 명렬의 hasPhone(번호가 있다/없다)은 읽힌다. 그걸로 '몇 명이
+// 번호는 못 읽지만 명단의 hasPhone(번호가 있다/없다)은 읽힌다. 그걸로 '몇 명이
 // 지워지는지'를 세서 막는다. 여기서는 실제 화면에 파일을 올려 저장까지 눌러 보고,
 // **무엇이 저장됐는지를 값으로** 본다.
 import { chromium } from 'playwright';
@@ -130,10 +130,10 @@ console.log('\n■ 번호가 빈 파일을 올리면 미리 막는다');
   await pg.click('#ctUploadBtn');
   await pg.waitForTimeout(300);
   check('저장을 눌러도 아무것도 안 써진다', (await writes()).length === 0, await writes());
-  check('명렬만 저장 버튼이 나타난다', await pg.isVisible('#ctRosterOnlyBtn'));
+  check('명단만 저장 버튼이 나타난다', await pg.isVisible('#ctRosterOnlyBtn'));
 }
 
-console.log('\n■ 명렬만 저장 — 번호 문서는 손대지 않는다');
+console.log('\n■ 명단만 저장 — 번호 문서는 손대지 않는다');
 {
   await pg.click('#ctRosterOnlyBtn');
   await pg.waitForFunction(() => window.__writes.length > 0, { timeout: 10000 });
@@ -166,7 +166,7 @@ console.log('\n■ 번호가 든 원본은 예전처럼 저장된다');
   await pg.setInputFiles('#ctFileInput', FILE_FULL);
   await pg.waitForTimeout(300);
   check('경고가 안 뜬다', !/지워집니다/.test(await status()), await status());
-  check('명렬만 저장 버튼은 숨어 있다', !(await pg.isVisible('#ctRosterOnlyBtn')));
+  check('명단만 저장 버튼은 숨어 있다', !(await pg.isVisible('#ctRosterOnlyBtn')));
   // 앞 시나리오에서 '신규교사'가 저장됐다. 이 파일에는 그 사람이 없으니
   // 명단에서 빠진다 — 확인을 받는 게 맞다.
   const diff0 = await pg.$eval('#ctDiffBox', e => e.innerText.replace(/\s+/g,' ').trim());
@@ -178,7 +178,7 @@ console.log('\n■ 번호가 든 원본은 예전처럼 저장된다');
   await pg.waitForFunction(() => window.__writes.length >= 2, { timeout: 10000 });
   const w = await written();
   const colls = w.map(x => x[0]);
-  check('명렬과 번호를 함께 쓴다', colls.includes('contacts') && colls.includes('contactsPhone'), colls);
+  check('명단과 번호를 함께 쓴다', colls.includes('contacts') && colls.includes('contactsPhone'), colls);
   const phones = w.find(x => x[0] === 'contactsPhone')[2].staff;
   check(`번호가 있는 ${HAD}명분이 저장된다`, phones.filter(p => p.phone).length === HAD,
         phones.filter(p => p.phone).length);
@@ -212,11 +212,11 @@ console.log('\n■ 몇 명만 든 파일을 올리면 나머지가 지워진다�
   check('확인 전에는 저장되지 않는다', (await writes()).length === 0, await writes());
   check('무엇을 하라고 알려 준다', /확인란/.test(await status()), await status());
 
-  // 명렬만 저장도 같은 확인을 거쳐야 한다 — 여기서도 사람은 지워진다
+  // 명단만 저장도 같은 확인을 거쳐야 한다 — 여기서도 사람은 지워진다
   await pg.evaluate(() => { document.getElementById('ctRosterOnlyBtn').style.display = ''; });
   await pg.click('#ctRosterOnlyBtn');
   await pg.waitForTimeout(300);
-  check('명렬만 저장도 막힌다', (await writes()).length === 0, await writes());
+  check('명단만 저장도 막힌다', (await writes()).length === 0, await writes());
 
   // 퇴직·전출이라면 확인하고 그대로 진행할 수 있어야 한다
   await pg.check('#ctConfirmDel');
@@ -317,7 +317,7 @@ console.log('\n■ 번호가 바뀐 사람만 적어서 올린다');
   await pm.waitForSelector('#ctPreviewWrap:not([style*="display: none"])');
   await pm.waitForTimeout(200);
   check('번호가 지워진다는 경고가 없다', !/지워집니다/.test(await pmStatus()), await pmStatus());
-  check('명렬만 저장 버튼도 안 뜬다', !(await pm.isVisible('#ctRosterOnlyBtn')));
+  check('명단만 저장 버튼도 안 뜬다', !(await pm.isVisible('#ctRosterOnlyBtn')));
   check('명단 변동도 없다', !(await pm.isVisible('#ctConfirmWrap')));
 
   await pm.click('#ctUploadBtn');
@@ -342,6 +342,76 @@ console.log('\n■ 번호가 바뀐 사람만 적어서 올린다');
   check("지운 사람은 '번호 있음' 표시도 꺼진다", flag.get(STAFF[3].name) === false);
   check('그대로 둔 사람은 표시도 그대로', flag.get(STAFF[5].name) === STAFF[5].hasPhone);
   check('무엇을 그대로 두었는지 알려 준다', /그대로 두었습니다/.test(await pmStatus()), await pmStatus());
+}
+
+console.log('\n■ 퇴직 자리에 신규임용 — 이름을 바꾸고 번호를 새로 넣는다');
+{
+  // 실제로 생기는 일. 여기서 절대 안 되는 것은 **퇴직자 번호가 신규자에게
+  // 붙는 것**이다. 번호는 이름으로 찾으니 새 이름은 못 찾아야 정상이다.
+  const RETIRED = STAFF[1];                       // 번호가 있던 사람
+  // 앞 시나리오들이 이미 몇 명의 번호를 바꿔 놨다. 원래 값이 아니라
+  // '지금 저장돼 있는 값' 과 비교해야 한다.
+  const before = new Map((await pm.evaluate(() => window.__PHONES))
+    .map(r => [r.name, r.phone || '']));
+  const rows = STAFF.map(t => [t.name, t.dept, t.subject, '', t.ext, t.role]);
+  rows[1][0] = '신규임용';
+  rows[1][3] = '010-7777-8888';                   // 새 번호를 직접 넣는다
+  const f = xlsxFile('replace.xlsx', rows);
+
+  await pm.evaluate(() => { window.__writes = []; });
+  await pm.setInputFiles('#ctFileInput', f);
+  await pm.waitForSelector('#ctPreviewWrap:not([style*="display: none"])');
+  await pm.waitForTimeout(200);
+
+  const diff = await pm.$eval('#ctDiffBox', e => e.innerText.replace(/\s+/g, ' ').trim());
+  check('퇴직자가 사라짐에 뜬다', new RegExp(`사라짐 1명 ${RETIRED.name}`).test(diff), diff);
+  check('신규자가 새로 들어옴에 뜬다', /새로 들어옴 1명 신규임용/.test(diff), diff);
+  check('사람이 빠지므로 확인을 받는다', await pm.isVisible('#ctConfirmWrap'));
+
+  await pm.check('#ctConfirmDel');
+  await pm.click('#ctUploadBtn');
+  await pm.waitForFunction(() => window.__writes.length >= 2, { timeout: 10000 });
+  const w = await pmWritten();
+  const phones = w.find(x => x[0] === 'contactsPhone')[2].staff;
+  const byName = new Map(phones.map(r => [r.name, r.phone || '']));
+
+  check('신규자는 새로 넣은 번호를 받는다', byName.get('신규임용') === '010-7777-8888', byName.get('신규임용'));
+  check('퇴직자는 번호 문서에서 사라진다', !byName.has(RETIRED.name), [...byName.keys()].slice(0,3));
+  // 이게 이 검사의 핵심 — 퇴직자 번호가 신규자 자리에 남으면 남의 번호로 전화가 간다
+  const retiredPhone = before.get(RETIRED.name);
+  check('퇴직자 번호가 어디에도 안 남는다',
+        !!retiredPhone && ![...byName.values()].includes(retiredPhone), retiredPhone);
+  const others = STAFF.filter((t, i) => i !== 1 && before.get(t.name));
+  check(`나머지 ${others.length}명 번호는 그대로`,
+        others.every(t => byName.get(t.name) === before.get(t.name)),
+        others.filter(t => byName.get(t.name) !== before.get(t.name)).slice(0,3)
+              .map(t => [t.name, before.get(t.name), byName.get(t.name)]));
+
+  const roster = w.find(x => x[0] === 'contacts')[2].staff;
+  check('명단에도 신규자가 들어간다', roster.some(r => r.name === '신규임용'));
+  check('명단에서 퇴직자는 빠진다', !roster.some(r => r.name === RETIRED.name));
+  check('인원은 그대로', roster.length === STAFF.length, roster.length);
+}
+
+console.log('\n■ 이름만 바꾸고 번호를 안 넣으면 — 빈칸으로 남아야 한다');
+{
+  // 번호를 깜빡한 경우. 앞 사람 번호가 그대로 붙으면 최악이다.
+  const rows = STAFF.map(t => [t.name, t.dept, t.subject, '', t.ext, t.role]);
+  rows[2][0] = '신규임용2';                        // 번호 칸은 비운 채로
+  const f = xlsxFile('replace2.xlsx', rows);
+  await pm.evaluate(() => { window.__writes = []; });
+  await pm.setInputFiles('#ctFileInput', f);
+  await pm.waitForSelector('#ctConfirmWrap', { state: 'visible', timeout: 5000 });
+  await pm.check('#ctConfirmDel');
+  await pm.click('#ctUploadBtn');
+  await pm.waitForFunction(() => window.__writes.length >= 2, { timeout: 10000 });
+  const w = await pmWritten();
+  const phones = w.find(x => x[0] === 'contactsPhone')[2].staff;
+  const byName = new Map(phones.map(r => [r.name, r.phone || '']));
+  check('새 이름에는 번호가 없다', !byName.get('신규임용2'), byName.get('신규임용2'));
+  const roster = w.find(x => x[0] === 'contacts')[2].staff;
+  const flag = new Map(roster.map(r => [r.name, !!r.hasPhone]));
+  check("'번호 있음' 표시도 꺼져 있다", flag.get('신규임용2') === false);
 }
 
 console.log('\n■ 사람이 빠지는 것은 여기서도 확인을 받는다');
