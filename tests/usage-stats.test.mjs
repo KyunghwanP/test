@@ -72,7 +72,7 @@ console.log('\n■ 부르는 함수가 원본에 있는가');
   const BUILTIN = new Set(['if','for','while','switch','catch','return','typeof','function',
     'Number','String','Object','Array','Math','Date','Promise','JSON','Set','Map','parseInt',
     'parseFloat','isNaN','setTimeout','clearTimeout','require','await','new','RegExp',
-    'var']);   // var(--…) 는 CSS 다
+    'var', 'confirm', 'alert', 'getComputedStyle', 'setInterval', 'clearInterval']);
   // firebase 에서 들여온 이름(getDoc·doc 등)도 '있는' 것이다
   const imported = new Set([...HTML.matchAll(/^import \{([^}]+)\} from/gm)]
     .flatMap(m => m[1].split(',').map(x => x.trim().split(/\s+as\s+/).pop())));
@@ -91,6 +91,7 @@ pg.on('pageerror', e => errs.push(e.message));
 const HARNESS = `<!doctype html><meta charset="utf-8">
 <div class="page-view active" id="homePage">
   <div id="homeMemoCard"><span class="home-section-title">📝 빠른 메모</span></div>
+  <textarea id="someMemo"></textarea>
 </div>
 <div class="page-view" id="usagePage">
   <input type="month" id="usageMonth"><span id="usageNote"></span><div id="usageBody"></div>
@@ -106,6 +107,9 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
 
   const fbDb = {};
   const doc = (db, ...p) => ({ path: p.join('/') });
+  let _snapCb = null;
+  function onSnapshot(ref, cb){ _snapCb = cb; return () => { _snapCb = null; }; }
+  window.__push = n => _snapCb && _snapCb({ exists: () => true, data: () => ({ n }) });
   window.__store = {};        // 저장돼 있는 문서
   window.__writes = [];
   const getDoc = async r => ({ exists: () => !!window.__store[r.path],
@@ -135,6 +139,14 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   ${grab('usageFlush')}
   ${grabConst('USAGE_TABS')}
   ${grabConst('usageIsAdmin')}
+  ${grabConst('APP_VER')}
+  ${grabConst('RELOAD_SEEN_KEY')}
+  let _reloadUnsub = null, _reloadBar = null, _reloadTimer = null;
+  let _reloadSeen = (() => { try { return localStorage.getItem(RELOAD_SEEN_KEY); } catch(e){ return null; } })();
+  ${grab('isBusyTyping')}
+  ${grab('showReloadBar')}
+  ${grab('onReloadSignal')}
+  ${grab('watchReloadSignal')}
   let _ugClicks = 0, _ugTimer = null;
   ${grab('initUsageEasterEgg')}
   let _usageBackTo = 'home';
@@ -146,12 +158,25 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   ${grab('renderUsage')}
 
   Object.assign(window, { usageStart, usageTab, usageFlush, usageDate, loadUsage,
-                          renderUsage, initUsageEasterEgg, openUsagePage });
+                          renderUsage, initUsageEasterEgg, openUsagePage,
+                          watchReloadSignal, isBusyTyping, APP_VER });
+  window.__armed = () => { watchReloadSignal(); };
   window.__day = () => usageDay;
   initUsageEasterEgg();
 </script>`;
 
-await pg.setContent(HARNESS);
+// setContent 로 띄우면 localStorage 가 막힌 출처가 된다(SecurityError).
+// 실제 배포는 https 라 그 상태로 검사하면 저장 경로를 아예 못 본다.
+// location.reload 는 덮어쓸 수 없다(읽기 전용). 실제로 새로고침이 일어나므로
+// '몇 번 다시 받아 갔는지'를 라우트에서 센다. 새로고침되면 하네스도 처음부터
+// 다시 도는데, 그게 실제 동작과 같다.
+let serves = 0;
+await pg.route('https://ynhs.test/**', r => {
+  serves++;
+  r.fulfill({ contentType: 'text/html; charset=utf-8', body: HARNESS });
+});
+await pg.goto('https://ynhs.test/h.html');
+const reloadedSince = base => serves - base;
 
 const tap = async n => { for (let i = 0; i < n; i++) await pg.click('#homeMemoCard .home-section-title'); };
 const active = () => pg.evaluate(() => document.querySelector('.page-view.active')?.id);
@@ -261,6 +286,100 @@ console.log('\n■ 화면 — 집계가 맞는가');
   check('안 쓴 사람은 따로 모은다',
         /이 달에 안 쓴 1명/.test(txt) && /박세찬/.test(await pg.$eval('.ug-idle', e => e.innerText)), txt.slice(-200));
   check('무엇을 안 남기는지 화면에 적어 둔다', /무엇을 검색했는지/.test(txt));
+}
+
+/* ══ 전체 새로고침 ══════════════════════════════════════════════════════ */
+console.log('\n■ 배포해도 옛 화면을 쓰는 사람에게 새로고침을 보낸다');
+check('규칙: 읽기는 교사, 쓰기는 관리자만',
+      /match \/appNotice\/\{docId\} \{[\s\S]{0,160}allow read:\s+if isYnhsTeacher\(\);[\s\S]{0,80}allow write: if isAppAdmin\(\);/.test(RULES));
+check('전 교사가 쓸 수 있는 appdata 에 두지 않았다',
+      !/appdata', 'reload'|appdata', 'appVersion/.test(HTML));
+check('로그인하면 신호를 듣는다', /watchReloadSignal\(\);/.test(HTML));
+check('보낸 뒤 번호가 오르는 방식', /n = \(Number\(snap\.exists\(\) \? snap\.data\(\)\.n : 0\) \|\| 0\) \+ 1/.test(HTML));
+{
+  await pg.evaluate(() => {
+    try { localStorage.removeItem('ynhsReloadSeen'); } catch(e){}
+    document.getElementById('appReloadBar')?.remove();
+    window.__armed();
+  });
+
+  // 이 기능이 깔리는 순간 전원이 새로고침하면 안 된다
+  let base = serves;
+  await pg.evaluate(() => window.__push(7));
+  await pg.waitForTimeout(150);
+  check('처음 보는 기기는 번호만 적어 둔다',
+        reloadedSince(base) === 0 && !(await pg.$('#appReloadBar')));
+  check('그 번호를 기억한다',
+        (await pg.evaluate(() => localStorage.getItem('ynhsReloadSeen'))) === '7');
+
+  // 스냅샷은 내용이 안 바뀌어도 다시 올 수 있다
+  await pg.evaluate(() => window.__push(7));
+  await pg.waitForTimeout(150);
+  check('같은 번호에는 아무 일 없다', !(await pg.$('#appReloadBar')));
+
+  // 관리자가 새로 보냈다 — 적는 중이 아니면 세고 새로고침
+  await pg.evaluate(() => window.__push(8));
+  await pg.waitForTimeout(150);
+  const bar = await pg.$eval('#appReloadBar', e => e.innerText.replace(/\s+/g,' '));
+  check('막대가 뜬다', /새 버전이 있습니다/.test(bar), bar);
+  check('몇 초 뒤인지 알려준다', /\d초 후 새로고침/.test(bar), bar);
+  check('바로 날리지 않는다', reloadedSince(base) === 0);
+
+  base = serves;
+  await pg.waitForURL('**/h.html', { timeout: 12000 }).catch(() => {});
+  await pg.waitForTimeout(6000);
+  check('세고 나면 새로고침한다', reloadedSince(base) >= 1, reloadedSince(base));
+  check('새로고침 뒤에는 다시 안 뜬다 (번호를 기억한다)',
+        (await pg.evaluate(() => localStorage.getItem('ynhsReloadSeen'))) === '8');
+}
+
+console.log('\n■ 적고 있으면 강제로 하지 않는다');
+{
+  await pg.evaluate(() => {
+    document.getElementById('appReloadBar')?.remove();
+    window.__armed();
+    const t = document.getElementById('someMemo'); t.value = '학부모 상담 메모 쓰는 중'; t.focus();
+  });
+  check('적는 중으로 본다', await pg.evaluate(() => window.isBusyTyping()));
+
+  let base = serves;
+  await pg.evaluate(() => window.__push(9));
+  await pg.waitForTimeout(150);
+  const bar = await pg.$eval('#appReloadBar', e => e.innerText.replace(/\s+/g,' '));
+  check('안내만 하고 세지 않는다', !/초 후/.test(bar), bar);
+  check('직접 누를 버튼은 있다', /지금 새로고침/.test(bar), bar);
+  await pg.waitForTimeout(3000);
+  check('시간이 지나도 적던 게 안 날아간다', reloadedSince(base) === 0, reloadedSince(base));
+
+  // 세는 도중에 적기 시작하면 멈춰야 한다
+  await pg.evaluate(() => {
+    document.getElementById('appReloadBar')?.remove();
+    const t = document.getElementById('someMemo'); t.value = ''; t.blur();
+  });
+  base = serves;
+  await pg.evaluate(() => window.__push(10));
+  await pg.waitForTimeout(1300);
+  await pg.evaluate(() => { const t = document.getElementById('someMemo');
+    t.value = '갑자기 적기 시작'; t.focus(); });
+  await pg.waitForTimeout(5500);
+  check('세다가도 적기 시작하면 멈춘다', reloadedSince(base) === 0, reloadedSince(base));
+  await pg.evaluate(() => { const t = document.getElementById('someMemo'); t.value = ''; t.blur();
+    document.getElementById('appReloadBar')?.remove(); });
+}
+
+console.log('\n■ 누가 옛 화면을 쓰는지 보인다');
+{
+  const rows = [
+    { email:'a@x', name:'김하나', days:{ '2026-05-01':{opens:1, last:'10:00', ver:'ver6.97', tabs:{home:1}} } },
+    { email:'b@x', name:'이두리', days:{ '2026-05-01':{opens:1, last:'10:00', ver:'ver6.80', tabs:{home:1}} } },
+  ];
+  await pg.evaluate(([r, ym]) => window.renderUsage(r, ym), [rows, '2026-05']);
+  const olds = await pg.$$eval('.ug-tbl td.old', els => els.map(e => e.textContent));
+  check('옛 버전만 빨갛게 짚어 준다', olds.join() === 'ver6.80', olds);
+  const txt = await pg.$eval('#usageBody', e => e.innerText.replace(/\s+/g,' '));
+  check('몇 명인지 요약에도 나온다', /옛 버전\s*1명/.test(txt), txt.slice(0,220));
+  check('버전 칸이 표에 있다',
+        (await pg.$$eval('.ug-tbl th', els => els.map(e => e.textContent))).includes('버전'));
 }
 
 console.log(errs.length ? '\n❌ 런타임 오류:\n' + errs.slice(0,4).join('\n') : '\n✅ 런타임 오류 없음');

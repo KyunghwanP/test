@@ -110,7 +110,7 @@ FAB(모바일 발급 버튼)은 `#passPage` 바깥의 `position:fixed` 라 하�
 node tests/pass-fab.test.mjs                       # FAB 이 외출증 화면에서만 뜨는지
 node tests/seat-inpage.test.mjs                    # 자리 배치 '크게 보기' → 앱 안 화면 + 돌아가기
 node tests/weekly-chips-live.test.mjs              # 주차 칩이 새로고침 없이 늘어나는지
-node tests/usage-stats.test.mjs                    # 사용 현황 — 세는 값·저장·관리자만
+node tests/usage-stats.test.mjs                    # 사용 현황 · 전체 새로고침
 node tests/consult-weekend.test.mjs                # 상담 주말 슬롯 + 7칸 폭 측정
 node tests/task-share.test.mjs                     # 공유받은 업무에 작성자·함께 받은 사람
 node tests/cal-consult.test.mjs                    # 업무 캘린더의 상담 예약 표시·상세
@@ -129,6 +129,19 @@ node tests/cal-consult.test.mjs                    # 업무 캘린더의 상담 
 - 관리자 말고는 못 들어가는가 — 다른 교사·보기 모드에서 5연타해도 안 열린다
 - 화면 집계가 맞는가 — 사람 수·횟수·날짜별 막대·기능 순위·안 쓴 사람
 - **부르는 함수가 원본에 정말 있는가**
+
+**전체 새로고침**도 여기서 본다. 배포해도 탭을 켜 둔 사람은 옛 화면을 계속 쓴다 —
+서비스워커의 '새 버전' 안내는 화면을 새로 열 때만 뜨니 켜 둔 탭에는 영영 안 뜬다.
+관리자가 `appNotice/reload` 의 번호를 올리면 열려 있는 화면들이 스냅샷으로 받는다.
+
+- 처음 보는 기기는 번호만 적어 둔다(안 그러면 배포 순간 전원이 새로고침한다)
+- 같은 번호가 다시 와도 아무 일 없다
+- **적고 있으면 강제로 하지 않는다** — 안내만 하고, 세는 도중에 적기 시작해도 멈춘다
+- 사람별 표에 지금 쓰는 버전이 뜨고, 옛 버전은 빨갛게 짚어 준다
+
+`location.reload` 는 덮어쓸 수 없어서(읽기 전용) 실제로 새로고침이 일어난다. 그래서
+'몇 번 다시 받아 갔는지'를 라우트에서 센다. `setContent` 로 띄우면 localStorage 가
+막힌 출처가 돼 저장 경로를 아예 못 보므로, 진짜 출처처럼 띄운다.
 
 마지막 항목은 하네스의 함정 때문에 넣었다. 하네스가 없는 함수를 대신 정의해 주면
 원본에 없어도 검사는 통과한다. 실제로 그렇게 통과시켰다 — `esc()` 는 index.html 에

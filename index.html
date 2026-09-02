@@ -3428,6 +3428,8 @@
   .ug-tbl td.nm{font-weight:700;}
   .ug-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}
   .ug-tbl td.dim{color:var(--ink-soft);}
+  /* 옛 화면을 쓰는 사람 — 이 칸 하나 보려고 버전을 남긴다 */
+  .ug-tbl td.old{color:#B71C1C;font-weight:700;}
   .ug-idle{margin-top:11px;padding-top:10px;border-top:1px solid var(--rule);
     font-size:11.5px;color:var(--ink-soft);line-height:1.75;}
   .ug-empty{font-size:12.5px;color:var(--ink-soft);padding:10px 0;}
@@ -5410,6 +5412,7 @@
           <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">📊 사용 현황</span>
           <input type="month" id="usageMonth" style="font-size:13px;padding:4px 8px;border:1px solid var(--rule);border-radius:7px;background:#fff;color:inherit;">
           <button class="sg-back-btn" id="usageReloadBtn">↻ 새로고침</button>
+          <button class="sg-back-btn" id="usageReloadAllBtn" title="열려 있는 모든 선생님 화면에 새로고침을 보냅니다">📣 모두 새로고침</button>
           <span id="usageNote" style="font-size:11.5px;color:var(--ink-soft);margin-left:auto;"></span>
         </div>
         <div id="usageBody" style="flex:1;overflow:auto;padding:16px;"></div>
@@ -5927,6 +5930,9 @@ const TEACHERS = [];
 
 // ── 관리자 '다른 교사로 보기' (admin.html → index.html?viewAs=이메일, 읽기 전용) ──
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
+// 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
+// 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
+const APP_VER = 'ver6.97';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -5990,7 +5996,7 @@ const REMOTE_BASE = (window.NL_TOKEN || window.NL_PORT) ? 'https://kyunghwanp.gi
 try {
   const nlKeys = Object.keys(window).filter(k => k.startsWith('NL_'));
   document.querySelectorAll('.nav-version').forEach(el => {
-    el.textContent = 'ver6.97 · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
+    el.textContent = APP_VER + ' · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
@@ -7990,6 +7996,112 @@ async function toggleSemester(){
     _semBusy = false;
   }
 }
+/* ══ 전체 새로고침 ═══════════════════════════════════════════════════════
+   배포해도 탭을 켜 둔 사람은 옛 화면을 계속 쓴다. 서비스워커의 '새 버전' 안내는
+   화면을 새로 열 때만 뜨니 켜 둔 탭에는 영영 안 뜬다 — 새로고침해야 새로고침하라는
+   안내가 뜨는 꼴이다. 실제로 고쳐 줬는데 안 고쳐진 줄 아는 일이 있었다.
+
+   관리자가 appNotice/reload 의 번호를 올리면 열려 있는 화면들이 스냅샷으로 받는다.
+   무턱대고 새로고침하지는 않는다 — 뭘 적고 있으면 그게 날아간다. 적는 중이면
+   막대만 띄우고, 아니면 5초를 세고 새로고침한다(그동안 취소할 수 있다).       */
+const RELOAD_SEEN_KEY = 'ynhsReloadSeen';
+let _reloadUnsub = null, _reloadBar = null, _reloadTimer = null;
+
+// '지금 뭘 적는 중인가' — 적는 중이면 새로고침하지 않는다.
+function isBusyTyping(){
+  const a = document.activeElement;
+  if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && String(a.value || '').trim()) return true;
+  if (a && a.isContentEditable && String(a.textContent || '').trim()) return true;
+  if (document.querySelector('.modal-overlay.open, .pass-modal-overlay.open')) return true;
+  // 내용이 있는 채로 열려 있는 입력칸(포커스를 잃었어도 적던 것이다)
+  for (const el of document.querySelectorAll('textarea')) {
+    if (el.offsetParent && String(el.value || '').trim()) return true;
+  }
+  return false;
+}
+
+function showReloadBar(text, secs){
+  if (_reloadBar) _reloadBar.remove();
+  const bar = _reloadBar = document.createElement('div');
+  bar.id = 'appReloadBar';
+  bar.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);z-index:2000;'
+    + 'bottom:calc(18px + env(safe-area-inset-bottom,0px));display:flex;gap:10px;align-items:center;'
+    + 'background:#1F3D33;color:#FBF6EC;padding:11px 15px;border-radius:12px;font-size:13px;'
+    + 'box-shadow:0 6px 20px rgba(0,0,0,.28);max-width:calc(100vw - 24px);';
+  const msg = document.createElement('span');
+  const go  = document.createElement('button');
+  go.textContent = '지금 새로고침';
+  go.style.cssText = 'background:#FBF6EC;color:#1F3D33;border:0;border-radius:8px;'
+    + 'padding:6px 11px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;';
+  go.onclick = () => location.reload();
+  const no = document.createElement('button');
+  no.textContent = '나중에';
+  no.style.cssText = 'background:transparent;color:#FBF6EC;border:1px solid rgba(251,246,236,.45);'
+    + 'border-radius:8px;padding:6px 10px;font-size:12.5px;cursor:pointer;white-space:nowrap;';
+  no.onclick = () => { clearInterval(_reloadTimer); bar.remove(); _reloadBar = null; };
+  bar.append(msg, go, no);
+  document.body.appendChild(bar);
+
+  let left = secs;
+  const paint = () => { msg.textContent = left > 0 ? `${text} ${left}초 후 새로고침합니다.` : text; };
+  paint();
+  if (secs > 0) {
+    _reloadTimer = setInterval(() => {
+      left--;
+      // 세는 도중에 뭘 적기 시작하면 멈춘다 — 적던 게 날아가면 안 된다.
+      if (isBusyTyping()) { clearInterval(_reloadTimer); msg.textContent = text; return; }
+      if (left <= 0) { clearInterval(_reloadTimer); location.reload(); return; }
+      paint();
+    }, 1000);
+  }
+}
+
+// 마지막으로 본 번호. localStorage 를 못 쓰는 브라우저(사이트 데이터 차단 등)에서도
+// 최소한 이 세션 안에서는 동작하도록 메모리에도 들고 있는다. 저장만 믿으면 그런
+// 기기에서는 '처음 보는 번호'가 영원히 반복돼 신호가 통째로 무시된다.
+let _reloadSeen = (() => { try { return localStorage.getItem(RELOAD_SEEN_KEY); } catch(e){ return null; } })();
+
+function onReloadSignal(n){
+  const seen = _reloadSeen;
+  _reloadSeen = String(n);
+  try { localStorage.setItem(RELOAD_SEEN_KEY, String(n)); } catch(e){}
+  // 처음 보는 기기는 번호만 적어 둔다. 안 그러면 이 기능이 깔리는 순간 전원이 새로고침한다.
+  if (seen === null) return;
+  if (Number(n) <= Number(seen)) return;
+  if (isBusyTyping()) showReloadBar('새 버전이 있습니다.', 0);
+  else showReloadBar('새 버전이 있습니다.', 5);
+}
+
+function watchReloadSignal(){
+  if (_reloadUnsub) return;
+  _reloadUnsub = onSnapshot(doc(fbDb, 'appNotice', 'reload'), snap => {
+    if (!snap.exists()) return;
+    const n = Number(snap.data().n) || 0;
+    if (n) onReloadSignal(n);
+  }, () => {});
+}
+
+// 관리자만 — 열려 있는 모든 화면에 새로고침을 건다.
+async function broadcastReload(){
+  if (fbAuth.currentUser?.email !== ADMIN_EMAIL || isViewAs()) return;
+  const btn = document.getElementById('usageReloadAllBtn');
+  const ref = doc(fbDb, 'appNotice', 'reload');
+  try {
+    btn.disabled = true;
+    const snap = await getDoc(ref);
+    const n = (Number(snap.exists() ? snap.data().n : 0) || 0) + 1;
+    await _fsSetDoc(ref, { n, at: new Date().toISOString(),
+                           by: fbAuth.currentUser.email, ver: APP_VER });
+    // 내 화면은 스냅샷으로 나에게도 돌아온다 — 번호만 적어 두고 넘긴다.
+    _reloadSeen = String(n);
+    try { localStorage.setItem(RELOAD_SEEN_KEY, String(n)); } catch(e){}
+    document.getElementById('usageNote').textContent =
+      `열려 있는 화면에 새로고침을 보냈습니다 (#${n}).`;
+  } catch(e) {
+    document.getElementById('usageNote').textContent = '보내기 실패: ' + (e.message || e);
+  } finally { btn.disabled = false; }
+}
+
 /* 🥚 사용 현황 — '📝 빠른 메모' 제목 5연타. 관리자만 열린다.
    ────────────────────────────────────────────────────────────────────────
    탭 버튼을 두지 않는 이유: 이 화면은 관리자 혼자 보는 것이고, 탭으로 두면
@@ -8011,6 +8123,10 @@ const usageIsAdmin = () => fbAuth.currentUser?.email === ADMIN_EMAIL && !isViewA
 document.getElementById('usageBackBtn').addEventListener('click', () => closeUsagePage());
 document.getElementById('usageReloadBtn').addEventListener('click', () => loadUsage());
 document.getElementById('usageMonth').addEventListener('change', () => loadUsage());
+document.getElementById('usageReloadAllBtn').addEventListener('click', () => {
+  if (confirm('열려 있는 모든 선생님 화면에 새로고침을 보냅니다.\n\n'
+    + '뭔가 적고 있는 분에게는 강제로 하지 않고 안내 막대만 뜹니다.\n계속할까요?')) broadcastReload();
+});
 
 let _ugClicks = 0, _ugTimer = null;
 function initUsageEasterEgg(){
@@ -8087,12 +8203,13 @@ function renderUsage(rows, ym){
   const tabTot = {};
   let opensAll = 0, usersAll = 0;
   const people = rows.map(r => {
-    let opens = 0, used = 0, last = '', tabs = {};
+    let opens = 0, used = 0, last = '', tabs = {}, ver = '';
     for(let d = 1; d <= nDays; d++){
       const row = r.days[dstr(d)];
       if(!row) continue;
       const o = Number(row.opens) || 0;
       opens += o; used++;
+      if(row.ver) ver = row.ver;                 // 마지막으로 쓴 화면 버전
       perDay[d-1].users++; perDay[d-1].opens += o;
       if(row.date || row.last) last = `${dstr(d).slice(5)} ${row.last || ''}`.trim();
       Object.entries(row.tabs || {}).forEach(([k, v]) => {
@@ -8103,7 +8220,7 @@ function renderUsage(rows, ym){
     opensAll += opens;
     if(used) usersAll++;
     const top = Object.entries(tabs).sort((a,b) => b[1]-a[1]).slice(0,3);
-    return { ...r, opens, used, last, tabs, top, clicks: Object.values(tabs).reduce((a,b)=>a+b,0) };
+    return { ...r, opens, used, last, tabs, top, ver, clicks: Object.values(tabs).reduce((a,b)=>a+b,0) };
   }).sort((a,b) => b.opens - a.opens || b.used - a.used || a.name.localeCompare(b.name,'ko'));
 
   const daysWithUse = perDay.filter(d => d.users).length;
@@ -8146,6 +8263,7 @@ function renderUsage(rows, ym){
     <td class="num">${p.used || ''}</td>
     <td class="num">${p.clicks || ''}</td>
     <td class="dim">${escapeHtml(p.last)}</td>
+    <td class="${p.ver && p.ver !== APP_VER ? 'old' : 'dim'}">${escapeHtml(p.ver)}</td>
     <td class="dim">${p.top.map(t => `${escapeHtml(USAGE_TABS[t[0]] || t[0])} ${t[1]}`).join(' · ')}</td>
   </tr>`;
 
@@ -8156,6 +8274,8 @@ function renderUsage(rows, ym){
       ${chip('탭 이동', clickAll.toLocaleString())}
       ${chip('사용한 날', `${daysWithUse}일`)}
       ${chip('하루 평균', `${avgUsers.toFixed(1)}명`)}
+      ${(() => { const old_ = people.filter(p => p.ver && p.ver !== APP_VER).length;
+                 return chip('옛 버전', old_ ? `<span style="color:#B71C1C">${old_}명</span>` : '없음'); })()}
     </div>
 
     <div class="ug-card">
@@ -8171,8 +8291,8 @@ function renderUsage(rows, ym){
       <div class="ug-card">
         <div class="ug-h">사람별</div>
         <div class="ug-tblwrap"><table class="ug-tbl">
-          <thead><tr><th>이름</th><th>연 횟수</th><th>쓴 날</th><th>탭 이동</th><th>마지막</th><th>많이 쓴 기능</th></tr></thead>
-          <tbody>${used.map(rowHtml).join('') || '<tr><td colspan="6" class="dim">기록 없음</td></tr>'}</tbody>
+          <thead><tr><th>이름</th><th>연 횟수</th><th>쓴 날</th><th>탭 이동</th><th>마지막</th><th>버전</th><th>많이 쓴 기능</th></tr></thead>
+          <tbody>${used.map(rowHtml).join('') || '<tr><td colspan="7" class="dim">기록 없음</td></tr>'}</tbody>
         </table></div>
         ${idle.length ? `<div class="ug-idle"><b>이 달에 안 쓴 ${idle.length}명</b>
           <div>${idle.map(p => escapeHtml(p.name)).join(' · ')}</div></div>` : ''}
@@ -8588,6 +8708,7 @@ async function usageStart(email) {
     opens: (Number(prev.opens) || 0) + 1,
     first: prev.first || usageHhmm(),
     last:  usageHhmm(),
+    ver:   APP_VER,                     // 이 사람이 지금 쓰는 화면 버전
     tabs:  Object.assign({}, prev.tabs),
   };
   usageMark();
@@ -8652,6 +8773,7 @@ onAuthStateChanged(fbAuth, async (user) => {
     window._myUid = effUid() || user.uid;
     appInitialized = true;
     usageStart(user.email);
+    watchReloadSignal();
     // 관리자만 AI 요약 갱신 버튼 표시 (보기 모드 제외 — 대상 교사 화면 그대로)
     if (!isViewAs() && user.email === ADMIN_EMAIL) {
       const adminBtn  = document.getElementById('homeAISummaryAdminBtn');
