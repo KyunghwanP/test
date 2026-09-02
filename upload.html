@@ -462,7 +462,10 @@ if ('serviceWorker' in navigator) {
         <b>올리는 파일은 항상 전체 명단이어야 합니다</b> — 기존 데이터를 통째로 갈아치우므로,
         파일에 없는 사람은 명단에서 사라집니다(퇴직·전출 처리는 이 방법으로 합니다).
         <b>몇 명만 고쳐서 올리면 나머지가 전부 지워집니다.</b> 저장 전에 누가 빠지고 누가
-        새로 들어오는지 아래에 보여 드립니다.</div>
+        새로 들어오는지 아래에 보여 드립니다.<br>
+        <b>휴대폰은 다릅니다</b> — 빈 칸은 저장돼 있던 번호를 그대로 둡니다. 그래서
+        전체 명단을 내려받아 <b>번호가 바뀐 사람 칸에만 새 번호를 적어</b> 올리면 그 사람만 바뀝니다.
+        번호를 <b>지우려면</b> 휴대폰 칸에 <code>-</code> 를 적으세요.</div>
 
       <div class="format-box">
         <b>엑셀 형식 안내</b> — 1행은 헤더, 2행부터 데이터<br>
@@ -505,10 +508,9 @@ if ('serviceWorker' in navigator) {
     <div class="section">
       <div class="section-title">📋 현재 저장된 비상연락망</div>
       <div class="section-desc">Firestore에 저장된 교직원 목록입니다.
-        <b>휴대폰 칸은 비어 있습니다</b> — 번호는 교사 브라우저가 못 읽는 별도 문서에 있고,
-        앱은 워커를 통해 한 번에 한 명분씩만 받아 옵니다(개인정보 보호).
-        그래서 <b>내려받은 파일에도 번호가 없습니다.</b> 부서·내선 등을 고쳐 다시 올리면
-        번호는 건드리지 않고 그대로 둡니다.</div>
+        번호는 별도 문서에 있고 <b>교사 브라우저는 못 읽습니다</b> — 앱은 워커를 통해
+        한 번에 한 명분씩만 받아 옵니다(개인정보 보호). 이 화면은 <b>관리자 계정에서만</b>
+        번호가 채워집니다.</div>
       <div class="stat-chips" id="dbStats"></div>
       <div class="db-list" id="dbList"><div style="color:var(--ink-soft);font-size:13px;">불러오는 중...</div></div>
       <div class="btn-row">
@@ -1466,13 +1468,35 @@ async function saveSplit(rosterColl, rosterKey, contactColl, list, contactFields
    번호 자체는 못 읽지만, 명렬에는 사람마다 hasPhone(번호가 있다/없다)이
    남아 있다. 이건 번호가 아니라서 규칙을 안 바꿔도 읽힌다. 그래서 '저장하면
    몇 명의 번호가 지워지는지'는 정확히 셀 수 있다.                          */
+let ctCanReadPhone = false;
+
 function ctWipeCount(rows) {
   const prev = window._dbStaff || [];
   if (!prev.length) return null;                       // 목록을 아직 안 읽었다
+  if (ctCanReadPhone) return 0;                        // 병합하니 지워질 일이 없다
   const had = new Map(prev.map(s => [`${s.name}|${s.dept || ''}`, !!s.hasPhone]));
   let n = 0;
   for (const r of rows) if (!r.phone && had.get(`${r.name}|${r.dept || ''}`)) n++;
   return n;
+}
+
+/* ══ 번호는 적은 사람만 바뀐다 ═════════════════════════════════════════════
+   휴대폰 칸이 비어 있으면 저장된 번호를 그대로 둔다. 그래야 내려받은 파일에서
+   몇 명 번호만 고쳐 올릴 수 있다. 번호를 정말 지우려면(본인 요청 등) 휴대폰
+   칸에 '-' 를 적는다 — 빈칸과 삭제를 구분할 방법이 달리 없다.
+   기존 번호는 이름으로 찾는다. 부서 이동이 흔한데 이름+부서로 맞추면
+   부서만 옮긴 사람이 남처럼 취급돼 번호를 잃는다.                          */
+const CT_CLEAR_MARKS = ['-', '−', '–', '없음', '삭제'];
+
+function ctMergePhones(rows) {
+  if (!ctCanReadPhone) return rows;                    // 못 읽으면 병합도 못 한다
+  const prev = new Map((window._dbStaff || []).filter(s => s.phone).map(s => [s.name, s.phone]));
+  return rows.map(r => {
+    const typed = String(r.phone || '').trim();
+    if (CT_CLEAR_MARKS.includes(typed)) return { ...r, phone: '' };
+    if (typed) return r;
+    return { ...r, phone: prev.get(r.name) || '' };
+  });
 }
 
 async function ctSave(rosterOnly) {
@@ -1499,9 +1523,13 @@ async function ctSave(rosterOnly) {
       });
       setStatus('ctStatus', `✅ ${ctParsedData.length}명 저장 완료 — 휴대폰은 그대로 두었습니다.`, 'ok');
     } else {
-      await saveSplit('contacts', 'staff', 'contactsPhone', ctParsedData,
+      const rows = ctMergePhones(ctParsedData);
+      await saveSplit('contacts', 'staff', 'contactsPhone', rows,
                       STAFF_CONTACT_FIELDS, ['name', 'dept']);
-      setStatus('ctStatus', `✅ ${ctParsedData.length}명 저장 완료!`, 'ok');
+      const kept = ctCanReadPhone
+        ? rows.filter((r, i) => r.phone && !String(ctParsedData[i].phone || '').trim()).length : 0;
+      setStatus('ctStatus', `✅ ${rows.length}명 저장 완료!`
+        + (kept ? ` 휴대폰 칸이 비어 있던 ${kept}명은 저장돼 있던 번호를 그대로 두었습니다.` : ''), 'ok');
     }
     document.getElementById('ctRosterOnlyBtn').style.display = 'none';
     document.getElementById('ctDiffBox').innerHTML = '';
@@ -1566,12 +1594,25 @@ async function loadDbContacts() {
     }
     const data  = snap.data();
     const staff = data.staff || [];
+    // 번호 문서는 관리자만 읽힌다. 읽히면 사람별 병합(빈 칸은 기존 번호 유지)이
+    // 가능하고, 못 읽히면(규칙을 아직 안 올렸다) 예전처럼 통째 저장만 된다.
+    ctCanReadPhone = false;
+    try {
+      const ps = await getDoc(doc(db, 'contactsPhone', 'main'));
+      const rows = ps.exists() ? (ps.data().staff || []) : [];
+      ctCanReadPhone = true;
+      // 번호 문서는 명렬과 길이·순서가 같게 저장된다. 그래도 순서를 믿지 않고
+      // 이름으로 맞춘다 — 어긋나면 남의 번호가 붙는다.
+      const byName = new Map(rows.filter(r => r.name).map(r => [r.name, r.phone || '']));
+      for (const t of staff) { const ph = byName.get(t.name); if (ph) t.phone = ph; }
+    } catch (e) { /* 규칙이 막고 있다 — 번호 없이 진행한다 */ }
     const depts = [...new Set(staff.map(s => s.dept).filter(Boolean))];
     const upd   = data.updatedAt ? new Date(data.updatedAt).toLocaleString('ko-KR') : '-';
     stats.innerHTML = `
       <div class="stat-chip">총 <b>${staff.length}</b>명</div>
       <div class="stat-chip">부서 <b>${depts.length}</b>개</div>
       <div class="stat-chip">마지막 업데이트 <b>${upd}</b></div>
+      <div class="stat-chip">휴대폰 <b>${ctCanReadPhone ? staff.filter(s => s.phone).length + '명' : '못 읽음'}</b></div>
     `;
     list.innerHTML = staff.map(s => `
       <div class="db-item">

@@ -51,8 +51,16 @@ service cloud.firestore {
       allow read:  if isAppAdmin();
       allow write: if isAppAdmin();
     }
+    // 위 studentsContact 와 같은 이유로 관리자에게만 읽기를 연다.
+    // 비상연락망을 다시 올릴 때 이 문서를 덮어쓰기 전에 먼저 읽어야 한다.
+    //   · 휴대폰 칸이 빈 사람은 기존 번호를 그대로 두기 — 안 읽으면 병합이 안 되고,
+    //     내려받아 고친 파일(번호가 비어 있다)을 올리는 순간 전원의 번호가 날아간다
+    //   · 저장 전 백업 — 되돌릴 수단이 이것뿐이다(Spark 요금제라 시점 복구가 없다)
+    // 같은 계정이 write 로 이미 통째로 갈아치울 수 있다. 읽기만 막으면 얻는 것 없이
+    // '백업 없이 덮어쓰기' 만 남는다.
+    // 교사 전체에는 절대 열지 말 것 — 그러면 '페이지 저장 한 번' 으로 돌아간다.
     match /contactsPhone/{docId} {
-      allow read: if false;
+      allow read:  if isAppAdmin();
       allow write: if isAppAdmin();
     }
     // ── 접속기록 (개인정보 보호법 제29조 안전조치 — 접속기록 보관·점검) ──

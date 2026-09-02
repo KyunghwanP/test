@@ -32,6 +32,8 @@ const STAFF = Array.from({ length: 30 }, (_, i) => ({
   hasPhone: i % 5 !== 0,                 // 6명은 원래 번호가 없다
 }));
 const HAD = STAFF.filter(s => s.hasPhone).length;   // 24
+const PHONE_OF = s => `010-2000-${String(3000 + STAFF.indexOf(s)).slice(-4)}`;
+const PHONES = STAFF.map(s => ({ name: s.name, dept: s.dept, ...(s.hasPhone ? { phone: PHONE_OF(s) } : {}) }));
 
 const HEAD = ['이름','담당부서','담당과목','휴대폰','내선번호','직위'];
 function xlsxFile(name, rows) {
@@ -55,7 +57,7 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
 const errs = [];
 const NOISE = /favicon|ServiceWorker|ERR_CONNECTION|net::ERR_FAILED/;
 
-async function openPage() {
+async function openPage(phoneReadable = false) {
   const page = await b.newPage();
   page.on('pageerror', e => { if (!NOISE.test(e.message)) errs.push(e.message); });
   page.on('console', m => { if (m.type() === 'error' && !NOISE.test(m.text())) errs.push(m.text()); });
@@ -77,19 +79,26 @@ async function openPage() {
       export const getDocs=async()=>({docs:[],empty:true,forEach(){}});
       window.__writes = [];
       export const setDoc=async(r,d)=>{ window.__writes.push([r.coll, r.id, d]);
-        if (r.coll==='contacts' && r.id==='main') window.__STAFF = d.staff; };
+        if (r.coll==='contacts' && r.id==='main') window.__STAFF = d.staff;
+        if (r.coll==='contactsPhone' && r.id==='main') window.__PHONES = d.staff; };
       export const deleteDoc=async()=>{};
-      // contactsPhone 은 규칙이 읽기를 막는다 — 실제와 같게 거부한다.
+      // 규칙을 아직 안 올렸으면 contactsPhone 읽기가 거부된다. 양쪽 다 돌려 본다.
       export const getDoc=async r=>{
-        if (r.coll==='contactsPhone') throw new Error('Missing or insufficient permissions.');
+        if (r.coll==='contactsPhone') {
+          if (!window.__PHONE_OK) throw new Error('Missing or insufficient permissions.');
+          return { exists:()=>true, data:()=>({staff: window.__PHONES}) };
+        }
         return { exists:()=> r.coll==='contacts',
                  data:()=> r.coll==='contacts' ? {staff:window.__STAFF, updatedAt:'옛날'} : {} };
       };
       export const writeBatch=()=>({ set(c,d){ window.__writes.push([c.coll,c.id,d]);
-          if (c.coll==='contacts' && c.id==='main') window.__STAFF = d.staff; }, async commit(){} });`;
+          if (c.coll==='contacts' && c.id==='main') window.__STAFF = d.staff;
+          if (c.coll==='contactsPhone' && c.id==='main') window.__PHONES = d.staff; }, async commit(){} });`;
     route.fulfill({ status:200, contentType:'text/javascript', body });
   });
-  await page.addInitScript(s => { window.__STAFF = s; }, STAFF);
+  await page.addInitScript(([s, ph, ok]) => {
+    window.__STAFF = s; window.__PHONES = ph; window.__PHONE_OK = ok;
+  }, [STAFF, PHONES, phoneReadable]);
   await page.goto('file://' + HTML, { waitUntil: 'networkidle' });
   await page.click('[data-tab="contacts"]');
   await page.waitForSelector('#dbList .db-item', { timeout: 20000 });
@@ -270,6 +279,83 @@ console.log('\n■ 목록을 못 읽었으면 저장하지 않는다');
   check('새로고침을 먼저 하라고 한다', /새로고침/.test(st), st);
   await p2.close();
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   규칙을 올린 뒤 — 관리자는 번호 문서를 읽을 수 있다. 그러면 사람별로 합쳐서
+   '번호가 바뀐 사람만' 고쳐 올릴 수 있다.
+   ══════════════════════════════════════════════════════════════════════════ */
+await pg.close();
+const pm = await openPage(true);
+const pmWritten = () => pm.evaluate(() => window.__writes);
+const pmStatus  = () => pm.$eval('#ctStatus', e => e.innerText.replace(/\s+/g, ' ').trim());
+
+console.log('\n■ 관리자는 번호를 볼 수 있다');
+{
+  const shown = await pm.$eval('#dbList', e => e.innerText);
+  check('목록에 번호가 채워진다', shown.includes(PHONE_OF(STAFF[1])), shown.slice(0, 200));
+  const stats = await pm.$eval('#dbStats', e => e.innerText.replace(/\s+/g, ' '));
+  check(`번호가 있는 ${HAD}명을 센다`, new RegExp(`휴대폰 ${HAD}명`).test(stats), stats);
+  // 번호가 원래 없던 사람에게 남의 번호가 붙으면 안 된다
+  const none = await pm.$eval('#dbList', e =>
+    [...e.querySelectorAll('.db-item')].map(d => d.innerText));
+  check('번호 없던 사람은 그대로 빈칸',
+        !/010-/.test(none[0]) && /010-/.test(none[1]), [none[0], none[1]]);
+}
+
+console.log('\n■ 번호가 바뀐 사람만 적어서 올린다');
+{
+  // 전체 명단을 내려받은 상태 — 번호 칸은 채워져 있다. 두 명만 새 번호로 고치고,
+  // 한 명은 '-' 로 지우고, 나머지는 아예 비워서 올린다(다 지우면 안 된다).
+  const rows = STAFF.map(t => [t.name, t.dept, t.subject, '', t.ext, t.role]);
+  rows[1][3] = '010-9999-1111';                 // 바꾼 사람
+  rows[2][3] = '010-9999-2222';                 // 바꾼 사람
+  rows[3][3] = '-';                             // 지우는 사람
+  const f = xlsxFile('merge.xlsx', rows);
+
+  await pm.evaluate(() => { window.__writes = []; });
+  await pm.setInputFiles('#ctFileInput', f);
+  await pm.waitForSelector('#ctPreviewWrap:not([style*="display: none"])');
+  await pm.waitForTimeout(200);
+  check('번호가 지워진다는 경고가 없다', !/지워집니다/.test(await pmStatus()), await pmStatus());
+  check('명렬만 저장 버튼도 안 뜬다', !(await pm.isVisible('#ctRosterOnlyBtn')));
+  check('명단 변동도 없다', !(await pm.isVisible('#ctConfirmWrap')));
+
+  await pm.click('#ctUploadBtn');
+  await pm.waitForFunction(() => window.__writes.length >= 2, { timeout: 10000 });
+  const w = await pmWritten();
+  const saved = w.find(x => x[0] === 'contactsPhone')[2].staff;
+  const byName = new Map(saved.map(r => [r.name, r.phone || '']));
+
+  check('고친 사람은 새 번호로', byName.get(STAFF[1].name) === '010-9999-1111', byName.get(STAFF[1].name));
+  check('두 번째도 새 번호로', byName.get(STAFF[2].name) === '010-9999-2222', byName.get(STAFF[2].name));
+  check("'-' 를 적으면 지워진다", !byName.get(STAFF[3].name), byName.get(STAFF[3].name));
+  // 나머지 — 빈칸으로 올렸지만 그대로 남아야 한다
+  const kept = STAFF.filter((t, i) => i > 3 && t.hasPhone);
+  check(`빈칸으로 올린 ${kept.length}명은 번호가 그대로`,
+        kept.every(t => byName.get(t.name) === PHONE_OF(t)),
+        kept.filter(t => byName.get(t.name) !== PHONE_OF(t)).slice(0, 3).map(t => [t.name, byName.get(t.name)]));
+  check('원래 번호 없던 사람은 계속 없다',
+        STAFF.filter(t => !t.hasPhone).every(t => !byName.get(t.name)));
+
+  const roster = w.find(x => x[0] === 'contacts')[2].staff;
+  const flag = new Map(roster.map(r => [r.name, !!r.hasPhone]));
+  check("지운 사람은 '번호 있음' 표시도 꺼진다", flag.get(STAFF[3].name) === false);
+  check('그대로 둔 사람은 표시도 그대로', flag.get(STAFF[5].name) === STAFF[5].hasPhone);
+  check('무엇을 그대로 두었는지 알려 준다', /그대로 두었습니다/.test(await pmStatus()), await pmStatus());
+}
+
+console.log('\n■ 사람이 빠지는 것은 여기서도 확인을 받는다');
+{
+  const f = xlsxFile('merge-partial.xlsx',
+    STAFF.slice(0, 3).map(t => [t.name, t.dept, t.subject, '', t.ext, t.role]));
+  await pm.evaluate(() => { window.__writes = []; });
+  await pm.setInputFiles('#ctFileInput', f);
+  await pm.waitForSelector('#ctConfirmWrap', { state: 'visible', timeout: 5000 });
+  await pm.click('#ctUploadBtn');
+  await pm.waitForTimeout(300);
+  check('확인 전에는 저장되지 않는다', (await pmWritten()).length === 0, await pmWritten());
+}
+await pm.close();
 
 console.log(errs.length ? '\n❌ 런타임 오류:\n' + errs.slice(0,4).join('\n') : '\n✅ 런타임 오류 없음');
 console.log(`\n${fail || errs.length ? '❌' : '✅'} 통과 ${pass} / 실패 ${fail}`);
