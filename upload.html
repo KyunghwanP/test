@@ -458,7 +458,11 @@ if ('serviceWorker' in navigator) {
 
     <div class="section">
       <div class="section-title">📞 비상연락망 업로드</div>
-      <div class="section-desc">엑셀(.xlsx) 또는 CSV를 올리면 Firestore의 <code>contacts/main</code>에 저장됩니다. 기존 데이터는 덮어씁니다.</div>
+      <div class="section-desc">엑셀(.xlsx) 또는 CSV를 올리면 Firestore의 <code>contacts/main</code>에 저장됩니다.
+        <b>올리는 파일은 항상 전체 명단이어야 합니다</b> — 기존 데이터를 통째로 갈아치우므로,
+        파일에 없는 사람은 명단에서 사라집니다(퇴직·전출 처리는 이 방법으로 합니다).
+        <b>몇 명만 고쳐서 올리면 나머지가 전부 지워집니다.</b> 저장 전에 누가 빠지고 누가
+        새로 들어오는지 아래에 보여 드립니다.</div>
 
       <div class="format-box">
         <b>엑셀 형식 안내</b> — 1행은 헤더, 2행부터 데이터<br>
@@ -484,6 +488,11 @@ if ('serviceWorker' in navigator) {
             <tbody id="ctPreviewBody"></tbody>
           </table>
         </div>
+        <div id="ctDiffBox"></div>
+        <label id="ctConfirmWrap" style="display:none;gap:9px;align-items:flex-start;margin:10px 0;font-size:13.5px;">
+          <input type="checkbox" id="ctConfirmDel" style="margin-top:3px;flex-shrink:0;">
+          <span id="ctConfirmText"></span>
+        </label>
         <div class="btn-row">
           <button class="btn btn-primary" id="ctUploadBtn">☁️ Firestore에 저장</button>
           <button class="btn btn-secondary" id="ctRosterOnlyBtn" style="display:none;">📋 명렬만 저장 (번호는 그대로)</button>
@@ -1320,6 +1329,7 @@ function renderContactPreview(contacts) {
   }
   document.getElementById('ctPreviewWrap').style.display = '';
   document.getElementById('ctRosterOnlyBtn').style.display = 'none';
+  ctRenderDiff(contacts);
   // 저장 버튼을 누르기 전에 미리 알려 준다 — 누른 다음에 막는 것보다 낫다.
   const wipe = ctWipeCount(contacts);
   if (wipe > 0) {
@@ -1329,6 +1339,70 @@ function renderContactPreview(contacts) {
   } else {
     clearStatus('ctStatus');
   }
+}
+
+/* ══ 누가 빠지고 누가 들어오는지 ═══════════════════════════════════════════
+   저장은 통째로 갈아치우기라 파일에 없는 사람은 명단에서 사라진다. 퇴직·전출을
+   그렇게 처리하니 그 자체는 맞는 동작이다. 문제는 '몇 명만 고쳐서 올리는' 경우다.
+   파일만 봐서는 둘을 구분할 수 없어서, 사라질 사람을 이름으로 보여 주고 지울
+   때만 확인을 받는다. 실제로 2명짜리 파일을 올려 30명이 2명이 된 적이 있다.  */
+const ctPersonKey = c => `${c.name}|${c.dept || ''}`;
+
+// 누가 빠지고 들어오는지는 **이름으로** 본다. 부서 이동은 흔한데, 이름+부서로
+// 맞추면 부서만 옮긴 사람이 '사라짐 + 새로 들어옴' 두 번 나와 진짜 삭제가 묻힌다.
+function ctDiff(rows) {
+  const prev = window._dbStaff || [];
+  if (!prev.length) return null;
+  const now = new Set(rows.map(c => c.name));
+  const was = new Set(prev.map(c => c.name));
+  return {
+    gone:  prev.filter(c => !now.has(c.name)),
+    added: rows.filter(c => !was.has(c.name)),
+    prevCount: prev.length,
+  };
+}
+
+function ctRenderDiff(rows) {
+  const box  = document.getElementById('ctDiffBox');
+  const wrap = document.getElementById('ctConfirmWrap');
+  const cb   = document.getElementById('ctConfirmDel');
+  cb.checked = false;
+  const d = ctDiff(rows);
+  if (!d) {
+    box.innerHTML = '';
+    wrap.style.display = 'none';
+    return;
+  }
+  const who = arr => arr.slice(0, 40).map(c => `${c.name}(${c.dept || '-'})`).join(' · ')
+                   + (arr.length > 40 ? ` … 외 ${arr.length - 40}명` : '');
+  const list = (title, arr, cls) => !arr.length ? '' :
+    `<div class="status ${cls}" style="margin:8px 0;"><b>${title} ${arr.length}명</b>`
+    + `<div style="margin-top:5px;font-size:13px;line-height:1.7;">${who(arr)}</div></div>`;
+  box.innerHTML =
+    (!d.gone.length && !d.added.length
+      ? `<div class="status ok" style="margin:8px 0;"><b>명단 변동 없음</b> — ${d.prevCount}명 그대로입니다</div>`
+      : '')
+    + list('명단에서 사라짐', d.gone, 'err')
+    + list('새로 들어옴', d.added, 'ok');
+
+  if (d.gone.length) {
+    document.getElementById('ctConfirmText').innerHTML =
+      `<b>${d.gone.length}명을 명단에서 지웁니다.</b> `
+      + `${d.prevCount}명 → ${rows.length}명. 퇴직·전출이라면 그대로 진행하시고, `
+      + `<b>몇 명만 고쳐서 올린 것이라면 전체 명단이 든 파일로 다시 올리세요.</b> 확인했습니다.`;
+    wrap.style.display = 'flex';
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+// 지울 사람이 있는데 확인을 안 했으면 저장을 막는다.
+function ctDeleteBlocked() {
+  const wrap = document.getElementById('ctConfirmWrap');
+  if (wrap.style.display === 'none') return false;
+  if (document.getElementById('ctConfirmDel').checked) return false;
+  setStatus('ctStatus', '⚠️ 명단에서 사라지는 사람이 있습니다. 위의 확인란을 읽고 체크해 주세요.', 'warn');
+  return true;
 }
 
 // ══════════════════════════════════════════
@@ -1430,6 +1504,8 @@ async function ctSave(rosterOnly) {
       setStatus('ctStatus', `✅ ${ctParsedData.length}명 저장 완료!`, 'ok');
     }
     document.getElementById('ctRosterOnlyBtn').style.display = 'none';
+    document.getElementById('ctDiffBox').innerHTML = '';
+    document.getElementById('ctConfirmWrap').style.display = 'none';
     loadDbContacts();
   } catch(e) {
     setStatus('ctStatus', '저장 실패: ' + e.message, 'err');
@@ -1441,6 +1517,7 @@ async function ctSave(rosterOnly) {
 
 document.getElementById('ctUploadBtn').addEventListener('click', async () => {
   if (!ctParsedData.length) return;
+  if (ctDeleteBlocked()) return;
   const wipe = ctWipeCount(ctParsedData);
   if (wipe === null) {
     setStatus('ctStatus', '저장된 목록을 아직 못 읽었습니다. 아래 [🔄 새로고침]을 먼저 눌러 주세요 — '
@@ -1462,13 +1539,16 @@ document.getElementById('ctUploadBtn').addEventListener('click', async () => {
 });
 
 document.getElementById('ctRosterOnlyBtn').addEventListener('click', () => {
-  if (ctParsedData.length) ctSave(true);
+  if (!ctParsedData.length || ctDeleteBlocked()) return;
+  ctSave(true);
 });
 
 document.getElementById('ctClearBtn').addEventListener('click', () => {
   ctParsedData = [];
   document.getElementById('ctPreviewWrap').style.display = 'none';
   document.getElementById('ctRosterOnlyBtn').style.display = 'none';
+  document.getElementById('ctDiffBox').innerHTML = '';
+  document.getElementById('ctConfirmWrap').style.display = 'none';
   ctFileInput.value = '';
   clearStatus('ctStatus');
 });

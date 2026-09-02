@@ -158,6 +158,12 @@ console.log('\n■ 번호가 든 원본은 예전처럼 저장된다');
   await pg.waitForTimeout(300);
   check('경고가 안 뜬다', !/지워집니다/.test(await status()), await status());
   check('명렬만 저장 버튼은 숨어 있다', !(await pg.isVisible('#ctRosterOnlyBtn')));
+  // 앞 시나리오에서 '신규교사'가 저장됐다. 이 파일에는 그 사람이 없으니
+  // 명단에서 빠진다 — 확인을 받는 게 맞다.
+  const diff0 = await pg.$eval('#ctDiffBox', e => e.innerText.replace(/\s+/g,' ').trim());
+  check('앞서 넣은 신규교사가 빠지는 것을 짚어 준다',
+        /명단에서 사라짐 1명/.test(diff0) && diff0.includes('신규교사'), diff0);
+  await pg.check('#ctConfirmDel');
 
   await pg.click('#ctUploadBtn');
   await pg.waitForFunction(() => window.__writes.length >= 2, { timeout: 10000 });
@@ -168,6 +174,61 @@ console.log('\n■ 번호가 든 원본은 예전처럼 저장된다');
   check(`번호가 있는 ${HAD}명분이 저장된다`, phones.filter(p => p.phone).length === HAD,
         phones.filter(p => p.phone).length);
   check('번호 문서에도 찾을 이름·부서가 있다', phones.every(p => p.name && p.dept !== undefined));
+}
+
+console.log('\n■ 몇 명만 든 파일을 올리면 나머지가 지워진다는 것을 알린다');
+{
+  // 실제로 겪은 일 — 2명짜리 파일을 올려 30명이 2명이 됐다. 경고도 없었다.
+  const partial = xlsxFile('partial.xlsx', [
+    [STAFF[2].name, STAFF[2].dept, '국어', '010-1111-2222', '2102', ''],
+    [STAFF[6].name, '학생부',      '수학', '010-3333-4444', '2106', ''],
+  ]);
+  await pg.evaluate(() => { window.__writes = []; });
+  await pg.setInputFiles('#ctFileInput', partial);
+  await pg.waitForSelector('#ctPreviewWrap:not([style*="display: none"])');
+  await pg.waitForTimeout(200);
+
+  const diff = await pg.$eval('#ctDiffBox', e => e.innerText.replace(/\s+/g, ' ').trim());
+  check('사라지는 인원을 센다', new RegExp(`명단에서 사라짐 ${STAFF.length - 2}명`).test(diff), diff);
+  // 교사07 은 부서만 옮겼다. 이름이 그대로면 사라진 게 아니다.
+  check('부서만 옮긴 사람은 사라짐/새로 들어옴이 아니다', !/새로 들어옴/.test(diff), diff);
+  check('사라지는 사람을 이름으로 보여 준다', diff.includes(STAFF[0].name) && diff.includes(STAFF[1].name), diff);
+  check('남는 사람은 사라짐에 없다', !new RegExp(`사라짐[^새]*${STAFF[2].name}\\(`).test(diff), diff);
+  check('확인란이 뜬다', await pg.isVisible('#ctConfirmWrap'));
+  const ctext = await pg.$eval('#ctConfirmText', e => e.innerText.replace(/\s+/g,' '));
+  check('몇 명 → 몇 명인지 밝힌다', new RegExp(`${STAFF.length}명 → 2명`).test(ctext), ctext);
+
+  await pg.click('#ctUploadBtn');
+  await pg.waitForTimeout(300);
+  check('확인 전에는 저장되지 않는다', (await writes()).length === 0, await writes());
+  check('무엇을 하라고 알려 준다', /확인란/.test(await status()), await status());
+
+  // 명렬만 저장도 같은 확인을 거쳐야 한다 — 여기서도 사람은 지워진다
+  await pg.evaluate(() => { document.getElementById('ctRosterOnlyBtn').style.display = ''; });
+  await pg.click('#ctRosterOnlyBtn');
+  await pg.waitForTimeout(300);
+  check('명렬만 저장도 막힌다', (await writes()).length === 0, await writes());
+
+  // 퇴직·전출이라면 확인하고 그대로 진행할 수 있어야 한다
+  await pg.check('#ctConfirmDel');
+  await pg.click('#ctUploadBtn');
+  await pg.waitForFunction(() => window.__writes.length > 0, { timeout: 10000 });
+  const saved = (await written()).find(x => x[0] === 'contacts')[2].staff;
+  check('확인하면 저장된다 (지우는 것도 정상 기능)', saved.length === 2, saved.length);
+}
+
+console.log('\n■ 파일을 바꾸면 확인은 다시 받는다');
+{
+  await pg.evaluate(() => { window.__writes = []; window.__STAFF = null; });
+  await pg.reload({ waitUntil: 'networkidle' });
+  await pg.evaluate(s => { window._dbStaff = s; }, STAFF);
+  await pg.click('[data-tab="contacts"]');
+  await pg.setInputFiles('#ctFileInput', FILE_FULL);
+  await pg.waitForSelector('#ctPreviewWrap:not([style*="display: none"])');
+  await pg.waitForTimeout(200);
+  check('전원이 든 파일에는 확인란이 없다', !(await pg.isVisible('#ctConfirmWrap')));
+  const diff = await pg.$eval('#ctDiffBox', e => e.innerText.replace(/\s+/g,' ').trim());
+  check('변동 없음을 알려 준다', /변동 없음/.test(diff), diff);
 }
 
 console.log('\n■ 목록을 못 읽었으면 저장하지 않는다');
