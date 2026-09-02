@@ -367,6 +367,36 @@ console.log('\n■ 적고 있으면 강제로 하지 않는다');
     document.getElementById('appReloadBar')?.remove(); });
 }
 
+console.log('\n■ 막대가 좁은 화면에서 깨지지 않는다');
+{
+  // 한 번 깨졌다 — 좁은 화면에서 안내문이 버튼에 밀려 최소 폭까지 줄었고,
+  // 한글은 아무 데서나 줄바꿈되니 그 최소 폭이 '한 글자'였다. 글자가 세로로
+  // 한 줄씩 쌓여 막대 높이가 321px 이 됐다. 그래서 실제로 재 본다.
+  const bar = await b.newPage();
+  await bar.route('https://ynhs.test/**', r =>
+    r.fulfill({ contentType: 'text/html; charset=utf-8', body: `<!doctype html><meta charset="utf-8">
+      <body style="font-family:'Noto Sans KR',sans-serif;margin:0">
+      <script>let _reloadBar=null,_reloadTimer=null;
+      ${grab('isBusyTyping')}
+      ${grab('showReloadBar')}
+      showReloadBar('새 버전이 있습니다.', 5);<\/script>` }));
+
+  for (const w of [360, 390, 430, 768, 1280]) {
+    await bar.setViewportSize({ width: w, height: 780 });
+    await bar.goto('https://ynhs.test/b.html');
+    const r = await bar.$eval('#appReloadBar', e => {
+      const g = e.getBoundingClientRect(), s = e.querySelector('span').getBoundingClientRect();
+      return { w: Math.round(g.width), h: Math.round(g.height),
+               l: Math.round(g.left), r: Math.round(g.right),
+               msgW: Math.round(s.width), msgH: Math.round(s.height), vw: innerWidth };
+    });
+    check(`${w}px — 글이 세로로 눌리지 않는다`, r.msgW > 120 && r.msgH < 90, r);
+    check(`${w}px — 화면 밖으로 안 나간다`, r.l >= 0 && r.r <= r.vw, r);
+    check(`${w}px — 막대가 지나치게 높지 않다`, r.h < 130, r);
+  }
+  await bar.close();
+}
+
 console.log('\n■ 누가 옛 화면을 쓰는지 보인다');
 {
   const rows = [

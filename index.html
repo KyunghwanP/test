@@ -8024,19 +8024,29 @@ function showReloadBar(text, secs){
   if (_reloadBar) _reloadBar.remove();
   const bar = _reloadBar = document.createElement('div');
   bar.id = 'appReloadBar';
+  // 좁은 화면에서는 안내문이 버튼에 밀려 최소 폭까지 줄어든다. 한글은 아무 데서나
+  // 줄바꿈되므로 그 최소 폭이 '한 글자'다 — 글자가 세로로 한 줄씩 쌓였다.
+  // 그래서 줄바꿈을 허용하고(flex-wrap), 안내문에 기준 폭을 준다. 자리가 모자라면
+  // 버튼이 아래로 내려가고 글은 제 폭을 지킨다.
   bar.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);z-index:2000;'
-    + 'bottom:calc(18px + env(safe-area-inset-bottom,0px));display:flex;gap:10px;align-items:center;'
+    + 'bottom:calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;'
+    // left:50% 만 주고 right 가 없으면 쓸 수 있는 폭이 '그 지점부터 오른쪽 끝'
+    // 까지, 즉 화면의 절반뿐이다. max-width:100vw 를 적어 둬도 소용이 없다.
+    // width:max-content 로 그 제약을 벗어나고 max-width 로 다시 가둔다.
+    // box-sizing 을 적어 둔다 — 전역 reset 에 기대면 padding 만큼 화면을 넘는다.
+    + 'box-sizing:border-box;width:max-content;gap:8px 10px;align-items:center;justify-content:flex-end;'
     + 'background:#1F3D33;color:#FBF6EC;padding:11px 15px;border-radius:12px;font-size:13px;'
     + 'box-shadow:0 6px 20px rgba(0,0,0,.28);max-width:calc(100vw - 24px);';
   const msg = document.createElement('span');
+  msg.style.cssText = 'flex:1 1 200px;line-height:1.45;word-break:keep-all;';
   const go  = document.createElement('button');
   go.textContent = '지금 새로고침';
-  go.style.cssText = 'background:#FBF6EC;color:#1F3D33;border:0;border-radius:8px;'
+  go.style.cssText = 'flex:0 0 auto;background:#FBF6EC;color:#1F3D33;border:0;border-radius:8px;'
     + 'padding:6px 11px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;';
   go.onclick = () => location.reload();
   const no = document.createElement('button');
   no.textContent = '나중에';
-  no.style.cssText = 'background:transparent;color:#FBF6EC;border:1px solid rgba(251,246,236,.45);'
+  no.style.cssText = 'flex:0 0 auto;background:transparent;color:#FBF6EC;border:1px solid rgba(251,246,236,.45);'
     + 'border-radius:8px;padding:6px 10px;font-size:12.5px;cursor:pointer;white-space:nowrap;';
   no.onclick = () => { clearInterval(_reloadTimer); bar.remove(); _reloadBar = null; };
   bar.append(msg, go, no);
