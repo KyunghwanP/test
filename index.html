@@ -7919,6 +7919,8 @@ function initAppUI(){
   // usage 는 그냥 넘기면 빈 화면이 뜬다 — 관리자 확인과 자료 읽기를 같이 하는 통로로 보낸다.
   if (_gotoTarget === 'usage') openUsagePage();
   else if (_gotoTarget) navigateTo(_gotoTarget);
+  // 조용한 새로고침으로 다시 뜬 것이면 보던 탭·스크롤로 돌아간다(위젯 딥링크가 우선).
+  else applyResumePoint();
   // 전체 시간표 위젯: 시간표 페이지로 이동해 내 시간표를 자동 로드
   if (document.documentElement.getAttribute('data-widget') === 'fulltt') {
     navigateTo('timetable');
@@ -8043,7 +8045,7 @@ function showReloadBar(text, secs){
   go.textContent = '지금 새로고침';
   go.style.cssText = 'flex:0 0 auto;background:#FBF6EC;color:#1F3D33;border:0;border-radius:8px;'
     + 'padding:6px 11px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;';
-  go.onclick = () => location.reload();
+  go.onclick = () => { saveResumePoint(); location.reload(); };
   const no = document.createElement('button');
   no.textContent = '나중에';
   no.style.cssText = 'flex:0 0 auto;background:transparent;color:#FBF6EC;border:1px solid rgba(251,246,236,.45);'
@@ -8071,6 +8073,45 @@ function showReloadBar(text, secs){
 // 기기에서는 '처음 보는 번호'가 영원히 반복돼 신호가 통째로 무시된다.
 let _reloadSeen = (() => { try { return localStorage.getItem(RELOAD_SEEN_KEY); } catch(e){ return null; } })();
 
+/* 새로고침해도 보던 자리에 그대로 있게 한다.
+   restoreLastView 는 '시간표 안의 선택'만 되살리고 어떤 탭이었는지는 모른다 —
+   그대로 두면 새로고침 뒤 현황판으로 튄다. 조용히 새로고침하려면 이게 먼저다.
+   sessionStorage 라 같은 탭에서만 살아 있고, 창을 닫으면 사라진다.       */
+const RESUME_KEY = 'ynhsResumeView';
+
+function saveResumePoint(){
+  const el = document.querySelector('.page-view.active');
+  if (!el) return;
+  try {
+    sessionStorage.setItem(RESUME_KEY, JSON.stringify({
+      page: el.id.replace('Page', ''), top: el.scrollTop || 0, at: Date.now(),
+    }));
+  } catch(e){}
+}
+
+function applyResumePoint(){
+  let d = null;
+  try {
+    const raw = sessionStorage.getItem(RESUME_KEY);
+    sessionStorage.removeItem(RESUME_KEY);          // 한 번만 쓴다
+    d = raw ? JSON.parse(raw) : null;
+  } catch(e){}
+  // 오래된 것은 무시한다 — 어제 보던 자리로 끌고 가면 그게 더 이상하다.
+  if (!d || !d.page || Date.now() - (d.at || 0) > 120000) return false;
+  if (d.page === 'usage') return false;             // 숨은 화면으로 되돌리지 않는다
+  navigateTo(d.page);
+  const el = document.getElementById(d.page + 'Page');
+  if (el && d.top) requestAnimationFrame(() => { el.scrollTop = d.top; });
+  return true;
+}
+
+// 조용히 새로고침한다 — 막대도 안 띄운다. 다만 적는 중이면 절대 안 한다.
+function silentReload(){
+  if (isBusyTyping()) { showReloadBar('새 버전이 있습니다.', 0); return; }
+  saveResumePoint();
+  location.reload();
+}
+
 function onReloadSignal(n){
   const seen = _reloadSeen;
   _reloadSeen = String(n);
@@ -8078,8 +8119,7 @@ function onReloadSignal(n){
   // 처음 보는 기기는 번호만 적어 둔다. 안 그러면 이 기능이 깔리는 순간 전원이 새로고침한다.
   if (seen === null) return;
   if (Number(n) <= Number(seen)) return;
-  if (isBusyTyping()) showReloadBar('새 버전이 있습니다.', 0);
-  else showReloadBar('새 버전이 있습니다.', 5);
+  silentReload();
 }
 
 function watchReloadSignal(){

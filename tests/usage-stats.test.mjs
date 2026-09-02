@@ -145,6 +145,10 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   let _reloadSeen = (() => { try { return localStorage.getItem(RELOAD_SEEN_KEY); } catch(e){ return null; } })();
   ${grab('isBusyTyping')}
   ${grab('showReloadBar')}
+  ${grabConst('RESUME_KEY')}
+  ${grab('saveResumePoint')}
+  ${grab('applyResumePoint')}
+  ${grab('silentReload')}
   ${grab('onReloadSignal')}
   ${grab('watchReloadSignal')}
   let _ugClicks = 0, _ugTimer = null;
@@ -159,7 +163,8 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
 
   Object.assign(window, { usageStart, usageTab, usageFlush, usageDate, loadUsage,
                           renderUsage, initUsageEasterEgg, openUsagePage,
-                          watchReloadSignal, isBusyTyping, APP_VER });
+                          watchReloadSignal, isBusyTyping, APP_VER,
+                          saveResumePoint, applyResumePoint });
   window.__armed = () => { watchReloadSignal(); };
   window.__day = () => usageDay;
   initUsageEasterEgg();
@@ -317,20 +322,48 @@ check('보낸 뒤 번호가 오르는 방식', /n = \(Number\(snap\.exists\(\) \
   await pg.waitForTimeout(150);
   check('같은 번호에는 아무 일 없다', !(await pg.$('#appReloadBar')));
 
-  // 관리자가 새로 보냈다 — 적는 중이 아니면 세고 새로고침
-  await pg.evaluate(() => window.__push(8));
-  await pg.waitForTimeout(150);
-  const bar = await pg.$eval('#appReloadBar', e => e.innerText.replace(/\s+/g,' '));
-  check('막대가 뜬다', /새 버전이 있습니다/.test(bar), bar);
-  check('몇 초 뒤인지 알려준다', /\d초 후 새로고침/.test(bar), bar);
-  check('바로 날리지 않는다', reloadedSince(base) === 0);
-
+  // 관리자가 새로 보냈다 — 적는 중이 아니면 묻지 않고 조용히 새로고침한다
   base = serves;
-  await pg.waitForURL('**/h.html', { timeout: 12000 }).catch(() => {});
-  await pg.waitForTimeout(6000);
-  check('세고 나면 새로고침한다', reloadedSince(base) >= 1, reloadedSince(base));
+  await pg.evaluate(() => window.__push(8));
+  await pg.waitForTimeout(1500);
+  check('묻지 않고 바로 새로고침한다', reloadedSince(base) >= 1, reloadedSince(base));
+  check('막대를 띄우지 않는다', !(await pg.$('#appReloadBar')));
   check('새로고침 뒤에는 다시 안 뜬다 (번호를 기억한다)',
         (await pg.evaluate(() => localStorage.getItem('ynhsReloadSeen'))) === '8');
+}
+
+console.log('\n■ 새로고침해도 보던 자리에 그대로');
+{
+  await pg.evaluate(() => {
+    window.__armed();
+    // 주간교육활동 탭을 보며 아래로 내려간 상태
+    document.querySelectorAll('.page-view').forEach(e => e.classList.remove('active'));
+    const u = document.getElementById('usagePage');
+    u.classList.add('active');
+    window.saveResumePoint();
+  });
+  const saved = await pg.evaluate(() => JSON.parse(sessionStorage.getItem('ynhsResumeView') || 'null'));
+  check('보던 탭을 적어 둔다', saved && saved.page === 'usage', saved);
+  check('스크롤 위치도 같이', saved && typeof saved.top === 'number', saved);
+
+  // 돌아올 때: usage 는 숨은 화면이라 되돌리지 않는다
+  await pg.evaluate(() => window.__nav.length = 0);
+  const back1 = await pg.evaluate(() => window.applyResumePoint());
+  check('숨은 화면으로는 안 되돌린다', back1 === false, back1);
+
+  // 보통 탭이면 그 탭으로 돌아간다
+  await pg.evaluate(() => { sessionStorage.setItem('ynhsResumeView',
+    JSON.stringify({ page:'home', top: 480, at: Date.now() })); window.__nav.length = 0; });
+  check('보던 탭으로 돌아간다', (await pg.evaluate(() => window.applyResumePoint())) === true);
+  check('그 탭으로 이동한다', (await pg.evaluate(() => window.__nav)).includes('home'),
+        await pg.evaluate(() => window.__nav));
+  check('한 번 쓰면 지운다',
+        (await pg.evaluate(() => sessionStorage.getItem('ynhsResumeView'))) === null);
+
+  // 어제 것으로 끌고 가면 그게 더 이상하다
+  await pg.evaluate(() => { sessionStorage.setItem('ynhsResumeView',
+    JSON.stringify({ page:'meal', top: 0, at: Date.now() - 3600000 })); window.__nav.length = 0; });
+  check('오래된 자리는 무시한다', (await pg.evaluate(() => window.applyResumePoint())) === false);
 }
 
 console.log('\n■ 적고 있으면 강제로 하지 않는다');
@@ -346,23 +379,11 @@ console.log('\n■ 적고 있으면 강제로 하지 않는다');
   await pg.evaluate(() => window.__push(9));
   await pg.waitForTimeout(150);
   const bar = await pg.$eval('#appReloadBar', e => e.innerText.replace(/\s+/g,' '));
-  check('안내만 하고 세지 않는다', !/초 후/.test(bar), bar);
+  check('조용히 안 하고 물어본다', /새 버전이 있습니다/.test(bar), bar);
+  check('세지 않는다 — 적던 게 날아가면 안 된다', !/초 후/.test(bar), bar);
   check('직접 누를 버튼은 있다', /지금 새로고침/.test(bar), bar);
-  await pg.waitForTimeout(3000);
+  await pg.waitForTimeout(3500);
   check('시간이 지나도 적던 게 안 날아간다', reloadedSince(base) === 0, reloadedSince(base));
-
-  // 세는 도중에 적기 시작하면 멈춰야 한다
-  await pg.evaluate(() => {
-    document.getElementById('appReloadBar')?.remove();
-    const t = document.getElementById('someMemo'); t.value = ''; t.blur();
-  });
-  base = serves;
-  await pg.evaluate(() => window.__push(10));
-  await pg.waitForTimeout(1300);
-  await pg.evaluate(() => { const t = document.getElementById('someMemo');
-    t.value = '갑자기 적기 시작'; t.focus(); });
-  await pg.waitForTimeout(5500);
-  check('세다가도 적기 시작하면 멈춘다', reloadedSince(base) === 0, reloadedSince(base));
   await pg.evaluate(() => { const t = document.getElementById('someMemo'); t.value = ''; t.blur();
     document.getElementById('appReloadBar')?.remove(); });
 }
