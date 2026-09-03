@@ -1869,7 +1869,8 @@
     font-size:20px;line-height:2;color:var(--ink-soft);
     overflow:visible;
   }
-  .weekly-html-content *{
+  /* 받아온 HTML 의 글꼴을 통째로 갈아 끼운다. 원본 모양을 보려면 이걸 꺼야 한다. */
+  .weekly-html-content:not(.wk-plain):not(.wk-orig) *{
     font-family:'Noto Sans KR',sans-serif !important;
   }
   /* h1(페이지 제목): 카드 상단 어두운 타이틀바, flex로 제목+버튼 나란히 */
@@ -1914,11 +1915,28 @@
   .weekly-html-content h3{font-family:'Noto Sans KR';color:var(--ink);font-size:25px;font-weight:700;margin:18px 0 8px;}
   .weekly-html-content h4{font-family:'Noto Sans KR';color:var(--ink);font-size:24px;font-weight:700;margin:14px 0 6px;}
   .weekly-html-content p,.weekly-html-content div{margin:5px 0;}
-  .weekly-html-content a{color:var(--wed);}
+  .weekly-html-content:not(.wk-plain) a{color:var(--wed);}
   .weekly-html-content a:hover{text-decoration:underline;}
-  .weekly-html-content strong,.weekly-html-content b{color:var(--ink);font-weight:700;}
+  .weekly-html-content:not(.wk-plain) strong,
+  .weekly-html-content:not(.wk-plain) b{color:var(--ink);font-weight:700;}
   .weekly-html-content ul,.weekly-html-content ol{padding-left:20px;margin:6px 0;}
   .weekly-html-content li{margin:4px 0;}
+  /* 모드 '원본 그대로' — 받아온 HTML 을 Shadow DOM 에 넣어 앱 CSS 를 차단한다.
+     껍데기(카드·제목바)만 앱 것이고 안쪽은 사이트 그대로다. */
+  .weekly-html-content.wk-orig{
+    background:#fff;color:#000;font-size:initial;line-height:initial;padding:0;
+  }
+  html.dark .weekly-html-content.wk-orig{background:#fff;}
+  .wk-shadow-host{display:block;padding:14px;}
+
+  /* 보기 전환(관리자만) */
+  .wk-modes{display:flex;gap:0;margin-left:auto;flex-shrink:0;
+    border:1px solid var(--rule);border-radius:8px;overflow:hidden;}
+  .wk-modes button{background:var(--paper);border:0;border-right:1px solid var(--rule);
+    padding:4px 9px;font-family:inherit;font-size:11.5px;color:var(--ink-soft);cursor:pointer;}
+  .wk-modes button:last-child{border-right:0;}
+  .wk-modes button.on{background:var(--mon);color:#fff;font-weight:700;}
+
   /* 별도 버튼 행 숨김 (제목 바에 통합) */
   .weekly-btn-row{display:none;}
   .weekly-dept{
@@ -1961,7 +1979,8 @@
   .weekly-html-content h3{font-size:16px;}
   .weekly-html-content h4{font-size:15px;border-bottom:none;}
   .weekly-html-content p{margin:6px 0;}
-  .weekly-html-content a{color:var(--wed);word-break:break-all;}
+  .weekly-html-content:not(.wk-plain) a{color:var(--wed);}
+  .weekly-html-content a{word-break:break-all;}
   .weekly-html-content a:hover{text-decoration:underline;}
   .weekly-html-content strong,.weekly-html-content b{color:var(--ink);font-weight:700;}
   .weekly-html-content ul,.weekly-html-content ol{padding-left:20px;margin:6px 0;}
@@ -9062,9 +9081,66 @@ function applyWeeklyDarkColors(root){
   });
 }
 
+/* ══ 주간교육활동을 어떻게 그릴까 ═════════════════════════════════════════
+   받아온 HTML 은 구글 사이트의 마크업이다. 지금까지는 앱이 그걸 통째로 고쳐
+   그렸다 — 모든 글자의 글꼴을 !important 로 갈아 끼우고, 본문 20px·줄간격 2,
+   제목 크기·링크색·굵은글씨색까지 앱 색으로 덮었다. 읽기는 편한데 원본과
+   디테일이 달라진다.
+
+     app   지금까지의 방식
+     plain 글꼴·색만 원본 (크기는 앱 것 유지)
+     orig  원본 그대로 — Shadow DOM 에 넣어 앱 CSS 가 아예 못 닿게 하고,
+           그 안에 스티키 규칙 하나만 넣는다
+
+   무엇이 나은지는 눈으로 봐야 안다. 전환은 관리자에게만 보인다.        */
+const WK_MODE_KEY = 'ynhsWeeklyMode';
+const WK_MODES = [['app','지금'], ['plain','글꼴·색'], ['orig','원본']];
+let weeklyMode = (() => { try { return localStorage.getItem(WK_MODE_KEY) || 'app'; }
+                          catch(e){ return 'app'; } })();
+let _wkLast = null;              // 마지막으로 그린 것 — 전환할 때 다시 안 받아온다
+
+// 그림자 영역 안에 넣을 규칙. 원본을 건드리는 것은 스티키 하나뿐이다.
+const WK_SHADOW_CSS = `
+  :host{display:block;}
+  /* CSS 변수는 그림자 경계를 넘어 상속된다 — 바깥 top-bar 높이를 그대로 쓴다.
+     top:0 으로 두면 제목이 상단 바 밑으로 파고든다. */
+  h2{position:sticky;top:var(--weekly-top-offset, 44px);z-index:10;background:#fff;
+     margin-left:-14px;margin-right:-14px;padding-left:14px;padding-right:14px;}
+  img,table{max-width:100%;}
+  table{border-collapse:collapse;}
+`;
+
+function renderWeeklyModeBar(){
+  const bar = document.getElementById('weeklyTopBar');
+  if(!bar) return;
+  let box = document.getElementById('wkModes');
+  const show = fbAuth.currentUser?.email === ADMIN_EMAIL && !isViewAs();
+  if(!show){ box?.remove(); return; }
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'wkModes'; box.className = 'wk-modes';
+    WK_MODES.forEach(([k, label]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.dataset.wkMode = k; b.textContent = label;
+      b.addEventListener('click', () => {
+        weeklyMode = k;
+        try { localStorage.setItem(WK_MODE_KEY, k); } catch(e){}
+        renderWeeklyModeBar();
+        if(_wkLast) renderWeeklyHtml(_wkLast.title, _wkLast.html);
+      });
+      box.appendChild(b);
+    });
+    bar.appendChild(box);
+  }
+  box.querySelectorAll('[data-wk-mode]').forEach(b =>
+    b.classList.toggle('on', b.dataset.wkMode === weeklyMode));
+}
+
 function renderWeeklyHtml(title, html){
+  _wkLast = { title, html };
   const wrap = document.createElement('div');
-  wrap.className = 'weekly-html-content';
+  wrap.className = 'weekly-html-content'
+    + (weeklyMode === 'plain' ? ' wk-plain' : weeklyMode === 'orig' ? ' wk-orig' : '');
 
   // 제목 바
   const titleBar = document.createElement('div');
@@ -9083,13 +9159,27 @@ function renderWeeklyHtml(title, html){
   wrap.appendChild(titleBar);
 
   // 본문 HTML 삽입
-  const body = document.createElement('div');
-  body.innerHTML = html;
-  applyWeeklyDarkColors(body);
-  wrap.appendChild(body);
+  if(weeklyMode === 'orig'){
+    // 그림자 영역 — 앱 CSS 가 넘어가지 못한다. 원본 마크업이 제 모양대로 나온다.
+    const host = document.createElement('div');
+    host.className = 'wk-shadow-host';
+    const sh = host.attachShadow({ mode: 'open' });
+    const st = document.createElement('style');
+    st.textContent = WK_SHADOW_CSS;
+    const body = document.createElement('div');
+    body.innerHTML = html;
+    sh.append(st, body);
+    wrap.appendChild(host);
+  } else {
+    const body = document.createElement('div');
+    body.innerHTML = html;
+    applyWeeklyDarkColors(body);
+    wrap.appendChild(body);
+  }
 
   weeklyPageContent.innerHTML = '';
   weeklyPageContent.appendChild(wrap);
+  renderWeeklyModeBar();
   setTimeout(updateWeeklyTopOffset, 50);
 }
 

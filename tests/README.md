@@ -111,6 +111,7 @@ node tests/pass-fab.test.mjs                       # FAB 이 외출증 화면에
 node tests/seat-inpage.test.mjs                    # 자리 배치 '크게 보기' → 앱 안 화면 + 돌아가기
 node tests/weekly-chips-live.test.mjs              # 주차 칩이 새로고침 없이 늘어나는지
 node tests/usage-stats.test.mjs                    # 사용 현황 · 전체 새로고침
+node tests/weekly-render-mode.test.mjs             # 주간교육활동을 원본대로 그리는가
 node tests/consult-weekend.test.mjs                # 상담 주말 슬롯 + 7칸 폭 측정
 node tests/task-share.test.mjs                     # 공유받은 업무에 작성자·함께 받은 사람
 node tests/cal-consult.test.mjs                    # 업무 캘린더의 상담 예약 표시·상세
@@ -170,6 +171,19 @@ node tests/cal-consult.test.mjs                    # 업무 캘린더의 상담 
 없고 `escapeHtml()` 이 맞는데, 하네스가 `esc` 를 정의해 버려서 화면이
 '불러오는 중…' 에서 멈추는 걸 못 잡았다. 지금은 하네스가 원본에서 `escapeHtml` 을
 떼어 오고, 이 구간이 부르는 이름이 원본(또는 import)에 있는지 따로 본다.
+
+### 주간교육활동 그리기 (원본 대비)
+
+받아오는 것은 구글 사이트의 마크업이다. 앱이 그걸 고쳐 그리면 읽기는 편한데
+원본과 디테일이 달라진다. 세 방식(`app` · `plain` · `orig`)을 놓고 고를 수 있게 해
+뒀고, 검사는 **각 방식이 실제로 무엇을 바꾸는지**를 계산된 스타일로 잰다.
+
+여기서 하나 확인됐다 — **앱이 힘으로 덮는 것은 글꼴 하나뿐이다.** 크기·색 규칙에는
+`!important` 가 없어서, 사이트가 인라인으로 적어 준 값은 그대로 살아남는다.
+'앱이 크기까지 다 덮는다'는 것은 사실이 아니었다.
+
+`orig` 는 Shadow DOM 이라 앱 CSS 가 아예 못 닿는다. 그 안에 넣는 것은 스티키
+규칙 하나뿐이고, 바깥 상단 바 높이는 CSS 변수가 그림자 경계를 넘어 상속된다.
 
 ### 보안 규칙 (Firestore 에뮬레이터)
 
