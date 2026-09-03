@@ -41,7 +41,8 @@ const grabConst = name => {
 const STYLES = [...HTML.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n');
 
 console.log('\n■ 배선 (정적)');
-check('세 가지 방식이 있다', /const WK_MODES = \[\['app'/.test(HTML));
+check('네 가지 방식이 있다',
+      /const WK_MODES = \[\['app','지금'\], \['plain','글꼴·색'\], \['orig','원본'\], \['plus','원본\+'\]\]/.test(HTML));
 // 사이트를 통째로 iframe 으로 띄우는 것은 해 봤고 안 된다(구글이 삽입 차단).
 // 지워 놓고 나중에 또 넣지 않도록 못 박는다.
 check('iframe 으로 띄우려 하지 않는다',
@@ -69,7 +70,7 @@ check('사이트가 쓰는 굵기를 싣는다',
 check('바깥에서 그림자 상자에 여백을 주지 않는다',
       !/\.wk-shadow-host\{[^}]*padding/.test(STYLES));
 check('죽은 코드가 아니라 실제로 그리는 곳에 붙였다',
-      /weeklyMode === 'orig'/.test(grab('renderContent')));
+      /if\(wkIsOrig\(\)\)\{/.test(grab('renderContent')));
 check('스티키가 상단 바 높이를 따른다',
       /top:var\(--weekly-top-offset, 44px\)/.test(grabConst('WK_SHADOW_CSS')));
 
@@ -117,7 +118,13 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grabConst('WK_MODES')}
   let weeklyMode = 'app';
   let _wkLast = null;
+  ${grabConst('wkIsOrig')}
   ${grabConst('WK_SHADOW_CSS')}
+  ${grabConst('WK_MARK')}
+  ${grab('wkHangIndent')}
+  ${grabConst('WK_TIGHTEN')}
+  ${grab('wkTightenTails')}
+  ${grab('wkPlusTune')}
   ${grab('wkStripDupTitle')}
   ${grab('wkGroupDepts')}
   ${grab('renderWeeklyModeBar')}
@@ -417,10 +424,101 @@ console.log('\n■ 부서 구분');
   check('넓은 화면에서도 글줄은 상자 안에 묶인다', line <= 1200, line);
 }
 
+// ── 원본+ ───────────────────────────────────────────────────────────────
+// 원본과 같은 길로 그리되 읽기 편하도록 네 가지를 손본다. 원본과 달라지는 것을
+// 아는 채로 하는 손질이라, '원본' 은 그대로 두고 별도 방식으로 뒀다.
+console.log('\n■ 원본+ — 읽기 편하게 손본 것');
+{
+  await pg.setViewportSize({ width: 420, height: 900 });
+  const LONG = `
+    <h1>2026학년도 9월 1주</h1>
+    <h2>교무기획부</h2>
+    <p>· 2학기 학생 학부모 상담주간 운영에 관한 안내입니다 협조 부탁드립니다</p>
+    <p>■ 대상: 전 교직원과 학부모 및 관련 부서 담당자 전원이 참여합니다</p>
+    <p>짧은 줄</p>
+    <h2>행정실</h2>
+    <p>· 물품 구입 신청은 9. 5.(금)까지 제출해 주시기 바랍니다</p>
+  `;
+  const readOrig = async mode => {
+    await pg.evaluate(([m, h]) => { window.setMode(m); window.render(h); }, [mode, LONG]);
+    return pg.evaluate(() => {
+      const r = document.querySelector('.wk-shadow-host').shadowRoot;
+      const ps = [...r.querySelectorAll('p')];
+      const c = ps.map(el => getComputedStyle(el));
+      return {
+        align: c.map(x => x.textAlign),
+        brk: c.map(x => x.wordBreak),
+        // ④ 기호로 시작하는 줄만 내어쓰기가 붙는다
+        hang: ps.map(el => ({ mark: el.textContent.trim()[0],
+                              ml: parseFloat(el.style.marginLeft) || 0,
+                              ti: parseFloat(el.style.textIndent) || 0 })),
+        // ② 자간은 넘치는 줄에만, 그것도 -0.03em 안에서만 손댄다
+        ls: ps.map(el => el.style.letterSpacing || ''),
+      };
+    });
+  };
+
+  const plus = await readOrig('plus');
+  check('① 양쪽 맞춤', plus.align.every(a => a === 'justify'), plus.align);
+  check('③ 어절 단위로 끊는다', plus.brk.every(b => b === 'keep-all'), plus.brk);
+  const marked = plus.hang.filter(h => '·■'.includes(h.mark));
+  const plain = plus.hang.filter(h => !'·■'.includes(h.mark));
+  check('④ 기호로 시작하는 줄은 기호 뒤로 내어쓴다',
+        marked.length === 3 && marked.every(h => h.ml > 0 && h.ti === -h.ml), plus.hang);
+  check('④ 기호가 없는 줄은 건드리지 않는다',
+        plain.every(h => h.ml === 0 && h.ti === 0), plus.hang);
+  check('② 자간을 조여도 -0.03em 을 넘지 않는다',
+        plus.ls.every(v => v === '' || (parseFloat(v) < 0 && parseFloat(v) >= -0.03)), plus.ls);
+  // 자간을 건드려 놓고 줄은 그대로면 아무 소용 없이 글자만 빽빽해진 것이다.
+  check('② 자간을 건드린 줄은 실제로 한 줄이 줄었다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    return [...r.querySelectorAll('p, li, small, h2, h3, h4')]
+      .filter(el => el.style.letterSpacing)
+      .every(el => {
+        const lh = parseFloat(getComputedStyle(el).lineHeight);
+        const n = () => Math.round(el.getBoundingClientRect().height / lh);
+        const tight = n(); const keep = el.style.letterSpacing;
+        el.style.letterSpacing = ''; const loose = n(); el.style.letterSpacing = keep;
+        return tight < loose;
+      });
+  }));
+  // 한두 글자 넘치는 줄이 실제로 한 줄로 접히는지, 폭을 그렇게 맞춰 놓고 본다.
+  check('② 한두 글자 넘치면 한 줄로 접힌다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const box = document.createElement('div');
+    const p = document.createElement('p');
+    p.textContent = '2학기 학생 학부모 상담주간 운영 협조 안내드립니다';
+    p.style.cssText = 'text-align:justify;word-break:keep-all;margin:0;';
+    box.style.cssText = 'position:absolute;visibility:hidden;';
+    box.appendChild(p); r.querySelector('.wk-plus').appendChild(box);
+    // 한 줄일 때의 폭보다 1.5% 만 좁히면 한두 글자가 넘어간다
+    p.style.whiteSpace = 'nowrap';
+    const w1 = p.getBoundingClientRect().width;
+    p.style.whiteSpace = '';
+    box.style.width = Math.floor(w1 * 0.985) + 'px';
+    const lh = parseFloat(getComputedStyle(p).lineHeight);
+    const before = Math.round(p.getBoundingClientRect().height / lh);
+    wkTightenTails(box);
+    const after = Math.round(p.getBoundingClientRect().height / lh);
+    const ls = p.style.letterSpacing;
+    box.remove();
+    return { before, after, ls };
+  }).then(v => v.before === 2 && v.after === 1 && v.ls !== ''));
+
+  // 손질은 '원본+' 만의 것이다. '원본' 은 사이트 그대로여야 한다.
+  const orig = await readOrig('orig');
+  check('원본은 그대로 둔다',
+        orig.align.every(a => a !== 'justify') && orig.brk.every(b => b !== 'keep-all')
+        && orig.hang.every(h => h.ml === 0) && orig.ls.every(v => v === ''), orig);
+
+  await pg.setViewportSize({ width: 1200, height: 800 });
+  await pg.evaluate(h => { window.setMode('orig'); window.render(h); }, SITE);
+}
+
 console.log('\n■ 전환 막대');
 {
   check('관리자에게는 보인다', await pg.evaluate(() => !!document.getElementById('wkModes')));
-  check('세 칸이다', (await pg.$$eval('#wkModes button', e => e.length)) === 3);
+  check('네 칸이다', (await pg.$$eval('#wkModes button', e => e.length)) === 4);
   check('고른 것이 켜져 있다',
         (await pg.$eval('#wkModes button.on', e => e.dataset.wkMode)) === 'orig');
   await pg.evaluate(() => { window.__setWho('kim@yeungnam.hs.kr'); window.render('<p>x</p>'); });
