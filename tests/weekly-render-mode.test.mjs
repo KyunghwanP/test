@@ -139,6 +139,8 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grabConst('WK_LEVEL')}
   ${grabConst('WK_STEP')}
   ${grab('wkLevelOf')}
+  ${grabConst('WK_NUM')}
+  ${grabConst('WK_HEAD_NUM')}
   ${grab('wkDropLeadWs')}
   ${grab('wkFirstTextX')}
   ${grab('wkHangIndent')}
@@ -786,6 +788,48 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
 // 이 사이트는 페이지 제목을 heading 으로 안 보낸다 — 그냥 span 이다. h1 만
 // 찾다가 못 찾으면 제목 글자를 못 얻고, 그러면 중복 제거가 시작도 못 한다.
 // 흰 바탕의 노란 제목이 계속 남아 있던 이유다.
+// ── 번호가 두 가지로 쓰인다 ──────────────────────────────────────────────
+// 같은 '1.' 이 어떤 데서는 소제목이고 어떤 데서는 ■ 에 딸린 목록이다.
+// 가르는 단서는 '번호가 이어지는가' 뿐이다.
+console.log('\n■ 번호가 두 가지로 쓰인다');
+{
+  const NB = '\u00A0';
+  const LI = t => `<ul><li dir="ltr"><p dir="ltr"><span style="color:#000000">${t}</span></p></li></ul>`;
+  const NUM = `
+    <h2><span>교육지원부</span></h2>
+    <p class="t1"><span>${NB}1.</span><span> 교내 환경 정화</span></p>
+    ${LI('아침 8시 교실 환기하면서 청소 실시')}
+    ${LI('교실, 복도 구석구석 깨끗하게 쓸기')}
+    <p class="t2"><span>${NB}2.</span><span> 방과후학교 수업, 학습집중채움 프로그램</span></p>
+    ${LI('신청자 해당 수업일에 빠지지 않도록 훈화 지도 부탁')}
+    <h2><span>교육과정부</span></h2>
+    <h3><span>${NB}01._</span><span>2026. 2학기 공동교육과정 개설 완료</span></h3>
+    <p class="b1"><span>■</span><span> 대상: 1,2학년</span></p>
+    <p class="b2"><span>■</span><span> 8.24.(월) 부터 운영하는 강좌 안내</span></p>
+    <p class="s1"><span>1.</span><span> 물리학 실험(18명)(박경환): (월,목) / 물리실</span></p>
+    <p class="s2"><span>2.</span><span> 물리 과제연구(13명)(정선우): (화,금) / 물리실</span></p>
+    <p class="s3"><span>3.</span><span> 통계이론 과제연구(11명)(정승호): (화,금) / 멀티실</span></p>
+  `;
+  await pg.evaluate(([m, h]) => { window.setMode(m); window.render(h); }, ['plus', NUM]);
+  const r = await pg.evaluate(() => {
+    const sh = document.querySelector('.wk-shadow-host').shadowRoot;
+    const box = sel => { const e = sh.querySelector(sel); if (!e) return null;
+      const rg = document.createRange(); rg.selectNodeContents(e);
+      const rc = [...rg.getClientRects()].filter(x => x.width > 0.5)[0];
+      return rc ? Math.round(rc.left) : null; };
+    return { t1: box('.t1'), t2: box('.t2'), ul: box('ul li'),
+             b1: box('.b1'), b2: box('.b2'),
+             s: ['.s1', '.s2', '.s3'].map(box) };
+  });
+  // 이어지는 번호(1. → 2.)는 소제목이다. 제 항목들보다 앞 칸에 선다.
+  check('이어지는 번호는 소제목 — 맨 앞 칸', r.t1 === r.t2 && r.t1 < r.ul, r);
+  // 흐름을 벗어나 1 부터 다시 시작하는 번호는 앞 줄에 딸린 목록이다.
+  check('흐름을 벗어난 번호는 앞 줄보다 한 칸 안', r.s.every(x => x > r.b2), r);
+  check('딸린 번호끼리는 열이 맞는다', new Set(r.s).size === 1, r);
+  check('■ 끼리도 열이 맞는다', r.b1 === r.b2, r);
+  await pg.evaluate(h => { window.setMode('orig'); window.render(h); }, SITE);
+}
+
 console.log('\n■ 제목이 heading 으로 안 올 때');
 {
   const NOH1 = `
