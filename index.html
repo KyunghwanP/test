@@ -9247,32 +9247,56 @@ const WK_SHADOW_CSS = `
 //    안 맞는다. 실제 기호를 잠깐 span 에 담아 재고 바로 걷어낸다.
 //    padding 이 아니라 margin 을 쓴다 — 좌우 여백(--wk-pad)이 padding 으로 들어와
 //    있어서, padding 을 덮으면 그 여백이 통째로 날아간다.
-const WK_MARK = /^[\s\u00A0]*((?:[·∙•‣⁃■▪▫□○●◦◆◇▶▷►※☞*]|[-–—])[\s\u00A0.]*)/;
-// 태그 이름으로 고르면 안 된다. 프록시가 넘겨 주는 줄은 p 일 때도 있고 div 일
-// 때도 있고, span 하나만 달랑 올 때도 있다. '한 줄로 놓이는 상자'인지를
-// 계산된 display 로 직접 보고, 그 안에 또 다른 줄이 들어 있으면 건너뛴다.
-function wkIsLine(el){
-  const d = getComputedStyle(el).display;
-  if(d !== 'block' && d !== 'list-item') return false;
-  for(const kid of el.querySelectorAll('*')){
-    const kd = getComputedStyle(kid).display;
-    if(kd === 'block' || kd === 'list-item') return false;
+// 기호는 나열하지 않는다. 어떤 기호가 오는지 다 알 수 없고, 실제로 두 번
+// 빗나갔다. '글자도 숫자도 아닌 것이 한두 개 앞에 오고 그 뒤가 띄어져 있으면
+// 그건 머리 기호다' 로 잡는다. 다만 여는 괄호·따옴표로 시작하는 줄은 뺀다 —
+// 「초·중등교육법」… 같은 줄이 통째로 밀려나면 안 된다.
+const WK_OPEN = '「『（(［[｛{《〈【〔“‘"\'<';
+const WK_MARK = /^[\s\u00A0]*([^\p{L}\p{N}\s\u00A0]{1,3}[\s\u00A0.]+)/u;
+
+// 그 글자가 놓인 '줄 상자'를 찾는다. 태그 이름으로도, 잎인지 아닌지로도 고르면
+// 안 된다 — 프록시가 p 로 줄 때도 div 로 줄 때도 있고, 줄 안에 또 상자가 들어
+// 있기도 하다. 글자에서 위로 올라가며 처음 만나는 블록이 그 줄이다.
+function wkBlockOf(node){
+  let el = node.parentElement;
+  while(el){
+    const d = getComputedStyle(el).display;
+    if(d === 'block' || d === 'list-item' || d === 'table-cell') return el;
+    el = el.parentElement;
   }
-  return true;
+  return null;
 }
+
+// ④ 기호 뒤로 내어쓰기. 줄의 첫 글자가 머리 기호면, 넘어간 줄이 기호 뒤에
+//    맞춰 들어간다. 기호마다 폭이 달라 고정값으로는 안 맞으므로, 그 기호를
+//    기호가 놓인 바로 그 자리에 잠깐 넣어 재고 걷어낸다(글꼴·크기가 같아야
+//    정확하다). padding 이 아니라 margin 을 쓴다 — 좌우 여백(--wk-pad)이
+//    padding 으로 들어와 있어서 padding 을 덮으면 그 여백이 통째로 날아간다.
 function wkHangIndent(root){
-  root.querySelectorAll('*').forEach(el => {
-    if(!wkIsLine(el)) return;
-    const m = WK_MARK.exec(el.textContent || '');
-    if(!m) return;
+  const seen = new Set();
+  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let n, hit = 0, seenCount = 0;
+  while((n = walk.nextNode())){
+    if(!n.nodeValue || !n.nodeValue.trim()) continue;
+    const block = wkBlockOf(n);
+    if(!block || seen.has(block)) continue;
+    seen.add(block);                    // 줄마다 첫 글자만 본다
+    seenCount++;
+    const m = WK_MARK.exec(n.nodeValue);
+    if(!m || WK_OPEN.includes(m[1][0])) continue;
     const probe = document.createElement('span');
     probe.textContent = m[1];
     probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;';
-    el.insertBefore(probe, el.firstChild);
+    n.parentNode.insertBefore(probe, n);
     const w = probe.getBoundingClientRect().width;
     probe.remove();
-    if(w > 0 && w < 80){ el.style.marginLeft = w + 'px'; el.style.textIndent = -w + 'px'; }
-  });
+    if(w > 0 && w < 80){
+      block.style.marginLeft = w + 'px';
+      block.style.textIndent = -w + 'px';
+      hit++;
+    }
+  }
+  return { lines: seenCount, hung: hit };
 }
 
 // ② 한두 글자가 넘쳐 한 줄이 더 생겼을 때만 자간을 조인다. 한글 프로그램의
@@ -9281,21 +9305,28 @@ function wkHangIndent(root){
 //    넘치는 문단은 아무리 조여도 안 줄어들고, 원래대로 되돌린다.
 const WK_TIGHTEN = ['-0.01em', '-0.02em', '-0.03em'];
 function wkTightenTails(root){
-  root.querySelectorAll('*').forEach(el => {
-    if(!wkIsLine(el)) return;
+  const seen = new Set();
+  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let n;
+  while((n = walk.nextNode())){
+    if(!n.nodeValue || !n.nodeValue.trim()) continue;
+    const el = wkBlockOf(n);
+    if(!el || seen.has(el)) continue;
+    seen.add(el);
     const cs = getComputedStyle(el);
     const lh = parseFloat(cs.lineHeight);
-    if(!lh) return;
+    if(!lh) continue;
     const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
     const lines = () => Math.round((el.getBoundingClientRect().height - pad) / lh);
     const n0 = lines();
-    if(n0 < 2) return;
+    if(n0 < 2) continue;
+    let done = false;
     for(const step of WK_TIGHTEN){
       el.style.letterSpacing = step;
-      if(lines() < n0) return;
+      if(lines() < n0){ done = true; break; }
     }
-    el.style.letterSpacing = '';
-  });
+    if(!done) el.style.letterSpacing = '';
+  }
 }
 
 function wkPlusTune(root){
@@ -9303,8 +9334,14 @@ function wkPlusTune(root){
   root.querySelectorAll('[style]').forEach(el => {
     el.style.marginLeft = ''; el.style.textIndent = ''; el.style.letterSpacing = '';
   });
-  wkHangIndent(root);
+  const stat = wkHangIndent(root);
   wkTightenTails(root);   // 내어쓰기로 줄 수가 달라지므로 반드시 뒤에 잰다
+  // 안 먹을 때 무엇이 들어왔는지 알려면 실제 마크업을 봐야 한다. 관리자에게만.
+  if(fbAuth.currentUser?.email === ADMIN_EMAIL) console.log('[원본+]', stat,
+    [...root.querySelectorAll('*')].slice(0, 400)
+      .filter(el => el.firstChild?.nodeType === 3 && el.firstChild.nodeValue.trim())
+      .slice(0, 6)
+      .map(el => el.tagName + ' | ' + el.firstChild.nodeValue.trim().slice(0, 14)));
 }
 
 // 화면 폭이 바뀌면 잰 값이 다 틀어진다. 가로·세로 돌릴 때가 그렇다.
@@ -9321,17 +9358,29 @@ window.addEventListener('resize', () => {
 // 상자 위로 꺼낸 제목이 첫 부서 앞에 한 번 더 남아 있다. 사이트가 제목을 두 군데
 // (배너와 본문 머리)에 두는데, 앞엣것만 h1 로 넘어오고 뒤엣것은 색만 인라인으로
 // 실린 평범한 글이라 h1 규칙에도 안 걸린다 — 흰 바탕에 옅은 노랑으로 남는다.
-// 첫 부서 이름보다 앞에 있으면서 제목과 글자가 똑같은 것만 지운다.
+//
+// 글자를 그대로 맞대면 못 잡는다. 두 군데의 띄어쓰기가 다를 수 있고('업무 안내'
+// 와 '업무안내'), 줄바꿈·붙임표가 섞이기도 한다. 공백을 모두 걷어내고 비교하며,
+// 한쪽이 다른 쪽을 품고 있어도 같은 것으로 본다.
+const wkSquash = t => (t || '').replace(/[\s\u00A0]+/g, '');
+function wkSameTitle(a, b){
+  a = wkSquash(a); b = wkSquash(b);
+  if(!a || !b || a.length < 4) return false;
+  return a === b || a.includes(b) || b.includes(a);
+}
 function wkStripDupTitle(root, text){
-  if(!text) return;
+  if(wkSquash(text).length < 4) return;
   const firstDept = root.querySelector('h2');
   for(const el of [...root.querySelectorAll('*')]){
-    if(el.children.length) continue;                       // 잎만 본다
-    if(el.textContent.trim() !== text) continue;
+    // 앞서 지운 것의 자손일 수 있다. isConnected 로 보면 안 된다 — 이 시점의
+    // div 는 아직 화면에 안 붙어 있어서 전부 false 다.
+    if(!root.contains(el)) continue;
     // 첫 부서보다 뒤에 있으면 본문 내용일 수 있다 — 건드리지 않는다.
     if(firstDept && !(firstDept.compareDocumentPosition(el)
                       & Node.DOCUMENT_POSITION_PRECEDING)) continue;
-    // 지우고 나서 빈 껍데기만 남은 부모도 같이 걷는다.
+    if(!wkSameTitle(el.textContent, text)) continue;
+    // 제목만 든 가장 안쪽 상자를 지운다. 바깥부터 지우면 형제 내용까지 날아간다.
+    if([...el.children].some(k => wkSameTitle(k.textContent, text))) continue;
     let n = el;
     while(n && n !== root){
       const parent = n.parentNode;

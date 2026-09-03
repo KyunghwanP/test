@@ -128,12 +128,15 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   let _wkLast = null;
   ${grabConst('wkIsOrig')}
   ${grabConst('WK_SHADOW_CSS')}
+  ${grabConst('WK_OPEN')}
   ${grabConst('WK_MARK')}
-  ${grab('wkIsLine')}
+  ${grab('wkBlockOf')}
   ${grab('wkHangIndent')}
   ${grabConst('WK_TIGHTEN')}
   ${grab('wkTightenTails')}
   ${grab('wkPlusTune')}
+  ${grabConst('wkSquash')}
+  ${grab('wkSameTitle')}
   ${grab('wkStripDupTitle')}
   ${grab('wkGroupDepts')}
   ${grab('renderWeeklyModeBar')}
@@ -284,8 +287,11 @@ console.log('\n■ 부서 구분');
   const DEPT = `
     <h1><span style="color:#FFD966">주간 교육활동 및 업무 안내</span></h1>
     <!-- 사이트는 제목을 한 번 더 싣는다. 이건 h1 이 아니라 색만 인라인으로
-         실린 평범한 글이라 h1 규칙에 안 걸리고 흰 바탕에 옅은 노랑으로 남는다. -->
+         실린 평범한 글이라 h1 규칙에 안 걸리고 흰 바탕에 옅은 노랑으로 남는다.
+         두 군데의 띄어쓰기가 다를 수 있어서('업무 안내' / '업무안내'), 글자를
+         그대로 맞대면 못 잡는다. 둘 다 넣어 둔다. -->
     <p><span style="color:#FFD966">주간 교육활동 및 업무 안내</span></p>
+    <div><span style="color:#FFD966">주간 교육활동 및 업무안내</span></div>
     <h2>교무기획부</h2>
     <p>9월 2일(수) 전교조회</p>
     <p><small>· 대상: 전교생</small></p>
@@ -325,9 +331,10 @@ console.log('\n■ 부서 구분');
   });
   const dup = await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
-    const t = '주간 교육활동 및 업무 안내';
+    const sq = s => s.replace(/[\s\u00A0]+/g, '');
+    const t = sq('주간 교육활동 및 업무 안내');
     return [...r.querySelectorAll('*')].filter(e => !e.children.length
-             && e.textContent.trim() === t).length;
+             && sq(e.textContent) === t).length;
   });
   check('상자 안에 제목이 한 번 더 남지 않는다', dup === 0, dup);
   check('부서마다 하나씩 묶인다', d.n === 4, d.n);
@@ -455,7 +462,14 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
     await pg.evaluate(([m, h]) => { window.setMode(m); window.render(h); }, [mode, LONG]);
     return pg.evaluate(() => {
       const r = document.querySelector('.wk-shadow-host').shadowRoot;
-      const ps = [...r.querySelectorAll('p, div')].filter(e => wkIsLine(e));
+      // '줄'은 그 안의 첫 글자가 자기를 가리키는 상자다 — 본 코드와 같은 기준.
+      const isLine = el => {
+        const first = [...el.childNodes].find(n => n.nodeType === 3 && n.nodeValue.trim())
+          || [...el.querySelectorAll('*')].map(k => [...k.childNodes]
+               .find(n => n.nodeType === 3 && n.nodeValue.trim())).find(Boolean);
+        return !!first && wkBlockOf(first) === el;
+      };
+      const ps = [...r.querySelectorAll('p, div')].filter(isLine);
       const c = ps.map(el => getComputedStyle(el));
       return {
         align: c.map(x => x.textAlign),
@@ -482,7 +496,8 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
   check('④ p 든 div 든 가리지 않는다', await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
     return [...r.querySelectorAll('div')]
-      .filter(e => wkIsLine(e) && '·■'.includes(e.textContent.trim()[0]))
+      .filter(e => '·■'.includes(e.textContent.trim()[0])
+                   && !e.querySelector('div, p'))
       .every(e => parseFloat(e.style.marginLeft) > 0);
   }));
   check('④ 기호가 없는 줄은 건드리지 않는다',
