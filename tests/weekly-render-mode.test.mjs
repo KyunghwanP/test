@@ -314,6 +314,47 @@ console.log('\n■ 부서 구분');
     return Math.round(((Math.max(bg, fg) + 0.05) / (Math.min(bg, fg) + 0.05)) * 10) / 10;
   });
   check('제목 글자가 배경과 충분히 대비된다(4.5:1 이상)', con >= 4.5, con);
+
+  // 여백을 색 있는 상자에 주면 색이 그만큼 안쪽으로 물러난다. 여백은 글에만
+  // 물려야 띠가 좌우 끝까지 닿는다. 아래 두 검사가 그걸 잰다.
+  const bleed = await pg.evaluate(() => {
+    const host = document.querySelector('.wk-shadow-host');
+    const r = host.shadowRoot, H = host.getBoundingClientRect();
+    const box = el => { const b = el.getBoundingClientRect();
+                        return { l: Math.round(b.left - H.left), w: Math.round(b.width) }; };
+    return { host: Math.round(H.width),
+             secs: [...r.querySelectorAll('section.wk-dept')].map(box),
+             h1: box(r.querySelector('h1')),
+             // 글은 여백만큼 안으로 들어와 있어야 한다
+             pPad: parseFloat(getComputedStyle(r.querySelector('p')).paddingLeft) };
+  });
+  check('부서 띠가 좌우 끝까지 닿는다',
+        bleed.secs.every(s => s.l === 0 && s.w === bleed.host), bleed);
+  check('제목 띠도 좌우 끝까지 닿는다',
+        bleed.h1.l === 0 && bleed.h1.w === bleed.host, bleed.h1);
+  check('띠는 끝까지 가도 글은 안으로 들어와 있다', bleed.pPad > 0, bleed.pPad);
+
+  // 좁아질수록 좌우 여백이 줄고, 휴대폰에서는 거의 없어야 한다.
+  const padAt = async w => {
+    await pg.setViewportSize({ width: w, height: 800 });
+    return pg.evaluate(() => parseFloat(getComputedStyle(
+      document.querySelector('.wk-shadow-host').shadowRoot.querySelector('p')).paddingLeft));
+  };
+  const pads = [];
+  for (const w of [1600, 1200, 900, 700, 500, 380]) pads.push(await padAt(w));
+  check('좁아질수록 좌우 여백이 준다',
+        pads.every((v, i) => i === 0 || v <= pads[i - 1]), pads);
+  check('휴대폰에서는 여백이 거의 없다', pads[pads.length - 1] <= 8, pads);
+  // 넓은 화면에서 글줄이 끝없이 길어지면 읽기 어렵다 — 1280px 로 묶인다.
+  const wide = await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const p = r.querySelector('p');
+    const c = getComputedStyle(p);
+    return Math.round(p.getBoundingClientRect().width
+                      - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight));
+  });
+  await pg.setViewportSize({ width: 1200, height: 800 });
+  check('넓은 화면에서도 글줄은 1280px 을 안 넘는다', wide <= 1280, wide);
 }
 
 console.log('\n■ 전환 막대');

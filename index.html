@@ -1927,6 +1927,12 @@
     background:#fff;color:#000;font-size:initial;line-height:initial;padding:0;
   }
   html.dark .weekly-html-content.wk-orig{background:#fff;}
+  /* 휴대폰에서는 부서 띠가 화면 끝까지 닿게 한다. .weekly-body 의 좌우 4px 을
+     이 카드에서만 되돌린다 — 다른 모드 카드는 그대로 둔다. 카드 모서리를 둥글게
+     두면 네모난 띠가 모서리 밖으로 삐져나오므로 같이 편다. */
+  @media (max-width:560px){
+    .weekly-html-content.wk-orig{margin-left:-4px;margin-right:-4px;border-radius:0;}
+  }
   /* 여백은 그림자 안(:host)이 정한다. 바깥에서 .wk-shadow-host 로 주면
      클래스 선택자가 :host 를 이겨서, 안쪽이 계산해 둔 좌우 여백이 통째로
      무시되고 스티키 제목만 여백만큼 삐져나온다. */
@@ -9119,21 +9125,35 @@ const WK_SHADOW_CSS = `
      글꼴 이름을 'Noto Sans' 로 두고 한글은 시스템 글꼴로 흘려보내는 것도 사이트와
      같다. Noto Sans 는 라틴만 있고, 사이트도 한글은 브라우저 기본 산돌/맑은고딕
      으로 떨어진다. 여기서 Noto Sans KR 을 쓰면 오히려 사이트와 달라진다. */
-  :host{display:block;--wk-pad:36px;max-width:1280px;margin:0 auto;
-        padding:14px var(--wk-pad);
+  /* 좌우 여백은 '색 있는 상자'가 아니라 그 안의 글에 준다. 상자에 주면 색이
+     여백만큼 안쪽으로 물러나 좌우 끝까지 안 닿는다. 그래서 :host 와 부서 상자는
+     좌우 여백 0 으로 두고, --wk-side 를 글에만 물린다.
+     넓은 화면에서는 글줄이 끝없이 길어지지 않게 1280px 로 묶는다 — 남는 만큼이
+     여백이 되고, 좁아지면 max() 가 --wk-pad 쪽을 고른다. 휴대폰에서는 6px 까지
+     내려가 사실상 화면 끝까지 쓴다. */
+  :host{display:block;--wk-pad:36px;
+        --wk-side:max(var(--wk-pad), calc((100% - 1280px) / 2));
+        padding:14px 0;
         font-family:'Noto Sans',Arial,sans-serif;font-weight:500;
         font-size:14pt;line-height:1.38;color:#1C1C1C;
         -webkit-font-smoothing:antialiased;}
-  @media (max-width:768px){ :host{--wk-pad:24px;} }
-  @media (max-width:480px){ :host{--wk-pad:16px;} }
+  @media (max-width:1024px){ :host{--wk-pad:28px;} }
+  @media (max-width:768px){ :host{--wk-pad:20px;} }
+  @media (max-width:560px){ :host{--wk-pad:10px;} }
+  @media (max-width:420px){ :host{--wk-pad:6px;} }
+
+  /* h1 은 제 여백을 따로 쥔다(위아래도 줘야 해서). :not() 이 붙은 이 선택자가
+     맨 h1 보다 세서, 안 빼면 h1 의 padding 이 여기에 먹힌다. */
+  .wk-doc > *:not(section):not(h1),
+  section.wk-dept > *{padding-left:var(--wk-side);padding-right:var(--wk-side);}
 
   p{font-weight:500;font-size:14pt;line-height:1.38;margin:5pt 0 0;}
   /* 페이지 제목. 사이트에서는 어두운 띠 위의 밝은 글자인데, 그 띠는 class 로만
      칠해져 있어 프록시를 못 넘어온다. 글자색(노랑)만 인라인으로 살아 넘어와서
      흰 바탕에 노란 글자가 되어 안 보였다. 띠를 여기서 다시 깔아 준다.
      안쪽 글자색은 !important 로 덮는다 — 인라인으로 실려 온 색이 더 세다. */
-  h1{font-weight:700;font-size:36pt;line-height:1.2;margin:0 calc(-1 * var(--wk-pad)) 20pt;
-     padding:14pt var(--wk-pad);background:#1F3D33;color:#FBF6EC !important;}
+  h1{font-weight:700;font-size:36pt;line-height:1.2;margin:0 0 20pt;
+     padding:14pt var(--wk-side);background:#1F3D33;color:#FBF6EC !important;}
   h1 *{color:#FBF6EC !important;background:transparent !important;}
   h2{font-weight:800;font-size:20pt;line-height:1.38;margin:10pt 0;}
   h3{font-weight:600;font-size:16pt;line-height:1.38;margin:15pt 0 5pt;}
@@ -9154,8 +9174,7 @@ const WK_SHADOW_CSS = `
      것은 h2(부서 이름)뿐이다. 그래서 h2 부터 다음 h2 직전까지를 section 으로
      묶고(wkGroupDepts), 여기서 세 가지 띠 색을 돌려 가며 칠한다. 색은 사이트가
      쓰는 것 그대로다 — 흰색 / 회색 / 옅은 파랑. */
-  section.wk-dept{margin:0 calc(-1 * var(--wk-pad)) 20pt;
-                  padding:0 var(--wk-pad) 14pt;background:#FFFFFF;}
+  section.wk-dept{margin:0 0 20pt;padding:0 0 14pt;background:#FFFFFF;}
   section.wk-dept[data-band="1"]{background:#F1F1F1;}
   section.wk-dept[data-band="2"]{background:#E0EEF5;}
   section.wk-dept:last-of-type{margin-bottom:0;}
@@ -9167,8 +9186,6 @@ const WK_SHADOW_CSS = `
      제목도 같이 밀려 나간다 — 지금 보고 있는 부서 이름만 붙어 있게 된다. */
   h2{position:sticky;top:var(--weekly-top-offset, 44px);z-index:10;
      background-color:inherit;
-     margin-left:calc(-1 * var(--wk-pad));margin-right:calc(-1 * var(--wk-pad));
-     padding-left:var(--wk-pad);padding-right:var(--wk-pad);
      padding-top:8px;padding-bottom:8px;margin-bottom:14pt;
      border-bottom:1px solid rgba(0,0,0,0.16);
      box-shadow:0 4px 8px -4px rgba(0,0,0,0.08);
@@ -9448,6 +9465,7 @@ function renderContent(html){
     const sh = host.attachShadow({ mode: 'open' });
     const st = document.createElement('style');
     st.textContent = WK_SHADOW_CSS;
+    div.className = 'wk-doc';
     wkGroupDepts(div);
     sh.append(st, div);
     wrap.appendChild(host);
