@@ -9361,7 +9361,12 @@ function wkPlusTune(root){
       if(!t || /^[\p{L}\p{N}]/u.test(t)) continue;     // 글자·숫자로 시작하면 정상
       missed.push(b.tagName + '«' + t.slice(0, 12) + '»');
     }
-    console.log('[원본+] ' + JSON.stringify({ ...stat, missed }));
+    // 콘솔에서 펼쳐 보게 하면 안 된다 — 접힌 채로 여러 줄 쌓여서 복사를 못 한다.
+    // 한 줄 글자로 찍고, 같은 내용이 다시 나오면(리사이즈 등) 다시 안 찍는다.
+    // 그래도 길면 콘솔에 copy(__wkDiag) 한 번이면 클립보드로 넘어간다.
+    const line = '[원본+] ' + JSON.stringify({ ...stat, missed });
+    window.__wkDiag = line;
+    if(window.__wkDiagLast !== line){ window.__wkDiagLast = line; console.log(line); }
   }
 }
 
