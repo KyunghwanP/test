@@ -114,6 +114,7 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   let weeklyMode = 'app';
   let _wkLast = null;
   ${grabConst('WK_SHADOW_CSS')}
+  ${grab('wkGroupDepts')}
   ${grab('renderWeeklyModeBar')}
   ${grab('renderContent')}
   window.setMode = m => { weeklyMode = m; };
@@ -241,6 +242,78 @@ console.log('\n■ 원본 그대로 — 사이트에서 잰 값과 같은가');
   check('스티키 제목이 좌우를 꽉 덮는다', near(bleed.h2, bleed.host), bleed);
   await pg.setViewportSize({ width: 1200, height: 800 });
   await pg.evaluate(h => { window.setMode('orig'); window.render(h); }, SITE);
+}
+
+// ── 부서 구분 ───────────────────────────────────────────────────────────
+// 사이트는 부서마다 배경 띠를 깔아 구분하는데, 그 띠는 class 로만 칠해져 있어
+// 프록시를 못 넘어온다. 넘어오는 것 중 부서 경계를 알려 주는 건 h2 하나뿐이라,
+// h2 부터 다음 h2 직전까지를 묶어 여기서 다시 칠한다.
+console.log('\n■ 부서 구분');
+{
+  const DEPT = `
+    <h1><span style="color:#FFD966">주간 교육활동 및 업무 안내</span></h1>
+    <h2>교무기획부</h2>
+    <p>9월 2일(수) 전교조회</p>
+    <p><small>· 대상: 전교생</small></p>
+    <h2>학생안전부</h2>
+    <p>9월 3일(목) 안전교육</p>
+    <h2>진로진학부</h2>
+    <p>9월 4일(금) 진학 설명회</p>
+    <h2>교육연구부</h2>
+    <p>9월 5일(토) 공개수업</p>
+  `;
+  await pg.evaluate(h => { window.setMode('orig'); window.render(h); }, DEPT);
+  const d = await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const secs = [...r.querySelectorAll('section.wk-dept')];
+    return {
+      n: secs.length,
+      heads: secs.map(s => s.querySelector('h2')?.textContent.trim()),
+      // 부서 안에 자기 항목만 들어 있는가 — 다음 부서 것까지 삼키면 안 된다
+      items: secs.map(s => s.querySelectorAll('p').length),
+      bg: secs.map(s => getComputedStyle(s).backgroundColor),
+      // 부서와 부서 사이가 벌어져 있는가
+      gaps: secs.slice(1).map((s, i) =>
+        Math.round(s.getBoundingClientRect().top - secs[i].getBoundingClientRect().bottom)),
+      // 부서 이름: 밑줄 · 아래 여백 · 배경(자기 띠 색을 물려받아야 한다)
+      h2: secs.map(s => {
+        const c = getComputedStyle(s.querySelector('h2'));
+        return { bw: c.borderBottomWidth, mb: parseFloat(c.marginBottom),
+                 pb: parseFloat(c.paddingBottom), bg: c.backgroundColor };
+      }),
+    };
+  });
+  check('부서마다 하나씩 묶인다', d.n === 4, d.n);
+  check('부서 이름이 제자리에 있다',
+        JSON.stringify(d.heads) === JSON.stringify(['교무기획부','학생안전부','진로진학부','교육연구부']), d.heads);
+  check('다음 부서 것까지 삼키지 않는다',
+        JSON.stringify(d.items) === JSON.stringify([2,1,1,1]), d.items);
+  check('이웃한 부서는 배경색이 다르다',
+        d.bg.slice(1).every((c, i) => c !== d.bg[i]), d.bg);
+  check('부서 사이가 벌어져 있다', d.gaps.every(g => g >= 20), d.gaps);
+  check('부서 이름에 밑줄이 있다', d.h2.every(h => h.bw === '1px'), d.h2.map(h => h.bw));
+  check('부서 이름 아래에 여백이 있다',
+        d.h2.every(h => h.mb >= 18 && h.pb >= 6), d.h2.map(h => [h.mb, h.pb]));
+  // 흰색으로 박아 두면 회색·파랑 띠 위에서 부서 이름만 흰 판으로 떠 보인다.
+  check('부서 이름 배경이 그 부서 띠와 같다',
+        d.h2.every((h, i) => h.bg === d.bg[i]), { h2: d.h2.map(h => h.bg), sec: d.bg });
+
+  // 사이트에서는 어두운 띠 위의 밝은 글자인데, 띠가 class 라 안 넘어오고 글자색
+  // (노랑)만 인라인으로 넘어와 흰 바탕에 노란 글자가 됐다. 띠를 다시 깔아 준다.
+  const con = await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const h1 = r.querySelector('h1');
+    const lum = c => {
+      const [R, G, B] = c.match(/\d+/g).slice(0, 3).map(v => {
+        const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+    };
+    const bg = lum(getComputedStyle(h1).backgroundColor);
+    const fg = lum(getComputedStyle(h1.querySelector('span')).color);
+    return Math.round(((Math.max(bg, fg) + 0.05) / (Math.min(bg, fg) + 0.05)) * 10) / 10;
+  });
+  check('제목 글자가 배경과 충분히 대비된다(4.5:1 이상)', con >= 4.5, con);
 }
 
 console.log('\n■ 전환 막대');

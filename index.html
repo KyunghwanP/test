@@ -9128,7 +9128,13 @@ const WK_SHADOW_CSS = `
   @media (max-width:480px){ :host{--wk-pad:16px;} }
 
   p{font-weight:500;font-size:14pt;line-height:1.38;margin:5pt 0 0;}
-  h1{font-weight:700;font-size:36pt;line-height:1.2;margin:20pt 0;}
+  /* 페이지 제목. 사이트에서는 어두운 띠 위의 밝은 글자인데, 그 띠는 class 로만
+     칠해져 있어 프록시를 못 넘어온다. 글자색(노랑)만 인라인으로 살아 넘어와서
+     흰 바탕에 노란 글자가 되어 안 보였다. 띠를 여기서 다시 깔아 준다.
+     안쪽 글자색은 !important 로 덮는다 — 인라인으로 실려 온 색이 더 세다. */
+  h1{font-weight:700;font-size:36pt;line-height:1.2;margin:0 calc(-1 * var(--wk-pad)) 20pt;
+     padding:14pt var(--wk-pad);background:#1F3D33;color:#FBF6EC !important;}
+  h1 *{color:#FBF6EC !important;background:transparent !important;}
   h2{font-weight:800;font-size:20pt;line-height:1.38;margin:10pt 0;}
   h3{font-weight:600;font-size:16pt;line-height:1.38;margin:15pt 0 5pt;}
   h4{font-weight:700;font-size:14pt;line-height:1.38;margin:15pt 0 5pt;}
@@ -9143,14 +9149,54 @@ const WK_SHADOW_CSS = `
         margin:2.5pt 0 0;}
   a{color:#0041A5;}
 
+  /* ── 부서 띠 ───────────────────────────────────────────────────────
+     프록시가 class 를 지워 버려서, 어디부터 어디까지가 한 부서인지 알려 주는
+     것은 h2(부서 이름)뿐이다. 그래서 h2 부터 다음 h2 직전까지를 section 으로
+     묶고(wkGroupDepts), 여기서 세 가지 띠 색을 돌려 가며 칠한다. 색은 사이트가
+     쓰는 것 그대로다 — 흰색 / 회색 / 옅은 파랑. */
+  section.wk-dept{margin:0 calc(-1 * var(--wk-pad)) 20pt;
+                  padding:0 var(--wk-pad) 14pt;background:#FFFFFF;}
+  section.wk-dept[data-band="1"]{background:#F1F1F1;}
+  section.wk-dept[data-band="2"]{background:#E0EEF5;}
+  section.wk-dept:last-of-type{margin-bottom:0;}
+
   /* CSS 변수는 그림자 경계를 넘어 상속된다 — 바깥 top-bar 높이를 그대로 쓴다.
-     top:0 으로 두면 제목이 상단 바 밑으로 파고든다. */
-  h2{position:sticky;top:var(--weekly-top-offset, 44px);z-index:10;background:#fff;
+     top:0 으로 두면 제목이 상단 바 밑으로 파고든다.
+     배경은 inherit 이어야 한다. 흰색으로 박아 두면 회색·파랑 띠 위에서 부서
+     이름만 흰 판으로 떠 보인다. 부서 안에 갇힌 스티키라, 다음 부서가 올라오면
+     제목도 같이 밀려 나간다 — 지금 보고 있는 부서 이름만 붙어 있게 된다. */
+  h2{position:sticky;top:var(--weekly-top-offset, 44px);z-index:10;
+     background-color:inherit;
      margin-left:calc(-1 * var(--wk-pad));margin-right:calc(-1 * var(--wk-pad));
-     padding-left:var(--wk-pad);padding-right:var(--wk-pad);}
+     padding-left:var(--wk-pad);padding-right:var(--wk-pad);
+     padding-top:8px;padding-bottom:8px;margin-bottom:14pt;
+     border-bottom:1px solid rgba(0,0,0,0.16);
+     box-shadow:0 4px 8px -4px rgba(0,0,0,0.08);
+     scroll-margin-top:50px;}
   img,table{max-width:100%;}
   table{border-collapse:collapse;}
 `;
+
+// 부서 단위로 묶는다 — h2(부서 이름)부터 다음 h2 직전까지가 한 부서다.
+// 형제 사이에서만 자르므로 h2 가 어느 깊이에 있든 그 자리에서 묶인다.
+// 띠 색 번호는 여기서 매긴다. CSS 의 nth-of-type 으로 세면 h2 가 서로 다른
+// 부모 밑에 흩어져 있을 때 번호가 부모별로 다시 1부터 돌아 색이 겹친다.
+function wkGroupDepts(root){
+  const heads = [...root.querySelectorAll('h2')];
+  heads.forEach((h, i) => {
+    const sec = document.createElement('section');
+    sec.className = 'wk-dept';
+    sec.dataset.band = String(i % 3);
+    h.parentNode.insertBefore(sec, h);
+    let n = h;
+    while(n){
+      const next = n.nextSibling;
+      sec.appendChild(n);
+      if(next && next.nodeType === 1 && next.tagName === 'H2') break;
+      n = next;
+    }
+  });
+}
 
 function renderWeeklyModeBar(){
   const bar = document.getElementById('weeklyTopBar');
@@ -9402,6 +9448,7 @@ function renderContent(html){
     const sh = host.attachShadow({ mode: 'open' });
     const st = document.createElement('style');
     st.textContent = WK_SHADOW_CSS;
+    wkGroupDepts(div);
     sh.append(st, div);
     wrap.appendChild(host);
     weeklyPageContent.innerHTML = '';
