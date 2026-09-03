@@ -1929,8 +1929,12 @@
   html.dark .weekly-html-content.wk-orig{background:#fff;}
   .wk-shadow-host{display:block;padding:14px;}
 
-  /* 보기 전환(관리자만) */
-  .wk-modes{display:flex;gap:0;margin-left:auto;flex-shrink:0;
+  .wk-orig-bar{display:flex;justify-content:flex-end;padding:8px 10px 0;}
+  .wk-orig-bar .weekly-title-btn{background:var(--mon);border-color:var(--mon);color:#fff !important;}
+
+  /* 보기 전환(관리자만). 상단 바가 세로 flex 라 align-self 로 오른쪽에 붙인다 —
+     margin-left:auto 만으로는 한 줄을 통째로 차지한다. */
+  .wk-modes{display:flex;gap:0;align-self:flex-end;margin:4px 0 6px;flex-shrink:0;
     border:1px solid var(--rule);border-radius:8px;overflow:hidden;}
   .wk-modes button{background:var(--paper);border:0;border-right:1px solid var(--rule);
     padding:4px 9px;font-family:inherit;font-size:11.5px;color:var(--ink-soft);cursor:pointer;}
@@ -8926,6 +8930,7 @@ async function initWeeklyPage(){
     // 주차 칩은 스냅샷으로 본다 — 스크래핑(GitHub Action)이 새 주차를 올리면
     // 새로고침 없이 칩이 늘어난다. 내용은 그대로 두고 칩만 갈아 끼운다.
     watchWeeklyIndex();
+    renderWeeklyModeBar();
     // 현재 주차: Firestore 캐시 확인
     const mainCacheSnap = await getDoc(doc(fbDb, 'weeklyData', 'cache-current'));
     const ONE_HOUR = 60 * 60 * 1000;
@@ -9097,7 +9102,7 @@ const WK_MODE_KEY = 'ynhsWeeklyMode';
 const WK_MODES = [['app','지금'], ['plain','글꼴·색'], ['orig','원본']];
 let weeklyMode = (() => { try { return localStorage.getItem(WK_MODE_KEY) || 'app'; }
                           catch(e){ return 'app'; } })();
-let _wkLast = null;              // 마지막으로 그린 것 — 전환할 때 다시 안 받아온다
+let _wkLast = null;              // 마지막 본문 HTML — 전환할 때 다시 안 받아온다
 
 // 그림자 영역 안에 넣을 규칙. 원본을 건드리는 것은 스티키 하나뿐이다.
 const WK_SHADOW_CSS = `
@@ -9126,7 +9131,7 @@ function renderWeeklyModeBar(){
         weeklyMode = k;
         try { localStorage.setItem(WK_MODE_KEY, k); } catch(e){}
         renderWeeklyModeBar();
-        if(_wkLast) renderWeeklyHtml(_wkLast.title, _wkLast.html);
+        if(_wkLast) renderContent(_wkLast);
       });
       box.appendChild(b);
     });
@@ -9136,11 +9141,12 @@ function renderWeeklyModeBar(){
     b.classList.toggle('on', b.dataset.wkMode === weeklyMode));
 }
 
+// ⚠ 아래 renderWeeklyHtml · renderSections 는 지금 어디서도 부르지 않는다.
+//   실제로 그리는 것은 renderContent 다. 여기에 손을 대고 화면이 안 바뀌어
+//   한참 헤맸다.
 function renderWeeklyHtml(title, html){
-  _wkLast = { title, html };
   const wrap = document.createElement('div');
-  wrap.className = 'weekly-html-content'
-    + (weeklyMode === 'plain' ? ' wk-plain' : weeklyMode === 'orig' ? ' wk-orig' : '');
+  wrap.className = 'weekly-html-content';
 
   // 제목 바
   const titleBar = document.createElement('div');
@@ -9159,27 +9165,13 @@ function renderWeeklyHtml(title, html){
   wrap.appendChild(titleBar);
 
   // 본문 HTML 삽입
-  if(weeklyMode === 'orig'){
-    // 그림자 영역 — 앱 CSS 가 넘어가지 못한다. 원본 마크업이 제 모양대로 나온다.
-    const host = document.createElement('div');
-    host.className = 'wk-shadow-host';
-    const sh = host.attachShadow({ mode: 'open' });
-    const st = document.createElement('style');
-    st.textContent = WK_SHADOW_CSS;
-    const body = document.createElement('div');
-    body.innerHTML = html;
-    sh.append(st, body);
-    wrap.appendChild(host);
-  } else {
-    const body = document.createElement('div');
-    body.innerHTML = html;
-    applyWeeklyDarkColors(body);
-    wrap.appendChild(body);
-  }
+  const body = document.createElement('div');
+  body.innerHTML = html;
+  applyWeeklyDarkColors(body);
+  wrap.appendChild(body);
 
   weeklyPageContent.innerHTML = '';
   weeklyPageContent.appendChild(wrap);
-  renderWeeklyModeBar();
   setTimeout(updateWeeklyTopOffset, 50);
 }
 
@@ -9319,8 +9311,8 @@ function renderContent(html){
     .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi,'')
     .replace(/\son\w+="[^"]*"/g,'')
     .replace(/javascript:/gi,'#');
+  _wkLast = safe;
   const div = document.createElement('div');
-  div.className = 'weekly-html-content';
   div.innerHTML = safe;
 
   // 구글 사이트 앵커 링크 아이콘 제거
@@ -9333,8 +9325,8 @@ function renderContent(html){
     else svg.remove();
   });
 
-  // <small> 태그 줄바꿈 + 글자색 검정
-  div.querySelectorAll('small').forEach(small => {
+  // <small> 태그 줄바꿈 + 글자색 검정 — 앱이 손보는 부분이라 원본 모드에서는 안 한다
+  if(weeklyMode !== 'orig') div.querySelectorAll('small').forEach(small => {
     small.style.color = '#000';
     small.insertAdjacentHTML('afterend', '<br>');
   });
@@ -9352,6 +9344,37 @@ function renderContent(html){
       (el.closest('div, p, li, span') || el).remove();
     }
   });
+
+  // ── 원본 그대로 ─────────────────────────────────────────────────────
+  // 여기까지의 손질은 '안전'과 '구글 사이트 껍데기 제거'다. 그건 원본 모드에서도
+  // 해야 한다. 아래부터가 앱이 모양을 바꾸는 부분이라, 원본 모드는 여기서 갈린다.
+  if(weeklyMode === 'orig'){
+    const wrap = document.createElement('div');
+    wrap.className = 'weekly-html-content wk-orig';
+    // 원본보기는 본문 밖에 둔다 — 사이트 제목을 건드리지 않으려고.
+    const bar = document.createElement('div');
+    bar.className = 'wk-orig-bar';
+    const ob = document.createElement('a');
+    ob.href = weeklyCurrentUrl; ob.target = '_blank';
+    ob.className = 'weekly-title-btn'; ob.textContent = '↗ 원본보기';
+    bar.appendChild(ob);
+    wrap.appendChild(bar);
+    // 그림자 영역 — 앱 CSS 가 넘어가지 못한다.
+    const host = document.createElement('div');
+    host.className = 'wk-shadow-host';
+    const sh = host.attachShadow({ mode: 'open' });
+    const st = document.createElement('style');
+    st.textContent = WK_SHADOW_CSS;
+    sh.append(st, div);
+    wrap.appendChild(host);
+    weeklyPageContent.innerHTML = '';
+    weeklyPageContent.appendChild(wrap);
+    renderWeeklyModeBar();
+    setTimeout(updateWeeklyTopOffset, 50);
+    return;
+  }
+
+  div.className = 'weekly-html-content' + (weeklyMode === 'plain' ? ' wk-plain' : '');
 
   // 제목 요소 찾기: h1 → role="heading" → 첫 번째 자식 순으로 시도
   const titleEl =
@@ -9385,6 +9408,8 @@ function renderContent(html){
   applyWeeklyDarkColors(div);
   weeklyPageContent.innerHTML = '';
   weeklyPageContent.appendChild(div);
+  renderWeeklyModeBar();
+  setTimeout(updateWeeklyTopOffset, 50);
 }
 
 

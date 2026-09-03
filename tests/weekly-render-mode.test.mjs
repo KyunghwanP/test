@@ -46,11 +46,13 @@ check('고른 것을 기억한다', /localStorage\.getItem\(WK_MODE_KEY\)/.test(
 check('전환은 관리자에게만 보인다',
       /fbAuth\.currentUser\?\.email === ADMIN_EMAIL && !isViewAs\(\)/.test(grab('renderWeeklyModeBar')));
 check('전환할 때 다시 받아오지 않는다',
-      /_wkLast = \{ title, html \}/.test(HTML) && /if\(_wkLast\) renderWeeklyHtml/.test(HTML));
+      /_wkLast = safe;/.test(HTML) && /if\(_wkLast\) renderContent\(_wkLast\)/.test(HTML));
 check('원본 방식은 그림자 영역을 쓴다', /attachShadow\(\{ mode: 'open' \}\)/.test(HTML));
 check('그림자 안에는 스티키만 넣는다',
       /position:sticky/.test(grabConst('WK_SHADOW_CSS'))
       && !/font-family/.test(grabConst('WK_SHADOW_CSS')));
+check('죽은 코드가 아니라 실제로 그리는 곳에 붙였다',
+      /weeklyMode === 'orig'/.test(grab('renderContent')));
 check('스티키가 상단 바 높이를 따른다',
       /top:var\(--weekly-top-offset, 44px\)/.test(grabConst('WK_SHADOW_CSS')));
 
@@ -95,16 +97,17 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   let _wkLast = null;
   ${grabConst('WK_SHADOW_CSS')}
   ${grab('renderWeeklyModeBar')}
-  ${grab('renderWeeklyHtml')}
+  ${grab('renderContent')}
   window.setMode = m => { weeklyMode = m; };
-  window.render = h => renderWeeklyHtml('제목', h);
+  window.render = h => renderContent(h);
 <\/script>`);
 
 // 제목바에도 a 가 있다(원본보기 버튼). 본문 안에서만 재야 실제 차이가 보인다.
 const styleOf = async (sel, inShadow) => pg.evaluate(([s, sh]) => {
   const root = sh ? document.querySelector('.wk-shadow-host').shadowRoot
-                  : document.querySelector('.weekly-html-content > div:not(.weekly-forced-title)');
-  const el = root.querySelector(s);
+                  : document.querySelector('.weekly-html-content');
+  // 제목바로 개조된 h1 안에도 a 가 있다(원본보기). 본문 것만 골라야 한다.
+  const el = [...root.querySelectorAll(s)].find(e => !e.closest('.weekly-forced-title')) || null;
   if (!el) return null;
   const c = getComputedStyle(el);
   return { ff: c.fontFamily, fs: c.fontSize, color: c.color, pos: c.position, top: c.top };
