@@ -138,10 +138,12 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grab('wkLead')}
   ${grabConst('WK_LEVEL')}
   ${grabConst('WK_STEP')}
+  ${grabConst('WK_SUB_LEVEL')}
   ${grab('wkLevelOf')}
   ${grabConst('WK_NUM')}
   ${grabConst('WK_HEAD_NUM')}
   ${grab('wkDropLeadWs')}
+  ${grab('wkInset')}
   ${grab('wkFirstTextX')}
   ${grab('wkHangIndent')}
   ${grabConst('WK_JUSTIFY_SLACK')}
@@ -645,6 +647,20 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
           && ul.getBoundingClientRect().left >= 0;
     });
   }));
+  // 목록 글머리표도 ■ 로 시작하는 글줄과 같은 칸에 서야 한다.
+  check('④ 목록 글머리표가 ■ 글줄과 같은 칸에 선다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const ul = r.querySelector('ul');
+    const sq = r.querySelector('p.col');        // ■ 로 시작하는 1단계 글줄
+    if (!ul || !sq) return false;
+    const rg = document.createRange(); rg.selectNodeContents(sq);
+    const sqLeft = [...rg.getClientRects()].filter(x => x.width > 0.5)[0].left;
+    const cs = getComputedStyle(ul);
+    const em = parseFloat(cs.fontSize);
+    // 글머리표는 상자 밖에 그려진다 — 그 왼쪽 끝이 ■ 글자와 한 글자 폭 안쪽에서 만난다
+    const markLeft = ul.getBoundingClientRect().left + parseFloat(cs.paddingLeft) - em;
+    return Math.abs(markLeft - sqLeft) < em * 0.35;
+  }));
   check('④ 목록 줄에 여백을 두 번 주지 않는다', await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
     return [...r.querySelectorAll('li p')].every(e => !e.style.marginLeft);
@@ -654,10 +670,12 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
     const uls = [...r.querySelectorAll('ul')];
     return uls.every(u => parseFloat(getComputedStyle(u).marginTop) === 0);
   }));
+  // 제목도 열은 맞춘다(왼쪽 여백을 준다). 다만 내어쓰기와 양쪽 맞춤은 안 건다 —
+  // 제목을 기호처럼 당기거나 늘이면 흉하다.
   check('제목에는 내어쓰기·양쪽 맞춤을 걸지 않는다', await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
     return [...r.querySelectorAll('h1, h2, h3, h4')]
-      .every(e => !e.style.marginLeft && !e.style.textIndent && !e.style.textAlign);
+      .every(e => !e.style.textIndent && !e.style.textAlign);
   }));
   // 기호 없는 줄은 앞 줄에 딸린 말이다. '(학생이 직접 …)' 처럼 여는 괄호로
   // 시작하는 줄이 왼쪽 끝으로 떨어지면 남처럼 보인다 — 앞 줄 단계를 물려받되,
@@ -832,6 +850,17 @@ console.log('\n■ 번호가 두 가지로 쓰인다');
   check('딸린 번호끼리는 열이 맞는다', new Set(r.s).size === 1, r);
   check('■ 끼리도 열이 맞는다', r.b1 === r.b2, r);
   // 제목의 &nbsp; 개수도 부서마다 다르다. 그대로 두면 소제목이 줄줄이 밀린다.
+  // 소제목은 ■ 와 같은 칸에 선다. 부서 이름만 그보다 한 칸 밖이다.
+  check('소제목이 ■ 와 같은 칸에 선다', await pg.evaluate(() => {
+    const sh = document.querySelector('.wk-shadow-host').shadowRoot;
+    const box = e => { const rg = document.createRange(); rg.selectNodeContents(e);
+      const rc = [...rg.getClientRects()].filter(x => x.width > 0.5)[0];
+      return rc ? Math.round(rc.left) : null; };
+    const hd = box(sh.querySelector('.hd'));
+    const b1 = box(sh.querySelector('.b1'));
+    const dept = box([...sh.querySelectorAll('h2')].pop());
+    return { hd, b1, dept, ok: Math.abs(hd - b1) <= 1 && dept < hd };
+  }).then(v => v.ok));
   check('소제목끼리 열이 맞는다', await pg.evaluate(() => {
     const sh = document.querySelector('.wk-shadow-host').shadowRoot;
     const xs = [...sh.querySelectorAll('.hd')].map(e => {
