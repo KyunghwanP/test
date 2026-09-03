@@ -9424,6 +9424,11 @@ function wkHangIndent(root){
       subSeq = 0;
       if(block.tagName === 'H2') numSeq = 0;
       else { const hm = WK_HEAD_NUM.exec(block.textContent || ''); if(hm) numSeq = +hm[1]; }
+      // 제목도 앞 공백은 지운다. 부서마다 &nbsp; 를 넣은 손이 달라서, 어떤 칸은
+      // 소제목이 제자리에 있고 어떤 칸은 줄줄이 오른쪽으로 밀려 있었다.
+      // 미는 것(들여쓰기)도 당기는 것(내어쓰기)도 하지 않고, 시작점만 맞춘다.
+      const hw = (/^[\s\u00A0]*/.exec(block.textContent || '') || [''])[0];
+      if(hw) wkDropLeadWs(block, hw.length);
       continue;
     }
     // 목록 안의 줄은 ul 이 이미 자리를 잡아 준다. 여기서 또 밀면 두 번 들어간다.

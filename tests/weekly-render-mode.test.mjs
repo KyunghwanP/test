@@ -803,12 +803,16 @@ console.log('\n■ 번호가 두 가지로 쓰인다');
     <p class="t2"><span>${NB}2.</span><span> 방과후학교 수업, 학습집중채움 프로그램</span></p>
     ${LI('신청자 해당 수업일에 빠지지 않도록 훈화 지도 부탁')}
     <h2><span>교육과정부</span></h2>
-    <h3><span>${NB}01._</span><span>2026. 2학기 공동교육과정 개설 완료</span></h3>
+    <!-- 소제목의 &nbsp; 개수도 부서마다 제각각이다. 어떤 칸은 제자리에 있고
+         어떤 칸은 줄줄이 오른쪽으로 밀려 있었다. -->
+    <h3 class="hd"><span>${NB}01._</span><span>2026. 2학기 공동교육과정 개설 완료</span></h3>
     <p class="b1"><span>■</span><span> 대상: 1,2학년</span></p>
     <p class="b2"><span>■</span><span> 8.24.(월) 부터 운영하는 강좌 안내</span></p>
     <p class="s1"><span>1.</span><span> 물리학 실험(18명)(박경환): (월,목) / 물리실</span></p>
     <p class="s2"><span>2.</span><span> 물리 과제연구(13명)(정선우): (화,금) / 물리실</span></p>
     <p class="s3"><span>3.</span><span> 통계이론 과제연구(11명)(정승호): (화,금) / 멀티실</span></p>
+    <h3 class="hd"><span>${NB}${NB}${NB}${NB}02._</span><span>과학 과제수행 탐구 캠프</span></h3>
+    <h3 class="hd"><span>03._</span><span>과학중점과정 추가 모집</span></h3>
   `;
   await pg.evaluate(([m, h]) => { window.setMode(m); window.render(h); }, ['plus', NUM]);
   const r = await pg.evaluate(() => {
@@ -827,6 +831,15 @@ console.log('\n■ 번호가 두 가지로 쓰인다');
   check('흐름을 벗어난 번호는 앞 줄보다 한 칸 안', r.s.every(x => x > r.b2), r);
   check('딸린 번호끼리는 열이 맞는다', new Set(r.s).size === 1, r);
   check('■ 끼리도 열이 맞는다', r.b1 === r.b2, r);
+  // 제목의 &nbsp; 개수도 부서마다 다르다. 그대로 두면 소제목이 줄줄이 밀린다.
+  check('소제목끼리 열이 맞는다', await pg.evaluate(() => {
+    const sh = document.querySelector('.wk-shadow-host').shadowRoot;
+    const xs = [...sh.querySelectorAll('.hd')].map(e => {
+      const rg = document.createRange(); rg.selectNodeContents(e);
+      return Math.round([...rg.getClientRects()].filter(x => x.width > 0.5)[0].left);
+    });
+    return { xs, ok: xs.length === 3 && new Set(xs).size === 1 };
+  }).then(v => v.ok));
   await pg.evaluate(h => { window.setMode('orig'); window.render(h); }, SITE);
 }
 
