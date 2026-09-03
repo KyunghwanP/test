@@ -9269,6 +9269,10 @@ function wkBlockOf(node){
   return null;
 }
 
+// 제목은 손대지 않는다. 내어쓰기도 양쪽 맞춤도 본문 줄에나 어울리는 것이지,
+// 제목에 걸면 '01. 9월 3차 …' 같은 소제목이 괜히 밀리고 벌어져 보인다.
+const wkIsHead = el => /^H[1-6]$/.test(el.tagName);
+
 // 줄 앞머리의 **글자 수**. 앞 공백 + 기호·번호 + 그 뒤 공백까지.
 // 앞 공백을 빼면 안 된다. 사이트는 들여쓰기를 &nbsp; 로 하는데, 그건 줄바꿈에서
 // 사라지지 않아 첫 줄만 안으로 들어가고 넘어간 줄은 맨 왼쪽까지 튀어나간다.
@@ -9319,6 +9323,7 @@ function wkHangIndent(root){
     if(!block || seen.has(block)) continue;
     seen.add(block);                    // 줄마다 한 번만 본다
     seenCount++;
+    if(wkIsHead(block)) continue;
     const text = block.textContent || '';
     const skip = wkLeadLen(text);
     if(!skip || !text.slice(skip).trim()) continue;    // 앞머리뿐인 줄
@@ -9385,6 +9390,7 @@ function wkJustifyEasy(root){
     const el = wkBlockOf(n);
     if(!el || seen.has(el)) continue;
     seen.add(el);
+    if(wkIsHead(el)) continue;
     const cs = getComputedStyle(el);
     const fs = parseFloat(cs.fontSize) || 16;
     const right = el.getBoundingClientRect().right - parseFloat(cs.paddingRight || 0);

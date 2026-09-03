@@ -131,6 +131,7 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grabConst('WK_OPEN')}
   ${grabConst('WK_TOKEN')}
   ${grab('wkBlockOf')}
+  ${grabConst('wkIsHead')}
   ${grab('wkLeadLen')}
   ${grab('wkFirstTextX')}
   ${grab('wkHangIndent')}
@@ -473,6 +474,9 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
     <!-- 긴 어절 하나가 통째로 다음 줄로 넘어가면서 앞 줄에 큰 구멍이 남는 문단.
          여기에 양쪽 맞춤을 걸면 그 구멍이 어절 사이로 퍼져 흉해진다. -->
     <p class="hole"><span>짧은 말 뒤에 대구광역시교육청진로진학지원센터운영협의회자료집 이 옵니다</span></p>
+    <!-- 소제목. 번호로 시작하고 &nbsp; 로 들여쓴 모양이 본문 줄과 똑같지만,
+         제목은 한 덩어리라 내어쓰기도 양쪽 맞춤도 걸면 안 된다. -->
+    <h3><span>\u00A0\u00A001.</span><span> 9월 3차 정보 공시 내용 입력과 각 부서 확인 절차 안내</span></h3>
     <h2><span>행정실</span></h2>
     <p><span>·</span><span> 물품 구입 신청은 9. 5.(금)까지 제출해 주시기 바랍니다</span></p>
   `;
@@ -561,6 +565,11 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
       .every(e => parseFloat(e.style.marginLeft) > 0);
   }));
   // 앞머리가 아예 없는 줄은 그대로 둔다. (여는 괄호·숫자 소제목은 따로 본다)
+  check('제목에는 내어쓰기·양쪽 맞춤을 걸지 않는다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    return [...r.querySelectorAll('h1, h2, h3, h4')]
+      .every(e => !e.style.marginLeft && !e.style.textIndent && !e.style.textAlign);
+  }));
   check('④ 앞머리가 없는 줄은 건드리지 않는다', await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
     const el = [...r.querySelectorAll('p')].find(e => /평범한 줄/.test(e.textContent));
