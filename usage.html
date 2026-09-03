@@ -108,8 +108,17 @@
   .ug-tbl td.dim{color:var(--ink-soft);}
   /* 옛 화면을 쓰는 사람 — 이 칸 하나 보려고 버전을 남긴다 */
   .ug-tbl td.old{color:var(--warn);font-weight:700;}
+  /* 사람별 표에서 이름을 체크해 특정 사람에게만 새로고침을 보낸다 */
+  .ug-tbl td.nm label{display:flex;align-items:center;gap:6px;cursor:pointer;}
+  .ug-tbl tr.ug-prow.sel{background:var(--today-tint);}
   .ug-idle{margin-top:11px;padding-top:10px;border-top:1px solid var(--rule);
     font-size:11.5px;color:var(--ink-soft);line-height:1.75;}
+  .ug-idle label{display:inline-flex;align-items:center;gap:4px;cursor:pointer;
+    margin-right:2px;}
+  #ugSelBar{display:none;align-items:center;gap:10px;flex-wrap:wrap;
+    background:var(--today-tint);border:1px solid var(--accent);border-radius:10px;
+    padding:8px 12px;margin-bottom:11px;font-size:12.5px;}
+  #ugSelBar b{font-weight:800;}
   .ug-empty{font-size:12.5px;color:var(--ink-soft);padding:10px 0;}
   .ug-foot{font-size:11.5px;color:var(--ink-soft);line-height:1.7;padding:2px 2px 18px;}
 </style>
@@ -179,6 +188,11 @@ const USAGE_TABS = {
   contacts:'📞 교원연락망', students:'🎒 학생연락망', meal:'🍱 식단표',
   seat:'🪑 자리 배치', usage:'📊 사용 현황',
 };
+
+// 새로고침을 특정 사람에게만 보내려고 고른 이메일들. 달을 바꿔 다시 그려도
+// (renderUsage 가 매번 innerHTML 을 통째로 새로 만든다) 고른 것이 풀리면
+// 안 되니 화면 밖(모듈 스코프)에 둔다.
+const _selEmails = new Set();
 
 async function usagePeople(){
   const byEmail = new Map();
@@ -282,8 +296,12 @@ function renderUsage(rows, ym){
 
   // ── 사람별 표 ──────────────────────────────────────────────────────────
   const used = people.filter(p => p.used), idle = people.filter(p => !p.used);
-  const rowHtml = p => `<tr>
-    <td class="nm">${escapeHtml(p.name)}</td>
+  // 이름을 체크하면 그 사람만 골라 새로고침을 보낼 수 있다. 표에 없는
+  // '이 달에 안 쓴' 사람도 아래에서 같은 방식으로 고를 수 있다.
+  const pickBox = p => `<label><input type="checkbox" data-email="${escapeHtml(p.email)}"
+      ${_selEmails.has(p.email) ? 'checked' : ''}> ${escapeHtml(p.name)}</label>`;
+  const rowHtml = p => `<tr class="ug-prow${_selEmails.has(p.email) ? ' sel' : ''}">
+    <td class="nm">${pickBox(p)}</td>
     <td class="num">${p.opens || ''}</td>
     <td class="num">${p.used || ''}</td>
     <td class="num">${p.clicks || ''}</td>
@@ -314,38 +332,69 @@ function renderUsage(rows, ym){
         ${tabBars}
       </div>
       <div class="ug-card">
-        <div class="ug-h">사람별</div>
+        <div class="ug-h">사람별 <small>이름을 체크하면 그 사람에게만 새로고침을 보낼 수 있습니다</small></div>
+        <div id="ugSelBar">
+          <span><b id="ugSelCount">0</b>명 선택됨</span>
+          <button class="btn warn" id="usageReloadSelBtn" type="button">📣 선택한 사람만 새로고침</button>
+          <button class="btn" id="ugSelClearBtn" type="button">선택 해제</button>
+        </div>
         <div class="ug-tblwrap"><table class="ug-tbl">
-          <thead><tr><th>이름</th><th>연 횟수</th><th>쓴 날</th><th>탭 이동</th><th>마지막</th><th>버전</th><th>많이 쓴 기능</th></tr></thead>
+          <thead><tr><th></th><th>연 횟수</th><th>쓴 날</th><th>탭 이동</th><th>마지막</th><th>버전</th><th>많이 쓴 기능</th></tr></thead>
           <tbody>${used.map(rowHtml).join('') || '<tr><td colspan="7" class="dim">기록 없음</td></tr>'}</tbody>
         </table></div>
         ${idle.length ? `<div class="ug-idle"><b>이 달에 안 쓴 ${idle.length}명</b>
-          <div>${idle.map(p => escapeHtml(p.name)).join(' · ')}</div></div>` : ''}
+          <div>${idle.map(pickBox).join(' ')}</div></div>` : ''}
       </div>
     </div>
 
     <div class="ug-foot">기록은 <b>앱을 연 횟수</b>와 <b>탭 이름·횟수</b>뿐입니다.
       무엇을 검색했는지·누구를 조회했는지 같은 내용은 담지 않습니다.
       (연락처 조회는 법에 따라 따로 남습니다.)</div>`;
+
+  // 체크박스마다 듣는다. 표(사람별)와 이달에 안 쓴 목록이 같은 방식(data-email)
+  // 을 쓰므로 한 번에 묶어 처리한다.
+  document.querySelectorAll('#usageBody input[type=checkbox][data-email]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (cb.checked) _selEmails.add(cb.dataset.email); else _selEmails.delete(cb.dataset.email);
+      cb.closest('tr')?.classList.toggle('sel', cb.checked);
+      updateSelBar();
+    });
+  });
+  updateSelBar();
+}
+
+// 선택 바를 고른 인원 수에 맞춰 보이거나 숨긴다. renderUsage 가 통째로 다시
+// 그릴 때마다(달을 바꿀 때 등) 불러 상태를 맞춘다.
+function updateSelBar(){
+  const bar = document.getElementById('ugSelBar');
+  if (!bar) return;
+  bar.style.display = _selEmails.size ? 'flex' : 'none';
+  const cnt = document.getElementById('ugSelCount');
+  if (cnt) cnt.textContent = String(_selEmails.size);
 }
 
 // ── 모두 새로고침 ──────────────────────────────────────────────────────
 // 배포해도 탭을 켜 둔 사람은 옛 화면을 계속 쓴다. 번호를 올리면 열려 있는
 // 화면들이 스냅샷으로 받아 조용히 새로고침한다(적는 중인 사람은 빼고).
-async function broadcastReload(){
-  const btn = document.getElementById('usageReloadAllBtn');
+// to 를 안 주면 전체, 주면(이메일 배열) 그 사람들에게만. setDoc 은 문서를
+// 통째로 갈아 끼우므로(merge 아님) 전체로 보낼 때 지난번 to 가 남지 않는다.
+async function broadcastReload(to){
+  const targeting = Array.isArray(to) && to.length > 0;
+  const btn = document.getElementById(targeting ? 'usageReloadSelBtn' : 'usageReloadAllBtn');
   const ref = doc(fbDb, 'appNotice', 'reload');
   try {
-    btn.disabled = true;
+    if (btn) btn.disabled = true;
     const snap = await getDoc(ref);
     const n = (Number(snap.exists() ? snap.data().n : 0) || 0) + 1;
-    await setDoc(ref, { n, at: new Date().toISOString(),
-                        by: fbAuth.currentUser.email, ver: APP_VER });
-    document.getElementById('usageNote').textContent =
-      `열려 있는 화면에 새로고침을 보냈습니다 (#${n}).`;
+    const payload = { n, at: new Date().toISOString(), by: fbAuth.currentUser.email, ver: APP_VER };
+    if (targeting) payload.to = to;
+    await setDoc(ref, payload);
+    document.getElementById('usageNote').textContent = targeting
+      ? `선택한 ${to.length}명에게 새로고침을 보냈습니다 (#${n}).`
+      : `열려 있는 화면에 새로고침을 보냈습니다 (#${n}).`;
   } catch(e) {
     document.getElementById('usageNote').textContent = '보내기 실패: ' + (e.message || e);
-  } finally { btn.disabled = false; }
+  } finally { if (btn) btn.disabled = false; }
 }
 
 document.getElementById('loginBtn').addEventListener('click', async () => {
@@ -366,6 +415,20 @@ document.getElementById('usageMonth').addEventListener('change', () => loadUsage
 document.getElementById('usageReloadAllBtn').addEventListener('click', () => {
   if (confirm('열려 있는 모든 선생님 화면을 새로고침합니다.\n\n'
     + '뭔가 적고 있는 분은 새로고침하지 않고 안내만 뜹니다.\n계속할까요?')) broadcastReload();
+});
+// 선택 바는 renderUsage 가 부를 때마다 다시 그려지므로(달을 바꿀 때 등),
+// 그 안의 버튼에 직접 걸지 않고 안 바뀌는 #usageBody 에서 위임해 듣는다.
+document.getElementById('usageBody').addEventListener('click', e => {
+  if (e.target.closest('#usageReloadSelBtn')) {
+    const to = [..._selEmails];
+    if (to.length && confirm(`선택한 ${to.length}명에게만 새로고침을 보냅니다.\n\n`
+      + '뭔가 적고 있으면 새로고침하지 않고 안내만 뜹니다.\n계속할까요?')) broadcastReload(to);
+  } else if (e.target.closest('#ugSelClearBtn')) {
+    _selEmails.clear();
+    document.querySelectorAll('#usageBody input[type=checkbox][data-email]').forEach(cb => { cb.checked = false; });
+    document.querySelectorAll('#usageBody tr.ug-prow.sel').forEach(tr => tr.classList.remove('sel'));
+    updateSelBar();
+  }
 });
 
 onAuthStateChanged(fbAuth, user => {

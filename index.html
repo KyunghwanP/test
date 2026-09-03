@@ -8004,7 +8004,12 @@ async function toggleSemester(){
 
    관리자가 appNotice/reload 의 번호를 올리면 열려 있는 화면들이 스냅샷으로 받는다.
    무턱대고 새로고침하지는 않는다 — 뭘 적고 있으면 그게 날아간다. 적는 중이면
-   막대만 띄우고, 아니면 5초를 세고 새로고침한다(그동안 취소할 수 있다).       */
+   막대만 띄우고, 아니면 5초를 세고 새로고침한다(그동안 취소할 수 있다).
+
+   특정 사람에게만 보낼 수도 있다 — 문서에 to(이메일 배열)를 같이 싣는다.
+   그 필드가 없거나 비어 있으면 전체(지금과 같다). setDoc 은 매번 문서를
+   통째로 갈아 끼우므로(merge 아님), 전체로 보낼 때 지난번 to 가 남아
+   전달 대상이 좁아지는 일은 없다.                                        */
 const RELOAD_SEEN_KEY = 'ynhsReloadSeen';
 let _reloadUnsub = null, _reloadBar = null, _reloadTimer = null;
 
@@ -8112,13 +8117,16 @@ function silentReload(){
   location.reload();
 }
 
-function onReloadSignal(n){
+function onReloadSignal(n, to){
   const seen = _reloadSeen;
   _reloadSeen = String(n);
   try { localStorage.setItem(RELOAD_SEEN_KEY, String(n)); } catch(e){}
   // 처음 보는 기기는 번호만 적어 둔다. 안 그러면 이 기능이 깔리는 순간 전원이 새로고침한다.
   if (seen === null) return;
   if (Number(n) <= Number(seen)) return;
+  // 대상이 정해져 있으면 내가 그 안에 있을 때만 받는다. 비어 있으면(또는
+  // 필드 자체가 없으면) 전체 발송이다 — 지금까지의 동작 그대로.
+  if (Array.isArray(to) && to.length && !to.includes(fbAuth.currentUser?.email)) return;
   silentReload();
 }
 
@@ -8126,8 +8134,9 @@ function watchReloadSignal(){
   if (_reloadUnsub) return;
   _reloadUnsub = onSnapshot(doc(fbDb, 'appNotice', 'reload'), snap => {
     if (!snap.exists()) return;
-    const n = Number(snap.data().n) || 0;
-    if (n) onReloadSignal(n);
+    const d = snap.data();
+    const n = Number(d.n) || 0;
+    if (n) onReloadSignal(n, d.to);
   }, () => {});
 }
 

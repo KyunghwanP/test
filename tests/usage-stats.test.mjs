@@ -124,7 +124,7 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   const doc = (db, ...p) => ({ path: p.join('/') });
   let _snapCb = null;
   function onSnapshot(ref, cb){ _snapCb = cb; return () => { _snapCb = null; }; }
-  window.__push = n => _snapCb && _snapCb({ exists: () => true, data: () => ({ n }) });
+  window.__push = (n, to) => _snapCb && _snapCb({ exists: () => true, data: () => (to ? { n, to } : { n }) });
   window.__store = {};        // 저장돼 있는 문서
   window.__writes = [];
   const getDoc = async r => ({ exists: () => !!window.__store[r.path],
@@ -173,8 +173,10 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   ${grab('closeUsagePage')}
   ${grab('usagePeople', PAGE)}
   let _usageBusy = false;
+  ${grabConst('_selEmails', PAGE)}
   ${grab('loadUsage', PAGE)}
   ${grab('renderUsage', PAGE)}
+  ${grab('updateSelBar', PAGE)}
 
   Object.assign(window, { usageStart, usageTab, usageFlush, usageDate, loadUsage,
                           renderUsage, initUsageEasterEgg, closeUsagePage,
@@ -313,7 +315,9 @@ console.log('\n■ 화면 — 집계가 맞는가');
   check('많이 쓴 기능이 위로 온다', /시간표 11/.test(tabs[0]) && /외출증 9/.test(tabs[1]), tabs);
   check('안 쓴 기능은 아예 안 나온다', !tabs.some(t => /학사일정/.test(t)), tabs);
 
-  const names = await pg.$$eval('.ug-tbl tbody td.nm', els => els.map(e => e.textContent));
+  // 이름은 이제 체크박스 라벨 안에 있다(선택해서 새로고침을 보내려고) —
+  // 앞뒤 공백은 마크업 때문이지 순서와 무관하니 trim 하고 본다.
+  const names = await pg.$$eval('.ug-tbl tbody td.nm', els => els.map(e => e.textContent.trim()));
   check('사람도 많이 쓴 순', names.join() === '김하나,이두리', names);
   check('안 쓴 사람은 따로 모은다',
         /이 달에 안 쓴 1명/.test(txt) && /박세찬/.test(await pg.$eval('.ug-idle', e => e.innerText)), txt.slice(-200));
@@ -361,6 +365,33 @@ check('보낸 뒤 번호가 오른다', /n = \(Number\(snap\.exists\(\) \? snap\
         (await pg.evaluate(() => localStorage.getItem('ynhsReloadSeen'))) === '8');
 }
 
+console.log('\n■ 특정 사람에게만 보낼 수 있다');
+{
+  // 방금 reload 로 페이지가 통째로 다시 실행됐다 — 다시 구독해야 한다.
+  await pg.evaluate(() => { window.__armed(); window.__setWho('kim@yeungnam.hs.kr'); });
+
+  // 대상 목록에 내가 없으면 새로고침되지 않는다.
+  let base = serves;
+  await pg.evaluate(() => window.__push(10, ['lee@yeungnam.hs.kr', 'park@yeungnam.hs.kr']));
+  await pg.waitForTimeout(300);
+  check('대상이 아니면 새로고침되지 않는다', reloadedSince(base) === 0, reloadedSince(base));
+  check('그래도 번호는 기억해 둔다 — 다음 신호와 비교할 기준이 있어야 한다',
+        (await pg.evaluate(() => localStorage.getItem('ynhsReloadSeen'))) === '10');
+
+  // 대상 목록에 내가 있으면 새로고침된다.
+  base = serves;
+  await pg.evaluate(() => window.__push(11, ['kim@yeungnam.hs.kr', 'park@yeungnam.hs.kr']));
+  await pg.waitForTimeout(1500);
+  check('대상이면 새로고침된다', reloadedSince(base) >= 1, reloadedSince(base));
+
+  // 페이지가 다시 실행됐다 — to 없이(전체 발송) 보내면 대상을 안 가린다.
+  await pg.evaluate(() => { window.__armed(); window.__setWho('choi@yeungnam.hs.kr'); });
+  base = serves;
+  await pg.evaluate(() => window.__push(12));
+  await pg.waitForTimeout(1500);
+  check("to 가 없으면(전체 발송) 목록에 없는 사람도 받는다", reloadedSince(base) >= 1, reloadedSince(base));
+}
+
 console.log('\n■ 새로고침해도 보던 자리에 그대로');
 {
   await pg.evaluate(() => {
@@ -403,7 +434,7 @@ console.log('\n■ 적고 있으면 강제로 하지 않는다');
   check('적는 중으로 본다', await pg.evaluate(() => window.isBusyTyping()));
 
   let base = serves;
-  await pg.evaluate(() => window.__push(9));
+  await pg.evaluate(() => window.__push(13));
   await pg.waitForTimeout(150);
   const bar = await pg.$eval('#appReloadBar', e => e.innerText.replace(/\s+/g,' '));
   check('조용히 안 하고 물어본다', /새 버전이 있습니다/.test(bar), bar);
@@ -510,6 +541,45 @@ console.log('\n■ usage.html 을 실제로 띄워 본다');
   const wrote = await up.evaluate(() => window.__wrote);
   check('모두 새로고침이 번호를 올린다',
         wrote.some(w => w[0] === 'appNotice/reload' && w[1].n === 42), wrote);
+
+  // 특정 사람만 골라 보낸다 — 표(김하나)와 '이 달에 안 쓴' 목록(박세찬) 둘 다에서.
+  check('처음에는 선택 바가 안 보인다',
+        (await up.$eval('#ugSelBar', e => getComputedStyle(e).display)) === 'none');
+  const rows = await up.$$('.ug-tbl tbody input[type=checkbox][data-email]');
+  await rows[0].check();                                  // 김하나(a@)
+  const idleBox = await up.$('.ug-idle input[type=checkbox][data-email]');
+  await idleBox.check();                                  // 박세찬(c@)
+  check('고른 만큼 바에 나온다',
+        (await up.$eval('#ugSelCount', e => e.textContent)) === '2');
+  check('고른 행이 강조된다',
+        (await up.$eval('.ug-tbl tbody tr', e => e.classList.contains('sel'))));
+
+  await up.click('#usageReloadSelBtn');
+  await up.waitForTimeout(400);
+  const wrote2 = await up.evaluate(() => window.__wrote);
+  // getDoc 모킹이 고정값(n:41)이라 두 번 보내도 매번 42 로 계산된다 —
+  // 실제 배포에서는 이전 값을 읽어 오지만, 여기서는 'to 가 실렸는가' 만 본다.
+  const sel = wrote2.find(w => w[0] === 'appNotice/reload' && w[1].to);
+  check('선택한 사람에게만 보낸다 — to 목록이 실린다',
+        !!sel && new Set(sel[1].to).size === 2
+        && sel[1].to.includes('a@yeungnam.hs.kr') && sel[1].to.includes('c@yeungnam.hs.kr'), sel);
+
+  // 선택 해제 — 바가 다시 숨고, 체크도 풀린다
+  await up.click('#ugSelClearBtn');
+  check('선택 해제하면 바가 숨는다',
+        (await up.$eval('#ugSelBar', e => getComputedStyle(e).display)) === 'none');
+  check('체크도 같이 풀린다',
+        !(await up.$eval('.ug-tbl tbody input[type=checkbox]', e => e.checked)));
+
+  // 달을 바꿔 다시 그려도(renderUsage 재호출) 골라 둔 것이 안 풀려야 한다.
+  await rows[0].check();
+  await up.selectOption('#usageMonth', { index: 0 }).catch(() => {});
+  await up.evaluate(ym => { document.getElementById('usageMonth').value = ym;
+    document.getElementById('usageMonth').dispatchEvent(new Event('change')); }, YM);
+  await up.waitForTimeout(400);
+  check('달을 바꿔도 골라 둔 사람이 유지된다',
+        (await up.$eval('#ugSelCount', e => e.textContent)) === '1');
+  await up.click('#ugSelClearBtn');
 
   // 앱 안(iframe)으로 열렸을 때 — '대시보드' 버튼이 살아 있으면 프레임 안이
   // 앱으로 바뀌어 앱 속에 앱이 뜬다.
