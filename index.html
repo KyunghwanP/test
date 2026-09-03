@@ -1923,23 +1923,39 @@
   .weekly-html-content li{margin:4px 0;}
   /* 모드 '원본 그대로' — 받아온 HTML 을 Shadow DOM 에 넣어 앱 CSS 를 차단한다.
      껍데기(카드·제목바)만 앱 것이고 안쪽은 사이트 그대로다. */
+  /* 바깥은 껍데기일 뿐이다 — 카드는 그림자 상자(.wk-shadow-host)가 맡는다. */
   .weekly-html-content.wk-orig{
-    background:#fff;color:#000;font-size:initial;line-height:initial;padding:0;
+    background:transparent;box-shadow:none;border-radius:0;
+    color:var(--ink);font-size:initial;line-height:initial;
+    max-width:1200px;margin:6px auto 0;padding:0 12px;
   }
-  html.dark .weekly-html-content.wk-orig{background:#fff;}
-  /* 휴대폰에서는 부서 띠가 화면 끝까지 닿게 한다. .weekly-body 의 좌우 4px 을
-     이 카드에서만 되돌린다 — 다른 모드 카드는 그대로 둔다. 카드 모서리를 둥글게
-     두면 네모난 띠가 모서리 밖으로 삐져나오므로 같이 편다. */
-  @media (max-width:560px){
-    .weekly-html-content.wk-orig{margin-left:-4px;margin-right:-4px;border-radius:0;}
-  }
-  /* 여백은 그림자 안(:host)이 정한다. 바깥에서 .wk-shadow-host 로 주면
-     클래스 선택자가 :host 를 이겨서, 안쪽이 계산해 둔 좌우 여백이 통째로
-     무시되고 스티키 제목만 여백만큼 삐져나온다. */
-  .wk-shadow-host{display:block;}
+  /* 제목은 상자 위에 둔다. 사이트 제목을 그대로 상자 안에 두면 앱과 겉돌아서,
+     글만 가져와 앱의 다른 화면과 같은 글꼴·색으로 다시 쓴다. */
+  .wk-orig-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:2px 2px 10px;}
+  .wk-orig-title{font-family:'Pretendard','Noto Sans KR',sans-serif;
+    font-weight:800;font-size:16px;color:var(--ink);letter-spacing:-0.2px;}
+  .wk-orig-head .weekly-title-btn{margin-left:auto;
+    background:var(--mon);border-color:var(--mon);color:#fff !important;}
 
-  .wk-orig-bar{display:flex;align-items:center;gap:10px;justify-content:flex-end;padding:8px 10px 0;}
-  .wk-orig-bar .weekly-title-btn{background:var(--mon);border-color:var(--mon);color:#fff !important;}
+  /* 상자 = 그림자 영역 자체. 안쪽 여백은 그림자 안(--wk-pad)이 정한다.
+     바깥에서 .wk-shadow-host 로 여백을 주면 클래스 선택자가 :host 를 이겨
+     안쪽 계산이 통째로 무시된다. */
+  .wk-shadow-host{display:block;background:var(--paper);border-radius:12px;
+    box-shadow:0 4px 12px -8px rgba(0,0,0,0.3);}
+  html.dark .wk-shadow-host{background:#fff;}
+
+  /* 휴대폰에서는 상자를 지우고 화면을 꽉 채운다. .weekly-body 의 좌우 4px 까지
+     되돌린다 — 이 화면에서만, 다른 모드 카드는 그대로 둔다. */
+  @media (max-width:560px){
+    .weekly-html-content.wk-orig{padding:0;margin-left:-4px;margin-right:-4px;}
+    /* 제목을 상자 안 글과 같은 선에 맞춘다(그림자 안 --wk-pad 와 같은 값). */
+    .wk-orig-head{padding-left:10px;padding-right:10px;}
+    .wk-shadow-host{border-radius:0;box-shadow:none;}
+  }
+  @media (max-width:420px){
+    .wk-orig-head{padding-left:6px;padding-right:6px;}
+  }
 
   /* 보기 전환(관리자만). 상단 바가 세로 flex 라 align-self 로 오른쪽에 붙인다 —
      margin-left:auto 만으로는 한 줄을 통째로 차지한다. */
@@ -9126,14 +9142,12 @@ const WK_SHADOW_CSS = `
      같다. Noto Sans 는 라틴만 있고, 사이트도 한글은 브라우저 기본 산돌/맑은고딕
      으로 떨어진다. 여기서 Noto Sans KR 을 쓰면 오히려 사이트와 달라진다. */
   /* 좌우 여백은 '색 있는 상자'가 아니라 그 안의 글에 준다. 상자에 주면 색이
-     여백만큼 안쪽으로 물러나 좌우 끝까지 안 닿는다. 그래서 :host 와 부서 상자는
-     좌우 여백 0 으로 두고, --wk-side 를 글에만 물린다.
-     넓은 화면에서는 글줄이 끝없이 길어지지 않게 1280px 로 묶는다 — 남는 만큼이
-     여백이 되고, 좁아지면 max() 가 --wk-pad 쪽을 고른다. 휴대폰에서는 6px 까지
-     내려가 사실상 화면 끝까지 쓴다. */
-  :host{display:block;--wk-pad:36px;
-        --wk-side:max(var(--wk-pad), calc((100% - 1280px) / 2));
-        padding:14px 0;
+     여백만큼 안쪽으로 물러나 상자 끝까지 안 닿는다. 그래서 :host 와 부서 상자는
+     좌우 여백 0 으로 두고, --wk-pad 를 글에만 물린다.
+     전체 폭은 바깥 상자(.wk-orig)가 잡는다. 여기서는 그 안쪽 여백만 정하고,
+     화면이 좁아질수록 줄여 휴대폰에서는 6px 까지 내려간다. 미디어 쿼리는 그림자
+     안에서도 화면 폭을 기준으로 판단한다 — 상자 폭이 아니다. */
+  :host{display:block;--wk-pad:36px;padding:0;
         font-family:'Noto Sans',Arial,sans-serif;font-weight:500;
         font-size:14pt;line-height:1.38;color:#1C1C1C;
         -webkit-font-smoothing:antialiased;}
@@ -9142,19 +9156,24 @@ const WK_SHADOW_CSS = `
   @media (max-width:560px){ :host{--wk-pad:10px;} }
   @media (max-width:420px){ :host{--wk-pad:6px;} }
 
-  /* h1 은 제 여백을 따로 쥔다(위아래도 줘야 해서). :not() 이 붙은 이 선택자가
-     맨 h1 보다 세서, 안 빼면 h1 의 padding 이 여기에 먹힌다. */
-  .wk-doc > *:not(section):not(h1),
-  section.wk-dept > *{padding-left:var(--wk-side);padding-right:var(--wk-side);}
+  .wk-doc > *:not(section),
+  section.wk-dept > *{padding-left:var(--wk-pad);padding-right:var(--wk-pad);}
+
+  /* 상자의 둥근 모서리는 첫·마지막 띠가 만든다. 바깥에 overflow:hidden 을 걸어
+     자르면 그 상자가 스크롤 컨테이너가 되어 부서 이름 스티키가 죽는다. */
+  section.wk-dept:first-of-type{border-radius:12px 12px 0 0;}
+  section.wk-dept:last-of-type{border-radius:0 0 12px 12px;}
+  @media (max-width:560px){ section.wk-dept{border-radius:0 !important;} }
 
   p{font-weight:500;font-size:14pt;line-height:1.38;margin:5pt 0 0;}
-  /* 페이지 제목. 사이트에서는 어두운 띠 위의 밝은 글자인데, 그 띠는 class 로만
-     칠해져 있어 프록시를 못 넘어온다. 글자색(노랑)만 인라인으로 살아 넘어와서
-     흰 바탕에 노란 글자가 되어 안 보였다. 띠를 여기서 다시 깔아 준다.
-     안쪽 글자색은 !important 로 덮는다 — 인라인으로 실려 온 색이 더 세다. */
-  h1{font-weight:700;font-size:36pt;line-height:1.2;margin:0;
-     padding:14pt var(--wk-side);background:#1F3D33;color:#FBF6EC !important;}
-  h1 *{color:#FBF6EC !important;background:transparent !important;}
+  /* 페이지 제목은 상자 밖(.wk-orig-head)으로 꺼내 앱 제목으로 다시 쓴다.
+     사이트에서는 어두운 띠 위의 밝은 글자인데 그 띠는 class 라 안 넘어오고,
+     글자색(노랑)만 인라인으로 살아 넘어와 흰 바탕에 노란 글자가 됐었다.
+     여기 규칙은 h1 이 두 개 이상일 때(첫 개만 꺼낸다)를 위한 대비다.
+     글자색은 !important 로 덮는다 — 인라인으로 실려 온 색이 더 세다. */
+  h1{font-weight:700;font-size:36pt;line-height:1.2;margin:20pt 0;
+     color:#1C1C1C !important;}
+  h1 *{color:#1C1C1C !important;background:transparent !important;}
   h2{font-weight:800;font-size:20pt;line-height:1.38;margin:10pt 0;}
   h3{font-weight:600;font-size:16pt;line-height:1.38;margin:15pt 0 5pt;}
   h4{font-weight:700;font-size:14pt;line-height:1.38;margin:15pt 0 5pt;}
@@ -9177,8 +9196,8 @@ const WK_SHADOW_CSS = `
   /* 부서와 부서는 맞붙인다. 마진으로 띄우면 그 틈으로 카드의 흰 바탕이 비쳐
      띠 사이에 흰 줄이 생긴다. 간격은 띠 **안쪽**(패딩)에서 만든다. */
   section.wk-dept{margin:0;padding:0 0 24pt;background:#FFFFFF;}
-  section.wk-dept[data-band="1"]{background:#F1F1F1;}
-  section.wk-dept[data-band="2"]{background:#E0EEF5;}
+  section.wk-dept[data-band="gray"]{background:#F1F1F1;}
+  section.wk-dept[data-band="blue"]{background:#E0EEF5;}
 
   /* CSS 변수는 그림자 경계를 넘어 상속된다 — 바깥 top-bar 높이를 그대로 쓴다.
      top:0 으로 두면 제목이 상단 바 밑으로 파고든다.
@@ -9197,14 +9216,19 @@ const WK_SHADOW_CSS = `
 
 // 부서 단위로 묶는다 — h2(부서 이름)부터 다음 h2 직전까지가 한 부서다.
 // 형제 사이에서만 자르므로 h2 가 어느 깊이에 있든 그 자리에서 묶인다.
-// 띠 색 번호는 여기서 매긴다. CSS 의 nth-of-type 으로 세면 h2 가 서로 다른
-// 부모 밑에 흩어져 있을 때 번호가 부모별로 다시 1부터 돌아 색이 겹친다.
+//
+// 띠 색은 사이트를 그대로 따른다: 맨 위(교감선생님)와 맨 아래(행정실)가 파랑,
+// 그 사이는 회색·흰색이 번갈아 나온다. 자리로 정한다 — 부서 이름은 해마다
+// 바뀌지만 맨 위·맨 아래 자리는 그대로다.
+// 번호를 CSS 의 nth-of-type 으로 세면 안 된다. h2 가 서로 다른 부모 밑에
+// 흩어져 있을 때 번호가 부모별로 다시 1부터 돌아 색이 겹친다.
 function wkGroupDepts(root){
   const heads = [...root.querySelectorAll('h2')];
+  const last = heads.length - 1;
   heads.forEach((h, i) => {
     const sec = document.createElement('section');
     sec.className = 'wk-dept';
-    sec.dataset.band = String(i % 3);
+    sec.dataset.band = (i === 0 || i === last) ? 'blue' : (i % 2 ? 'gray' : 'white');
     h.parentNode.insertBefore(sec, h);
     let n = h;
     while(n){
@@ -9452,14 +9476,20 @@ function renderContent(html){
   if(weeklyMode === 'orig'){
     const wrap = document.createElement('div');
     wrap.className = 'weekly-html-content wk-orig';
-    // 원본보기는 본문 밖에 둔다 — 사이트 제목을 건드리지 않으려고.
-    const bar = document.createElement('div');
-    bar.className = 'wk-orig-bar';
+    // 사이트 제목은 상자 밖으로 꺼내 앱 제목으로 다시 쓴다. 안에 두면 사이트가
+    // class 로만 칠한 어두운 띠를 흉내 내야 하고, 그게 앱과 겉돈다.
+    const head = document.createElement('div');
+    head.className = 'wk-orig-head';
+    const siteH1 = div.querySelector('h1');
+    const ttl = document.createElement('div');
+    ttl.className = 'wk-orig-title';
+    ttl.textContent = (siteH1?.textContent || '').trim() || '주간 교육활동 및 업무 안내';
+    siteH1?.remove();
     const ob = document.createElement('a');
     ob.href = weeklyCurrentUrl; ob.target = '_blank';
     ob.className = 'weekly-title-btn'; ob.textContent = '↗ 원본보기';
-    bar.appendChild(ob);
-    wrap.appendChild(bar);
+    head.append(ttl, ob);
+    wrap.appendChild(head);
     // 그림자 영역 — 앱 CSS 가 넘어가지 못한다.
     const host = document.createElement('div');
     host.className = 'wk-shadow-host';

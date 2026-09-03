@@ -91,8 +91,12 @@ const SITE = `
 
 await pg.setContent(`<!doctype html><meta charset="utf-8">
 <style>${STYLES}</style>
-<div id="weeklyTopBar" style="height:44px"></div>
-<div class="weekly-page-content" id="weeklyPageContent"></div>
+<!-- 실제 앱 뼈대 그대로: .weekly-body 가 스크롤 상자이고 좌우 4px 여백을 준다.
+     원본 모드 카드는 휴대폰에서 그 4px 을 음수 마진으로 되돌려 화면을 꽉 채운다. -->
+<div class="weekly-body">
+  <div id="weeklyTopBar" style="height:44px"></div>
+  <div class="weekly-page-content" id="weeklyPageContent"></div>
+</div>
 <script>
   const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
   let _who = ADMIN_EMAIL;
@@ -165,9 +169,20 @@ console.log('\n■ 원본 그대로 — 앱 CSS 가 아예 안 닿는다');
   check('사이트 제목 크기 그대로', h2.fs === '22px', h2.fs);
   check('제목은 스티키다 — 이것만 손댄다', h2.pos === 'sticky', h2);
   check('상단 바(44px) 아래에 붙는다', h2.top === '44px', h2.top);
-  // 앱의 h1 타이틀바 규칙이 사이트 h1 을 잡아먹으면 안 된다
-  const h1 = await styleOf('h1', true);
-  check('사이트 h1 도 제 모양', h1.fs === '30px' && !/Noto Sans KR/.test(h1.ff), h1);
+  // 사이트 제목은 상자 밖으로 꺼내 앱 제목으로 다시 쓴다.
+  const ttl = await pg.evaluate(() => {
+    const el = document.querySelector('.wk-orig-title');
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    return { text: el?.textContent.trim(),
+             ff: el && getComputedStyle(el).fontFamily,
+             inBox: r.querySelectorAll('h1').length,
+             // 제목이 상자보다 위에 있어야 한다
+             above: el.getBoundingClientRect().bottom
+                    <= document.querySelector('.wk-shadow-host').getBoundingClientRect().top };
+  });
+  check('사이트 제목을 상자 위 앱 제목으로 옮긴다',
+        ttl.text === '2026학년도 9월 1주' && ttl.inBox === 0 && ttl.above, ttl);
+  check('제목은 앱 글꼴로 쓴다', /Pretendard|Noto Sans KR/.test(ttl.ff), ttl.ff);
   // 프록시가 사이트 CSS 를 지워 보내서 한 줄씩이던 항목이 옆으로 붙는다.
   // 받아온 내용에 <br> 을 끼워 넣지 않고 표시 방식만 바꿔 되살린다.
   const sm = await pg.evaluate(() => {
@@ -215,8 +230,8 @@ console.log('\n■ 원본 그대로 — 사이트에서 잰 값과 같은가');
   check('본문 줄간격 1.38', near(p1.lh * 100, 138), p1.lh);
   check('본문 글자색 #1C1C1C', p1.color === 'rgb(28, 28, 28)', p1.color);
 
-  const h1 = await measure('h1'), h2 = await measure('h2'), h3 = await measure('h3');
-  check('제목(h1) 36pt · 700', near(h1.px, 36 * 96 / 72) && h1.w === '700', h1);
+  // h1(페이지 제목)은 상자 밖 앱 제목으로 빠졌다 — 여기서는 안 잰다.
+  const h2 = await measure('h2'), h3 = await measure('h3');
   check('소제목(h2) 20pt · 800', near(h2.px, 20 * 96 / 72) && h2.w === '800', h2);
   check('중제목(h3) 16pt · 600', near(h3.px, 16 * 96 / 72) && h3.w === '600', h3);
 
@@ -226,11 +241,10 @@ console.log('\n■ 원본 그대로 — 사이트에서 잰 값과 같은가');
   const a = await measure('a');
   check('링크 색 #0041A5', a.color === 'rgb(0, 65, 165)', a.color);
 
-  // 사이트는 좁은 화면에서 제목을 줄인다(36→32→27pt, 20→19→18pt).
+  // 사이트는 좁은 화면에서 소제목을 줄인다(20→19→18pt).
   await pg.setViewportSize({ width: 400, height: 800 });
-  const h1s = await measure('h1'), h2s = await measure('h2');
-  check('좁은 화면에서 제목이 줄어든다',
-        near(h1s.px, 27 * 96 / 72) && near(h2s.px, 18 * 96 / 72), { h1: h1s.px, h2: h2s.px });
+  const h2s = await measure('h2');
+  check('좁은 화면에서 부서 이름이 줄어든다', near(h2s.px, 18 * 96 / 72), h2s.px);
   // 스티키 제목이 배경으로 좌우를 덮어야 뒤 글자가 비쳐 보이지 않는다.
   // 여백이 16px 로 줄었으니 밀어내는 폭도 16px 이어야 한다.
   const bleed = await pg.evaluate(() => {
@@ -294,6 +308,13 @@ console.log('\n■ 부서 구분');
         JSON.stringify(d.heads) === JSON.stringify(['교무기획부','학생안전부','진로진학부','교육연구부']), d.heads);
   check('다음 부서 것까지 삼키지 않는다',
         JSON.stringify(d.items) === JSON.stringify([2,1,1,1]), d.items);
+  // 사이트를 그대로 따른다: 맨 위(교감선생님)와 맨 아래(행정실)가 파랑,
+  // 그 사이는 회색·흰색 번갈아.
+  check('맨 위와 맨 아래가 파랑',
+        d.bg[0] === 'rgb(224, 238, 245)' && d.bg[d.bg.length - 1] === 'rgb(224, 238, 245)', d.bg);
+  check('사이는 회색·흰색이 번갈아 나온다',
+        d.bg.slice(1, -1).every((c, i) =>
+          c === (i % 2 === 0 ? 'rgb(241, 241, 241)' : 'rgb(255, 255, 255)')), d.bg);
   check('이웃한 부서는 배경색이 다르다',
         d.bg.slice(1).every((c, i) => c !== d.bg[i]), d.bg);
   check('띠와 띠가 맞붙어 흰 줄이 안 생긴다', d.gaps.every(g => g === 0), d.gaps);
@@ -305,22 +326,25 @@ console.log('\n■ 부서 구분');
   check('부서 이름 배경이 그 부서 띠와 같다',
         d.h2.every((h, i) => h.bg === d.bg[i]), { h2: d.h2.map(h => h.bg), sec: d.bg });
 
-  // 사이트에서는 어두운 띠 위의 밝은 글자인데, 띠가 class 라 안 넘어오고 글자색
-  // (노랑)만 인라인으로 넘어와 흰 바탕에 노란 글자가 됐다. 띠를 다시 깔아 준다.
+  // 사이트 제목은 어두운 띠 위의 밝은 글자인데, 띠는 class 라 안 넘어오고
+  // 글자색(노랑)만 인라인으로 넘어와 흰 바탕에 노란 글자가 됐었다. 이제 글만
+  // 가져와 앱 제목으로 다시 쓰므로, 실려 온 색이 따라오면 안 된다.
   const con = await pg.evaluate(() => {
-    const r = document.querySelector('.wk-shadow-host').shadowRoot;
-    const h1 = r.querySelector('h1');
+    const el = document.querySelector('.wk-orig-title');
     const lum = c => {
       const [R, G, B] = c.match(/\d+/g).slice(0, 3).map(v => {
         const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
       });
       return 0.2126 * R + 0.7152 * G + 0.0722 * B;
     };
-    const bg = lum(getComputedStyle(h1).backgroundColor);
-    const fg = lum(getComputedStyle(h1.querySelector('span')).color);
-    return Math.round(((Math.max(bg, fg) + 0.05) / (Math.min(bg, fg) + 0.05)) * 10) / 10;
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg-base').trim();
+    const hex = h => `rgb(${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)})`;
+    const a = lum(getComputedStyle(el).color), b = lum(hex(bg));
+    return { ratio: Math.round(((Math.max(a,b) + 0.05) / (Math.min(a,b) + 0.05)) * 10) / 10,
+             yellow: el.innerHTML.includes('FFD966') || el.children.length > 0 };
   });
-  check('제목 글자가 배경과 충분히 대비된다(4.5:1 이상)', con >= 4.5, con);
+  check('사이트가 실어 보낸 글자색이 따라오지 않는다', !con.yellow, con);
+  check('제목 글자가 배경과 충분히 대비된다(4.5:1 이상)', con.ratio >= 4.5, con);
 
   // 여백을 색 있는 상자에 주면 색이 그만큼 안쪽으로 물러난다. 여백은 글에만
   // 물려야 띠가 좌우 끝까지 닿는다. 아래 두 검사가 그걸 잰다.
@@ -331,15 +355,32 @@ console.log('\n■ 부서 구분');
                         return { l: Math.round(b.left - H.left), w: Math.round(b.width) }; };
     return { host: Math.round(H.width),
              secs: [...r.querySelectorAll('section.wk-dept')].map(box),
-             h1: box(r.querySelector('h1')),
              // 글은 여백만큼 안으로 들어와 있어야 한다
              pPad: parseFloat(getComputedStyle(r.querySelector('p')).paddingLeft) };
   });
-  check('부서 띠가 좌우 끝까지 닿는다',
+  check('부서 띠가 상자 좌우 끝까지 닿는다',
         bleed.secs.every(s => s.l === 0 && s.w === bleed.host), bleed);
-  check('제목 띠도 좌우 끝까지 닿는다',
-        bleed.h1.l === 0 && bleed.h1.w === bleed.host, bleed.h1);
   check('띠는 끝까지 가도 글은 안으로 들어와 있다', bleed.pPad > 0, bleed.pPad);
+
+  // 넓은 화면에서는 상자로 담고(좌우가 남고 모서리가 둥글다), 휴대폰에서는
+  // 상자가 안 보이고 화면을 꽉 채운다.
+  const boxAt = async w => {
+    await pg.setViewportSize({ width: w, height: 800 });
+    return pg.evaluate(() => {
+      const host = document.querySelector('.wk-shadow-host');
+      const c = getComputedStyle(host);
+      const b = host.getBoundingClientRect();
+      return { r: parseFloat(c.borderRadius), sh: c.boxShadow,
+               left: Math.round(b.left), w: Math.round(b.width),
+               vw: Math.round(document.documentElement.clientWidth) };
+    });
+  };
+  const wide = await boxAt(1400), narrow = await boxAt(390);
+  check('넓은 화면에서는 상자에 담긴다',
+        wide.r > 0 && wide.sh !== 'none' && wide.left > 0 && wide.w < wide.vw, wide);
+  check('휴대폰에서는 상자가 안 보이고 꽉 찬다',
+        narrow.r === 0 && narrow.sh === 'none'
+        && narrow.left === 0 && narrow.w === narrow.vw, narrow);
 
   // 좁아질수록 좌우 여백이 줄고, 휴대폰에서는 거의 없어야 한다.
   const padAt = async w => {
@@ -352,8 +393,9 @@ console.log('\n■ 부서 구분');
   check('좁아질수록 좌우 여백이 준다',
         pads.every((v, i) => i === 0 || v <= pads[i - 1]), pads);
   check('휴대폰에서는 여백이 거의 없다', pads[pads.length - 1] <= 8, pads);
-  // 넓은 화면에서 글줄이 끝없이 길어지면 읽기 어렵다 — 1280px 로 묶인다.
-  const wide = await pg.evaluate(() => {
+  // 넓은 화면에서 글줄이 끝없이 길어지면 읽기 어렵다 — 상자가 1200px 로 묶는다.
+  await pg.setViewportSize({ width: 1600, height: 800 });
+  const line = await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
     const p = r.querySelector('p');
     const c = getComputedStyle(p);
@@ -361,7 +403,7 @@ console.log('\n■ 부서 구분');
                       - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight));
   });
   await pg.setViewportSize({ width: 1200, height: 800 });
-  check('넓은 화면에서도 글줄은 1280px 을 안 넘는다', wide <= 1280, wide);
+  check('넓은 화면에서도 글줄은 상자 안에 묶인다', line <= 1200, line);
 }
 
 console.log('\n■ 전환 막대');
