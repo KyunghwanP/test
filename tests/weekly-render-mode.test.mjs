@@ -118,6 +118,7 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   let weeklyMode = 'app';
   let _wkLast = null;
   ${grabConst('WK_SHADOW_CSS')}
+  ${grab('wkStripDupTitle')}
   ${grab('wkGroupDepts')}
   ${grab('renderWeeklyModeBar')}
   ${grab('renderContent')}
@@ -266,6 +267,9 @@ console.log('\n■ 부서 구분');
 {
   const DEPT = `
     <h1><span style="color:#FFD966">주간 교육활동 및 업무 안내</span></h1>
+    <!-- 사이트는 제목을 한 번 더 싣는다. 이건 h1 이 아니라 색만 인라인으로
+         실린 평범한 글이라 h1 규칙에 안 걸리고 흰 바탕에 옅은 노랑으로 남는다. -->
+    <p><span style="color:#FFD966">주간 교육활동 및 업무 안내</span></p>
     <h2>교무기획부</h2>
     <p>9월 2일(수) 전교조회</p>
     <p><small>· 대상: 전교생</small></p>
@@ -303,6 +307,13 @@ console.log('\n■ 부서 구분');
       }),
     };
   });
+  const dup = await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const t = '주간 교육활동 및 업무 안내';
+    return [...r.querySelectorAll('*')].filter(e => !e.children.length
+             && e.textContent.trim() === t).length;
+  });
+  check('상자 안에 제목이 한 번 더 남지 않는다', dup === 0, dup);
   check('부서마다 하나씩 묶인다', d.n === 4, d.n);
   check('부서 이름이 제자리에 있다',
         JSON.stringify(d.heads) === JSON.stringify(['교무기획부','학생안전부','진로진학부','교육연구부']), d.heads);

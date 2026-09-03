@@ -1932,9 +1932,12 @@
   /* 제목은 상자 위에 둔다. 사이트 제목을 그대로 상자 안에 두면 앱과 겉돌아서,
      글만 가져와 앱의 다른 화면과 같은 글꼴·색으로 다시 쓴다. */
   .wk-orig-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-    padding:2px 2px 10px;}
+    padding:10px 4px 14px;}
+  /* 글자색은 앱 본문색(--ink, 거의 검정)을 쓴다. 메인 파랑(--mon, #3B82F6)은
+     이 크기·이 배경에서 대비가 3.1:1 밖에 안 나와 읽기 기준(4.5:1)에 못 미친다.
+     파랑은 옆의 원본보기 단추가 이미 쥐고 있다. */
   .wk-orig-title{font-family:'Pretendard','Noto Sans KR',sans-serif;
-    font-weight:800;font-size:16px;color:var(--ink);letter-spacing:-0.2px;}
+    font-weight:800;font-size:18px;color:var(--ink);letter-spacing:-0.2px;}
   .wk-orig-head .weekly-title-btn{margin-left:auto;
     background:var(--mon);border-color:var(--mon);color:#fff !important;}
 
@@ -9214,6 +9217,31 @@ const WK_SHADOW_CSS = `
   table{border-collapse:collapse;}
 `;
 
+// 상자 위로 꺼낸 제목이 첫 부서 앞에 한 번 더 남아 있다. 사이트가 제목을 두 군데
+// (배너와 본문 머리)에 두는데, 앞엣것만 h1 로 넘어오고 뒤엣것은 색만 인라인으로
+// 실린 평범한 글이라 h1 규칙에도 안 걸린다 — 흰 바탕에 옅은 노랑으로 남는다.
+// 첫 부서 이름보다 앞에 있으면서 제목과 글자가 똑같은 것만 지운다.
+function wkStripDupTitle(root, text){
+  if(!text) return;
+  const firstDept = root.querySelector('h2');
+  for(const el of [...root.querySelectorAll('*')]){
+    if(el.children.length) continue;                       // 잎만 본다
+    if(el.textContent.trim() !== text) continue;
+    // 첫 부서보다 뒤에 있으면 본문 내용일 수 있다 — 건드리지 않는다.
+    if(firstDept && !(firstDept.compareDocumentPosition(el)
+                      & Node.DOCUMENT_POSITION_PRECEDING)) continue;
+    // 지우고 나서 빈 껍데기만 남은 부모도 같이 걷는다.
+    let n = el;
+    while(n && n !== root){
+      const parent = n.parentNode;
+      n.remove();
+      if(!parent || parent === root) break;
+      if(parent.textContent.trim() || parent.querySelector('img')) break;
+      n = parent;
+    }
+  }
+}
+
 // 부서 단위로 묶는다 — h2(부서 이름)부터 다음 h2 직전까지가 한 부서다.
 // 형제 사이에서만 자르므로 h2 가 어느 깊이에 있든 그 자리에서 묶인다.
 //
@@ -9483,8 +9511,10 @@ function renderContent(html){
     const siteH1 = div.querySelector('h1');
     const ttl = document.createElement('div');
     ttl.className = 'wk-orig-title';
-    ttl.textContent = (siteH1?.textContent || '').trim() || '주간 교육활동 및 업무 안내';
+    const ttlText = (siteH1?.textContent || '').trim();
+    ttl.textContent = ttlText || '주간 교육활동 및 업무 안내';
     siteH1?.remove();
+    wkStripDupTitle(div, ttlText);
     const ob = document.createElement('a');
     ob.href = weeklyCurrentUrl; ob.target = '_blank';
     ob.className = 'weekly-title-btn'; ob.textContent = '↗ 원본보기';
