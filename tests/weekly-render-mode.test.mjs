@@ -446,17 +446,19 @@ console.log('\n■ 부서 구분');
 console.log('\n■ 원본+ — 읽기 편하게 손본 것');
 {
   await pg.setViewportSize({ width: 420, height: 900 });
-  // 프록시가 넘겨 주는 줄은 p 일 때도 div 일 때도 있고, 안에 span 이 끼기도 한다.
-  // 태그 이름으로 고르면 div 로 온 줄이 통째로 빠진다 — 그래서 섞어 둔다.
+  // 실제로 오는 모양이다. 앱에서 찍어 본 진단이 전부 SPAN 이었고, 그중 하나는
+  // 내용이 '·' 하나뿐이었다 — 기호가 자기 혼자 조각을 차지한다. 기호 뒤에
+  // 공백이 이어질 거라고 보면 하나도 안 걸린다. 그래서 그 모양 그대로 둔다.
   const LONG = `
-    <h1>2026학년도 9월 1주</h1>
-    <h2>교무기획부</h2>
-    <p>· 2학기 학생 학부모 상담주간 운영에 관한 안내입니다 협조 부탁드립니다</p>
-    <div>■ 대상: 전 교직원과 학부모 및 관련 부서 담당자 전원이 참여합니다</div>
+    <h1><span>2026학년도 9월 1주</span></h1>
+    <h2><span>교무기획부</span></h2>
+    <p><span>·</span><span> 2학기 학생 학부모 상담주간 운영에 관한 안내입니다 협조 부탁드립니다</span></p>
+    <div><span>■</span><span> 대상: 전 교직원과 학부모 및 관련 부서 담당자 전원이 참여합니다</span></div>
     <div><span style="color:#c00">· 장소: 각 학급 교실 또는 상담실을 이용해 주시기 바랍니다</span></div>
-    <p>짧은 줄</p>
-    <h2>행정실</h2>
-    <p>· 물품 구입 신청은 9. 5.(금)까지 제출해 주시기 바랍니다</p>
+    <p><span>「</span><span>초·중등교육법」 개정에 따른 안내이며 여는 괄호로 시작하는 줄입니다</span></p>
+    <p><span>01_</span><span>2학기 영어듣기평가 안내</span></p>
+    <h2><span>행정실</span></h2>
+    <p><span>·</span><span> 물품 구입 신청은 9. 5.(금)까지 제출해 주시기 바랍니다</span></p>
   `;
   const readOrig = async mode => {
     await pg.evaluate(([m, h]) => { window.setMode(m); window.render(h); }, [mode, LONG]);
@@ -492,6 +494,15 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
   const plain = plus.hang.filter(h => !'·■'.includes(h.mark));
   check('④ 기호로 시작하는 줄은 기호 뒤로 내어쓴다',
         marked.length === 4 && marked.every(h => h.ml > 0 && h.ti === -h.ml), plus.hang);
+  // 기호가 자기 혼자 조각을 차지하는 모양('<span>·</span><span> 대상…')이 실제
+  // 사이트가 보내는 모양이다. 이걸 놓쳐서 두 번 안 먹었다.
+  check('④ 기호가 딴 조각에 떨어져 있어도 잡는다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const lone = [...r.querySelectorAll('span')]
+      .filter(e => e.textContent.trim() === '·' || e.textContent.trim() === '■');
+    return lone.length >= 3
+        && lone.every(e => parseFloat(e.parentElement.style.marginLeft) > 0);
+  }));
   // div 로 온 줄이 빠지면 여기서 걸린다 — 태그 이름으로 고르던 시절의 버그다.
   check('④ p 든 div 든 가리지 않는다', await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
@@ -502,6 +513,18 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
   }));
   check('④ 기호가 없는 줄은 건드리지 않는다',
         plain.every(h => h.ml === 0 && h.ti === 0), plus.hang);
+  // 「초·중등교육법」 같은 줄이 통째로 밀려나면 안 된다.
+  check('④ 여는 괄호로 시작하는 줄은 밀지 않는다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const el = [...r.querySelectorAll('p')].find(e => e.textContent.startsWith('「'));
+    return !!el && !el.style.marginLeft;
+  }));
+  // 숫자로 시작하는 소제목(01_…)도 기호가 아니다.
+  check('④ 숫자로 시작하는 줄도 건드리지 않는다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const el = [...r.querySelectorAll('p')].find(e => e.textContent.startsWith('01_'));
+    return !!el && !el.style.marginLeft;
+  }));
   check('② 자간을 조여도 -0.03em 을 넘지 않는다',
         plus.ls.every(v => v === '' || (parseFloat(v) < 0 && parseFloat(v) >= -0.03)), plus.ls);
   // 자간을 건드려 놓고 줄은 그대로면 아무 소용 없이 글자만 빽빽해진 것이다.
