@@ -134,6 +134,8 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grab('wkLeadLen')}
   ${grab('wkFirstTextX')}
   ${grab('wkHangIndent')}
+  ${grabConst('WK_JUSTIFY_SLACK')}
+  ${grab('wkJustifyEasy')}
   ${grabConst('WK_TIGHTEN')}
   ${grab('wkTightenTails')}
   ${grab('wkPlusTune')}
@@ -465,6 +467,12 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
          화면에서 제일 눈에 띄던 문제가 이것이었다. -->
     <p><span>\u00A0\u00A0\u00A01.</span><span> 물리학 실험(18명)(박경환): (월,목) / 물리실 / 18:50-21:20 / 매주 진행합니다</span></p>
     <p><span>앞머리가 없는 평범한 줄입니다 여기는 손대지 않아야 합니다</span></p>
+    <!-- 줄 끝이 잘 차는 문단. 어절이 짧아 남는 자리가 적으니 양쪽 맞춤을 해도
+         어절 사이가 안 벌어진다. -->
+    <p class="fit"><span>가 나 다 라 마 바 사 아 자 차 카 타 파 하 거 너 더 러 머 버 서 어 저 처 커 터 퍼 허 고 노 도 로 모 보 소 오 조 초 코 토 포 호</span></p>
+    <!-- 긴 어절 하나가 통째로 다음 줄로 넘어가면서 앞 줄에 큰 구멍이 남는 문단.
+         여기에 양쪽 맞춤을 걸면 그 구멍이 어절 사이로 퍼져 흉해진다. -->
+    <p class="hole"><span>짧은 말 뒤에 대구광역시교육청진로진학지원센터운영협의회자료집 이 옵니다</span></p>
     <h2><span>행정실</span></h2>
     <p><span>·</span><span> 물품 구입 신청은 9. 5.(금)까지 제출해 주시기 바랍니다</span></p>
   `;
@@ -496,7 +504,40 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
 
   const plus = await readOrig('plus');
   // ① 양쪽 맞춤은 넣었다가 뺐다 — 좁은 화면에서 어절 사이가 흉하게 벌어진다.
-  check('① 양쪽 맞춤은 하지 않는다', plus.align.every(a => a !== 'justify'), plus.align);
+  // ① 양쪽 맞춤은 문단마다 켜고 끈다. 어절 단위로만 끊으면 줄 끝에 늘 어절
+  //    하나만큼 자리가 남는데, 켜면 그 자리가 어절 사이로 퍼져 벌어지고 끄면
+  //    그대로 오른쪽 여백이 된다. 그래서 조금만 남는 문단만 맞춘다.
+  const just = await pg.evaluate(([slack]) => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const gapsOf = el => {
+      const cs = getComputedStyle(el);
+      const right = el.getBoundingClientRect().right - parseFloat(cs.paddingRight || 0);
+      const rg = document.createRange(); rg.selectNodeContents(el);
+      const lines = new Map();
+      for (const rc of rg.getClientRects()) {
+        if (rc.width < 0.5) continue;
+        const k = Math.round(rc.top);
+        lines.set(k, Math.max(lines.get(k) ?? 0, rc.right));
+      }
+      const tops = [...lines.keys()].sort((a, b) => a - b);
+      return { fs: parseFloat(cs.fontSize),
+               worst: tops.slice(0, -1).reduce((m, k) => Math.max(m, right - lines.get(k)), 0),
+               lines: tops.length };
+    };
+    const all = [...r.querySelectorAll('p, div')].filter(e => !e.querySelector('p, div'));
+    return {
+      fit:  r.querySelector('.fit')?.style.textAlign,
+      hole: r.querySelector('.hole')?.style.textAlign,
+      holeLines: gapsOf(r.querySelector('.hole')).lines,
+      // 맞춘 문단은 전부 '조금만 남는' 문단이어야 한다
+      bad: all.filter(e => e.style.textAlign === 'justify')
+              .map(gapsOf).filter(g => g.worst > slack * g.fs + 1).length,
+    };
+  }, [1.5]);
+  check('① 줄 끝이 잘 차는 문단은 양쪽 맞춤', just.fit === 'justify', just);
+  check('① 크게 남는 문단은 맞추지 않는다',
+        just.holeLines >= 2 && just.hole !== 'justify', just);
+  check('① 맞춘 문단은 모두 조금만 남는 문단이다', just.bad === 0, just);
   check('③ 어절 단위로 끊는다', plus.brk.every(b => b === 'keep-all'), plus.brk);
   const marked = plus.hang.filter(h => '·■'.includes(h.mark));
   const plain = plus.hang.filter(h => !'·■'.includes(h.mark));
@@ -568,8 +609,12 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
       byLine.set(k, Math.min(byLine.get(k) ?? Infinity, rc.left));
     }
     const tops = [...byLine.keys()].sort((a, b) => a - b);
+    // 양쪽 맞춤이 켜진 문단은 첫 줄의 공백이 조금 늘어난다. 앞머리 안의 공백도
+    // 같이 늘어나므로 첫 줄 글자가 몇 px 밀린다. 내어쓰기 폭은 늘어나기 전
+    // 기준으로 잡히니, 그만큼은 어긋나는 것이 맞다 — 글자 폭의 1/3 까지 본다.
+    const slack = parseFloat(getComputedStyle(el).fontSize) / 3;
     return tops.length >= 2 && ml > 0 && x0 !== null
-        && Math.abs(byLine.get(tops[1]) - x0) < 2;
+        && Math.abs(byLine.get(tops[1]) - x0) < slack;
   }));
   check('② 자간을 조여도 -0.03em 을 넘지 않는다',
         plus.ls.every(v => v === '' || (parseFloat(v) < 0 && parseFloat(v) >= -0.03)), plus.ls);
@@ -612,7 +657,8 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
   // 손질은 '원본+' 만의 것이다. '원본' 은 사이트 그대로여야 한다.
   const orig = await readOrig('orig');
   check('원본은 그대로 둔다',
-        orig.brk.every(b => b !== 'keep-all')
+        orig.align.every(a => a !== 'justify')
+        && orig.brk.every(b => b !== 'keep-all')
         && orig.hang.every(h => h.ml === 0) && orig.ls.every(v => v === ''), orig);
 
   await pg.setViewportSize({ width: 1200, height: 800 });
