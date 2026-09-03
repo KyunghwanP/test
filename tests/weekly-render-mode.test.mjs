@@ -49,8 +49,8 @@ const grabConst = name => {
 const STYLES = [...HTML.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n');
 
 console.log('\n■ 배선 (정적)');
-check('네 가지 방식이 있다',
-      /const WK_MODES = \[\['app','지금'\], \['plain','글꼴·색'\], \['orig','원본'\], \['plus','원본\+'\]\]/.test(HTML));
+check('다섯 가지 방식이 있다',
+      /\['app','지금'\], \['plain','글꼴·색'\], \['orig','원본'\],\s*\['plus','원본\+'\], \['plus2','원본\+2'\]\]/.test(HTML));
 // 사이트를 통째로 iframe 으로 띄우는 것은 해 봤고 안 된다(구글이 삽입 차단).
 // 지워 놓고 나중에 또 넣지 않도록 못 박는다.
 check('iframe 으로 띄우려 하지 않는다',
@@ -127,6 +127,7 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   let weeklyMode = 'app';
   let _wkLast = null;
   ${grabConst('wkIsOrig')}
+  ${grabConst('wkIsPlus')}
   ${grabConst('WK_SHADOW_CSS')}
   ${grabConst('WK_OPEN')}
   ${grabConst('WK_TOKEN')}
@@ -146,6 +147,8 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grab('wkInset')}
   ${grab('wkFirstTextX')}
   ${grab('wkHangIndent')}
+  ${grabConst('WK_NUM2')}
+  ${grab('wkHangSimple')}
   ${grabConst('WK_JUSTIFY_SLACK')}
   ${grab('wkJustifyEasy')}
   ${grabConst('WK_TIGHTEN')}
@@ -809,6 +812,58 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
 // ── 번호가 두 가지로 쓰인다 ──────────────────────────────────────────────
 // 같은 '1.' 이 어떤 데서는 소제목이고 어떤 데서는 ■ 에 딸린 목록이다.
 // 가르는 단서는 '번호가 이어지는가' 뿐이다.
+// ── 원본+2 — 단순한 쪽 ──────────────────────────────────────────────────
+// 원래 부탁받은 것은 '줄바꿈될 때 둘째 줄을 기호 뒤에 맞춰라' 하나였다. 원본+ 는
+// 거기에 단계 판정·번호 추론·공백 제거·밀린 만큼 되돌리기까지 얹었고, 사이트에
+// 그런 규칙이 없어서 화면마다 어긋났다. 원본+2 는 첫 줄을 건드리지 않는다.
+console.log('\n■ 원본+2 — 첫 줄은 그대로, 넘어간 줄만');
+{
+  await pg.setViewportSize({ width: 420, height: 900 });
+  const NB2 = '\u00A0';
+  const RAW = `
+    <h2><span>교무기획부</span></h2>
+    <p class="k1"><span>${NB2}${NB2}${NB2}■</span><span> 대학수학능력시험 모의평가 및 전국연합학력평가를 함께 실시합니다</span></p>
+    <p class="k2"><span>■</span><span> 3학년 금요일 오후 시간표 조정에 관한 안내이며 협조 부탁드립니다</span></p>
+    <h3 class="k3"><span>${NB2}${NB2}01_</span><span>2026학년도 8월 교육활동 운영 계획</span></h3>
+  `;
+  const read = async mode => {
+    await pg.evaluate(([m, h]) => { window.setMode(m); window.render(h); }, [mode, RAW]);
+    return pg.evaluate(() => {
+      const sh = document.querySelector('.wk-shadow-host').shadowRoot;
+      const lines = e => {
+        const rg = document.createRange(); rg.selectNodeContents(e);
+        const by = new Map();
+        for (const rc of rg.getClientRects()) {
+          if (rc.width < 0.5) continue;
+          const k = Math.round(rc.top);
+          by.set(k, Math.min(by.get(k) ?? Infinity, rc.left));
+        }
+        return [...by.entries()].sort((a, b) => a[0] - b[0]).map(e => Math.round(e[1]));
+      };
+      return { k1: lines(sh.querySelector('.k1')), k2: lines(sh.querySelector('.k2')),
+               k3: lines(sh.querySelector('.k3')) };
+    });
+  };
+  const s2 = await read('plus2');
+  // 넘어간 줄은 그 줄 첫 글자에 맞춘다 — 부탁받은 것은 이것 하나였다.
+  check('넘어간 줄만 첫 줄 글자에 맞춘다',
+        s2.k1.length >= 2 && s2.k1[1] > s2.k1[0]
+        && s2.k2.length >= 2 && s2.k2[1] > s2.k2[0], s2);
+  // 첫 줄은 사이트가 놓아 준 자리 그대로다. &nbsp; 세 개짜리 줄과 없는 줄은
+  // 글자 시작이 다르고, 그러니 넘어간 줄이 맞춰 가는 자리도 달라야 맞다.
+  // (줄 상자 자체는 둘 다 여백 끝에서 시작한다 — &nbsp; 는 글자라서 그 안에 있다)
+  check('사이트가 놓아 준 자리를 건드리지 않는다', s2.k1[1] > s2.k2[1], s2);
+  check('제목은 앞 공백만 걷는다', s2.k3[0] <= s2.k2[0] + 1, s2);
+
+  // 원본+ 는 같은 입력을 열 맞춰 그린다 — 둘의 차이가 이것이다.
+  const s1 = await read('plus');
+  check('원본+ 는 같은 기호끼리 열을 맞춘다', s1.k1[0] === s1.k2[0], { s1, s2 });
+  check('두 방식이 실제로 다르게 그린다', s1.k1[0] !== s2.k1[0], { s1, s2 });
+
+  await pg.setViewportSize({ width: 1200, height: 800 });
+  await pg.evaluate(h => { window.setMode('orig'); window.render(h); }, SITE);
+}
+
 console.log('\n■ 번호가 두 가지로 쓰인다');
 {
   const NB = '\u00A0';
@@ -850,8 +905,9 @@ console.log('\n■ 번호가 두 가지로 쓰인다');
   check('딸린 번호끼리는 열이 맞는다', new Set(r.s).size === 1, r);
   check('■ 끼리도 열이 맞는다', r.b1 === r.b2, r);
   // 제목의 &nbsp; 개수도 부서마다 다르다. 그대로 두면 소제목이 줄줄이 밀린다.
-  // 소제목은 ■ 와 같은 칸에 선다. 부서 이름만 그보다 한 칸 밖이다.
-  check('소제목이 ■ 와 같은 칸에 선다', await pg.evaluate(() => {
+  // 소제목은 들여쓰지 않는다 — 사이트 원본이 그렇다. 부서 이름과 같은 칸에서
+  // 시작하고, 딸린 항목(■)만 안으로 들어간다.
+  check('소제목은 들여쓰지 않는다', await pg.evaluate(() => {
     const sh = document.querySelector('.wk-shadow-host').shadowRoot;
     const box = e => { const rg = document.createRange(); rg.selectNodeContents(e);
       const rc = [...rg.getClientRects()].filter(x => x.width > 0.5)[0];
@@ -859,7 +915,7 @@ console.log('\n■ 번호가 두 가지로 쓰인다');
     const hd = box(sh.querySelector('.hd'));
     const b1 = box(sh.querySelector('.b1'));
     const dept = box([...sh.querySelectorAll('h2')].pop());
-    return { hd, b1, dept, ok: Math.abs(hd - b1) <= 1 && dept < hd };
+    return { hd, b1, dept, ok: Math.abs(hd - dept) <= 1 && hd < b1 };
   }).then(v => v.ok));
   check('소제목끼리 열이 맞는다', await pg.evaluate(() => {
     const sh = document.querySelector('.wk-shadow-host').shadowRoot;
@@ -899,7 +955,7 @@ console.log('\n■ 제목이 heading 으로 안 올 때');
 console.log('\n■ 전환 막대');
 {
   check('관리자에게는 보인다', await pg.evaluate(() => !!document.getElementById('wkModes')));
-  check('네 칸이다', (await pg.$$eval('#wkModes button', e => e.length)) === 4);
+  check('다섯 칸이다', (await pg.$$eval('#wkModes button', e => e.length)) === 5);
   check('고른 것이 켜져 있다',
         (await pg.$eval('#wkModes button.on', e => e.dataset.wkMode)) === 'orig');
   await pg.evaluate(() => { window.__setWho('kim@yeungnam.hs.kr'); window.render('<p>x</p>'); });

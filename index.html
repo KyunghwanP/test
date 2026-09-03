@@ -9130,11 +9130,13 @@ function applyWeeklyDarkColors(root){
 
    무엇이 나은지는 눈으로 봐야 안다. 전환은 관리자에게만 보인다.        */
 const WK_MODE_KEY = 'ynhsWeeklyMode';
-const WK_MODES = [['app','지금'], ['plain','글꼴·색'], ['orig','원본'], ['plus','원본+']];
+const WK_MODES = [['app','지금'], ['plain','글꼴·색'], ['orig','원본'],
+                 ['plus','원본+'], ['plus2','원본+2']];
 // '원본+' 는 원본과 같은 길로 그리되, 읽기 편하도록 네 가지를 손본다.
 // 원본과 달라지는 것을 아는 채로 하는 손질이다: 양쪽 맞춤 / 어절 단위 줄바꿈 /
 // 한두 글자 넘칠 때 자간 조이기 / 기호 뒤로 내어쓰기.
-const wkIsOrig = () => weeklyMode === 'orig' || weeklyMode === 'plus';
+const wkIsOrig = () => weeklyMode === 'orig' || wkIsPlus();
+const wkIsPlus = () => weeklyMode === 'plus' || weeklyMode === 'plus2';
 let weeklyMode = (() => { try { return localStorage.getItem(WK_MODE_KEY) || 'app'; }
                           catch(e){ return 'app'; } })();
 let _wkLast = null;              // 마지막 본문 HTML — 전환할 때 다시 안 받아온다
@@ -9354,8 +9356,9 @@ const WK_LEVEL = [
   ['-–—※*☞', 3],
 ];
 const WK_STEP = 1.15;                  // 한 단계에 글자 폭 몇 개
-// 소제목은 ■ 와 같은 칸에 선다. 부서 이름만 그보다 한 칸 밖이다.
-const WK_SUB_LEVEL = 1;
+// 소제목은 들여쓰지 않는다 — 사이트 원본이 그렇다. 부서 이름과 같은 칸에서
+// 시작하고, 딸린 항목(■ · -)만 안으로 들어간다.
+const WK_SUB_LEVEL = 0;
 // 기호 없는 줄은 앞 줄 단계를 물려받는다. '(학생이 직접 …)' 같은 줄은 바로 위
 // 항목에 딸린 말인데, 왼쪽 끝으로 떨어뜨리면 남처럼 보인다. 단계는 부서 이름
 // (제목)에서 0 으로 되돌아가므로 앞 부서 것이 넘어오지 않는다.
@@ -9502,6 +9505,50 @@ function wkHangIndent(root){
   return { lines: seenCount, hung: hit };
 }
 
+/* ④의 단순한 쪽 — '원본+2'.
+   원래 부탁받은 것은 '줄바꿈될 때 둘째 줄을 기호 뒤에 맞춰라' 하나였다. 그런데
+   '열이 안 맞는다' 는 말에 위쪽(wkHangIndent)에서는 기호로 단계를 판정하고,
+   번호가 소제목인지 딸린 목록인지 추론하고, 사이트가 넣은 공백을 지우고, 밀린
+   만큼을 재서 되돌리기까지 한다. 사이트는 사람이 손으로 만든 문서라 그런 규칙이
+   애초에 없어서, 화면마다 새로 어긋났다.
+
+   여기서는 첫 줄을 건드리지 않는다. 사이트가 놓아 준 자리 그대로 두고 **넘어간
+   줄만** 첫 줄 글자에 맞춘다. 제목은 앞 공백만 걷는다.
+   어느 쪽이 나은지는 눈으로 봐야 알아서 둘 다 남겨 두고 고르게 한다. */
+const WK_NUM2 = /^0?\d{1,2}[._)]$/;
+function wkHangSimple(root){
+  const seen = new Set();
+  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let n, hit = 0, seenCount = 0;
+  while((n = walk.nextNode())){
+    if(!n.nodeValue || !n.nodeValue.trim()) continue;
+    const block = wkBlockOf(n);
+    if(!block || seen.has(block)) continue;
+    seen.add(block);
+    seenCount++;
+    if(wkIsHead(block)){
+      const hw = (/^[\s\u00A0]*/.exec(block.textContent || '') || [''])[0];
+      if(hw) wkDropLeadWs(block, hw.length);
+      continue;
+    }
+    const text = block.textContent || '';
+    const lead = wkLead(text);
+    const skip = lead.ws1.length + lead.tok.length + lead.ws2.length;
+    if(!skip || !text.slice(skip).trim()) continue;      // 앞머리뿐인 줄
+    if(lead.tok && WK_NUM2.test(lead.tok)) block.dataset.wkNum = '1';
+    const x = wkFirstTextX(block, skip);
+    if(x === null) continue;
+    const cs = getComputedStyle(block);
+    const w = x - block.getBoundingClientRect().left - parseFloat(cs.paddingLeft || 0);
+    if(w > 1 && w < 140){
+      block.style.marginLeft = w + 'px';     // 첫 줄은 제자리, 넘어간 줄만 안으로
+      block.style.textIndent = -w + 'px';
+      hit++;
+    }
+  }
+  return { lines: seenCount, hung: hit };
+}
+
 // ② 한두 글자가 넘쳐 한 줄이 더 생겼을 때만 자간을 조인다. 한글 프로그램의
 //    자간 자동 조절에 해당하는 CSS 속성이 없어서, 조금씩 좁혀 보고 줄이 줄면
 //    거기서 멈춘다. -0.03em 이 상한이라 '한두 글자 차이' 만 걸린다. 그 이상
@@ -9552,7 +9599,7 @@ function wkJustifyEasy(root){
     const el = wkBlockOf(n);
     if(!el || seen.has(el)) continue;
     seen.add(el);
-    if(wkIsHead(el) || el.dataset.wkSub) continue;
+    if(wkIsHead(el) || el.dataset.wkSub || el.dataset.wkNum) continue;
     const cs = getComputedStyle(el);
     const fs = parseFloat(cs.fontSize) || 16;
     const right = el.getBoundingClientRect().right - parseFloat(cs.paddingRight || 0);
@@ -9574,14 +9621,15 @@ function wkJustifyEasy(root){
   return on;
 }
 
-function wkPlusTune(root){
+function wkPlusTune(root, simple){
   // 다시 부를 때(화면 폭이 바뀌었을 때)를 위해 지난번 값을 먼저 지운다.
   root.querySelectorAll('[style]').forEach(el => {
     el.style.marginLeft = ''; el.style.textIndent = '';
     el.style.letterSpacing = ''; el.style.textAlign = '';
   });
   root.querySelectorAll('[data-wk-sub]').forEach(el => delete el.dataset.wkSub);
-  const stat = wkHangIndent(root);
+  root.querySelectorAll('[data-wk-num]').forEach(el => delete el.dataset.wkNum);
+  const stat = simple ? wkHangSimple(root) : wkHangIndent(root);
   wkTightenTails(root);   // 내어쓰기로 줄 수가 달라지므로 반드시 뒤에 잰다
   stat.just = wkJustifyEasy(root);   // 줄이 다 정해진 뒤라야 남는 폭을 잴 수 있다
   // 안 먹을 때 무엇이 들어왔는지 알려면 실제 마크업을 봐야 한다. 관리자에게만.
@@ -9617,7 +9665,8 @@ function wkPlusTune(root){
       sample = [...sec.children].slice(0, 4).map(e => e.outerHTML.slice(0, 160));
       break;
     }
-    const line = '[원본+] ' + JSON.stringify({ ...stat, missed, tags, sample });
+    const line = '[' + (simple ? '원본+2' : '원본+') + '] '
+               + JSON.stringify({ ...stat, missed, tags, sample });
     window.__wkDiag = line;
     if(window.__wkDiagLast !== line){ window.__wkDiagLast = line; console.log(line); }
   }
@@ -9626,11 +9675,11 @@ function wkPlusTune(root){
 // 화면 폭이 바뀌면 잰 값이 다 틀어진다. 가로·세로 돌릴 때가 그렇다.
 let _wkPlusTimer = null;
 window.addEventListener('resize', () => {
-  if(weeklyMode !== 'plus') return;
+  if(!wkIsPlus()) return;
   clearTimeout(_wkPlusTimer);
   _wkPlusTimer = setTimeout(() => {
     const doc = document.querySelector('.wk-shadow-host')?.shadowRoot?.querySelector('.wk-plus');
-    if(doc) wkPlusTune(doc);
+    if(doc) wkPlusTune(doc, weeklyMode === 'plus2');
   }, 200);
 });
 
@@ -9961,7 +10010,8 @@ function renderContent(html){
   // 여기까지의 손질은 '안전'과 '구글 사이트 껍데기 제거'다. 그건 원본 모드에서도
   // 해야 한다. 아래부터가 앱이 모양을 바꾸는 부분이라, 원본 모드는 여기서 갈린다.
   if(wkIsOrig()){
-    const plus = weeklyMode === 'plus';
+    const plus = wkIsPlus();
+    const simple = weeklyMode === 'plus2';
     const wrap = document.createElement('div');
     wrap.className = 'weekly-html-content wk-orig';
     // 사이트 제목은 상자 밖으로 꺼내 앱 제목으로 다시 쓴다. 안에 두면 사이트가
@@ -9995,7 +10045,7 @@ function renderContent(html){
     weeklyPageContent.innerHTML = '';
     weeklyPageContent.appendChild(wrap);
     // 재기는 화면에 붙은 뒤라야 한다 — 붙기 전에는 폭이 0 이다.
-    if(plus) wkPlusTune(div);
+    if(plus) wkPlusTune(div, simple);
     renderWeeklyModeBar();
     setTimeout(updateWeeklyTopOffset, 50);
     return;
