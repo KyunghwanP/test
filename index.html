@@ -9520,7 +9520,19 @@ function wkPlusTune(root){
     // 콘솔에서 펼쳐 보게 하면 안 된다 — 접힌 채로 여러 줄 쌓여서 복사를 못 한다.
     // 한 줄 글자로 찍고, 같은 내용이 다시 나오면(리사이즈 등) 다시 안 찍는다.
     // 그래도 길면 콘솔에 copy(__wkDiag) 한 번이면 클립보드로 넘어간다.
-    const line = '[원본+] ' + JSON.stringify({ ...stat, missed });
+    // 글머리(■ 등)가 통째로 안 보이는 구역이 있다. 글자로 오는지, 목록 태그로
+    // 오는지, 아니면 지워진 class 가 그리던 것인지 — 마크업을 봐야 안다.
+    const tags = {};
+    for(const el of root.querySelectorAll('*'))
+      tags[el.tagName] = (tags[el.tagName] || 0) + 1;
+    // 부서 이름에 '교육지원' 이 든 칸의 첫 줄 두 개를 그대로 떠 온다.
+    let sample = [];
+    for(const sec of root.querySelectorAll('section.wk-dept')){
+      if(!/교육지원|환경 정화/.test(sec.textContent || '')) continue;
+      sample = [...sec.children].slice(0, 4).map(e => e.outerHTML.slice(0, 160));
+      break;
+    }
+    const line = '[원본+] ' + JSON.stringify({ ...stat, missed, tags, sample });
     window.__wkDiag = line;
     if(window.__wkDiagLast !== line){ window.__wkDiagLast = line; console.log(line); }
   }
