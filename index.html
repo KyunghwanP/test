@@ -9113,6 +9113,10 @@ const WK_SHADOW_CSS = `
      margin-left:-14px;margin-right:-14px;padding-left:14px;padding-right:14px;}
   img,table{max-width:100%;}
   table{border-collapse:collapse;}
+  /* 프록시가 사이트 CSS 를 통째로 지워 보내서, 원래 한 줄씩이던 항목이 옆으로
+     붙어 버린다. '지금' 방식은 <small> 뒤에 <br> 을 끼워 넣어 때웠는데, 그건
+     받아온 내용을 고치는 것이다. 여기서는 표시 방식만 바꾼다. */
+  small{display:block;}
 `;
 
 function renderWeeklyModeBar(){

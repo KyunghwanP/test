@@ -69,6 +69,7 @@ const SITE = `
   <p><span style="background-color:#ffff00;font-size:13px">형광펜 강조</span></p>
   <p><a href="https://example.com" style="color:#0b57d0">첨부 파일</a></p>
   <p><b style="color:#c00000">굵은 빨강</b></p>
+  <p><small>· 일시: 9. 2.(수)</small><small>· 대상: 3학년</small></p>
 `;
 
 await pg.setContent(`<!doctype html><meta charset="utf-8">
@@ -149,6 +150,17 @@ console.log('\n■ 원본 그대로 — 앱 CSS 가 아예 안 닿는다');
   // 앱의 h1 타이틀바 규칙이 사이트 h1 을 잡아먹으면 안 된다
   const h1 = await styleOf('h1', true);
   check('사이트 h1 도 제 모양', h1.fs === '30px' && !/Noto Sans KR/.test(h1.ff), h1);
+  // 프록시가 사이트 CSS 를 지워 보내서 한 줄씩이던 항목이 옆으로 붙는다.
+  // 받아온 내용에 <br> 을 끼워 넣지 않고 표시 방식만 바꿔 되살린다.
+  const sm = await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const a = r.querySelectorAll('small');
+    return { disp: getComputedStyle(a[0]).display,
+             sameLine: a[0].getBoundingClientRect().top === a[1].getBoundingClientRect().top,
+             brAdded: r.querySelectorAll('br').length };
+  });
+  check('항목이 한 줄씩 나뉜다', sm.disp === 'block' && !sm.sameLine, sm);
+  check('받아온 내용에 <br> 을 끼워 넣지 않는다', sm.brAdded === 0, sm);
 }
 
 console.log('\n■ 전환 막대');
