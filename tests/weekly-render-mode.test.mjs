@@ -129,14 +129,17 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grabConst('wkIsOrig')}
   ${grabConst('WK_SHADOW_CSS')}
   ${grabConst('WK_OPEN')}
-  ${grabConst('WK_MARK')}
+  ${grabConst('WK_TOKEN')}
   ${grab('wkBlockOf')}
+  ${grab('wkLeadLen')}
+  ${grab('wkFirstTextX')}
   ${grab('wkHangIndent')}
   ${grabConst('WK_TIGHTEN')}
   ${grab('wkTightenTails')}
   ${grab('wkPlusTune')}
   ${grabConst('wkSquash')}
   ${grab('wkSameTitle')}
+  ${grab('wkTitleEl')}
   ${grab('wkStripDupTitle')}
   ${grab('wkGroupDepts')}
   ${grab('renderWeeklyModeBar')}
@@ -457,6 +460,11 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
     <div><span style="color:#c00">· 장소: 각 학급 교실 또는 상담실을 이용해 주시기 바랍니다</span></div>
     <p><span>「</span><span>초·중등교육법」 개정에 따른 안내이며 여는 괄호로 시작하는 줄입니다</span></p>
     <p><span>01_</span><span>2학기 영어듣기평가 안내</span></p>
+    <!-- 사이트는 들여쓰기를 &nbsp; 로 한다. 그건 줄바꿈에서 사라지지 않아서
+         첫 줄만 안으로 들어가고 넘어간 줄은 상자 맨 왼쪽까지 튀어나간다.
+         화면에서 제일 눈에 띄던 문제가 이것이었다. -->
+    <p><span>\u00A0\u00A0\u00A01.</span><span> 물리학 실험(18명)(박경환): (월,목) / 물리실 / 18:50-21:20 / 매주 진행합니다</span></p>
+    <p><span>앞머리가 없는 평범한 줄입니다 여기는 손대지 않아야 합니다</span></p>
     <h2><span>행정실</span></h2>
     <p><span>·</span><span> 물품 구입 신청은 9. 5.(금)까지 제출해 주시기 바랍니다</span></p>
   `;
@@ -511,8 +519,12 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
                    && !e.querySelector('div, p'))
       .every(e => parseFloat(e.style.marginLeft) > 0);
   }));
-  check('④ 기호가 없는 줄은 건드리지 않는다',
-        plain.every(h => h.ml === 0 && h.ti === 0), plus.hang);
+  // 앞머리가 아예 없는 줄은 그대로 둔다. (여는 괄호·숫자 소제목은 따로 본다)
+  check('④ 앞머리가 없는 줄은 건드리지 않는다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const el = [...r.querySelectorAll('p')].find(e => /평범한 줄/.test(e.textContent));
+    return !!el && !el.style.marginLeft && !el.style.textIndent;
+  }), plus.hang);
   // 「초·중등교육법」 같은 줄이 통째로 밀려나면 안 된다.
   check('④ 여는 괄호로 시작하는 줄은 밀지 않는다', await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
@@ -524,6 +536,40 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
     const el = [...r.querySelectorAll('p')].find(e => e.textContent.startsWith('01_'));
     return !!el && !el.style.marginLeft;
+  }));
+  // 첫 줄만 &nbsp; 로 들어가 있고 넘어간 줄은 맨 왼쪽까지 튀어나가던 줄.
+  // 앞 공백까지 재야 맞는다 — 기호 폭만 재면 한참 모자란다.
+  check('④ &nbsp; 들여쓰기 + 번호 줄도 맞춘다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const el = [...r.querySelectorAll('p')].find(e => /물리학 실험/.test(e.textContent));
+    if (!el) return false;
+    const ml = parseFloat(el.style.marginLeft);
+    // 넘어간 줄의 왼쪽 끝이 첫 줄 글자('물')와 같은 자리인가 — 실제로 재 본다.
+    const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let n, seen = 0, x0 = null;
+    while ((n = walk.nextNode())) {
+      const skip = wkLeadLen(el.textContent);
+      if (seen + n.nodeValue.length > skip) {
+        const rg = document.createRange();
+        rg.setStart(n, skip - seen); rg.setEnd(n, skip - seen + 1);
+        x0 = rg.getBoundingClientRect().left; break;
+      }
+      seen += n.nodeValue.length;
+    }
+    // 블록의 getClientRects 는 테두리 상자 하나뿐이다. 줄 상자를 보려면
+    // 내용 전체에 Range 를 걸어야 한다.
+    const all = document.createRange();
+    all.selectNodeContents(el);
+    const rects = [...all.getClientRects()].filter(r => r.width > 1);
+    // 한 줄에 조각이 여럿일 수 있으니(span 마다 따로 잡힌다) 세로 위치로 묶는다.
+    const byLine = new Map();
+    for (const rc of rects) {
+      const k = Math.round(rc.top);
+      byLine.set(k, Math.min(byLine.get(k) ?? Infinity, rc.left));
+    }
+    const tops = [...byLine.keys()].sort((a, b) => a - b);
+    return tops.length >= 2 && ml > 0 && x0 !== null
+        && Math.abs(byLine.get(tops[1]) - x0) < 2;
   }));
   check('② 자간을 조여도 -0.03em 을 넘지 않는다',
         plus.ls.every(v => v === '' || (parseFloat(v) < 0 && parseFloat(v) >= -0.03)), plus.ls);
@@ -570,6 +616,34 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
         && orig.hang.every(h => h.ml === 0) && orig.ls.every(v => v === ''), orig);
 
   await pg.setViewportSize({ width: 1200, height: 800 });
+  await pg.evaluate(h => { window.setMode('orig'); window.render(h); }, SITE);
+}
+
+// ── 제목이 heading 으로 안 올 때 ────────────────────────────────────────
+// 이 사이트는 페이지 제목을 heading 으로 안 보낸다 — 그냥 span 이다. h1 만
+// 찾다가 못 찾으면 제목 글자를 못 얻고, 그러면 중복 제거가 시작도 못 한다.
+// 흰 바탕의 노란 제목이 계속 남아 있던 이유다.
+console.log('\n■ 제목이 heading 으로 안 올 때');
+{
+  const NOH1 = `
+    <div><span style="color:#FFD966">주간 교육활동 및 업무 안내</span></div>
+    <div><span style="color:#FFD966">주간 교육활동 및 업무 안내</span></div>
+    <h2><span>교감 선생님</span></h2>
+    <p><span>·</span><span> 안전에 유의해 주십시오</span></p>
+  `;
+  await pg.evaluate(h => { window.setMode('orig'); window.render(h); }, NOH1);
+  const r = await pg.evaluate(() => {
+    const sh = document.querySelector('.wk-shadow-host').shadowRoot;
+    const sq = s => s.replace(/[\s\u00A0]+/g, '');
+    const t = sq('주간 교육활동 및 업무 안내');
+    return { title: document.querySelector('.wk-orig-title').textContent.trim(),
+             left: [...sh.querySelectorAll('*')]
+                     .filter(e => !e.children.length && sq(e.textContent) === t).length,
+             dept: !!sh.querySelector('h2') };
+  });
+  check('h1 이 없어도 제목을 찾아낸다', r.title === '주간 교육활동 및 업무 안내', r);
+  check('노란 제목이 상자 안에 남지 않는다', r.left === 0, r);
+  check('부서는 그대로 남는다', r.dept, r);
   await pg.evaluate(h => { window.setMode('orig'); window.render(h); }, SITE);
 }
 
