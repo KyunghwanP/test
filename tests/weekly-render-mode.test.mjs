@@ -52,9 +52,22 @@ check('전환은 관리자에게만 보인다',
 check('전환할 때 다시 받아오지 않는다',
       /_wkLast = safe;/.test(HTML) && /if\(_wkLast\) renderContent\(_wkLast\)/.test(HTML));
 check('원본 방식은 그림자 영역을 쓴다', /attachShadow\(\{ mode: 'open' \}\)/.test(HTML));
-check('그림자 안에는 스티키만 넣는다',
-      /position:sticky/.test(grabConst('WK_SHADOW_CSS'))
-      && !/font-family/.test(grabConst('WK_SHADOW_CSS')));
+check('그림자 안에 스티키가 있다', /position:sticky/.test(grabConst('WK_SHADOW_CSS')));
+// 한글은 사이트와 똑같이 시스템 글꼴로 흘려보내야 한다. 여기서 Noto Sans KR 을
+// 쓰면 사이트보다 '예뻐지고', 그게 곧 사이트와 달라지는 것이다.
+{
+  // 주석에 'Noto Sans KR' 을 언급할 수 있으니 선언만 본다.
+  const decls = grabConst('WK_SHADOW_CSS').replace(/\/\*[\s\S]*?\*\//g, '');
+  check('한글 글꼴을 앱 것으로 바꾸지 않는다',
+        /font-family:'Noto Sans',Arial,sans-serif/.test(decls) && !/Noto Sans KR/.test(decls));
+}
+// 사이트가 쓰는 굵기 600·800 을 안 실으면 브라우저가 700 으로 뭉갠다.
+check('사이트가 쓰는 굵기를 싣는다',
+      /family=Noto\+Sans:wght@400;500;600;700;800/.test(HTML));
+// 클래스 선택자(.wk-shadow-host)는 :host 를 이긴다. 바깥에서 여백을 주면
+// 안쪽이 계산한 좌우 여백이 통째로 무시되고 스티키 제목만 삐져나온다.
+check('바깥에서 그림자 상자에 여백을 주지 않는다',
+      !/\.wk-shadow-host\{[^}]*padding/.test(STYLES));
 check('죽은 코드가 아니라 실제로 그리는 곳에 붙였다',
       /weeklyMode === 'orig'/.test(grab('renderContent')));
 check('스티키가 상단 바 높이를 따른다',
@@ -165,6 +178,69 @@ console.log('\n■ 원본 그대로 — 앱 CSS 가 아예 안 닿는다');
   });
   check('항목이 한 줄씩 나뉜다', sm.disp === 'block' && !sm.sameLine, sm);
   check('받아온 내용에 <br> 을 끼워 넣지 않는다', sm.brAdded === 0, sm);
+}
+
+// ── 사이트와 똑같은 글자 ────────────────────────────────────────────────
+// 프록시는 사이트의 <style> 과 class 를 지우고 인라인 style 만 6가지 속성으로
+// 걸러 넘긴다. 그래서 구글 사이트가 class 로만 정해 둔 글꼴·크기·굵기·줄간격은
+// 아무것도 안 실려 온다. 아래 값은 실제 사이트에서 재 온 것이고, 그림자 안에서
+// 태그별로 다시 적어 준다. 여기 숫자가 곧 '사이트와 같은가'의 기준이다.
+console.log('\n■ 원본 그대로 — 사이트에서 잰 값과 같은가');
+{
+  // 프록시가 실제로 넘겨 주는 모습: class 도 style 도 없다.
+  const BARE = `
+    <h1>2026학년도 9월 1주 주간교육활동</h1>
+    <h2>1. 학사 일정</h2>
+    <h3>가. 전교조회</h3>
+    <p>9월 2일(수) 1교시 체육관</p>
+    <p><small>· 대상: 전교생</small></p>
+    <p><a href="https://example.com">첨부 파일</a></p>
+  `;
+  await pg.evaluate(h => { window.setMode('orig'); window.render(h); }, BARE);
+  const measure = sel => pg.evaluate(s => {
+    const el = document.querySelector('.wk-shadow-host').shadowRoot.querySelector(s);
+    if (!el) return null;
+    const c = getComputedStyle(el);
+    return { ff: c.fontFamily, px: parseFloat(c.fontSize), w: c.fontWeight,
+             lh: parseFloat(c.lineHeight) / parseFloat(c.fontSize), color: c.color };
+  }, sel);
+  const near = (a, b) => Math.abs(a - b) < 0.5;
+
+  // 사이트 값: 본문 'Noto Sans' 500 / 14pt / 줄간격 1.38 / #1C1C1C
+  const p1 = await measure('p');
+  check('본문 글꼴이 사이트와 같다', /Noto Sans/.test(p1.ff) && !/Noto Sans KR/.test(p1.ff), p1.ff);
+  check('본문 크기 14pt', near(p1.px, 14 * 96 / 72), p1.px);
+  check('본문 굵기 500', p1.w === '500', p1.w);
+  check('본문 줄간격 1.38', near(p1.lh * 100, 138), p1.lh);
+  check('본문 글자색 #1C1C1C', p1.color === 'rgb(28, 28, 28)', p1.color);
+
+  const h1 = await measure('h1'), h2 = await measure('h2'), h3 = await measure('h3');
+  check('제목(h1) 36pt · 700', near(h1.px, 36 * 96 / 72) && h1.w === '700', h1);
+  check('소제목(h2) 20pt · 800', near(h2.px, 20 * 96 / 72) && h2.w === '800', h2);
+  check('중제목(h3) 16pt · 600', near(h3.px, 16 * 96 / 72) && h3.w === '600', h3);
+
+  const sm = await measure('small');
+  check('작은 글씨 12.5pt · 400', near(sm.px, 12.5 * 96 / 72) && sm.w === '400', sm);
+
+  const a = await measure('a');
+  check('링크 색 #0041A5', a.color === 'rgb(0, 65, 165)', a.color);
+
+  // 사이트는 좁은 화면에서 제목을 줄인다(36→32→27pt, 20→19→18pt).
+  await pg.setViewportSize({ width: 400, height: 800 });
+  const h1s = await measure('h1'), h2s = await measure('h2');
+  check('좁은 화면에서 제목이 줄어든다',
+        near(h1s.px, 27 * 96 / 72) && near(h2s.px, 18 * 96 / 72), { h1: h1s.px, h2: h2s.px });
+  // 스티키 제목이 배경으로 좌우를 덮어야 뒤 글자가 비쳐 보이지 않는다.
+  // 여백이 16px 로 줄었으니 밀어내는 폭도 16px 이어야 한다.
+  const bleed = await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const host = document.querySelector('.wk-shadow-host');
+    return { h2: r.querySelector('h2').getBoundingClientRect().width,
+             host: host.getBoundingClientRect().width };
+  });
+  check('스티키 제목이 좌우를 꽉 덮는다', near(bleed.h2, bleed.host), bleed);
+  await pg.setViewportSize({ width: 1200, height: 800 });
+  await pg.evaluate(h => { window.setMode('orig'); window.render(h); }, SITE);
 }
 
 console.log('\n■ 전환 막대');

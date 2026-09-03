@@ -281,8 +281,13 @@ console.log('\n■ 연락처 문서 읽기 권한 — 열되, 관리자에게만
   // 여기가 교사 전체로 열리면 '페이지 저장 한 번에 전교생 연락처' 로 되돌아간다.
   check('교사 전체에는 열려 있지 않다',
         !/allow read:[^;]*isYnhsTeacher/.test(stu) && !/allow read:\s*if true/.test(stu), stu);
-  check('교직원 연락처는 여전히 아무도 못 읽는다',
-        /allow read:\s*if false;/.test(blockOf('contactsPhone')), blockOf('contactsPhone'));
+  // 교원 비상연락망은 관리자만 읽는다(학생 연락처와 같은 취급). 예전에는 아무도
+  // 못 읽게 막아 뒀는데, 그러면 관리자도 수정분만 올릴 수가 없어 매번 전체를
+  // 다시 채워야 했다. 교사 전체로 열리는 것만은 그대로 막는다.
+  const cp = blockOf('contactsPhone');
+  check('교직원 연락처는 관리자만 읽는다',
+        /allow read:\s*if isAppAdmin\(\);/.test(cp)
+        && !/allow read:[^;]*isYnhsTeacher/.test(cp), cp);
 
   // 규칙을 아직 안 올렸을 때 원문('Missing or insufficient permissions.') 대신
   // 무엇을 고쳐야 하는지 알려 주는가. 그리고 반쯤 읽은 상태로 남지 않는가.
