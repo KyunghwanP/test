@@ -384,7 +384,7 @@ if ('serviceWorker' in navigator) {
   <div class="tab-panel" id="tab-students">
     <div class="section">
       <div class="section-title">🎒 학생 비상연락망 업로드</div>
-      <div class="section-desc">엑셀(.xlsx)을 올리면 Firestore의 <code>students/main</code>에 저장됩니다. 기존 데이터는 덮어씁니다.</div>
+      <div class="section-desc">엑셀(.xlsx)을 올리면 Firestore의 <code>students/main</code> · <code>studentsContact/main</code>에 저장됩니다. 명단은 통째로 갈아치우고, <b>생년월일·연락처는 적은 사람만</b> 바뀝니다(빈 칸은 저장된 값을 그대로 둡니다).</div>
       <div class="format-box">
         <b>엑셀 형식 안내</b> — 1행은 헤더, 2행부터 데이터<br>
         <code>A: 학년</code> &nbsp;
@@ -410,6 +410,12 @@ if ('serviceWorker' in navigator) {
             <tbody id="stPreviewBody"></tbody>
           </table>
         </div>
+        <div class="status err" id="stWipeWarn" style="display:none;">
+          <div id="stWipeText"></div>
+          <label style="display:block;margin-top:8px;">
+            <input type="checkbox" id="stWipeOk"> 알고 있습니다. 그대로 저장합니다.
+          </label>
+        </div>
         <div class="btn-row">
           <button class="btn btn-primary" id="stUploadBtn">☁️ Firestore에 저장</button>
           <button class="btn btn-secondary" id="stClearBtn">취소</button>
@@ -420,13 +426,32 @@ if ('serviceWorker' in navigator) {
 
     <div class="section">
       <div class="section-title">📋 현재 저장된 학생연락망</div>
-      <div class="section-desc">Firestore에 저장된 학생 목록입니다. <b>다운로드 → 수정(전입생 추가/전출생 삭제) → 재업로드</b> 순서로 학적 변동을 반영하세요.</div>
+      <div class="section-desc">Firestore에 저장된 학생 목록입니다. <b>다운로드 → 수정(전입생 추가/전출생 삭제) → 재업로드</b> 순서로 학적 변동을 반영하세요.<br>
+        내려받은 파일에는 <b>생년월일·연락처가 비어 있습니다</b>(개인정보라 목록에 안 실립니다). 그 칸을 비워 둔 채 올리면 저장된 값이 그대로 남고, 적은 사람만 바뀝니다. 정말 지우려면 그 칸에 <code>-</code> 를 적으세요.</div>
       <div class="stat-chips" id="stDbStats"></div>
       <div class="db-list" id="stDbList"><div style="color:var(--ink-soft);font-size:13px;">불러오는 중...</div></div>
       <div class="btn-row">
         <button class="btn btn-secondary" id="stRefreshDbBtn">🔄 새로고침</button>
         <button class="btn btn-secondary" id="stDownloadBtn">⬇️ 엑셀 다운로드</button>
       </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">♻️ 백업 파일로 되돌리기</div>
+      <div class="section-desc">편성표 탭에서 저장 전에 받은 <code>명렬백업_날짜.json</code> 을 올리면, 그때의 명단·생년월일·연락처로 되돌립니다.
+        지금 저장된 것은 <b>덮어써집니다</b> — 되돌리기 전에 지금 것도 한 번 받아 두세요.</div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="stDumpBtn">⬇️ 지금 상태 백업</button>
+        <button class="btn btn-secondary" id="stRestorePick">📂 백업 파일 고르기</button>
+        <input type="file" id="stRestoreInput" accept=".json" style="display:none;">
+      </div>
+      <div id="stRestoreBox" style="display:none;">
+        <div class="status err" style="display:block;" id="stRestoreInfo"></div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="stRestoreBtn">♻️ 이 백업으로 되돌리기</button>
+        </div>
+      </div>
+      <div class="status" id="stRestoreStatus"></div>
     </div>
 
     <div class="section">
@@ -2318,6 +2343,65 @@ function excelDateToStr(val) {
   return str;
 }
 
+/* ══ 학생 번호·생일이 지워지는 것을 막는다 ═══════════════════════════════
+   '⬇️ 엑셀 다운로드'로 받은 파일에는 생년월일·연락처가 비어 있다. 그 값들은
+   studentsContact 문서에 있고, 목록은 students 문서만 읽기 때문이다. 안내문이
+   '다운로드 → 수정 → 재업로드' 라고 적혀 있어서, 그대로 하면 전교생의 생일과
+   번호가 한 번에 지워진다. 실제로 지워졌고, 그 바람에 앱의 학생 상세가 비고
+   학부모 상담예약이 전부 NOT_FOUND 가 됐다(워커가 생일로 본인 확인을 한다).
+   Spark 요금제라 시점 복구가 없어 되돌릴 수단은 백업 파일뿐이다.
+
+   그래서 교직원 연락망과 같은 방식으로 막는다.
+     · 빈 칸은 저장된 값을 그대로 둔다(같은 자리, 또는 이름+생일로 찾는다).
+     · 정말 지우려면 '-' 를 적는다.
+     · 그래도 지워지는 사람이 있으면 몇 명인지 세어 보여 주고, 확인을 받는다. */
+let stPrevRoster = null, stPrevContact = null;
+const ST_CLEAR_MARKS = ['-', '−', '–', '없음', '삭제'];
+const stSeat = s => `${parseInt(s.grade)}-${parseInt(s.room)}-${parseInt(s.num)}`;
+const stBirth = b => String(b || '').replace(/[.\-\/]/g, '').slice(0, 8);
+
+function stPrevFull() {
+  const cmap = new Map((stPrevContact || []).map(c => [stSeat(c), c]));
+  return (stPrevRoster || []).map(s => ({ ...s, ...(cmap.get(stSeat(s)) || {}) }));
+}
+
+// 빈 칸을 저장된 값으로 채운다. 자리로 먼저 찾고, 반이 바뀐 학생은 이름+생일로
+// 한 번 더 찾는다 — 자리만 보면 반 바뀐 학생이 남처럼 취급돼 번호를 잃는다.
+function stMergeContacts(rows) {
+  const prev = stPrevFull();
+  const bySeat = new Map(prev.map(s => [stSeat(s), s]));
+  const byPerson = new Map();
+  for (const s of prev) {
+    const nm = String(s.name || '').trim();
+    if (nm && s.birth) byPerson.set(`${nm}|${stBirth(s.birth)}`, s);
+  }
+  return rows.map(r => {
+    const old = bySeat.get(stSeat(r))
+             || byPerson.get(`${String(r.name||'').trim()}|${stBirth(r.birth)}`) || {};
+    const out = { ...r };
+    for (const f of STU_CONTACT_FIELDS) {
+      const typed = String(r[f] || '').trim();
+      if (ST_CLEAR_MARKS.includes(typed)) { out[f] = ''; continue; }
+      if (!typed && old[f]) out[f] = old[f];
+    }
+    return out;
+  });
+}
+
+// 병합하고도 지워지는 사람 수. 0 이면 안심하고 저장해도 된다.
+function stWipeCount(rows) {
+  if (!stPrevContact) return null;                 // 아직 못 읽었다
+  const merged = stMergeContacts(rows);
+  const bySeat = new Map(stPrevFull().map(s => [stSeat(s), s]));
+  let n = 0;
+  for (const m of merged) {
+    const old = bySeat.get(stSeat(m));
+    if (!old) continue;
+    if (STU_CONTACT_FIELDS.some(f => old[f] && !m[f])) n++;
+  }
+  return n;
+}
+
 async function processStudentFile(file) {
   setStatus('stStatus', '📂 파일 읽는 중...', 'loading');
   try {
@@ -2345,6 +2429,23 @@ async function processStudentFile(file) {
       return;
     }
 
+    // 저장된 연락처를 먼저 읽는다. 못 읽으면 무엇이 지워지는지 알 수 없으니
+    // 진행을 막는다 — 편성표 탭과 같은 규칙이다.
+    setStatus('stStatus', '☁️ 저장된 연락처와 대조하는 중...', 'loading');
+    try {
+      const [a, b] = await Promise.all([
+        getDoc(doc(db, 'students', 'main')),
+        getDoc(doc(db, 'studentsContact', 'main')),
+      ]);
+      stPrevRoster  = a.exists() ? (a.data().students || []) : [];
+      stPrevContact = b.exists() ? (b.data().students || []) : [];
+    } catch (e) {
+      stParsedData = [];
+      setStatus('stStatus', '저장된 연락처를 읽지 못했습니다: ' + e.message
+        + '\n\n이걸 못 읽으면 빈 칸이 기존 번호를 지우는지 알 수 없어 저장을 막습니다.', 'err');
+      return;
+    }
+
     // 미리보기
     const grades = [...new Set(stParsedData.map(s => s.grade).filter(Boolean))];
     document.getElementById('stStats').innerHTML = `
@@ -2366,22 +2467,44 @@ async function processStudentFile(file) {
       tbody.innerHTML += `<tr><td colspan="8" style="text-align:center;color:var(--ink-soft);padding:10px;">... 외 ${stParsedData.length-50}명</td></tr>`;
     }
     document.getElementById('stPreviewWrap').style.display = '';
+    stRenderWipeWarning();
     clearStatus('stStatus');
   } catch(e) {
     setStatus('stStatus', '파일 읽기 실패: ' + e.message, 'err');
   }
 }
 
+// 지워질 사람이 있으면 몇 명인지 보여 주고 확인을 받는다. 0 명이면 안 띄운다 —
+// 매번 뜨는 경고는 아무도 안 읽는다.
+function stRenderWipeWarning() {
+  const box = document.getElementById('stWipeWarn');
+  const n = stWipeCount(stParsedData);
+  document.getElementById('stWipeOk').checked = false;
+  if (!n) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  document.getElementById('stWipeText').innerHTML =
+    `이대로 저장하면 <b>${n}명</b>의 생년월일·연락처가 지워집니다. `
+    + `되돌릴 방법은 백업 파일뿐입니다(지금 요금제는 시점 복구가 없습니다).<br>`
+    + `번호를 정말 지우려는 것이 아니라면, 그 칸을 <b>비워 두면</b> 저장된 값이 그대로 남습니다.`;
+}
+
 document.getElementById('stUploadBtn').addEventListener('click', async () => {
   if (!stParsedData.length) return;
+  if (document.getElementById('stWipeWarn').style.display !== 'none'
+      && !document.getElementById('stWipeOk').checked) {
+    setStatus('stStatus', '지워지는 사람이 있습니다. 확인란에 체크해야 저장됩니다.', 'err');
+    return;
+  }
   const btn = document.getElementById('stUploadBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>저장 중...';
   setStatus('stStatus', '☁️ Firestore에 저장하는 중...', 'loading');
   try {
-    await saveSplit('students', 'students', 'studentsContact', stParsedData,
+    // 빈 칸은 저장된 값을 그대로 둔다. 이 한 줄이 없어서 전교생 연락처가 날아갔다.
+    const merged = stMergeContacts(stParsedData);
+    await saveSplit('students', 'students', 'studentsContact', merged,
                     STU_CONTACT_FIELDS, ['grade', 'room', 'num']);
-    setStatus('stStatus', `✅ ${stParsedData.length}명 저장 완료!`, 'ok');
+    setStatus('stStatus', `✅ ${merged.length}명 저장 완료!`, 'ok');
     loadDbStudents();
   } catch(e) {
     setStatus('stStatus', '저장 실패: ' + e.message, 'err');
@@ -2391,8 +2514,89 @@ document.getElementById('stUploadBtn').addEventListener('click', async () => {
   }
 });
 
+/* ══ 백업 파일로 되돌리기 ═════════════════════════════════════════════════
+   Spark 요금제는 시점 복구가 없다. 잘못 덮어쓰면 백업 파일이 유일한 되돌리기
+   수단인데, 정작 그 파일을 되돌려 넣을 자리가 없었다. 편성표 탭이 만드는
+   명렬백업_*.json 을 그대로 받아 두 문서에 다시 넣는다.
+   백업 안의 studentsContact 는 이미 '연락처만' 담긴 모양이라, 명렬과 합쳐
+   한 사람으로 만든 뒤 저장 때 다시 나눈다 — 저장 경로를 하나로 유지한다. */
+let stRestoreData = null;
+
+document.getElementById('stDumpBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('stDumpBtn');
+  btn.disabled = true;
+  try {
+    const [a, b] = await Promise.all([
+      getDoc(doc(db, 'students', 'main')),
+      getDoc(doc(db, 'studentsContact', 'main')),
+    ]);
+    const blob = new Blob([JSON.stringify({
+      savedAt: new Date().toISOString(),
+      students: a.exists() ? (a.data().students || []) : [],
+      studentsContact: b.exists() ? (b.data().students || []) : [],
+    }, null, 1)], { type: 'application/json' });
+    const el = document.createElement('a');
+    el.href = URL.createObjectURL(blob);
+    el.download = `명렬백업_${new Date().toISOString().slice(0,10)}.json`;
+    el.click(); URL.revokeObjectURL(el.href);
+    setStatus('stRestoreStatus', '✅ 지금 상태를 내려받았습니다.', 'ok');
+  } catch (e) {
+    setStatus('stRestoreStatus', '백업 실패: ' + e.message, 'err');
+  } finally { btn.disabled = false; }
+});
+
+document.getElementById('stRestorePick').addEventListener('click',
+  () => document.getElementById('stRestoreInput').click());
+
+document.getElementById('stRestoreInput').addEventListener('change', async (ev) => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  try {
+    const j = JSON.parse(await file.text());
+    const roster  = Array.isArray(j.students) ? j.students : [];
+    const contact = Array.isArray(j.studentsContact) ? j.studentsContact : [];
+    if (!roster.length) throw new Error('students 목록이 비어 있습니다.');
+    const cmap = new Map(contact.map(c => [stSeat(c), c]));
+    stRestoreData = roster.map(s => ({ ...s, ...(cmap.get(stSeat(s)) || {}) }));
+    const withBirth = stRestoreData.filter(s => s.birth).length;
+    const withPhone = stRestoreData.filter(s =>
+      s.phone || s.fatherPhone || s.motherPhone).length;
+    document.getElementById('stRestoreInfo').innerHTML =
+      `<b>${psEsc(file.name)}</b> — ${j.savedAt ? psEsc(String(j.savedAt).slice(0,19).replace('T',' ')) : '시각 없음'}<br>`
+      + `학생 <b>${stRestoreData.length}명</b> · 생년월일 있는 사람 <b>${withBirth}명</b> · 연락처 있는 사람 <b>${withPhone}명</b><br>`
+      + `누르면 지금 저장된 명단·연락처를 <b>이것으로 덮어씁니다.</b>`;
+    document.getElementById('stRestoreBox').style.display = '';
+    clearStatus('stRestoreStatus');
+  } catch (e) {
+    stRestoreData = null;
+    document.getElementById('stRestoreBox').style.display = 'none';
+    setStatus('stRestoreStatus', '백업 파일을 읽지 못했습니다: ' + e.message, 'err');
+  } finally { ev.target.value = ''; }
+});
+
+document.getElementById('stRestoreBtn').addEventListener('click', async () => {
+  if (!stRestoreData) return;
+  const btn = document.getElementById('stRestoreBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>되돌리는 중...';
+  setStatus('stRestoreStatus', '☁️ 되돌리는 중...', 'loading');
+  try {
+    await saveSplit('students', 'students', 'studentsContact', stRestoreData,
+                    STU_CONTACT_FIELDS, ['grade', 'room', 'num']);
+    setStatus('stRestoreStatus', `✅ ${stRestoreData.length}명으로 되돌렸습니다.`, 'ok');
+    document.getElementById('stRestoreBox').style.display = 'none';
+    stRestoreData = null;
+    loadDbStudents();
+  } catch (e) {
+    setStatus('stRestoreStatus', '되돌리기 실패: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false; btn.innerHTML = '♻️ 이 백업으로 되돌리기';
+  }
+});
+
 document.getElementById('stClearBtn').addEventListener('click', () => {
   stParsedData = [];
+  document.getElementById('stWipeWarn').style.display = 'none';
   document.getElementById('stPreviewWrap').style.display = 'none';
   stFileInput.value = '';
   clearStatus('stStatus');

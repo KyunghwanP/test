@@ -59,6 +59,7 @@ PS_FILE=/tmp/pyeonseong.xlsx node tests/upload-pyeonseong-page.test.mjs
 
 ```bash
 node tests/upload-staff-contact-guard.test.mjs      # 편성표 파일 필요 없음
+node tests/upload-student-contact-guard.test.mjs   # 학생 명렬 재업로드에 생일·번호가 안 지워지는가 + 백업 되돌리기
 ```
 
 내려받은 파일에는 휴대폰이 **비어 있다** — 번호는 `contactsPhone` 에 있고 규칙이
