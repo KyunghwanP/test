@@ -9177,6 +9177,8 @@ const WK_SHADOW_CSS = `
         피해 준다. 안 되는 브라우저는 그냥 무시한다.
      ②(자간 조이기)와 ④(기호 뒤 내어쓰기)는 폭을 재야 해서 JS(wkPlusTune)가
         맡는다. CSS 로는 잴 방법이 없다. */
+  /* <br> 를 갈라 만든 줄 상자. 원래 줄바꿈과 같아 보이도록 여백을 안 준다. */
+  .wk-plus .wk-line{display:block;margin:0;padding:0;}
   .wk-plus p, .wk-plus li, .wk-plus small, .wk-plus td, .wk-plus div{
     word-break:keep-all;
     overflow-wrap:break-word;
@@ -9267,6 +9269,47 @@ function wkBlockOf(node){
     el = el.parentElement;
   }
   return null;
+}
+
+// <br> 로만 나뉜 줄들은 한 상자 안에 있다. 내어쓰기(text-indent)는 상자의 첫
+// 줄에만 걸리므로, 그런 상자에서는 첫 줄만 맞고 나머지는 안 먹는다 — 화면에서
+// 잘 되는 줄과 안 되는 줄이 번갈아 보이던 이유가 이것이다.
+// 그래서 줄마다 상자를 하나씩 만들어 준다. Range 로 잘라 내면 span·링크 같은
+// 안쪽 구조가 그대로 따라온다(직접 옮기면 색·링크가 끊긴다).
+const WK_INLINE = /^(SPAN|A|B|I|U|EM|STRONG|FONT|SUB|SUP|CODE|MARK|BR)$/;
+function wkLineBox(el){
+  let n = el;
+  while(n && WK_INLINE.test(n.tagName)) n = n.parentElement;
+  return n;
+}
+function wkSplitBr(root){
+  const boxes = new Set();
+  for(const br of root.querySelectorAll('br')){
+    const box = wkLineBox(br.parentElement);
+    if(box && box !== root) boxes.add(box);
+  }
+  for(const box of boxes){
+    const lines = [];
+    let br;
+    while((br = box.querySelector('br'))){
+      const r = document.createRange();
+      r.setStart(box, 0);
+      r.setEndBefore(br);
+      lines.push(r.extractContents());
+      br.remove();
+    }
+    const tail = document.createRange();
+    tail.selectNodeContents(box);
+    lines.push(tail.extractContents());
+    for(const frag of lines){
+      const line = document.createElement('div');
+      line.className = 'wk-line';
+      line.appendChild(frag);
+      // 빈 줄은 원래 자리를 지켜야 한다 — 그냥 두면 통째로 사라진다.
+      if(!line.textContent.trim()) line.appendChild(document.createElement('br'));
+      box.appendChild(line);
+    }
+  }
 }
 
 // 제목은 손대지 않는다. 내어쓰기도 양쪽 맞춤도 본문 줄에나 어울리는 것이지,
@@ -9811,6 +9854,8 @@ function renderContent(html){
     const st = document.createElement('style');
     st.textContent = WK_SHADOW_CSS;
     div.className = 'wk-doc' + (plus ? ' wk-plus' : '');
+    // 구조를 바꾸는 일이라 그릴 때 한 번만 한다(리사이즈마다 다시 하면 안 된다).
+    if(plus) wkSplitBr(div);
     wkGroupDepts(div);
     sh.append(st, div);
     wrap.appendChild(host);

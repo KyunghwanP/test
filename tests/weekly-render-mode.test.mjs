@@ -131,6 +131,9 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grabConst('WK_OPEN')}
   ${grabConst('WK_TOKEN')}
   ${grab('wkBlockOf')}
+  ${grabConst('WK_INLINE')}
+  ${grab('wkLineBox')}
+  ${grab('wkSplitBr')}
   ${grabConst('wkIsHead')}
   ${grab('wkLeadLen')}
   ${grab('wkFirstTextX')}
@@ -477,6 +480,10 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
     <!-- 소제목. 번호로 시작하고 &nbsp; 로 들여쓴 모양이 본문 줄과 똑같지만,
          제목은 한 덩어리라 내어쓰기도 양쪽 맞춤도 걸면 안 된다. -->
     <h3><span>\u00A0\u00A001.</span><span> 9월 3차 정보 공시 내용 입력과 각 부서 확인 절차 안내</span></h3>
+    <!-- 여러 줄이 <br> 로 한 상자에 들어오는 모양. 내어쓰기는 상자의 첫 줄에만
+         걸리므로, 가르지 않으면 둘째 줄부터는 안 먹는다. 화면에서 잘 되는 줄과
+         안 되는 줄이 번갈아 보이던 이유가 이것이다. -->
+    <p class="multi"><span>\u00A0■</span><span> 1,2학년 33개 동아리 활동에 대한 안내이며 자세한 내용은 아래를 보십시오</span><br><span>\u00A0·</span><span> 예산 배정: 아래 시트참조(공개 여부: 부분공개-예산파일, 10월 2주까지 신청마감)</span><br><span>\u00A0·</span><span> 문의는 담당 부서로 주시기 바라며 기한을 꼭 지켜 주시기 바랍니다</span></p>
     <h2><span>행정실</span></h2>
     <p><span>·</span><span> 물품 구입 신청은 9. 5.(금)까지 제출해 주시기 바랍니다</span></p>
   `;
@@ -546,7 +553,7 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
   const marked = plus.hang.filter(h => '·■'.includes(h.mark));
   const plain = plus.hang.filter(h => !'·■'.includes(h.mark));
   check('④ 기호로 시작하는 줄은 기호 뒤로 내어쓴다',
-        marked.length === 4 && marked.every(h => h.ml > 0 && h.ti === -h.ml), plus.hang);
+        marked.length >= 4 && marked.every(h => h.ml > 0 && h.ti === -h.ml), plus.hang);
   // 기호가 자기 혼자 조각을 차지하는 모양('<span>·</span><span> 대상…')이 실제
   // 사이트가 보내는 모양이다. 이걸 놓쳐서 두 번 안 먹었다.
   check('④ 기호가 딴 조각에 떨어져 있어도 잡는다', await pg.evaluate(() => {
@@ -565,6 +572,26 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
       .every(e => parseFloat(e.style.marginLeft) > 0);
   }));
   // 앞머리가 아예 없는 줄은 그대로 둔다. (여는 괄호·숫자 소제목은 따로 본다)
+  // <br> 로 한 상자에 여러 줄이 들어오면 내어쓰기가 첫 줄에만 걸린다.
+  // 줄마다 상자를 만들어 줘야 전부 먹는다.
+  check('④ <br> 로 이어 붙은 줄도 전부 맞춘다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const box = r.querySelector('.multi');
+    const lines = [...box.querySelectorAll('.wk-line')];
+    return { n: lines.length, br: box.querySelectorAll('br').length,
+             ml: lines.map(e => Math.round(parseFloat(e.style.marginLeft) || 0)),
+             txt: lines.map(e => e.textContent.trim().slice(0, 6)) };
+  }).then(v => v.n === 3 && v.br === 0 && v.ml.every(m => m > 0)));
+  check('④ 가른 줄의 글이 순서대로 남는다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const lines = [...r.querySelectorAll('.multi .wk-line')];
+    return lines.length === 3
+        && /1,2학년 33개/.test(lines[0].textContent)
+        && /예산 배정/.test(lines[1].textContent)
+        && /문의는 담당/.test(lines[2].textContent)
+        // 색·링크 같은 안쪽 구조가 끊기면 안 된다
+        && lines[1].querySelectorAll('span').length >= 2;
+  }));
   check('제목에는 내어쓰기·양쪽 맞춤을 걸지 않는다', await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
     return [...r.querySelectorAll('h1, h2, h3, h4')]
