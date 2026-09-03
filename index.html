@@ -9166,6 +9166,19 @@ const WK_SHADOW_CSS = `
   .wk-doc > *:not(section),
   section.wk-dept > *{padding-left:var(--wk-pad);padding-right:var(--wk-pad);}
 
+  /* 목록은 따로 봐야 한다. 사이트는 글머리 줄을 <ul><li><p> 로 보내고 글머리
+     모양(■)은 class 로 정하는데, 그 class 가 프록시를 못 넘어온다. 게다가 위
+     규칙이 ul 의 기본 안쪽 여백(40px)까지 덮어써서 글머리표가 상자 밖으로
+     밀려나 아예 안 보였다 — 화면에서 ■ 가 통째로 사라진 이유다.
+     ul 마다 붙는 기본 위아래 여백(18.7px)도 걷는다. 한 줄이 <ul> 하나씩으로
+     오기 때문에 그대로 두면 줄 사이가 유난히 벌어진다. */
+  .wk-doc ul, .wk-doc ol{margin:0;}
+  section.wk-dept > ul, section.wk-dept > ol,
+  .wk-doc > ul, .wk-doc > ol{padding-left:calc(var(--wk-pad) + 1.7em);}
+  .wk-doc ul{list-style-type:square;}
+  .wk-doc ul ul{list-style-type:circle;}
+  .wk-doc li{margin:0;}
+
   /* ── '원본+' 만의 손질 ────────────────────────────────────────────
      ① 양쪽 맞춤은 넣었다가 뺐다. 한글에서 이건 어절 사이 공백을 늘려 줄 끝을
         맞추는 방식이라 좁은 화면에서 띄어쓰기가 흉하게 벌어진다. 글자 사이로도
@@ -9330,19 +9343,24 @@ function wkLead(text){
 // 머리 기호로 단계를 정한다. 사이트의 &nbsp; 개수는 사람이 손으로 넣은 것이라
 // 같은 단계인데도 줄마다 제각각이다 — 그걸 그대로 존중하면 열이 안 맞는다.
 // 기호가 곧 단계다: ■ 가 한 칸, · - ※ 숫자 가 두 칸.
-const WK_LEVEL = [['■▪▫◾◼□', 1], ['·∙•◦○●-–—※*▶►◆◇', 2]];
+// 기호가 곧 단계다. 네모가 첫 칸, 점이 그 안, 줄표·별표는 점에 딸린 말이라
+// 한 칸 더 안으로 들어간다. 번호(1. 가. ①)는 점과 같은 칸이다.
+const WK_LEVEL = [
+  ['■▪▫◾◼□▣', 1],
+  ['·∙•◦○●▶►◆◇', 2],
+  ['-–—※*☞', 3],
+];
 const WK_STEP = 1.15;                  // 한 단계에 글자 폭 몇 개
-// 기호 없는 줄은 원칙적으로 안 민다. 다만 한 상자를 <br> 로 가른 뒤따르는 줄은
-// 앞 줄에서 이어지는 말이므로 앞 줄 단계를 물려받는다 — 거기서 왼쪽 끝으로
-// 떨어뜨리면 딸린 말이 남처럼 보인다.
+// 기호 없는 줄은 앞 줄 단계를 물려받는다. '(학생이 직접 …)' 같은 줄은 바로 위
+// 항목에 딸린 말인데, 왼쪽 끝으로 떨어뜨리면 남처럼 보인다. 단계는 부서 이름
+// (제목)에서 0 으로 되돌아가므로 앞 부서 것이 넘어오지 않는다.
 function wkLevelOf(block, tok, prev){
-  if(!tok){
-    const cont = block.classList?.contains('wk-line')
-              && block.previousElementSibling?.classList?.contains('wk-line');
-    return cont ? prev : 0;
-  }
+  if(!tok) return prev;
   for(const [chars, lv] of WK_LEVEL) if(chars.includes(tok[0])) return lv;
-  return 2;                            // 1. 가. ① 같은 번호
+  // 번호(1. 가. ①)는 이 문서에서 소제목으로 쓰인다 — '1. 교내 환경 정화' 아래에
+  // 글머리 항목들이 딸린다. 그러니 맨 앞 칸이다. 안으로 밀면 위계가 뒤집혀
+  // 소제목이 제 항목들보다 더 안쪽에 놓인다.
+  return 0;
 }
 
 // 앞 공백을 지운다. 지우지 않으면 그 폭만큼 줄마다 다르게 밀려 열이 안 맞는다.
@@ -9393,6 +9411,8 @@ function wkHangIndent(root){
     seen.add(block);                    // 줄마다 한 번만 본다
     seenCount++;
     if(wkIsHead(block)){ prev = 0; continue; }
+    // 목록 안의 줄은 ul 이 이미 자리를 잡아 준다. 여기서 또 밀면 두 번 들어간다.
+    if(block.closest && block.closest('li')){ prev = 1; continue; }
     const lead = wkLead(block.textContent || '');
     const level = wkLevelOf(block, lead.tok, prev);
     prev = level;

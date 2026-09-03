@@ -467,7 +467,7 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
     <h2><span>교무기획부</span></h2>
     <p><span>·</span><span> 2학기 학생 학부모 상담주간 운영에 관한 안내입니다 협조 부탁드립니다</span></p>
     <div><span>■</span><span> 대상: 전 교직원과 학부모 및 관련 부서 담당자 전원이 참여합니다</span></div>
-    <div><span style="color:#c00">· 장소: 각 학급 교실 또는 상담실을 이용해 주시기 바랍니다</span></div>
+    <p><span>·</span><span> 장소: 각 학급 교실 또는 상담실을 이용해 주시기 바랍니다</span></p>
     <p><span>「</span><span>초·중등교육법」 개정에 따른 안내이며 여는 괄호로 시작하는 줄입니다</span></p>
     <p><span>01_</span><span>2학기 영어듣기평가 안내</span></p>
     <!-- 사이트는 들여쓰기를 &nbsp; 로 한다. 그건 줄바꿈에서 사라지지 않아서
@@ -496,6 +496,12 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
     <p class="col"><span>\u00A0\u00A0\u00A0■</span><span> 내용: 수밭골 늦반딧불이 탐사</span></p>
     <p class="col2"><span>·</span><span> 대상: 1학년 희망자 20명</span></p>
     <p class="col2"><span>\u00A0\u00A0·</span><span> 참가신청: 8.20.(목)~8.25.(화)</span></p>
+    <p class="col3"><span>-</span><span> 준비물은 개별 안내합니다</span></p>
+    <p class="col3"><span>\u00A0\u00A0※</span><span> 우천 시 순연됩니다</span></p>
+    <!-- 진단이 보여 준 실제 모양. 글머리 줄이 <ul><li><p> 로 오고, 한 줄이
+         <ul> 하나씩이다. 글머리 모양(■)은 class 에 있어 프록시를 못 넘어온다. -->
+    <ul><li dir="ltr"><p dir="ltr" style="background-color: transparent;"><span style="color:#000000; font-weight:700">아침 8시 교실 환기하면서 청소 실시</span></p></li></ul>
+    <ul><li dir="ltr"><p dir="ltr" style="background-color: transparent;"><span style="color:#000000; font-weight:700">교실, 복도 구석구석 깨끗하게 쓸기, 밀대 빨아 닦기</span></p></li></ul>
     <h2><span>행정실</span></h2>
     <p><span>·</span><span> 물품 구입 신청은 9. 5.(금)까지 제출해 주시기 바랍니다</span></p>
   `;
@@ -608,7 +614,7 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
   }));
   // 이게 '열이 안 맞는다' 에 대한 답이다. 같은 기호는 &nbsp; 가 몇 개였든
   // 같은 자리에서 시작해야 한다.
-  check('④ 같은 기호끼리 열이 맞는다', await pg.evaluate(() => {
+  check('④ 같은 기호끼리 열이 맞고, 기호마다 단계가 다르다', await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
     const leftOf = el => {
       const rg = document.createRange(); rg.selectNodeContents(el);
@@ -616,31 +622,77 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
     };
     const a = [...r.querySelectorAll('.col')].map(leftOf);
     const b = [...r.querySelectorAll('.col2')].map(leftOf);
-    return { a, b, ok: a.length === 3 && b.length === 2
-             && new Set(a).size === 1 && new Set(b).size === 1
-             && b[0] > a[0] };            // · 는 ■ 보다 한 단계 더 안쪽
+    const c = [...r.querySelectorAll('.col3')].map(leftOf);
+    return { a, b, c, ok: a.length === 3 && b.length === 2 && c.length === 2
+             && new Set(a).size === 1 && new Set(b).size === 1 && new Set(c).size === 1
+             // ■ → · → - ※ 순으로 한 칸씩 더 안쪽
+             && b[0] > a[0] && c[0] > b[0] };
   }).then(v => v.ok));
+  // 글머리(■)가 통째로 사라지던 자리. 좌우 여백 규칙이 ul 의 기본 안쪽 여백을
+  // 덮어써서 글머리표가 상자 밖으로 밀려나 있었다.
+  // 번호는 소제목이다. 제 항목들보다 안으로 들어가면 위계가 뒤집힌다.
+  check('④ 번호 소제목은 제 항목들보다 앞 칸에 선다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const num = [...r.querySelectorAll('p')].find(e => /물리학 실험/.test(e.textContent));
+    const ul = r.querySelector('ul');
+    const box = e => { const rg = document.createRange(); rg.selectNodeContents(e);
+                       return Math.round([...rg.getClientRects()].filter(x => x.width > 0.5)[0].left); };
+    return !!num && !!ul && box(num) < box(ul);
+  }));
+  check('④ 목록의 글머리표가 보인다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const uls = [...r.querySelectorAll('ul')];
+    if (uls.length !== 2) return false;
+    return uls.every(ul => {
+      const cs = getComputedStyle(ul);
+      const li = ul.querySelector('li');
+      // 글머리표가 그려질 자리가 상자 안에 있어야 한다
+      return parseFloat(cs.paddingLeft) > 16
+          && getComputedStyle(li).listStyleType === 'square'
+          && ul.getBoundingClientRect().left >= 0;
+    });
+  }));
+  check('④ 목록 줄에 여백을 두 번 주지 않는다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    return [...r.querySelectorAll('li p')].every(e => !e.style.marginLeft);
+  }));
+  check('④ 목록 줄끼리 유난히 벌어지지 않는다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const uls = [...r.querySelectorAll('ul')];
+    return uls.every(u => parseFloat(getComputedStyle(u).marginTop) === 0);
+  }));
   check('제목에는 내어쓰기·양쪽 맞춤을 걸지 않는다', await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
     return [...r.querySelectorAll('h1, h2, h3, h4')]
       .every(e => !e.style.marginLeft && !e.style.textIndent && !e.style.textAlign);
   }));
-  check('④ 앞머리가 없는 줄은 건드리지 않는다', await pg.evaluate(() => {
+  // 기호 없는 줄은 앞 줄에 딸린 말이다. '(학생이 직접 …)' 처럼 여는 괄호로
+  // 시작하는 줄이 왼쪽 끝으로 떨어지면 남처럼 보인다 — 앞 줄 단계를 물려받되,
+  // 내어쓰기(기호 폭)는 없다.
+  check('④ 앞머리 없는 줄은 앞 줄 단계를 물려받는다', await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
-    const el = [...r.querySelectorAll('p')].find(e => /평범한 줄/.test(e.textContent));
-    return !!el && !el.style.marginLeft && !el.style.textIndent;
+    const paren = [...r.querySelectorAll('p')].find(e => e.textContent.startsWith('「'));
+    const prev = paren?.previousElementSibling;   // · 로 시작하는 줄
+    return !!paren && !!prev
+        && parseFloat(paren.style.marginLeft) > 0
+        && !parseFloat(paren.style.textIndent || 0)
+        && Math.abs(parseFloat(paren.style.marginLeft)
+                    - (parseFloat(prev.style.marginLeft) + parseFloat(prev.style.textIndent))) < 1;
   }), plus.hang);
-  // 「초·중등교육법」 같은 줄이 통째로 밀려나면 안 된다.
-  check('④ 여는 괄호로 시작하는 줄은 밀지 않는다', await pg.evaluate(() => {
+  // 부서 이름을 지나면 단계가 0 으로 돌아간다 — 앞 부서 것이 넘어오면 안 된다.
+  check('④ 부서가 바뀌면 단계가 처음으로 돌아간다', await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
-    const el = [...r.querySelectorAll('p')].find(e => e.textContent.startsWith('「'));
-    return !!el && !el.style.marginLeft;
+    const h = [...r.querySelectorAll('h2')].pop();
+    const first = h.nextElementSibling;
+    return !!first && parseFloat(first.style.marginLeft) > 0;   // · 줄이라 2단계
   }));
-  // 숫자로 시작하는 소제목(01_…)도 기호가 아니다.
-  check('④ 숫자로 시작하는 줄도 건드리지 않는다', await pg.evaluate(() => {
+  // 여는 괄호와 숫자 소제목(01_)은 머리 기호가 아니다. 단계는 앞 줄을 따라가되
+  // 내어쓰기(기호 폭만큼 당기는 것)는 주면 안 된다 — 기호가 없으니 당길 것도 없다.
+  check('④ 여는 괄호·숫자 소제목에는 내어쓰기를 주지 않는다', await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
-    const el = [...r.querySelectorAll('p')].find(e => e.textContent.startsWith('01_'));
-    return !!el && !el.style.marginLeft;
+    const els = [...r.querySelectorAll('p')]
+      .filter(e => e.textContent.startsWith('「') || e.textContent.startsWith('01_'));
+    return els.length === 2 && els.every(e => !parseFloat(e.style.textIndent || 0));
   }));
   // 첫 줄만 &nbsp; 로 들어가 있고 넘어간 줄은 맨 왼쪽까지 튀어나가던 줄.
   // 앞 공백까지 재야 맞는다 — 기호 폭만 재면 한참 모자란다.
