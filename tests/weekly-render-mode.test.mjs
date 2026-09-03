@@ -23,17 +23,25 @@ const grab = name => {
   }
   throw new Error('닫는 괄호 못 찾음: ' + name);
 };
+// 괄호 깊이를 세어 선언 끝의 ';' 을 찾는다. 정규식 리터럴 안의 괄호까지 세면
+// 깊이가 틀어져 뒤 코드를 통째로 삼킨다 — 실제로 두 번 당했다. 그래서 문자열과
+// 정규식은 건너뛴다. '/' 가 나눗셈인지 정규식 시작인지는 바로 앞 글자로 가린다.
 const grabConst = name => {
   const m = new RegExp(`^const ${name} = `, 'm').exec(HTML);
   if (!m) throw new Error('못 찾음(const): ' + name);
-  let d = 0, q = null;
+  let d = 0, q = null, re = false, prev = '';
   for (let j = m.index; j < HTML.length; j++) {
     const c = HTML[j];
+    if (re) { if (c === '\\') j++; else if (c === '[') re = 'cls';
+              else if (c === ']' && re === 'cls') re = true;
+              else if (c === '/' && re !== 'cls') re = false; continue; }
     if (q) { if (c === '\\') j++; else if (c === q) q = null; continue; }
     if (c === '"' || c === "'" || c === '`') { q = c; continue; }
+    if (c === '/' && '=(,:[!&|?{};\n'.includes(prev)) { re = true; continue; }
     if ('{[('.includes(c)) d++;
     else if (')]}'.includes(c)) d--;
     else if (c === ';' && d === 0) return HTML.slice(m.index, j + 1);
+    if (!/\s/.test(c)) prev = c;
   }
   throw new Error('끝을 못 찾음(const): ' + name);
 };
@@ -121,6 +129,7 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grabConst('wkIsOrig')}
   ${grabConst('WK_SHADOW_CSS')}
   ${grabConst('WK_MARK')}
+  ${grab('wkIsLine')}
   ${grab('wkHangIndent')}
   ${grabConst('WK_TIGHTEN')}
   ${grab('wkTightenTails')}
@@ -430,11 +439,14 @@ console.log('\n■ 부서 구분');
 console.log('\n■ 원본+ — 읽기 편하게 손본 것');
 {
   await pg.setViewportSize({ width: 420, height: 900 });
+  // 프록시가 넘겨 주는 줄은 p 일 때도 div 일 때도 있고, 안에 span 이 끼기도 한다.
+  // 태그 이름으로 고르면 div 로 온 줄이 통째로 빠진다 — 그래서 섞어 둔다.
   const LONG = `
     <h1>2026학년도 9월 1주</h1>
     <h2>교무기획부</h2>
     <p>· 2학기 학생 학부모 상담주간 운영에 관한 안내입니다 협조 부탁드립니다</p>
-    <p>■ 대상: 전 교직원과 학부모 및 관련 부서 담당자 전원이 참여합니다</p>
+    <div>■ 대상: 전 교직원과 학부모 및 관련 부서 담당자 전원이 참여합니다</div>
+    <div><span style="color:#c00">· 장소: 각 학급 교실 또는 상담실을 이용해 주시기 바랍니다</span></div>
     <p>짧은 줄</p>
     <h2>행정실</h2>
     <p>· 물품 구입 신청은 9. 5.(금)까지 제출해 주시기 바랍니다</p>
@@ -443,7 +455,7 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
     await pg.evaluate(([m, h]) => { window.setMode(m); window.render(h); }, [mode, LONG]);
     return pg.evaluate(() => {
       const r = document.querySelector('.wk-shadow-host').shadowRoot;
-      const ps = [...r.querySelectorAll('p')];
+      const ps = [...r.querySelectorAll('p, div')].filter(e => wkIsLine(e));
       const c = ps.map(el => getComputedStyle(el));
       return {
         align: c.map(x => x.textAlign),
@@ -459,12 +471,20 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
   };
 
   const plus = await readOrig('plus');
-  check('① 양쪽 맞춤', plus.align.every(a => a === 'justify'), plus.align);
+  // ① 양쪽 맞춤은 넣었다가 뺐다 — 좁은 화면에서 어절 사이가 흉하게 벌어진다.
+  check('① 양쪽 맞춤은 하지 않는다', plus.align.every(a => a !== 'justify'), plus.align);
   check('③ 어절 단위로 끊는다', plus.brk.every(b => b === 'keep-all'), plus.brk);
   const marked = plus.hang.filter(h => '·■'.includes(h.mark));
   const plain = plus.hang.filter(h => !'·■'.includes(h.mark));
   check('④ 기호로 시작하는 줄은 기호 뒤로 내어쓴다',
-        marked.length === 3 && marked.every(h => h.ml > 0 && h.ti === -h.ml), plus.hang);
+        marked.length === 4 && marked.every(h => h.ml > 0 && h.ti === -h.ml), plus.hang);
+  // div 로 온 줄이 빠지면 여기서 걸린다 — 태그 이름으로 고르던 시절의 버그다.
+  check('④ p 든 div 든 가리지 않는다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    return [...r.querySelectorAll('div')]
+      .filter(e => wkIsLine(e) && '·■'.includes(e.textContent.trim()[0]))
+      .every(e => parseFloat(e.style.marginLeft) > 0);
+  }));
   check('④ 기호가 없는 줄은 건드리지 않는다',
         plain.every(h => h.ml === 0 && h.ti === 0), plus.hang);
   check('② 자간을 조여도 -0.03em 을 넘지 않는다',
@@ -488,7 +508,7 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
     const box = document.createElement('div');
     const p = document.createElement('p');
     p.textContent = '2학기 학생 학부모 상담주간 운영 협조 안내드립니다';
-    p.style.cssText = 'text-align:justify;word-break:keep-all;margin:0;';
+    p.style.cssText = 'word-break:keep-all;margin:0;';
     box.style.cssText = 'position:absolute;visibility:hidden;';
     box.appendChild(p); r.querySelector('.wk-plus').appendChild(box);
     // 한 줄일 때의 폭보다 1.5% 만 좁히면 한두 글자가 넘어간다
@@ -508,7 +528,7 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
   // 손질은 '원본+' 만의 것이다. '원본' 은 사이트 그대로여야 한다.
   const orig = await readOrig('orig');
   check('원본은 그대로 둔다',
-        orig.align.every(a => a !== 'justify') && orig.brk.every(b => b !== 'keep-all')
+        orig.brk.every(b => b !== 'keep-all')
         && orig.hang.every(h => h.ml === 0) && orig.ls.every(v => v === ''), orig);
 
   await pg.setViewportSize({ width: 1200, height: 800 });

@@ -9167,21 +9167,17 @@ const WK_SHADOW_CSS = `
   section.wk-dept > *{padding-left:var(--wk-pad);padding-right:var(--wk-pad);}
 
   /* ── '원본+' 만의 손질 ────────────────────────────────────────────
-     ① 양쪽 맞춤. 한글에서 이건 어절 사이 공백을 늘려 줄 끝을 맞추는 방식이라,
-        ③ 과 짝지어야 벌어짐이 덜하다.
+     ① 양쪽 맞춤은 넣었다가 뺐다. 한글에서 이건 어절 사이 공백을 늘려 줄 끝을
+        맞추는 방식이라 좁은 화면에서 띄어쓰기가 흉하게 벌어진다. 글자 사이로도
+        나눠 주는 text-justify:inter-character 는 2026-09 크로미움·사파리 모두
+        아직 안 듣는다(재 봤다). 그래서 어색한 채로 남아 다시 뺐다.
      ③ 어절 단위 줄바꿈(word-break:keep-all). 한글이 단어 한가운데서 끊기지
         않는다. 대신 긴 링크 주소가 상자를 뚫으므로 overflow-wrap 으로 막는다.
      text-wrap:pretty 는 마지막 줄에 한 낱말만 덜렁 남는 것을 브라우저가 알아서
         피해 준다. 안 되는 브라우저는 그냥 무시한다.
      ②(자간 조이기)와 ④(기호 뒤 내어쓰기)는 폭을 재야 해서 JS(wkPlusTune)가
         맡는다. CSS 로는 잴 방법이 없다. */
-  .wk-plus p, .wk-plus li, .wk-plus small, .wk-plus td{
-    text-align:justify;
-    /* 어절 사이만 벌리면 좁은 화면에서 띄어쓰기가 흉하게 넓어진다. 한글 프로그램
-       처럼 글자 사이로도 나눠 달라는 뜻인데, 2026-09 크로미움에서 재 보니 아직
-       듣지 않는다(모양이 그대로다). 사파리도 이 속성을 모른다. 맞는 선언이라
-       남겨 두되, 이게 켜져 있다고 좁은 화면의 벌어짐이 해결된 것은 아니다. */
-    text-justify:inter-character;
+  .wk-plus p, .wk-plus li, .wk-plus small, .wk-plus td, .wk-plus div{
     word-break:keep-all;
     overflow-wrap:break-word;
     text-wrap:pretty;
@@ -9251,10 +9247,22 @@ const WK_SHADOW_CSS = `
 //    안 맞는다. 실제 기호를 잠깐 span 에 담아 재고 바로 걷어낸다.
 //    padding 이 아니라 margin 을 쓴다 — 좌우 여백(--wk-pad)이 padding 으로 들어와
 //    있어서, padding 을 덮으면 그 여백이 통째로 날아간다.
-const WK_MARK = /^\s*((?:[·∙•■▪□▫○◦◆◇▶►※*]|[-–—])+[ \t]*)/;
+const WK_MARK = /^[\s\u00A0]*((?:[·∙•‣⁃■▪▫□○●◦◆◇▶▷►※☞*]|[-–—])[\s\u00A0.]*)/;
+// 태그 이름으로 고르면 안 된다. 프록시가 넘겨 주는 줄은 p 일 때도 있고 div 일
+// 때도 있고, span 하나만 달랑 올 때도 있다. '한 줄로 놓이는 상자'인지를
+// 계산된 display 로 직접 보고, 그 안에 또 다른 줄이 들어 있으면 건너뛴다.
+function wkIsLine(el){
+  const d = getComputedStyle(el).display;
+  if(d !== 'block' && d !== 'list-item') return false;
+  for(const kid of el.querySelectorAll('*')){
+    const kd = getComputedStyle(kid).display;
+    if(kd === 'block' || kd === 'list-item') return false;
+  }
+  return true;
+}
 function wkHangIndent(root){
-  root.querySelectorAll('p, li, small, td').forEach(el => {
-    if(el.querySelector('p, li, div, small, td')) return;   // 잎 블록만
+  root.querySelectorAll('*').forEach(el => {
+    if(!wkIsLine(el)) return;
     const m = WK_MARK.exec(el.textContent || '');
     if(!m) return;
     const probe = document.createElement('span');
@@ -9273,8 +9281,8 @@ function wkHangIndent(root){
 //    넘치는 문단은 아무리 조여도 안 줄어들고, 원래대로 되돌린다.
 const WK_TIGHTEN = ['-0.01em', '-0.02em', '-0.03em'];
 function wkTightenTails(root){
-  root.querySelectorAll('p, li, small, h2, h3, h4').forEach(el => {
-    if(el.querySelector('p, li, div, small')) return;
+  root.querySelectorAll('*').forEach(el => {
+    if(!wkIsLine(el)) return;
     const cs = getComputedStyle(el);
     const lh = parseFloat(cs.lineHeight);
     if(!lh) return;
