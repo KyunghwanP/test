@@ -272,9 +272,15 @@ console.log('\n■ 부서 구분');
       // 부서 안에 자기 항목만 들어 있는가 — 다음 부서 것까지 삼키면 안 된다
       items: secs.map(s => s.querySelectorAll('p').length),
       bg: secs.map(s => getComputedStyle(s).backgroundColor),
-      // 부서와 부서 사이가 벌어져 있는가
+      // 띠와 띠 사이에 틈이 있으면 그리로 흰 바탕이 비친다
       gaps: secs.slice(1).map((s, i) =>
         Math.round(s.getBoundingClientRect().top - secs[i].getBoundingClientRect().bottom)),
+      // 간격은 띠 안쪽에서 만든다 — 앞 부서 마지막 줄과 다음 부서 이름 사이
+      inner: secs.slice(1).map((s, i) => {
+        const prev = [...secs[i].children].pop();
+        return Math.round(s.querySelector('h2').getBoundingClientRect().top
+                          - prev.getBoundingClientRect().bottom);
+      }),
       // 부서 이름: 밑줄 · 아래 여백 · 배경(자기 띠 색을 물려받아야 한다)
       h2: secs.map(s => {
         const c = getComputedStyle(s.querySelector('h2'));
@@ -290,7 +296,8 @@ console.log('\n■ 부서 구분');
         JSON.stringify(d.items) === JSON.stringify([2,1,1,1]), d.items);
   check('이웃한 부서는 배경색이 다르다',
         d.bg.slice(1).every((c, i) => c !== d.bg[i]), d.bg);
-  check('부서 사이가 벌어져 있다', d.gaps.every(g => g >= 20), d.gaps);
+  check('띠와 띠가 맞붙어 흰 줄이 안 생긴다', d.gaps.every(g => g === 0), d.gaps);
+  check('간격은 띠 안쪽에서 만든다', d.inner.every(g => g >= 30), d.inner);
   check('부서 이름에 밑줄이 있다', d.h2.every(h => h.bw === '1px'), d.h2.map(h => h.bw));
   check('부서 이름 아래에 여백이 있다',
         d.h2.every(h => h.mb >= 18 && h.pb >= 6), d.h2.map(h => [h.mb, h.pb]));
