@@ -135,7 +135,11 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grab('wkLineBox')}
   ${grab('wkSplitBr')}
   ${grabConst('wkIsHead')}
-  ${grab('wkLeadLen')}
+  ${grab('wkLead')}
+  ${grabConst('WK_LEVEL')}
+  ${grabConst('WK_STEP')}
+  ${grab('wkLevelOf')}
+  ${grab('wkDropLeadWs')}
   ${grab('wkFirstTextX')}
   ${grab('wkHangIndent')}
   ${grabConst('WK_JUSTIFY_SLACK')}
@@ -484,6 +488,14 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
          걸리므로, 가르지 않으면 둘째 줄부터는 안 먹는다. 화면에서 잘 되는 줄과
          안 되는 줄이 번갈아 보이던 이유가 이것이다. -->
     <p class="multi"><span>\u00A0■</span><span> 1,2학년 33개 동아리 활동에 대한 안내이며 자세한 내용은 아래를 보십시오</span><br><span>\u00A0·</span><span> 예산 배정: 아래 시트참조(공개 여부: 부분공개-예산파일, 10월 2주까지 신청마감)</span><br><span>\u00A0·</span><span> 문의는 담당 부서로 주시기 바라며 기한을 꼭 지켜 주시기 바랍니다</span></p>
+    <!-- 사이트의 &nbsp; 개수는 사람이 손으로 넣은 것이라 같은 단계인데도 줄마다
+         다르다. 그대로 존중하면 ■ 가 어떤 줄은 60px, 어떤 줄은 75px 에서
+         시작한다 — 화면에서 '열이 안 맞는다' 던 것이 이것이다. -->
+    <p class="col"><span>■</span><span> 일시: 9.9.(수) 18:00~21:00</span></p>
+    <p class="col"><span>\u00A0■</span><span> 장소: 달서구 월광수변공원</span></p>
+    <p class="col"><span>\u00A0\u00A0\u00A0■</span><span> 내용: 수밭골 늦반딧불이 탐사</span></p>
+    <p class="col2"><span>·</span><span> 대상: 1학년 희망자 20명</span></p>
+    <p class="col2"><span>\u00A0\u00A0·</span><span> 참가신청: 8.20.(목)~8.25.(화)</span></p>
     <h2><span>행정실</span></h2>
     <p><span>·</span><span> 물품 구입 신청은 9. 5.(금)까지 제출해 주시기 바랍니다</span></p>
   `;
@@ -552,8 +564,10 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
   check('③ 어절 단위로 끊는다', plus.brk.every(b => b === 'keep-all'), plus.brk);
   const marked = plus.hang.filter(h => '·■'.includes(h.mark));
   const plain = plus.hang.filter(h => !'·■'.includes(h.mark));
+  // 왼쪽 여백 = 단계 들여쓰기 + 기호 폭, 내어쓰기 = -기호 폭.
+  // 그래야 첫 줄은 단계 자리에서 시작하고 넘어간 줄은 기호 뒤에 붙는다.
   check('④ 기호로 시작하는 줄은 기호 뒤로 내어쓴다',
-        marked.length >= 4 && marked.every(h => h.ml > 0 && h.ti === -h.ml), plus.hang);
+        marked.length >= 4 && marked.every(h => h.ti < 0 && h.ml > -h.ti), plus.hang);
   // 기호가 자기 혼자 조각을 차지하는 모양('<span>·</span><span> 대상…')이 실제
   // 사이트가 보내는 모양이다. 이걸 놓쳐서 두 번 안 먹었다.
   check('④ 기호가 딴 조각에 떨어져 있어도 잡는다', await pg.evaluate(() => {
@@ -592,6 +606,20 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
         // 색·링크 같은 안쪽 구조가 끊기면 안 된다
         && lines[1].querySelectorAll('span').length >= 2;
   }));
+  // 이게 '열이 안 맞는다' 에 대한 답이다. 같은 기호는 &nbsp; 가 몇 개였든
+  // 같은 자리에서 시작해야 한다.
+  check('④ 같은 기호끼리 열이 맞는다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const leftOf = el => {
+      const rg = document.createRange(); rg.selectNodeContents(el);
+      return Math.round([...rg.getClientRects()].filter(x => x.width > 0.5)[0].left);
+    };
+    const a = [...r.querySelectorAll('.col')].map(leftOf);
+    const b = [...r.querySelectorAll('.col2')].map(leftOf);
+    return { a, b, ok: a.length === 3 && b.length === 2
+             && new Set(a).size === 1 && new Set(b).size === 1
+             && b[0] > a[0] };            // · 는 ■ 보다 한 단계 더 안쪽
+  }).then(v => v.ok));
   check('제목에는 내어쓰기·양쪽 맞춤을 걸지 않는다', await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
     return [...r.querySelectorAll('h1, h2, h3, h4')]
@@ -625,7 +653,8 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
     const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     let n, seen = 0, x0 = null;
     while ((n = walk.nextNode())) {
-      const skip = wkLeadLen(el.textContent);
+      const ld = wkLead(el.textContent);
+      const skip = ld.ws1.length + ld.tok.length + ld.ws2.length;
       if (seen + n.nodeValue.length > skip) {
         const rg = document.createRange();
         rg.setStart(n, skip - seen); rg.setEnd(n, skip - seen + 1);
