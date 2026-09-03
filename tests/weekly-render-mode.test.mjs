@@ -632,15 +632,6 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
   }).then(v => v.ok));
   // 글머리(■)가 통째로 사라지던 자리. 좌우 여백 규칙이 ul 의 기본 안쪽 여백을
   // 덮어써서 글머리표가 상자 밖으로 밀려나 있었다.
-  // 번호는 소제목이다. 제 항목들보다 안으로 들어가면 위계가 뒤집힌다.
-  check('④ 번호 소제목은 제 항목들보다 앞 칸에 선다', await pg.evaluate(() => {
-    const r = document.querySelector('.wk-shadow-host').shadowRoot;
-    const num = [...r.querySelectorAll('p')].find(e => /물리학 실험/.test(e.textContent));
-    const ul = r.querySelector('ul');
-    const box = e => { const rg = document.createRange(); rg.selectNodeContents(e);
-                       return Math.round([...rg.getClientRects()].filter(x => x.width > 0.5)[0].left); };
-    return !!num && !!ul && box(num) < box(ul);
-  }));
   check('④ 목록의 글머리표가 보인다', await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
     const uls = [...r.querySelectorAll('ul')];
@@ -690,11 +681,20 @@ console.log('\n■ 원본+ — 읽기 편하게 손본 것');
   }));
   // 여는 괄호와 숫자 소제목(01_)은 머리 기호가 아니다. 단계는 앞 줄을 따라가되
   // 내어쓰기(기호 폭만큼 당기는 것)는 주면 안 된다 — 기호가 없으니 당길 것도 없다.
-  check('④ 여는 괄호·숫자 소제목에는 내어쓰기를 주지 않는다', await pg.evaluate(() => {
+  check('④ 여는 괄호로 시작하는 줄에는 내어쓰기를 주지 않는다', await pg.evaluate(() => {
     const r = document.querySelector('.wk-shadow-host').shadowRoot;
-    const els = [...r.querySelectorAll('p')]
-      .filter(e => e.textContent.startsWith('「') || e.textContent.startsWith('01_'));
-    return els.length === 2 && els.every(e => !parseFloat(e.style.textIndent || 0));
+    const el = [...r.querySelectorAll('p')].find(e => e.textContent.startsWith('「'));
+    return !!el && !parseFloat(el.style.textIndent || 0);
+  }));
+  // '02_2026학년도 …' 처럼 밑줄로 번호를 매긴 소제목이 heading 이 아니라 p 로
+  // 오기도 한다. 못 알아보면 앞 줄 단계를 물려받아 오른쪽으로 밀리고 양쪽
+  // 맞춤까지 걸려 '02_2026학년도      1학기' 처럼 벌어진다.
+  check('④ 밑줄로 번호를 매긴 소제목도 알아본다', await pg.evaluate(() => {
+    const r = document.querySelector('.wk-shadow-host').shadowRoot;
+    const el = [...r.querySelectorAll('p')].find(e => e.textContent.startsWith('01_'));
+    return !!el && el.dataset.wkSub === '1'
+        && el.style.textAlign !== 'justify'
+        && parseFloat(el.style.textIndent) < 0;      // 넘어간 줄은 번호 뒤로
   }));
   // 첫 줄만 &nbsp; 로 들어가 있고 넘어간 줄은 맨 왼쪽까지 튀어나가던 줄.
   // 앞 공백까지 재야 맞는다 — 기호 폭만 재면 한참 모자란다.

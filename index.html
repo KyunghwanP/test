@@ -9269,7 +9269,7 @@ const WK_SHADOW_CSS = `
 const WK_OPEN = '「『（(［[｛{《〈【〔“‘"\'<';
 // 줄 앞머리로 인정하는 한 덩어리 — 머리 기호(·, ■, -), 번호(1. 1) 가. ①).
 // 기호를 일일이 나열하지 않는다. '글자도 숫자도 아닌 것이 한두 개' 로 잡는다.
-const WK_TOKEN = /^(?:[^\p{L}\p{N}\s\u00A0]{1,3}|\d{1,2}[.)]|[가-힣][.)]|[①-⑳])/u;
+const WK_TOKEN = /^(?:[^\p{L}\p{N}\s\u00A0]{1,3}|\d{1,2}[._)]|[가-힣][.)]|[①-⑳])/u;
 
 // 그 글자가 놓인 '줄 상자'를 찾는다. 태그 이름으로도, 잎인지 아닌지로도 고르면
 // 안 된다 — 프록시가 p 로 줄 때도 div 로 줄 때도 있고, 줄 안에 또 상자가 들어
@@ -9365,7 +9365,7 @@ function wkLevelOf(block, tok, prev){
 //   · 하위 항목 — '■ 강좌 안내' 밑의 '1. 물리학 실험 …'. 그 흐름을 벗어나 1 부터
 //                 다시 시작하므로, 앞 줄보다 한 칸 더 안이다.
 // 가르는 단서는 '번호가 이어지는가' 뿐이다. 안 이어지면 딸린 목록으로 본다.
-const WK_NUM = /^0?(\d{1,2})[.)]$/;
+const WK_NUM = /^0?(\d{1,2})[._)]$/;
 const WK_HEAD_NUM = /^[\s\u00A0]*0?(\d{1,2})[._)]/;
 
 // 앞 공백을 지운다. 지우지 않으면 그 폭만큼 줄마다 다르게 밀려 열이 안 맞는다.
@@ -9441,7 +9441,12 @@ function wkHangIndent(root){
       // 딸린 목록이 이미 굴러가고 있으면 그 흐름을 먼저 본다. 아니면 소제목
       // 흐름을 본다. 둘 다 아니면 새로 시작하는 딸린 목록이다.
       if(subSeq && val === subSeq + 1){ level = subLevel; subSeq = val; }
-      else if(val === numSeq + 1){ level = 0; numSeq = val; subSeq = 0; }
+      else if(val === numSeq + 1){
+        // 소제목이다. heading 으로 안 왔을 뿐이니 제목처럼 다룬다 —
+        // 양쪽 맞춤을 걸면 '02_2026학년도      1학기' 처럼 벌어진다.
+        level = 0; numSeq = val; subSeq = 0;
+        block.dataset.wkSub = '1';
+      }
       else {
         level = subLevel = Math.min(Math.max(prev, 1) + 1, 3);
         subSeq = val;
@@ -9520,7 +9525,7 @@ function wkJustifyEasy(root){
     const el = wkBlockOf(n);
     if(!el || seen.has(el)) continue;
     seen.add(el);
-    if(wkIsHead(el)) continue;
+    if(wkIsHead(el) || el.dataset.wkSub) continue;
     const cs = getComputedStyle(el);
     const fs = parseFloat(cs.fontSize) || 16;
     const right = el.getBoundingClientRect().right - parseFloat(cs.paddingRight || 0);
@@ -9548,6 +9553,7 @@ function wkPlusTune(root){
     el.style.marginLeft = ''; el.style.textIndent = '';
     el.style.letterSpacing = ''; el.style.textAlign = '';
   });
+  root.querySelectorAll('[data-wk-sub]').forEach(el => delete el.dataset.wkSub);
   const stat = wkHangIndent(root);
   wkTightenTails(root);   // 내어쓰기로 줄 수가 달라지므로 반드시 뒤에 잰다
   stat.just = wkJustifyEasy(root);   // 줄이 다 정해진 뒤라야 남는 폭을 잴 수 있다
