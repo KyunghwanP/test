@@ -1929,7 +1929,11 @@
   html.dark .weekly-html-content.wk-orig{background:#fff;}
   .wk-shadow-host{display:block;padding:14px;}
 
-  .wk-orig-bar{display:flex;justify-content:flex-end;padding:8px 10px 0;}
+  .wk-orig-bar{display:flex;align-items:center;gap:10px;justify-content:flex-end;padding:8px 10px 0;}
+  .wk-frame-note{font-size:11.5px;color:var(--ink-soft);margin-right:auto;}
+  .weekly-html-content.wk-frame{padding:0;background:var(--paper);}
+  .wk-frame-el{width:100%;height:calc(100vh - 190px);min-height:420px;border:0;
+    background:#fff;border-radius:0 0 8px 8px;}
   .wk-orig-bar .weekly-title-btn{background:var(--mon);border-color:var(--mon);color:#fff !important;}
 
   /* 보기 전환(관리자만). 상단 바가 세로 flex 라 align-self 로 오른쪽에 붙인다 —
@@ -9096,10 +9100,12 @@ function applyWeeklyDarkColors(root){
      plain 글꼴·색만 원본 (크기는 앱 것 유지)
      orig  원본 그대로 — Shadow DOM 에 넣어 앱 CSS 가 아예 못 닿게 하고,
            그 안에 스티키 규칙 하나만 넣는다
+     frame 사이트를 통째로 iframe 으로. 픽셀까지 같지만 스티키는 못 넣는다
+           (남의 문서라 CSS 를 못 넣는다). 구글이 삽입을 막으면 빈 화면이 뜬다.
 
    무엇이 나은지는 눈으로 봐야 안다. 전환은 관리자에게만 보인다.        */
 const WK_MODE_KEY = 'ynhsWeeklyMode';
-const WK_MODES = [['app','지금'], ['plain','글꼴·색'], ['orig','원본']];
+const WK_MODES = [['app','지금'], ['plain','글꼴·색'], ['orig','원본'], ['frame','통째로']];
 let weeklyMode = (() => { try { return localStorage.getItem(WK_MODE_KEY) || 'app'; }
                           catch(e){ return 'app'; } })();
 let _wkLast = null;              // 마지막 본문 HTML — 전환할 때 다시 안 받아온다
@@ -9118,6 +9124,28 @@ const WK_SHADOW_CSS = `
      받아온 내용을 고치는 것이다. 여기서는 표시 방식만 바꾼다. */
   small{display:block;}
 `;
+
+function renderWeeklyFrame(){
+  const wrap = document.createElement('div');
+  wrap.className = 'weekly-html-content wk-frame';
+  const bar = document.createElement('div');
+  bar.className = 'wk-orig-bar';
+  const note = document.createElement('span');
+  note.className = 'wk-frame-note';
+  note.textContent = '사이트를 그대로 띄웁니다. 비어 있으면 구글이 삽입을 막은 것입니다.';
+  const ob = document.createElement('a');
+  ob.href = weeklyCurrentUrl; ob.target = '_blank';
+  ob.className = 'weekly-title-btn'; ob.textContent = '↗ 원본보기';
+  bar.append(note, ob);
+  const fr = document.createElement('iframe');
+  fr.className = 'wk-frame-el';
+  fr.src = weeklyCurrentUrl;
+  fr.title = '주간 교육활동 및 업무 안내';
+  wrap.append(bar, fr);
+  weeklyPageContent.innerHTML = '';
+  weeklyPageContent.appendChild(wrap);
+  renderWeeklyModeBar();
+}
 
 function renderWeeklyModeBar(){
   const bar = document.getElementById('weeklyTopBar');
@@ -9289,6 +9317,8 @@ function renderWeekChips(navLinks, activeHref){
       weeklyOpenLink.href = link.href;
       weeklyPageContent.innerHTML = '<div class="weekly-page-loading" style="padding:24px;">불러오는 중...</div>';
       try{
+        // 통째로 띄우는 모드에서는 받아올 필요가 없다 — 사이트가 직접 그린다.
+        if(weeklyMode === 'frame'){ renderWeeklyFrame(); return; }
         const raw  = await fetchViaProxy(link.href);
         const data = parseSitesResponse(raw);
         renderContent(data.contentHtml || raw);
@@ -9348,6 +9378,16 @@ function renderContent(html){
       (el.closest('div, p, li, span') || el).remove();
     }
   });
+
+  // ── 통째로 (iframe) ─────────────────────────────────────────────────
+  // 사이트를 그대로 띄운다. 우리가 손댈 것이 없으니 픽셀까지 같다. 대신 남의
+  // 문서라 CSS 를 못 넣는다 — 스티키는 포기해야 한다.
+  // 구글이 삽입을 막아 두면(X-Frame-Options 등) 빈 화면이 뜬다. 그때를 대비해
+  // 안내와 원본보기를 위에 둔다.
+  if(weeklyMode === 'frame'){
+    renderWeeklyFrame();
+    return;
+  }
 
   // ── 원본 그대로 ─────────────────────────────────────────────────────
   // 여기까지의 손질은 '안전'과 '구글 사이트 껍데기 제거'다. 그건 원본 모드에서도

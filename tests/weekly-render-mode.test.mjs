@@ -41,7 +41,7 @@ const grabConst = name => {
 const STYLES = [...HTML.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n');
 
 console.log('\n■ 배선 (정적)');
-check('세 가지 방식이 있다', /const WK_MODES = \[\['app'/.test(HTML));
+check('네 가지 방식이 있다', /\['frame','통째로'\]/.test(HTML));
 check('고른 것을 기억한다', /localStorage\.getItem\(WK_MODE_KEY\)/.test(HTML));
 check('전환은 관리자에게만 보인다',
       /fbAuth\.currentUser\?\.email === ADMIN_EMAIL && !isViewAs\(\)/.test(grab('renderWeeklyModeBar')));
@@ -97,6 +97,7 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   let weeklyMode = 'app';
   let _wkLast = null;
   ${grabConst('WK_SHADOW_CSS')}
+  ${grab('renderWeeklyFrame')}
   ${grab('renderWeeklyModeBar')}
   ${grab('renderContent')}
   window.setMode = m => { weeklyMode = m; };
@@ -163,12 +164,28 @@ console.log('\n■ 원본 그대로 — 앱 CSS 가 아예 안 닿는다');
   check('받아온 내용에 <br> 을 끼워 넣지 않는다', sm.brAdded === 0, sm);
 }
 
+console.log('\n■ 통째로(iframe) — 픽셀은 같고 스티키는 포기');
+{
+  await pg.evaluate(h => { window.setMode('frame'); window.render(h); }, SITE);
+  const fr = await pg.$eval('.wk-frame-el', e => ({ tag: e.tagName, src: e.getAttribute('src') }));
+  check('사이트를 그대로 띄운다', fr.tag === 'IFRAME' && fr.src === 'https://sites.google.com/x', fr);
+  check('받아온 HTML 은 안 쓴다', !(await pg.$('.wk-shadow-host')) && !(await pg.$('.weekly-forced-title')));
+  // 남의 문서라 CSS 를 못 넣는다 — 스티키를 넣은 척하면 안 된다
+  check('스티키를 넣지 않는다(넣을 수 없다)',
+        !/position:sticky/.test(await pg.$eval('.wk-frame-el', e => e.getAttribute('style') || '')));
+  check('비었을 때를 대비해 안내와 원본보기를 둔다',
+        /구글이 삽입을 막은/.test(await pg.$eval('.wk-frame-note', e => e.textContent))
+        && !!(await pg.$('.wk-orig-bar .weekly-title-btn')));
+  check('칩을 눌러도 받아오지 않는다',
+        /if\(weeklyMode === 'frame'\)\{ renderWeeklyFrame\(\); return; \}/.test(HTML));
+}
+
 console.log('\n■ 전환 막대');
 {
   check('관리자에게는 보인다', await pg.evaluate(() => !!document.getElementById('wkModes')));
-  check('세 칸이다', (await pg.$$eval('#wkModes button', e => e.length)) === 3);
+  check('네 칸이다', (await pg.$$eval('#wkModes button', e => e.length)) === 4);
   check('고른 것이 켜져 있다',
-        (await pg.$eval('#wkModes button.on', e => e.dataset.wkMode)) === 'orig');
+        (await pg.$eval('#wkModes button.on', e => e.dataset.wkMode)) === 'frame');
   await pg.evaluate(() => { window.__setWho('kim@yeungnam.hs.kr'); window.render('<p>x</p>'); });
   check('다른 교사에게는 안 보인다', await pg.evaluate(() => !document.getElementById('wkModes')));
 }
