@@ -1830,6 +1830,26 @@
   .pts-new-who{font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;color:var(--ink);}
   .pts-new-num{font-family:'IBM Plex Mono';font-size:12px;color:var(--ink-soft);font-weight:600;}
   .pts-new-why{font-size:13px;color:var(--ink-soft);line-height:1.5;margin-top:2px;}
+  .pts-warn{
+    margin:12px 20px 0;padding:10px 12px;border-radius:10px;
+    background:#FEF2F2;border:1px solid #FECACA;
+  }
+  html.dark .pts-warn{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.35);}
+  .pts-warn-title{
+    font-family:'Pretendard','Noto Sans KR';font-weight:800;font-size:12.5px;
+    color:#991B1B;margin-bottom:6px;
+  }
+  html.dark .pts-warn-title{color:#FCA5A5;}
+  .pts-warn-item{
+    display:flex;align-items:baseline;gap:8px;padding:3px 0;
+    font-size:13px;color:var(--ink);
+  }
+  .pts-warn-item .w-name{font-weight:700;}
+  .pts-warn-item .w-num{font-family:'IBM Plex Mono';font-size:11.5px;color:var(--ink-soft);}
+  .pts-warn-item .w-tot{
+    font-family:'IBM Plex Mono';font-weight:700;color:#EF4444;margin-left:auto;
+  }
+  .pts-warn-item .w-sub{font-family:'IBM Plex Mono';font-size:11px;color:var(--ink-soft);}
   .pts-new-foot{padding:12px 20px;border-top:1px solid var(--rule);}
   .pts-new-go{
     width:100%;padding:11px;border-radius:10px;border:1px solid var(--rule);
@@ -5818,6 +5838,7 @@
       </div>
       <button class="pts-detail-close" onclick="closePtsNewModalBtn()">×</button>
     </div>
+    <div id="ptsNewWarn"></div>
     <div class="pts-detail-records" id="ptsNewRecords"></div>
     <div class="pts-new-foot">
       <button class="pts-new-go" onclick="ptsNewGoToPoints()">상벌점 조회로 이동 ›</button>
@@ -16082,10 +16103,36 @@ function ptsEntriesWithin(students, room, grade, days, today) {
     .filter(e => ptsDateKey(e.date, today) >= lo);
 }
 
+// 누적 벌점 경고. 합계(상점 + 벌점 + 상계 감점)가 기준 이하인 학생 — 상계 봉사까지
+// 반영된 실질 점수라 선도 기준에 맞춰 보기 좋다. 기준값은 학교 규정에 맞춰 바꾼다.
+const PTS_WARN_TOTAL = -5;
+function ptsWarnStudents(students, room, grade, threshold) {
+  const limit = threshold == null ? PTS_WARN_TOTAL : threshold;
+  return (students || [])
+    .filter(s => String(s.room) === String(room))
+    .filter(s => grade == null || String(s.grade) === String(grade))
+    .filter(s => Number(s.total || 0) <= limit)
+    .sort((a, b) => Number(a.total || 0) - Number(b.total || 0));
+}
+
 // ── 새로 반영된 상벌점 모달 ──
-function renderPtsNewModal(homeroom, entries, title, info) {
+function renderPtsNewModal(homeroom, entries, title, info, warns) {
   document.getElementById('ptsNewTitle').textContent = title || '🆕 새로 반영된 상벌점';
   document.getElementById('ptsNewInfo').textContent = info || `${homeroom} · ${entries.length}건`;
+  const warnBox = document.getElementById('ptsNewWarn');
+  if (warnBox) {
+    warnBox.innerHTML = (warns && warns.length) ? `
+      <div class="pts-warn">
+        <div class="pts-warn-title">⚠️ 누적 벌점 주의 — 합계 ${PTS_WARN_TOTAL} 이하 ${warns.length}명</div>
+        ${warns.map(s => `
+          <div class="pts-warn-item">
+            <span class="w-name">${escapeHtml(String(s.name || ''))}</span>
+            <span class="w-num">${escapeHtml(String(s.num || ''))}번</span>
+            <span class="w-sub">벌점 ${Number(s.demerit || 0)}${s.deducted ? ` · 상계 +${Math.abs(Number(s.deducted))}` : ''}</span>
+            <span class="w-tot">합계 ${Number(s.total || 0)}</span>
+          </div>`).join('')}
+      </div>` : '';
+  }
   const box = document.getElementById('ptsNewRecords');
   box.innerHTML = entries.length ? entries.map(e => `
     <div class="pts-detail-record-item">
@@ -16108,16 +16155,17 @@ function openPtsRecentModal() {
   if (!hr) return;
   const [grade, room] = hr.split('-');
   const title = `🗓 최근 ${PTS_RECENT_DAYS}일 상벌점`;
+  const warns = ptsWarnStudents(ptsViewData, room, grade);
   const within = ptsEntriesWithin(ptsViewData, room, grade, PTS_RECENT_DAYS);
   if (within.length) {
-    renderPtsNewModal(hr, within, title, `${hr} · ${within.length}건`);
+    renderPtsNewModal(hr, within, title, `${hr} · ${within.length}건`, warns);
     return;
   }
   // 한 주 내내 아무 일도 없으면 빈 창만 뜬다 — 그때는 그 이전 것으로 물러난다
   const older = ptsRecentEntries(ptsViewData, room, grade).slice(0, PTS_FALLBACK_LIMIT);
   renderPtsNewModal(hr, older, title,
     older.length ? `${hr} · 최근 ${PTS_RECENT_DAYS}일 없음 — 그 이전 ${older.length}건`
-                 : `${hr} · 기록 없음`);
+                 : `${hr} · 기록 없음`, warns);
 }
 window.openPtsRecentModal = openPtsRecentModal;
 function closePtsNewModal(e) {

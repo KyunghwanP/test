@@ -55,6 +55,9 @@ check('모달 안에서 조회 페이지로 갈 길은 남겨 둔다', /ptsNewGo
 console.log('\n■ 기준선과 무관하게 "최근 항목"을 볼 수 있는가 (정적)');
 check('조회 화면에 최근 항목 버튼이 있다', /id="ptsViewRecentBtn"[\s\S]{0,120}openPtsRecentModal\(\)/.test(HTML));
 check('최근 창은 7일', /const PTS_RECENT_DAYS = 7;/.test(HTML));
+check('최근 7일 모달에 누적 경고를 함께 넘긴다',
+      /const warns = ptsWarnStudents\(ptsViewData, room, grade\)/.test(HTML)
+      && /renderPtsNewModal\(hr, within, title, [^,]+, warns\)/.test(HTML));
 check('그 주에 아무것도 없을 때만 이전 것으로 물러난다',
       /if \(within\.length\)[\s\S]{0,200}ptsRecentEntries\([\s\S]{0,80}PTS_FALLBACK_LIMIT\)/.test(HTML));
 check('담임(관리자는 고른 반)일 때만 보인다',
@@ -63,6 +66,7 @@ check('열기 함수가 window 에 있다', /window\.openPtsRecentModal\s*=/.tes
 
 const ptsRecentEntriesSrc  = grab('ptsRecentEntries');
 const ptsEntriesWithinSrc  = grab('ptsEntriesWithin');
+const ptsWarnStudentsSrc   = grab('ptsWarnStudents');
 const ptsDateKeySrc        = grab('ptsDateKey');
 const ptsEntriesForSrc     = grab('ptsEntriesFor');
 const ptsSignaturesForSrc  = grab('ptsSignaturesFor');
@@ -91,6 +95,7 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   <div class="pts-detail-box">
     <div class="pts-detail-head-name" id="ptsNewTitle"></div>
     <div class="pts-detail-head-info" id="ptsNewInfo"></div>
+    <div id="ptsNewWarn"></div>
     <div class="pts-detail-records" id="ptsNewRecords"></div>
   </div>
 </div>
@@ -113,8 +118,11 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   ${ptsNewSinceSrc}
   ${ptsRecentEntriesSrc}
   ${ptsEntriesWithinSrc}
+  const PTS_WARN_TOTAL = -5;
+  ${ptsWarnStudentsSrc}
   window.ptsRecentEntries = ptsRecentEntries;
   window.ptsEntriesWithin = ptsEntriesWithin;
+  window.ptsWarnStudents = ptsWarnStudents;
   window.ptsDateKey = ptsDateKey;
   ${renderPtsNewModalSrc}
   ${closePtsNewModalBtnSrc}
@@ -123,6 +131,7 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   window.ptsSignaturesFor = ptsSignaturesFor;
   window.ptsNewSince = ptsNewSince;
   window.closePtsNewModalBtn = closePtsNewModalBtn;
+  window.renderPtsNewModal = renderPtsNewModal;
 </script>`;
 
 await pg.route('https://ynhs.test/**', r =>
@@ -297,6 +306,41 @@ console.log('\n■ 연도 없는 리로스쿨 날짜(MM.DD)');
   ]);
   check('해가 바뀐 뒤에 열어도 같은 학년도로 읽는다',
         inJan[0] === '2026-09-04' && inJan[1] === '2027-01-15', inJan);
+}
+
+console.log('\n■ 누적 벌점 경고');
+{
+  const students = [
+    // 합계 = 상점 + 벌점 + 상계 감점. 상계까지 반영된 실질 점수로 본다
+    { grade: '1', room: '1', num: '1',  name: '김도욱', total: -3, demerit: -7, deducted: 3 },
+    { grade: '1', room: '1', num: '7',  name: '위험학생', total: -8, demerit: -9, deducted: 1 },
+    { grade: '1', room: '1', num: '9',  name: '딱기준',   total: -5, demerit: -5, deducted: 0 },
+    { grade: '1', room: '1', num: '12', name: '착한학생', total: 3,  demerit: 0,  deducted: 0 },
+    { grade: '1', room: '2', num: '4',  name: '옆반위험', total: -9, demerit: -9, deducted: 0 },
+    { grade: '2', room: '1', num: '4',  name: '2학년위험', total: -9, demerit: -9, deducted: 0 },
+  ];
+  const warns = await pg.evaluate(s => window.ptsWarnStudents(s, '1', '1'), students);
+  check('기준(-5) 이하만 걸린다', warns.length === 2, warns.map(w => w.name));
+  check('기준값 자체도 포함된다(-5)', warns.some(w => w.name === '딱기준'), warns.map(w => w.name));
+  check('상계로 올라온 학생(-3)은 안 걸린다', !warns.some(w => w.name === '김도욱'), warns.map(w => w.name));
+  check('옆 반·다른 학년은 안 섞인다',
+        !warns.some(w => w.name === '옆반위험' || w.name === '2학년위험'), warns.map(w => w.name));
+  check('나쁜 쪽부터 위로', warns[0].name === '위험학생', warns.map(w => w.total));
+
+  const strict = await pg.evaluate(s => window.ptsWarnStudents(s, '1', '1', -8), students);
+  check('기준을 바꿀 수 있다', strict.length === 1 && strict[0].name === '위험학생', strict.map(w => w.name));
+
+  // 모달에 실제로 붙는지
+  await pg.evaluate(w => window.renderPtsNewModal('1-1', [], '🗓 최근 7일 상벌점', '1-1 · 0건', w), warns);
+  const warnText = await pg.$eval('#ptsNewWarn', e => e.textContent.replace(/\s+/g, ' ').trim());
+  check('모달에 경고 줄이 뜬다', warnText.includes('누적 벌점 주의') && warnText.includes('2명'), warnText);
+  check('이름·번호·합계가 보인다',
+        warnText.includes('위험학생') && warnText.includes('7번') && warnText.includes('합계 -8'), warnText);
+  check('상계 점수도 같이 적힌다', warnText.includes('상계 +1'), warnText);
+
+  await pg.evaluate(() => window.renderPtsNewModal('1-1', [], '제목', '정보', []));
+  check('걸린 학생이 없으면 경고 줄 자체가 없다',
+        (await pg.$eval('#ptsNewWarn', e => e.innerHTML)) === '');
 }
 
 console.log('\n■ 사유에 태그가 들어 있어도 실행되지 않는다');
