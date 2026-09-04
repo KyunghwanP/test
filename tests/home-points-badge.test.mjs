@@ -52,6 +52,13 @@ check('배지는 조회 페이지로 던지지 않고 모달을 연다',
       /tag\.onclick[\s\S]{0,220}renderPtsNewModal\(hr, newEntries\)/.test(HTML));
 check('모달 안에서 조회 페이지로 갈 길은 남겨 둔다', /ptsNewGoToPoints\(\)[\s\S]{0,120}navigateTo\('points'\)/.test(HTML));
 
+console.log('\n■ 기준선과 무관하게 "최근 항목"을 볼 수 있는가 (정적)');
+check('조회 화면에 최근 항목 버튼이 있다', /id="ptsViewRecentBtn"[\s\S]{0,120}openPtsRecentModal\(\)/.test(HTML));
+check('담임(관리자는 고른 반)일 때만 보인다',
+      /recentBtn\.style\.display = hr \? '' : 'none'/.test(HTML));
+check('열기 함수가 window 에 있다', /window\.openPtsRecentModal\s*=/.test(HTML));
+
+const ptsRecentEntriesSrc  = grab('ptsRecentEntries');
 const ptsEntriesForSrc     = grab('ptsEntriesFor');
 const ptsSignaturesForSrc  = grab('ptsSignaturesFor');
 const ptsNewSinceSrc       = grab('ptsNewSince');
@@ -77,6 +84,7 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
 </div>
 <div class="pts-detail-modal" id="ptsNewModal">
   <div class="pts-detail-box">
+    <div class="pts-detail-head-name" id="ptsNewTitle"></div>
     <div class="pts-detail-head-info" id="ptsNewInfo"></div>
     <div class="pts-detail-records" id="ptsNewRecords"></div>
   </div>
@@ -97,6 +105,8 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   ${ptsEntriesForSrc}
   ${ptsSignaturesForSrc}
   ${ptsNewSinceSrc}
+  ${ptsRecentEntriesSrc}
+  window.ptsRecentEntries = ptsRecentEntries;
   ${renderPtsNewModalSrc}
   ${closePtsNewModalBtnSrc}
   ${checkHomeroomNewPointsSrc}
@@ -193,6 +203,27 @@ console.log('\n■ 배지를 누르면 — 조회 페이지로 던지지 않고 
 
   await pg.evaluate(() => window.checkHomeroomNewPoints());
   check('같은 데이터로 다시 확인해도 배지가 다시 안 뜬다', (await pg.$('#homeClassTimetable .home-pts-tag')) === null);
+}
+
+console.log('\n■ 최근 항목 — 기준선을 이미 잡아 둔 뒤에도 날짜로 볼 수 있다');
+{
+  const students = [
+    { num: '3', room: '1', name: '김민준', records: [
+      { date: '2026-09-04', detail: '오늘 것' },
+      { date: '2026-08-20', detail: '보름 전 것' },   // 14일 밖
+    ] },
+    { num: '9', room: '2', name: '박지후', records: [{ date: '2026-09-04', detail: '옆 반' }] },
+  ];
+  const recent = await pg.evaluate(s => window.ptsRecentEntries(s, '1', 14, '2026-09-04'), students);
+  check('창 안의 우리 반 항목만 나온다', recent.length === 1 && recent[0].detail === '오늘 것', recent);
+
+  const wide = await pg.evaluate(s => window.ptsRecentEntries(s, '1', 30, '2026-09-04'), students);
+  check('기간을 넓히면 예전 것도 들어온다', wide.length === 2, wide);
+  check('최신 날짜가 위로 온다', wide[0].date === '2026-09-04', wide.map(e => e.date));
+
+  // 기준선을 이미 잡아 둔(= 새 것이 하나도 없는) 상태여도 볼 수 있어야 한다
+  const seeded = await pg.evaluate(s => window.ptsNewSince(s, '1', window.ptsSignaturesFor(s, '1')), students);
+  check('새 것이 하나도 없어도 최근 항목은 남는다', seeded.length === 0 && recent.length === 1);
 }
 
 console.log('\n■ 사유에 태그가 들어 있어도 실행되지 않는다');

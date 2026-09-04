@@ -1757,6 +1757,12 @@
     text-align:center;font-size:12px;color:var(--ink-soft);
     font-family:'IBM Plex Mono';margin-bottom:12px;
   }
+  .pts-view-recent{
+    display:block;margin:0 auto 12px;padding:4px 10px;
+    border:1px solid var(--rule);border-radius:8px;background:var(--paper-soft);
+    color:var(--ink-soft);cursor:pointer;
+    font-family:'Pretendard','Noto Sans KR';font-size:12px;font-weight:700;
+  }
   .pts-list-header{
     display:grid;grid-template-columns:40px 1fr 56px 52px 52px 52px;
     gap:8px;padding:8px 16px;
@@ -5130,6 +5136,8 @@
             <div class="pts-view-wrap">
               <!-- 업데이트 시각 -->
               <div class="pts-view-updated" id="ptsViewUpdated">불러오는 중...</div>
+              <button class="pts-view-recent" id="ptsViewRecentBtn" onclick="openPtsRecentModal()"
+                      style="display:none;">🗓 우리 반 최근 항목 보기</button>
 
               <!-- 검색 -->
               <div class="pts-view-search">
@@ -5805,7 +5813,7 @@
   <div class="pts-detail-box">
     <div class="pts-detail-head">
       <div>
-        <div class="pts-detail-head-name">🆕 새로 반영된 상벌점</div>
+        <div class="pts-detail-head-name" id="ptsNewTitle">🆕 새로 반영된 상벌점</div>
         <div class="pts-detail-head-info" id="ptsNewInfo"></div>
       </div>
       <button class="pts-detail-close" onclick="closePtsNewModalBtn()">×</button>
@@ -15967,6 +15975,14 @@ async function loadPtsViewData() {
     }
     ptsViewLoaded = true;
     renderPtsGroups();
+    // 담임(관리자는 고른 반)이면 '우리 반 최근 항목'을 언제든 열 수 있게
+    const recentBtn = document.getElementById('ptsViewRecentBtn');
+    if (recentBtn) {
+      const hr = getMyHomeroom() || ((!isViewAs() && fbAuth.currentUser?.email === ADMIN_EMAIL)
+                                     ? testHomeroomPick() : null);
+      recentBtn.style.display = hr ? '' : 'none';
+      if (hr) recentBtn.textContent = `🗓 ${hr}반 최근 ${PTS_RECENT_DAYS}일 항목 보기`;
+    }
   } catch(e) {
     updatedEl.textContent = '데이터 로딩 실패';
     console.error(e);
@@ -16029,8 +16045,21 @@ function ptsNewSince(students, room, ackedSigs) {
   return ptsEntriesFor(students, room).filter(e => !acked.has(e.sig));
 }
 
+// 스냅샷에는 '언제 반영됐는지'가 없다. 그래서 기준선을 잡기 전에 이미 들어온 것은
+// 소급해서 새 것으로 잡을 수 없다 — 대신 항목에 적힌 날짜로 '최근 것'은 언제든 볼 수 있다.
+function ptsRecentEntries(students, room, days, today) {
+  const base = today ? new Date(today) : new Date();
+  const from = new Date(base.getTime() - (days - 1) * 86400000);
+  const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const lo = ymd(from), hi = ymd(base);
+  return ptsEntriesFor(students, room)
+    .filter(e => { const d = String(e.date || ''); return d >= lo && d <= hi; })
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+}
+
 // ── 새로 반영된 상벌점 모달 ──
-function renderPtsNewModal(homeroom, entries) {
+function renderPtsNewModal(homeroom, entries, title) {
+  document.getElementById('ptsNewTitle').textContent = title || '🆕 새로 반영된 상벌점';
   document.getElementById('ptsNewInfo').textContent = `${homeroom} · ${entries.length}건`;
   const box = document.getElementById('ptsNewRecords');
   box.innerHTML = entries.length ? entries.map(e => `
@@ -16041,9 +16070,21 @@ function renderPtsNewModal(homeroom, entries) {
           <span class="pts-new-num">${escapeHtml(String(e.num || ''))}번</span></div>
         <div class="pts-new-why">${escapeHtml(String(e.detail || ''))}</div>
       </div>
-    </div>`).join('') : '<div class="pts-detail-empty">새로 반영된 항목이 없습니다.</div>';
+    </div>`).join('') : '<div class="pts-detail-empty">해당하는 항목이 없습니다.</div>';
   document.getElementById('ptsNewModal').classList.add('show');
 }
+
+// 조회 화면에서 아무 때나 — 기준선과 상관없이 '항목에 적힌 날짜' 기준 최근 것
+const PTS_RECENT_DAYS = 14;
+function openPtsRecentModal() {
+  const hr = getMyHomeroom() || ((!isViewAs() && fbAuth.currentUser?.email === ADMIN_EMAIL)
+                                 ? testHomeroomPick() : null);
+  if (!hr) return;
+  const room = hr.split('-')[1];
+  const entries = ptsRecentEntries(ptsViewData, room, PTS_RECENT_DAYS);
+  renderPtsNewModal(hr, entries, `🗓 최근 ${PTS_RECENT_DAYS}일 상벌점`);
+}
+window.openPtsRecentModal = openPtsRecentModal;
 function closePtsNewModal(e) {
   if (e.target === document.getElementById('ptsNewModal')) closePtsNewModalBtn();
 }
