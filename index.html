@@ -2205,6 +2205,8 @@
   .home-tt-cell.tt-sub{box-shadow:inset 3px 0 0 rgba(99,102,241,.6);}
   .home-op-tag{font-size:11px;font-weight:800;color:#4338ca;background:#e0e7ff;border-radius:6px;padding:1px 7px;margin-left:6px;vertical-align:middle;}
   html.dark .home-op-tag{color:#c7d2fe;background:#312e81;}
+  .home-pts-tag{font-size:11px;font-weight:800;color:#fff;background:#7c3aed;border-radius:6px;padding:1px 7px;margin-left:6px;vertical-align:middle;cursor:pointer;}
+  html.dark .home-pts-tag{background:#8b5cf6;}
   .tt-wk-btn{
     border:none;background:transparent;cursor:pointer;font-size:17px;line-height:1;
     color:var(--ink-soft);padding:1px 7px;border-radius:14px;font-family:inherit;
@@ -13093,6 +13095,7 @@ async function initHomePage() {
         }
       };
       window._renderHomeClassTt();
+      checkHomeroomNewPoints();
 
       document.querySelector('[data-goto="timetable-class"]').addEventListener('click', () => {
         navigateTo('timetable');
@@ -15927,6 +15930,61 @@ async function loadPtsViewData() {
     updatedEl.textContent = '데이터 로딩 실패';
     console.error(e);
   }
+}
+
+// ── 담임 학급 새 상벌점 배지 (홈 현황판 '우리반 오늘 시간표' 헤더) ──
+// riro_points 는 밤마다 학년 전체가 통째로 덮어써지는 스냅샷이라 '새로 추가된 것'이라는
+// 개념이 원래 없다. 학생별 records(개별 항목) 를 서명으로 바꿔 직전에 확인한 서명 목록과
+// 비교하는 방식으로 흉내낸다 — 순수 함수라 riro_points 없이도 테스트할 수 있다.
+function ptsSignaturesFor(students, room) {
+  const sigs = [];
+  (students || []).forEach(s => {
+    if (String(s.room) !== String(room)) return;
+    (s.records || []).forEach(r => sigs.push(`${s.num}|${r.date}|${r.detail}`));
+  });
+  return sigs;
+}
+function ptsNewSince(students, room, ackedSigs) {
+  const acked = new Set(ackedSigs || []);
+  return ptsSignaturesFor(students, room).filter(sig => !acked.has(sig));
+}
+
+async function checkHomeroomNewPoints() {
+  try {
+    if (!myTeacher || !myTeacher.homeroom) return;
+    const [grade, room] = myTeacher.homeroom.split('-');
+    if (!grade || !room) return;
+    const ackKey = 'ynhsPtsAck_' + myTeacher.homeroom;
+    const snap = await getDoc(doc(fbDb, 'riro_points', `grade${grade}`));
+    if (!snap.exists()) return;
+    const students = snap.data().students || [];
+    const allSigs = ptsSignaturesFor(students, room);
+
+    let acked;
+    try { acked = JSON.parse(localStorage.getItem(ackKey) || 'null'); } catch (e) { acked = null; }
+    if (acked === null) {
+      // 처음 켠 기기 — 지금까지 쌓인 이력을 전부 '새 항목'으로 취급하지 않는다
+      localStorage.setItem(ackKey, JSON.stringify(allSigs));
+      return;
+    }
+
+    const newSigs = ptsNewSince(students, room, acked);
+    const classTitleEl = document.querySelector('#homeClassTimetable .home-section-title');
+    if (!classTitleEl) return;
+    classTitleEl.querySelector('.home-pts-tag')?.remove();
+    if (newSigs.length) {
+      const tag = document.createElement('span');
+      tag.className = 'home-pts-tag';
+      tag.textContent = `🆕 ${newSigs.length}`;
+      tag.onclick = (e) => {
+        e.stopPropagation();
+        localStorage.setItem(ackKey, JSON.stringify(allSigs));
+        tag.remove();
+        navigateTo('points');
+      };
+      classTitleEl.appendChild(tag);
+    }
+  } catch (e) { console.error('상벌점 배지', e); }
 }
 
 function selectPtsGrade(grade) {
