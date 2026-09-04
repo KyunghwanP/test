@@ -59,6 +59,7 @@ check('담임(관리자는 고른 반)일 때만 보인다',
 check('열기 함수가 window 에 있다', /window\.openPtsRecentModal\s*=/.test(HTML));
 
 const ptsRecentEntriesSrc  = grab('ptsRecentEntries');
+const ptsDateKeySrc        = grab('ptsDateKey');
 const ptsEntriesForSrc     = grab('ptsEntriesFor');
 const ptsSignaturesForSrc  = grab('ptsSignaturesFor');
 const ptsNewSinceSrc       = grab('ptsNewSince');
@@ -102,11 +103,13 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   window.navLog = navLog;
 
+  ${ptsDateKeySrc}
   ${ptsEntriesForSrc}
   ${ptsSignaturesForSrc}
   ${ptsNewSinceSrc}
   ${ptsRecentEntriesSrc}
   window.ptsRecentEntries = ptsRecentEntries;
+  window.ptsDateKey = ptsDateKey;
   ${renderPtsNewModalSrc}
   ${closePtsNewModalBtnSrc}
   ${checkHomeroomNewPointsSrc}
@@ -205,25 +208,74 @@ console.log('\n■ 배지를 누르면 — 조회 페이지로 던지지 않고 
   check('같은 데이터로 다시 확인해도 배지가 다시 안 뜬다', (await pg.$('#homeClassTimetable .home-pts-tag')) === null);
 }
 
-console.log('\n■ 최근 항목 — 기준선을 이미 잡아 둔 뒤에도 날짜로 볼 수 있다');
+console.log('\n■ 최근 항목 — 기준선을 이미 잡아 둔 뒤에도 볼 수 있다');
 {
   const students = [
-    { num: '3', room: '1', name: '김민준', records: [
+    { grade: '1', num: '3', room: '1', name: '김민준', records: [
       { date: '2026-09-04', detail: '오늘 것' },
-      { date: '2026-08-20', detail: '보름 전 것' },   // 14일 밖
+      { date: '2026-05-02', detail: '한참 전 것' },
     ] },
-    { num: '9', room: '2', name: '박지후', records: [{ date: '2026-09-04', detail: '옆 반' }] },
+    { grade: '1', num: '9', room: '2', name: '박지후', records: [{ date: '2026-09-04', detail: '옆 반' }] },
+    // 조회 화면의 ptsViewData 는 세 학년이 한 배열에 들어 있다 — 반만 보면 딸려 온다
+    { grade: '2', num: '1', room: '1', name: '다른학년', records: [{ date: '2026-09-04', detail: '2학년 1반' }] },
   ];
-  const recent = await pg.evaluate(s => window.ptsRecentEntries(s, '1', 14, '2026-09-04'), students);
-  check('창 안의 우리 반 항목만 나온다', recent.length === 1 && recent[0].detail === '오늘 것', recent);
+  const recent = await pg.evaluate(s => window.ptsRecentEntries(s, '1', '1', 30), students);
+  check('우리 반(1학년 1반) 것만 나온다', recent.length === 2, recent);
+  check('같은 반 번호의 다른 학년이 안 섞인다', !recent.some(e => e.detail === '2학년 1반'), recent);
+  check('옆 반도 안 섞인다', !recent.some(e => e.detail === '옆 반'), recent);
+  check('최신 날짜가 위로 온다', recent[0].date === '2026-09-04', recent.map(e => e.date));
 
-  const wide = await pg.evaluate(s => window.ptsRecentEntries(s, '1', 30, '2026-09-04'), students);
-  check('기간을 넓히면 예전 것도 들어온다', wide.length === 2, wide);
-  check('최신 날짜가 위로 온다', wide[0].date === '2026-09-04', wide.map(e => e.date));
+  // 방학처럼 한동안 기록이 없어도 '해당 항목 없음'이 되면 안 된다
+  const stale = await pg.evaluate(() => window.ptsRecentEntries(
+    [{ grade: '1', num: '3', room: '1', name: '김민준', records: [{ date: '2026-05-02', detail: '한참 전' }] }],
+    '1', '1', 30));
+  check('오래된 것뿐이어도 비지 않는다', stale.length === 1, stale);
+
+  // 개수로 자른다
+  const many = await pg.evaluate(() => window.ptsRecentEntries(
+    [{ grade: '1', num: '3', room: '1', name: 'ㄱ', records:
+       Array.from({length: 40}, (_, i) => ({ date: '2026-09-' + String(i % 28 + 1).padStart(2,'0'), detail: 'r' + i })) }],
+    '1', '1', 30));
+  check('최대 개수만큼만 자른다', many.length === 30, many.length);
 
   // 기준선을 이미 잡아 둔(= 새 것이 하나도 없는) 상태여도 볼 수 있어야 한다
-  const seeded = await pg.evaluate(s => window.ptsNewSince(s, '1', window.ptsSignaturesFor(s, '1')), students);
-  check('새 것이 하나도 없어도 최근 항목은 남는다', seeded.length === 0 && recent.length === 1);
+  const seeded = await pg.evaluate(s =>
+    window.ptsNewSince(s, '1', window.ptsSignaturesFor(s, '1', '1'), '1'), students);
+  check('새 것이 하나도 없어도 최근 항목은 남는다', seeded.length === 0 && recent.length === 2);
+}
+
+// 리로스쿨 실제 형식은 '[ 09.04 ]' — 연도가 없다. 전에 'YYYY-MM-DD' 로 가정하고
+// 날짜 창으로 자르다가 비교가 전부 실패해 '해당 항목 없음'만 떴다.
+console.log('\n■ 연도 없는 리로스쿨 날짜(MM.DD)');
+{
+  const key = await pg.evaluate(() => [
+    window.ptsDateKey('09.04'), window.ptsDateKey('[ 09.04 ]'),
+    window.ptsDateKey('9.4'),   window.ptsDateKey('2026-09-04'),
+    window.ptsDateKey('01.15'), window.ptsDateKey(''),
+  ]);
+  check('대괄호·한 자리 수도 같은 키가 된다', key[0] === key[1] && key[1] === key[2], key);
+  check('연도가 있으면 그대로 쓴다', key[3] === '2026-09-04', key[3]);
+  // 학년도가 3월 시작이라 1·2월은 12월보다 뒤여야 한다
+  check('1·2월은 뒤로 간다(학년도 3월 시작)', key[4] > key[0], [key[4], key[0]]);
+
+  const real = await pg.evaluate(() => window.ptsRecentEntries(
+    [{ grade: '1', num: '10101', room: '1', name: '김도욱', records: [
+      { date: '09.04', detail: '지각 ( 학급 담임 요청 시 ) ( -1 ) 등교지도 정선욱(-1)' },
+      { date: '06.12', detail: '#벌점을 상계하기 위한 교내봉사활동 ( 1 ) 아침 김영순(1)' },
+      { date: '05.29', detail: '실내생활 ( 공놀이, 소란, 욕설, 가래침, 심한 장난 등 ) ( -1 )' },
+    ] }], '1', '1', 30));
+  check('실제 형식으로도 항목이 나온다', real.length === 3, real.length);
+  check('최신(09.04)이 맨 위', real[0].date === '09.04', real.map(e => e.date));
+  check('그 다음이 06.12', real[1].date === '06.12', real.map(e => e.date));
+
+  const wrap = await pg.evaluate(() => window.ptsRecentEntries(
+    [{ grade: '1', num: '1', room: '1', name: 'ㄱ', records: [
+      { date: '03.05', detail: '3월(학년도 시작)' },
+      { date: '01.15', detail: '1월(학년도 끝 무렵)' },
+      { date: '12.20', detail: '12월' },
+    ] }], '1', '1', 30));
+  check('학년도 순서대로 1월 > 12월 > 3월',
+        wrap.map(e => e.date).join(',') === '01.15,12.20,03.05', wrap.map(e => e.date));
 }
 
 console.log('\n■ 사유에 태그가 들어 있어도 실행되지 않는다');
