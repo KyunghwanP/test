@@ -29,7 +29,19 @@ const grab = (name) => {
 console.log('\n■ 원본 배선 (정적)');
 check('배지 CSS가 있다', /\.home-pts-tag\{/.test(HTML));
 check('우리반 시간표를 그릴 때 배지 진단도 부른다',
-      /window\._renderHomeClassTt\(\);\s*checkHomeroomNewPoints\(\);/.test(HTML));
+      /window\._renderHomeClassTt\(\);\s*checkHomeroomNewPoints\(homeroomKey\);/.test(HTML));
+
+// 관리자는 담임반이 없다. 상담 화면은 이미 테스트용 1-1 로 폴백하는데 현황판만 안 해서
+// '우리반 오늘 시간표' 자체가 안 떴고, 그래서 배지도 볼 수가 없었다.
+{
+  const blk = HTML.slice(HTML.indexOf('// ── 담임 학급 시간표 ──'),
+                         HTML.indexOf('window._renderHomeClassTt();'));
+  check('현황판도 관리자면 1-1 로 폴백한다',
+        /homeroomKey = myTeacher\.homeroom[\s\S]{0,220}ADMIN_EMAIL\) \? '1-1' : null\)/.test(blk), blk.slice(0, 320));
+  check('보기 모드에서는 폴백하지 않는다(대상 교사 기준)', /!isViewAs\(\)/.test(blk));
+  check('폴백한 학급으로 시간표를 그린다', /classSchedule\[homeroomKey\]/.test(HTML));
+  check('폴백한 학급 이름을 헤더에 쓴다', /homeClassName'\)\.textContent = homeroomKey/.test(HTML));
+}
 
 const ptsSignaturesForSrc  = grab('ptsSignaturesFor');
 const ptsNewSinceSrc       = grab('ptsNewSince');

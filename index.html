@@ -13059,10 +13059,14 @@ async function initHomePage() {
     } // hasAnyClass end
 
     // ── 담임 학급 시간표 ──
-    if(myTeacher.homeroom) {
+    // 담임 학급 (관리자 테스트는 1-1 폴백 — 상담 화면이 이미 쓰던 규칙과 같다.
+    // 보기 모드는 대상 교사 기준이라 폴백하지 않는다)
+    const homeroomKey = myTeacher.homeroom
+      || ((!isViewAs() && fbAuth.currentUser?.email === ADMIN_EMAIL) ? '1-1' : null);
+    if(homeroomKey) {
       const classSection = document.getElementById('homeClassTimetable');
       classSection.style.display = '';
-      document.getElementById('homeClassName').textContent = myTeacher.homeroom;
+      document.getElementById('homeClassName').textContent = homeroomKey;
       // 내 시간표와 같이 '다시 그릴 수 있는' 함수로 둔다. 전에는 여기서 한 번 그리고
       // 끝이라, 운영표(OPERATING)가 늦게 도착해도 반영되지 않았다 — 탭을 나갔다
       // 들어오기 전까지 계속 기초시간표였다. 요일·시각도 부를 때마다 새로 잡는다.
@@ -13070,8 +13074,8 @@ async function initHomePage() {
         const nowDate = new Date();
         const todayDayC = days[nowDate.getDay()];
         const nowMinC = nowDate.getHours()*60 + nowDate.getMinutes();
-        const classSched = classSchedule[myTeacher.homeroom] || {};
-        const _gradeH = ttGradeOf(myTeacher.homeroom);
+        const classSched = classSchedule[homeroomKey] || {};
+        const _gradeH = ttGradeOf(homeroomKey);
         const _opH = ttOpForDate(ttISO(nowDate));
         const _crossH = ttDayCross(_opH, todayDayC, _gradeH-1);
         const classHtml = periods.map(b => {
@@ -13095,7 +13099,7 @@ async function initHomePage() {
         }
       };
       window._renderHomeClassTt();
-      checkHomeroomNewPoints();
+      checkHomeroomNewPoints(homeroomKey);
 
       document.querySelector('[data-goto="timetable-class"]').addEventListener('click', () => {
         navigateTo('timetable');
@@ -13104,7 +13108,7 @@ async function initHomePage() {
           const classTabBtn = document.querySelector('.tab-btn[data-mode="class"]');
           if(classTabBtn) classTabBtn.click();
           setTimeout(() => {
-            const homeroom = myTeacher.homeroom;
+            const homeroom = homeroomKey;
             const [grade, room] = homeroom.split('-');
             const gradeEl = document.getElementById('gradeSelect');
             const roomEl  = document.getElementById('roomSelect');
@@ -15949,12 +15953,13 @@ function ptsNewSince(students, room, ackedSigs) {
   return ptsSignaturesFor(students, room).filter(sig => !acked.has(sig));
 }
 
-async function checkHomeroomNewPoints() {
+async function checkHomeroomNewPoints(homeroom) {
   try {
-    if (!myTeacher || !myTeacher.homeroom) return;
-    const [grade, room] = myTeacher.homeroom.split('-');
+    const hr = homeroom || (myTeacher && myTeacher.homeroom);
+    if (!hr) return;
+    const [grade, room] = hr.split('-');
     if (!grade || !room) return;
-    const ackKey = 'ynhsPtsAck_' + myTeacher.homeroom;
+    const ackKey = 'ynhsPtsAck_' + hr;
     const snap = await getDoc(doc(fbDb, 'riro_points', `grade${grade}`));
     if (!snap.exists()) return;
     const students = snap.data().students || [];
