@@ -48,6 +48,18 @@ console.log('\n■ 모달 배선 (정적)');
 check('새 상벌점 모달이 있다', /id="ptsNewModal"/.test(HTML) && /id="ptsNewRecords"/.test(HTML));
 check('닫기·이동 핸들러가 window 에 있다',
       /window\.closePtsNewModalBtn\s*=/.test(HTML) && /window\.ptsNewGoToPoints\s*=/.test(HTML));
+
+// 등록을 빠뜨리면 모달은 그대로 있고 뒷페이지가 뒤로 가 버린다(실제로 그랬다).
+// 두 곳 모두 상벌점 상세 팝업 바로 옆에 나란히 있어야 한다.
+{
+  const pop = HTML.slice(HTML.indexOf("window.addEventListener('popstate'"),
+                         HTML.indexOf('// 2. 교체/보강 모달 뎁스'));
+  check('뒤로가기가 이 모달을 먼저 닫는다',
+        /ptsNewModal'\)\?\.classList\.contains\('show'\)\) \{ closePtsNewModalBtn\(\); armExitGuard\(\);/.test(pop), pop.slice(-400));
+  const esc = HTML.slice(HTML.indexOf('// ESC 키로 열린 모달 닫기'),
+                         HTML.indexOf('// ESC 키로 열린 모달 닫기') + 2500);
+  check('ESC 로도 닫힌다', /ptsNewModal'\)\?\.classList\.contains\('show'\)[\s\S]{0,80}closePtsNewModalBtn\(\)/.test(esc));
+}
 check('배지는 조회 페이지로 던지지 않고 모달을 연다',
       /tag\.onclick[\s\S]{0,220}renderPtsNewModal\(hr, newEntries\)/.test(HTML));
 check('모달 안에서 조회 페이지로 갈 길은 남겨 둔다', /ptsNewGoToPoints\(\)[\s\S]{0,120}navigateTo\('points'\)/.test(HTML));

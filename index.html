@@ -7812,6 +7812,7 @@ window.addEventListener('popstate', (e)=>{
   if (document.getElementById('groupSettingsModal')?.style.display === 'flex') { closeGroupSettings(); armExitGuard(); return; }
   if (document.getElementById('mytaskModal')?.classList.contains('show')) { closeMytaskModal(); armExitGuard(); return; }
   if (document.getElementById('ptsDetailModal')?.classList.contains('show')) { closePtsDetailBtn(); armExitGuard(); return; }
+  if (document.getElementById('ptsNewModal')?.classList.contains('show')) { closePtsNewModalBtn(); armExitGuard(); return; }
   if (document.querySelector('.cd-overlay.open')) { document.querySelector('.cd-overlay.open').classList.remove('open'); armExitGuard(); return; }
   if (document.getElementById('jindanModal')?.classList.contains('open')) { closeJindanModal(); armExitGuard(); return; }
   if (document.getElementById('seatModal')?.classList.contains('open')) { closeSeatModal(); armExitGuard(); return; }
@@ -20098,6 +20099,10 @@ document.addEventListener('keydown', e => {
   // 상벌점 상세 팝업
   if (document.getElementById('ptsDetailModal')?.classList.contains('show')) {
     closePtsDetailBtn(); return;
+  }
+  // 새로 반영된 상벌점 / 최근 7일 팝업
+  if (document.getElementById('ptsNewModal')?.classList.contains('show')) {
+    closePtsNewModalBtn(); return;
   }
   // 교체/보강 모달
   if (document.getElementById('swapModal')?.classList.contains('open')) {
