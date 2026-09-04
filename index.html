@@ -1820,6 +1820,23 @@
   }
   .pts-detail-record-text{font-size:14px;color:var(--ink);line-height:1.5;}
   .pts-detail-empty{padding:24px;text-align:center;color:var(--ink-soft);font-size:14px;}
+  /* 새로 반영된 상벌점 모달 — 상세 팝업의 뼈대를 그대로 쓰고 아래 버튼 줄만 더한다 */
+  .pts-new-who{font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;color:var(--ink);}
+  .pts-new-num{font-family:'IBM Plex Mono';font-size:12px;color:var(--ink-soft);font-weight:600;}
+  .pts-new-why{font-size:13px;color:var(--ink-soft);line-height:1.5;margin-top:2px;}
+  .pts-new-foot{padding:12px 20px;border-top:1px solid var(--rule);}
+  .pts-new-go{
+    width:100%;padding:11px;border-radius:10px;border:1px solid var(--rule);
+    background:var(--paper-soft);color:var(--ink);cursor:pointer;
+    font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;
+  }
+  /* 관리자 확인용 담임 반 고르기 (담임반이 없을 때만) */
+  .home-test-hr{
+    font-family:'IBM Plex Mono';font-size:12px;font-weight:700;
+    color:var(--ink-soft);background:var(--paper-soft);
+    border:1px solid var(--rule);border-radius:8px;padding:3px 6px;
+    margin-left:auto;margin-right:8px;cursor:pointer;flex-shrink:0;
+  }
 
   /* 버전 표시 */
   .nav-version{
@@ -5780,6 +5797,23 @@
       </div>
     </div>
     <div class="pts-detail-records" id="ptsDetailRecords"></div>
+  </div>
+</div>
+
+<!-- 새로 반영된 상벌점 (현황판 '우리반 오늘 시간표' 배지에서 열림) -->
+<div class="pts-detail-modal" id="ptsNewModal" onclick="closePtsNewModal(event)">
+  <div class="pts-detail-box">
+    <div class="pts-detail-head">
+      <div>
+        <div class="pts-detail-head-name">🆕 새로 반영된 상벌점</div>
+        <div class="pts-detail-head-info" id="ptsNewInfo"></div>
+      </div>
+      <button class="pts-detail-close" onclick="closePtsNewModalBtn()">×</button>
+    </div>
+    <div class="pts-detail-records" id="ptsNewRecords"></div>
+    <div class="pts-new-foot">
+      <button class="pts-new-go" onclick="ptsNewGoToPoints()">상벌점 조회로 이동 ›</button>
+    </div>
   </div>
 </div>
 
@@ -13059,14 +13093,17 @@ async function initHomePage() {
     } // hasAnyClass end
 
     // ── 담임 학급 시간표 ──
-    // 담임 학급 (관리자 테스트는 1-1 폴백 — 상담 화면이 이미 쓰던 규칙과 같다.
-    // 보기 모드는 대상 교사 기준이라 폴백하지 않는다)
-    const homeroomKey = myTeacher.homeroom
-      || ((!isViewAs() && fbAuth.currentUser?.email === ADMIN_EMAIL) ? '1-1' : null);
+    // 담임 학급 (관리자는 담임반이 없어 이 섹션 자체가 안 떴다. 상담 화면이 이미 쓰던
+    // 테스트용 폴백과 같은 규칙 — 보기 모드는 대상 교사 기준이라 폴백하지 않는다.
+    // 관리자는 어느 반으로 볼지 헤더의 드롭다운으로 고를 수 있다)
+    const isTestHomeroom = !myTeacher.homeroom && !isViewAs()
+                           && fbAuth.currentUser?.email === ADMIN_EMAIL;
+    const homeroomKey = myTeacher.homeroom || (isTestHomeroom ? testHomeroomPick() : null);
     if(homeroomKey) {
       const classSection = document.getElementById('homeClassTimetable');
       classSection.style.display = '';
       document.getElementById('homeClassName').textContent = homeroomKey;
+      if(isTestHomeroom) renderTestHomeroomPicker(homeroomKey);
       // 내 시간표와 같이 '다시 그릴 수 있는' 함수로 둔다. 전에는 여기서 한 번 그리고
       // 끝이라, 운영표(OPERATING)가 늦게 도착해도 반영되지 않았다 — 탭을 나갔다
       // 들어오기 전까지 계속 기초시간표였다. 요일·시각도 부를 때마다 새로 잡는다.
@@ -15936,22 +15973,90 @@ async function loadPtsViewData() {
   }
 }
 
+// ── 관리자 확인용: 어느 반 담임으로 볼지 (담임반이 없는 계정에서만) ──
+// 담임반이 없으면 '우리반 오늘 시간표'가 아예 안 떠서 거기 붙는 것들을 확인할 수 없다.
+const TEST_HR_KEY = 'ynhsTestHomeroom';
+function testHomeroomPick() {
+  try { return localStorage.getItem(TEST_HR_KEY) || '1-1'; } catch (e) { return '1-1'; }
+}
+function renderTestHomeroomPicker(current) {
+  const hdr = document.querySelector('#homeClassTimetable .home-section-header');
+  if (!hdr) return;
+  hdr.querySelector('#homeTestHrPick')?.remove();
+  const keys = Object.keys(classSchedule || {}).sort((a, b) => {
+    const [ag, ar] = a.split('-').map(Number), [bg, br] = b.split('-').map(Number);
+    return (ag - bg) || (ar - br);
+  });
+  if (!keys.length) keys.push(current);
+  const sel = document.createElement('select');
+  sel.id = 'homeTestHrPick';
+  sel.className = 'home-test-hr';
+  sel.title = '관리자 확인용 — 어느 반 담임으로 볼지';
+  sel.innerHTML = keys.map(k =>
+    `<option value="${escapeHtml(k)}"${k === current ? ' selected' : ''}>${escapeHtml(k)}반</option>`).join('');
+  // 헤더 전체가 시간표로 가는 버튼이라 드롭다운 조작이 새어 나가면 안 된다
+  sel.onclick = e => e.stopPropagation();
+  sel.onchange = e => {
+    e.stopPropagation();
+    try { localStorage.setItem(TEST_HR_KEY, sel.value); } catch (err) {}
+    initHomePage();   // 시간표·배지 전부 새 반 기준으로 다시
+  };
+  hdr.insertBefore(sel, hdr.querySelector('.home-section-arrow'));
+}
+
 // ── 담임 학급 새 상벌점 배지 (홈 현황판 '우리반 오늘 시간표' 헤더) ──
 // riro_points 는 밤마다 학년 전체가 통째로 덮어써지는 스냅샷이라 '새로 추가된 것'이라는
 // 개념이 원래 없다. 학생별 records(개별 항목) 를 서명으로 바꿔 직전에 확인한 서명 목록과
 // 비교하는 방식으로 흉내낸다 — 순수 함수라 riro_points 없이도 테스트할 수 있다.
-function ptsSignaturesFor(students, room) {
-  const sigs = [];
+function ptsEntriesFor(students, room) {
+  const out = [];
   (students || []).forEach(s => {
     if (String(s.room) !== String(room)) return;
-    (s.records || []).forEach(r => sigs.push(`${s.num}|${r.date}|${r.detail}`));
+    (s.records || []).forEach(r => out.push({
+      sig: `${s.num}|${r.date}|${r.detail}`,
+      num: s.num, name: s.name || '', date: r.date, detail: r.detail
+    }));
   });
-  return sigs;
+  return out;
 }
+function ptsSignaturesFor(students, room) {
+  return ptsEntriesFor(students, room).map(e => e.sig);
+}
+// 서명만 주고받으면 배지 숫자는 셀 수 있어도 '무엇이' 새로 생겼는지는 못 보여 준다.
+// 조회 페이지로 통째로 넘겨 버리면 새로 생긴 걸 다시 찾아야 하므로 항목 자체를 돌려준다.
 function ptsNewSince(students, room, ackedSigs) {
   const acked = new Set(ackedSigs || []);
-  return ptsSignaturesFor(students, room).filter(sig => !acked.has(sig));
+  return ptsEntriesFor(students, room).filter(e => !acked.has(e.sig));
 }
+
+// ── 새로 반영된 상벌점 모달 ──
+function renderPtsNewModal(homeroom, entries) {
+  document.getElementById('ptsNewInfo').textContent = `${homeroom} · ${entries.length}건`;
+  const box = document.getElementById('ptsNewRecords');
+  box.innerHTML = entries.length ? entries.map(e => `
+    <div class="pts-detail-record-item">
+      <span class="pts-detail-record-date">${escapeHtml(String(e.date || ''))}</span>
+      <div>
+        <div class="pts-new-who">${escapeHtml(String(e.name || ''))}
+          <span class="pts-new-num">${escapeHtml(String(e.num || ''))}번</span></div>
+        <div class="pts-new-why">${escapeHtml(String(e.detail || ''))}</div>
+      </div>
+    </div>`).join('') : '<div class="pts-detail-empty">새로 반영된 항목이 없습니다.</div>';
+  document.getElementById('ptsNewModal').classList.add('show');
+}
+function closePtsNewModal(e) {
+  if (e.target === document.getElementById('ptsNewModal')) closePtsNewModalBtn();
+}
+function closePtsNewModalBtn() {
+  document.getElementById('ptsNewModal').classList.remove('show');
+}
+function ptsNewGoToPoints() {
+  closePtsNewModalBtn();
+  navigateTo('points');
+}
+window.closePtsNewModal = closePtsNewModal;
+window.closePtsNewModalBtn = closePtsNewModalBtn;
+window.ptsNewGoToPoints = ptsNewGoToPoints;
 
 async function checkHomeroomNewPoints(homeroom) {
   try {
@@ -15973,19 +16078,19 @@ async function checkHomeroomNewPoints(homeroom) {
       return;
     }
 
-    const newSigs = ptsNewSince(students, room, acked);
+    const newEntries = ptsNewSince(students, room, acked);
     const classTitleEl = document.querySelector('#homeClassTimetable .home-section-title');
     if (!classTitleEl) return;
     classTitleEl.querySelector('.home-pts-tag')?.remove();
-    if (newSigs.length) {
+    if (newEntries.length) {
       const tag = document.createElement('span');
       tag.className = 'home-pts-tag';
-      tag.textContent = `🆕 ${newSigs.length}`;
+      tag.textContent = `🆕 ${newEntries.length}`;
       tag.onclick = (e) => {
         e.stopPropagation();
         localStorage.setItem(ackKey, JSON.stringify(allSigs));
         tag.remove();
-        navigateTo('points');
+        renderPtsNewModal(hr, newEntries);
       };
       classTitleEl.appendChild(tag);
     }
