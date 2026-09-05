@@ -61,7 +61,12 @@ check('닫기·이동 핸들러가 window 에 있다',
   check('ESC 로도 닫힌다', /ptsNewModal'\)\?\.classList\.contains\('show'\)[\s\S]{0,80}closePtsNewModalBtn\(\)/.test(esc));
 }
 check('배지는 조회 페이지로 던지지 않고 모달을 연다',
-      /tag\.onclick[\s\S]{0,220}renderPtsNewModal\(hr, newEntries\)/.test(HTML));
+      /tag\.onclick[\s\S]{0,420}renderPtsNewModal\(hr, recent,/.test(HTML));
+// 한 번 누르면 사라지는 배지는 그 뒤로 현황판에서 최근 상황을 알 길이 없다
+check('배지는 안 본 것이 아니라 최근 것을 센다',
+      /const recent = ptsEntriesWithin\(students, room, null, PTS_RECENT_DAYS\)[\s\S]{0,600}tag\.textContent = `🆕 \$\{recent\.length\}`/.test(HTML));
+check('눌러도 배지를 지우지 않는다(NEW 표시만 걷는다)',
+      /tag\.classList\.remove\('unseen'\)/.test(HTML) && !/tag\.remove\(\);/.test(HTML));
 check('모달 안에서 조회 페이지로 갈 길은 남겨 둔다', /ptsNewGoToPoints\(\)[\s\S]{0,120}navigateTo\('points'\)/.test(HTML));
 
 console.log('\n■ 기준선과 무관하게 "최근 항목"을 볼 수 있는가 (정적)');
@@ -131,6 +136,7 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   ${ptsRecentEntriesSrc}
   ${ptsEntriesWithinSrc}
   const PTS_WARN_TOTAL = -5;
+  const PTS_RECENT_DAYS = 7;
   ${ptsWarnStudentsSrc}
   window.ptsRecentEntries = ptsRecentEntries;
   window.ptsEntriesWithin = ptsEntriesWithin;
@@ -171,59 +177,83 @@ console.log('\n■ 순수 함수 — 서명 만들기 · 반 필터');
         news[0].date === '2026-09-02' && news[0].detail === '흡연' && news[0].num === '3', news[0]);
 }
 
+// 오늘을 2026-09-04 로 고정한다 — '최근 7일' 이 흐르는 시각에 딸려 가면 안 된다
+const FIXED_TODAY = '2026-09-04T09:00:00';
+await pg.addInitScript(iso => {
+  const R = Date;
+  const F = new R(iso).getTime();
+  // eslint-disable-next-line no-global-assign
+  Date = class extends R {
+    constructor(...a) { return a.length ? new R(...a) : new R(F); }
+    static now() { return F; }
+  };
+}, FIXED_TODAY);
+await pg.goto('https://ynhs.test/h.html');
+
 console.log('\n■ 우리반(1-1) 오늘 시간표 헤더 — 첫 실행은 이력을 새 것으로 취급하지 않는다');
 {
   await pg.evaluate(() => { window.__mockStudents = [
-    { num: '3', room: '1', name: '김민준', records: [{ date: '2026-09-01', detail: '지각 3회' }] },
+    { num: '3', room: '1', name: '김민준', records: [{ date: '09.01', detail: '지각 3회' }] },
   ]; });
   await pg.evaluate(() => window.checkHomeroomNewPoints());
-  check('배지가 안 뜬다(처음 켠 기기)', (await pg.$('#homeClassTimetable .home-pts-tag')) === null);
   const acked = await pg.evaluate(() => JSON.parse(localStorage.getItem('ynhsPtsAck_1-1')));
-  check('대신 지금 상태를 기준으로 조용히 저장해 둔다', JSON.stringify(acked) === JSON.stringify(['3|2026-09-01|지각 3회']), acked);
+  check('지금 상태를 기준으로 조용히 저장해 둔다',
+        JSON.stringify(acked) === JSON.stringify(['3|09.01|지각 3회']), acked);
+  // 배지는 '안 본 것'이 아니라 '최근 것'을 센다 — 처음 켠 기기에서도 최근이면 뜬다
+  const tag = await pg.$eval('#homeClassTimetable .home-pts-tag',
+    e => ({ text: e.textContent, unseen: e.classList.contains('unseen') })).catch(() => null);
+  check('그래도 배지는 뜬다(최근 1건)', tag && tag.text === '🆕 1', tag);
+  check('다 본 상태라 옅게 뜬다', tag && !tag.unseen, tag);
 }
 
 console.log('\n■ 다음 날 — 우리 반에 2건이 새로 반영되면');
 {
   await pg.evaluate(() => { window.__mockStudents = [
     { num: '3', room: '1', name: '김민준', records: [
-      { date: '2026-09-01', detail: '지각 3회' },     // 이미 확인함
-      { date: '2026-09-02', detail: '수업 태도 우수(상점)' },  // 새 것
+      { date: '09.01', detail: '지각 3회' },     // 이미 확인함
+      { date: '09.02', detail: '수업 태도 우수(상점)' },  // 새 것
     ] },
     { num: '5', room: '1', name: '이서준', records: [
-      { date: '2026-09-02', detail: '휴대폰 사용' },          // 새 것
+      { date: '09.02', detail: '휴대폰 사용' },          // 새 것
     ] },
     { num: '9', room: '2', name: '박지후', records: [
-      { date: '2026-09-02', detail: '벌점 5점' },             // 옆 반 — 무시돼야 함
+      { date: '09.02', detail: '벌점 5점' },             // 옆 반 — 무시돼야 함
     ] },
   ]; });
   await pg.evaluate(() => window.checkHomeroomNewPoints());
 
-  const tagText = await pg.$eval('#homeClassTimetable .home-pts-tag', e => e.textContent).catch(() => null);
-  check('배지에 정확히 2건이라고 뜬다', tagText === '🆕 2', tagText);
+  const tag = await pg.$eval('#homeClassTimetable .home-pts-tag',
+    e => ({ text: e.textContent, unseen: e.classList.contains('unseen'), title: e.title })).catch(() => null);
+  check('배지는 최근 7일 전체 건수(3건)를 센다', tag && tag.text === '🆕 3', tag);
+  check('안 본 것이 있으면 진하게', tag && tag.unseen, tag);
+  check('안 본 건수는 툴팁에 적는다', tag && tag.title.includes('안 본 것 2건'), tag && tag.title);
 
   const inHeader = await pg.$eval('#homeClassTimetable .home-section-title',
     e => e.textContent.includes('우리반(1-1) 오늘 시간표') && e.querySelector('.home-pts-tag') !== null);
   check("'우리반(1-1) 오늘 시간표' 제목 안에 배지가 붙는다(새 섹션이 아니라)", inHeader);
 }
 
-console.log('\n■ 배지를 누르면 — 조회 페이지로 던지지 않고 바뀐 것만 모아 보여 준다');
+console.log('\n■ 배지를 눌러도 사라지지 않는다 — 계속 떠 있고 NEW 표시만 걷힌다');
 {
   await pg.click('#homeClassTimetable .home-pts-tag');
-  check('배지가 사라진다', (await pg.$('#homeClassTimetable .home-pts-tag')) === null);
+  const after = await pg.$eval('#homeClassTimetable .home-pts-tag',
+    e => ({ text: e.textContent, unseen: e.classList.contains('unseen') })).catch(() => null);
+  check('배지가 그대로 남는다', after && after.text === '🆕 3', after);
+  check('다 봤으니 옅어진다', after && !after.unseen, after);
   check('바로 페이지를 옮기지 않는다', JSON.stringify(await pg.evaluate(() => window.navLog)) === '[]',
         await pg.evaluate(() => window.navLog));
   check('모달이 열린다', await pg.$eval('#ptsNewModal', e => e.classList.contains('show')));
   check('머리글에 반과 건수가 뜬다',
-        (await pg.$eval('#ptsNewInfo', e => e.textContent)) === '1-1 · 2건',
+        (await pg.$eval('#ptsNewInfo', e => e.textContent)) === '1-1 · 3건',
         await pg.$eval('#ptsNewInfo', e => e.textContent));
 
   const rows = await pg.$$eval('#ptsNewRecords .pts-detail-record-item', els => els.map(e => e.textContent.replace(/\s+/g, ' ').trim()));
-  check('새로 생긴 2건만 나온다', rows.length === 2, rows);
-  check('학생 이름·번호·날짜·사유가 다 보인다',
-        rows[0].includes('김민준') && rows[0].includes('3번') &&
-        rows[0].includes('2026-09-02') && rows[0].includes('수업 태도 우수'), rows[0]);
+  check('최근 7일 3건이 다 나온다(이미 본 것 포함)', rows.length === 3, rows);
+  check('그중 새로 생긴 것만 NEW 로 표시된다',
+        rows.filter(r => r.includes('NEW')).length === 2, rows);
+  check('이미 봤던 항목엔 NEW 가 없다',
+        !rows.find(r => r.includes('지각 3회')).includes('NEW'), rows);
   check('옆 반(1-2) 학생은 안 섞인다', !rows.join(' ').includes('박지후'), rows);
-  check('이미 확인했던 예전 항목은 안 나온다', !rows.join(' ').includes('지각 3회'), rows);
 
   const acked = await pg.evaluate(() => JSON.parse(localStorage.getItem('ynhsPtsAck_1-1')));
   check('확인한 것으로 3건 전부 저장된다', acked.length === 3, acked);
@@ -232,7 +262,22 @@ console.log('\n■ 배지를 누르면 — 조회 페이지로 던지지 않고 
   check('닫으면 모달이 사라진다', !(await pg.$eval('#ptsNewModal', e => e.classList.contains('show'))));
 
   await pg.evaluate(() => window.checkHomeroomNewPoints());
-  check('같은 데이터로 다시 확인해도 배지가 다시 안 뜬다', (await pg.$('#homeClassTimetable .home-pts-tag')) === null);
+  const again = await pg.$eval('#homeClassTimetable .home-pts-tag',
+    e => ({ text: e.textContent, unseen: e.classList.contains('unseen') })).catch(() => null);
+  check('다시 그려도 배지는 계속 있다', again && again.text === '🆕 3', again);
+  check('NEW 는 다시 안 붙는다', again && !again.unseen, again);
+}
+
+console.log('\n■ 최근 7일에 아무것도 없으면 배지도 없다');
+{
+  await pg.evaluate(() => {
+    localStorage.removeItem('ynhsPtsAck_1-1');
+    window.__mockStudents = [
+      { num: '3', room: '1', name: '김민준', records: [{ date: '05.02', detail: '한참 전' }] },
+    ];
+  });
+  await pg.evaluate(() => window.checkHomeroomNewPoints());
+  check('오래된 것만 있으면 배지가 안 뜬다', (await pg.$('#homeClassTimetable .home-pts-tag')) === null);
 }
 
 console.log('\n■ 최근 항목 — 기준선을 이미 잡아 둔 뒤에도 볼 수 있다');

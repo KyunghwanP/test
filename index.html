@@ -1830,6 +1830,10 @@
   .pts-new-who{font-family:'Pretendard','Noto Sans KR';font-weight:700;font-size:14px;color:var(--ink);}
   .pts-new-num{font-family:'IBM Plex Mono';font-size:12px;color:var(--ink-soft);font-weight:600;}
   .pts-new-why{font-size:13px;color:var(--ink-soft);line-height:1.5;margin-top:2px;}
+  .pts-new-flag{
+    font-size:10px;font-weight:800;color:#fff;background:#7c3aed;
+    border-radius:5px;padding:0 5px;margin-left:5px;vertical-align:middle;
+  }
   .pts-warn{
     margin:12px 20px 0;padding:10px 12px;border-radius:10px;
     background:#FEF2F2;border:1px solid #FECACA;
@@ -2248,8 +2252,12 @@
   .home-tt-cell.tt-sub{box-shadow:inset 3px 0 0 rgba(99,102,241,.6);}
   .home-op-tag{font-size:11px;font-weight:800;color:#4338ca;background:#e0e7ff;border-radius:6px;padding:1px 7px;margin-left:6px;vertical-align:middle;}
   html.dark .home-op-tag{color:#c7d2fe;background:#312e81;}
-  .home-pts-tag{font-size:11px;font-weight:800;color:#fff;background:#7c3aed;border-radius:6px;padding:1px 7px;margin-left:6px;vertical-align:middle;cursor:pointer;}
-  html.dark .home-pts-tag{background:#8b5cf6;}
+  /* 안 본 것이 남아 있으면 진하게, 다 봤으면 옅게 — 배지 자체는 계속 떠 있는다 */
+  .home-pts-tag{font-size:11px;font-weight:800;color:var(--ink-soft);background:var(--paper-soft);
+    border:1px solid var(--rule);border-radius:6px;padding:1px 7px;margin-left:6px;
+    vertical-align:middle;cursor:pointer;}
+  .home-pts-tag.unseen{color:#fff;background:#7c3aed;border-color:#7c3aed;}
+  html.dark .home-pts-tag.unseen{background:#8b5cf6;border-color:#8b5cf6;}
   .tt-wk-btn{
     border:none;background:transparent;cursor:pointer;font-size:17px;line-height:1;
     color:var(--ink-soft);padding:1px 7px;border-radius:14px;font-family:inherit;
@@ -16117,7 +16125,8 @@ function ptsWarnStudents(students, room, grade, threshold) {
 }
 
 // ── 새로 반영된 상벌점 모달 ──
-function renderPtsNewModal(homeroom, entries, title, info, warns) {
+function renderPtsNewModal(homeroom, entries, title, info, warns, newSigs) {
+  const isNew = new Set(newSigs || []);
   document.getElementById('ptsNewTitle').textContent = title || '🆕 새로 반영된 상벌점';
   document.getElementById('ptsNewInfo').textContent = info || `${homeroom} · ${entries.length}건`;
   const warnBox = document.getElementById('ptsNewWarn');
@@ -16140,7 +16149,8 @@ function renderPtsNewModal(homeroom, entries, title, info, warns) {
       <span class="pts-detail-record-date">${escapeHtml(String(e.date || ''))}</span>
       <div>
         <div class="pts-new-who">${escapeHtml(String(e.name || ''))}
-          <span class="pts-new-num">${escapeHtml(String(e.num || ''))}번</span></div>
+          <span class="pts-new-num">${escapeHtml(String(e.num || ''))}번</span>
+          ${isNew.has(e.sig) ? '<span class="pts-new-flag">NEW</span>' : ''}</div>
         <div class="pts-new-why">${escapeHtml(String(e.detail || ''))}</div>
       </div>
     </div>`).join('') : '<div class="pts-detail-empty">해당하는 항목이 없습니다.</div>';
@@ -16199,25 +16209,37 @@ async function checkHomeroomNewPoints(homeroom) {
 
     let acked;
     try { acked = JSON.parse(localStorage.getItem(ackKey) || 'null'); } catch (e) { acked = null; }
+    // 처음 켠 기기 — 지금까지 쌓인 이력을 전부 '새 항목'으로 취급하지 않는다.
+    // 배지 자체는 '안 본 것'이 아니라 '최근 것'을 세므로 이때도 뜬다.
     if (acked === null) {
-      // 처음 켠 기기 — 지금까지 쌓인 이력을 전부 '새 항목'으로 취급하지 않는다
       localStorage.setItem(ackKey, JSON.stringify(allSigs));
-      return;
+      acked = allSigs;
     }
 
-    const newEntries = ptsNewSince(students, room, acked);
+    // 배지를 '안 본 것' 으로 세면 한 번 누르는 순간 사라져서, 그 뒤로는 최근에 무슨 일이
+    // 있었는지 현황판에서 알 길이 없다. 최근 7일에 항목이 있으면 계속 떠 있게 하고,
+    // 그중 아직 안 본 것은 모달에서 NEW 로 구분한다.
+    const recent = ptsEntriesWithin(students, room, null, PTS_RECENT_DAYS);
+    const newSigs = ptsNewSince(students, room, acked).map(e => e.sig);
+    const warns = ptsWarnStudents(students, room, null);
+
     const classTitleEl = document.querySelector('#homeClassTimetable .home-section-title');
     if (!classTitleEl) return;
     classTitleEl.querySelector('.home-pts-tag')?.remove();
-    if (newEntries.length) {
+    if (recent.length) {
+      const unseen = newSigs.filter(sig => recent.some(e => e.sig === sig)).length;
       const tag = document.createElement('span');
-      tag.className = 'home-pts-tag';
-      tag.textContent = `🆕 ${newEntries.length}`;
-      tag.onclick = (e) => {
-        e.stopPropagation();
+      tag.className = 'home-pts-tag' + (unseen ? ' unseen' : '');
+      tag.textContent = `🆕 ${recent.length}`;
+      tag.title = unseen ? `최근 ${PTS_RECENT_DAYS}일 ${recent.length}건 (안 본 것 ${unseen}건)`
+                         : `최근 ${PTS_RECENT_DAYS}일 ${recent.length}건`;
+      tag.onclick = (ev) => {
+        ev.stopPropagation();
+        // 열어 봤으니 확인 처리 — 배지는 그대로 두고 NEW 표시만 사라진다
         localStorage.setItem(ackKey, JSON.stringify(allSigs));
-        tag.remove();
-        renderPtsNewModal(hr, newEntries);
+        tag.classList.remove('unseen');
+        renderPtsNewModal(hr, recent, `🗓 최근 ${PTS_RECENT_DAYS}일 상벌점`,
+                          `${hr} · ${recent.length}건`, warns, newSigs);
       };
       classTitleEl.appendChild(tag);
     }
