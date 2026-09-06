@@ -16199,6 +16199,13 @@ window.closePtsNewModal = closePtsNewModal;
 window.closePtsNewModalBtn = closePtsNewModalBtn;
 window.ptsNewGoToPoints = ptsNewGoToPoints;
 
+// 확인한 목록 저장. 시크릿 모드처럼 저장이 막힌 브라우저에서는 setItem 이 예외를
+// 던지는데, 그걸 안 막으면 그 다음 줄(배지 그리기·모달 띄우기)이 통째로 안 돈다.
+// 기억을 못 할 뿐이지 화면은 그대로 떠야 한다.
+function ptsRememberAck(ackKey, sigs) {
+  try { localStorage.setItem(ackKey, JSON.stringify(sigs)); } catch (e) { /* 저장 못 해도 계속 */ }
+}
+
 async function checkHomeroomNewPoints(homeroom) {
   try {
     const hr = homeroom || (myTeacher && myTeacher.homeroom);
@@ -16218,7 +16225,7 @@ async function checkHomeroomNewPoints(homeroom) {
     // 처음 켠 기기 — 지금까지 쌓인 이력을 전부 '새 항목'으로 취급하지 않는다.
     // 배지 자체는 '안 본 것'이 아니라 '최근 것'을 세므로 이때도 뜬다.
     if (acked === null) {
-      localStorage.setItem(ackKey, JSON.stringify(allSigs));
+      ptsRememberAck(ackKey, allSigs);
       acked = allSigs;
     }
 
@@ -16241,8 +16248,9 @@ async function checkHomeroomNewPoints(homeroom) {
                          : `최근 ${PTS_RECENT_DAYS}일 ${recent.length}건`;
       tag.onclick = (ev) => {
         ev.stopPropagation();
-        // 열어 봤으니 확인 처리 — 배지는 그대로 두고 NEW 표시만 사라진다
-        localStorage.setItem(ackKey, JSON.stringify(allSigs));
+        // 열어 봤으니 확인 처리 — 배지는 그대로 두고 NEW 표시만 사라진다.
+        // 저장이 막혀도 모달은 떠야 한다(이 클로저는 나중에 실행돼 바깥 try 가 못 잡는다).
+        ptsRememberAck(ackKey, allSigs);
         tag.classList.remove('unseen');
         renderPtsNewModal(hr, recent, `🗓 최근 ${PTS_RECENT_DAYS}일 상벌점`,
                           `${hr} · ${recent.length}건`, warns, newSigs);

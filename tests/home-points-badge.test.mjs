@@ -84,6 +84,7 @@ check('열기 함수가 window 에 있다', /window\.openPtsRecentModal\s*=/.tes
 const ptsRecentEntriesSrc  = grab('ptsRecentEntries');
 const ptsEntriesWithinSrc  = grab('ptsEntriesWithin');
 const ptsWarnStudentsSrc   = grab('ptsWarnStudents');
+const ptsRememberAckSrc    = grab('ptsRememberAck');
 const ptsDateKeySrc        = grab('ptsDateKey');
 const ptsEntriesForSrc     = grab('ptsEntriesFor');
 const ptsSignaturesForSrc  = grab('ptsSignaturesFor');
@@ -138,6 +139,7 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   const PTS_WARN_TOTAL = -5;
   const PTS_RECENT_DAYS = 7;
   ${ptsWarnStudentsSrc}
+  ${ptsRememberAckSrc}
   window.ptsRecentEntries = ptsRecentEntries;
   window.ptsEntriesWithin = ptsEntriesWithin;
   window.ptsWarnStudents = ptsWarnStudents;
@@ -398,6 +400,35 @@ console.log('\n■ 누적 벌점 경고');
   await pg.evaluate(() => window.renderPtsNewModal('1-1', [], '제목', '정보', []));
   check('걸린 학생이 없으면 경고 줄 자체가 없다',
         (await pg.$eval('#ptsNewWarn', e => e.innerHTML)) === '');
+}
+
+// 시크릿 모드 등에서는 setItem 이 예외를 던진다. 배지 onclick 은 나중에 실행되는
+// 클로저라 checkHomeroomNewPoints 를 감싼 바깥 try 가 못 잡는다 — 그대로 두면
+// 저장에서 멈춰 모달이 아예 안 뜬다.
+console.log('\n■ 저장이 막힌 브라우저에서도 배지·모달이 뜬다');
+{
+  await pg.evaluate(() => {
+    // 앞 블록이 열어 둔 모달을 닫고 시작한다 — 안 그러면 '모달이 뜬다'가 거저 통과한다
+    window.closePtsNewModalBtn();
+    localStorage.clear();
+    window.__writes = 0;
+    const real = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (...a) { window.__writes++; throw new Error('QuotaExceededError'); };
+    window.__restore = () => { Storage.prototype.setItem = real; };
+    window.__mockStudents = [
+      { num: '3', room: '1', name: '김민준', records: [{ date: '09.03', detail: '지각' }] },
+    ];
+  });
+  await pg.evaluate(() => window.checkHomeroomNewPoints());
+  check('저장이 막혀도 배지는 뜬다',
+        (await pg.$('#homeClassTimetable .home-pts-tag')) !== null);
+  check('저장을 시도는 했다', (await pg.evaluate(() => window.__writes)) > 0);
+
+  await pg.click('#homeClassTimetable .home-pts-tag');
+  check('눌렀을 때 모달도 뜬다(여기서 멈추던 것)',
+        await pg.$eval('#ptsNewModal', e => e.classList.contains('show')));
+
+  await pg.evaluate(() => { window.__restore(); window.closePtsNewModalBtn(); localStorage.clear(); });
 }
 
 console.log('\n■ 사유에 태그가 들어 있어도 실행되지 않는다');
