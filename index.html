@@ -7819,6 +7819,12 @@ window.addEventListener('popstate', (e)=>{
   if (document.getElementById('groupEditorModal')?.style.display === 'flex') { closeGroupEditor(); armExitGuard(); return; }
   if (document.getElementById('groupSettingsModal')?.style.display === 'flex') { closeGroupSettings(); armExitGuard(); return; }
   if (document.getElementById('mytaskModal')?.classList.contains('show')) { closeMytaskModal(); armExitGuard(); return; }
+  // 날짜별 목록 위에 업무 상세가 겹쳐 뜨므로 상세를 먼저 본다(위 줄)
+  if (document.getElementById('mytaskDayModal')?.classList.contains('show')) { closeMytaskDayModal(); armExitGuard(); return; }
+  if (document.getElementById('consultPeekModal')?.classList.contains('show')) { closeConsultPeek(); armExitGuard(); return; }
+  if (document.getElementById('consultAutoModal')?.classList.contains('show')) { closeConsultAutoModal(); armExitGuard(); return; }
+  if (document.getElementById('roomModalOverlay')?.classList.contains('open')) { closeRoomModal(); armExitGuard(); return; }
+  if (document.getElementById('ttMeetModal')?.classList.contains('open')) { ttMeetClose(); armExitGuard(); return; }
   if (document.getElementById('ptsDetailModal')?.classList.contains('show')) { closePtsDetailBtn(); armExitGuard(); return; }
   if (document.getElementById('ptsNewModal')?.classList.contains('show')) { closePtsNewModalBtn(); armExitGuard(); return; }
   if (document.querySelector('.cd-overlay.open')) { document.querySelector('.cd-overlay.open').classList.remove('open'); armExitGuard(); return; }
@@ -20129,6 +20135,40 @@ document.addEventListener('keydown', e => {
   // 교체/보강 모달
   if (document.getElementById('swapModal')?.classList.contains('open')) {
     closeSwapModal(); return;
+  }
+  // 업무 날짜별 목록 (상세가 겹치면 위에서 이미 걸린다)
+  if (document.getElementById('mytaskDayModal')?.classList.contains('show')) {
+    closeMytaskDayModal(); return;
+  }
+  // 상담 — 미리보기 · 자동배정
+  if (document.getElementById('consultPeekModal')?.classList.contains('show')) {
+    closeConsultPeek(); return;
+  }
+  if (document.getElementById('consultAutoModal')?.classList.contains('show')) {
+    closeConsultAutoModal(); return;
+  }
+  // 특별실 예약 · 협의시간
+  if (document.getElementById('roomModalOverlay')?.classList.contains('open')) {
+    closeRoomModal(); return;
+  }
+  if (document.getElementById('ttMeetModal')?.classList.contains('open')) {
+    ttMeetClose(); return;
+  }
+  // 아래는 뒤로가기에는 이미 걸려 있었는데 ESC 에만 빠져 있던 것들
+  if (document.getElementById('jindanModal')?.classList.contains('open')) {
+    closeJindanModal(); return;
+  }
+  if (document.getElementById('seatModal')?.classList.contains('open')) {
+    closeSeatModal(); return;
+  }
+  if (document.getElementById('classOrgModal')?.classList.contains('open')) {
+    closeClassOrgModal(); return;
+  }
+  if (document.getElementById('passDetailOverlay')?.classList.contains('open')) {
+    passCloseDetail(); return;
+  }
+  if (document.getElementById('passModalOverlay')?.classList.contains('open')) {
+    passCloseForm(); return;
   }
   // cd-overlay 팝업 (학사일정, 시간표 등)
   const cdOverlay = document.querySelector('.cd-overlay.open');
