@@ -13,6 +13,8 @@ import fs from 'node:fs';
 const HTML  = fs.readFileSync(import.meta.dirname + '/../index.html', 'utf8');
 const PAGE  = fs.readFileSync(import.meta.dirname + '/../usage.html', 'utf8');
 const RULES = fs.readFileSync(import.meta.dirname + '/../firestore.rules', 'utf8');
+// '지금 버전' 을 여기 적어 두면 APP_VER 가 올라갈 때마다 이 검사가 죽는다.
+const CUR_VER = /const APP_VER = '([^']+)'/.exec(PAGE)[1];
 
 let pass = 0, fail = 0;
 const check = (n, c, x) => c ? (pass++, console.log('  ✅', n))
@@ -504,7 +506,7 @@ console.log('\n■ usage.html 을 실제로 띄워 본다');
         if(r.path==='acl/emailByName') return {exists:()=>true,
           data:()=>({'김하나':'a@yeungnam.hs.kr','이두리':'b@yeungnam.hs.kr','박세찬':'c@yeungnam.hs.kr'})};
         if(r.path.startsWith('usage/a@')) return {exists:()=>true, data:()=>({days:{
-          ['${YM}-03']:{opens:4,first:'08:10',last:'16:40',ver:'ver6.97',tabs:{timetable:9,pass:2}} }})};
+          ['${YM}-03']:{opens:4,first:'08:10',last:'16:40',ver:'${CUR_VER}',tabs:{timetable:9,pass:2}} }})};
         if(r.path.startsWith('usage/b@')) return {exists:()=>true, data:()=>({days:{
           ['${YM}-03']:{opens:1,first:'09:00',last:'09:30',ver:'ver1.00',tabs:{meal:3}} }})};
         if(r.path==='appNotice/reload') return {exists:()=>true,data:()=>({n:41})};
@@ -596,8 +598,10 @@ console.log('\n■ usage.html 을 실제로 띄워 본다');
 
 console.log('\n■ 누가 옛 화면을 쓰는지 보인다');
 {
+  const curVer = await pg.evaluate(() => window.APP_VER);
   const rows = [
-    { email:'a@x', name:'김하나', days:{ '2026-05-01':{opens:1, last:'10:00', ver:'ver6.97', tabs:{home:1}} } },
+    // 페이지가 이미 읽어 둔 값(window.APP_VER)을 그대로 쓴다 — 버전이 올라가도 안 죽는다.
+    { email:'a@x', name:'김하나', days:{ '2026-05-01':{opens:1, last:'10:00', ver:curVer, tabs:{home:1}} } },
     { email:'b@x', name:'이두리', days:{ '2026-05-01':{opens:1, last:'10:00', ver:'ver6.80', tabs:{home:1}} } },
   ];
   await pg.evaluate(([r, ym]) => window.renderUsage(r, ym), [rows, '2026-05']);
