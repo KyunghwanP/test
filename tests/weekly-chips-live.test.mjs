@@ -87,6 +87,11 @@ console.log('\n■ 스크랩이 끝나면 칩이 늘어난다');
   await pg.evaluate(w => window.__push(w), W(4));
   const after = await pg.evaluate(() => window.chips());
   check('새 주차가 새로고침 없이 붙는다', after.length === 4 && after[3] === '4주차', after);
+
+  // 여기서 새 칩이 켜져 버리면, 화면은 아직 옛 주차인데 칩은 새 주차를 가리킨다.
+  // 칩만 늘고 선택은 보던 자리에 있어야 한다(칩을 누르기 전에는 아무것도 안 바뀐다).
+  check('새로 붙은 칩은 꺼진 채로 온다', !after[3].endsWith('*'), after);
+  check('보고 있던 자리가 그대로', after[0].endsWith('*'), after);
 }
 
 console.log('\n■ 보고 있던 주차가 그대로 켜져 있어야 한다');
@@ -98,11 +103,14 @@ console.log('\n■ 보고 있던 주차가 그대로 켜져 있어야 한다');
   check('선택이 유지된다', c.filter(x => x.endsWith('*')).join() === '2주차*', c);
   check('5주차까지 늘었다', c.length === 5, c);
 
-  // 목록에 없는 주차를 보고 있으면(캐시 등) 첫 칩을 켠다
+  // 켜진 칩을 href 로 못 가리는 경우 — 처음 열면 weeklyCurrentUrl 이 사이트 첫 화면이라
+  // 어떤 칩과도 안 맞는다. 이때 맨 앞 칩을 켜면 새 주차가 올라올 때마다 선택이 그리로
+  // 옮겨간 것처럼 보인다. 화면 내용은 그대로인데 칩만 새 주차를 가리키니 잘못 읽는다.
   await pg.evaluate(() => window.pick('없는주차'));
   await pg.evaluate(w => window.__push(w), W(6));
   const c2 = await pg.evaluate(() => window.chips());
-  check('선택한 게 목록에 없으면 첫 칩', c2.filter(x => x.endsWith('*')).join() === '1주차*', c2);
+  check('href 로 못 가려도 켜져 있던 칩이 그대로', c2.filter(x => x.endsWith('*')).join() === '2주차*', c2);
+  check('새로 들어온 칩이 선택을 뺏지 않는다', !c2[0].endsWith('*'), c2);
 }
 
 console.log('\n■ 같은 목록이면 다시 그리지 않는다');
@@ -110,8 +118,8 @@ console.log('\n■ 같은 목록이면 다시 그리지 않는다');
   await pg.evaluate(() => window.pick('w3'));
   await pg.evaluate(w => window.__push(w), W(6));   // 아까와 같은 6주차 목록
   const c = await pg.evaluate(() => window.chips());
-  // 다시 그렸다면 w3 가 켜졌을 것이다 — 안 그렸으니 1주차가 그대로여야 한다
-  check('같은 목록에는 손대지 않는다', c.filter(x => x.endsWith('*')).join() === '1주차*', c);
+  // 다시 그렸다면 w3 가 켜졌을 것이다 — 안 그렸으니 앞 블록 상태(2주차)가 그대로여야 한다
+  check('같은 목록에는 손대지 않는다', c.filter(x => x.endsWith('*')).join() === '2주차*', c);
 }
 
 console.log('\n■ 탭을 나가면 끊는다');

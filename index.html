@@ -9163,15 +9163,27 @@ function formatWeekChipText(text) {
 }
 
 function renderWeekChipsFromFirestore(weeks){
-  weeklyWeekBar.innerHTML = '';
   // 새 주차가 올라와 다시 그릴 때, 보고 있던 주차가 그대로 켜져 있어야 한다.
   // 무조건 첫 칩을 켜면 읽던 주차가 눈앞에서 바뀐 것처럼 보인다.
+  //
+  // 처음 열었을 때는 weeklyCurrentUrl 이 SITES_BASE(사이트 첫 화면)이라 어떤 칩의
+  // href 와도 안 맞는다. 그래서 href 로만 판단하면 다시 그릴 때마다 맨 앞 칩이
+  // 켜지고, 새 주차가 들어오면 선택이 그리로 옮겨간 것처럼 보인다 — 화면 내용은
+  // 그대로인데 칩만 새 주차를 가리키니 잘못 읽기 쉽다.
+  // 그래서 다시 그릴 때는 켜져 있던 칩을 글자로 기억해 두고 그대로 되돌린다.
+  // 그 주차가 목록에서 사라졌으면 아무것도 켜지 않는다 — 엉뚱한 주차를 가리키느니 낫다.
+  const firstRender = !weeklyWeekBar.children.length;
+  const prevActive = weeklyWeekBar.querySelector('.weekly-week-chip.active')?.textContent ?? null;
+  weeklyWeekBar.innerHTML = '';
   const picked = weeks.slice(0,20).some(w => w.href === weeklyCurrentUrl);
   weeks.slice(0,20).forEach((week, i) => {
+    const label = formatWeekChipText(week.text);
+    const active = picked      ? week.href === weeklyCurrentUrl
+                 : firstRender ? i === 0
+                 :               prevActive !== null && label === prevActive;
     const chip = document.createElement('button');
-    chip.className = 'weekly-week-chip'
-      + ((picked ? week.href === weeklyCurrentUrl : i === 0) ? ' active' : '');
-    chip.textContent = formatWeekChipText(week.text);
+    chip.className = 'weekly-week-chip' + (active ? ' active' : '');
+    chip.textContent = label;
     chip.addEventListener('click', async () => {
       weeklyWeekBar.querySelectorAll('.weekly-week-chip').forEach(c=>c.classList.remove('active'));
       chip.classList.add('active');
