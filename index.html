@@ -6599,8 +6599,11 @@ function isNoSwapSubject(subject, cls, day, period){
   return false;
 }
 
-// ---- 과목별 교사 그룹 (지정한 순서 그대로) ----
-const SUBJECT_GROUPS = [
+// ---- 과목별 교사 그룹 ----
+// 기본은 교원 연락망 업로드(contacts/main)의 '담당과목' 열이다. 인사이동 때마다 코드를
+// 고치지 않도록, 아래 표는 그 자료가 아직 없을 때 쓰는 밑그림 겸 '과목 나열 순서'다.
+// (연락망은 연락망 탭에 들어가야 받아오므로, 시작할 때 따로 한 번 받아 온다)
+const SUBJECT_GROUPS_SEED = [
   { subject:'국어', teachers:['최영수','이인태','윤익희','손병락','박재정','김창식','남영동','문광섭','정희철','정원길','강서영','박한솔'] },
   { subject:'수학', teachers:['정승호','김종욱','노진석','주원순','이재문','이호정','한지훈','전병화','김영란','이상용','권재현','윤동현','김정훈','김경모','정현석'] },
   { subject:'영어', teachers:['정훈철','박순옥','김원호','이현호','김진섭','박준형','구본광','권춘혁','황영채','권혜지','도나경'] },
@@ -6621,12 +6624,57 @@ const SUBJECT_GROUPS = [
   { subject:'진로/보건/상담', teachers:['박용수','현지환','장수정'] },
 ];
 // 위 그룹에 없는 교사(예: 외부 온라인 강사 등)는 전체 목록 맨 뒤에 그대로 붙여 누락을 막음
+let SUBJECT_GROUPS = SUBJECT_GROUPS_SEED;
 const GROUPED_NAME_SET = new Set(SUBJECT_GROUPS.flatMap(g=>g.teachers));
 const UNGROUPED_NAMES = TEACHERS.map(t=>t.name).filter(n=>!GROUPED_NAME_SET.has(n));
 const ORDERED_TEACHER_NAMES = [...SUBJECT_GROUPS.flatMap(g=>g.teachers), ...UNGROUPED_NAMES];
 rebuildFromTeachers();
 const TEACHER_TO_SUBJECT = {};
 SUBJECT_GROUPS.forEach(g=> g.teachers.forEach(name=> { TEACHER_TO_SUBJECT[name] = g.subject; }));
+
+// 연락망(staff)의 담당과목으로 그룹을 다시 만든다. 순서는 밑그림의 과목 순서를 따르고,
+// 거기 없는 과목은 뒤에 붙인다. 담당과목이 비어 있는 사람은 묶이지 않고 목록 끝으로 간다
+// (지금까지 밑그림에 없던 교사가 그랬던 것과 같다).
+function subjectGroupsFromStaff(staff){
+  const bySubject = new Map();
+  (staff || []).forEach(c => {
+    const name = String(c?.name || '').trim();
+    const subject = String(c?.subject || '').trim();
+    if (!name || !subject) return;
+    if (!bySubject.has(subject)) bySubject.set(subject, []);
+    const list = bySubject.get(subject);
+    if (!list.includes(name)) list.push(name);
+  });
+  const seedOrder = SUBJECT_GROUPS_SEED.map(g => g.subject);
+  const ordered = [...bySubject.keys()].sort((a, b) => {
+    const ia = seedOrder.indexOf(a), ib = seedOrder.indexOf(b);
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    return a.localeCompare(b);
+  });
+  return ordered.map(subject => ({ subject, teachers: bySubject.get(subject) }));
+}
+
+// 연락망이 도착하면 갈아 끼운다. 자료가 부실하면(과목이 거의 안 적혀 있으면) 손대지
+// 않는다 — 잘못 올린 파일 하나로 시간표의 교과 묶음이 통째로 무너지면 안 된다.
+function applySubjectGroups(staff){
+  const next = subjectGroupsFromStaff(staff);
+  const covered = next.reduce((n, g) => n + g.teachers.length, 0);
+  const seedCovered = SUBJECT_GROUPS_SEED.reduce((n, g) => n + g.teachers.length, 0);
+  if (covered < Math.min(10, seedCovered)) return false;
+
+  SUBJECT_GROUPS = next;
+  GROUPED_NAME_SET.clear();
+  SUBJECT_GROUPS.forEach(g => g.teachers.forEach(n => GROUPED_NAME_SET.add(n)));
+  Object.keys(TEACHER_TO_SUBJECT).forEach(k => delete TEACHER_TO_SUBJECT[k]);
+  SUBJECT_GROUPS.forEach(g => g.teachers.forEach(n => { TEACHER_TO_SUBJECT[n] = g.subject; }));
+  UNGROUPED_NAMES.length = 0;
+  UNGROUPED_NAMES.push(...TEACHERS.map(t => t.name).filter(n => !GROUPED_NAME_SET.has(n)));
+  ORDERED_TEACHER_NAMES.length = 0;
+  ORDERED_TEACHER_NAMES.push(...SUBJECT_GROUPS.flatMap(g => g.teachers), ...UNGROUPED_NAMES);
+  return true;
+}
 
 // 보강 후보 정렬용 '동교과' 큰 단위 묶음 (한문은 강사라 어느 교과에도 묶지 않음)
 const DEPARTMENT_OF_SUBJECT = {
@@ -8572,6 +8620,17 @@ async function loadDataFromFirestore(){
     // 아직 없어 아무 일도 안 하고, 어차피 처음부터 운영표로 그려진다.
     try { window._renderHomeMyTt?.(); } catch(e){}
     try { window._renderHomeClassTt?.(); } catch(e){}
+  }).catch(()=>{});
+  // 교과 묶음은 연락망의 담당과목에서 온다. 연락망은 그 탭에 들어가야 받아오므로
+  // 여기서 한 번 같이 받아 둔다 — 안 그러면 시간표가 밑그림(코드에 박힌 표)으로 그려진다.
+  getDoc(doc(fbDb, 'contacts', 'main')).then(s => {
+    if(!s.exists()) return;
+    if(!applySubjectGroups(s.data().staff)) return;
+    const tp = document.getElementById('timetablePage');
+    if(tp && tp.classList.contains('active')){
+      try { renderSubjectSelectors(); } catch(e){}
+      reRenderTimetable(mode, selectedKey);
+    }
   }).catch(()=>{});
   const timeout = new Promise((_, reject) =>
     setTimeout(() => reject(new Error('데이터 로딩 시간 초과 (네트워크 확인)')), 10000)
