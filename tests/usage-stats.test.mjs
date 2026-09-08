@@ -15,6 +15,10 @@ const PAGE  = fs.readFileSync(import.meta.dirname + '/../usage.html', 'utf8');
 const RULES = fs.readFileSync(import.meta.dirname + '/../firestore.rules', 'utf8');
 // '지금 버전' 을 여기 적어 두면 APP_VER 가 올라갈 때마다 이 검사가 죽는다.
 const CUR_VER = /const APP_VER = '([^']+)'/.exec(PAGE)[1];
+// usage.html 은 자기 APP_VER 를 따로 들고 있다(이 화면은 index.html 안에 없다).
+// 이게 index.html 과 어긋나면 '옛 버전 쓰는 사람' 표가 거꾸로 나온다 —
+// 실제로 index 만 올렸다가 전원이 옛 버전으로 잡혔다.
+const IDX_VER = /const APP_VER = '([^']+)'/.exec(HTML)[1];
 
 let pass = 0, fail = 0;
 const check = (n, c, x) => c ? (pass++, console.log('  ✅', n))
@@ -238,6 +242,7 @@ console.log('\n■ 관리자 말고는 못 들어간다');
   check('프레임이 usage.html 을 가리킨다', (await src()).startsWith('usage.html?in=1'), await src());
   // usage.html 은 PRECACHE 에 없어 강제로 다시 받아 오는 경로가 없다. 주소에 버전을
   // 붙여 두지 않으면 브라우저 HTTP 캐시에 걸려 새로고침해도 옛 화면이 뜬다.
+  check(`usage.html 과 index.html 의 버전이 같다 (${IDX_VER})`, CUR_VER === IDX_VER, [CUR_VER, IDX_VER]);
   check(`주소에 버전이 붙어 있다 (${CUR_VER})`, (await src()).includes(`&v=${CUR_VER}`), await src());
 
   await pg.evaluate(() => window.closeUsagePage());

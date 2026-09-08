@@ -99,9 +99,25 @@ console.log('\n■ 닫고 나면 가드를 다시 쌓는가 (뒤로가기 전용
 // armExitGuard() 를 빼먹으면 히스토리 스택이 한 칸씩 줄어, 몇 번 열고 닫으면
 // 뒤로가기가 앱을 통째로 빠져나간다.
 {
-  const lines = POP.split('\n').filter(l => /getElementById\('\w+Modal|getElementById\('\w+Overlay/.test(l));
-  const noGuard = lines.filter(l => !l.includes('armExitGuard()'));
-  check(`모달을 닫는 ${lines.length}줄이 전부 가드를 다시 쌓는다`, noGuard.length === 0, noGuard);
+  // 대부분 한 줄이지만 여러 줄짜리 가지도 있다(닫기 전에 되묻는 것 등).
+  // 여는 중괄호를 세어 그 가지 전체를 모은 뒤 본다 — 한 줄만 보면 여러 줄짜리가
+  // 무조건 실패하고, 그러면 이 검사를 느슨하게 고치고 싶어진다.
+  const src = POP.split('\n');
+  const branches = [];
+  for (let i = 0; i < src.length; i++) {
+    if (!/getElementById\('\w+Modal|getElementById\('\w+Overlay/.test(src[i])) continue;
+    let d = 0, out = [];
+    for (let j = i; j < src.length; j++) {
+      out.push(src[j]);
+      for (const ch of src[j]) { if (ch === '{') d++; else if (ch === '}') d--; }
+      if (d <= 0) break;
+    }
+    branches.push(out.join('\n'));
+  }
+  // 가드를 다시 안 쌓으면 히스토리가 한 칸씩 줄어 몇 번 열고 닫으면 앱을 빠져나간다.
+  // 되묻고 남는 가지는 대신 상태를 다시 밀어 넣는다 — 효과가 같다.
+  const noGuard = branches.filter(b => !b.includes('armExitGuard()') && !b.includes('history.pushState('));
+  check(`모달을 닫는 ${branches.length}가지가 전부 히스토리를 되돌려 놓는다`, noGuard.length === 0, noGuard);
 }
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} 통과 ${pass} / 실패 ${fail}\n`);
