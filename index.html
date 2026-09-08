@@ -6212,7 +6212,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.13';
+const APP_VER = 'ver7.14';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -8813,7 +8813,55 @@ function watchNotice(){
     // 쓰는 중이면 화면을 안 건드린다 — 쓰던 글이 남의 저장으로 날아가면 못 되돌린다.
     if (!_noticeEditing) renderNoticeAdminList();
     renderNoticeEditState();
+    noticeAutoOpen();
   }, () => {});
+}
+
+// ── 처음 들어올 때 저절로 띄우기 ────────────────────────────────────────────
+// 확성기만 두면 안 누르는 사람이 반드시 나온다. 모의고사 감독 시정은 그러면
+// 안 되는 종류라, 앱을 열 때 한 번은 앞에 띄운다.
+//
+// '오늘 그만보기'를 날짜만으로 잡으면 안 된다 — 오늘 안에 감독이 한 번 더 바뀌면
+// 그 공지까지 같이 묻힌다. 그래서 공지마다, 그리고 그 공지를 '고친 시각'까지
+// 함께 적어 둔다. 내용이 바뀌면 접어 뒀어도 다시 뜬다.
+const NOTICE_SNOOZE_KEY = 'noticeSnooze';
+const noticeToday = () => { const d = new Date(); const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; };
+
+function noticeSnoozeMap(){
+  let m = {};
+  try { m = JSON.parse(localStorage.getItem(NOTICE_SNOOZE_KEY) || '{}') || {}; } catch(e){}
+  return (m && typeof m === 'object') ? m : {};
+}
+// 오늘 이 공지를 안 띄우기로 해 뒀는가
+function noticeSnoozed(n){
+  const e = noticeSnoozeMap()[n.id];
+  return !!e && e.d === noticeToday() && Number(e.v) === Number(n.updatedAt || 0);
+}
+function noticeSnoozeToday(){
+  const m = noticeSnoozeMap();
+  const today = noticeToday();
+  // 지난 날짜는 버린다 — 안 그러면 한 해치가 쌓인다
+  for (const k of Object.keys(m)) if (!m[k] || m[k].d !== today) delete m[k];
+  for (const n of noticeLiveList()) m[n.id] = { v: Number(n.updatedAt || 0), d: today };
+  try { localStorage.setItem(NOTICE_SNOOZE_KEY, JSON.stringify(m)); } catch(e){}
+  closeNoticeModalBtn();
+}
+
+let _noticeAuto = false;        // 지금 창이 '저절로 뜬' 것인가 (단추가 달라진다)
+let _noticeAutoDone = false;    // 앱을 연 뒤 한 번만
+function noticeAutoOpen(){
+  if (_noticeAutoDone) return;
+  if (!noticeBtnVisible()) return;                       // 볼 수 없는 사람에게는 안 띄운다
+  const live = noticeLiveList();
+  if (!live.length) return;
+  _noticeAutoDone = true;
+  if (live.every(noticeSnoozed)) return;                 // 오늘은 접어 뒀다
+  // 공지 쓰는 중에 앞을 가리면 안 된다
+  if (document.getElementById('noticePage')?.classList.contains('active')) return;
+  if (document.getElementById('noticeModal')?.classList.contains('open')) return;
+  _noticeAuto = true;
+  openNoticeModal(true);
 }
 
 function initNotice(){
@@ -8872,9 +8920,9 @@ function renderNoticeModal(){
     body.querySelectorAll('.notice-row').forEach(r => r.addEventListener('click', () => {
       _noticeOpenId = r.dataset.id; renderNoticeModal();
     }));
-    foot.innerHTML = _IS_ADMIN()
+    foot.innerHTML = _noticeAuto ? noticeAutoFoot('') : (_IS_ADMIN()
       ? `<span class="notice-foot-msg"></span>
-         <button class="notice-btn primary" onclick="startNoticeEdit()">공지 관리 ›</button>` : '';
+         <button class="notice-btn primary" onclick="startNoticeEdit()">공지 관리 ›</button>` : '');
     noticeMarkSeen();
     return;
   }
@@ -8901,6 +8949,7 @@ function renderNoticeModal(){
 
   const back = list.length > 1
     ? `<button class="notice-btn" onclick="noticeBackToList()">‹ 목록</button>` : '';
+  if (_noticeAuto) { foot.innerHTML = noticeAutoFoot(back); noticeMarkSeen(); return; }
   foot.innerHTML = _IS_ADMIN()
     ? `<span class="notice-foot-msg">${show.by ? '쓴 사람: ' + escapeHtml(show.by) : ''}</span>
        ${back}<button class="notice-btn primary" onclick="startNoticeEdit('${show.id}')">✏️ 편집</button>`
@@ -8908,11 +8957,20 @@ function renderNoticeModal(){
   noticeMarkSeen();
 }
 
+// 저절로 뜬 창의 바닥글. 확성기로 직접 연 창에는 안 붙는다 —
+// 내가 눌러서 연 창에 '오늘 그만보기'가 있으면 무엇을 그만본다는 건지 헷갈린다.
+function noticeAutoFoot(back){
+  return `<span class="notice-foot-msg"></span>${back}
+    <button class="notice-btn" onclick="noticeSnoozeToday()">오늘 그만보기</button>
+    <button class="notice-btn primary" onclick="closeNoticeModalBtn()">닫기</button>`;
+}
+
 function noticeBackToList(){ _noticeOpenId = ''; renderNoticeModal(); }
 
-function openNoticeModal(){
+function openNoticeModal(auto){
   const m = document.getElementById('noticeModal');
   if (!m) return;
+  if (!auto) _noticeAuto = false;
   _noticeOpenId = '';
   renderNoticeModal();
   m.classList.add('open');
@@ -8928,6 +8986,7 @@ function closeNoticeModal(e){
 }
 function closeNoticeModalBtn(){ closeNoticeModal(null); }
 function doCloseNoticeModal(){
+  _noticeAuto = false;
   noticeReleaseImages();
   document.getElementById('noticeModal')?.classList.remove('open');
   document.getElementById('noticeBody').innerHTML = '';
@@ -9422,6 +9481,7 @@ window.openNoticeModal    = openNoticeModal;
 window.closeNoticeModal   = closeNoticeModal;
 window.closeNoticeModalBtn= closeNoticeModalBtn;
 window.noticeBackToList   = noticeBackToList;
+window.noticeSnoozeToday  = noticeSnoozeToday;
 window.startNoticeEdit    = startNoticeEdit;
 window.initNoticePage     = initNoticePage;
 window.openNoticeEditor   = openNoticeEditor;

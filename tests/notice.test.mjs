@@ -104,6 +104,12 @@ await pg.route('https://ynhs.test/**', r => r.fulfill({
     ${grab('noticeUnseen')}
     ${grab('noticeTitleOf')}
     ${grab('noticeAllKeys')}
+    ${grabConst('NOTICE_SNOOZE_KEY')}
+    ${grabConst('noticeToday')}
+    ${grab('noticeSnoozeMap')}
+    ${grab('noticeSnoozed')}
+    ${grab('noticeSnoozeToday')}
+    function closeNoticeModalBtn(){ window.__closed = true; }
     ${grab('noticePeriodText')}
     ${grab('noticeToInput')}
     ${grab('noticeFromInput')}
@@ -114,6 +120,12 @@ await pg.route('https://ynhs.test/**', r => r.fulfill({
     window.live    = (list, now) => { _noticeList = list; return noticeLiveList(now).map(n => n.id); };
     window.titleOf = n => noticeTitleOf(n);
     window.allKeys = (list, extra) => { _noticeList = list; return noticeAllKeys(extra); };
+    window.snoozeReset = () => { localStorage.removeItem(NOTICE_SNOOZE_KEY); window.__closed = false; };
+    window.snoozeNow   = list => { _noticeList = list; noticeSnoozeToday(); return window.__closed; };
+    window.isSnoozed   = n => noticeSnoozed(n);
+    window.snoozeRaw   = () => localStorage.getItem(NOTICE_SNOOZE_KEY);
+    window.snoozeSet   = v => localStorage.setItem(NOTICE_SNOOZE_KEY, v);
+    window.today_      = () => noticeToday();
     window.period  = (a, b) => noticePeriodText(a, b);
     window.toIn    = ms => noticeToInput(ms);
     window.fromIn  = v => noticeFromInput(v);
@@ -265,6 +277,58 @@ console.log('\n■ 여러 건일 때 — 지금 뜨는 것만 고른다');
   check('다 봤으면 점이 사라진다',     (await u(LIVE_ONLY, 30)) === false);
   check('게시중인 것이 없으면 점도 없다',
         (await u(LIST.filter(n => n.id === 'c'), null)) === false);
+}
+
+console.log('\n■ 처음 들어올 때 저절로 띄우기');
+{
+  check('배선 — 첫 목록을 받으면 한 번 시도한다',
+        /renderNoticeEditState\(\);\s*\n\s*noticeAutoOpen\(\);/.test(HTML));
+  check('배선 — 앱을 연 뒤 한 번만', /if \(_noticeAutoDone\) return;/.test(HTML));
+  check('배선 — 볼 수 없는 사람에게는 안 띄운다', /if \(!noticeBtnVisible\(\)\) return;/.test(HTML));
+  check('배선 — 게시중인 것이 없으면 안 띄운다',
+        /const live = noticeLiveList\(\);\s*\n\s*if \(!live\.length\) return;/.test(HTML));
+  check('배선 — 공지 쓰는 중에는 앞을 안 가린다',
+        /getElementById\('noticePage'\)\?\.classList\.contains\('active'\)\) return;/.test(HTML));
+  check('배선 — 확성기로 직접 열면 저절로-뜸 상태가 풀린다',
+        /if \(!auto\) _noticeAuto = false;/.test(HTML));
+  check('배선 — 직접 연 창에는 오늘 그만보기가 안 붙는다',
+        /if \(_noticeAuto\) \{ foot\.innerHTML = noticeAutoFoot/.test(HTML));
+
+  await pg.evaluate(() => window.snoozeReset());
+  const N = (id, upd) => ({ id, html: '감독 변경', updatedAt: upd });
+  const a = N('a', 100), b = N('b', 200);
+
+  check('처음에는 접힌 것이 없다', (await pg.evaluate(x => window.isSnoozed(x), a)) === false);
+  const closed = await pg.evaluate(l => window.snoozeNow(l), [a, b]);
+  check('오늘 그만보기를 누르면 창이 닫힌다', closed === true);
+  check('그 공지는 오늘 안 뜬다', (await pg.evaluate(x => window.isSnoozed(x), a)) === true);
+  check('같이 떠 있던 것도 함께 접힌다', (await pg.evaluate(x => window.isSnoozed(x), b)) === true);
+
+  // 여기가 이 기능의 핵심이다. 오늘 안에 감독이 또 바뀌면 접어 뒀어도 다시 떠야 한다.
+  check('내용을 고치면 접어 뒀어도 다시 뜬다',
+        (await pg.evaluate(x => window.isSnoozed(x), N('a', 101))) === false);
+  check('안 고친 것은 그대로 접혀 있다',
+        (await pg.evaluate(x => window.isSnoozed(x), a)) === true);
+  check('새로 올라온 공지는 접혀 있지 않다',
+        (await pg.evaluate(x => window.isSnoozed(x), N('c', 300))) === false);
+
+  // 날이 바뀌면 풀린다
+  await pg.evaluate(() => window.snoozeSet(JSON.stringify({ a: { v: 100, d: '2000-01-01' } })));
+  check('어제 접은 것은 오늘 다시 뜬다', (await pg.evaluate(x => window.isSnoozed(x), a)) === false);
+
+  // 지난 날짜가 쌓이면 저장소가 계속 커진다
+  await pg.evaluate(() => window.snoozeSet(JSON.stringify({
+    old1: { v: 1, d: '2000-01-01' }, old2: { v: 2, d: '2000-01-02' } })));
+  await pg.evaluate(l => window.snoozeNow(l), [a]);
+  const kept = JSON.parse(await pg.evaluate(() => window.snoozeRaw()));
+  check('지난 날짜는 지운다', Object.keys(kept).join() === 'a', kept);
+  check('오늘 날짜로 적힌다', kept.a.d === (await pg.evaluate(() => window.today_())), kept);
+
+  // 저장소가 망가져 있어도 죽으면 안 된다(사생활 보호 모드·손으로 고친 값)
+  await pg.evaluate(() => window.snoozeSet('{망가진 값'));
+  check('저장소가 깨져 있어도 안 죽는다', (await pg.evaluate(x => window.isSnoozed(x), a)) === false);
+  await pg.evaluate(() => window.snoozeSet('"글자"'));
+  check('모양이 달라도 안 죽는다', (await pg.evaluate(x => window.isSnoozed(x), a)) === false);
 }
 
 console.log('\n■ 목록에 뭐라고 적히나');
