@@ -6105,7 +6105,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.02';
+const APP_VER = 'ver7.03';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -8409,7 +8409,11 @@ let _noticeObjUrls = [];          // 화면에서 뗄 때 되돌려줄 blob 주�
 const NOTICE_TAGS = new Set(['B','STRONG','I','EM','U','S','STRIKE','SPAN','DIV','P','BR',
                              'UL','OL','LI','A','IMG','H1','H2','H3','H4']);
 // 이것들은 태그를 벗기는 게 아니라 안의 것까지 통째로 버린다. 벗기기만 하면
-// <script>alert(1)</script> 가 'alert(1)' 이라는 글자로 공지에 남는다.
+// 스크립트 태그의 알맹이가 그냥 글자로 공지에 남는다.
+// 주의: 여기에 그 태그를 예로 적으면 안 된다. HTML 파서는 주석인 줄 모르므로
+// 닫는 태그 글자가 나오는 순간 이 스크립트를 그 자리에서 끊어 버린다 — 실제로
+// 그래서 아래 12,000줄이 HTML 로 읽혀 로그인부터 먹통이 됐다.
+// tests/html-scripts.test.mjs 가 이걸 잡는다.
 const NOTICE_DROP = new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','NOSCRIPT',
                              'TEMPLATE','LINK','META','FORM','INPUT','BUTTON','SVG']);
 // 주간교육활동 원본을 그릴 때 쓰는 것과 같은 여섯 가지. 이 밖의 것(position,
