@@ -72,10 +72,13 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grab('renderNoticeEditState')}
   ${grab('noticeMarkDirty')}
   ${grab('noticeMayLeave')}
-  ${grab('noticeWindowState')}
-  ${grab('initNoticePage')}
+  ${grab('noticeStateOf')}
+  ${grabConst('noticeLiveList')}
+  ${grab('noticeNewId')}
+  ${grab('openNoticeEditor')}
 
-  window.open_ = html => { _noticeData = { html, keys:[], updatedAt:0, by:'', from:0, until:0 }; initNoticePage(); };
+  window.open_ = html => { _noticeList = html ? [{ id:'x', title:'', html, keys:[], from:0, until:0, updatedAt:1 }] : [];
+                           openNoticeEditor(html ? 'x' : ''); };
   window.ed    = () => document.getElementById('noticeEditor');
   window.html_ = () => document.getElementById('noticeEditor').innerHTML;
   // 편집기 안 글자를 전부 고른다
@@ -92,8 +95,8 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   window.color = c   => document.querySelector('#noticeEditBody .notice-tool-swatch[data-color="'+c+'"]').click();
   window.sizeSel = () => document.getElementById('noticeSizeSel');
   window.sizes = () => NOTICE_SIZES;
-  window.openWith = d => { _noticeData = { html:'', keys:[], updatedAt:0, by:'', from:0, until:0, ...d };
-                           initNoticePage(); };
+  window.openWith = d => { _noticeList = [{ id:'x', title:'', keys:[], from:0, until:0, updatedAt:1, ...d }];
+                           openNoticeEditor('x'); };
   window.dirty  = () => _noticeDirty;
   window.state_ = () => document.getElementById('noticeEditState').textContent;
   window.periodIn  = () => [document.getElementById('noticeFrom').value,
@@ -397,7 +400,11 @@ console.log('\n■ 쓰는 화면에도 지금 상태가 보인다');
   const T = (y,m,d,h,mi) => new Date(y, m-1, d, h, mi).getTime();
   const st = async d => { await pg.evaluate(x => window.openWith(x), d);
                           return pg.evaluate(() => window.state_()); };
-  check('공지가 없으면 그렇게 적는다', (await st({ html: '' })).includes('없음'), await st({ html: '' }));
+  check('내용이 빈 공지는 그렇게 적는다', (await st({ html: '' })).includes('빈 공지'), await st({ html: '' }));
+  check('새로 쓰는 중이면 아직 저장 전이라고 적는다',
+        (await pg.evaluate(() => { window.openWith({ html: '감독' }); openNoticeEditor(''); return window.state_(); }))
+          .includes('아직 저장 전'),
+        await pg.evaluate(() => { openNoticeEditor(''); return window.state_(); }));
   check('기간 없이 올린 것은 지금 뜨는 중',
         (await st({ html: '감독' })).includes('지금 뜨는 중'), await st({ html: '감독' }));
   const before = { html: '감독', from: Date.now() + 3600e3 };

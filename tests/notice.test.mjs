@@ -43,18 +43,22 @@ check('확성기가 헤더에 있다', /id="noticeBtn"/.test(HTML) && /📢/.tes
 check('종이 아니라 확성기다(상벌점 알림과 뜻이 겹치지 않게)',
       !/id="noticeBtn"[^>]*>🔔/.test(HTML));
 check('처음엔 숨어 있다', /id="noticeBtn"[^>]*style="display:none;"/.test(HTML));
-check('관리자에게만 그린다',
-      /function noticeBtnVisible\(\)\{\s*\n\s*if \(_IS_ADMIN\(\)\) return true;\s*\n\s*return false && noticeLive\(\);/.test(HTML));
-check('관리자는 기간 밖에도 들어갈 수 있다 (안 그러면 고칠 문이 없다)',
+check('관리자에게만 그린다', /function noticeBtnVisible\(\)/.test(HTML));
+check('관리자는 게시중인 것이 없어도 들어갈 수 있다 (안 그러면 쓸 문이 없다)',
       /if \(_IS_ADMIN\(\)\) return true;/.test(HTML));
-check('전체 공개는 한 줄만 풀면 된다', /return false && noticeLive\(\);/.test(HTML));
+check('전체 공개는 한 줄만 풀면 된다', /return false && noticeLiveList\(\)\.length > 0;/.test(HTML));
 check('기간이 바뀌는 순간을 시계로 잡는다',
-      /function startNoticeClock\(\)/.test(HTML) && /setInterval\(\(\) => \{[\s\S]{0,200}noticeWindowState\(\)/.test(HTML));
-check('상태가 안 바뀌면 화면을 안 건드린다', /if \(st === _noticeLastState\) return;/.test(HTML));
-check('배포별로 문서를 가른다',
-      /const NOTICE_DOC\s*=\s*'board-test'/.test(HTML) && /const NOTICE_SCOPE\s*=\s*'test'/.test(HTML));
+      /function startNoticeClock\(\)/.test(HTML) && /setInterval\(\(\) => \{[\s\S]{0,200}noticeStateSig\(\)/.test(HTML));
+check('상태가 안 바뀌면 화면을 안 건드린다', /if \(sig === _noticeLastSig\) return;/.test(HTML));
+check('배포를 문서 안의 scope 로 가른다',
+      /const NOTICE_SCOPE\s*=\s*'test'/.test(HTML) && /if \(scope !== NOTICE_SCOPE\) return;/.test(HTML));
+check('예전 문서(공지 하나이던 시절)도 계속 읽는다',
+      /NOTICE_LEGACY_ID = \{ test: 'board-test', live: 'board' \}/.test(HTML));
+check('전체 새로고침 신호는 공지로 안 센다', /if \(d\.id === 'reload'\) return;/.test(HTML));
+check('청소는 모든 공지의 키를 기준으로 한다 (안 그러면 남의 그림이 지워진다)',
+      /keep: noticeAllKeys\(keys\)/.test(HTML));
 check('로그인 뒤에 켠다', /watchReloadSignal\(\);\s*\n\s*initNotice\(\);/.test(HTML));
-check('스냅샷으로 본다', /onSnapshot\(doc\(fbDb, 'appNotice', NOTICE_DOC\)/.test(HTML));
+check('목록을 스냅샷으로 본다', /onSnapshot\(collection\(fbDb, 'appNotice'\)/.test(HTML));
 check('뒤로가기로 닫힌다',
       /popstate[\s\S]{0,900}getElementById\('noticeModal'\)\?\.classList\.contains\('open'\)[\s\S]{0,300}doCloseNoticeModal\(\)/.test(HTML));
 check('보는 창은 그냥 닫힌다(쓰기가 탭으로 나갔으므로)',
@@ -71,10 +75,9 @@ check('쓰다 만 채로 나가면 되묻는다',
 check('고친 것이 없으면 안 묻는다',
       /if \(!_noticeEditing \|\| !_noticeDirty\) return true;/.test(HTML));
 check('남이 저장해도 쓰던 글은 안 건드린다',
-      !/renderNoticeEditor\(\)/.test(HTML) &&
-      /renderNoticeEditState\(\);\n  \}, \(\) => \{\}\);/.test(HTML));
+      /if \(!_noticeEditing\) renderNoticeAdminList\(\);/.test(HTML));
 check('보는 창은 저절로 갱신된다',
-      /renderNoticeBtn\(\);[\s\S]{0,400}renderNoticeView\(\);/.test(HTML));
+      /modal\?\.classList\.contains\('open'\)\) renderNoticeModal\(\);/.test(HTML));
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const ctx = await b.newContext({ timezoneId: 'Asia/Seoul' });
@@ -92,24 +95,29 @@ await pg.route('https://ynhs.test/**', r => r.fulfill({
     ${grabConst('NOTICE_KEY_RE')}
     ${grabConst('NOTICE_ZWSP')}
     const NOTICE_SEEN_KEY = 'noticeSeenAt';
-    let _noticeData = { html:'', keys:[], updatedAt:0, by:'' };
+    let _noticeList = [];
     ${grab('noticeCleanStyle')}
     ${grab('noticeSanitize')}
     ${grab('noticeKeysIn')}
-    ${grab('noticeWindowState')}
-    ${grabConst('noticeLive')}
+    ${grab('noticeStateOf')}
+    ${grabConst('noticeLiveList')}
     ${grab('noticeUnseen')}
+    ${grab('noticeTitleOf')}
+    ${grab('noticeAllKeys')}
     ${grab('noticePeriodText')}
     ${grab('noticeToInput')}
     ${grab('noticeFromInput')}
     ${grab('noticeWhenText')}
     window.clean   = h => noticeSanitize(h);
     window.keys    = h => noticeKeysIn(h);
-    window.state   = (d, now) => { _noticeData = d; return noticeWindowState(now); };
+    window.state   = (d, now) => noticeStateOf(d, now);
+    window.live    = (list, now) => { _noticeList = list; return noticeLiveList(now).map(n => n.id); };
+    window.titleOf = n => noticeTitleOf(n);
+    window.allKeys = (list, extra) => { _noticeList = list; return noticeAllKeys(extra); };
     window.period  = (a, b) => noticePeriodText(a, b);
     window.toIn    = ms => noticeToInput(ms);
     window.fromIn  = v => noticeFromInput(v);
-    window.unseen  = (d, seen) => { _noticeData = d;
+    window.unseen  = (list, seen) => { _noticeList = Array.isArray(list) ? list : [list];
       if (seen === null) localStorage.removeItem(NOTICE_SEEN_KEY);
       else localStorage.setItem(NOTICE_SEEN_KEY, String(seen));
       return noticeUnseen(); };
@@ -232,6 +240,62 @@ console.log('\n■ 게시 기간');
   check('끝난 공지도 빨간 점이 안 뜬다',
         (await u({ ...N, updatedAt: 5, until: Date.now() - 3600e3 }, null)) === false);
   check('기간 안이면 뜬다', (await u({ ...N, updatedAt: 5 }, null)) === true);
+}
+
+console.log('\n■ 여러 건일 때 — 지금 뜨는 것만 고른다');
+{
+  const T = (y,m,d,h,mi) => new Date(y, m-1, d, h, mi).getTime();
+  const NOON = T(2026,9,8,12,0);
+  const LIST = [
+    { id:'a', html:'늘 뜨는 것',   updatedAt: 30 },
+    { id:'b', html:'오늘 하루',     updatedAt: 20, from: T(2026,9,8,7,0),  until: T(2026,9,8,17,0) },
+    { id:'c', html:'다음 주 예약',  updatedAt: 40, from: T(2026,9,15,7,0) },
+    { id:'d', html:'지난 주에 끝남', updatedAt: 10, until: T(2026,9,1,17,0) },
+  ];
+  const live = await pg.evaluate(a => window.live(a[0], a[1]), [LIST, NOON]);
+  check('기간에 걸린 것만 나온다', JSON.stringify(live) === '["a","b"]', live);
+  check('예약된 것은 빠진다', !live.includes('c'), live);
+  check('끝난 것도 빠진다',   !live.includes('d'), live);
+
+  // 빨간 점은 '지금 뜨는 것' 기준이어야 한다. 예약해 둔 것(c)이 제일 최근에
+  // 고쳐졌다고 점을 켜면, 눌러도 볼 것이 없다.
+  const u = (list, seen) => pg.evaluate(a => window.unseen(a[0], a[1]), [list, seen]);
+  const LIVE_ONLY = LIST.filter(n => ['a','b'].includes(n.id));
+  check('안 본 것이 있으면 점이 뜬다', (await u(LIVE_ONLY, 10)) === true);
+  check('다 봤으면 점이 사라진다',     (await u(LIVE_ONLY, 30)) === false);
+  check('게시중인 것이 없으면 점도 없다',
+        (await u(LIST.filter(n => n.id === 'c'), null)) === false);
+}
+
+console.log('\n■ 목록에 뭐라고 적히나');
+{
+  const t = n => pg.evaluate(x => window.titleOf(x), n);
+  check('제목을 적었으면 그대로', (await t({ title: '9월 모의고사 감독', html: '<p>내용</p>' })) === '9월 모의고사 감독');
+  check('안 적었으면 본문 첫 줄', (await t({ html: '<p>3교시 감독 변경</p><p>둘째 줄</p>' })) === '3교시 감독 변경');
+  check('공백만 적은 제목은 안 쓴다', (await t({ title: '   ', html: '<p>본문</p>' })) === '본문');
+  check('너무 길면 자른다', (await t({ html: '<p>' + '가'.repeat(80) + '</p>' })).length === 40);
+  check('본문도 비면 그렇게 적는다', (await t({ html: '' })) === '(내용 없음)');
+  // 목록에 태그가 그대로 보이면 안 된다
+  check('태그가 글자로 새지 않는다',
+        !/[<>]/.test(await t({ html: '<b style="color:red">굵은 제목</b>' })),
+        await t({ html: '<b style="color:red">굵은 제목</b>' }));
+}
+
+console.log('\n■ 그림 청소 기준 (여기가 틀리면 남의 그림이 지워진다)');
+{
+  const K = i => `notices/test/board/f${i}.jpg`;
+  const LIST = [
+    { id:'a', html:'가', keys:[K(1), K(2)] },
+    { id:'b', html:'나', keys:[K(3)] },
+  ];
+  const all = await pg.evaluate(a => window.allKeys(a[0], a[1]), [LIST, []]);
+  check('모든 공지의 키를 모은다', all.length === 3 && all.includes(K(3)), all);
+  const withNew = await pg.evaluate(a => window.allKeys(a[0], a[1]), [LIST, [K(9)]]);
+  check('방금 올린 것도 지킨다', withNew.includes(K(9)) && withNew.length === 4, withNew);
+  const dup = await pg.evaluate(a => window.allKeys(a[0], a[1]), [LIST, [K(1)]]);
+  check('겹치면 한 번만', dup.length === 3, dup);
+  const bad = await pg.evaluate(a => window.allKeys(a[0], a[1]), [[{ keys:['../x'] }], []]);
+  check('이상한 키는 안 센다', bad.length === 0, bad);
 }
 
 console.log('\n■ 기간 적기·읽기');

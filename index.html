@@ -2564,6 +2564,36 @@
   }
   /* 예약해 두고 잊는 일이 잦다 — 관리자 화면에서 눈에 띄게 */
   .app-notice-btn.scheduled{border-color:#ca8a04;background:rgba(202,138,4,0.12);}
+  /* 공지 목록 (확성기 창 · 쓰기 탭 공용) */
+  .notice-list{display:flex;flex-direction:column;gap:6px;}
+  .notice-row{
+    display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+    padding:11px 13px;border-radius:9px;border:1px solid var(--rule);
+    background:var(--paper);color:var(--ink);font-family:inherit;cursor:pointer;
+  }
+  .notice-row:hover{background:var(--paper-soft);}
+  .notice-row-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+  .notice-row-title{
+    font-size:14px;font-weight:800;letter-spacing:-0.01em;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .notice-row-sub{font-size:12px;font-weight:600;color:var(--ink-soft);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .notice-chip{
+    flex-shrink:0;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;
+    border:1px solid var(--rule);color:var(--ink-soft);background:var(--paper-soft);
+  }
+  .notice-chip.live{color:#166534;border-color:rgba(22,101,52,0.35);background:rgba(22,163,74,0.12);}
+  .notice-chip.before{color:#854d0e;border-color:rgba(202,138,4,0.4);background:rgba(202,138,4,0.14);}
+  .notice-chip.after{color:var(--ink-soft);}
+  .notice-title-in{
+    width:100%;padding:9px 12px;margin-bottom:10px;
+    border-radius:9px;border:1px solid var(--rule);
+    background:var(--paper);color:var(--ink);
+    font-size:15px;font-weight:800;font-family:inherit;
+  }
+  .notice-title-in:focus{outline:none;border-color:var(--mon);}
+
   /* 쓰기 탭 */
   .notice-page-body{flex:1;overflow-y:auto;padding:16px 18px;}
   .notice-edit-state{
@@ -5602,10 +5632,9 @@
            섞여 있으면, 고친 것이 남에게 어떻게 보이는지 확인하기가 헷갈린다. -->
       <div class="page-view" id="noticePage">
         <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;">
-          <span style="font-size:13px;font-weight:800;color:var(--ink-soft);flex:1;">📢 전체 공지 쓰기</span>
+          <span style="font-size:13px;font-weight:800;color:var(--ink-soft);flex:1;">📢 전체 공지</span>
           <span id="noticeEditState" class="notice-edit-state"></span>
-          <button class="notice-btn" id="noticeCheckBtn" title="그림 저장소(R2)가 붙었는지 확인">🔌 저장소 확인</button>
-          <button class="notice-btn" id="noticePreviewBtn">👁 보이는 대로</button>
+          <button class="notice-btn" id="noticePreviewBtn" style="display:none;">👁 보이는 대로</button>
         </div>
         <div class="notice-page-body" id="noticeEditBody"></div>
         <div class="notice-foot" id="noticeEditFoot"></div>
@@ -6157,7 +6186,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.09';
+const APP_VER = 'ver7.10';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -8431,29 +8460,36 @@ function watchReloadSignal(){
    대신 메신저에 붙여넣듯 공지로 띄우려는 것이다. 그래서 웹주소 없는 그림
    (클립보드 붙여넣기)을 받는 것이 이 기능의 핵심이다.
 
-   지금은 관리자에게만 확성기가 그려진다. test 배포에도 실사용 선생님이 계셔서,
-   시험 삼아 쓴 공지가 그분들 화면에 뜨면 안 된다. 전체 공개는 나중에 이
-   조건 한 줄만 풀면 된다.
+   공지는 여러 개다. 게시 기간을 두면서 하나로는 안 되게 됐다 — 다음 주 모의고사
+   공지를 예약해 두면 그동안 다른 것을 못 띄운다.
 
-   글은 Firestore(appNotice/board-test)에, 그림은 R2(notice-api 워커)에 둔다.
-   현황판은 모든 교사가 매번 여는 화면이라, 그림을 문서에 넣으면 그 용량을
-   매번 다 받는다. 워커가 아직 없으면 글만 뜨고 그림은 조용히 빠진다.        */
+   지금은 관리자에게만 확성기와 쓰기 탭이 뜬다. test 배포에도 실사용 선생님이
+   계셔서, 시험 삼아 쓴 공지가 그분들 화면에 뜨면 안 된다. 전체 공개는
+   noticeBtnVisible() 의 false 한 줄만 지우면 된다.
 
-// 배포별로 문서를 가른다 — 운영과 test 가 같은 Firestore 를 본다.
+   글은 Firestore(appNotice)에, 그림은 R2(notice-api 워커)에 둔다. 현황판은 모든
+   교사가 매번 여는 화면이라, 그림을 문서에 넣으면 그 용량을 매번 다 받는다.
+   워커가 없으면 글만 뜨고 그림은 조용히 빠진다.
+
+   왜 appNotice 를 같이 쓰나: 이 컬렉션에는 이미 reload(전체 새로고침 신호)가
+   있고 규칙이 '읽기=교사, 쓰기=관리자'로 딱 맞다. 새 컬렉션을 만들면 규칙을
+   다시 배포해야 하는데, 그건 손으로 하는 일이라 빠뜨리면 공지가 통째로 안 뜬다.
+   대신 문서 안의 scope 로 배포(test/live)를 가르고, reload 는 걸러 낸다.        */
+
+// 배포를 가른다 — 운영과 test 가 같은 Firestore 를 본다.
 // 안 가르면 여기서 시험 삼아 쓴 글이 운영 현황판에 그대로 뜬다.
 const NOTICE_SCOPE  = 'test';                 // 운영본은 'live'
-const NOTICE_DOC    = 'board-test';           // 운영본은 'board'
 const NOTICE_WORKER = 'https://notice-api.pkh910518.workers.dev';
 const NOTICE_SEEN_KEY = 'noticeSeenAt';
-// R2 키의 <공지id> 자리. 배포(test/live)는 scope 가 이미 가르므로 여기는 고정이다.
-// 공지가 하나뿐이라 나눌 것이 없다 — 여러 개가 되면 그때 문서 id 를 쓴다.
-const NOTICE_IMG_ID = 'board';
+// 예전에 공지가 하나뿐이던 시절의 문서. 그 안의 글을 잃지 않으려고 계속 읽는다.
+const NOTICE_LEGACY_ID = { test: 'board-test', live: 'board' }[NOTICE_SCOPE];
 
 let _noticeUnsub = null;
-let _noticeData  = { html: '', keys: [], updatedAt: 0, by: '', from: 0, until: 0 };
-let _noticeEditing = false;   // 공지 쓰기 탭에 있는가
+let _noticeList  = [];        // 이 배포의 공지들. 최근에 고친 것이 앞.
+let _noticeEditing = false;   // 공지 쓰기 화면(편집)에 있는가
 let _noticeDirty   = false;   // 그 안에서 실제로 고친 것이 있는가
-let _noticeObjUrls = [];          // 화면에서 뗄 때 되돌려줄 blob 주소
+let _noticeDraft   = null;    // 지금 고치고 있는 공지 { id, title, html, keys, from, until, isNew }
+let _noticeObjUrls = [];      // 화면에서 뗄 때 되돌려줄 blob 주소
 
 // ── 걸러내기 ────────────────────────────────────────────────────────────────
 // 글은 관리자만 쓰므로 남이 심을 일은 없지만, 붙여넣기로 바깥 HTML 이 통째로
@@ -8474,6 +8510,9 @@ const NOTICE_DROP = new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','NOSCRIP
 const NOTICE_STYLES = ['color','font-size','font-weight','font-style',
                        'text-decoration','background-color'];
 const NOTICE_KEY_RE = /^notices\/[A-Za-z0-9_-]{1,40}\/[A-Za-z0-9_-]{1,40}\/[A-Za-z0-9_-]{1,40}\.jpg$/;
+// 크기만 고르고 아직 아무것도 안 친 자리를 잡아 두는 보이지 않는 글자.
+// 저장할 때 걸러내기가 지운다 — 안 지우면 공지에 빈 칸이 섞여 남는다.
+const NOTICE_ZWSP = '​';
 
 function noticeCleanStyle(el){
   const keep = [];
@@ -8540,12 +8579,26 @@ function noticeSanitize(html){
   return box.innerHTML;
 }
 
-// 지금 글에 실제로 쓰이는 그림 키. 저장할 때 문서에 같이 넣고, 청소의 기준이 된다.
+// 글에 실제로 쓰이는 그림 키. 저장할 때 문서에 같이 넣고, 청소의 기준이 된다.
 function noticeKeysIn(html){
   const box = document.createElement('div');
   box.innerHTML = String(html || '');
   return [...new Set([...box.querySelectorAll('img[data-k]')]
     .map(i => i.getAttribute('data-k')).filter(k => NOTICE_KEY_RE.test(k)))];
+}
+
+// 제목을 안 적었으면 본문 첫 줄에서 만든다. 목록에 '(제목 없음)' 만 늘어서면
+// 어느 것이 무엇인지 알 수 없다.
+function noticeTitleOf(n){
+  const t = String(n && n.title || '').trim();
+  if (t) return t;
+  const box = document.createElement('div');
+  // 문단·줄바꿈 자리에 줄을 넣고 읽는다. 안 넣으면 textContent 가 문단을 그대로
+  // 이어 붙여, '첫 줄'이 본문 전체가 된다.
+  box.innerHTML = String(n && n.html || '')
+    .replace(/<\/(p|div|h[1-4]|li|ul|ol)>|<br\s*\/?>/gi, '\n');
+  const line = (box.textContent || '').trim().split('\n')[0].trim();
+  return line ? line.slice(0, 40) : '(내용 없음)';
 }
 
 // ── 워커 ────────────────────────────────────────────────────────────────────
@@ -8589,104 +8642,55 @@ function noticeReleaseImages(){
   _noticeObjUrls = [];
 }
 
-// ── 확성기 ──────────────────────────────────────────────────────────────────
+// 이 배포의 모든 공지가 쓰는 그림 키. 청소는 반드시 이걸 기준으로 해야 한다 —
+// 지금 고치는 공지의 키만 넘기면 다른 공지의 그림이 통째로 지워진다.
+function noticeAllKeys(extra){
+  const set = new Set();
+  for (const n of _noticeList) for (const k of (n.keys || [])) if (NOTICE_KEY_RE.test(k)) set.add(k);
+  for (const k of (extra || [])) if (NOTICE_KEY_RE.test(k)) set.add(k);
+  return [...set];
+}
+
 // ── 게시 기간 ───────────────────────────────────────────────────────────────
 // from·until 은 밀리초. 0 이면 '제한 없음'이다(즉시 시작 / 안 내림).
 // 판정은 보는 사람 기기의 시계로 한다. 서버에 물으면 화면을 그릴 때마다 왕복이
 // 생기고, 열어 둔 탭에서는 어차피 시계로 세야 한다.
-function noticeWindowState(now){
+function noticeStateOf(n, now){
   const t = Number(now || Date.now());
-  const from = Number(_noticeData.from || 0);
-  const until = Number(_noticeData.until || 0);
-  if (!_noticeData.html) return 'none';
-  if (from && t < from)  return 'before';   // 아직 안 열림(예약)
-  if (until && t > until) return 'after';   // 게시 끝남
+  if (!n || !n.html) return 'none';
+  const from = Number(n.from || 0), until = Number(n.until || 0);
+  if (from && t < from)   return 'before';   // 아직 안 열림(예약)
+  if (until && t > until) return 'after';    // 게시 끝남
   return 'live';
 }
-// 다른 선생님 화면에 떠야 하는가
-const noticeLive = now => noticeWindowState(now) === 'live';
-// 확성기를 그릴 것인가. 관리자는 기간 밖에도 늘 보인다 —
-// 안 그러면 기간이 끝난 뒤 공지를 고치거나 새로 쓰러 들어갈 문이 없다.
+const NOTICE_STATE_TEXT = { live: '게시중', before: '게시예정', after: '게시종료', none: '빈 공지' };
+
+// 지금 뜨는 공지들. 최근에 올린 것이 앞.
+const noticeLiveList = now => _noticeList.filter(n => noticeStateOf(n, now) === 'live');
+
+// 확성기를 그릴 것인가. 관리자는 늘 보인다 — 안 그러면 게시중인 것이 없을 때
+// 공지를 쓰거나 고치러 들어갈 문이 없다.
 function noticeBtnVisible(){
   if (_IS_ADMIN()) return true;
-  return false && noticeLive();     // 전체 공개할 때 이 false 를 지운다
+  return false && noticeLiveList().length > 0;   // 전체 공개할 때 이 false 를 지운다
 }
 
 function noticeUnseen(){
-  if (!noticeLive()) return false;
+  const live = noticeLiveList();
+  if (!live.length) return false;
   let seen = null;
   try { seen = localStorage.getItem(NOTICE_SEEN_KEY); } catch(e){}
-  return Number(_noticeData.updatedAt || 0) > Number(seen || 0);
+  return Math.max(...live.map(n => Number(n.updatedAt || 0))) > Number(seen || 0);
 }
 
 function noticeMarkSeen(){
-  try { localStorage.setItem(NOTICE_SEEN_KEY, String(_noticeData.updatedAt || 0)); } catch(e){}
+  const live = noticeLiveList();
+  const at = live.length ? Math.max(...live.map(n => Number(n.updatedAt || 0))) : 0;
+  try { localStorage.setItem(NOTICE_SEEN_KEY, String(at)); } catch(e){}
   document.getElementById('noticeBtn')?.classList.remove('unseen');
 }
 
-function renderNoticeBtn(){
-  // 쓰기 탭도 관리자에게만. 확성기와 같은 조건이라 여기서 같이 다룬다.
-  const admin = _IS_ADMIN();
-  const navN = document.getElementById('navNotice'), tabN = document.getElementById('tabNotice');
-  if (navN) navN.style.display = admin ? '' : 'none';
-  if (tabN) tabN.style.display = admin ? '' : 'none';
-
-  const btn = document.getElementById('noticeBtn');
-  if (!btn) return;
-  const show = noticeBtnVisible();
-  btn.style.display = show ? '' : 'none';
-  btn.classList.toggle('unseen', show && noticeUnseen());
-  // 관리자에게는 지금 어떤 상태인지 알려 준다(예약해 놓고 잊는 일이 잦다)
-  const st = noticeWindowState();
-  btn.classList.toggle('scheduled', _IS_ADMIN() && (st === 'before' || st === 'after'));
-  btn.title = { none: '전체 공지', live: '전체 공지',
-                before: '전체 공지 (예약됨 — 아직 안 뜸)',
-                after: '전체 공지 (게시 종료)' }[st];
-}
-
-// 기간이 시작·종료되는 순간에는 아무 일도 안 일어난다 — 문서가 안 바뀌기 때문이다.
-// 앱을 열어 둔 채 그 시각을 넘기는 사람이 있으므로 시계를 보고 다시 그린다.
-let _noticeTimer = null, _noticeLastState = '';
-function startNoticeClock(){
-  if (_noticeTimer) return;
-  _noticeTimer = setInterval(() => {
-    const st = noticeWindowState();
-    if (st === _noticeLastState) return;      // 바뀔 때만 손댄다
-    _noticeLastState = st;
-    renderNoticeBtn();
-    const modal = document.getElementById('noticeModal');
-    if (modal?.classList.contains('open')) renderNoticeView();
-    renderNoticeEditState();
-  }, 30000);
-}
-
-function watchNotice(){
-  if (_noticeUnsub) return;
-  _noticeUnsub = onSnapshot(doc(fbDb, 'appNotice', NOTICE_DOC), snap => {
-    const d = snap.exists() ? (snap.data() || {}) : {};
-    _noticeData = { html: String(d.html || ''), keys: Array.isArray(d.keys) ? d.keys : [],
-                    updatedAt: Number(d.updatedAt || 0), by: String(d.by || ''),
-                    from: Number(d.from || 0), until: Number(d.until || 0) };
-    _noticeLastState = noticeWindowState();
-    renderNoticeBtn();
-    // 열어 둔 창은 그 자리에서 갱신한다. 단 편집 중이면 건드리지 않는다 —
-    // 쓰던 글이 남의 저장으로 날아가면 되돌릴 길이 없다.
-    const modal = document.getElementById('noticeModal');
-    if (modal?.classList.contains('open')) renderNoticeView();
-    // 쓰는 중이면 화면을 안 건드린다 — 쓰던 글이 남의 저장으로 날아가면 못 되돌린다.
-    // 대신 '남이 방금 고쳤다'는 것은 상태 표시로 알린다.
-    renderNoticeEditState();
-  }, () => {});
-}
-
-function initNotice(){
-  renderNoticeBtn();
-  watchNotice();
-  startNoticeClock();
-  document.getElementById('noticeBtn')?.addEventListener('click', () => openNoticeModal());
-}
-
-// ── 창 ──────────────────────────────────────────────────────────────────────
+// ── 시각 다루기 ─────────────────────────────────────────────────────────────
 // datetime-local 칸은 '현지 시각' 문자열만 받는다(YYYY-MM-DDTHH:MM).
 // toISOString 을 쓰면 UTC 로 나가 9시간이 어긋난다.
 function noticeToInput(ms){
@@ -8714,7 +8718,6 @@ function noticePeriodText(from, until){
   if (from) { const a = f(from); return `${a.day} ${a.hm}부터`; }
   const b = f(until); return `${b.day} ${b.hm}까지`;
 }
-
 function noticeWhenText(ts){
   if (!ts) return '';
   const d = new Date(Number(ts));
@@ -8723,67 +8726,175 @@ function noticeWhenText(ts){
   return `${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-function renderNoticeView(){
-  _noticeEditing = false;
+// ── 확성기 · 목록 구독 ──────────────────────────────────────────────────────
+function renderNoticeBtn(){
+  // 쓰기 탭도 관리자에게만. 확성기와 같은 조건이라 여기서 같이 다룬다.
+  const admin = _IS_ADMIN();
+  const navN = document.getElementById('navNotice'), tabN = document.getElementById('tabNotice');
+  if (navN) navN.style.display = admin ? '' : 'none';
+  if (tabN) tabN.style.display = admin ? '' : 'none';
+
+  const btn = document.getElementById('noticeBtn');
+  if (!btn) return;
+  const show = noticeBtnVisible();
+  btn.style.display = show ? '' : 'none';
+  btn.classList.toggle('unseen', show && noticeUnseen());
+  const n = noticeLiveList().length;
+  btn.title = n ? `전체 공지 ${n}건` : '전체 공지 (게시중인 것 없음)';
+}
+
+// 기간이 시작·종료되는 순간에는 아무 일도 안 일어난다 — 문서가 안 바뀌기 때문이다.
+// 앱을 열어 둔 채 그 시각을 넘기는 사람이 있으므로 시계를 보고 다시 그린다.
+let _noticeTimer = null, _noticeLastSig = '';
+const noticeStateSig = () => _noticeList.map(n => n.id + ':' + noticeStateOf(n)).join('|');
+function startNoticeClock(){
+  if (_noticeTimer) return;
+  _noticeTimer = setInterval(() => {
+    const sig = noticeStateSig();
+    if (sig === _noticeLastSig) return;      // 바뀔 때만 손댄다
+    _noticeLastSig = sig;
+    renderNoticeBtn();
+    const modal = document.getElementById('noticeModal');
+    if (modal?.classList.contains('open')) renderNoticeModal();
+    if (!_noticeEditing) renderNoticeAdminList();
+    renderNoticeEditState();
+  }, 30000);
+}
+
+function watchNotice(){
+  if (_noticeUnsub) return;
+  _noticeUnsub = onSnapshot(collection(fbDb, 'appNotice'), snap => {
+    const out = [];
+    snap.forEach(d => {
+      const v = d.data() || {};
+      if (d.id === 'reload') return;                       // 전체 새로고침 신호
+      // 예전 문서에는 scope 가 없다. 이름으로 어느 배포 것인지 가린다.
+      const scope = v.scope || (d.id === NOTICE_LEGACY_ID ? NOTICE_SCOPE : '');
+      if (scope !== NOTICE_SCOPE) return;
+      if (!v.html) return;                                 // 내려놓은 공지
+      out.push({ id: d.id, title: String(v.title || ''), html: String(v.html || ''),
+                 keys: Array.isArray(v.keys) ? v.keys : [],
+                 from: Number(v.from || 0), until: Number(v.until || 0),
+                 updatedAt: Number(v.updatedAt || 0), by: String(v.by || '') });
+    });
+    // 최근에 고친 것이 앞. 목록에서 방금 쓴 것을 찾느라 헤매지 않게.
+    out.sort((a, b) => b.updatedAt - a.updatedAt);
+    _noticeList = out;
+    _noticeLastSig = noticeStateSig();
+    renderNoticeBtn();
+    const modal = document.getElementById('noticeModal');
+    if (modal?.classList.contains('open')) renderNoticeModal();
+    // 쓰는 중이면 화면을 안 건드린다 — 쓰던 글이 남의 저장으로 날아가면 못 되돌린다.
+    if (!_noticeEditing) renderNoticeAdminList();
+    renderNoticeEditState();
+  }, () => {});
+}
+
+function initNotice(){
+  renderNoticeBtn();
+  watchNotice();
+  startNoticeClock();
+  document.getElementById('noticeBtn')?.addEventListener('click', () => openNoticeModal());
+  document.getElementById('noticePreviewBtn')?.addEventListener('click', previewNotice);
+}
+
+// ── 보는 창(확성기) ─────────────────────────────────────────────────────────
+// 관리자는 예정·종료까지 다 보고, 다른 선생님은 게시중인 것만 본다.
+let _noticeOpenId = '';        // 목록에서 고른 공지. 빈 값이면 목록 화면.
+
+function noticeVisibleList(){
+  return _IS_ADMIN() ? _noticeList : noticeLiveList();
+}
+
+function noticeStateChip(st){
+  return `<span class="notice-chip ${st}">${NOTICE_STATE_TEXT[st] || ''}</span>`;
+}
+
+function renderNoticeModal(){
   noticeReleaseImages();
   const body = document.getElementById('noticeBody');
   const foot = document.getElementById('noticeFoot');
   const when = document.getElementById('noticeWhen');
-  document.getElementById('noticeTitle').textContent = '📢 전체 공지';
-  when.textContent = _noticeData.html
-    ? (noticePeriodText(_noticeData.from, _noticeData.until) || noticeWhenText(_noticeData.updatedAt))
-    : '';
+  const list = noticeVisibleList();
+  const cur  = list.find(n => n.id === _noticeOpenId);
 
-  // 기간이 지났거나 아직 안 온 공지는 다른 선생님께는 없는 것과 같다.
-  // (지금은 확성기 자체가 관리자에게만 뜨지만, 전체 공개해도 이 줄이 지킨다)
-  if (_noticeData.html && !noticeLive() && !_IS_ADMIN()) {
-    body.innerHTML = `<div class="notice-empty">올라온 공지가 없습니다.</div>`;
-    foot.innerHTML = '';
-    return;
-  }
+  // 하나뿐이면 목록을 거치지 않는다 — 대개는 한 건이고, 한 번 더 누르게 할 이유가 없다.
+  const only = list.length === 1 ? list[0] : null;
+  const show = cur || only;
 
-  if (!_noticeData.html) {
-    body.innerHTML = `<div class="notice-empty">올라온 공지가 없습니다.</div>`;
+  if (!list.length) {
+    document.getElementById('noticeTitle').textContent = '📢 전체 공지';
+    when.textContent = '';
+    body.innerHTML = `<div class="notice-empty">${_IS_ADMIN() ? '올라온 공지가 없습니다.' : '지금 게시중인 공지가 없습니다.'}</div>`;
     foot.innerHTML = _IS_ADMIN()
       ? `<span class="notice-foot-msg"></span>
-         <button class="notice-btn primary" onclick="startNoticeEdit()">＋ 전체 공지 쓰기</button>`
-      : '';
+         <button class="notice-btn primary" onclick="startNoticeEdit()">＋ 공지 쓰기</button>` : '';
     return;
   }
-  const view = document.createElement('div');
-  view.className = 'notice-view';
-  view.innerHTML = noticeSanitize(_noticeData.html);
+
+  if (!show) {                                   // 목록 화면
+    document.getElementById('noticeTitle').textContent = `📢 전체 공지 ${list.length}건`;
+    when.textContent = '';
+    body.innerHTML = `<div class="notice-list">${list.map(n => {
+      const st = noticeStateOf(n);
+      return `<button type="button" class="notice-row" data-id="${n.id}">
+        <span class="notice-row-main">
+          <span class="notice-row-title">${escapeHtml(noticeTitleOf(n))}</span>
+          <span class="notice-row-sub">${escapeHtml(noticePeriodText(n.from, n.until) || noticeWhenText(n.updatedAt))}</span>
+        </span>${noticeStateChip(st)}</button>`;
+    }).join('')}</div>`;
+    body.querySelectorAll('.notice-row').forEach(r => r.addEventListener('click', () => {
+      _noticeOpenId = r.dataset.id; renderNoticeModal();
+    }));
+    foot.innerHTML = _IS_ADMIN()
+      ? `<span class="notice-foot-msg"></span>
+         <button class="notice-btn primary" onclick="startNoticeEdit()">공지 관리 ›</button>` : '';
+    noticeMarkSeen();
+    return;
+  }
+
+  // 한 건 보기
+  const st = noticeStateOf(show);
+  document.getElementById('noticeTitle').textContent = '📢 ' + noticeTitleOf(show);
+  when.textContent = noticePeriodText(show.from, show.until) || noticeWhenText(show.updatedAt);
   body.innerHTML = '';
-  // 예약해 두고 잊는 일이 잦다. 관리자에게는 지금 남에게 보이는지를 먼저 알린다.
-  const st = noticeWindowState();
-  if (_IS_ADMIN() && st !== 'live') {
+  if (st !== 'live') {
+    // 예약해 두고 잊는 일이 잦다. 지금 남에게 보이는지를 먼저 알린다.
     const tag = document.createElement('div');
     tag.className = 'notice-state';
     tag.textContent = st === 'before'
-      ? `아직 안 뜹니다 — ${noticePeriodText(_noticeData.from, 0)} 뜹니다`
+      ? `아직 안 뜹니다 — ${noticePeriodText(show.from, 0)} 뜹니다`
       : '게시가 끝났습니다 — 다른 선생님께는 안 보입니다';
     body.appendChild(tag);
   }
+  const view = document.createElement('div');
+  view.className = 'notice-view';
+  view.innerHTML = noticeSanitize(show.html);
   body.appendChild(view);
   noticeLoadImages(view);
+
+  const back = list.length > 1
+    ? `<button class="notice-btn" onclick="noticeBackToList()">‹ 목록</button>` : '';
   foot.innerHTML = _IS_ADMIN()
-    ? `<span class="notice-foot-msg">${_noticeData.by ? '쓴 사람: ' + _noticeData.by : ''}</span>
-       <button class="notice-btn danger" onclick="deleteNotice()">공지 내리기</button>
-       <button class="notice-btn primary" onclick="startNoticeEdit()">✏️ 편집</button>`
-    : '';
+    ? `<span class="notice-foot-msg">${show.by ? '쓴 사람: ' + escapeHtml(show.by) : ''}</span>
+       ${back}<button class="notice-btn primary" onclick="startNoticeEdit('${show.id}')">✏️ 편집</button>`
+    : `<span class="notice-foot-msg"></span>${back}`;
   noticeMarkSeen();
 }
+
+function noticeBackToList(){ _noticeOpenId = ''; renderNoticeModal(); }
 
 function openNoticeModal(){
   const m = document.getElementById('noticeModal');
   if (!m) return;
-  renderNoticeView();
+  _noticeOpenId = '';
+  renderNoticeModal();
   m.classList.add('open');
   // 뒤로가기로 닫히게 한다 — 안 걸면 모달만 남고 뒷페이지가 넘어간다
   history.pushState({ modal: 'notice' }, '');
 }
 
-// 배경을 눌러 닫는 길. 이 창은 이제 보기 전용이라 물어볼 것이 없다(쓰기는 탭).
+// 배경을 눌러 닫는 길. 이 창은 보기 전용이라 물어볼 것이 없다(쓰기는 탭).
 function closeNoticeModal(e){
   if (e && e.target !== e.currentTarget) return;
   if (history.state?.modal === 'notice') history.back();
@@ -8797,29 +8908,75 @@ function doCloseNoticeModal(){
   document.getElementById('noticeFoot').innerHTML = '';
 }
 
-// ── 편집 ────────────────────────────────────────────────────────────────────
-// 크기만 고르고 아직 아무것도 안 친 자리를 잡아 두는 보이지 않는 글자.
-// 저장할 때 걸러내기가 지운다 — 안 지우면 공지에 빈 칸이 섞여 남는다.
-const NOTICE_ZWSP = '\u200B';
-const NOTICE_COLORS = ['#111827','#dc2626','#ea580c','#ca8a04','#16a34a','#2563eb','#7c3aed'];
-// 본문 기본은 14px 이다. '작게'를 14px 로 두면 골라도 아무 일이 안 일어난 것처럼
-// 보이므로, 기본보다 확실히 작은 값에서 시작한다.
-const NOTICE_SIZES  = [['작게','12px'],['보통','14px'],['크게','19px'],['아주 크게','25px']];
+// ── 쓰기 탭 (관리자 전용) ───────────────────────────────────────────────────
+// 목록과 편집이 같은 탭 안에서 갈린다. 확성기(보는 창)와는 완전히 나눠 두었다 —
+// 한 창에서 모드로 갈리면 고친 것이 남에게 어떻게 보이는지 확인하기가 헷갈린다.
+let _noticePendingEdit = null;      // 확성기에서 '편집'으로 넘어올 때 실어 오는 id
 
-// 편집은 탭에서 한다. 확성기(보는 창)에서 '편집'을 누르면 이리로 넘어온다.
-function startNoticeEdit(){
+// 확성기에서 부른다. 탭으로 넘어가 바로 그 공지를 연다.
+function startNoticeEdit(id){
+  _noticePendingEdit = id || '';    // 빈 문자열이면 새 공지
   doCloseNoticeModal();
   navigateTo('notice');
 }
 
-// 탭에 들어올 때마다 그린다. 남이 그 사이 고쳤을 수도 있으니 늘 최신을 담는다.
 function initNoticePage(){
   if (!_IS_ADMIN()) { navigateTo('home'); return; }
+  const pending = _noticePendingEdit;
+  _noticePendingEdit = null;
+  if (pending === null) renderNoticeAdminList();
+  else openNoticeEditor(pending);
+}
+
+function noticeNewId(){
+  return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function renderNoticeAdminList(){
+  const body = document.getElementById('noticeEditBody');
+  if (!body || !document.getElementById('noticePage')) return;
+  _noticeEditing = false;
+  _noticeDirty = false;
+  _noticeDraft = null;
+  noticeReleaseImages();
+  document.getElementById('noticePreviewBtn').style.display = 'none';
+
+  body.innerHTML = _noticeList.length
+    ? `<div class="notice-list">${_noticeList.map(n => {
+        const st = noticeStateOf(n);
+        return `<button type="button" class="notice-row" data-id="${n.id}">
+          <span class="notice-row-main">
+            <span class="notice-row-title">${escapeHtml(noticeTitleOf(n))}</span>
+            <span class="notice-row-sub">${escapeHtml(noticePeriodText(n.from, n.until) || '기간 없음')}
+              · ${escapeHtml(noticeWhenText(n.updatedAt))}${n.by ? ' · ' + escapeHtml(n.by) : ''}</span>
+          </span>${noticeStateChip(st)}</button>`;
+      }).join('')}</div>`
+    : `<div class="notice-empty">아직 쓴 공지가 없습니다.</div>`;
+  body.querySelectorAll('.notice-row').forEach(r =>
+    r.addEventListener('click', () => openNoticeEditor(r.dataset.id)));
+
+  document.getElementById('noticeEditFoot').innerHTML = `
+    <span class="notice-foot-msg" id="noticeSaveMsg"></span>
+    <button class="notice-btn" id="noticeCheckBtn2" title="그림 저장소(R2)가 붙었는지 확인">🔌 저장소 확인</button>
+    <button class="notice-btn primary" onclick="openNoticeEditor('')">＋ 새 공지</button>`;
+  document.getElementById('noticeCheckBtn2').onclick = noticeCheckWorker;
+  renderNoticeEditState();
+}
+
+function openNoticeEditor(id){
+  const found = _noticeList.find(n => n.id === id);
+  _noticeDraft = found
+    ? { ...found, isNew: false }
+    : { id: noticeNewId(), title: '', html: '', keys: [], from: 0, until: 0, isNew: true };
   _noticeEditing = true;
   _noticeDirty = false;
   noticeReleaseImages();
+  document.getElementById('noticePreviewBtn').style.display = '';
+
   const body = document.getElementById('noticeEditBody');
   body.innerHTML = `
+    <input type="text" id="noticeTitleIn" class="notice-title-in" maxlength="60"
+           placeholder="제목 (비우면 본문 첫 줄을 씁니다)">
     <div class="notice-toolbar">
       <button type="button" class="notice-tool" data-cmd="bold"      title="굵게 (Ctrl+B)"><b>B</b></button>
       <button type="button" class="notice-tool" data-cmd="italic"    title="기울임 (Ctrl+I)"><i>I</i></button>
@@ -8844,104 +9001,54 @@ function initNoticePage(){
       <button type="button" class="notice-btn" id="noticePeriodClear">기간 없이</button>
     </div>
     <div class="notice-hint" id="noticePeriodHint">비워 두면 저장하는 즉시 뜨고, 내릴 때까지 계속 뜹니다.</div>`;
-  document.getElementById('noticeFrom').value  = noticeToInput(_noticeData.from);
-  document.getElementById('noticeUntil').value = noticeToInput(_noticeData.until);
+
+  document.getElementById('noticeTitleIn').value = _noticeDraft.title;
+  document.getElementById('noticeFrom').value  = noticeToInput(_noticeDraft.from);
+  document.getElementById('noticeUntil').value = noticeToInput(_noticeDraft.until);
   document.getElementById('noticePeriodClear').addEventListener('click', () => {
     document.getElementById('noticeFrom').value = '';
     document.getElementById('noticeUntil').value = '';
     noticeMarkDirty();
   });
+  document.getElementById('noticeTitleIn').addEventListener('input', noticeMarkDirty);
   document.getElementById('noticeFrom').addEventListener('change', noticeMarkDirty);
   document.getElementById('noticeUntil').addEventListener('change', noticeMarkDirty);
 
   const ed = document.getElementById('noticeEditor');
-  ed.innerHTML = noticeSanitize(_noticeData.html);
+  ed.innerHTML = noticeSanitize(_noticeDraft.html);
   noticeLoadImages(ed);
   bindNoticeEditor(ed);
 
   document.getElementById('noticeEditFoot').innerHTML = `
     <span class="notice-foot-msg" id="noticeSaveMsg"></span>
-    ${_noticeData.html ? '<button class="notice-btn danger" onclick="deleteNotice()">공지 내리기</button>' : ''}
-    <button class="notice-btn" onclick="cancelNoticeEdit()">그만두기</button>
+    ${_noticeDraft.isNew ? '' : '<button class="notice-btn danger" onclick="deleteNotice()">이 공지 지우기</button>'}
+    <button class="notice-btn" onclick="noticeCloseEditor()">‹ 목록</button>
     <button class="notice-btn primary" id="noticeSaveBtn" onclick="saveNotice()">저장</button>`;
-  document.getElementById('noticePreviewBtn').onclick = previewNotice;
-  document.getElementById('noticeCheckBtn').onclick = noticeCheckWorker;
   renderNoticeEditState();
   ed.focus();
 }
 
-// 지금 이 공지가 남에게 보이는지를 쓰는 화면에도 붙여 둔다.
+// 지금 고치는 공지가 남에게 보이는지를 쓰는 화면에도 붙여 둔다.
 // 예약해 놓고 잊거나, 기간이 끝난 줄 모르고 고치는 일이 잦다.
 function renderNoticeEditState(){
   const el = document.getElementById('noticeEditState');
   if (!el) return;
-  const st = _noticeDirty ? 'dirty' : noticeWindowState();
-  const txt = { dirty: '● 저장 안 됨', none: '올라온 공지 없음',
-                live: '지금 뜨는 중', before: '예약됨 — 아직 안 뜸',
-                after: '게시 끝남 — 안 뜸' }[st] || '';
+  let st, txt;
+  if (!_noticeEditing) {
+    const live = noticeLiveList().length;
+    st = live ? 'live' : 'none';
+    txt = live ? `게시중 ${live}건` : '게시중인 공지 없음';
+  } else if (_noticeDirty) {
+    st = 'dirty'; txt = '● 저장 안 됨';
+  } else if (_noticeDraft && _noticeDraft.isNew) {
+    st = 'none'; txt = '새 공지 — 아직 저장 전';
+  } else {
+    st = noticeStateOf(_noticeDraft);
+    txt = { live: '지금 뜨는 중', before: '예약됨 — 아직 안 뜸',
+            after: '게시 끝남 — 안 뜸', none: '빈 공지' }[st] || '';
+  }
   el.textContent = txt;
   el.className = 'notice-edit-state ' + st;
-}
-
-// 그림 저장소가 실제로 붙었는지 한 번에 확인한다.
-// 올리기·내려받기·지우기를 다 태우고 흔적을 지운다 — 설정 네 군데(코드 배포,
-// 변수 둘, 버킷 바인딩) 중 어디가 빠졌는지는 오류 이름으로만 갈린다.
-async function noticeCheckWorker(){
-  const btn = document.getElementById('noticeCheckBtn');
-  const msg = document.getElementById('noticeSaveMsg');
-  const say = t => { if (msg) msg.textContent = t; };
-  if (btn) btn.disabled = true;
-  say('그림 저장소 확인 중...');
-  // 1×1 짜리 흰 점. 올려도 사실상 자리를 안 차지한다.
-  const c = document.createElement('canvas'); c.width = c.height = 1;
-  const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,1,1);
-  try {
-    const put = await noticeApi({ action: 'put', noticeId: NOTICE_IMG_ID,
-                                  fileId: 'selftest', dataUrl: c.toDataURL('image/jpeg', 0.5) });
-    if (!put || !put.success) throw new Error(noticeErrText(put && put.error));
-
-    const idToken = await fbAuth.currentUser.getIdToken();
-    const got = await fetch(`${NOTICE_WORKER}/img?k=${encodeURIComponent(put.key)}`,
-                            { headers: { Authorization: `Bearer ${idToken}` } });
-    if (!got.ok) throw new Error('올리기는 됐는데 내려받기가 안 됩니다(' + got.status + ').');
-
-    const del = await noticeApi({ action: 'del', key: put.key });
-    if (!del || !del.success) throw new Error('올리기·보기는 되는데 지우기가 안 됩니다.');
-
-    say('✅ 그림 저장소 정상 — 붙여넣기로 그림을 올릴 수 있습니다.');
-  } catch(e){
-    say('');
-    alert('그림 저장소에 문제가 있습니다.\n\n' + (e.message || e) +
-          '\n\nworkers/README.md 의 "안 될 때 보는 곳" 을 확인해 주세요.');
-  }
-  if (btn) btn.disabled = false;
-}
-
-// 저장하기 전에 남의 화면에서 어떻게 보이는지 확인하는 길.
-// 쓰는 화면과 보는 화면을 나눈 김에, 둘을 오가지 않고도 볼 수 있게 한다.
-function previewNotice(){
-  const ed = document.getElementById('noticeEditor');
-  if (!ed) return;
-  const m = document.getElementById('noticeModal');
-  document.getElementById('noticeTitle').textContent = '📢 전체 공지 — 미리보기';
-  const from  = noticeFromInput(document.getElementById('noticeFrom')?.value);
-  const until = noticeFromInput(document.getElementById('noticeUntil')?.value);
-  document.getElementById('noticeWhen').textContent = noticePeriodText(from, until);
-
-  const body = document.getElementById('noticeBody');
-  body.innerHTML = '';
-  const tag = document.createElement('div');
-  tag.className = 'notice-state';
-  tag.textContent = '미리보기입니다 — 아직 저장 전이라 다른 선생님께는 안 보입니다.';
-  body.appendChild(tag);
-  const view = document.createElement('div');
-  view.className = 'notice-view';
-  view.innerHTML = noticeSanitize(ed.innerHTML);
-  body.appendChild(view);
-  noticeLoadImages(view);
-  document.getElementById('noticeFoot').innerHTML = '';
-  m.classList.add('open');
-  history.pushState({ modal: 'notice' }, '');
 }
 
 function noticeMarkDirty(){
@@ -8950,20 +9057,27 @@ function noticeMarkDirty(){
   renderNoticeEditState();
 }
 
-// 쓰던 것을 버리고 나갈지. navigateTo 와 뒤로가기가 같이 쓴다.
+// 쓰던 것을 버리고 나갈지. navigateTo 와 '목록' 단추가 같이 쓴다.
 function noticeMayLeave(){
   if (!_noticeEditing || !_noticeDirty) return true;
   return confirm('저장하지 않은 공지가 있습니다. 버리고 나갈까요?');
 }
 
-function cancelNoticeEdit(){
+function noticeCloseEditor(){
   if (!noticeMayLeave()) return;
-  _noticeDirty = false;
-  navigateTo('home');
+  renderNoticeAdminList();
 }
+// 예전 이름 — 확성기의 '＋ 공지 쓰기' 가 부른다
+function cancelNoticeEdit(){ noticeCloseEditor(); }
+
+// ── 편집기 조작 ─────────────────────────────────────────────────────────────
+const NOTICE_COLORS = ['#111827','#dc2626','#ea580c','#ca8a04','#16a34a','#2563eb','#7c3aed'];
+// 본문 기본은 14px 이다. '작게'를 14px 로 두면 골라도 아무 일이 안 일어난 것처럼
+// 보이므로, 기본보다 확실히 작은 값에서 시작한다.
+const NOTICE_SIZES  = [['작게','12px'],['보통','14px'],['크게','19px'],['아주 크게','25px']];
 
 function bindNoticeEditor(ed){
-  // 색·크기를 span 으로 넣는다. 안 켜면 <font> 태그가 나와 걸러내기에서 사라진다.
+  // 색·굵기를 span 으로 넣는다. 안 켜면 <font> 태그가 나와 걸러내기에서 사라진다.
   try { document.execCommand('styleWithCSS', false, true); } catch(e){}
 
   document.querySelectorAll('#noticeEditBody .notice-tool[data-cmd]').forEach(b => {
@@ -8972,6 +9086,7 @@ function bindNoticeEditor(ed){
     b.addEventListener('click', () => {
       ed.focus();
       try { document.execCommand(b.dataset.cmd, false, null); } catch(e){}
+      noticeMarkDirty();
     });
   });
   document.querySelectorAll('#noticeEditBody .notice-tool-swatch').forEach(b => {
@@ -8979,11 +9094,12 @@ function bindNoticeEditor(ed){
     b.addEventListener('click', () => {
       ed.focus();
       try { document.execCommand('foreColor', false, b.dataset.color); } catch(e){}
+      noticeMarkDirty();
     });
   });
   const sel = document.getElementById('noticeSizeSel');
   // focus() 를 여기서 먼저 부르면 안 된다. 커서 자리를 챙기는 것이 먼저다.
-  sel?.addEventListener('change', () => noticeSetFontSize(sel.value));
+  sel?.addEventListener('change', () => { noticeSetFontSize(sel.value); noticeMarkDirty(); });
 
   // 한글 워드프로세서처럼 Ctrl+B/I/U — 브라우저가 기본으로 주는 것이지만,
   // contenteditable 밖에서 눌렸을 때 엉뚱한 곳에 걸리지 않게 여기서 받는다.
@@ -9001,13 +9117,6 @@ function bindNoticeEditor(ed){
   ed.addEventListener('mouseup', noticeSyncSizeSel);
 }
 
-// px 를 직접 넣는 표준 명령이 없다. 그래서 fontSize 로 7단계를 씌운 뒤 그 자리를
-// 원하는 px 로 바꿔 끼우는 오래된 방법을 쓴다.
-//
-// 여기서 styleWithCSS 를 잠깐 꺼야 한다. 켜 둔 채로 fontSize 를 부르면 브라우저가
-// <font size="7"> 대신 <span style="font-size: xxx-large"> 를 만들어, 바꿔 끼울
-// 자리를 못 찾는다 — 그러면 어느 크기를 골라도 똑같이 xxx-large 가 된다.
-// (색·굵기 쪽은 반대로 켜져 있어야 <font color> 대신 span 이 나온다.)
 function noticeSetFontSize(px){
   const ed = document.getElementById('noticeEditor');
   if (!ed) return;
@@ -9095,6 +9204,7 @@ async function onNoticePaste(e){
   if (!html) return;                       // 그냥 글자면 브라우저에 맡긴다
   e.preventDefault();
   document.execCommand('insertHTML', false, noticeSanitize(html));
+  noticeMarkDirty();
 }
 
 // 붙여넣은 그림을 줄여서 dataURL 로. 원본 그대로 올리면 캡처 한 장이 몇 MB 다.
@@ -9127,11 +9237,12 @@ async function noticeInsertImage(file){
   if (msg) msg.textContent = '그림 올리는 중...';
   try {
     const dataUrl = await noticeShrink(file);
-    const r = await noticeApi({ action: 'put', noticeId: NOTICE_IMG_ID,
+    const r = await noticeApi({ action: 'put', noticeId: _noticeDraft.id,
                                 fileId: noticeFileId(), dataUrl });
     if (!r || !r.success) throw new Error(noticeErrText(r && r.error));
     document.execCommand('insertHTML', false,
       `<img data-k="${r.key}" src="${dataUrl}"><br>`);
+    noticeMarkDirty();
     if (msg) msg.textContent = '';
   } catch(err){
     if (msg) msg.textContent = '';
@@ -9148,15 +9259,15 @@ function noticeErrText(err){
   return '연결에 실패했습니다. 잠시 뒤 다시 시도해 주세요.';
 }
 
-// ── 저장 ────────────────────────────────────────────────────────────────────
+// ── 저장·지우기·점검 ────────────────────────────────────────────────────────
 async function saveNotice(){
-  const ed = document.getElementById('noticeEditor');
+  const ed  = document.getElementById('noticeEditor');
   const btn = document.getElementById('noticeSaveBtn');
   const msg = document.getElementById('noticeSaveMsg');
-  if (!ed) return;
+  if (!ed || !_noticeDraft) return;
   const html = noticeSanitize(ed.innerHTML);
-  // 글자도 그림도 없으면 빈 공지다 — 저장 대신 내리는 것으로 본다
-  const bare = html.replace(/<[^>]*>/g, '').replace(/ |\s/g, '');
+  // 글자도 그림도 없으면 빈 공지다 — 저장 대신 지우는 것으로 본다
+  const bare = html.replace(/<[^>]*>/g, '').replace(/&nbsp;|\s/g, '');
   if (!bare && !/\<img/i.test(html)) { alert('내용이 비어 있습니다.'); return; }
 
   const from  = noticeFromInput(document.getElementById('noticeFrom')?.value);
@@ -9166,24 +9277,35 @@ async function saveNotice(){
   if (until && until < Date.now() &&
       !confirm('게시 종료 시각이 이미 지났습니다. 이대로 저장하면 다른 선생님께는 안 뜹니다.\n그래도 저장할까요?')) return;
 
-  if (btn) { btn.disabled = true; }
+  if (btn) btn.disabled = true;
   if (msg) msg.textContent = '저장 중...';
   try {
-    const keys = noticeKeysIn(html);
-    await setDoc(doc(fbDb, 'appNotice', NOTICE_DOC), {
-      html, keys, updatedAt: Date.now(), from, until,
+    const keys  = noticeKeysIn(html);
+    const title = String(document.getElementById('noticeTitleIn')?.value || '').trim();
+    await setDoc(doc(fbDb, 'appNotice', _noticeDraft.id), {
+      scope: NOTICE_SCOPE, title, html, keys, from, until,
+      updatedAt: Date.now(),
       by: fbAuth.currentUser?.displayName || fbAuth.currentUser?.email || ''
     });
     // 쓰다 만 그림(넣었다 지운 것)은 R2 에 그대로 남는다. 저장이 끝난 지금이
     // '무엇이 쓰이는지'가 확정된 유일한 시점이라 여기서 치운다.
-    noticeApi({ action: 'sweep', keep: keys }).catch(() => {});
-    _noticeData = { ..._noticeData, html, keys, from, until, updatedAt: Date.now() };
-    noticeMarkSeen();
+    // 반드시 '모든 공지'의 키를 넘긴다 — 이 공지 것만 넘기면 다른 공지의 그림이
+    // 안 쓰이는 것으로 보여 통째로 지워진다.
+    noticeApi({ action: 'sweep', keep: noticeAllKeys(keys) }).catch(() => {});
+
+    _noticeDraft = { ..._noticeDraft, title, html, keys, from, until,
+                     updatedAt: Date.now(), isNew: false };
     _noticeDirty = false;
     if (btn) btn.disabled = false;
     if (msg) msg.textContent = '저장했습니다.';
     setTimeout(() => { const m = document.getElementById('noticeSaveMsg');
                        if (m && m.textContent === '저장했습니다.') m.textContent = ''; }, 3000);
+    // 새 공지였다면 이제 '지우기' 가 붙어야 한다
+    const foot = document.getElementById('noticeEditFoot');
+    if (foot && !foot.querySelector('.danger')) {
+      foot.insertAdjacentHTML('afterbegin',
+        '<button class="notice-btn danger" onclick="deleteNotice()">이 공지 지우기</button>');
+    }
     renderNoticeEditState();
   } catch(e){
     if (btn) btn.disabled = false;
@@ -9193,30 +9315,94 @@ async function saveNotice(){
 }
 
 async function deleteNotice(){
-  if (!confirm('공지를 내릴까요? 그림도 함께 지워집니다.')) return;
+  if (!_noticeDraft || _noticeDraft.isNew) return;
+  if (!confirm('이 공지를 지울까요? 그림도 함께 지워집니다.')) return;
   try {
-    await setDoc(doc(fbDb, 'appNotice', NOTICE_DOC),
-                 { html: '', keys: [], updatedAt: Date.now(), from: 0, until: 0,
-                   by: fbAuth.currentUser?.displayName || fbAuth.currentUser?.email || '' });
-    noticeApi({ action: 'sweep', keep: [] }).catch(() => {});
-    _noticeData = { html: '', keys: [], updatedAt: Date.now(), by: '', from: 0, until: 0 };
-    noticeMarkSeen();
+    await deleteDoc(doc(fbDb, 'appNotice', _noticeDraft.id));
+    // 지운 공지의 키는 빼고 나머지 전부를 남긴다
+    const gone = new Set(_noticeDraft.keys || []);
+    const keep = noticeAllKeys().filter(k => !gone.has(k));
+    noticeApi({ action: 'sweep', keep }).catch(() => {});
+    _noticeList = _noticeList.filter(n => n.id !== _noticeDraft.id);
     _noticeDirty = false;
-    if (document.getElementById('noticePage')?.classList.contains('active')) initNoticePage();
-    else renderNoticeView();
+    renderNoticeAdminList();
   } catch(e){
-    alert('내리지 못했습니다.\n' + (e.message || e));
+    alert('지우지 못했습니다.\n' + (e.message || e));
+  }
+}
+
+// 저장하기 전에 남의 화면에서 어떻게 보이는지 확인하는 길.
+function previewNotice(){
+  const ed = document.getElementById('noticeEditor');
+  if (!ed || !_noticeDraft) return;
+  const m = document.getElementById('noticeModal');
+  const title = String(document.getElementById('noticeTitleIn')?.value || '').trim();
+  document.getElementById('noticeTitle').textContent =
+    '📢 ' + (title || noticeTitleOf({ html: ed.innerHTML })) + ' — 미리보기';
+  const from  = noticeFromInput(document.getElementById('noticeFrom')?.value);
+  const until = noticeFromInput(document.getElementById('noticeUntil')?.value);
+  document.getElementById('noticeWhen').textContent = noticePeriodText(from, until);
+
+  const body = document.getElementById('noticeBody');
+  body.innerHTML = '';
+  const tag = document.createElement('div');
+  tag.className = 'notice-state';
+  tag.textContent = _noticeDirty
+    ? '미리보기입니다 — 아직 저장 전이라 다른 선생님께는 안 보입니다.'
+    : '미리보기입니다 — 다른 선생님 화면에서 이렇게 보입니다.';
+  body.appendChild(tag);
+  const view = document.createElement('div');
+  view.className = 'notice-view';
+  view.innerHTML = noticeSanitize(ed.innerHTML);
+  body.appendChild(view);
+  noticeLoadImages(view);
+  document.getElementById('noticeFoot').innerHTML = '';
+  m.classList.add('open');
+  history.pushState({ modal: 'notice' }, '');
+}
+
+// 그림 저장소가 실제로 붙었는지 한 번에 확인한다.
+// 올리기·내려받기·지우기를 다 태우고 흔적을 지운다 — 설정 네 군데(코드 배포,
+// 변수 둘, 버킷 바인딩) 중 어디가 빠졌는지는 오류 이름으로만 갈린다.
+async function noticeCheckWorker(){
+  const msg = document.getElementById('noticeSaveMsg');
+  const say = t => { if (msg) msg.textContent = t; };
+  say('그림 저장소 확인 중...');
+  // 1×1 짜리 흰 점. 올려도 사실상 자리를 안 차지한다.
+  const c = document.createElement('canvas'); c.width = c.height = 1;
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,1,1);
+  try {
+    const put = await noticeApi({ action: 'put', noticeId: 'selftest',
+                                  fileId: 'selftest', dataUrl: c.toDataURL('image/jpeg', 0.5) });
+    if (!put || !put.success) throw new Error(noticeErrText(put && put.error));
+
+    const idToken = await fbAuth.currentUser.getIdToken();
+    const got = await fetch(`${NOTICE_WORKER}/img?k=${encodeURIComponent(put.key)}`,
+                            { headers: { Authorization: `Bearer ${idToken}` } });
+    if (!got.ok) throw new Error('올리기는 됐는데 내려받기가 안 됩니다(' + got.status + ').');
+
+    const del = await noticeApi({ action: 'del', key: put.key });
+    if (!del || !del.success) throw new Error('올리기·보기는 되는데 지우기가 안 됩니다.');
+
+    say('✅ 그림 저장소 정상 — 붙여넣기로 그림을 올릴 수 있습니다.');
+  } catch(e){
+    say('');
+    alert('그림 저장소에 문제가 있습니다.\n\n' + (e.message || e) +
+          '\n\nworkers/README.md 의 "안 될 때 보는 곳" 을 확인해 주세요.');
   }
 }
 
 window.openNoticeModal    = openNoticeModal;
 window.closeNoticeModal   = closeNoticeModal;
 window.closeNoticeModalBtn= closeNoticeModalBtn;
+window.noticeBackToList   = noticeBackToList;
 window.startNoticeEdit    = startNoticeEdit;
 window.initNoticePage     = initNoticePage;
+window.openNoticeEditor   = openNoticeEditor;
+window.noticeCloseEditor  = noticeCloseEditor;
+window.cancelNoticeEdit   = cancelNoticeEdit;
 window.previewNotice      = previewNotice;
 window.noticeCheckWorker  = noticeCheckWorker;
-window.cancelNoticeEdit   = cancelNoticeEdit;
 window.saveNotice         = saveNotice;
 window.deleteNotice       = deleteNotice;
 
