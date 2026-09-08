@@ -2564,6 +2564,18 @@
   }
   /* 예약해 두고 잊는 일이 잦다 — 관리자 화면에서 눈에 띄게 */
   .app-notice-btn.scheduled{border-color:#ca8a04;background:rgba(202,138,4,0.12);}
+  /* 쓰기 탭 */
+  .notice-page-body{flex:1;overflow-y:auto;padding:16px 18px;}
+  .notice-edit-state{
+    font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;
+    border:1px solid var(--rule);color:var(--ink-soft);background:var(--paper-soft);
+  }
+  .notice-edit-state.live{color:#166534;border-color:rgba(22,101,52,0.35);background:rgba(22,163,74,0.12);}
+  .notice-edit-state.before,
+  .notice-edit-state.after{color:#854d0e;border-color:rgba(202,138,4,0.4);background:rgba(202,138,4,0.14);}
+  .notice-edit-state.dirty{color:#991b1b;border-color:rgba(153,27,27,0.4);background:rgba(220,38,38,0.12);}
+  #noticePage .notice-editor{max-height:none;min-height:320px;}
+
   .notice-state{
     margin-bottom:12px;padding:9px 12px;border-radius:8px;
     background:rgba(202,138,4,0.12);border:1px solid rgba(202,138,4,0.35);
@@ -4620,6 +4632,9 @@
     <div class="tab-item" data-page="room" id="tabRoom" style="display:none;">
       <span class="tab-item-icon">🚪</span>특별실 예약
     </div>
+    <div class="tab-item" data-page="notice" id="tabNotice" style="display:none;">
+      <span class="tab-item-icon">📢</span>전체 공지 쓰기
+    </div>
     <div class="tab-item" data-page="docs">
       <span class="tab-item-icon">📋</span>업무자료
     </div>
@@ -4675,6 +4690,9 @@
       </div>
       <div class="main-nav-item" data-page="room" id="navRoom" style="display:none;">
         <span class="main-nav-icon">🚪</span>특별실 예약
+      </div>
+      <div class="main-nav-item" data-page="notice" id="navNotice" style="display:none;">
+        <span class="main-nav-icon">📢</span>전체 공지 쓰기
       </div>
       <div class="main-nav-item" data-page="docs">
         <span class="main-nav-icon">📋</span>업무자료
@@ -5579,6 +5597,19 @@
         <iframe id="usagePageFrame" title="사용 현황" style="flex:1;width:100%;border:0;background:var(--bg-base);"></iframe>
       </div>
 
+      <!-- 전체 공지 쓰기 — 관리자 전용 탭.
+           모달 안에서 쓰다가 탭으로 뺐다. 쓰는 화면과 보는 화면(확성기)이 한 창에
+           섞여 있으면, 고친 것이 남에게 어떻게 보이는지 확인하기가 헷갈린다. -->
+      <div class="page-view" id="noticePage">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;">
+          <span style="font-size:13px;font-weight:800;color:var(--ink-soft);flex:1;">📢 전체 공지 쓰기</span>
+          <span id="noticeEditState" class="notice-edit-state"></span>
+          <button class="notice-btn" id="noticePreviewBtn">👁 보이는 대로</button>
+        </div>
+        <div class="notice-page-body" id="noticeEditBody"></div>
+        <div class="notice-foot" id="noticeEditFoot"></div>
+      </div>
+
       <div class="page-view" id="seatPage">
         <div id="seatPageHead" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;">
           <button class="sg-back-btn" id="seatBackBtn">← 돌아가기</button>
@@ -6125,7 +6156,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.07';
+const APP_VER = 'ver7.08';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -7985,12 +8016,9 @@ window.addEventListener('popstate', (e)=>{
   const st = e.state || {};
 
   // 1. 열린 모달 닫기 (최우선). 가드 1개 다시 쌓아 스택 보존
-  // 전체 공지는 늘 맨 위다. 편집 중이면 물어보고, 아니라고 하면 상태를 다시 쌓아
-  // 창을 남긴다 — 안 그러면 뒤로가기 한 번에 쓰던 글이 통째로 날아간다.
+  // 전체 공지 창은 늘 맨 위다. 보기 전용이라 그냥 닫으면 된다 — 쓰기는 탭으로
+  // 나가 있고, 쓰다 만 것은 탭을 떠날 때(navigateTo) 붙잡는다.
   if (document.getElementById('noticeModal')?.classList.contains('open')) {
-    if (_noticeEditing && !confirm('쓰던 공지를 버리고 닫을까요?')) {
-      history.pushState({ modal: 'notice' }, ''); return;
-    }
     doCloseNoticeModal(); armExitGuard(); return;
   }
   if (document.getElementById('groupEditorModal')?.style.display === 'flex') { closeGroupEditor(); armExitGuard(); return; }
@@ -8419,7 +8447,8 @@ const NOTICE_SEEN_KEY = 'noticeSeenAt';
 
 let _noticeUnsub = null;
 let _noticeData  = { html: '', keys: [], updatedAt: 0, by: '', from: 0, until: 0 };
-let _noticeEditing = false;
+let _noticeEditing = false;   // 공지 쓰기 탭에 있는가
+let _noticeDirty   = false;   // 그 안에서 실제로 고친 것이 있는가
 let _noticeObjUrls = [];          // 화면에서 뗄 때 되돌려줄 blob 주소
 
 // ── 걸러내기 ────────────────────────────────────────────────────────────────
@@ -8592,6 +8621,12 @@ function noticeMarkSeen(){
 }
 
 function renderNoticeBtn(){
+  // 쓰기 탭도 관리자에게만. 확성기와 같은 조건이라 여기서 같이 다룬다.
+  const admin = _IS_ADMIN();
+  const navN = document.getElementById('navNotice'), tabN = document.getElementById('tabNotice');
+  if (navN) navN.style.display = admin ? '' : 'none';
+  if (tabN) tabN.style.display = admin ? '' : 'none';
+
   const btn = document.getElementById('noticeBtn');
   if (!btn) return;
   const show = noticeBtnVisible();
@@ -8616,7 +8651,8 @@ function startNoticeClock(){
     _noticeLastState = st;
     renderNoticeBtn();
     const modal = document.getElementById('noticeModal');
-    if (modal?.classList.contains('open') && !_noticeEditing) renderNoticeView();
+    if (modal?.classList.contains('open')) renderNoticeView();
+    renderNoticeEditState();
   }, 30000);
 }
 
@@ -8632,7 +8668,10 @@ function watchNotice(){
     // 열어 둔 창은 그 자리에서 갱신한다. 단 편집 중이면 건드리지 않는다 —
     // 쓰던 글이 남의 저장으로 날아가면 되돌릴 길이 없다.
     const modal = document.getElementById('noticeModal');
-    if (modal?.classList.contains('open') && !_noticeEditing) renderNoticeView();
+    if (modal?.classList.contains('open')) renderNoticeView();
+    // 쓰는 중이면 화면을 안 건드린다 — 쓰던 글이 남의 저장으로 날아가면 못 되돌린다.
+    // 대신 '남이 방금 고쳤다'는 것은 상태 표시로 알린다.
+    renderNoticeEditState();
   }, () => {});
 }
 
@@ -8740,16 +8779,14 @@ function openNoticeModal(){
   history.pushState({ modal: 'notice' }, '');
 }
 
-// 배경을 눌러 닫는 길. 편집 중에는 실수로 지나가지 못하게 막는다.
+// 배경을 눌러 닫는 길. 이 창은 이제 보기 전용이라 물어볼 것이 없다(쓰기는 탭).
 function closeNoticeModal(e){
   if (e && e.target !== e.currentTarget) return;
-  if (_noticeEditing && !confirm('쓰던 공지를 버리고 닫을까요?')) return;
   if (history.state?.modal === 'notice') history.back();
   else doCloseNoticeModal();
 }
 function closeNoticeModalBtn(){ closeNoticeModal(null); }
 function doCloseNoticeModal(){
-  _noticeEditing = false;
   noticeReleaseImages();
   document.getElementById('noticeModal')?.classList.remove('open');
   document.getElementById('noticeBody').innerHTML = '';
@@ -8765,12 +8802,19 @@ const NOTICE_COLORS = ['#111827','#dc2626','#ea580c','#ca8a04','#16a34a','#2563e
 // 보이므로, 기본보다 확실히 작은 값에서 시작한다.
 const NOTICE_SIZES  = [['작게','12px'],['보통','14px'],['크게','19px'],['아주 크게','25px']];
 
+// 편집은 탭에서 한다. 확성기(보는 창)에서 '편집'을 누르면 이리로 넘어온다.
 function startNoticeEdit(){
+  doCloseNoticeModal();
+  navigateTo('notice');
+}
+
+// 탭에 들어올 때마다 그린다. 남이 그 사이 고쳤을 수도 있으니 늘 최신을 담는다.
+function initNoticePage(){
+  if (!_IS_ADMIN()) { navigateTo('home'); return; }
   _noticeEditing = true;
+  _noticeDirty = false;
   noticeReleaseImages();
-  document.getElementById('noticeTitle').textContent = '📢 전체 공지 쓰기';
-  document.getElementById('noticeWhen').textContent = '';
-  const body = document.getElementById('noticeBody');
+  const body = document.getElementById('noticeEditBody');
   body.innerHTML = `
     <div class="notice-toolbar">
       <button type="button" class="notice-tool" data-cmd="bold"      title="굵게 (Ctrl+B)"><b>B</b></button>
@@ -8801,29 +8845,89 @@ function startNoticeEdit(){
   document.getElementById('noticePeriodClear').addEventListener('click', () => {
     document.getElementById('noticeFrom').value = '';
     document.getElementById('noticeUntil').value = '';
+    noticeMarkDirty();
   });
+  document.getElementById('noticeFrom').addEventListener('change', noticeMarkDirty);
+  document.getElementById('noticeUntil').addEventListener('change', noticeMarkDirty);
+
   const ed = document.getElementById('noticeEditor');
   ed.innerHTML = noticeSanitize(_noticeData.html);
   noticeLoadImages(ed);
   bindNoticeEditor(ed);
 
-  document.getElementById('noticeFoot').innerHTML = `
+  document.getElementById('noticeEditFoot').innerHTML = `
     <span class="notice-foot-msg" id="noticeSaveMsg"></span>
-    <button class="notice-btn" onclick="cancelNoticeEdit()">취소</button>
+    ${_noticeData.html ? '<button class="notice-btn danger" onclick="deleteNotice()">공지 내리기</button>' : ''}
+    <button class="notice-btn" onclick="cancelNoticeEdit()">그만두기</button>
     <button class="notice-btn primary" id="noticeSaveBtn" onclick="saveNotice()">저장</button>`;
+  document.getElementById('noticePreviewBtn').onclick = previewNotice;
+  renderNoticeEditState();
   ed.focus();
 }
 
+// 지금 이 공지가 남에게 보이는지를 쓰는 화면에도 붙여 둔다.
+// 예약해 놓고 잊거나, 기간이 끝난 줄 모르고 고치는 일이 잦다.
+function renderNoticeEditState(){
+  const el = document.getElementById('noticeEditState');
+  if (!el) return;
+  const st = _noticeDirty ? 'dirty' : noticeWindowState();
+  const txt = { dirty: '● 저장 안 됨', none: '올라온 공지 없음',
+                live: '지금 뜨는 중', before: '예약됨 — 아직 안 뜸',
+                after: '게시 끝남 — 안 뜸' }[st] || '';
+  el.textContent = txt;
+  el.className = 'notice-edit-state ' + st;
+}
+
+// 저장하기 전에 남의 화면에서 어떻게 보이는지 확인하는 길.
+// 쓰는 화면과 보는 화면을 나눈 김에, 둘을 오가지 않고도 볼 수 있게 한다.
+function previewNotice(){
+  const ed = document.getElementById('noticeEditor');
+  if (!ed) return;
+  const m = document.getElementById('noticeModal');
+  document.getElementById('noticeTitle').textContent = '📢 전체 공지 — 미리보기';
+  const from  = noticeFromInput(document.getElementById('noticeFrom')?.value);
+  const until = noticeFromInput(document.getElementById('noticeUntil')?.value);
+  document.getElementById('noticeWhen').textContent = noticePeriodText(from, until);
+
+  const body = document.getElementById('noticeBody');
+  body.innerHTML = '';
+  const tag = document.createElement('div');
+  tag.className = 'notice-state';
+  tag.textContent = '미리보기입니다 — 아직 저장 전이라 다른 선생님께는 안 보입니다.';
+  body.appendChild(tag);
+  const view = document.createElement('div');
+  view.className = 'notice-view';
+  view.innerHTML = noticeSanitize(ed.innerHTML);
+  body.appendChild(view);
+  noticeLoadImages(view);
+  document.getElementById('noticeFoot').innerHTML = '';
+  m.classList.add('open');
+  history.pushState({ modal: 'notice' }, '');
+}
+
+function noticeMarkDirty(){
+  if (_noticeDirty) return;
+  _noticeDirty = true;
+  renderNoticeEditState();
+}
+
+// 쓰던 것을 버리고 나갈지. navigateTo 와 뒤로가기가 같이 쓴다.
+function noticeMayLeave(){
+  if (!_noticeEditing || !_noticeDirty) return true;
+  return confirm('저장하지 않은 공지가 있습니다. 버리고 나갈까요?');
+}
+
 function cancelNoticeEdit(){
-  if (!confirm('쓰던 내용을 버릴까요?')) return;
-  renderNoticeView();
+  if (!noticeMayLeave()) return;
+  _noticeDirty = false;
+  navigateTo('home');
 }
 
 function bindNoticeEditor(ed){
   // 색·크기를 span 으로 넣는다. 안 켜면 <font> 태그가 나와 걸러내기에서 사라진다.
   try { document.execCommand('styleWithCSS', false, true); } catch(e){}
 
-  document.querySelectorAll('#noticeBody .notice-tool[data-cmd]').forEach(b => {
+  document.querySelectorAll('#noticeEditBody .notice-tool[data-cmd]').forEach(b => {
     // mousedown 에서 막아야 커서(선택 영역)가 살아 있다. click 때는 이미 풀린다.
     b.addEventListener('mousedown', e => e.preventDefault());
     b.addEventListener('click', () => {
@@ -8831,7 +8935,7 @@ function bindNoticeEditor(ed){
       try { document.execCommand(b.dataset.cmd, false, null); } catch(e){}
     });
   });
-  document.querySelectorAll('#noticeBody .notice-tool-swatch').forEach(b => {
+  document.querySelectorAll('#noticeEditBody .notice-tool-swatch').forEach(b => {
     b.addEventListener('mousedown', e => e.preventDefault());
     b.addEventListener('click', () => {
       ed.focus();
@@ -8853,6 +8957,7 @@ function bindNoticeEditor(ed){
     }
   });
   ed.addEventListener('paste', onNoticePaste);
+  ed.addEventListener('input',   noticeMarkDirty);
   ed.addEventListener('keyup',   noticeSyncSizeSel);
   ed.addEventListener('mouseup', noticeSyncSizeSel);
 }
@@ -9035,7 +9140,12 @@ async function saveNotice(){
     noticeApi({ action: 'sweep', keep: keys }).catch(() => {});
     _noticeData = { ..._noticeData, html, keys, from, until, updatedAt: Date.now() };
     noticeMarkSeen();
-    renderNoticeView();
+    _noticeDirty = false;
+    if (btn) btn.disabled = false;
+    if (msg) msg.textContent = '저장했습니다.';
+    setTimeout(() => { const m = document.getElementById('noticeSaveMsg');
+                       if (m && m.textContent === '저장했습니다.') m.textContent = ''; }, 3000);
+    renderNoticeEditState();
   } catch(e){
     if (btn) btn.disabled = false;
     if (msg) msg.textContent = '';
@@ -9052,7 +9162,9 @@ async function deleteNotice(){
     noticeApi({ action: 'sweep', keep: [] }).catch(() => {});
     _noticeData = { html: '', keys: [], updatedAt: Date.now(), by: '', from: 0, until: 0 };
     noticeMarkSeen();
-    renderNoticeView();
+    _noticeDirty = false;
+    if (document.getElementById('noticePage')?.classList.contains('active')) initNoticePage();
+    else renderNoticeView();
   } catch(e){
     alert('내리지 못했습니다.\n' + (e.message || e));
   }
@@ -9062,6 +9174,8 @@ window.openNoticeModal    = openNoticeModal;
 window.closeNoticeModal   = closeNoticeModal;
 window.closeNoticeModalBtn= closeNoticeModalBtn;
 window.startNoticeEdit    = startNoticeEdit;
+window.initNoticePage     = initNoticePage;
+window.previewNotice      = previewNotice;
 window.cancelNoticeEdit   = cancelNoticeEdit;
 window.saveNotice         = saveNotice;
 window.deleteNotice       = deleteNotice;
@@ -16099,6 +16213,8 @@ function navigateTo(page) {
   //    (라벨 5연타로 ttSem1을 켠 상태에서만 시간표가 1학기로 보이고, 다른 기능은 항상 2학기)
   try { swapGlobals(page === 'timetable' && sessionStorage.getItem('ttSem1') ? '1' : '2'); } catch(e){}
   const currentPage = document.querySelector('.page-view.active')?.id?.replace('Page','') || 'home';
+  // 공지를 쓰다 만 채로 다른 탭을 누르면 그대로 날아간다 — 나가기 전에 묻는다
+  if (currentPage === 'notice' && page !== 'notice' && !noticeMayLeave()) return;
   usageTab(page);                       // 어떤 기능이 실제로 쓰이는지
   if (currentPage === page) { resetPageView(page); return; } // 같은 탭 재클릭 → 첫 화면
   history.pushState({ page }, '');
@@ -16107,7 +16223,7 @@ function navigateTo(page) {
   document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(t => t.classList.toggle('active', t.dataset.page === page));
   // 'seat' 은 탭 버튼이 없는 화면이다 — 자리 배치 모달의 「페이지로」로만 들어온다.
   // 여기 목록에 없으면 다른 탭으로 옮겨도 안 닫힌다.
-  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult','docs','grades','search','room','pass','seat','usage'].forEach(p => {
+  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult','docs','grades','search','room','pass','seat','usage','notice'].forEach(p => {
     const el = document.getElementById(p + 'Page');
     if(el) el.classList.toggle('active', p === page);
   });
@@ -16120,6 +16236,8 @@ function navigateTo(page) {
     const uf = document.getElementById('usagePageFrame');
     if (uf && uf.src && uf.src !== 'about:blank') uf.src = 'about:blank';
   }
+  if(page === 'notice') initNoticePage();
+  else if(currentPage === 'notice') { _noticeEditing = false; _noticeDirty = false; noticeReleaseImages(); }
   if(page !== 'consult') stopConsultWatch();
   if(page !== 'room') stopRoomWatch();
   if(page === 'room') initRoomPage();

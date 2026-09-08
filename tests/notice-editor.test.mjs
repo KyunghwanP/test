@@ -42,7 +42,8 @@ pg.on('pageerror', e => errs.push(e.message));
 await pg.setContent(`<!doctype html><meta charset="utf-8">
 <style>.notice-editor{font-size:14px;}</style>
 <div id="noticeTitle"></div><div id="noticeWhen"></div>
-<div id="noticeBody"></div><div id="noticeFoot"></div>
+<span id="noticeEditState"></span><button id="noticePreviewBtn"></button>
+<div id="noticeEditBody"></div><div id="noticeEditFoot"></div>
 <script>
   ${grabConst('NOTICE_TAGS')}
   ${grabConst('NOTICE_DROP')}
@@ -54,8 +55,11 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
     ${grabConst('NOTICE_ZWSP')}
   ${grabConst('NOTICE_COLORS')}
   ${grabConst('NOTICE_SIZES')}
-  let _noticeData = { html:'', keys:[], updatedAt:0, by:'' };
-  let _noticeEditing = false;
+  let _noticeData = { html:'', keys:[], updatedAt:0, by:'', from:0, until:0 };
+  let _noticeEditing = false, _noticeDirty = false;
+  const _IS_ADMIN = () => true;
+  function previewNotice(){}
+  function deleteNotice(){}
   function noticeLoadImages(){}
   function noticeReleaseImages(){}
   function onNoticePaste(){}
@@ -64,9 +68,13 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grab('noticeSetFontSize')}
   ${grab('noticeSyncSizeSel')}
   ${grab('bindNoticeEditor')}
-  ${grab('startNoticeEdit')}
+  ${grab('renderNoticeEditState')}
+  ${grab('noticeMarkDirty')}
+  ${grab('noticeMayLeave')}
+  ${grab('noticeWindowState')}
+  ${grab('initNoticePage')}
 
-  window.open_ = html => { _noticeData = { html, keys:[], updatedAt:0, by:'' }; startNoticeEdit(); };
+  window.open_ = html => { _noticeData = { html, keys:[], updatedAt:0, by:'', from:0, until:0 }; initNoticePage(); };
   window.ed    = () => document.getElementById('noticeEditor');
   window.html_ = () => document.getElementById('noticeEditor').innerHTML;
   // 편집기 안 글자를 전부 고른다
@@ -79,12 +87,14 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
     const r = document.createRange(); r.setStart(t, 0); r.setEnd(t, n);
     const s = getSelection(); s.removeAllRanges(); s.addRange(r); };
   window.size  = px => noticeSetFontSize(px);
-  window.tool  = cmd => document.querySelector('#noticeBody .notice-tool[data-cmd="'+cmd+'"]').click();
-  window.color = c   => document.querySelector('#noticeBody .notice-tool-swatch[data-color="'+c+'"]').click();
+  window.tool  = cmd => document.querySelector('#noticeEditBody .notice-tool[data-cmd="'+cmd+'"]').click();
+  window.color = c   => document.querySelector('#noticeEditBody .notice-tool-swatch[data-color="'+c+'"]').click();
   window.sizeSel = () => document.getElementById('noticeSizeSel');
   window.sizes = () => NOTICE_SIZES;
   window.openWith = d => { _noticeData = { html:'', keys:[], updatedAt:0, by:'', from:0, until:0, ...d };
-                           startNoticeEdit(); };
+                           initNoticePage(); };
+  window.dirty  = () => _noticeDirty;
+  window.state_ = () => document.getElementById('noticeEditState').textContent;
   window.periodIn  = () => [document.getElementById('noticeFrom').value,
                             document.getElementById('noticeUntil').value];
   // 저장 단추가 읽는 것과 같은 방식으로 칸을 읽는다
@@ -352,6 +362,49 @@ console.log('\n■ 게시 기간 칸');
   check('직접 적은 시각도 그대로 읽힌다',
         (await pg.evaluate(() => window.readPeriod()))[0] === T(2026,9,8,7,30),
         await pg.evaluate(() => window.readPeriod()));
+}
+
+console.log('\n■ 쓰다 만 것을 잃지 않는가');
+{
+  // 공지 쓰기는 이제 탭이다. 다른 탭을 누르면 쓰던 것이 그냥 사라질 수 있어,
+  // 실제로 고친 것이 있을 때만 붙잡는다(안 고쳤는데 묻는 것도 성가시다).
+  await pg.evaluate(() => window.open_(''));
+  check('막 들어왔을 때는 고친 것이 없다', (await pg.evaluate(() => window.dirty())) === false);
+  check('그래서 그냥 나갈 수 있다', await pg.evaluate(() => noticeMayLeave()));
+
+  await pg.click('#noticeEditor');
+  await pg.keyboard.type('감독 변경');
+  check('치면 고친 것으로 잡힌다', (await pg.evaluate(() => window.dirty())) === true);
+  check('표시가 저장 안 됨으로 바뀐다',
+        (await pg.evaluate(() => window.state_())).includes('저장 안 됨'),
+        await pg.evaluate(() => window.state_()));
+
+  // 기간만 건드려도 고친 것이다
+  await pg.evaluate(() => window.open_('감독'));
+  check('기간 전에는 안 고친 상태', (await pg.evaluate(() => window.dirty())) === false);
+  await pg.fill('#noticeFrom', '2026-09-08T07:00');
+  await pg.evaluate(() => document.getElementById('noticeFrom').dispatchEvent(new Event('change')));
+  check('기간을 바꿔도 고친 것으로 잡힌다', (await pg.evaluate(() => window.dirty())) === true);
+
+  await pg.evaluate(() => window.open_('감독'));
+  await pg.click('#noticePeriodClear');
+  check('"기간 없이"도 고친 것으로 잡힌다', (await pg.evaluate(() => window.dirty())) === true);
+}
+
+console.log('\n■ 쓰는 화면에도 지금 상태가 보인다');
+{
+  const T = (y,m,d,h,mi) => new Date(y, m-1, d, h, mi).getTime();
+  const st = async d => { await pg.evaluate(x => window.openWith(x), d);
+                          return pg.evaluate(() => window.state_()); };
+  check('공지가 없으면 그렇게 적는다', (await st({ html: '' })).includes('없음'), await st({ html: '' }));
+  check('기간 없이 올린 것은 지금 뜨는 중',
+        (await st({ html: '감독' })).includes('지금 뜨는 중'), await st({ html: '감독' }));
+  const before = { html: '감독', from: Date.now() + 3600e3 };
+  check('예약해 둔 것은 아직 안 뜬다고 적는다',
+        (await st(before)).includes('예약'), await st(before));
+  const after = { html: '감독', until: Date.now() - 3600e3 };
+  check('기간이 끝난 것은 끝났다고 적는다',
+        (await st(after)).includes('끝'), await st(after));
 }
 
 console.log('\n■ 목록이 지금 크기를 가리킨다');

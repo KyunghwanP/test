@@ -57,13 +57,23 @@ check('로그인 뒤에 켠다', /watchReloadSignal\(\);\s*\n\s*initNotice\(\);/
 check('스냅샷으로 본다', /onSnapshot\(doc\(fbDb, 'appNotice', NOTICE_DOC\)/.test(HTML));
 check('뒤로가기로 닫힌다',
       /popstate[\s\S]{0,900}getElementById\('noticeModal'\)\?\.classList\.contains\('open'\)[\s\S]{0,300}doCloseNoticeModal\(\)/.test(HTML));
-check('편집 중 뒤로가기는 되묻는다',
-      /_noticeEditing && !confirm\([\s\S]{0,120}history\.pushState\(\{ modal: 'notice' \}/.test(HTML));
+check('보는 창은 그냥 닫힌다(쓰기가 탭으로 나갔으므로)',
+      !/_noticeEditing && !confirm\(/.test(HTML));
 check('ESC 로도 닫힌다',
       /Escape[\s\S]{0,200}getElementById\('noticeModal'\)\?\.classList\.contains\('open'\)[\s\S]{0,80}closeNoticeModalBtn\(\)/.test(HTML));
-check('남이 저장해도 편집 중이면 안 건드린다',
-      /modal\?\.classList\.contains\('open'\) && !_noticeEditing\) renderNoticeView\(\)/.test(HTML));
-check('보기 모드일 때는 저절로 갱신된다',
+check('쓰기는 탭으로 나가 있다',
+      /id="noticePage"/.test(HTML) && /function initNoticePage\(\)/.test(HTML));
+check('쓰기 탭도 관리자에게만 뜬다',
+      /navN\.style\.display = admin \? '' : 'none'/.test(HTML) && /id="navNotice"[^>]*style="display:none;"/.test(HTML));
+check('쓰기 탭이 navigateTo 목록에 있다', /'usage','notice'\]\.forEach/.test(HTML));
+check('쓰다 만 채로 나가면 되묻는다',
+      /currentPage === 'notice' && page !== 'notice' && !noticeMayLeave\(\)\) return;/.test(HTML));
+check('고친 것이 없으면 안 묻는다',
+      /if \(!_noticeEditing \|\| !_noticeDirty\) return true;/.test(HTML));
+check('남이 저장해도 쓰던 글은 안 건드린다',
+      !/renderNoticeEditor\(\)/.test(HTML) &&
+      /renderNoticeEditState\(\);\n  \}, \(\) => \{\}\);/.test(HTML));
+check('보는 창은 저절로 갱신된다',
       /renderNoticeBtn\(\);[\s\S]{0,400}renderNoticeView\(\);/.test(HTML));
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
