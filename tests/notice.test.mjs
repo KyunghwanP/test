@@ -69,6 +69,7 @@ await pg.route('https://ynhs.test/**', r => r.fulfill({
     ${grabConst('NOTICE_DROP')}
     ${grabConst('NOTICE_STYLES')}
     ${grabConst('NOTICE_KEY_RE')}
+    ${grabConst('NOTICE_ZWSP')}
     const NOTICE_SEEN_KEY = 'noticeSeenAt';
     let _noticeData = { html:'', keys:[], updatedAt:0, by:'' };
     ${grab('noticeCleanStyle')}

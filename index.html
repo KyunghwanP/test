@@ -6105,7 +6105,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.04';
+const APP_VER = 'ver7.05';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -8477,6 +8477,13 @@ function noticeSanitize(html){
     }
   };
   walk(box);
+  // 크기를 골라 두느라 넣은 보이지 않는 글자를 걷어내고, 그 때문에 알맹이가
+  // 없어진 껍데기도 치운다(크기만 고르고 안 친 자리).
+  const it = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+  const texts = []; while (it.nextNode()) texts.push(it.currentNode);
+  for (const t of texts) t.data = t.data.split(NOTICE_ZWSP).join('');
+  for (const el of [...box.querySelectorAll('span')])
+    if (!el.textContent && !el.querySelector('img,br')) el.remove();
   return box.innerHTML;
 }
 
@@ -8637,6 +8644,9 @@ function doCloseNoticeModal(){
 }
 
 // ── 편집 ────────────────────────────────────────────────────────────────────
+// 크기만 고르고 아직 아무것도 안 친 자리를 잡아 두는 보이지 않는 글자.
+// 저장할 때 걸러내기가 지운다 — 안 지우면 공지에 빈 칸이 섞여 남는다.
+const NOTICE_ZWSP = '\u200B';
 const NOTICE_COLORS = ['#111827','#dc2626','#ea580c','#ca8a04','#16a34a','#2563eb','#7c3aed'];
 // 본문 기본은 14px 이다. '작게'를 14px 로 두면 골라도 아무 일이 안 일어난 것처럼
 // 보이므로, 기본보다 확실히 작은 값에서 시작한다.
@@ -8702,7 +8712,8 @@ function bindNoticeEditor(ed){
     });
   });
   const sel = document.getElementById('noticeSizeSel');
-  sel?.addEventListener('change', () => { ed.focus(); noticeSetFontSize(sel.value); });
+  // focus() 를 여기서 먼저 부르면 안 된다. 커서 자리를 챙기는 것이 먼저다.
+  sel?.addEventListener('change', () => noticeSetFontSize(sel.value));
 
   // 한글 워드프로세서처럼 Ctrl+B/I/U — 브라우저가 기본으로 주는 것이지만,
   // contenteditable 밖에서 눌렸을 때 엉뚱한 곳에 걸리지 않게 여기서 받는다.
@@ -8729,6 +8740,32 @@ function bindNoticeEditor(ed){
 function noticeSetFontSize(px){
   const ed = document.getElementById('noticeEditor');
   if (!ed) return;
+  // 고른 자리를 먼저 챙긴다. 목록(select)을 누르는 순간 편집기는 포커스를 잃는데,
+  // 되돌리기 전에 커서를 읽어 두는 편이 순서상 안전하다.
+  const sel = getSelection();
+  const r0 = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
+  if (!r0 || !ed.contains(r0.commonAncestorContainer)) { ed.focus(); return; }
+
+  // 글자를 안 고른 채 크기부터 고르고 이어서 치는 것이 오히려 흔한 순서다.
+  // 그때 fontSize 명령은 <font> 를 안 만든다 — '앞으로 칠 글자'의 스타일만 걸어
+  // 두고 끝난다. 바꿔 끼울 자리가 없어 브라우저 기본값(xxx-large)이 그대로 나오고,
+  // 어느 크기를 골라도 결과가 같아진다. 그래서 빈 자리를 만들어 커서를 넣어 준다.
+  if (r0.collapsed) {
+    const span = document.createElement('span');
+    span.style.fontSize = px;
+    span.appendChild(document.createTextNode(NOTICE_ZWSP));
+    r0.insertNode(span);
+    ed.focus();
+    try {
+      const r = document.createRange();
+      r.setStart(span.firstChild, 1); r.collapse(true);
+      sel.removeAllRanges(); sel.addRange(r);
+    } catch(e){}
+    return;
+  }
+
+  ed.focus();
+  try { sel.removeAllRanges(); sel.addRange(r0); } catch(e){}
   try {
     document.execCommand('styleWithCSS', false, false);
     document.execCommand('fontSize', false, '7');

@@ -46,6 +46,7 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grabConst('NOTICE_DROP')}
   ${grabConst('NOTICE_STYLES')}
   ${grabConst('NOTICE_KEY_RE')}
+    ${grabConst('NOTICE_ZWSP')}
   ${grabConst('NOTICE_COLORS')}
   ${grabConst('NOTICE_SIZES')}
   let _noticeData = { html:'', keys:[], updatedAt:0, by:'' };
@@ -205,6 +206,63 @@ console.log('\n■ 크기를 걸고 나서 색도 걸 수 있다 (선택이 살�
   check('크기를 건 뒤의 색도 저장에서 살아남는다',
         /color:/.test(await pg.evaluate(() => noticeSanitize(window.html_()))),
         await pg.evaluate(() => noticeSanitize(window.html_())));
+}
+
+// ── 여기서부터는 함수를 부르지 않는다. 사람이 하는 순서 그대로 화면을 조작한다.
+//    앞의 검사들이 전부 통과하는데도 실제로는 안 먹는 일이 있었다 — 함수만 부르면
+//    '목록을 누르는 순간 편집기가 포커스를 잃는다'는 것을 못 밟기 때문이다.
+console.log('\n■ 사람이 하는 순서 그대로 (도구모음을 실제로 누른다)');
+{
+  const type  = t => pg.keyboard.type(t);
+  const pickSize = px => pg.selectOption('#noticeSizeSel', px);
+  const reopen = async () => { await pg.evaluate(() => window.open_('')); await pg.click('#noticeEditor'); };
+
+  // 순서 A — 크기부터 고르고 친다. 이게 제일 흔하고, 실제로 이게 안 됐다.
+  await reopen();
+  await pickSize(SIZES[3][1]);            // 아주 크게
+  await type('3교시 감독');
+  let h = await pg.evaluate(() => window.html_());
+  check('안 고르고 크기부터 → 그 크기로 쳐진다',
+        new RegExp(`font-size: ?${SIZES[3][1]}`).test(h), h);
+  check('브라우저 기본값이 안 나온다', !/x-large|larger|smaller/.test(h), h);
+
+  // 크기를 바꿔 이어 치면 그 다음 글자만 바뀌어야 한다
+  await pickSize(SIZES[0][1]);            // 작게
+  await type('입니다');
+  h = await pg.evaluate(() => window.html_());
+  check('크기를 바꿔 이어 치면 새 크기로', new RegExp(`font-size: ?${SIZES[0][1]}`).test(h), h);
+  check('앞서 친 글자는 그대로 큼', new RegExp(`font-size: ?${SIZES[3][1]}`).test(h), h);
+  check('두 크기가 따로 산다',
+        (h.match(/font-size/g) || []).length >= 2, h);
+
+  // 저장했을 때 보이지 않는 자리표시가 안 남아야 한다
+  const saved = await pg.evaluate(() => noticeSanitize(window.html_()));
+  check('저장본에 보이지 않는 글자가 없다', !saved.includes('\u200B'), JSON.stringify(saved));
+  check('저장본에도 두 크기가 남는다',
+        saved.includes(SIZES[3][1]) && saved.includes(SIZES[0][1]), saved);
+
+  // 순서 B — 글자를 골라서 바꾼다
+  await reopen();
+  await type('3교시 감독');
+  await pg.evaluate(() => window.selectAll());
+  await pickSize(SIZES[2][1]);
+  h = await pg.evaluate(() => window.html_());
+  check('골라서 바꾸기도 된다', new RegExp(`font-size: ?${SIZES[2][1]}`).test(h), h);
+
+  // 목록을 누르면 편집기가 포커스를 잃는다 — 돌려주지 않으면 이어서 못 친다
+  await pickSize(SIZES[1][1]);
+  await type('!');
+  check('크기를 고른 뒤 바로 이어서 칠 수 있다',
+        (await pg.evaluate(() => window.ed().textContent)).includes('!'),
+        await pg.evaluate(() => window.ed().textContent));
+
+  // 크기만 고르고 아무것도 안 치면 흔적이 남으면 안 된다
+  await reopen();
+  await type('감독');
+  await pickSize(SIZES[3][1]);
+  const saved2 = await pg.evaluate(() => noticeSanitize(window.html_()));
+  check('크기만 고르고 안 치면 빈 껍데기가 안 남는다',
+        !/<span[^>]*><\/span>/.test(saved2) && !saved2.includes('\u200B'), JSON.stringify(saved2));
 }
 
 console.log('\n■ 목록이 지금 크기를 가리킨다');
