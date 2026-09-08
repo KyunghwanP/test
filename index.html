@@ -6105,7 +6105,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.03';
+const APP_VER = 'ver7.04';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -8638,7 +8638,9 @@ function doCloseNoticeModal(){
 
 // ── 편집 ────────────────────────────────────────────────────────────────────
 const NOTICE_COLORS = ['#111827','#dc2626','#ea580c','#ca8a04','#16a34a','#2563eb','#7c3aed'];
-const NOTICE_SIZES  = [['작게','14px'],['보통','16px'],['크게','20px'],['아주 크게','26px']];
+// 본문 기본은 14px 이다. '작게'를 14px 로 두면 골라도 아무 일이 안 일어난 것처럼
+// 보이므로, 기본보다 확실히 작은 값에서 시작한다.
+const NOTICE_SIZES  = [['작게','12px'],['보통','14px'],['크게','19px'],['아주 크게','25px']];
 
 function startNoticeEdit(){
   _noticeEditing = true;
@@ -8713,18 +8715,65 @@ function bindNoticeEditor(ed){
     }
   });
   ed.addEventListener('paste', onNoticePaste);
+  ed.addEventListener('keyup',   noticeSyncSizeSel);
+  ed.addEventListener('mouseup', noticeSyncSizeSel);
 }
 
-// execCommand('fontSize') 는 1~7 단계 <font> 만 만든다. 7 로 넣고 그 자리를
-// 원하는 px 로 바꿔 끼운다 — px 를 직접 넣는 표준 명령이 없다.
+// px 를 직접 넣는 표준 명령이 없다. 그래서 fontSize 로 7단계를 씌운 뒤 그 자리를
+// 원하는 px 로 바꿔 끼우는 오래된 방법을 쓴다.
+//
+// 여기서 styleWithCSS 를 잠깐 꺼야 한다. 켜 둔 채로 fontSize 를 부르면 브라우저가
+// <font size="7"> 대신 <span style="font-size: xxx-large"> 를 만들어, 바꿔 끼울
+// 자리를 못 찾는다 — 그러면 어느 크기를 골라도 똑같이 xxx-large 가 된다.
+// (색·굵기 쪽은 반대로 켜져 있어야 <font color> 대신 span 이 나온다.)
 function noticeSetFontSize(px){
-  try { document.execCommand('fontSize', false, '7'); } catch(e){ return; }
-  document.querySelectorAll('#noticeEditor font[size="7"]').forEach(f => {
+  const ed = document.getElementById('noticeEditor');
+  if (!ed) return;
+  try {
+    document.execCommand('styleWithCSS', false, false);
+    document.execCommand('fontSize', false, '7');
+  } catch(e){ return; }
+  finally { try { document.execCommand('styleWithCSS', false, true); } catch(e){} }
+
+  const made = [];
+  ed.querySelectorAll('font[size="7"]').forEach(f => {
     const span = document.createElement('span');
     span.style.fontSize = px;
-    span.innerHTML = f.innerHTML;
+    while (f.firstChild) span.appendChild(f.firstChild);
+    // 고른 자리 안에 있던 예전 크기는 fontSize 명령이 이미 걷어낸다. 붙여넣은
+    // span·문단·굵게 안쪽까지 그렇다 — 여기서 또 지울 필요가 없다(확인함).
     f.replaceWith(span);
+    made.push(span);
   });
+  if (!made.length) return;
+  // 고른 자리가 그대로 잡혀 있어야 이어서 다른 서식을 걸 수 있다
+  try {
+    const r = document.createRange();
+    r.setStartBefore(made[0]);
+    r.setEndAfter(made[made.length - 1]);
+    const sel = getSelection();
+    sel.removeAllRanges(); sel.addRange(r);
+  } catch(e){}
+}
+
+// 커서가 놓인 자리의 크기를 골라 놓은 값에 비춘다. 안 맞추면 목록은 늘 '보통'인데
+// 글자는 크게 나와, 고르는 사람이 무엇이 걸려 있는지 알 수 없다.
+function noticeSyncSizeSel(){
+  const selEl = document.getElementById('noticeSizeSel');
+  const ed = document.getElementById('noticeEditor');
+  if (!selEl || !ed) return;
+  const s = getSelection();
+  const r = s && s.rangeCount ? s.getRangeAt(0) : null;
+  if (!r) return;
+  // 시작 지점이 요소면 그 안의 실제 자식을 봐야 한다. 요소를 그대로 재면 편집기
+  // 자신의 크기(본문 기본값)가 나와, 무엇을 걸어 놨든 늘 '보통'으로 보인다.
+  let node = r.startContainer;
+  if (node.nodeType === 1) node = node.childNodes[r.startOffset] || node;
+  if (node && node.nodeType === 3) node = node.parentElement;
+  if (!node || !ed.contains(node)) return;
+  const px = node ? getComputedStyle(node).fontSize : '';
+  const hit = NOTICE_SIZES.find(([, v]) => v === px);
+  selEl.value = hit ? hit[1] : NOTICE_SIZES[1][1];
 }
 
 // ── 붙여넣기 ────────────────────────────────────────────────────────────────
