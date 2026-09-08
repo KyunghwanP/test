@@ -8301,7 +8301,11 @@ let _usageBackTo = 'home';
 function openUsagePage(){
   if(!usageIsAdmin()) return;
   _usageBackTo = document.querySelector('.page-view.active')?.id?.replace('Page','') || 'home';
-  document.getElementById('usagePageFrame').src = 'usage.html?in=1';
+  // 주소에 버전을 붙인다. usage.html 은 sw.js 의 PRECACHE 에 없어서 설치 때
+  // cache:'reload' 로 강제로 다시 받아 오는 경로가 없다 — 그냥 두면 브라우저
+  // HTTP 캐시에 걸려, 앱을 새로고침해도 iframe 이 옛 파일을 받는다.
+  // (워커의 화면 캐시 키는 쿼리를 떼고 경로만 쓰므로 캐시가 늘지는 않는다)
+  document.getElementById('usagePageFrame').src = `usage.html?in=1&v=${encodeURIComponent(APP_VER)}`;
   navigateTo('usage');
 }
 function closeUsagePage(){
