@@ -81,6 +81,7 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
 </script>`);
 
 const SIZES = await pg.evaluate(() => window.sizes());
+const SIZES_ = SIZES.map(x => x[1]);
 
 console.log('\n■ 고를 수 있는 크기');
 {
@@ -263,6 +264,47 @@ console.log('\n■ 사람이 하는 순서 그대로 (도구모음을 실제로 
   const saved2 = await pg.evaluate(() => noticeSanitize(window.html_()));
   check('크기만 고르고 안 치면 빈 껍데기가 안 남는다',
         !/<span[^>]*><\/span>/.test(saved2) && !saved2.includes('\u200B'), JSON.stringify(saved2));
+}
+
+console.log('\n■ 크기를 건 직후 바로 이어서 칠 수 있다');
+{
+  // 목록을 누르면 편집기가 포커스를 잃고 고른 자리도 흐트러진다. 돌려놓지 않으면
+  // 크기를 바꾼 뒤 곧바로 친 글자가 엉뚱한 자리·엉뚱한 크기로 들어간다.
+  await pg.evaluate(() => window.open_(''));
+  await pg.click('#noticeEditor');
+  await pg.keyboard.type('감독');
+  await pg.evaluate(() => window.selectAll());
+  await pg.selectOption('#noticeSizeSel', SIZES_[3]);
+  await pg.keyboard.type('교체');            // 고른 글자를 덮어쓴다
+  const h = await pg.evaluate(() => window.html_());
+  check('바로 친 글자가 편집기 안에 들어간다',
+        (await pg.evaluate(() => window.ed().textContent)).includes('교체'), h);
+  check('바로 친 글자가 고른 크기로 들어간다',
+        new RegExp(`font-size: ?${SIZES[3][1]}[^]*교체`).test(h), h);
+}
+
+console.log('\n■ 붙여넣은 글에 걸기 (브라우저가 안 걷어내 주는 자리)');
+{
+  const apply = async (start, px) => {
+    await pg.evaluate(h => window.open_(h), start);
+    await pg.evaluate(() => window.selectAll());
+    await pg.evaluate(v => window.size(v), px);
+    return pg.evaluate(() => window.html_());
+  };
+  const shown = () => pg.evaluate(() => {
+    let d = window.ed().querySelector('span');
+    while (d && d.firstElementChild) d = d.firstElementChild;
+    return d ? getComputedStyle(d).fontSize : ''; });
+
+  for (const [label, start] of [
+    ['한글에서 온 큰 글씨', '<span style="font-size:30px">감독 변경</span>'],
+    ['문단 안에 섞인 크기', '<p><span style="font-size:30px">가</span>나</p>'],
+    ['굵게 안쪽의 크기',    '<b><span style="font-size:30px">굵고 큰 글씨</span></b>'],
+  ]) {
+    const h = await apply(start, SIZES[0][1]);
+    check(`${label} → 크기가 하나만 남는다`, (h.match(/font-size/g) || []).length === 1, h);
+    check(`${label} → 실제로 ${SIZES[0][1]} 로 보인다`, (await shown()) === SIZES[0][1], await shown());
+  }
 }
 
 console.log('\n■ 목록이 지금 크기를 가리킨다');
