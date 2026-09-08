@@ -2549,6 +2549,26 @@
   .notice-view{font-size:14px;line-height:1.7;color:var(--ink);}
   .notice-view p{margin:0 0 8px;}
   .notice-hint{margin-top:8px;font-size:12px;font-weight:600;color:var(--ink-soft);}
+
+  /* 게시 기간 */
+  .notice-period{
+    display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+    margin-top:12px;padding-top:12px;border-top:1px solid var(--rule);
+  }
+  .notice-period-lbl{font-size:12px;font-weight:800;color:var(--ink-soft);margin-right:2px;}
+  .notice-period-tilde{color:var(--ink-soft);font-weight:800;}
+  .notice-period-in{
+    padding:6px 8px;border-radius:8px;border:1px solid var(--rule);
+    background:var(--paper);color:var(--ink);
+    font-size:13px;font-family:inherit;
+  }
+  /* 예약해 두고 잊는 일이 잦다 — 관리자 화면에서 눈에 띄게 */
+  .app-notice-btn.scheduled{border-color:#ca8a04;background:rgba(202,138,4,0.12);}
+  .notice-state{
+    margin-bottom:12px;padding:9px 12px;border-radius:8px;
+    background:rgba(202,138,4,0.12);border:1px solid rgba(202,138,4,0.35);
+    color:var(--ink);font-size:13px;font-weight:700;
+  }
   /* 모달 내부 레이아웃 */
   .modal-inner{
     flex:1;overflow:hidden;display:flex;flex-direction:column;
@@ -6105,7 +6125,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.06';
+const APP_VER = 'ver7.07';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -8398,7 +8418,7 @@ const NOTICE_WORKER = 'https://notice-api.pkh910518.workers.dev';
 const NOTICE_SEEN_KEY = 'noticeSeenAt';
 
 let _noticeUnsub = null;
-let _noticeData  = { html: '', keys: [], updatedAt: 0, by: '' };
+let _noticeData  = { html: '', keys: [], updatedAt: 0, by: '', from: 0, until: 0 };
 let _noticeEditing = false;
 let _noticeObjUrls = [];          // 화면에서 뗄 때 되돌려줄 blob 주소
 
@@ -8537,8 +8557,30 @@ function noticeReleaseImages(){
 }
 
 // ── 확성기 ──────────────────────────────────────────────────────────────────
+// ── 게시 기간 ───────────────────────────────────────────────────────────────
+// from·until 은 밀리초. 0 이면 '제한 없음'이다(즉시 시작 / 안 내림).
+// 판정은 보는 사람 기기의 시계로 한다. 서버에 물으면 화면을 그릴 때마다 왕복이
+// 생기고, 열어 둔 탭에서는 어차피 시계로 세야 한다.
+function noticeWindowState(now){
+  const t = Number(now || Date.now());
+  const from = Number(_noticeData.from || 0);
+  const until = Number(_noticeData.until || 0);
+  if (!_noticeData.html) return 'none';
+  if (from && t < from)  return 'before';   // 아직 안 열림(예약)
+  if (until && t > until) return 'after';   // 게시 끝남
+  return 'live';
+}
+// 다른 선생님 화면에 떠야 하는가
+const noticeLive = now => noticeWindowState(now) === 'live';
+// 확성기를 그릴 것인가. 관리자는 기간 밖에도 늘 보인다 —
+// 안 그러면 기간이 끝난 뒤 공지를 고치거나 새로 쓰러 들어갈 문이 없다.
+function noticeBtnVisible(){
+  if (_IS_ADMIN()) return true;
+  return false && noticeLive();     // 전체 공개할 때 이 false 를 지운다
+}
+
 function noticeUnseen(){
-  if (!_noticeData.html) return false;
+  if (!noticeLive()) return false;
   let seen = null;
   try { seen = localStorage.getItem(NOTICE_SEEN_KEY); } catch(e){}
   return Number(_noticeData.updatedAt || 0) > Number(seen || 0);
@@ -8552,10 +8594,30 @@ function noticeMarkSeen(){
 function renderNoticeBtn(){
   const btn = document.getElementById('noticeBtn');
   if (!btn) return;
-  // 지금은 관리자에게만. 전체 공개할 때 이 줄만 푼다.
-  const show = _IS_ADMIN();
+  const show = noticeBtnVisible();
   btn.style.display = show ? '' : 'none';
   btn.classList.toggle('unseen', show && noticeUnseen());
+  // 관리자에게는 지금 어떤 상태인지 알려 준다(예약해 놓고 잊는 일이 잦다)
+  const st = noticeWindowState();
+  btn.classList.toggle('scheduled', _IS_ADMIN() && (st === 'before' || st === 'after'));
+  btn.title = { none: '전체 공지', live: '전체 공지',
+                before: '전체 공지 (예약됨 — 아직 안 뜸)',
+                after: '전체 공지 (게시 종료)' }[st];
+}
+
+// 기간이 시작·종료되는 순간에는 아무 일도 안 일어난다 — 문서가 안 바뀌기 때문이다.
+// 앱을 열어 둔 채 그 시각을 넘기는 사람이 있으므로 시계를 보고 다시 그린다.
+let _noticeTimer = null, _noticeLastState = '';
+function startNoticeClock(){
+  if (_noticeTimer) return;
+  _noticeTimer = setInterval(() => {
+    const st = noticeWindowState();
+    if (st === _noticeLastState) return;      // 바뀔 때만 손댄다
+    _noticeLastState = st;
+    renderNoticeBtn();
+    const modal = document.getElementById('noticeModal');
+    if (modal?.classList.contains('open') && !_noticeEditing) renderNoticeView();
+  }, 30000);
 }
 
 function watchNotice(){
@@ -8563,7 +8625,9 @@ function watchNotice(){
   _noticeUnsub = onSnapshot(doc(fbDb, 'appNotice', NOTICE_DOC), snap => {
     const d = snap.exists() ? (snap.data() || {}) : {};
     _noticeData = { html: String(d.html || ''), keys: Array.isArray(d.keys) ? d.keys : [],
-                    updatedAt: Number(d.updatedAt || 0), by: String(d.by || '') };
+                    updatedAt: Number(d.updatedAt || 0), by: String(d.by || ''),
+                    from: Number(d.from || 0), until: Number(d.until || 0) };
+    _noticeLastState = noticeWindowState();
     renderNoticeBtn();
     // 열어 둔 창은 그 자리에서 갱신한다. 단 편집 중이면 건드리지 않는다 —
     // 쓰던 글이 남의 저장으로 날아가면 되돌릴 길이 없다.
@@ -8575,10 +8639,39 @@ function watchNotice(){
 function initNotice(){
   renderNoticeBtn();
   watchNotice();
+  startNoticeClock();
   document.getElementById('noticeBtn')?.addEventListener('click', () => openNoticeModal());
 }
 
 // ── 창 ──────────────────────────────────────────────────────────────────────
+// datetime-local 칸은 '현지 시각' 문자열만 받는다(YYYY-MM-DDTHH:MM).
+// toISOString 을 쓰면 UTC 로 나가 9시간이 어긋난다.
+function noticeToInput(ms){
+  if (!ms) return '';
+  const d = new Date(Number(ms));
+  if (isNaN(d)) return '';
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+// 빈 칸이면 0 = 제한 없음
+function noticeFromInput(v){
+  if (!v) return 0;
+  const t = new Date(v).getTime();
+  return isNaN(t) ? 0 : t;
+}
+// 기간을 한 줄로. 같은 날이면 뒤쪽 날짜는 생략한다.
+function noticePeriodText(from, until){
+  if (!from && !until) return '';
+  const f = n => { const d = new Date(Number(n)); const p = x => String(x).padStart(2,'0');
+    return { day: `${d.getMonth()+1}.${d.getDate()}`, hm: `${p(d.getHours())}:${p(d.getMinutes())}` }; };
+  if (from && until) {
+    const a = f(from), b = f(until);
+    return a.day === b.day ? `${a.day} ${a.hm}~${b.hm}` : `${a.day} ${a.hm} ~ ${b.day} ${b.hm}`;
+  }
+  if (from) { const a = f(from); return `${a.day} ${a.hm}부터`; }
+  const b = f(until); return `${b.day} ${b.hm}까지`;
+}
+
 function noticeWhenText(ts){
   if (!ts) return '';
   const d = new Date(Number(ts));
@@ -8594,7 +8687,17 @@ function renderNoticeView(){
   const foot = document.getElementById('noticeFoot');
   const when = document.getElementById('noticeWhen');
   document.getElementById('noticeTitle').textContent = '📢 전체 공지';
-  when.textContent = _noticeData.html ? noticeWhenText(_noticeData.updatedAt) : '';
+  when.textContent = _noticeData.html
+    ? (noticePeriodText(_noticeData.from, _noticeData.until) || noticeWhenText(_noticeData.updatedAt))
+    : '';
+
+  // 기간이 지났거나 아직 안 온 공지는 다른 선생님께는 없는 것과 같다.
+  // (지금은 확성기 자체가 관리자에게만 뜨지만, 전체 공개해도 이 줄이 지킨다)
+  if (_noticeData.html && !noticeLive() && !_IS_ADMIN()) {
+    body.innerHTML = `<div class="notice-empty">올라온 공지가 없습니다.</div>`;
+    foot.innerHTML = '';
+    return;
+  }
 
   if (!_noticeData.html) {
     body.innerHTML = `<div class="notice-empty">올라온 공지가 없습니다.</div>`;
@@ -8608,6 +8711,16 @@ function renderNoticeView(){
   view.className = 'notice-view';
   view.innerHTML = noticeSanitize(_noticeData.html);
   body.innerHTML = '';
+  // 예약해 두고 잊는 일이 잦다. 관리자에게는 지금 남에게 보이는지를 먼저 알린다.
+  const st = noticeWindowState();
+  if (_IS_ADMIN() && st !== 'live') {
+    const tag = document.createElement('div');
+    tag.className = 'notice-state';
+    tag.textContent = st === 'before'
+      ? `아직 안 뜹니다 — ${noticePeriodText(_noticeData.from, 0)} 뜹니다`
+      : '게시가 끝났습니다 — 다른 선생님께는 안 보입니다';
+    body.appendChild(tag);
+  }
   body.appendChild(view);
   noticeLoadImages(view);
   foot.innerHTML = _IS_ADMIN()
@@ -8674,7 +8787,21 @@ function startNoticeEdit(){
       <button type="button" class="notice-tool" data-cmd="removeFormat" title="서식 지우기">✕서식</button>
     </div>
     <div class="notice-editor" id="noticeEditor" contenteditable="true" spellcheck="false"></div>
-    <div class="notice-hint">그림은 <b>Ctrl+V 로 붙여넣기</b> 하시면 됩니다. 웹주소가 없는 캡처도 됩니다.</div>`;
+    <div class="notice-hint">그림은 <b>Ctrl+V 로 붙여넣기</b> 하시면 됩니다. 웹주소가 없는 캡처도 됩니다.</div>
+    <div class="notice-period">
+      <span class="notice-period-lbl">게시 기간</span>
+      <input type="datetime-local" id="noticeFrom" class="notice-period-in" aria-label="게시 시작">
+      <span class="notice-period-tilde">~</span>
+      <input type="datetime-local" id="noticeUntil" class="notice-period-in" aria-label="게시 종료">
+      <button type="button" class="notice-btn" id="noticePeriodClear">기간 없이</button>
+    </div>
+    <div class="notice-hint" id="noticePeriodHint">비워 두면 저장하는 즉시 뜨고, 내릴 때까지 계속 뜹니다.</div>`;
+  document.getElementById('noticeFrom').value  = noticeToInput(_noticeData.from);
+  document.getElementById('noticeUntil').value = noticeToInput(_noticeData.until);
+  document.getElementById('noticePeriodClear').addEventListener('click', () => {
+    document.getElementById('noticeFrom').value = '';
+    document.getElementById('noticeUntil').value = '';
+  });
   const ed = document.getElementById('noticeEditor');
   ed.innerHTML = noticeSanitize(_noticeData.html);
   noticeLoadImages(ed);
@@ -8888,18 +9015,25 @@ async function saveNotice(){
   const bare = html.replace(/<[^>]*>/g, '').replace(/ |\s/g, '');
   if (!bare && !/\<img/i.test(html)) { alert('내용이 비어 있습니다.'); return; }
 
+  const from  = noticeFromInput(document.getElementById('noticeFrom')?.value);
+  const until = noticeFromInput(document.getElementById('noticeUntil')?.value);
+  if (from && until && until <= from) { alert('게시 종료가 시작보다 빠릅니다.'); return; }
+  // 이미 지난 시각으로 끝내 두면 저장하자마자 아무에게도 안 뜬다 — 실수이기 쉽다
+  if (until && until < Date.now() &&
+      !confirm('게시 종료 시각이 이미 지났습니다. 이대로 저장하면 다른 선생님께는 안 뜹니다.\n그래도 저장할까요?')) return;
+
   if (btn) { btn.disabled = true; }
   if (msg) msg.textContent = '저장 중...';
   try {
     const keys = noticeKeysIn(html);
     await setDoc(doc(fbDb, 'appNotice', NOTICE_DOC), {
-      html, keys, updatedAt: Date.now(),
+      html, keys, updatedAt: Date.now(), from, until,
       by: fbAuth.currentUser?.displayName || fbAuth.currentUser?.email || ''
     });
     // 쓰다 만 그림(넣었다 지운 것)은 R2 에 그대로 남는다. 저장이 끝난 지금이
     // '무엇이 쓰이는지'가 확정된 유일한 시점이라 여기서 치운다.
     noticeApi({ action: 'sweep', keep: keys }).catch(() => {});
-    _noticeData = { ..._noticeData, html, keys, updatedAt: Date.now() };
+    _noticeData = { ..._noticeData, html, keys, from, until, updatedAt: Date.now() };
     noticeMarkSeen();
     renderNoticeView();
   } catch(e){
@@ -8913,10 +9047,10 @@ async function deleteNotice(){
   if (!confirm('공지를 내릴까요? 그림도 함께 지워집니다.')) return;
   try {
     await setDoc(doc(fbDb, 'appNotice', NOTICE_DOC),
-                 { html: '', keys: [], updatedAt: Date.now(),
+                 { html: '', keys: [], updatedAt: Date.now(), from: 0, until: 0,
                    by: fbAuth.currentUser?.displayName || fbAuth.currentUser?.email || '' });
     noticeApi({ action: 'sweep', keep: [] }).catch(() => {});
-    _noticeData = { html: '', keys: [], updatedAt: Date.now(), by: '' };
+    _noticeData = { html: '', keys: [], updatedAt: Date.now(), by: '', from: 0, until: 0 };
     noticeMarkSeen();
     renderNoticeView();
   } catch(e){

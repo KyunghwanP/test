@@ -7,6 +7,7 @@
 // 실제로 겪은 일: styleWithCSS 를 켜 둔 채 fontSize 를 부르면 브라우저가
 // <font size="7"> 대신 <span style="font-size: xxx-large"> 를 만든다. 바꿔 끼울
 // 자리를 못 찾아, 작게를 골라도 크게를 골라도 똑같이 xxx-large 가 됐다.
+process.env.TZ = 'Asia/Seoul';
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
@@ -33,7 +34,8 @@ const grabConst = name => {
 };
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
-const pg = await b.newPage();
+const ctx = await b.newContext({ timezoneId: 'Asia/Seoul' });
+const pg = await ctx.newPage();
 const errs = [];
 pg.on('pageerror', e => errs.push(e.message));
 
@@ -46,6 +48,9 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grabConst('NOTICE_DROP')}
   ${grabConst('NOTICE_STYLES')}
   ${grabConst('NOTICE_KEY_RE')}
+  ${grab('noticeToInput')}
+  ${grab('noticeFromInput')}
+  ${grab('noticePeriodText')}
     ${grabConst('NOTICE_ZWSP')}
   ${grabConst('NOTICE_COLORS')}
   ${grabConst('NOTICE_SIZES')}
@@ -78,6 +83,13 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   window.color = c   => document.querySelector('#noticeBody .notice-tool-swatch[data-color="'+c+'"]').click();
   window.sizeSel = () => document.getElementById('noticeSizeSel');
   window.sizes = () => NOTICE_SIZES;
+  window.openWith = d => { _noticeData = { html:'', keys:[], updatedAt:0, by:'', from:0, until:0, ...d };
+                           startNoticeEdit(); };
+  window.periodIn  = () => [document.getElementById('noticeFrom').value,
+                            document.getElementById('noticeUntil').value];
+  // 저장 단추가 읽는 것과 같은 방식으로 칸을 읽는다
+  window.readPeriod = () => [noticeFromInput(document.getElementById('noticeFrom').value),
+                             noticeFromInput(document.getElementById('noticeUntil').value)];
 </script>`);
 
 const SIZES = await pg.evaluate(() => window.sizes());
@@ -305,6 +317,41 @@ console.log('\n■ 붙여넣은 글에 걸기 (브라우저가 안 걷어내 주
     check(`${label} → 크기가 하나만 남는다`, (h.match(/font-size/g) || []).length === 1, h);
     check(`${label} → 실제로 ${SIZES[0][1]} 로 보인다`, (await shown()) === SIZES[0][1], await shown());
   }
+}
+
+console.log('\n■ 게시 기간 칸');
+{
+  const T = (y,m,d,h,mi) => new Date(y, m-1, d, h, mi).getTime();
+  const FROM = T(2026,9,8,7,0), UNTIL = T(2026,9,8,17,0);
+
+  await pg.evaluate(() => window.openWith({ html: '감독 변경' }));
+  check('기간을 안 정한 공지는 칸이 비어 있다',
+        JSON.stringify(await pg.evaluate(() => window.periodIn())) === '["",""]',
+        await pg.evaluate(() => window.periodIn()));
+
+  await pg.evaluate(d => window.openWith(d), { html: '감독 변경', from: FROM, until: UNTIL });
+  check('저장해 둔 기간이 칸에 그대로 들어온다',
+        JSON.stringify(await pg.evaluate(() => window.periodIn()))
+          === '["2026-09-08T07:00","2026-09-08T17:00"]',
+        await pg.evaluate(() => window.periodIn()));
+  // 칸 → 저장값 → 칸 을 한 바퀴 돌아도 같은 시각이어야 한다(시차로 어긋나기 쉽다)
+  check('칸에서 읽으면 넣었던 시각 그대로',
+        JSON.stringify(await pg.evaluate(() => window.readPeriod())) === JSON.stringify([FROM, UNTIL]),
+        await pg.evaluate(() => window.readPeriod()));
+
+  await pg.click('#noticePeriodClear');
+  check('"기간 없이" 를 누르면 둘 다 비워진다',
+        JSON.stringify(await pg.evaluate(() => window.periodIn())) === '["",""]',
+        await pg.evaluate(() => window.periodIn()));
+  check('그러면 제한 없음(0)으로 읽힌다',
+        JSON.stringify(await pg.evaluate(() => window.readPeriod())) === '[0,0]');
+
+  // 사람이 직접 쳐 넣는 경우
+  await pg.evaluate(() => window.openWith({ html: '감독 변경' }));
+  await pg.fill('#noticeFrom', '2026-09-08T07:30');
+  check('직접 적은 시각도 그대로 읽힌다',
+        (await pg.evaluate(() => window.readPeriod()))[0] === T(2026,9,8,7,30),
+        await pg.evaluate(() => window.readPeriod()));
 }
 
 console.log('\n■ 목록이 지금 크기를 가리킨다');

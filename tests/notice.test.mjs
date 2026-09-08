@@ -9,6 +9,9 @@
 //
 // index.html 은 Firebase 없이는 못 뜬다. 여기서는 걸러내기 함수만 원본에서 그대로
 // 떼어내 붙인 하네스로 확인한다.
+// 시각을 다루므로 한국 시각으로 못 박고 돈다. 검사 기계는 UTC 라, 그대로 두면
+// '현지 시각으로 내보내야 한다'는 것을 못 잡는다 — UTC 와 현지가 같아지기 때문이다.
+process.env.TZ = 'Asia/Seoul';
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
@@ -40,7 +43,14 @@ check('확성기가 헤더에 있다', /id="noticeBtn"/.test(HTML) && /📢/.tes
 check('종이 아니라 확성기다(상벌점 알림과 뜻이 겹치지 않게)',
       !/id="noticeBtn"[^>]*>🔔/.test(HTML));
 check('처음엔 숨어 있다', /id="noticeBtn"[^>]*style="display:none;"/.test(HTML));
-check('관리자에게만 그린다', /const show = _IS_ADMIN\(\);[\s\S]{0,120}btn\.style\.display = show/.test(HTML));
+check('관리자에게만 그린다',
+      /function noticeBtnVisible\(\)\{\s*\n\s*if \(_IS_ADMIN\(\)\) return true;\s*\n\s*return false && noticeLive\(\);/.test(HTML));
+check('관리자는 기간 밖에도 들어갈 수 있다 (안 그러면 고칠 문이 없다)',
+      /if \(_IS_ADMIN\(\)\) return true;/.test(HTML));
+check('전체 공개는 한 줄만 풀면 된다', /return false && noticeLive\(\);/.test(HTML));
+check('기간이 바뀌는 순간을 시계로 잡는다',
+      /function startNoticeClock\(\)/.test(HTML) && /setInterval\(\(\) => \{[\s\S]{0,200}noticeWindowState\(\)/.test(HTML));
+check('상태가 안 바뀌면 화면을 안 건드린다', /if \(st === _noticeLastState\) return;/.test(HTML));
 check('배포별로 문서를 가른다',
       /const NOTICE_DOC\s*=\s*'board-test'/.test(HTML) && /const NOTICE_SCOPE\s*=\s*'test'/.test(HTML));
 check('로그인 뒤에 켠다', /watchReloadSignal\(\);\s*\n\s*initNotice\(\);/.test(HTML));
@@ -57,7 +67,8 @@ check('보기 모드일 때는 저절로 갱신된다',
       /renderNoticeBtn\(\);[\s\S]{0,400}renderNoticeView\(\);/.test(HTML));
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
-const pg = await b.newPage();
+const ctx = await b.newContext({ timezoneId: 'Asia/Seoul' });
+const pg = await ctx.newPage();
 const errs = [];
 pg.on('pageerror', e => errs.push(e.message));
 
@@ -75,10 +86,19 @@ await pg.route('https://ynhs.test/**', r => r.fulfill({
     ${grab('noticeCleanStyle')}
     ${grab('noticeSanitize')}
     ${grab('noticeKeysIn')}
+    ${grab('noticeWindowState')}
+    ${grabConst('noticeLive')}
     ${grab('noticeUnseen')}
+    ${grab('noticePeriodText')}
+    ${grab('noticeToInput')}
+    ${grab('noticeFromInput')}
     ${grab('noticeWhenText')}
     window.clean   = h => noticeSanitize(h);
     window.keys    = h => noticeKeysIn(h);
+    window.state   = (d, now) => { _noticeData = d; return noticeWindowState(now); };
+    window.period  = (a, b) => noticePeriodText(a, b);
+    window.toIn    = ms => noticeToInput(ms);
+    window.fromIn  = v => noticeFromInput(v);
     window.unseen  = (d, seen) => { _noticeData = d;
       if (seen === null) localStorage.removeItem(NOTICE_SEEN_KEY);
       else localStorage.setItem(NOTICE_SEEN_KEY, String(seen));
@@ -171,6 +191,62 @@ console.log('\n■ 쓰이는 그림 키 모으기 (청소의 기준)');
   check('걸러낸 뒤에도 같은 키가 나온다', cleaned[0] === K, cleaned);
 }
 
+console.log('\n■ 게시 기간');
+{
+  const T = (y,m,d,h,mi) => new Date(y, m-1, d, h, mi).getTime();
+  const NOON = T(2026,9,8,12,0);
+  const st = (d, now) => pg.evaluate(a => window.state(a[0], a[1]), [d, now]);
+  const N = { html: '감독 변경' };
+
+  check('기간을 안 정하면 늘 뜬다', (await st({ ...N }, NOON)) === 'live');
+  check('공지가 없으면 기간과 무관', (await st({ html: '' }, NOON)) === 'none');
+
+  const day = { ...N, from: T(2026,9,8,7,0), until: T(2026,9,8,17,0) };
+  check('시작 전에는 안 뜬다',  (await st(day, T(2026,9,8,6,59))) === 'before');
+  check('시작 시각에는 뜬다',   (await st(day, T(2026,9,8,7,0)))  === 'live');
+  check('기간 안에는 뜬다',     (await st(day, NOON))             === 'live');
+  check('종료 시각까지는 뜬다', (await st(day, T(2026,9,8,17,0))) === 'live');
+  check('종료 뒤에는 안 뜬다',  (await st(day, T(2026,9,8,17,1))) === 'after');
+
+  check('시작만 정하면 그 뒤로 계속',
+        (await st({ ...N, from: T(2026,9,8,7,0) }, T(2027,1,1,0,0))) === 'live');
+  check('종료만 정하면 그때까지',
+        (await st({ ...N, until: T(2026,9,8,17,0) }, T(2026,1,1,0,0))) === 'live');
+  check('종료만 정해도 지나면 끝',
+        (await st({ ...N, until: T(2026,9,8,17,0) }, T(2026,9,9,0,0))) === 'after');
+
+  // 기간 밖이면 안 본 표시도 뜨면 안 된다 — 눌러도 볼 게 없다
+  const u = (d, seen) => pg.evaluate(a => window.unseen(a[0], a[1]), [d, seen]);
+  check('아직 안 열린 공지는 빨간 점이 안 뜬다',
+        (await u({ ...N, updatedAt: 5, from: Date.now() + 3600e3 }, null)) === false);
+  check('끝난 공지도 빨간 점이 안 뜬다',
+        (await u({ ...N, updatedAt: 5, until: Date.now() - 3600e3 }, null)) === false);
+  check('기간 안이면 뜬다', (await u({ ...N, updatedAt: 5 }, null)) === true);
+}
+
+console.log('\n■ 기간 적기·읽기');
+{
+  const T = (y,m,d,h,mi) => new Date(y, m-1, d, h, mi).getTime();
+  // datetime-local 은 현지 시각 문자열만 받는다. UTC 로 내보내면 9시간 어긋난다.
+  check('칸에 넣는 값이 현지 시각',
+        (await pg.evaluate(t => window.toIn(t), T(2026,9,8,7,5))) === '2026-09-08T07:05',
+        await pg.evaluate(t => window.toIn(t), T(2026,9,8,7,5)));
+  check('빈 칸은 빈 문자열', (await pg.evaluate(() => window.toIn(0))) === '');
+  check('칸에서 읽은 값이 같은 시각으로 돌아온다',
+        (await pg.evaluate(() => window.fromIn('2026-09-08T07:05'))) === T(2026,9,8,7,5));
+  check('빈 칸은 제한 없음(0)', (await pg.evaluate(() => window.fromIn(''))) === 0);
+  check('말이 안 되는 값도 0', (await pg.evaluate(() => window.fromIn('그제'))) === 0);
+
+  const p = (a,b) => pg.evaluate(x => window.period(x[0], x[1]), [a,b]);
+  check('같은 날이면 날짜는 한 번만',
+        (await p(T(2026,9,8,7,0), T(2026,9,8,17,0))) === '9.8 07:00~17:00', await p(T(2026,9,8,7,0), T(2026,9,8,17,0)));
+  check('날이 넘어가면 둘 다 적는다',
+        (await p(T(2026,9,8,7,0), T(2026,9,9,17,0))) === '9.8 07:00 ~ 9.9 17:00');
+  check('시작만 있으면 "부터"', (await p(T(2026,9,8,7,0), 0)) === '9.8 07:00부터');
+  check('종료만 있으면 "까지"', (await p(0, T(2026,9,8,17,0))) === '9.8 17:00까지');
+  check('둘 다 없으면 빈 칸', (await p(0, 0)) === '');
+}
+
 console.log('\n■ 안 본 공지 표시');
 {
   const u = (d, seen) => pg.evaluate(a => window.unseen(a[0], a[1]), [d, seen]);
@@ -185,7 +261,7 @@ console.log('\n■ 올린 시각');
 {
   check('없으면 빈 칸', (await pg.evaluate(() => window.when(0))) === '');
   const t = await pg.evaluate(() => window.when(new Date(2026, 8, 8, 7, 5).getTime()));
-  check('두 자리로 맞춘다', t === '2026.09.08 07:05', t);
+  check('두 자리로 맞춘다 (한국 시각)', t === '2026.09.08 07:05', t);
 }
 
 console.log(errs.length ? '\n❌ 런타임 오류:\n' + errs.slice(0, 4).join('\n') : '\n✅ 런타임 오류 없음');
