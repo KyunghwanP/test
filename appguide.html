@@ -173,7 +173,7 @@
             <div class="brand">
                 <div class="brand-badge">📑</div>
                 <div>
-                    <h1 class="serif">대학 수시 모집요강</h1>
+                    <h1 class="serif" id="brandTitle">대학 수시 모집요강</h1>
                     <p class="sub" id="brandSub">adiga 공개자료</p>
                 </div>
             </div>
@@ -195,7 +195,7 @@
                 </div>
                 <div class="combo-list" id="univList"></div>
             </div>
-            <p class="picker-hint" id="pickerHint">대학을 선택하면 수시 모집요강 원문을 바로 볼 수 있어요.</p>
+            <p class="picker-hint" id="pickerHint">대학을 선택하면 모집요강 원문을 바로 볼 수 있어요.</p>
         </section>
 
         <section class="viewer" id="viewer" hidden>
@@ -225,7 +225,7 @@
                 <div class="viewer-empty" id="viewerEmpty">
                     <div class="big">📄</div>
                     <h3>대학을 선택하세요</h3>
-                    <p>선택한 대학의 수시 모집요강 PDF가 여기에 표시됩니다.</p>
+                    <p>선택한 대학의 모집요강 PDF가 여기에 표시됩니다.</p>
                 </div>
             </div>
         </section>
@@ -268,7 +268,7 @@
             if (e) e.preventDefault();
             const u = currentUniv;
             if (!u) return;
-            const fname = `${u.year}_${safeFileName(u.base)}${u.campus ? '(' + safeFileName(u.campus) + ')' : ''} 수시 모집요강.pdf`;
+            const fname = `${u.year}_${safeFileName(u.base)}${u.campus ? '(' + safeFileName(u.campus) + ')' : ''} ${KIND_LABEL} 모집요강.pdf`;
             const btn = document.getElementById('pdfDownload');
             const label = btn.textContent;
             btn.textContent = '내려받는 중…';
@@ -295,6 +295,17 @@
             }
         }
 
+        // ── 수시 / 정시 ──
+        // 한 파일(appguide.csv)에 둘이 같이 들어 있다. 문서종류로 가르지 않으면
+        // 대학이 두 번씩 뜬다. 주소로 고르고, 기본은 지금까지대로 수시다.
+        // (문서종류 표기가 '수시 모집요강' · '정시모집' 으로 제각각이라 포함으로 본다)
+        const KIND = new URLSearchParams(location.search).get('kind') === '정시' ? '정시' : '수시';
+        const KIND_LABEL = KIND === '정시' ? '정시' : '수시';
+        // 제목도 모드를 따라간다 — 정시로 들어왔는데 '수시'라고 적혀 있으면 잘못 읽는다
+        document.title = `대학 ${KIND_LABEL} 모집요강 조회`;
+        { const t = document.getElementById('brandTitle');
+          if (t) t.textContent = `대학 ${KIND_LABEL} 모집요강`; }
+
         // ── 대학 목록 로드 ──
         fetch('appguide.csv')
             .then(res => res.text())
@@ -305,12 +316,13 @@
                     if (c.length < 5) continue;
                     const name = c[1], link = c[4];
                     if (!name || !/^https?:/.test(link)) continue;
+                    if (!String(c[3] || '').includes(KIND)) continue;
                     const { base, campus } = splitName(name);
                     univs.push({ name, base, campus, code: c[2], link, year: c[0] });
                 }
                 univs.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
                 document.getElementById('db-count').textContent = `${univs.length}개 대학`;
-                if (univs[0]) { document.getElementById('brandSub').textContent = `${univs[0].year} 수시`; document.getElementById('vtYear').textContent = univs[0].year; }
+                if (univs[0]) { document.getElementById('brandSub').textContent = `${univs[0].year} ${KIND_LABEL}`; document.getElementById('vtYear').textContent = univs[0].year; }
                 renderList('');
                 autoSelectFromParams();
             })
