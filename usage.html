@@ -98,6 +98,20 @@
   .ug-tnum{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;}
   .ug-tnum em{font-style:normal;font-weight:600;color:var(--ink-soft);font-size:10.5px;margin-left:4px;}
 
+  /* 표 위 도구 줄 — 검색 · 옛 버전만 · 몇 명 */
+  .ug-tools{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 7px;font-size:12px;}
+  .ug-tools input[type=search]{flex:1;min-width:110px;font:inherit;padding:5px 9px;
+    border:1px solid var(--rule);border-radius:8px;background:var(--paper,#fff);color:inherit;}
+  .ug-tools label{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
+  /* 기능별 머리글의 '내 사용량 빼기' */
+  .ug-mine{float:right;font-size:11px;font-weight:600;color:var(--ink-soft);
+    display:inline-flex;align-items:center;gap:4px;}
+  /* 정렬 가능한 머리글 */
+  .ug-tbl th[data-sort]{cursor:pointer;user-select:none;}
+  .ug-tbl th[data-sort]:hover{color:var(--ink);}
+  .ug-tbl th[data-sort].on{color:var(--ink);}
+  .ug-tbl th[data-sort].on::after{content:' ▾';font-size:9px;}
+  .ug-tbl th[data-sort].on[data-dir="asc"]::after{content:' ▴';}
   .ug-tblwrap{overflow-x:auto;}
   .ug-tbl{width:100%;border-collapse:collapse;font-size:12px;}
   .ug-tbl th{text-align:left;font-weight:700;color:var(--ink-soft);font-size:11px;
@@ -194,6 +208,15 @@ const USAGE_TABS = {
 // 안 되니 화면 밖(모듈 스코프)에 둔다.
 const _selEmails = new Set();
 
+// 표의 검색·정렬·필터도 같은 이유로 화면 밖에 둔다(달을 바꿔도 풀리지 않게).
+// 기능별 사용량에서 내 것을 빼는 것도 여기 — 오류를 잡느라 이리저리 돌아다니면
+// 실사용이 뻥튀기된다.
+let _ugExcludeMe = true;
+let _ugQuery     = '';
+let _ugOnlyOld   = false;
+let _ugSort      = { key: 'opens', dir: 'desc' };
+let _ugPeople    = [];
+
 async function usagePeople(){
   const byEmail = new Map();
   TEACHERS.forEach(t => { if(t && t.email) byEmail.set(t.email, t.name || t.email); });
@@ -251,9 +274,11 @@ function renderUsage(rows, ym){
       if(row.ver) ver = row.ver;                 // 마지막으로 쓴 화면 버전
       perDay[d-1].users++; perDay[d-1].opens += o;
       if(row.date || row.last) last = `${dstr(d).slice(5)} ${row.last || ''}`.trim();
+      const mine = r.email === ADMIN_EMAIL;
       Object.entries(row.tabs || {}).forEach(([k, v]) => {
         tabs[k] = (tabs[k] || 0) + (Number(v) || 0);
-        tabTot[k] = (tabTot[k] || 0) + (Number(v) || 0);
+        // 기능별 합계에서만 뺀다 — 사람별 표의 내 줄은 그대로 둔다.
+        if(!(_ugExcludeMe && mine)) tabTot[k] = (tabTot[k] || 0) + (Number(v) || 0);
       });
     }
     opensAll += opens;
@@ -264,6 +289,11 @@ function renderUsage(rows, ym){
 
   const daysWithUse = perDay.filter(d => d.users).length;
   const avgUsers = daysWithUse ? (perDay.reduce((a,d)=>a+d.users,0) / daysWithUse) : 0;
+  // 주말은 대부분 0 이라 '하루 평균'을 끌어내린다. 평일만 따로 낸다.
+  // 분모는 '평일 중 쓴 날' — 위 하루 평균과 같은 기준으로 맞춘다.
+  const isWeekend = d => { const w = new Date(y, mo-1, d).getDay(); return w === 0 || w === 6; };
+  const wdUsed = perDay.filter((d, i) => d.users && !isWeekend(i+1));
+  const avgWeekday = wdUsed.length ? (wdUsed.reduce((a,d)=>a+d.users,0) / wdUsed.length) : 0;
   const tabRank = Object.entries(tabTot).sort((a,b) => b[1]-a[1]);
   const tabMax  = tabRank.length ? tabRank[0][1] : 0;
   const dayMax  = Math.max(1, ...perDay.map(d => d.users));
@@ -296,6 +326,9 @@ function renderUsage(rows, ym){
 
   // ── 사람별 표 ──────────────────────────────────────────────────────────
   const used = people.filter(p => p.used), idle = people.filter(p => !p.used);
+  // 검색·정렬은 표 본문만 다시 그린다 — 화면을 통째로 다시 만들면 입력칸이
+  // 글자를 칠 때마다 새로 생겨 포커스가 튄다.
+  _ugPeople = used;
   // 이름을 체크하면 그 사람만 골라 새로고침을 보낼 수 있다. 표에 없는
   // '이 달에 안 쓴' 사람도 아래에서 같은 방식으로 고를 수 있다.
   const pickBox = p => `<label><input type="checkbox" data-email="${escapeHtml(p.email)}"
@@ -317,6 +350,7 @@ function renderUsage(rows, ym){
       ${chip('탭 이동', clickAll.toLocaleString())}
       ${chip('사용한 날', `${daysWithUse}일`)}
       ${chip('하루 평균', `${avgUsers.toFixed(1)}명`)}
+      ${chip('평일 평균', `${avgWeekday.toFixed(1)}명`)}
       ${(() => { const old_ = people.filter(p => p.ver && p.ver !== APP_VER).length;
                  return chip('옛 버전', old_ ? `<span style="color:var(--warn)">${old_}명</span>` : '없음'); })()}
     </div>
@@ -328,7 +362,9 @@ function renderUsage(rows, ym){
 
     <div class="ug-two">
       <div class="ug-card">
-        <div class="ug-h">기능별 사용량 <small>탭을 연 횟수</small></div>
+        <div class="ug-h">기능별 사용량 <small>탭을 연 횟수</small>
+          <label class="ug-mine"><input type="checkbox" id="ugExcludeMe"
+            ${_ugExcludeMe ? 'checked' : ''}> 내 사용량 빼기</label></div>
         ${tabBars}
       </div>
       <div class="ug-card">
@@ -338,9 +374,16 @@ function renderUsage(rows, ym){
           <button class="btn warn" id="usageReloadSelBtn" type="button">📣 선택한 사람만 새로고침</button>
           <button class="btn" id="ugSelClearBtn" type="button">선택 해제</button>
         </div>
+        <div class="ug-tools">
+          <input type="search" id="ugSearch" placeholder="이름으로 찾기" value="${escapeHtml(_ugQuery)}">
+          <label><input type="checkbox" id="ugOnlyOld" ${_ugOnlyOld ? 'checked' : ''}> 옛 버전만</label>
+          <span class="dim" id="ugCount"></span>
+        </div>
         <div class="ug-tblwrap"><table class="ug-tbl">
-          <thead><tr><th></th><th>연 횟수</th><th>쓴 날</th><th>탭 이동</th><th>마지막</th><th>버전</th><th>많이 쓴 기능</th></tr></thead>
-          <tbody>${used.map(rowHtml).join('') || '<tr><td colspan="7" class="dim">기록 없음</td></tr>'}</tbody>
+          <thead><tr><th data-sort="name">이름</th><th data-sort="opens">연 횟수</th><th data-sort="used">쓴 날</th>
+            <th data-sort="clicks">탭 이동</th><th data-sort="last">마지막</th><th data-sort="ver">버전</th>
+            <th>많이 쓴 기능</th></tr></thead>
+          <tbody id="ugTbody"></tbody>
         </table></div>
         ${idle.length ? `<div class="ug-idle"><b>이 달에 안 쓴 ${idle.length}명</b>
           <div>${idle.map(pickBox).join(' ')}</div></div>` : ''}
@@ -351,16 +394,82 @@ function renderUsage(rows, ym){
       무엇을 검색했는지·누구를 조회했는지 같은 내용은 담지 않습니다.
       (연락처 조회는 법에 따라 따로 남습니다.)</div>`;
 
+  ugRenderRows(rowHtml);
+
   // 체크박스마다 듣는다. 표(사람별)와 이달에 안 쓴 목록이 같은 방식(data-email)
   // 을 쓰므로 한 번에 묶어 처리한다.
+  ugBindPickBoxes();
+
+  // 검색 — 글자를 칠 때마다 본문만 다시 그린다
+  const q = document.getElementById('ugSearch');
+  q?.addEventListener('input', () => { _ugQuery = q.value; ugRenderRows(rowHtml); ugBindPickBoxes(); });
+  document.getElementById('ugOnlyOld')?.addEventListener('change', e => {
+    _ugOnlyOld = e.target.checked; ugRenderRows(rowHtml); ugBindPickBoxes();
+  });
+  // 머리글을 누르면 그 열로 정렬. 같은 열을 다시 누르면 방향이 바뀐다.
+  document.querySelectorAll('.ug-tbl th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if(_ugSort.key === key) _ugSort.dir = _ugSort.dir === 'desc' ? 'asc' : 'desc';
+      else _ugSort = { key, dir: key === 'name' ? 'asc' : 'desc' };
+      ugRenderRows(rowHtml); ugBindPickBoxes();
+    });
+  });
+  // 기능별에서 내 것 빼기 — 집계가 달라지므로 통째로 다시 그린다
+  document.getElementById('ugExcludeMe')?.addEventListener('change', e => {
+    _ugExcludeMe = e.target.checked;
+    renderUsage(rows, ym);
+  });
+
+  updateSelBar();
+}
+
+// 지금 상태(검색·필터·정렬)에 맞는 줄을 고른다
+function ugFilteredSorted(){
+  const q = _ugQuery.trim().toLowerCase();
+  let list = _ugPeople.filter(p =>
+    (!q || String(p.name || '').toLowerCase().includes(q)
+        || String(p.email || '').toLowerCase().includes(q)) &&
+    (!_ugOnlyOld || (p.ver && p.ver !== APP_VER)));
+
+  const { key, dir } = _ugSort;
+  const sign = dir === 'asc' ? 1 : -1;
+  list = list.slice().sort((a, b) => {
+    const av = a[key], bv = b[key];
+    const cmp = (typeof av === 'number' && typeof bv === 'number')
+      ? av - bv
+      : String(av ?? '').localeCompare(String(bv ?? ''), 'ko');
+    // 값이 같으면 이름으로 — 다시 그릴 때마다 순서가 흔들리지 않게
+    return cmp !== 0 ? cmp * sign : String(a.name).localeCompare(String(b.name), 'ko');
+  });
+  return list;
+}
+
+function ugRenderRows(rowHtml){
+  const tb = document.getElementById('ugTbody');
+  if(!tb) return;
+  const list = ugFilteredSorted();
+  tb.innerHTML = list.map(rowHtml).join('')
+    || `<tr><td colspan="7" class="dim">${_ugQuery || _ugOnlyOld ? '찾는 사람이 없습니다' : '기록 없음'}</td></tr>`;
+  const cnt = document.getElementById('ugCount');
+  if(cnt) cnt.textContent = list.length === _ugPeople.length
+    ? `${list.length}명` : `${list.length}명 / ${_ugPeople.length}명`;
+  document.querySelectorAll('.ug-tbl th[data-sort]').forEach(th => {
+    th.classList.toggle('on', th.dataset.sort === _ugSort.key);
+    th.dataset.dir = th.dataset.sort === _ugSort.key ? _ugSort.dir : '';
+  });
+}
+
+function ugBindPickBoxes(){
   document.querySelectorAll('#usageBody input[type=checkbox][data-email]').forEach(cb => {
+    if(cb.dataset.bound) return;
+    cb.dataset.bound = '1';
     cb.addEventListener('change', () => {
       if (cb.checked) _selEmails.add(cb.dataset.email); else _selEmails.delete(cb.dataset.email);
       cb.closest('tr')?.classList.toggle('sel', cb.checked);
       updateSelBar();
     });
   });
-  updateSelBar();
 }
 
 // 선택 바를 고른 인원 수에 맞춰 보이거나 숨긴다. renderUsage 가 통째로 다시

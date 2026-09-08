@@ -176,8 +176,14 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   ${grab('usagePeople', PAGE)}
   let _usageBusy = false;
   ${grabConst('_selEmails', PAGE)}
+  // 표의 검색·정렬·필터와 '내 사용량 빼기' 상태 (원본과 같은 초깃값)
+  let _ugExcludeMe = true, _ugQuery = '', _ugOnlyOld = false;
+  let _ugSort = { key: 'opens', dir: 'desc' }, _ugPeople = [];
   ${grab('loadUsage', PAGE)}
   ${grab('renderUsage', PAGE)}
+  ${grab('ugFilteredSorted', PAGE)}
+  ${grab('ugRenderRows', PAGE)}
+  ${grab('ugBindPickBoxes', PAGE)}
   ${grab('updateSelBar', PAGE)}
 
   Object.assign(window, { usageStart, usageTab, usageFlush, usageDate, loadUsage,
@@ -611,6 +617,109 @@ console.log('\n■ 누가 옛 화면을 쓰는지 보인다');
   check('몇 명인지 요약에도 나온다', /옛 버전\s*1명/.test(txt), txt.slice(0,220));
   check('버전 칸이 표에 있다',
         (await pg.$$eval('.ug-tbl th', els => els.map(e => e.textContent))).includes('버전'));
+}
+
+
+// ── 평일 평균 · 내 사용량 빼기 · 표 검색/정렬/필터 ───────────────────────────
+// 2026-05: 1일(금) 2일(토) 3일(일) 4일(월) … 주말이 대부분 0 이라 '하루 평균'만
+// 보면 실제보다 낮게 나온다. 그래서 평일만 따로 낸다.
+const ADMIN = 'pkh910518@yeungnam.hs.kr';
+// 이 하네스는 usage.html 의 CSS 를 싣지 않아 요소가 '보이지 않음'으로 잡힌다.
+// 여기서 보는 것은 배선이지 마우스 동작이 아니므로 이벤트를 직접 준다.
+const toggle = sel => pg.$eval(sel, el => {
+  el.checked = !el.checked;
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+});
+const typeIn = (sel, v) => pg.$eval(sel, (el, val) => {
+  el.value = val;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}, v);
+
+console.log('\n■ 평일 평균을 따로 낸다');
+{
+  const rows = [
+    { email:'a@x', name:'김하나', days:{
+        '2026-05-04':{opens:3, last:'10:00', tabs:{home:3}},   // 월
+        '2026-05-05':{opens:3, last:'10:00', tabs:{home:3}},   // 화
+        '2026-05-09':{opens:1, last:'10:00', tabs:{home:1}} }},// 토
+    { email:'b@x', name:'이두리', days:{
+        '2026-05-04':{opens:2, last:'10:00', tabs:{home:2}} }},// 월
+  ];
+  await pg.evaluate(([r, ym]) => window.renderUsage(r, ym), [rows, '2026-05']);
+  const txt = await pg.$eval('#usageBody', e => e.innerText.replace(/\s+/g,' '));
+  // 쓴 날: 월(2명) 화(1명) 토(1명) → 하루 평균 4/3 = 1.3
+  check('하루 평균은 주말까지 넣는다', /하루 평균\s*1\.3명/.test(txt), txt.slice(0,260));
+  // 평일만: 월(2명) 화(1명) → 3/2 = 1.5
+  check('평일 평균은 주말을 뺀다', /평일 평균\s*1\.5명/.test(txt), txt.slice(0,260));
+}
+
+console.log('\n■ 기능별 사용량에서 내 것을 뺀다');
+{
+  const rows = [
+    { email:ADMIN, name:'박경환', days:{ '2026-05-04':{opens:9, last:'10:00', tabs:{home:90}} } },
+    { email:'b@x', name:'이두리', days:{ '2026-05-04':{opens:1, last:'10:00', tabs:{home:10}} } },
+  ];
+  await pg.evaluate(([r, ym]) => window.renderUsage(r, ym), [rows, '2026-05']);
+
+  const bar = await pg.$eval('.ug-trow .ug-tnum', e => e.textContent);
+  check('내 90회는 빠지고 10회만 잡힌다', bar.startsWith('10'), bar);
+  check('빼는 중이라고 화면에 적어 둔다',
+        await pg.$eval('#ugExcludeMe', e => e.checked));
+  // 사람별 표의 내 줄은 그대로 — 내가 얼마나 돌아다녔는지는 볼 수 있어야 한다
+  const mine = await pg.$$eval('.ug-tbl tbody tr', trs =>
+    trs.map(tr => [...tr.querySelectorAll('td')].map(td => td.textContent.trim())));
+  check('사람별 표의 내 줄은 그대로', mine.some(r => r[0].includes('박경환') && r[3] === '90'), mine);
+
+  // 체크를 풀면 다시 합쳐 보인다
+  await toggle('#ugExcludeMe');
+  const bar2 = await pg.$eval('.ug-trow .ug-tnum', e => e.textContent);
+  check('체크를 풀면 100회로 돌아온다', bar2.startsWith('100'), bar2);
+  await toggle('#ugExcludeMe');
+}
+
+console.log('\n■ 사람별 표 — 검색 · 정렬 · 필터');
+{
+  const rows = [
+    { email:'a@x', name:'김하나', days:{ '2026-05-04':{opens:5, last:'10:00', ver:'ver6.80', tabs:{home:5}} } },
+    { email:'b@x', name:'이두리', days:{ '2026-05-04':{opens:9, last:'11:00', ver:CUR_VER,  tabs:{home:9}} } },
+    { email:'c@x', name:'박세찬', days:{ '2026-05-04':{opens:1, last:'12:00', ver:CUR_VER,  tabs:{home:1}} } },
+  ];
+  await pg.evaluate(([r, ym]) => window.renderUsage(r, ym), [rows, '2026-05']);
+  const names = () => pg.$$eval('.ug-tbl tbody tr td.nm', els => els.map(e => e.textContent.trim()));
+
+  check('처음엔 연 횟수 많은 순', (await names()).join() === '이두리,김하나,박세찬', await names());
+
+  // 정렬 — 머리글을 누르면 그 열로, 다시 누르면 방향이 바뀐다
+  await pg.$eval('.ug-tbl th[data-sort="opens"]', el => el.click());
+  check('연 횟수를 누르면 적은 순', (await names()).join() === '박세찬,김하나,이두리', await names());
+  await pg.$eval('.ug-tbl th[data-sort="name"]', el => el.click());
+  check('이름순으로도 된다', (await names()).join() === '김하나,박세찬,이두리', await names());
+  check('정렬 중인 열을 표시한다',
+        (await pg.$eval('.ug-tbl th[data-sort="name"]', e => e.className)).includes('on'));
+
+  // 검색
+  await typeIn('#ugSearch', '두리');
+  check('이름으로 찾는다', (await names()).join() === '이두리', await names());
+  check('몇 명인지 적어 준다', (await pg.$eval('#ugCount', e => e.textContent)) === '1명 / 3명');
+  await typeIn('#ugSearch', '없는사람');
+  check('없으면 안내를 준다',
+        (await pg.$eval('#ugTbody', e => e.textContent)).includes('찾는 사람이 없습니다'));
+  await typeIn('#ugSearch', '');
+  check('지우면 다시 다 나온다', (await names()).length === 3);
+
+  // 필터
+  await toggle('#ugOnlyOld');
+  check('옛 버전만 남긴다', (await names()).join() === '김하나', await names());
+  await toggle('#ugOnlyOld');
+
+  // 걸러 낸 상태에서도 체크(새로고침 대상 고르기)가 살아 있어야 한다
+  await typeIn('#ugSearch', '하나');
+  await toggle('.ug-tbl tbody input[type=checkbox][data-email]');
+  check('걸러 낸 줄도 고를 수 있다',
+        (await pg.$eval('#ugSelCount', e => e.textContent)) === '1');
+  await typeIn('#ugSearch', '');
+  check('검색을 지워도 고른 것이 유지된다',
+        (await pg.$eval('#ugSelCount', e => e.textContent)) === '1');
 }
 
 console.log(errs.length ? '\n❌ 런타임 오류:\n' + errs.slice(0,4).join('\n') : '\n✅ 런타임 오류 없음');
