@@ -108,7 +108,10 @@ await pg.route('https://ynhs.test/**', r => r.fulfill({
     ${grabConst('noticeToday')}
     ${grab('noticeSnoozeMap')}
     ${grab('noticeSnoozed')}
-    ${grab('noticeSnoozeToday')}
+    ${grabConst('NOTICE_EVER')}
+    ${grab('noticeSnooze')}
+    ${grabConst('noticeSnoozeToday')}
+    ${grabConst('noticeSnoozeEver')}
     function closeNoticeModalBtn(){ window.__closed = true; }
     ${grab('noticePeriodText')}
     ${grab('noticeToInput')}
@@ -122,6 +125,7 @@ await pg.route('https://ynhs.test/**', r => r.fulfill({
     window.allKeys = (list, extra) => { _noticeList = list; return noticeAllKeys(extra); };
     window.snoozeReset = () => { localStorage.removeItem(NOTICE_SNOOZE_KEY); window.__closed = false; };
     window.snoozeNow   = list => { _noticeList = list; noticeSnoozeToday(); return window.__closed; };
+    window.snoozeEver  = list => { _noticeList = list; noticeSnoozeEver();  return window.__closed; };
     window.isSnoozed   = n => noticeSnoozed(n);
     window.snoozeRaw   = () => localStorage.getItem(NOTICE_SNOOZE_KEY);
     window.snoozeSet   = v => localStorage.setItem(NOTICE_SNOOZE_KEY, v);
@@ -320,6 +324,10 @@ console.log('\n■ 처음 들어올 때 저절로 띄우기');
         /if \(!auto\) _noticeAuto = false;/.test(HTML));
   check('배선 — 저절로 뜬 창만 한 장씩 넘긴다',
         /if \(_noticeAuto\) \{ renderNoticeAutoStep\(list\); return; \}/.test(HTML));
+  check('배선 — 접기 두 가지가 다 있다',
+        /noticeSnoozeToday\(\)">오늘 그만보기/.test(HTML) && /noticeSnoozeEver\(\)">다시 보지 않기/.test(HTML));
+  check('배선 — 접기와 넘기기를 갈라 놓는다',
+        /class="notice-foot-skip"/.test(HTML) && /class="notice-skip"/.test(HTML));
   check('배선 — 오늘 그만보기·다음은 그 화면에만 붙는다',
         /function renderNoticeAutoStep\(list\)\{[\s\S]{0,1400}noticeSnoozeToday\(\)[\s\S]{0,400}noticeAutoStep\(1\)/.test(HTML) &&
         !/noticeSnoozeToday\(\)[\s\S]{0,80}공지 관리/.test(HTML));
@@ -347,6 +355,25 @@ console.log('\n■ 처음 들어올 때 저절로 띄우기');
         (await pg.evaluate(x => window.isSnoozed(x), a)) === true);
   check('새로 올라온 공지는 접혀 있지 않다',
         (await pg.evaluate(x => window.isSnoozed(x), N('c', 300))) === false);
+
+  // '다시 보지 않기' — 날이 지나도 안 뜬다. 다만 내용이 바뀌면 다시 뜬다.
+  await pg.evaluate(() => window.snoozeReset());
+  await pg.evaluate(l => window.snoozeEver(l), [a]);
+  check('다시 보지 않기를 누르면 접힌다', (await pg.evaluate(x => window.isSnoozed(x), a)) === true);
+  // 오늘 날짜로 적히면 내일이면 풀린다 — '다시 보지 않기'가 아니게 된다
+  const ever = JSON.parse(await pg.evaluate(() => window.snoozeRaw()));
+  check('오늘 날짜가 아니라 계속으로 적힌다', ever.a.d === 'ever', ever);
+  check('날이 지나도 안 뜬다', (await pg.evaluate(x => window.isSnoozed(x), a)) === true);
+  check('그래도 고치면 다시 뜬다',
+        (await pg.evaluate(x => window.isSnoozed(x), N('a', 101))) === false);
+
+  // 청소가 '계속 안 봄'까지 쓸어 가면 안 된다 — 그러면 다시 보지 않기가 하루짜리가 된다
+  await pg.evaluate(() => window.snoozeSet(JSON.stringify({
+    ever1: { v: 1, d: 'ever' }, old1: { v: 2, d: '2000-01-01' } })));
+  await pg.evaluate(l => window.snoozeNow(l), [N('z', 9)]);
+  const after = JSON.parse(await pg.evaluate(() => window.snoozeRaw()));
+  check('청소해도 계속 안 봄은 남는다', !!after.ever1, after);
+  check('지난 날짜는 그래도 지운다', !after.old1, after);
 
   // 날이 바뀌면 풀린다
   await pg.evaluate(() => window.snoozeSet(JSON.stringify({ a: { v: 100, d: '2000-01-01' } })));

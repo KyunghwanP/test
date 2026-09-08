@@ -29,27 +29,30 @@ let _noticeList=[], _noticeAuto=true, _noticeOpenId='', _noticeObjUrls=[];
 const _IS_ADMIN=()=>true;
 const escapeHtml=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function noticeLoadImages(){} function noticeReleaseImages(){} function noticeMarkSeen(){}
-function noticeSnoozeToday(){ window.__snoozed=true; closeNoticeModalBtn(); }
+function noticeSnoozeToday(){ window.__snoozed='today'; closeNoticeModalBtn(); }
+function noticeSnoozeEver(){ window.__snoozed='ever'; closeNoticeModalBtn(); }
 function closeNoticeModalBtn(){ document.getElementById('noticeModal').classList.remove('open'); window.__closed=true; }
 function startNoticeEdit(){}
 ${grab('noticeCleanStyle')}\n${grab('noticeSanitize')}\n${grab('noticeTitleOf')}
 ${grab('noticeStateOf')}\n${grab('noticeStateChip')}\n${grab('noticeVisibleList')}
 ${grab('noticePeriodText')}\n${grab('noticeWhenText')}
 ${grab('renderNoticeAutoStep')}\n${grab('noticeAutoStep')}\n${grab('renderNoticeModal')}
-window.noticeAutoStep=noticeAutoStep; window.noticeSnoozeToday=noticeSnoozeToday;
+window.noticeAutoStep=noticeAutoStep; window.noticeSnoozeToday=noticeSnoozeToday; window.noticeSnoozeEver=noticeSnoozeEver;
 window.closeNoticeModalBtn=closeNoticeModalBtn;
 window.go=list=>{ _noticeList=list; _noticeAuto=true; _noticeAutoIdx=0;
   document.getElementById('noticeModal').classList.add('open'); renderNoticeModal(); };
 window.st=()=>({ 제목:document.getElementById('noticeTitle').textContent,
   본문:document.getElementById('noticeBody').textContent.trim(),
-  단추:[...document.querySelectorAll('#noticeFoot button')].map(b=>b.textContent.trim()) });
+  넘기기:[...document.querySelectorAll('#noticeFoot > .notice-btn')].map(b=>b.textContent.trim()),
+  접기:[...document.querySelectorAll('#noticeFoot .notice-skip')].map(b=>b.textContent.trim()) });
 <\/script></body>`);
 const N=(id,t,h)=>({id,title:t,html:'<p>'+h+'</p>',updatedAt:Date.now()});
 const THREE = [N('a','영어듣기 시정표','3~4교시 방송'),
                N('b','모의고사 감독','A동 3층'),
                N('c','급식 변경','오늘 중식 지연')];
 const st = () => pg.evaluate(() => window.st());
-const 다음 = () => pg.click('#noticeFoot button:last-child');
+const 다음 = () => pg.click('#noticeFoot > .notice-btn:last-child');
+const 접기 = i => pg.click(`#noticeFoot .notice-skip:nth-child(${i})`);
 
 console.log('\n■ 세 건이면 세 장을 차례로');
 {
@@ -57,23 +60,25 @@ console.log('\n■ 세 건이면 세 장을 차례로');
   let x = await st();
   check('첫 장이 뜬다', x.제목.includes('영어듣기 시정표'), x.제목);
   check('몇 번째인지 알려준다', x.제목.includes('(1/3)'), x.제목);
-  check('첫 장에는 이전이 없다', !x.단추.includes('‹ 이전'), x.단추);
-  check('다음으로 넘어간다', x.단추.at(-1) === '다음 ›', x.단추);
-  check('오늘 그만보기는 어느 장에서든 있다', x.단추.includes('오늘 그만보기'), x.단추);
+  check('첫 장에는 이전이 없다', !x.넘기기.includes('‹ 이전'), x.넘기기);
+  check('다음으로 넘어간다', x.넘기기.at(-1) === '다음 ›', x.넘기기);
+  check('접기 두 가지가 어느 장에서든 있다',
+        x.접기.join() === '오늘 그만보기,다시 보지 않기', x.접기);
+  check('접기와 넘기기가 섞이지 않는다', !x.넘기기.some(t => /보기|않기/.test(t)), x.넘기기);
 
   await 다음(); x = await st();
   check('두 번째 장', x.제목.includes('모의고사 감독') && x.제목.includes('(2/3)'), x.제목);
   check('본문도 그 공지 것', x.본문 === 'A동 3층', x.본문);
-  check('가운데 장에는 이전이 생긴다', x.단추.includes('‹ 이전'), x.단추);
+  check('가운데 장에는 이전이 생긴다', x.넘기기.includes('‹ 이전'), x.넘기기);
 
   await 다음(); x = await st();
   check('마지막 장', x.제목.includes('급식 변경') && x.제목.includes('(3/3)'), x.제목);
-  check('마지막에는 다음 대신 닫기', x.단추.at(-1) === '닫기', x.단추);
+  check('마지막에는 다음 대신 닫기', x.넘기기.at(-1) === '닫기', x.넘기기);
 }
 
 console.log('\n■ 앞뒤로 오간다');
 {
-  await pg.click('#noticeFoot button:nth-child(3)');    // ‹ 이전
+  await pg.click('#noticeFoot > .notice-btn:not(:last-child)');    // ‹ 이전
   let x = await st();
   check('이전으로 돌아온다', x.제목.includes('(2/3)'), x.제목);
   check('내용도 같이 돌아온다', x.본문 === 'A동 3층', x.본문);
@@ -91,9 +96,17 @@ console.log('\n■ 닫기·오늘 그만보기');
 
   await pg.evaluate(l => window.go(l), THREE);
   await pg.evaluate(() => { window.__closed = false; window.__snoozed = false; });
-  await pg.click('#noticeFoot button:nth-child(2)');     // 오늘 그만보기 (첫 장)
-  check('첫 장에서도 오늘 그만보기가 눌린다', await pg.evaluate(() => window.__snoozed));
+  await 접기(1);                                         // 오늘 그만보기 (첫 장)
+  check('첫 장에서도 오늘 그만보기가 눌린다',
+        (await pg.evaluate(() => window.__snoozed)) === 'today');
   check('누르면 창도 닫힌다', await pg.evaluate(() => window.__closed));
+
+  await pg.evaluate(l => window.go(l), THREE);
+  await pg.evaluate(() => { window.__closed = false; window.__snoozed = false; });
+  await 접기(2);                                         // 다시 보지 않기
+  check('다시 보지 않기도 첫 장에서 눌린다',
+        (await pg.evaluate(() => window.__snoozed)) === 'ever');
+  check('그것도 창을 닫는다', await pg.evaluate(() => window.__closed));
 }
 
 console.log('\n■ 한 건이면 넘길 것이 없다');
@@ -101,8 +114,9 @@ console.log('\n■ 한 건이면 넘길 것이 없다');
   await pg.evaluate(l => window.go(l), [N('a','영어듣기 시정표','3~4교시 방송')]);
   const x = await st();
   check('번호를 안 붙인다', !/\(\d+\/\d+\)/.test(x.제목), x.제목);
-  check('바로 닫기', x.단추.at(-1) === '닫기', x.단추);
-  check('이전·다음이 없다', !x.단추.some(t => /이전|다음/.test(t)), x.단추);
+  check('바로 닫기', x.넘기기.at(-1) === '닫기', x.넘기기);
+  check('이전·다음이 없다', !x.넘기기.some(t => /이전|다음/.test(t)), x.넘기기);
+  check('접기는 그대로 둘 다', x.접기.length === 2, x.접기);
 }
 
 console.log('\n■ 넘길 때마다 위에서부터 읽는다');
