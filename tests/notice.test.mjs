@@ -294,6 +294,9 @@ console.log('\n■ 처음 들어올 때 저절로 띄우기');
   check('배선 — 직접 연 창에는 오늘 그만보기가 안 붙는다',
         /if \(_noticeAuto\) \{ foot\.innerHTML = noticeAutoFoot/.test(HTML));
 
+  check('저절로 뜬 창은 게시중인 것만 보여준다',
+        /if \(_noticeAuto\) return noticeLiveList\(\);[\s\S]{0,120}return _IS_ADMIN\(\) \? _noticeList/.test(HTML));
+
   await pg.evaluate(() => window.snoozeReset());
   const N = (id, upd) => ({ id, html: '감독 변경', updatedAt: upd });
   const a = N('a', 100), b = N('b', 200);
