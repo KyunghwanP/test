@@ -6261,7 +6261,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.16';
+const APP_VER = 'ver7.17';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -8914,6 +8914,7 @@ function noticeAutoOpen(){
   if (document.getElementById('noticePage')?.classList.contains('active')) return;
   if (document.getElementById('noticeModal')?.classList.contains('open')) return;
   _noticeAuto = true;
+  _noticeAutoIdx = 0;
   openNoticeModal(true);
 }
 
@@ -8964,6 +8965,10 @@ function renderNoticeModal(){
     return;
   }
 
+  // 저절로 뜬 창은 한 장씩 넘겨 보여준다. 목록을 주면 '고르라'는 화면이 되는데,
+  // 이 창의 목적은 고르는 것이 아니라 오늘 붙은 것을 다 읽게 하는 것이다.
+  if (_noticeAuto) { renderNoticeAutoStep(list); return; }
+
   if (!show) {                                   // 목록 화면
     document.getElementById('noticeTitle').textContent = `📢 전체 공지 ${list.length}건`;
     when.textContent = '';
@@ -8978,9 +8983,9 @@ function renderNoticeModal(){
     body.querySelectorAll('.notice-row').forEach(r => r.addEventListener('click', () => {
       _noticeOpenId = r.dataset.id; renderNoticeModal();
     }));
-    foot.innerHTML = _noticeAuto ? noticeAutoFoot('') : (_IS_ADMIN()
+    foot.innerHTML = _IS_ADMIN()
       ? `<span class="notice-foot-msg"></span>
-         <button class="notice-btn primary" onclick="startNoticeEdit()">공지 관리 ›</button>` : '');
+         <button class="notice-btn primary" onclick="startNoticeEdit()">공지 관리 ›</button>` : '';
     noticeMarkSeen();
     return;
   }
@@ -9007,7 +9012,6 @@ function renderNoticeModal(){
 
   const back = list.length > 1
     ? `<button class="notice-btn" onclick="noticeBackToList()">‹ 목록</button>` : '';
-  if (_noticeAuto) { foot.innerHTML = noticeAutoFoot(back); noticeMarkSeen(); return; }
   foot.innerHTML = _IS_ADMIN()
     ? `<span class="notice-foot-msg">${show.by ? '쓴 사람: ' + escapeHtml(show.by) : ''}</span>
        ${back}<button class="notice-btn primary" onclick="startNoticeEdit('${show.id}')">✏️ 편집</button>`
@@ -9015,12 +9019,43 @@ function renderNoticeModal(){
   noticeMarkSeen();
 }
 
-// 저절로 뜬 창의 바닥글. 확성기로 직접 연 창에는 안 붙는다 —
-// 내가 눌러서 연 창에 '오늘 그만보기'가 있으면 무엇을 그만본다는 건지 헷갈린다.
-function noticeAutoFoot(back){
-  return `<span class="notice-foot-msg"></span>${back}
+// 저절로 뜬 창 — 한 장씩. 확성기로 직접 연 창과 단추가 다르다.
+// (내가 눌러서 연 창에 '오늘 그만보기'가 있으면 무엇을 그만본다는 건지 헷갈린다)
+let _noticeAutoIdx = 0;
+function renderNoticeAutoStep(list){
+  const i = Math.max(0, Math.min(_noticeAutoIdx, list.length - 1));
+  _noticeAutoIdx = i;
+  const n = list[i];
+  const many = list.length > 1;
+
+  document.getElementById('noticeTitle').textContent =
+    '📢 ' + noticeTitleOf(n) + (many ? ` (${i + 1}/${list.length})` : '');
+  document.getElementById('noticeWhen').textContent =
+    noticePeriodText(n.from, n.until) || noticeWhenText(n.updatedAt);
+
+  const body = document.getElementById('noticeBody');
+  body.innerHTML = '';
+  const view = document.createElement('div');
+  view.className = 'notice-view';
+  view.innerHTML = noticeSanitize(n.html);
+  body.appendChild(view);
+  noticeLoadImages(view);
+  // 넘길 때 맨 위에서 시작하는 것은 본문을 비우는 것만으로 된다(브라우저가
+  // 스크롤을 0 으로 되돌린다) — 확인하고 따로 손대지 않는다.
+
+  const last = i === list.length - 1;
+  document.getElementById('noticeFoot').innerHTML = `
+    <span class="notice-foot-msg"></span>
     <button class="notice-btn" onclick="noticeSnoozeToday()">오늘 그만보기</button>
-    <button class="notice-btn primary" onclick="closeNoticeModalBtn()">닫기</button>`;
+    ${i > 0 ? '<button class="notice-btn" onclick="noticeAutoStep(-1)">‹ 이전</button>' : ''}
+    ${last
+      ? '<button class="notice-btn primary" onclick="closeNoticeModalBtn()">닫기</button>'
+      : '<button class="notice-btn primary" onclick="noticeAutoStep(1)">다음 ›</button>'}`;
+  noticeMarkSeen();
+}
+function noticeAutoStep(d){
+  _noticeAutoIdx += d;
+  renderNoticeModal();
 }
 
 // ── 그림 크게 보기 ──────────────────────────────────────────────────────────
@@ -9583,6 +9618,7 @@ window.closeNoticeModal   = closeNoticeModal;
 window.closeNoticeModalBtn= closeNoticeModalBtn;
 window.noticeBackToList   = noticeBackToList;
 window.noticeSnoozeToday  = noticeSnoozeToday;
+window.noticeAutoStep     = noticeAutoStep;
 window.openNoticeZoom     = openNoticeZoom;
 window.closeNoticeZoom    = closeNoticeZoom;
 window.startNoticeEdit    = startNoticeEdit;

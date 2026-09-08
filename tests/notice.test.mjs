@@ -318,8 +318,14 @@ console.log('\n■ 처음 들어올 때 저절로 띄우기');
         /getElementById\('noticePage'\)\?\.classList\.contains\('active'\)\) return;/.test(HTML));
   check('배선 — 확성기로 직접 열면 저절로-뜸 상태가 풀린다',
         /if \(!auto\) _noticeAuto = false;/.test(HTML));
-  check('배선 — 직접 연 창에는 오늘 그만보기가 안 붙는다',
-        /if \(_noticeAuto\) \{ foot\.innerHTML = noticeAutoFoot/.test(HTML));
+  check('배선 — 저절로 뜬 창만 한 장씩 넘긴다',
+        /if \(_noticeAuto\) \{ renderNoticeAutoStep\(list\); return; \}/.test(HTML));
+  check('배선 — 오늘 그만보기·다음은 그 화면에만 붙는다',
+        /function renderNoticeAutoStep\(list\)\{[\s\S]{0,1400}noticeSnoozeToday\(\)[\s\S]{0,400}noticeAutoStep\(1\)/.test(HTML) &&
+        !/noticeSnoozeToday\(\)[\s\S]{0,80}공지 관리/.test(HTML));
+  check('배선 — 마지막 장에서만 닫기가 나온다',
+        /last\s*\n?\s*\? '<button class="notice-btn primary" onclick="closeNoticeModalBtn\(\)">닫기/.test(HTML));
+  check('배선 — 저절로 열 때는 첫 장부터', /_noticeAutoIdx = 0;\s*\n\s*openNoticeModal\(true\);/.test(HTML));
 
   check('저절로 뜬 창은 게시중인 것만 보여준다',
         /if \(_noticeAuto\) return noticeLiveList\(\);[\s\S]{0,120}return _IS_ADMIN\(\) \? _noticeList/.test(HTML));
