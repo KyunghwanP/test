@@ -279,6 +279,33 @@ console.log('\n■ 여러 건일 때 — 지금 뜨는 것만 고른다');
         (await u(LIST.filter(n => n.id === 'c'), null)) === false);
 }
 
+console.log('\n■ 그림 크게 보기');
+{
+  check('공지 안 그림을 누르면 커진다',
+        /function openNoticeZoom\(src\)/.test(HTML) &&
+        /closest\('\.notice-view img'\)[\s\S]{0,80}openNoticeZoom\(img\.src\)/.test(HTML));
+  check('다시 그려도 계속 눌린다 (위임으로 받는다)',
+        /getElementById\('noticeBody'\)\?\.addEventListener\('click'/.test(HTML));
+  check('처음에는 화면에 맞춰 전체를 보여준다', /ov\.classList\.remove\('actual'\);/.test(HTML));
+  check('누르면 원래 크기로 바뀐다', /function toggleNoticeZoomActual\(\)/.test(HTML));
+  check('원래 크기에서는 훑어볼 수 있다',
+        /\.notice-zoom\.actual \.notice-zoom-scroll\{display:block;\}/.test(HTML) &&
+        /\.notice-zoom-scroll\{[^}]*overflow:auto/.test(HTML));
+  check('표는 왼쪽 위부터 보게 맞춘다', /sc\.scrollTop = 0; sc\.scrollLeft = 0;/.test(HTML));
+  check('닫으면 그림을 놓아준다(메모리)', /getElementById\('noticeZoomImg'\)\.src = '';/.test(HTML));
+  check('뒤로가기로 공지 창보다 먼저 닫힌다',
+        /noticeImgZoom'\)\?\.classList\.contains\('open'\)\) \{\s*\n\s*closeNoticeZoom\(\); armExitGuard\(\); return;[\s\S]{0,200}noticeModal'\)\?\.classList\.contains\('open'\)/.test(HTML));
+  check('ESC 로도 공지 창보다 먼저 닫힌다',
+        /noticeImgZoom'\)\?\.classList\.contains\('open'\)\) \{\s*\n\s*closeNoticeZoom\(\); return;[\s\S]{0,120}noticeModal'\)/.test(HTML));
+
+  // 모바일에서 상자가 더 못 커지면 그림이 줄어야 한다. none 이면 밖으로 삐져나가
+  // 가로 스크롤이 생긴다 — 실제로 그랬다.
+  check('그림이 창 밖으로 안 나간다',
+        /#noticeModal \.notice-view > img\{max-width:100%;\}/.test(HTML));
+  check('그림을 품은 문단은 풀어 준다(넓은 화면에서 창이 커지게)',
+        /#noticeModal \.notice-view > \*:has\(img\)\{max-width:none;\}/.test(HTML));
+}
+
 console.log('\n■ 처음 들어올 때 저절로 띄우기');
 {
   check('배선 — 첫 목록을 받으면 한 번 시도한다',

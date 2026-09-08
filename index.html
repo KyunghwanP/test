@@ -2503,8 +2503,12 @@
   #noticeModal .notice-view > *{max-width:74ch;}
   /* 그림은 잡아 두지 않는다 — 시정표 캡처가 74ch 에 갇히면 글자가 안 보인다.
      그림을 품은 문단도 같이 풀어 준다(붙여넣기 자리에 따라 문단 안에 들어간다). */
-  #noticeModal .notice-view > img,
+  /* 문단 감싸개는 풀어 주되, 그림 자체는 상자 안에 가둔다.
+     none 으로 두면 상자가 더 못 커지는 폭(모바일)에서 그림이 밖으로 삐져나가
+     가로 스크롤이 생긴다. 100% 는 상자 크기를 잴 때는 무시되므로, 넓은 화면에서
+     상자가 그림 크기만큼 커지는 것은 그대로다. */
   #noticeModal .notice-view > *:has(img){max-width:none;}
+  #noticeModal .notice-view > img{max-width:100%;}
   @media (max-width: 640px){
     #noticeModal{padding:6px;}
     #noticeModal .modal-box{width:99vw;min-width:0;max-height:96vh;}
@@ -2523,7 +2527,45 @@
   /* 본문·편집기 모두 여기에 들어간다 */
   .notice-body{padding:16px 20px;overflow-y:auto;flex:1;min-height:110px;}
   /* 창이 커진 만큼 그림도 크게. 화면 높이를 넘지 않는 선에서 다 쓴다. */
-  #noticeModal .notice-view img{max-height:78vh;object-fit:contain;}
+  #noticeModal .notice-view img{max-height:78vh;object-fit:contain;cursor:zoom-in;}
+
+  /* 그림 크게 보기.
+     시정표는 표라서 화면에 맞춰 줄이면 글자가 안 보인다. 처음에는 화면에 맞춰
+     전체를 보여주고, 누르면 원래 크기로 바꿔 훑어볼 수 있게 한다. */
+  .notice-zoom{
+    position:fixed;inset:0;z-index:9200;display:none;
+    background:rgba(15,18,14,0.92);
+  }
+  .notice-zoom.open{display:block;}
+  .notice-zoom-scroll{
+    position:absolute;inset:0;overflow:auto;
+    display:flex;align-items:center;justify-content:center;
+    -webkit-overflow-scrolling:touch;
+  }
+  .notice-zoom-scroll img{
+    max-width:100%;max-height:100%;
+    width:auto;height:auto;object-fit:contain;cursor:zoom-in;
+    background:#fff;border-radius:6px;
+  }
+  /* 원래 크기 — 화면보다 크면 훑어본다 */
+  .notice-zoom.actual .notice-zoom-scroll{display:block;}
+  .notice-zoom.actual .notice-zoom-scroll img{
+    max-width:none;max-height:none;cursor:zoom-out;border-radius:0;
+    display:block;margin:auto;
+  }
+  /* 원래 크기로 보면 흰 표 위에 얹히므로, 글자만 두면 안 보인다 */
+  .notice-zoom-hint{
+    position:absolute;left:50%;transform:translateX(-50%);
+    bottom:calc(12px + env(safe-area-inset-bottom));
+    padding:6px 14px;border-radius:999px;white-space:nowrap;max-width:92vw;
+    background:rgba(0,0,0,0.55);pointer-events:none;
+    font-size:12.5px;font-weight:700;color:rgba(255,255,255,0.92);
+  }
+  .notice-zoom-close{
+    position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;
+    width:38px;height:38px;border-radius:50%;border:none;
+    background:rgba(0,0,0,0.45);color:#fff;font-size:20px;line-height:1;cursor:pointer;
+  }
   .notice-empty{
     padding:34px 20px;text-align:center;color:var(--ink-soft);
     font-size:14px;font-weight:600;
@@ -6080,6 +6122,13 @@
 </div>
 
 <!-- 협의 시간 찾기 — #timetablePage 바깥에 둔다(위젯이 시간표 페이지를 늘려도 영향 없게) -->
+<!-- 공지 안 그림 크게 보기. 공지 창보다 위에 뜬다(z-index). -->
+<div class="notice-zoom" id="noticeImgZoom">
+  <div class="notice-zoom-scroll" id="noticeZoomScroll"><img id="noticeZoomImg" alt="공지 그림"></div>
+  <button class="notice-zoom-close" onclick="closeNoticeZoom()" aria-label="닫기">×</button>
+  <div class="notice-zoom-hint" id="noticeZoomHint"></div>
+</div>
+
 <!-- 전체 공지 — 보기와 편집이 같은 창이다. 창을 둘로 나누면 편집 중에 뒤로가기
      한 번으로 어디까지 닫히는지가 헷갈리고, 안 저장한 글을 잃기 쉽다. -->
 <div class="modal-overlay medium" id="noticeModal" onclick="closeNoticeModal(event)">
@@ -6212,7 +6261,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.15';
+const APP_VER = 'ver7.16';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -8072,6 +8121,10 @@ window.addEventListener('popstate', (e)=>{
   const st = e.state || {};
 
   // 1. 열린 모달 닫기 (최우선). 가드 1개 다시 쌓아 스택 보존
+  // 그림 크게 보기는 공지 창 위에 뜬다 — 먼저 닫는다
+  if (document.getElementById('noticeImgZoom')?.classList.contains('open')) {
+    closeNoticeZoom(); armExitGuard(); return;
+  }
   // 전체 공지 창은 늘 맨 위다. 보기 전용이라 그냥 닫으면 된다 — 쓰기는 탭으로
   // 나가 있고, 쓰다 만 것은 탭을 떠날 때(navigateTo) 붙잡는다.
   if (document.getElementById('noticeModal')?.classList.contains('open')) {
@@ -8870,6 +8923,7 @@ function initNotice(){
   startNoticeClock();
   document.getElementById('noticeBtn')?.addEventListener('click', () => openNoticeModal());
   document.getElementById('noticePreviewBtn')?.addEventListener('click', previewNotice);
+  bindNoticeZoom();
 }
 
 // ── 보는 창(확성기) ─────────────────────────────────────────────────────────
@@ -8967,6 +9021,49 @@ function noticeAutoFoot(back){
   return `<span class="notice-foot-msg"></span>${back}
     <button class="notice-btn" onclick="noticeSnoozeToday()">오늘 그만보기</button>
     <button class="notice-btn primary" onclick="closeNoticeModalBtn()">닫기</button>`;
+}
+
+// ── 그림 크게 보기 ──────────────────────────────────────────────────────────
+// 시정표는 표라서 화면 폭에 맞춰 줄이면 글자가 안 보인다. 처음에는 전체를 보여
+// 어디에 뭐가 있는지 알게 하고, 누르면 원래 크기로 바꿔 훑어보게 한다.
+function openNoticeZoom(src){
+  const ov = document.getElementById('noticeImgZoom');
+  if (!ov || !src) return;
+  document.getElementById('noticeZoomImg').src = src;
+  ov.classList.remove('actual');
+  document.getElementById('noticeZoomHint').textContent = '누르면 원래 크기로 봅니다';
+  ov.classList.add('open');
+}
+function toggleNoticeZoomActual(){
+  const ov = document.getElementById('noticeImgZoom');
+  const on = ov.classList.toggle('actual');
+  document.getElementById('noticeZoomHint').textContent =
+    on ? '끌어서 움직입니다 · 다시 누르면 전체가 보입니다' : '누르면 원래 크기로 봅니다';
+  if (on) {
+    // 표는 대개 왼쪽 위부터 읽는다. 가운데에서 시작하면 어디를 보는지 알기 어렵다.
+    const sc = document.getElementById('noticeZoomScroll');
+    sc.scrollTop = 0; sc.scrollLeft = 0;
+  }
+}
+function closeNoticeZoom(){
+  const ov = document.getElementById('noticeImgZoom');
+  if (!ov || !ov.classList.contains('open')) return;
+  ov.classList.remove('open', 'actual');
+  document.getElementById('noticeZoomImg').src = '';   // 메모리 해제
+}
+// 그림을 누르면 커진다. 공지는 다시 그릴 때마다 img 가 새로 생기므로, 하나씩
+// 붙이지 않고 본문에서 위임으로 받는다.
+function bindNoticeZoom(){
+  document.getElementById('noticeBody')?.addEventListener('click', e => {
+    const img = e.target.closest('.notice-view img');
+    if (img && img.src) openNoticeZoom(img.src);
+  });
+  const ov = document.getElementById('noticeImgZoom');
+  document.getElementById('noticeZoomImg')?.addEventListener('click', e => {
+    e.stopPropagation(); toggleNoticeZoomActual();
+  });
+  // 그림 밖(어두운 자리)을 누르면 닫는다
+  ov?.addEventListener('click', () => closeNoticeZoom());
 }
 
 function noticeBackToList(){ _noticeOpenId = ''; renderNoticeModal(); }
@@ -9486,6 +9583,8 @@ window.closeNoticeModal   = closeNoticeModal;
 window.closeNoticeModalBtn= closeNoticeModalBtn;
 window.noticeBackToList   = noticeBackToList;
 window.noticeSnoozeToday  = noticeSnoozeToday;
+window.openNoticeZoom     = openNoticeZoom;
+window.closeNoticeZoom    = closeNoticeZoom;
 window.startNoticeEdit    = startNoticeEdit;
 window.initNoticePage     = initNoticePage;
 window.openNoticeEditor   = openNoticeEditor;
@@ -21431,7 +21530,11 @@ window.closeMytaskModal        = closeMytaskModal;
 // ESC 키로 열린 모달 닫기
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
-  // 전체 공지 (편집 중이면 closeNoticeModal 이 물어본다)
+  // 그림 크게 보기가 공지 창 위에 있다
+  if (document.getElementById('noticeImgZoom')?.classList.contains('open')) {
+    closeNoticeZoom(); return;
+  }
+  // 전체 공지
   if (document.getElementById('noticeModal')?.classList.contains('open')) {
     closeNoticeModalBtn(); return;
   }
