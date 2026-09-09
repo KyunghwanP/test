@@ -18,11 +18,11 @@
 | **통합앱** | `app/ynhs-app.ahk` | 포털 창 + 위젯 토글. AHK + WebView2 |
 | **데스크톱 앱** | `desktop/` | Rust(wry). 통합앱과 별개의 대안 |
 | **상담 예약 API** | `workers/consult-api.js` | Cloudflare Worker |
-| **자동화** | `.github/workflows/` | 성적·날씨·상벌점 동기화, exe 빌드 |
+| **자동화** | `.github/workflows/` | 성적·날씨·상벌점 동기화(test 전용), exe 빌드 |
 
-배포는 GitHub Pages. `KyunghwanP/ynhs` → `/ynhs/`, `KyunghwanP/test` → `/test/`.
-**두 저장소는 대부분 파일을 동일하게 유지**하며, `admin.html`·`upload.html`·`scripts/`는
-test 전용이다.
+배포는 GitHub Pages. **`KyunghwanP/ynhs` → `/ynhs/` 가 선생님들이 쓰는 실제 배포이고,
+`KyunghwanP/test` → `/test/` 는 먼저 올려 보는 시험대다.** 두 저장소는 대부분 파일을
+동일하게 유지한다(→ 6장 「두 저장소 동기화」).
 
 ---
 
@@ -145,8 +145,36 @@ AHK 쪽은 **런처로 실행해야** 자동 갱신된다. `ynhs-widget.exe`를 
   서로의 캐시를 지우므로, 캐시 이름에 배포 경로를 포함한다
 
 ### 두 저장소 동기화
-`admin.html`·`upload.html`·`scripts/`·`manifest.json`을 제외한 파일은 양쪽을 같게 유지한다.
-스쿼시 병합 후에는 브랜치를 `origin/main`에서 다시 시작해야 충돌이 나지 않는다.
+
+**test에서 먼저 올려 보고, 확인되면 ynhs로 옮긴다.** 기본은 "양쪽을 같게"이고,
+아래 세 부류만 예외다.
+
+**① 배포 경로에 매인 값 — 옮길 때 반드시 `/test/` ↔ `/ynhs/` 로 바꾼다**
+
+| 파일 | 바꿀 곳 |
+|---|---|
+| `manifest.json` | `start_url`, 아이콘 `src` |
+| `index.html` | `REMOTE_BASE` (데스크톱 번들이 무거운 자산을 받아올 주소) |
+| `widget/ynhs-widget.ahk` `widget/ynhs-widgets.ahk` `app/ynhs-app.ahk` | `APP_URL` · `APP_BASE` |
+| `widget/ynhs-launcher.ahk` `app/ynhs-app-launcher.ahk` | 스크립트를 받아올 **저장소** 주소 |
+| `widget/README.md` | 예시 주소 |
+
+빠뜨리면 test 위젯이 ynhs를 띄우거나, 런처가 반대쪽 스크립트를 받아온다.
+
+**② test 전용 — ynhs로 옮기지 않는다**
+
+`admin.html`·`upload.html`·`scripts/`와 자동화 워크플로 5종
+(`sync-grades`·`fetch-weather`·`scrape`·`riro-points`·`Summarize`).
+스크립트는 **전부 Firestore에만 쓰고 저장소에 파일을 남기지 않으므로**, test에서 돌아도
+ynhs 배포가 그대로 받는다. 양쪽에 두면 중복 실행이 된다.
+
+**③ 그대로 두는 것**
+
+- `sw.js` — 경로를 파일에 박지 않고 `self.location.pathname`에서 알아내므로 **양쪽이 같은 파일**
+- `manual.html`의 주소 표기 — 선생님들이 실제로 쓰는 주소(`/ynhs/`)를 적는 게 맞다
+
+> 옮긴 뒤에는 두 저장소를 파일 단위로 대조해 **경로 외 차이가 0줄**인지 확인할 것.
+> 스쿼시 병합 후에는 브랜치를 `origin/main`에서 다시 시작해야 충돌이 나지 않는다.
 
 ---
 
@@ -159,6 +187,7 @@ AHK 쪽은 **런처로 실행해야** 자동 갱신된다. `ynhs-widget.exe`를 
 | 위젯이 안 뜸 | 앱·위젯 모두 종료 + `msedgewebview2.exe` 전부 종료 후 재실행 |
 | 위젯만 계속 실패 | 재시도 후 뜨는 "저장소 초기화" 안내를 수락 |
 | 페이지 접속 자체가 안 됨 | 시크릿 창과 비교 → 되면 프로필 캐시 문제(`Clear site data`) |
+| 자동화(성적·날씨)가 안 돎 | test 저장소 **루트에 `package.json`이 있는지**. `sync-grades`·`fetch-weather`는 루트에서 `npm init -y`를 하는데, 엉뚱한 파일이 있으면 JSON 파싱에서 죽는다 |
 | 원인을 못 찾겠음 | **로그를 남길 것**: 브라우저 `net-export`, 위젯·앱 `netlog.on` |
 
 마지막 항목이 중요하다. 증상만 보고 추론하면 헛짚기 쉽다. **실패하는 그 순간에**
