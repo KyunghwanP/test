@@ -120,6 +120,10 @@
   .ug-tbl td.nm{font-weight:700;}
   .ug-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}
   .ug-tbl td.dim{color:var(--ink-soft);}
+  /* 오늘 쓴 기능 — 달 전체와 나란히 있으니 어느 쪽이 오늘인지 보이게 */
+  .ug-tbl td.today{color:var(--ink);}
+  .ug-tbl td.today .dim{color:var(--ink-soft);}
+  .ug-tbl th small{font-weight:600;opacity:.7;}
   /* 옛 화면을 쓰는 사람 — 이 칸 하나 보려고 버전을 남긴다 */
   .ug-tbl td.old{color:var(--warn);font-weight:700;}
   /* 사람별 표에서 이름을 체크해 특정 사람에게만 새로고침을 보낸다 */
@@ -177,7 +181,7 @@ const firebaseConfig = {
   measurementId: "G-MTXQWT10P1"
 };
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
-const APP_VER = 'ver7.28';
+const APP_VER = 'ver7.29';
 
 const fbApp  = initializeApp(firebaseConfig);
 const fbAuth = getAuth(fbApp);
@@ -264,6 +268,12 @@ function renderUsage(rows, ym){
   const perDay = Array.from({length:nDays}, () => ({ users:0, opens:0 }));
   const tabTot = {};
   let opensAll = 0, usersAll = 0;
+  // '오늘' 은 지금 보고 있는 달이 이번 달일 때만 뜻이 있다. 지난 달을 보면서
+  // 오늘 칸을 채우면 무엇을 보는지 헷갈린다.
+  const _now = new Date();
+  const isThisMonth = _now.getFullYear() === y && _now.getMonth() + 1 === mo;
+  const todayKey = isThisMonth ? dstr(_now.getDate()) : '';
+
   const people = rows.map(r => {
     let opens = 0, used = 0, last = '', tabs = {}, ver = '';
     for(let d = 1; d <= nDays; d++){
@@ -284,7 +294,12 @@ function renderUsage(rows, ym){
     opensAll += opens;
     if(used) usersAll++;
     const top = Object.entries(tabs).sort((a,b) => b[1]-a[1]).slice(0,3);
-    return { ...r, opens, used, last, tabs, top, ver, clicks: Object.values(tabs).reduce((a,b)=>a+b,0) };
+    // 오늘 것은 달 전체와 따로 센다 — '요즘 뭘 쓰나' 는 누적으로는 안 보인다.
+    const tday = todayKey ? (r.days[todayKey] || null) : null;
+    const todayTabs = tday ? Object.entries(tday.tabs || {}).sort((a,b) => b[1]-a[1]) : [];
+    const todayOpens = tday ? (Number(tday.opens) || 0) : 0;
+    return { ...r, opens, used, last, tabs, top, ver, todayTabs, todayOpens,
+             clicks: Object.values(tabs).reduce((a,b)=>a+b,0) };
   }).sort((a,b) => b.opens - a.opens || b.used - a.used || a.name.localeCompare(b.name,'ko'));
 
   const daysWithUse = perDay.filter(d => d.users).length;
@@ -341,6 +356,9 @@ function renderUsage(rows, ym){
     <td class="dim">${escapeHtml(p.last)}</td>
     <td class="${p.ver && p.ver !== APP_VER ? 'old' : 'dim'}">${escapeHtml(p.ver)}</td>
     <td class="dim">${p.top.map(t => `${escapeHtml(USAGE_TABS[t[0]] || t[0])} ${t[1]}`).join(' · ')}</td>
+    ${todayKey ? `<td class="dim today">${p.todayTabs.length
+        ? p.todayTabs.slice(0,3).map(t => `${escapeHtml(USAGE_TABS[t[0]] || t[0])} ${t[1]}`).join(' · ')
+        : '<span class="dim">—</span>'}</td>` : ''}
   </tr>`;
 
   document.getElementById('usageBody').innerHTML = `
@@ -382,7 +400,8 @@ function renderUsage(rows, ym){
         <div class="ug-tblwrap"><table class="ug-tbl">
           <thead><tr><th data-sort="name">이름</th><th data-sort="opens">연 횟수</th><th data-sort="used">쓴 날</th>
             <th data-sort="clicks">탭 이동</th><th data-sort="last">마지막</th><th data-sort="ver">버전</th>
-            <th>많이 쓴 기능</th></tr></thead>
+            <th>많이 쓴 기능 <small>이 달</small></th>
+            ${todayKey ? `<th data-sort="todayOpens">오늘 쓴 기능</th>` : ''}</tr></thead>
           <tbody id="ugTbody"></tbody>
         </table></div>
         ${idle.length ? `<div class="ug-idle"><b>이 달에 안 쓴 ${idle.length}명</b>
@@ -450,7 +469,7 @@ function ugRenderRows(rowHtml){
   if(!tb) return;
   const list = ugFilteredSorted();
   tb.innerHTML = list.map(rowHtml).join('')
-    || `<tr><td colspan="7" class="dim">${_ugQuery || _ugOnlyOld ? '찾는 사람이 없습니다' : '기록 없음'}</td></tr>`;
+    || `<tr><td colspan="8" class="dim">${_ugQuery || _ugOnlyOld ? '찾는 사람이 없습니다' : '기록 없음'}</td></tr>`;
   const cnt = document.getElementById('ugCount');
   if(cnt) cnt.textContent = list.length === _ugPeople.length
     ? `${list.length}명` : `${list.length}명 / ${_ugPeople.length}명`;

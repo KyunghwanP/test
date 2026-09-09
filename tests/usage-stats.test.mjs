@@ -730,6 +730,50 @@ console.log('\n■ 사람별 표 — 검색 · 정렬 · 필터');
         (await pg.$eval('#ugSelCount', e => e.textContent)) === '1');
 }
 
+console.log('\n■ 오늘 쓴 기능도 같이 보여준다');
+{
+  // '많이 쓴 기능' 은 이 달 누적이라 요즘 뭘 쓰는지가 안 보인다. 오늘 것을 따로 낸다.
+  const p2 = n => String(n).padStart(2, '0');
+  const now = new Date();
+  const YM  = `${now.getFullYear()}-${p2(now.getMonth() + 1)}`;
+  const TODAY = `${YM}-${p2(now.getDate())}`;
+  const OTHER = `${YM}-${p2(now.getDate() === 1 ? 2 : 1)}`;   // 오늘이 아닌 날
+
+  const rows = [
+    { email:'a@x', name:'김하나', days:{
+        [OTHER]: { opens:9, last:'16:40', tabs:{ timetable:30, meal:20 } },
+        [TODAY]: { opens:2, last:'09:10', tabs:{ pass:4, home:1 } } } },
+    { email:'b@x', name:'이두리', days:{
+        [OTHER]: { opens:5, last:'15:00', tabs:{ timetable:8 } } } },   // 오늘은 안 씀
+  ];
+  await pg.evaluate(([r, ym]) => window.renderUsage(r, ym), [rows, YM]);
+
+  const heads = await pg.$$eval('.ug-tbl thead th', ths => ths.map(t => t.textContent.trim()));
+  check('두 칸이 다 있다',
+        heads.some(h => h.startsWith('많이 쓴 기능')) && heads.some(h => h.startsWith('오늘 쓴 기능')), heads);
+
+  const cells = await pg.$$eval('.ug-tbl tbody tr', trs => trs.map(tr =>
+    [...tr.querySelectorAll('td')].map(td => td.textContent.trim())));
+  const 하나 = cells.find(c => c[0].includes('김하나'));
+  const 두리 = cells.find(c => c[0].includes('이두리'));
+
+  check('많이 쓴 기능은 달 전체', 하나[6].includes('시간표 30'), 하나[6]);
+  check('오늘 쓴 기능은 오늘 것만', 하나[7].includes('외출증 4') && !하나[7].includes('시간표'), 하나[7]);
+  check('오늘 안 쓴 사람은 빈 표시', 두리[7] === '—', 두리[7]);
+  check('그래도 달 전체는 남아 있다', 두리[6].includes('시간표 8'), 두리[6]);
+
+  // 오늘 많이 쓴 사람 찾기 — 정렬이 되어야 쓸모가 있다
+  await pg.evaluate(() => document.querySelector('.ug-tbl th[data-sort="todayOpens"]').click());
+  const first = await pg.$eval('.ug-tbl tbody tr td', td => td.textContent.trim());
+  check('오늘 기준으로 정렬된다', first.includes('김하나'), first);
+
+  // 지난 달을 보면서 '오늘' 칸이 있으면 무엇을 보는지 헷갈린다
+  await pg.evaluate(([r, ym]) => window.renderUsage(r, ym), [rows, '2020-01']);
+  const oldHeads = await pg.$$eval('.ug-tbl thead th', ths => ths.map(t => t.textContent.trim()));
+  check('지난 달에는 오늘 칸이 아예 없다',
+        !oldHeads.some(h => h.startsWith('오늘 쓴 기능')), oldHeads);
+}
+
 console.log(errs.length ? '\n❌ 런타임 오류:\n' + errs.slice(0,4).join('\n') : '\n✅ 런타임 오류 없음');
 console.log(`\n${fail || errs.length ? '❌' : '✅'} 통과 ${pass} / 실패 ${fail}`);
 await b.close();
