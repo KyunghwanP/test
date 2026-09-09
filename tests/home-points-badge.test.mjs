@@ -121,6 +121,9 @@ const ptsRosterKeySrc = /^const ptsRosterKey = [\s\S]*?;$/m.exec(HTML)[0];
 const ptsSeatKeySrc = /^const ptsSeatKey = [\s\S]*?;$/m.exec(HTML)[0];
 const ptsOnRosterSrc = grab('ptsOnRoster');
 const ptsWatchListSrc = grab('ptsWatchList');
+// 상수도 원본에서 떼어 온다 — 베껴 적으면 원본을 바꿔도 검사가 안 문다
+const ptsWatchNetSrc = /^const PTS_WATCH_NET = [^\n]*$/m.exec(HTML)[0];
+const ptsWatchMinRowsSrc = /^const PTS_WATCH_MIN_ROWS = [^\n]*$/m.exec(HTML)[0];
 const renderHomeroomPtsBadgeSrc = grab('renderHomeroomPtsBadge');
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
@@ -185,7 +188,8 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   ${ptsRosterSetSrc}
   ${ptsOnRosterSrc}
   window.ptsOnRoster = ptsOnRoster;
-  const PTS_WATCH_NET = -10;
+  ${ptsWatchNetSrc}
+  ${ptsWatchMinRowsSrc}
   ${ptsWatchListSrc}
   window.ptsWatchList = ptsWatchList;
   window.ptsRosterSet = ptsRosterSet;
@@ -510,29 +514,65 @@ console.log('\n■ 사유에 태그가 들어 있어도 실행되지 않는다')
 console.log('\n■ 선도 관심 학생 — 순점수 -10 이하는 다 보여준다');
 {
   check('기준이 한 곳에 있다', /const PTS_WATCH_NET = -10;/.test(HTML));
-  // 다른 곳에도 slice(0,10) 이 있다(날짜 자르기 등) — 이 함수 안만 본다
-  check('열 명에서 자르지 않는다', !/\.slice\(/.test(ptsWatchListSrc), ptsWatchListSrc.slice(-120));
+  // 기준에 드는 사람은 몇 명이든 다 나온다(자르는 것은 '채우는' 쪽에만 있다)
+  check('기준에 드는 목록은 안 자른다',
+        /if \(hit\.length >= fill\) return hit;/.test(ptsWatchListSrc), ptsWatchListSrc.slice(-160));
   check('많으면 카드 안에서 스크롤한다', /\.pts-lead-list\{max-height:60vh;overflow-y:auto;\}/.test(HTML));
   check('제목도 순점수 기준으로 적혀 있다', /순점수 -10 이하 · 낮은 순/.test(HTML));
+  // 채워 넣었으면 제목이 그렇게 말해야 한다 — 안 그러면 -4 점짜리가
+  // '순점수 -10 이하' 밑에 앉아 있는 꼴이 된다
+  check('채워 넣었으면 제목이 기준을 안 내세운다',
+        /if \(sub\) sub\.textContent = dtop\.some\(x => x\.v > PTS_WATCH_NET\)\s*\n?\s*\? '\(점수 낮은 순\)'/.test(HTML));
 
-  const pick = (list, max) => pg.evaluate(a =>
-    window.ptsWatchList(a[0], a[1]).map(x => x.s.name), [list, max]);
+  const pick = (list, max, minRows) => pg.evaluate(a =>
+    window.ptsWatchList(a[0], a[1], a[2]).map(x => x.s.name), [list, max, minRows]);
   const S = (name, demerit, total) => ({ name, demerit, total, grade:3, room:1, num:1 });
 
-  check('순점수 -10 이면 들어간다', (await pick([S('가', -10, -10)])).join() === '가');
-  check('-9 면 안 들어간다', (await pick([S('가', -9, -9)])).length === 0);
-  check('-11 도 들어간다', (await pick([S('가', -11, -11)])).join() === '가');
+  // 기준 자체를 보는 검사 — 채우기(minRows)를 꺼 놓고 확인한다
+  check('순점수 -10 이면 들어간다', (await pick([S('가', -10, -10)], null, 0)).join() === '가');
+  check('-9 는 기준에 안 든다', (await pick([S('가', -9, -9)], null, 0)).length === 0);
+  check('-11 도 들어간다', (await pick([S('가', -11, -11)], null, 0)).join() === '가');
 
-  // 벌점 기준이 아니다 — 상계 봉사로 순점수가 올라간 학생은 뺀다
-  check('벌점이 많아도 순점수가 높으면 안 들어간다',
-        (await pick([S('가', -15, -3)])).length === 0);
+  // 벌점 기준이 아니다 — 상계 봉사로 순점수가 올라간 학생은 기준에 안 든다
+  check('벌점이 많아도 순점수가 높으면 기준 밖',
+        (await pick([S('가', -15, -3)], null, 0)).length === 0);
   check('벌점이 적어도 순점수가 낮으면 들어간다',
-        (await pick([S('가', -2, -12)])).join() === '가');
+        (await pick([S('가', -2, -12)], null, 0)).join() === '가');
 
   const many = Array.from({ length: 25 }, (_, i) => S('학생' + i, -(10 + i), -(10 + i)));
   const got = await pick(many);
   check('스물다섯 명이면 스물다섯 명 다 나온다', got.length === 25, got.length);
   check('순점수 낮은 순', got[0] === '학생24' && got.at(-1) === '학생0', [got[0], got.at(-1)]);
+
+  // 기준에 드는 사람이 열 명이 안 되면 점수 낮은 순으로 채운다
+  const few = [
+    S('가', -12, -12), S('나', -11, -11), S('다', -10, -10),   // 기준에 드는 셋
+    S('라', -9, -9), S('마', -8, -8), S('바', -7, -7), S('사', -6, -6),
+    S('아', -5, -5), S('자', -4, -4), S('차', -3, -3), S('카', -2, -2),
+    S('타', 0, 0), S('파', 0, 5),                              // 음수가 아닌 둘
+  ];
+  // 기본값(열 명)으로도 같은지 — 상수를 안 쓰면 여기서 걸린다
+  const filledDefault = await pick(few);
+  check('기본 채우기 수는 열 명', filledDefault.length === 10, filledDefault.length);
+  const filled = await pick(few, null, 10);
+  check('셋뿐이면 열 명까지 채운다', filled.length === 10, filled.length);
+  check('기준에 드는 셋이 앞에', filled.slice(0, 3).join() === '가,나,다', filled);
+  check('그다음은 점수 낮은 순', filled[3] === '라' && filled[9] === '차', filled);
+  check('0점이나 상점인 학생은 안 채운다',
+        !filled.includes('타') && !filled.includes('파'), filled);
+
+  // 음수인 학생이 열 명이 안 되면 그만큼만
+  const tiny = [S('가', -12, -12), S('나', -3, -3), S('다', 0, 2)];
+  const t = await pick(tiny);
+  check('음수가 둘뿐이면 둘만', t.join() === '가,나', t);
+  check('음수가 없으면 아무도 안 나온다', (await pick([S('가', 0, 3)])).length === 0);
+
+  // 기준에 드는 사람이 열 명 이상이면 채우지 않는다(전부 기준 안쪽)
+  const ten = Array.from({ length: 12 }, (_, i) => S('ㄱ' + i, -(10 + i), -(10 + i)))
+    .concat([S('여유', -1, -1)]);
+  const t2 = await pick(ten);
+  check('열 명을 넘으면 기준 밖은 안 넣는다', !t2.includes('여유'), t2);
+  check('그때는 기준에 드는 열두 명이 다 나온다', t2.length === 12, t2.length);
 }
 
 console.log('\n■ 컴퓨터를 안 꺼도 새로 들어온 것이 뜬다');
