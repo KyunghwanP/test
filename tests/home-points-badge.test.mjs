@@ -185,7 +185,7 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   ${ptsRosterSetSrc}
   ${ptsOnRosterSrc}
   window.ptsOnRoster = ptsOnRoster;
-  const PTS_DEMERIT_WATCH = 10;
+  const PTS_WATCH_NET = -10;
   ${ptsWatchListSrc}
   window.ptsWatchList = ptsWatchList;
   window.ptsRosterSet = ptsRosterSet;
@@ -507,31 +507,32 @@ console.log('\n■ 사유에 태그가 들어 있어도 실행되지 않는다')
   check('실행되지는 않았다', (await pg.evaluate(() => window.__pwned)) === undefined);
 }
 
-console.log('\n■ 선도 관심 학생 — 벌점 10점 이상은 다 보여준다');
+console.log('\n■ 선도 관심 학생 — 순점수 -10 이하는 다 보여준다');
 {
-  check('기준이 한 곳에 있다', /const PTS_DEMERIT_WATCH = 10;/.test(HTML));
-  check('열 명에서 자르지 않는다', !/\.sort\(\(a,b\) => a\.v - b\.v\)\s*\n?\s*\.slice\(0, 10\)/.test(HTML));
+  check('기준이 한 곳에 있다', /const PTS_WATCH_NET = -10;/.test(HTML));
+  // 다른 곳에도 slice(0,10) 이 있다(날짜 자르기 등) — 이 함수 안만 본다
+  check('열 명에서 자르지 않는다', !/\.slice\(/.test(ptsWatchListSrc), ptsWatchListSrc.slice(-120));
   check('많으면 카드 안에서 스크롤한다', /\.pts-lead-list\{max-height:60vh;overflow-y:auto;\}/.test(HTML));
+  check('제목도 순점수 기준으로 적혀 있다', /순점수 -10 이하 · 낮은 순/.test(HTML));
 
-  const pick = (list, min) => pg.evaluate(a =>
-    window.ptsWatchList(a[0], a[1]).map(x => x.s.name), [list, min]);
+  const pick = (list, max) => pg.evaluate(a =>
+    window.ptsWatchList(a[0], a[1]).map(x => x.s.name), [list, max]);
   const S = (name, demerit, total) => ({ name, demerit, total, grade:3, room:1, num:1 });
 
-  check('벌점 10점이면 들어간다', (await pick([S('가', -10, -10)])).join() === '가');
-  check('9점이면 안 들어간다', (await pick([S('가', -9, -9)])).length === 0);
-  check('벌점이 양수로 와도 본다(부호가 섞여 온다)', (await pick([S('가', 12, -12)])).join() === '가');
+  check('순점수 -10 이면 들어간다', (await pick([S('가', -10, -10)])).join() === '가');
+  check('-9 면 안 들어간다', (await pick([S('가', -9, -9)])).length === 0);
+  check('-11 도 들어간다', (await pick([S('가', -11, -11)])).join() === '가');
 
-  // 상계 봉사로 합계가 올라가도 벌점을 받은 사실은 남는다
-  check('상계로 합계가 양수여도 벌점이 많으면 들어간다',
-        (await pick([S('가', -15, 3)])).join() === '가');
-  // 예전 기준(합계 음수)으로는 이 학생이 들어갔었다
-  check('벌점이 적으면 합계가 음수여도 안 들어간다',
-        (await pick([S('가', -2, -8)])).length === 0);
+  // 벌점 기준이 아니다 — 상계 봉사로 순점수가 올라간 학생은 뺀다
+  check('벌점이 많아도 순점수가 높으면 안 들어간다',
+        (await pick([S('가', -15, -3)])).length === 0);
+  check('벌점이 적어도 순점수가 낮으면 들어간다',
+        (await pick([S('가', -2, -12)])).join() === '가');
 
   const many = Array.from({ length: 25 }, (_, i) => S('학생' + i, -(10 + i), -(10 + i)));
   const got = await pick(many);
   check('스물다섯 명이면 스물다섯 명 다 나온다', got.length === 25, got.length);
-  check('합계 낮은 순', got[0] === '학생24' && got.at(-1) === '학생0', [got[0], got.at(-1)]);
+  check('순점수 낮은 순', got[0] === '학생24' && got.at(-1) === '학생0', [got[0], got.at(-1)]);
 }
 
 console.log('\n■ 컴퓨터를 안 꺼도 새로 들어온 것이 뜬다');
