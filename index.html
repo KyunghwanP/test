@@ -2668,6 +2668,16 @@
   .notice-chip.live{color:#166534;border-color:rgba(22,101,52,0.35);background:rgba(22,163,74,0.12);}
   .notice-chip.before{color:#854d0e;border-color:rgba(202,138,4,0.4);background:rgba(202,138,4,0.14);}
   .notice-chip.after{color:var(--ink-soft);}
+  /* 업무 상태 드롭다운과 같은 결. 눌러서 바꿀 수 있다는 것이 보여야 한다. */
+  .notice-state-sel{
+    flex-shrink:0;padding:4px 10px;border-radius:999px;
+    border:1px solid var(--rule);
+    font-family:'Pretendard','Noto Sans KR';font-weight:800;font-size:11.5px;
+    cursor:pointer;appearance:none;-webkit-appearance:none;outline:none;
+    color:var(--ink-soft);background:var(--paper-soft);
+  }
+  .notice-state-sel.live{color:#166534;border-color:rgba(22,101,52,0.35);background:rgba(22,163,74,0.12);}
+  .notice-state-sel.before{color:#854d0e;border-color:rgba(202,138,4,0.4);background:rgba(202,138,4,0.14);}
   .notice-title-in{
     width:100%;padding:9px 12px;margin-bottom:10px;
     border-radius:9px;border:1px solid var(--rule);
@@ -2677,6 +2687,20 @@
   .notice-title-in:focus{outline:none;border-color:var(--mon);}
 
   /* 쓰기 탭 */
+  .notice-page-head{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;
+  }
+  .notice-page-title{
+    flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    font-size:13px;font-weight:800;color:var(--ink-soft);
+  }
+  /* 좁은 화면에서는 제목을 접는다. 탭 이름이 이미 어디인지 말해 주고 있어서,
+     제목을 남기면 단추들이 밀려 글자가 세로로 쪼개진다. */
+  @media (max-width: 560px){
+    .notice-page-title{display:none;}
+    .notice-page-head{gap:6px;padding:10px 12px;}
+  }
   .notice-page-body{flex:1;overflow-y:auto;padding:16px 18px;}
   .notice-edit-state{
     font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;
@@ -5713,9 +5737,11 @@
            모달 안에서 쓰다가 탭으로 뺐다. 쓰는 화면과 보는 화면(확성기)이 한 창에
            섞여 있으면, 고친 것이 남에게 어떻게 보이는지 확인하기가 헷갈린다. -->
       <div class="page-view" id="noticePage">
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;">
-          <span style="font-size:13px;font-weight:800;color:var(--ink-soft);flex:1;">📢 전체 공지</span>
+        <div class="notice-page-head">
+          <span class="notice-page-title">📢 전체 공지</span>
           <span id="noticeEditState" class="notice-edit-state"></span>
+          <button class="notice-btn" id="noticeCheckBtn" title="그림 저장소(R2)가 붙었는지 확인">🔌 저장소 확인</button>
+          <button class="notice-btn primary" id="noticeNewBtn">＋ 새 공지</button>
           <button class="notice-btn" id="noticePreviewBtn" style="display:none;">👁 보이는 대로</button>
         </div>
         <div class="notice-page-body" id="noticeEditBody"></div>
@@ -6275,7 +6301,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.18';
+const APP_VER = 'ver7.19';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -8840,18 +8866,34 @@ function renderNoticeBtn(){
 // 앱을 열어 둔 채 그 시각을 넘기는 사람이 있으므로 시계를 보고 다시 그린다.
 let _noticeTimer = null, _noticeLastSig = '';
 const noticeStateSig = () => _noticeList.map(n => n.id + ':' + noticeStateOf(n)).join('|');
+
+// 다음에 무언가 바뀌는 시각. 없으면 0.
+function noticeNextBoundary(){
+  const now = Date.now();
+  let next = 0;
+  for (const n of _noticeList) for (const t of [Number(n.from || 0), Number(n.until || 0)])
+    if (t > now && (!next || t < next)) next = t;
+  return next;
+}
+// 30초마다 들여다보는 대신 바뀌는 그 시각에 맞춰 깨운다. 게시 시작·종료가
+// 30초 늦게 반영되면 '3교시 시작에 맞춰 올린 공지'가 3교시에 안 뜬다.
+// 그래도 상한을 둔다 — 기기가 자거나 시계가 틀어졌을 때 되돌아올 자리가 필요하다.
 function startNoticeClock(){
-  if (_noticeTimer) return;
-  _noticeTimer = setInterval(() => {
+  clearTimeout(_noticeTimer);
+  const next = noticeNextBoundary();
+  const wait = Math.min(next ? next - Date.now() + 250 : Infinity, 600000);
+  _noticeTimer = setTimeout(() => {
     const sig = noticeStateSig();
-    if (sig === _noticeLastSig) return;      // 바뀔 때만 손댄다
-    _noticeLastSig = sig;
-    renderNoticeBtn();
-    const modal = document.getElementById('noticeModal');
-    if (modal?.classList.contains('open')) renderNoticeModal();
-    if (!_noticeEditing) renderNoticeAdminList();
-    renderNoticeEditState();
-  }, 30000);
+    if (sig !== _noticeLastSig) {             // 바뀔 때만 손댄다
+      _noticeLastSig = sig;
+      renderNoticeBtn();
+      const modal = document.getElementById('noticeModal');
+      if (modal?.classList.contains('open')) renderNoticeModal();
+      if (!_noticeEditing) renderNoticeAdminList();
+      renderNoticeEditState();
+    }
+    startNoticeClock();
+  }, Math.max(1000, wait));
 }
 
 function watchNotice(){
@@ -8880,6 +8922,7 @@ function watchNotice(){
     // 쓰는 중이면 화면을 안 건드린다 — 쓰던 글이 남의 저장으로 날아가면 못 되돌린다.
     if (!_noticeEditing) renderNoticeAdminList();
     renderNoticeEditState();
+    startNoticeClock();          // 기간이 바뀌었을 수 있다 — 깨울 시각을 다시 잡는다
     noticeAutoOpen();
   }, () => {});
 }
@@ -8946,6 +8989,8 @@ function initNotice(){
   startNoticeClock();
   document.getElementById('noticeBtn')?.addEventListener('click', () => openNoticeModal());
   document.getElementById('noticePreviewBtn')?.addEventListener('click', previewNotice);
+  document.getElementById('noticeCheckBtn')?.addEventListener('click', noticeCheckWorker);
+  document.getElementById('noticeNewBtn')?.addEventListener('click', () => openNoticeEditor(''));
   bindNoticeZoom();
 }
 
@@ -8959,6 +9004,46 @@ function noticeVisibleList(){
   // 끝난 것과 예약한 것은 확성기를 눌러서·쓰기 탭에서 본다.
   if (_noticeAuto) return noticeLiveList();
   return _IS_ADMIN() ? _noticeList : noticeLiveList();
+}
+
+// 쓰기 탭 목록에서는 칩을 눌러 바로 내리거나 다시 올릴 수 있게 한다.
+// 기간을 다시 잡으러 편집으로 들어가는 것이 매번 번거롭다.
+// '게시예정'은 고를 수 없다 — 언제부터인지를 정해야 하는 일이라 편집에서 한다.
+function noticeStateSelect(n, st){
+  return `<select class="notice-state-sel ${st}" data-id="${n.id}"
+    onclick="event.stopPropagation();"
+    onchange="event.stopPropagation();setNoticeState('${n.id}', this.value);">
+    ${st === 'before' ? '<option value="before" selected>게시예정</option>' : ''}
+    <option value="live" ${st === 'live' ? 'selected' : ''}>게시중</option>
+    <option value="after" ${st === 'after' ? 'selected' : ''}>게시종료</option>
+  </select>`;
+}
+
+async function setNoticeState(id, next){
+  const n = _noticeList.find(x => x.id === id);
+  if (!n || next === noticeStateOf(n)) return;
+  let from = Number(n.from || 0), until = Number(n.until || 0);
+  if (next === 'live') {
+    from = 0;                                        // 지금부터
+    if (until && until <= Date.now()) until = 0;     // 이미 지난 종료는 푼다
+  } else if (next === 'after') {
+    from = 0;                                        // 예약해 둔 것을 내리는 경우
+    until = Date.now();
+  } else return;
+
+  try {
+    await setDoc(doc(fbDb, 'appNotice', id), {
+      scope: NOTICE_SCOPE, title: n.title, html: n.html, keys: n.keys, from, until,
+      // 다시 올릴 때만 시각을 갱신한다. 그래야 접어 둔 사람에게 다시 뜬다.
+      // 내리는 것은 안 갱신한다 — 목록이 '고친 순'이라 내린 것이 맨 위로 올라온다.
+      updatedAt: next === 'live' ? Date.now() : Number(n.updatedAt || 0),
+      by: n.by
+    });
+    // 화면은 스냅샷이 받아서 바로 다시 그린다(새로고침 필요 없음).
+  } catch(e){
+    alert('바꾸지 못했습니다.\n' + (e.message || e));
+    renderNoticeAdminList();                         // 고른 값을 되돌린다
+  }
 }
 
 function noticeStateChip(st){
@@ -9187,6 +9272,8 @@ function renderNoticeAdminList(){
   _noticeDraft = null;
   noticeReleaseImages();
   document.getElementById('noticePreviewBtn').style.display = 'none';
+  document.getElementById('noticeCheckBtn').style.display = '';
+  document.getElementById('noticeNewBtn').style.display = '';
 
   body.innerHTML = _noticeList.length
     ? `<div class="notice-list">${_noticeList.map(n => {
@@ -9196,17 +9283,16 @@ function renderNoticeAdminList(){
             <span class="notice-row-title">${escapeHtml(noticeTitleOf(n))}</span>
             <span class="notice-row-sub">${escapeHtml(noticePeriodText(n.from, n.until) || '기간 없음')}
               · ${escapeHtml(noticeWhenText(n.updatedAt))}${n.by ? ' · ' + escapeHtml(n.by) : ''}</span>
-          </span>${noticeStateChip(st)}</button>`;
+          </span>${noticeStateSelect(n, st)}</button>`;
       }).join('')}</div>`
     : `<div class="notice-empty">아직 쓴 공지가 없습니다.</div>`;
   body.querySelectorAll('.notice-row').forEach(r =>
     r.addEventListener('click', () => openNoticeEditor(r.dataset.id)));
 
-  document.getElementById('noticeEditFoot').innerHTML = `
-    <span class="notice-foot-msg" id="noticeSaveMsg"></span>
-    <button class="notice-btn" id="noticeCheckBtn2" title="그림 저장소(R2)가 붙었는지 확인">🔌 저장소 확인</button>
-    <button class="notice-btn primary" onclick="openNoticeEditor('')">＋ 새 공지</button>`;
-  document.getElementById('noticeCheckBtn2').onclick = noticeCheckWorker;
+  // 목록에서는 바닥글에 둘 것이 없다 — 단추는 위로 올렸다.
+  // 저장소 확인이 남기는 말은 자리를 잡아 둬야 하므로 칸은 남긴다.
+  document.getElementById('noticeEditFoot').innerHTML =
+    '<span class="notice-foot-msg" id="noticeSaveMsg"></span>';
   renderNoticeEditState();
 }
 
@@ -9219,6 +9305,8 @@ function openNoticeEditor(id){
   _noticeDirty = false;
   noticeReleaseImages();
   document.getElementById('noticePreviewBtn').style.display = '';
+  document.getElementById('noticeCheckBtn').style.display = 'none';
+  document.getElementById('noticeNewBtn').style.display = 'none';
 
   const body = document.getElementById('noticeEditBody');
   body.innerHTML = `
@@ -9646,6 +9734,7 @@ window.noticeBackToList   = noticeBackToList;
 window.noticeSnoozeToday  = noticeSnoozeToday;
 window.noticeSnoozeEver   = noticeSnoozeEver;
 window.noticeAutoStep     = noticeAutoStep;
+window.setNoticeState     = setNoticeState;
 window.openNoticeZoom     = openNoticeZoom;
 window.closeNoticeZoom    = closeNoticeZoom;
 window.startNoticeEdit    = startNoticeEdit;

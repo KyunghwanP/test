@@ -47,9 +47,14 @@ check('관리자에게만 그린다', /function noticeBtnVisible\(\)/.test(HTML)
 check('관리자는 게시중인 것이 없어도 들어갈 수 있다 (안 그러면 쓸 문이 없다)',
       /if \(_IS_ADMIN\(\)\) return true;/.test(HTML));
 check('전체 공개는 한 줄만 풀면 된다', /return false && noticeLiveList\(\)\.length > 0;/.test(HTML));
-check('기간이 바뀌는 순간을 시계로 잡는다',
-      /function startNoticeClock\(\)/.test(HTML) && /setInterval\(\(\) => \{[\s\S]{0,200}noticeStateSig\(\)/.test(HTML));
-check('상태가 안 바뀌면 화면을 안 건드린다', /if \(sig === _noticeLastSig\) return;/.test(HTML));
+check('기간이 바뀌는 그 시각에 맞춰 깨운다 (30초마다 들여다보지 않는다)',
+      /function noticeNextBoundary\(\)/.test(HTML) &&
+      /const wait = Math\.min\(next \? next - Date\.now\(\)/.test(HTML) &&
+      !/setInterval\([\s\S]{0,200}noticeStateSig/.test(HTML));
+check('기기가 자거나 시계가 틀어져도 되돌아온다(상한)', /, 600000\);/.test(HTML));
+check('상태가 안 바뀌면 화면을 안 건드린다', /if \(sig !== _noticeLastSig\) \{/.test(HTML));
+check('기간을 고치면 깨울 시각도 다시 잡는다',
+      /renderNoticeEditState\(\);\s*\n\s*startNoticeClock\(\);/.test(HTML));
 check('배포를 문서 안의 scope 로 가른다',
       /const NOTICE_SCOPE\s*=\s*'test'/.test(HTML) && /if \(scope !== NOTICE_SCOPE\) return;/.test(HTML));
 check('예전 문서(공지 하나이던 시절)도 계속 읽는다',
@@ -104,6 +109,14 @@ await pg.route('https://ynhs.test/**', r => r.fulfill({
     ${grab('noticeUnseen')}
     ${grab('noticeTitleOf')}
     ${grab('noticeAllKeys')}
+    ${grab('noticeNextBoundary')}
+    const NOTICE_SCOPE = 'test';
+    let _written = null;
+    const fbDb = {}, doc = (db, c, id) => ({ c, id });
+    const setDoc = async (ref, data) => { _written = { id: ref.id, ...data }; };
+    const fbAuth = { currentUser: { email: 'me@x', displayName: '나' } };
+    function renderNoticeAdminList(){ window.__reverted = true; }
+    ${grab('setNoticeState')}
     ${grabConst('NOTICE_SNOOZE_KEY')}
     ${grabConst('noticeToday')}
     ${grab('noticeSnoozeMap')}
@@ -130,6 +143,9 @@ await pg.route('https://ynhs.test/**', r => r.fulfill({
     window.snoozeRaw   = () => localStorage.getItem(NOTICE_SNOOZE_KEY);
     window.snoozeSet   = v => localStorage.setItem(NOTICE_SNOOZE_KEY, v);
     window.today_      = () => noticeToday();
+    window.setState    = async (list, id, next) => { _noticeList = list; _written = null;
+      await setNoticeState(id, next); return _written; };
+    window.nextAt      = list => { _noticeList = list; return noticeNextBoundary(); };
     window.period  = (a, b) => noticePeriodText(a, b);
     window.toIn    = ms => noticeToInput(ms);
     window.fromIn  = v => noticeFromInput(v);
@@ -313,7 +329,7 @@ console.log('\n■ 그림 크게 보기');
 console.log('\n■ 처음 들어올 때 저절로 띄우기');
 {
   check('배선 — 첫 목록을 받으면 한 번 시도한다',
-        /renderNoticeEditState\(\);\s*\n\s*noticeAutoOpen\(\);/.test(HTML));
+        /startNoticeClock\(\);[\s\S]{0,120}noticeAutoOpen\(\);/.test(HTML));
   check('배선 — 앱을 연 뒤 한 번만', /if \(_noticeAutoDone\) return;/.test(HTML));
   check('배선 — 볼 수 없는 사람에게는 안 띄운다', /if \(!noticeBtnVisible\(\)\) return;/.test(HTML));
   check('배선 — 게시중인 것이 없으면 안 띄운다',
@@ -392,6 +408,90 @@ console.log('\n■ 처음 들어올 때 저절로 띄우기');
   check('저장소가 깨져 있어도 안 죽는다', (await pg.evaluate(x => window.isSnoozed(x), a)) === false);
   await pg.evaluate(() => window.snoozeSet('"글자"'));
   check('모양이 달라도 안 죽는다', (await pg.evaluate(x => window.isSnoozed(x), a)) === false);
+}
+
+console.log('\n■ 목록에서 바로 내리고 다시 올리기');
+{
+  check('칩이 드롭다운이다', /function noticeStateSelect\(n, st\)/.test(HTML) &&
+        /setNoticeState\('\$\{n\.id\}', this\.value\)/.test(HTML));
+  check('줄을 여는 것과 안 겹친다', /onclick="event\.stopPropagation\(\);"/.test(HTML));
+  check('게시예정은 지금 그 상태일 때만 보인다',
+        /st === 'before' \? '<option value="before" selected>게시예정<\/option>' : ''/.test(HTML));
+  check('내릴 때는 지금 시각으로 끝낸다', /until = Date\.now\(\);/.test(HTML));
+  check('내릴 때 예약도 같이 푼다 (안 그러면 게시예정으로 남는다)',
+        /\} else if \(next === 'after'\) \{\s*\n\s*from = 0;/.test(HTML));
+  check('올릴 때는 지나간 종료를 푼다',
+        /if \(until && until <= Date\.now\(\)\) until = 0;/.test(HTML));
+  check('다시 올릴 때만 고친 시각을 갱신한다 (접어 둔 사람에게 다시 뜨게)',
+        /updatedAt: next === 'live' \? Date\.now\(\) : Number\(n\.updatedAt \|\| 0\)/.test(HTML));
+  check('같은 상태를 고르면 아무것도 안 쓴다',
+        /if \(!n \|\| next === noticeStateOf\(n\)\) return;/.test(HTML));
+  check('실패하면 고른 값을 되돌린다',
+        /alert\('바꾸지 못했습니다[\s\S]{0,80}renderNoticeAdminList\(\);/.test(HTML));
+  check('바꾼 결과는 스냅샷이 받아 바로 그린다(새로고침 필요 없음)',
+        /onSnapshot\(collection\(fbDb, 'appNotice'\)/.test(HTML));
+}
+
+console.log('\n■ 실제로 무엇이 저장되나');
+{
+  const HOUR = 3600e3, NOW = Date.now();
+  const set = (list, id, next) => pg.evaluate(a => window.setState(a[0], a[1], a[2]), [list, id, next]);
+  const N = (o) => ({ id:'a', title:'감독', html:'<p>가</p>', keys:[], by:'박경환',
+                      from:0, until:0, updatedAt: 111, ...o });
+
+  // 게시중 → 게시종료
+  let w = await set([N()], 'a', 'after');
+  check('내리면 종료가 지금으로 찍힌다', Math.abs(w.until - Date.now()) < 5000, w);
+  check('내려도 고친 시각은 그대로', w.updatedAt === 111, w);
+  check('글·제목·그림키는 안 건드린다',
+        w.html === '<p>가</p>' && w.title === '감독' && Array.isArray(w.keys), w);
+  check('배포 표시도 같이 쓴다', w.scope === 'test', w);
+
+  // 예약해 둔 것을 내리면 '게시예정'으로 남으면 안 된다
+  w = await set([N({ from: NOW + 3*HOUR })], 'a', 'after');
+  check('예약도 같이 푼다', w.from === 0, w);
+  const st = await pg.evaluate(x => window.state(x, Date.now()), { html:'가', from: 0, until: Date.now()-1 });
+  check('그래서 실제로 게시종료가 된다', st === 'after', st);
+
+  // 끝난 것을 다시 올리기
+  w = await set([N({ until: NOW - HOUR, updatedAt: 111 })], 'a', 'live');
+  check('올리면 지나간 종료가 풀린다', w.until === 0, w);
+  check('올리면 시작도 지금부터', w.from === 0, w);
+  check('올릴 때는 고친 시각을 갱신한다 (접어 둔 사람에게 다시 뜨게)',
+        w.updatedAt > 111 && Math.abs(w.updatedAt - Date.now()) < 5000, w);
+
+  // 앞으로 잡아 둔 종료는 살린다
+  w = await set([N({ until: NOW + 5*HOUR, from: NOW + HOUR })], 'a', 'live');
+  check('앞으로 잡아 둔 종료는 그대로 둔다', w.until === NOW + 5*HOUR, w);
+  check('예약 시작만 푼다', w.from === 0, w);
+
+  // 같은 상태를 다시 고르면 아무 일도 없어야 한다
+  check('같은 상태는 저장하지 않는다', (await set([N()], 'a', 'live')) === null);
+  check('없는 공지도 조용히 넘어간다', (await set([N()], '없음', 'after')) === null);
+}
+
+console.log('\n■ 언제 깨울지');
+{
+  const NOW = Date.now(), H = 3600e3;
+  const at = list => pg.evaluate(l => window.nextAt(l), list);
+  check('기간이 없으면 깨울 일이 없다', (await at([{ id:'a', html:'가' }])) === 0);
+  check('앞으로 올 시작 시각을 잡는다',
+        (await at([{ id:'a', html:'가', from: NOW + 2*H }])) === NOW + 2*H);
+  check('지나간 시각은 안 잡는다',
+        (await at([{ id:'a', html:'가', from: NOW - 2*H, until: NOW + H }])) === NOW + H);
+  check('여럿이면 가장 빠른 것',
+        (await at([{ id:'a', html:'가', until: NOW + 5*H },
+                   { id:'b', html:'나', from: NOW + H }])) === NOW + H);
+}
+
+console.log('\n■ 단추를 위로 올렸다');
+{
+  check('저장소 확인·새 공지가 머리글에 있다',
+        /id="noticeCheckBtn"[\s\S]{0,200}id="noticeNewBtn"/.test(HTML) &&
+        /<div class="notice-page-body" id="noticeEditBody">/.test(HTML));
+  check('목록에서는 보이고', /getElementById\('noticeCheckBtn'\)\.style\.display = '';/.test(HTML));
+  check('편집할 때는 숨는다', /getElementById\('noticeCheckBtn'\)\.style\.display = 'none';/.test(HTML));
+  check('바닥글에는 이제 안 남아 있다', !/noticeCheckBtn2/.test(HTML));
 }
 
 console.log('\n■ 목록에 뭐라고 적히나');

@@ -42,7 +42,7 @@ pg.on('pageerror', e => errs.push(e.message));
 await pg.setContent(`<!doctype html><meta charset="utf-8">
 <style>.notice-editor{font-size:14px;}</style>
 <div id="noticeTitle"></div><div id="noticeWhen"></div>
-<span id="noticeEditState"></span><button id="noticePreviewBtn"></button><button id="noticeCheckBtn"></button>
+<span id="noticeEditState"></span><button id="noticePreviewBtn"></button><button id="noticeCheckBtn"></button><button id="noticeNewBtn"></button>
 <div id="noticeEditBody"></div><div id="noticeEditFoot"></div>
 <script>
   ${grabConst('NOTICE_TAGS')}
