@@ -30,6 +30,13 @@ console.log('\n■ 원본 배선 (정적)');
 check('배지 CSS가 있다', /\.home-pts-tag\{/.test(HTML));
 check('우리반 시간표를 그릴 때 배지 진단도 부른다',
       /window\._renderHomeClassTt\(\);\s*checkHomeroomNewPoints\(homeroomKey\);/.test(HTML));
+check('한 번만 읽지 않는다 (컴퓨터를 안 끄면 새로 들어온 것이 영영 안 뜬다)',
+      !/getDoc\(doc\(fbDb, `riro_points`/.test(HTML) &&
+      /onSnapshot\(doc\(fbDb, 'riro_points', `grade\$\{grade\}`\)/.test(HTML));
+check('같은 반이면 구독을 다시 걸지 않는다',
+      /if \(_ptsWatchHr === hr && _ptsUnsub\) return;/.test(HTML));
+check('반이 바뀌면 옛 구독을 끊는다',
+      /if \(_ptsUnsub\) \{ try \{ _ptsUnsub\(\); \} catch \(e\) \{\} _ptsUnsub = null; \}/.test(HTML));
 
 // 관리자는 담임반이 없다. 상담 화면은 이미 테스트용 1-1 로 폴백하는데 현황판만 안 해서
 // '우리반 오늘 시간표' 자체가 안 떴고, 그래서 배지도 볼 수가 없었다.
@@ -73,8 +80,13 @@ console.log('\n■ 기준선과 무관하게 "최근 항목"을 볼 수 있는�
 check('조회 화면에 최근 항목 버튼이 있다', /id="ptsViewRecentBtn"[\s\S]{0,120}openPtsRecentModal\(\)/.test(HTML));
 check('최근 창은 7일', /const PTS_RECENT_DAYS = 7;/.test(HTML));
 check('최근 7일 모달에 누적 경고를 함께 넘긴다',
-      /const warns = ptsWarnStudents\(ptsViewData, room, grade\)/.test(HTML)
+      /const warns = ptsWarnStudents\(ptsViewData, room, grade, null, ptsRosterSet\(allStudents\)\)/.test(HTML)
       && /renderPtsNewModal\(hr, within, title, [^,]+, warns\)/.test(HTML));
+check('선도관심은 명렬에 있는 학생만 (전출·자퇴가 계속 뜨던 자리)',
+      /\.filter\(s => !roster \|\| roster\.has\(ptsRosterKey\(s\)\)\)/.test(HTML));
+check('배지 쪽도 명렬을 읽고 나서 그린다',
+      /ensurePtsRoster\(\)\.then\(\(\) => renderHomeroomPtsBadge/.test(HTML));
+check('조회 화면도 명렬을 같이 읽는다', /await ensurePtsRoster\(\);/.test(HTML));
 check('그 주에 아무것도 없을 때만 이전 것으로 물러난다',
       /if \(within\.length\)[\s\S]{0,200}ptsRecentEntries\([\s\S]{0,80}PTS_FALLBACK_LIMIT\)/.test(HTML));
 check('담임(관리자는 고른 반)일 때만 보인다',
@@ -92,10 +104,14 @@ const ptsNewSinceSrc       = grab('ptsNewSince');
 const renderPtsNewModalSrc = grab('renderPtsNewModal');
 const closePtsNewModalBtnSrc = grab('closePtsNewModalBtn');
 const checkHomeroomNewPointsSrc = grab('checkHomeroomNewPoints');
+const ptsRosterSetSrc = grab('ptsRosterSet');
+const ptsRosterKeySrc = /^const ptsRosterKey = [\s\S]*?;$/m.exec(HTML)[0];
+const renderHomeroomPtsBadgeSrc = grab('renderHomeroomPtsBadge');
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const pg = await b.newPage({ viewport: { width: 390, height: 844 } });
 const errs = [];
+pg.on('console', m => { if (m.type()==='error') console.log('   [콘솔]', m.text().slice(0,200)); });
 pg.on('pageerror', e => errs.push(e.message));
 
 // 나를 1학년 1반 담임처럼 꾸민다 — 실제 index.html 이 그리는 것과 같은 마크업
@@ -122,8 +138,18 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   const myTeacher = { homeroom: '1-1' };
   window.__mockStudents = [];                 // 테스트마다 여기를 바꿔 '오늘 밤 스냅샷'을 흉내
   const doc = (...args) => args;
-  const getDoc = async () => ({ exists: () => true, data: () => ({ students: window.__mockStudents }) });
   const fbDb = {};
+  // 가짜 onSnapshot — window.__push() 로 '오늘 밤 스크랩이 올라온 척' 한다.
+  // 원본이 한 번만 읽던 시절에는 여기가 getDoc 이었다.
+  let _snapCb = null;
+  function onSnapshot(ref, cb){ _snapCb = cb; return () => { _snapCb = null; }; }
+  window.__push = () => _snapCb &&
+    _snapCb({ exists: () => true, data: () => ({ students: window.__mockStudents }) });
+  window.__live = () => !!_snapCb;
+  let _ptsUnsub = null, _ptsWatchHr = '';
+  let allStudents = [];
+  window.setRoster = list => { allStudents = list || []; };
+  const ensurePtsRoster = () => Promise.resolve();
   const navLog = [];
   function navigateTo(page){ navLog.push(page); }
   const escapeHtml = s => String(s).replace(/[&<>"']/g, c =>
@@ -139,6 +165,10 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   const PTS_WARN_TOTAL = -5;
   const PTS_RECENT_DAYS = 7;
   ${ptsWarnStudentsSrc}
+  ${ptsRosterKeySrc}
+  ${ptsRosterSetSrc}
+  window.ptsRosterSet = ptsRosterSet;
+  window.ptsWarnStudents = ptsWarnStudents;
   ${ptsRememberAckSrc}
   window.ptsRecentEntries = ptsRecentEntries;
   window.ptsEntriesWithin = ptsEntriesWithin;
@@ -146,8 +176,17 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   window.ptsDateKey = ptsDateKey;
   ${renderPtsNewModalSrc}
   ${closePtsNewModalBtnSrc}
+  ${renderHomeroomPtsBadgeSrc}
   ${checkHomeroomNewPointsSrc}
-  window.checkHomeroomNewPoints = checkHomeroomNewPoints;
+  // 이 하네스는 모듈이 아니라 함수 선언이 곧 window 속성이다. 같은 이름으로
+  // 덮어쓰면 안쪽 호출이 자기 자신을 부른다 — 먼저 원본을 붙잡아 둔다.
+  const _watch = checkHomeroomNewPoints;
+  // 예전 검사들이 '한 번 읽어서 그린다'로 쓰여 있다. 켜고 한 번 밀어 주는 것으로
+  // 같은 뜻이 되게 감싼다.
+  window.checkHomeroomNewPoints = hr => { _watch(hr); window.__push(); };
+  window.watchPts = hr => _watch(hr);
+  window.pushPts  = () => window.__push();
+  window.ptsLive  = () => window.__live();
   window.ptsSignaturesFor = ptsSignaturesFor;
   window.ptsNewSince = ptsNewSince;
   window.closePtsNewModalBtn = closePtsNewModalBtn;
@@ -445,6 +484,75 @@ console.log('\n■ 사유에 태그가 들어 있어도 실행되지 않는다')
   await pg.click('#homeClassTimetable .home-pts-tag');
   check('태그가 글자로 보인다', (await pg.$eval('#ptsNewRecords', e => e.textContent)).includes('<script>'));
   check('실행되지는 않았다', (await pg.evaluate(() => window.__pwned)) === undefined);
+}
+
+console.log('\n■ 컴퓨터를 안 꺼도 새로 들어온 것이 뜬다');
+{
+  // 그리기가 명렬 읽기(promise) 뒤에 붙어 있다 — 밀어 넣고 한 박자 기다린다
+  const tick = () => pg.evaluate(() => new Promise(r => setTimeout(r, 0)));
+  // 밤에 리로스쿨에서 긁어 오면 문서가 통째로 바뀐다. 예전에는 한 번만 읽어서,
+  // 앱을 켜 둔 사람에게는 그것이 영영 안 보였다.
+  await pg.evaluate(() => { localStorage.clear(); window.setRoster([]); });
+  await pg.evaluate(() => { window.__mockStudents = []; });
+  await pg.evaluate(() => window.watchPts('1-1'));
+  check('구독이 걸려 있다', await pg.evaluate(() => window.ptsLive()));
+  await pg.evaluate(() => window.pushPts());
+  await tick();
+  check('아무것도 없으면 배지도 없다',
+        (await pg.evaluate(() => !!document.querySelector('.home-pts-tag'))) === false);
+
+  // 오늘 밤 스크랩이 올라왔다 — 새로고침 없이 배지가 붙어야 한다
+  const today = new Date();
+  const dk = `[ ${String(today.getMonth()+1).padStart(2,'0')}.${String(today.getDate()).padStart(2,'0')} ]`;
+  await pg.evaluate(d => { window.__mockStudents = [
+    { grade:1, room:1, num:3, name:'김하나', total:-3,
+      records:[{ date:d, detail:'무단지각 -3' }] }]; }, dk);
+  await pg.evaluate(() => window.pushPts());
+  await tick();
+  const tag = await pg.evaluate(() => document.querySelector('.home-pts-tag')?.textContent);
+  check('새로고침 없이 배지가 붙는다', tag === '🆕 1', tag);
+
+  // 한 건 더 들어오면 숫자가 따라 올라야 한다
+  await pg.evaluate(d => { window.__mockStudents[0].records.push(
+    { date:d, detail:'복장 -1' }); }, dk);
+  await pg.evaluate(() => window.pushPts());
+  await tick();
+  check('그 뒤에 들어온 것도 바로 센다',
+        (await pg.evaluate(() => document.querySelector('.home-pts-tag')?.textContent)) === '🆕 2');
+  check('배지가 하나만 남는다 (다시 그릴 때 겹치지 않는다)',
+        (await pg.evaluate(() => document.querySelectorAll('.home-pts-tag').length)) === 1);
+}
+
+console.log('\n■ 선도관심학생 — 전출·자퇴한 학생은 뺀다');
+{
+  // 리로스쿨은 학적변동이 나도 자료 보관 때문에 계정을 바로 안 지운다.
+  // 그래서 이미 학교에 없는 학생의 누적 벌점이 계속 남는다.
+  const PTS = [
+    { grade:1, room:1, num:3,  name:'김하나', total:-7 },   // 재학
+    { grade:1, room:1, num:11, name:'이두리', total:-9 },   // 전출 — 명렬에 없다
+    { grade:1, room:1, num:20, name:'박세찬', total:-6 },   // 전출 뒤 그 번호에 새 학생
+  ];
+  const ROSTER = [
+    { grade:1, room:1, num:3,  name:'김하나' },
+    { grade:1, room:1, num:20, name:'최나래' },             // 20번은 이제 다른 사람
+  ];
+  const warn = (pts, roster) => pg.evaluate(a =>
+    window.ptsWarnStudents(a[0], 1, 1, -5, window.ptsRosterSet(a[1])).map(s => s.name), [pts, roster]);
+
+  check('명렬이 없으면 안 거른다 (전원이 사라지느니 낫다)',
+        (await warn(PTS, [])).join() === '이두리,김하나,박세찬', await warn(PTS, []));
+  const kept = await warn(PTS, ROSTER);
+  check('재학생은 남는다', kept.includes('김하나'), kept);
+  check('전출한 학생은 빠진다', !kept.includes('이두리'), kept);
+  check('번호가 넘어간 옛 학생도 빠진다', !kept.includes('박세찬'), kept);
+  check('결국 한 명만 남는다', kept.length === 1, kept);
+
+  // 이름에 공백이 섞여 들어와도 같은 사람으로 본다
+  const spaced = await warn([{ grade:1, room:1, num:3, name:'김 하나', total:-7 }], ROSTER);
+  check('이름의 공백은 무시한다', spaced.length === 1, spaced);
+  // 학년·반·번호가 글자로 와도 같은 사람으로 본다(원본이 섞여 들어온다)
+  const strNum = await warn([{ grade:'1', room:'1', num:'3', name:'김하나', total:-7 }], ROSTER);
+  check('숫자가 글자로 와도 같은 사람', strNum.join() === '김하나', strNum);
 }
 
 console.log(errs.length ? '\n❌ 런타임 오류:\n' + errs.slice(0,4).join('\n') : '\n✅ 런타임 오류 없음');

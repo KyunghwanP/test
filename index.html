@@ -6301,7 +6301,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.21';
+const APP_VER = 'ver7.22';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -17597,6 +17597,7 @@ async function loadPtsViewData() {
   updatedEl.textContent = '데이터 불러오는 중...';
   try {
     const grades = ['1','2','3'];
+    await ensurePtsRoster();      // 전출·자퇴한 학생을 선도관심에서 빼려면 명렬이 있어야 한다
     ptsViewData = [];
     for (const g of grades) {
       const snap = await getDoc(doc(fbDb, 'riro_points', `grade${g}`));
@@ -17721,13 +17722,41 @@ function ptsEntriesWithin(students, room, grade, days, today) {
 // 누적 벌점 경고. 합계(상점 + 벌점 + 상계 감점)가 기준 이하인 학생 — 상계 봉사까지
 // 반영된 실질 점수라 선도 기준에 맞춰 보기 좋다. 기준값은 학교 규정에 맞춰 바꾼다.
 const PTS_WARN_TOTAL = -5;
-function ptsWarnStudents(students, room, grade, threshold) {
+// 리로스쿨은 전출·자퇴로 학적변동이 나도 자료 보관 때문에 계정을 바로 안 지운다.
+// 그래서 그 학생의 누적 벌점이 계속 남아 '선도관심학생'에 뜬다 — 이미 학교에 없는
+// 학생을 챙기라고 띄우는 셈이다. 명렬(students/main)에 없으면 뺀다.
+//
+// 이름까지 열쇠에 넣는다. 번호만 보면, 전출로 빈 번호에 다른 학생이 들어왔을 때
+// 옛 학생이 그대로 걸린다.
+const ptsRosterKey = s =>
+  `${parseInt(s.grade)}-${parseInt(s.room)}-${parseInt(s.num)}-${String(s.name || '').replace(/\s+/g, '')}`;
+// 명렬을 아직 못 읽었으면 null 을 돌려 '거르지 않음'으로 둔다.
+// 빈 명렬로 거르면 선도관심학생이 통째로 사라진다 — 안 뜨는 것보다 낫다.
+function ptsRosterSet(list) {
+  if (!Array.isArray(list) || !list.length) return null;
+  return new Set(list.map(ptsRosterKey));
+}
+
+function ptsWarnStudents(students, room, grade, threshold, roster) {
   const limit = threshold == null ? PTS_WARN_TOTAL : threshold;
   return (students || [])
     .filter(s => String(s.room) === String(room))
     .filter(s => grade == null || String(s.grade) === String(grade))
+    .filter(s => !roster || roster.has(ptsRosterKey(s)))
     .filter(s => Number(s.total || 0) <= limit)
     .sort((a, b) => Number(a.total || 0) - Number(b.total || 0));
+}
+
+// 명렬을 한 번만 읽어 둔다(다른 화면들과 같은 allStudents 를 쓴다)
+let _ptsRosterP = null;
+function ensurePtsRoster() {
+  if (Array.isArray(allStudents) && allStudents.length) return Promise.resolve();
+  if (_ptsRosterP) return _ptsRosterP;
+  _ptsRosterP = getDoc(doc(fbDb, 'students', 'main'))
+    .then(snap => { if (snap.exists()) allStudents = snap.data().students || []; })
+    .catch(() => {})
+    .finally(() => { _ptsRosterP = null; });
+  return _ptsRosterP;
 }
 
 // ── 새로 반영된 상벌점 모달 ──
@@ -17772,7 +17801,7 @@ function openPtsRecentModal() {
   if (!hr) return;
   const [grade, room] = hr.split('-');
   const title = `🗓 최근 ${PTS_RECENT_DAYS}일 상벌점`;
-  const warns = ptsWarnStudents(ptsViewData, room, grade);
+  const warns = ptsWarnStudents(ptsViewData, room, grade, null, ptsRosterSet(allStudents));
   const within = ptsEntriesWithin(ptsViewData, room, grade, PTS_RECENT_DAYS);
   if (within.length) {
     renderPtsNewModal(hr, within, title, `${hr} · ${within.length}건`, warns);
@@ -17806,16 +17835,31 @@ function ptsRememberAck(ackKey, sigs) {
   try { localStorage.setItem(ackKey, JSON.stringify(sigs)); } catch (e) { /* 저장 못 해도 계속 */ }
 }
 
-async function checkHomeroomNewPoints(homeroom) {
-  try {
-    const hr = homeroom || (myTeacher && myTeacher.homeroom);
-    if (!hr) return;
-    const [grade, room] = hr.split('-');
-    if (!grade || !room) return;
-    const ackKey = 'ynhsPtsAck_' + hr;
-    const snap = await getDoc(doc(fbDb, 'riro_points', `grade${grade}`));
+// 상벌점은 밤마다 리로스쿨에서 긁어 온다. 한 번만 읽으면 컴퓨터를 안 끄고
+// 앱을 켜 둔 채 지내는 사람에게는 새로 들어온 것이 영영 안 뜬다 — 이 배지는
+// 바로 그 '새로 들어온 것'을 알리려고 만든 것이라, 그러면 있으나 마나다.
+// 그래서 스냅샷으로 본다.
+let _ptsUnsub = null, _ptsWatchHr = '';
+function checkHomeroomNewPoints(homeroom) {
+  const hr = homeroom || (myTeacher && myTeacher.homeroom);
+  if (!hr) return;
+  const [grade, room] = hr.split('-');
+  if (!grade || !room) return;
+  if (_ptsWatchHr === hr && _ptsUnsub) return;      // 같은 반이면 그대로 둔다
+  // 보기 모드로 다른 반을 고르면 반이 바뀐다 — 옛 구독은 끊는다
+  if (_ptsUnsub) { try { _ptsUnsub(); } catch (e) {} _ptsUnsub = null; }
+  _ptsWatchHr = hr;
+  _ptsUnsub = onSnapshot(doc(fbDb, 'riro_points', `grade${grade}`), snap => {
     if (!snap.exists()) return;
     const students = snap.data().students || [];
+    // 명렬이 있어야 전출·자퇴한 학생을 선도관심에서 뺄 수 있다
+    ensurePtsRoster().then(() => renderHomeroomPtsBadge(hr, room, students));
+  }, () => {});
+}
+
+function renderHomeroomPtsBadge(hr, room, students) {
+  try {
+    const ackKey = 'ynhsPtsAck_' + hr;
     // 여기서는 grade{N} 문서 하나만 읽었으므로 학년은 이미 정해져 있다. 학년까지 걸면
     // 레코드에 grade 가 빠진 경우 통째로 사라지기만 한다 — 반만 본다.
     const allSigs = ptsSignaturesFor(students, room);
@@ -17834,7 +17878,7 @@ async function checkHomeroomNewPoints(homeroom) {
     // 그중 아직 안 본 것은 모달에서 NEW 로 구분한다.
     const recent = ptsEntriesWithin(students, room, null, PTS_RECENT_DAYS);
     const newSigs = ptsNewSince(students, room, acked).map(e => e.sig);
-    const warns = ptsWarnStudents(students, room, null);
+    const warns = ptsWarnStudents(students, room, null, null, ptsRosterSet(allStudents));
 
     const classTitleEl = document.querySelector('#homeClassTimetable .home-section-title');
     if (!classTitleEl) return;
