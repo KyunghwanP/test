@@ -6301,7 +6301,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.19';
+const APP_VER = 'ver7.20';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -14794,33 +14794,8 @@ async function initHomePage() {
     });
   });
 
-  // AI 요약 로드
-  try {
-    const summarySnap = await getDoc(doc(fbDb, 'weeklyData', 'summary'));
-    if(summarySnap.exists()) {
-      const { summary, weekText, updatedAt } = summarySnap.data();
-      const date = updatedAt ? new Date(updatedAt).toLocaleDateString('ko-KR', {month:'long', day:'numeric'}) : '';
-      // 줄바꿈 기준으로 문장 분리 → 각 줄 날짜 굵게 처리
-      const lines = summary.split('\n').map(l => l.trim()).filter(Boolean);
-      const lineHtml = lines.map(line => {
-        const bolded = line.replace(
-          /(\d{1,2}\.\d{1,2}\.(?:\([월화수목금토일]\))?(?:~\d{1,2}\.\d{1,2}\.(?:\([월화수목금토일]\))?)?)/g,
-          '<strong>$1</strong>'
-        );
-        return `<div style="padding:5px 0;border-bottom:1px dashed var(--rule);font-size:15px;line-height:1.7;">${bolded}</div>`;
-      }).join('');
-      const summaryHTML = `<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">${weekText||''} · ${date} 기준</div><div style="padding:0 16px 10px;">${lineHtml}</div>`;
-      // 모바일용 + 데스크톱용 둘 다 채움
-      document.getElementById('homeAISummary').innerHTML = summaryHTML;
-      document.getElementById('homeAISummaryD').innerHTML = summaryHTML;
-    } else {
-      document.getElementById('homeAISummary').textContent = '요약 정보가 없습니다.';
-      document.getElementById('homeAISummaryD').textContent = '요약 정보가 없습니다.';
-    }
-  } catch(e) {
-    document.getElementById('homeAISummary').textContent = '불러오기 실패';
-    document.getElementById('homeAISummaryD').textContent = '불러오기 실패';
-  }
+  // AI 요약 — 스냅샷으로 본다
+  watchHomeSummary();
 
   // ── 오늘 급식 ──
   loadHomeMeal(0);
@@ -14853,6 +14828,41 @@ async function initHomePage() {
 }
 
 let _mealOffset = 0; // 0=오늘, -1=어제, 1=내일, ...
+
+
+// 주간교육활동 AI 요약. 스크래핑·요약이 GitHub Action 으로 밤에 돌기 때문에,
+// 한 번만 읽으면 앱을 열어 둔 사이에 새 요약이 올라와도 안 보인다.
+// initHomePage 는 한 번만 돌아서 현황판을 나갔다 들어와도 다시 안 읽는다 —
+// 주차 칩(watchWeeklyIndex)과 공지에서 겪은 것과 같은 자리다.
+//
+// 이 카드는 현황판에 늘 붙어 있어서 탭을 나갈 때 끊지 않는다(문서 하나뿐이다).
+let _homeSummaryUnsub = null;
+function watchHomeSummary(){
+  if (_homeSummaryUnsub) return;
+  const put = (html, isText) => {
+    for (const id of ['homeAISummary', 'homeAISummaryD']) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      if (isText) el.textContent = html; else el.innerHTML = html;
+    }
+  };
+  _homeSummaryUnsub = onSnapshot(doc(fbDb, 'weeklyData', 'summary'), snap => {
+    if (!snap.exists()) { put('요약 정보가 없습니다.', true); return; }
+    const { summary, weekText, updatedAt } = snap.data() || {};
+    if (!summary) { put('요약 정보가 없습니다.', true); return; }
+    const date = updatedAt ? new Date(updatedAt).toLocaleDateString('ko-KR', {month:'long', day:'numeric'}) : '';
+    // 줄바꿈 기준으로 문장 분리 → 각 줄 날짜 굵게 처리
+    const lines = String(summary).split('\n').map(l => l.trim()).filter(Boolean);
+    const lineHtml = lines.map(line => {
+      const bolded = escapeHtml(line).replace(
+        /(\d{1,2}\.\d{1,2}\.(?:\([월화수목금토일]\))?(?:~\d{1,2}\.\d{1,2}\.(?:\([월화수목금토일]\))?)?)/g,
+        '<strong>$1</strong>'
+      );
+      return `<div style="padding:5px 0;border-bottom:1px dashed var(--rule);font-size:15px;line-height:1.7;">${bolded}</div>`;
+    }).join('');
+    put(`<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">${escapeHtml(weekText||'')} · ${date} 기준</div><div style="padding:0 16px 10px;">${lineHtml}</div>`);
+  }, () => put('불러오기 실패', true));
+}
 
 async function loadHomeMeal(offset) {
   _mealOffset = offset;
