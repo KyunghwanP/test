@@ -44,8 +44,10 @@ check('종이 아니라 확성기다(상벌점 알림과 뜻이 겹치지 않게
       !/id="noticeBtn"[^>]*>🔔/.test(HTML));
 check('처음엔 숨어 있다', /id="noticeBtn"[^>]*style="display:none;"/.test(HTML));
 check('관리자에게만 그린다', /function noticeBtnVisible\(\)/.test(HTML));
-check('관리자는 게시중인 것이 없어도 들어갈 수 있다 (안 그러면 쓸 문이 없다)',
-      /if \(_IS_ADMIN\(\)\) return true;/.test(HTML));
+// 쓰러 들어가는 문은 '전체 공지 쓰기' 탭이 따로 있다. 볼 것이 없는데 확성기만
+// 떠 있을 이유가 없다.
+check('볼 것이 없으면 관리자에게도 안 뜬다',
+      /if \(_IS_ADMIN\(\)\) return _noticeList\.length > 0;/.test(HTML));
 check('전체 공개는 한 줄만 풀면 된다', /return false && noticeLiveList\(\)\.length > 0;/.test(HTML));
 check('기간이 바뀌는 그 시각에 맞춰 깨운다 (30초마다 들여다보지 않는다)',
       /function noticeNextBoundary\(\)/.test(HTML) &&
