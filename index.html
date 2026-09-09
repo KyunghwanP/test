@@ -6301,7 +6301,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.23';
+const APP_VER = 'ver7.24';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -17592,18 +17592,31 @@ function switchPointsMode(mode) {
   }
 }
 
-async function loadPtsViewData() {
+// 세 군데에서 부른다(탭 열기·조회 전환·통계 전환). ptsViewLoaded 는 다 끝난 뒤에야
+// 켜지므로, 먼저 부른 것이 끝나기 전에 또 부르면 둘 다 돌면서 같은 자료를 두 번
+// 담는다 — 선도관심 목록에 같은 학생이 두 줄로 뜨던 것이 이것이다.
+// 돌고 있는 약속을 그대로 돌려준다(spotLoadData 와 같은 방식).
+let ptsViewLoading = null;
+function loadPtsViewData() {
+  if (ptsViewLoading) return ptsViewLoading;
+  ptsViewLoading = _loadPtsViewData().finally(() => { ptsViewLoading = null; });
+  return ptsViewLoading;
+}
+
+async function _loadPtsViewData() {
   const updatedEl = document.getElementById('ptsViewUpdated');
   updatedEl.textContent = '데이터 불러오는 중...';
   try {
     const grades = ['1','2','3'];
     await ensurePtsRoster();      // 전출·자퇴한 학생을 선도관심에서 빼려면 명렬이 있어야 한다
-    ptsViewData = [];
+    // 따로 모았다가 마지막에 한 번에 넣는다. 전역에 바로 밀어 넣으면 담는 중간에
+    // 다른 화면이 반쯤 찬 자료를 읽는다.
+    const rows = [];
     for (const g of grades) {
       const snap = await getDoc(doc(fbDb, 'riro_points', `grade${g}`));
       if (snap.exists()) {
         const data = snap.data();
-        ptsViewData.push(...(data.students || []));
+        rows.push(...(data.students || []));
         if (data.updatedAt) {
           const d = new Date(data.updatedAt);
           updatedEl.textContent = `마지막 업데이트: ${d.toLocaleDateString('ko-KR')} ${d.toLocaleTimeString('ko-KR', {hour:'2-digit',minute:'2-digit'})}`;
@@ -17613,8 +17626,7 @@ async function loadPtsViewData() {
     // 전출·자퇴한 학생을 여기서 한 번 걸러 낸다. 통계·반별 목록·검색·선도관심이
     // 모두 ptsViewData 를 쓰므로, 한 군데씩 거르면 어디선가 빠뜨리게 된다.
     // 명렬을 못 읽었으면 안 거른다(전원이 사라지느니 낫다).
-    const _roster = ptsRosterSet(allStudents);
-    if (_roster) ptsViewData = ptsViewData.filter(s => _roster.has(ptsRosterKey(s)));
+    ptsViewData = ptsOnRoster(rows, ptsRosterSet(allStudents));
     ptsViewLoaded = true;
     renderPtsGroups();
     // 담임(관리자는 고른 반)이면 '우리 반 최근 항목'을 언제든 열 수 있게
@@ -17731,25 +17743,43 @@ const PTS_WARN_TOTAL = -5;
 // 그래서 그 학생의 누적 벌점이 계속 남아 '선도관심학생'에 뜬다 — 이미 학교에 없는
 // 학생을 챙기라고 띄우는 셈이다. 명렬(students/main)에 없으면 뺀다.
 //
-// 열쇠는 '이름'만 쓴다. 학년·반·번호까지 맞추면 학기 중 반을 옮긴 학생이나
-// 리로 자료에 학년이 빠져 온 학생이 명렬에 있는데도 안 맞아 사라진다 —
-// 있는 학생을 선도관심에서 지우는 쪽이 없는 학생이 하나 남는 것보다 나쁘다.
-// 전출로 빈 번호에 다른 학생이 들어온 경우도, 나간 학생 이름은 명렬에 없으므로
-// 이름만으로 걸러진다. 공백은 무시한다(원본에 '김 하나' 처럼 섞여 온다).
+// 이름은 공백을 뺀 것으로 본다(원본에 '김 하나' 처럼 섞여 온다).
 const ptsRosterKey = s => String(s && s.name || '').replace(/\s+/g, '');
+// 자리 = 학년-반-번호. 리로 자료에 학년이 빠져 오면 NaN 이 되므로 이름과 함께 쓴다.
+const ptsSeatKey = s => `${parseInt(s && s.grade)}-${parseInt(s && s.room)}-${parseInt(s && s.num)}`;
+
 // 명렬을 아직 못 읽었으면 null 을 돌려 '거르지 않음'으로 둔다.
 // 빈 명렬로 거르면 선도관심학생이 통째로 사라진다 — 안 뜨는 것보다 낫다.
 function ptsRosterSet(list) {
   if (!Array.isArray(list) || !list.length) return null;
-  return new Set(list.map(ptsRosterKey));
+  return { names: new Set(list.map(ptsRosterKey)), seats: new Set(list.map(ptsSeatKey)) };
+}
+
+// 명렬에 없는 학생(전출·자퇴)을 빼고, 같은 자리가 두 번 들어와 있으면 하나로 줄인다.
+//
+// 리로스쿨은 학적변동이 나도 자료 보관 때문에 계정을 바로 안 지운다 — 그래서 이미
+// 학교에 없는 학생의 누적 벌점이 계속 남는다. 이름이 명렬에 없으면 뺀다.
+//
+// 자리(학번)로 한 번 더 줄이는 이유: 자료를 두 번 담는 길이 있으면 같은 학생이
+// 그대로 두 줄로 보인다. 실제로 선도관심 목록에 '김태형 3-10-04' 이 두 번 떴다.
+// 담는 쪽을 고쳤지만(loadPtsViewData 의 중복 실행 막기), 여기서도 한 번 더 막는다 —
+// 화면에 한 사람이 두 번 뜨는 것은 자료가 이상하다는 뜻이지 보여줄 일이 아니다.
+// 동명이인은 자리가 다르므로 둘 다 남는다.
+function ptsOnRoster(students, roster) {
+  const seen = new Map();
+  for (const s of students || []) {
+    if (roster && !roster.names.has(ptsRosterKey(s))) continue;   // 전출·자퇴
+    const k = ptsSeatKey(s) + '|' + ptsRosterKey(s);
+    if (!seen.has(k)) seen.set(k, s);
+  }
+  return [...seen.values()];
 }
 
 function ptsWarnStudents(students, room, grade, threshold, roster) {
   const limit = threshold == null ? PTS_WARN_TOTAL : threshold;
-  return (students || [])
+  return ptsOnRoster(students, roster)
     .filter(s => String(s.room) === String(room))
     .filter(s => grade == null || String(s.grade) === String(grade))
-    .filter(s => !roster || roster.has(ptsRosterKey(s)))
     .filter(s => Number(s.total || 0) <= limit)
     .sort((a, b) => Number(a.total || 0) - Number(b.total || 0));
 }
