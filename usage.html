@@ -181,7 +181,7 @@ const firebaseConfig = {
   measurementId: "G-MTXQWT10P1"
 };
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
-const APP_VER = 'ver7.29';
+const APP_VER = 'ver7.30';
 
 const fbApp  = initializeApp(firebaseConfig);
 const fbAuth = getAuth(fbApp);
@@ -228,6 +228,14 @@ async function usagePeople(){
     const snap = await getDoc(doc(fbDb, 'acl', 'emailByName'));
     if(snap.exists()) Object.entries(snap.data() || {}).forEach(([n, e]) => {
       if(typeof e === 'string' && e.includes('@') && !byEmail.has(e)) byEmail.set(e, n);
+    });
+  } catch(e){}
+  // 위 둘(시간표·교원 명렬)에 없는 선생님은 기록이 쌓여도 안 뜬다. 앱을 연 사람이
+  // 스스로 여기에 이름을 올려 두므로(index.html usageRegisterMe) 그것도 본다.
+  try {
+    const snap = await getDoc(doc(fbDb, 'appdata', 'usageRoster'));
+    if(snap.exists()) Object.entries(snap.data() || {}).forEach(([e, n]) => {
+      if(typeof e === 'string' && e.includes('@') && !byEmail.has(e)) byEmail.set(e, n || e);
     });
   } catch(e){}
   return [...byEmail].map(([email, name]) => ({ email, name }));

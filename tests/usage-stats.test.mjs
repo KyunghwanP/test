@@ -135,11 +135,22 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   window.__writes = [];
   const getDoc = async r => ({ exists: () => !!window.__store[r.path],
                                data: () => window.__store[r.path] || {} });
+  // increment 흉내 — 더하기는 서버가 한다(이 문서를 읽을 권한이 없어도 쌓인다)
+  const increment = n => ({ __inc: n });
+  window.__fail = false;                     // 저장이 실패하는 상황을 만든다
+  function _deepMerge(cur, d){
+    const out = { ...(cur || {}) };
+    for (const [k, v] of Object.entries(d || {})) {
+      if (v && typeof v === 'object' && '__inc' in v) out[k] = (Number(out[k]) || 0) + v.__inc;
+      else if (v && typeof v === 'object' && !Array.isArray(v)) out[k] = _deepMerge(out[k], v);
+      else out[k] = v;
+    }
+    return out;
+  }
   function _fsSetDoc(r, d, opt){
     window.__writes.push({ path: r.path, data: JSON.parse(JSON.stringify(d)), merge: !!(opt && opt.merge) });
-    const cur = window.__store[r.path] || {};
-    // Firestore merge 흉내 — days 아래는 날짜별로 얹는다
-    window.__store[r.path] = { ...cur, ...d, days: { ...(cur.days || {}), ...(d.days || {}) } };
+    if (window.__fail) return Promise.reject(new Error('권한 없음'));
+    window.__store[r.path] = _deepMerge(window.__store[r.path], d);
     return Promise.resolve();
   }
   window.__nav = [];
@@ -155,6 +166,7 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   ${grabConst('usageDate')}
   ${grabConst('usageHhmm')}
   ${grab('usageStart')}
+  ${grab('usageRegisterMe')}
   ${grab('usageTab')}
   ${grab('usageMark')}
   ${grab('usageFlush')}
@@ -252,44 +264,91 @@ console.log('\n■ 관리자 말고는 못 들어간다');
 
 console.log('\n■ 앱을 연 횟수·탭 이동을 센다');
 {
-  await pg.evaluate(() => { window.__store = {}; window.__writes = []; window.__setWho('kim@yeungnam.hs.kr'); });
+  await pg.evaluate(() => { window.__store = {}; window.__writes = []; window.__fail = false;
+                            window.__setWho('kim@yeungnam.hs.kr'); });
   await pg.evaluate(() => window.usageStart('kim@yeungnam.hs.kr'));
   let d = await pg.evaluate(() => window.__day());
-  check('처음 열면 1회', d.opens === 1, d);
-  check('처음 시각이 남는다', /^\d\d:\d\d$/.test(d.first), d.first);
+  check('처음 열면 보낼 것이 1회', d.opens === 1, d);
 
   await pg.evaluate(() => { ['timetable','pass','timetable','search','timetable'].forEach(window.usageTab); });
   d = await pg.evaluate(() => window.__day());
   check('탭마다 센다', d.tabs.timetable === 3 && d.tabs.pass === 1 && d.tabs.search === 1, d.tabs);
 
-  // 저장은 모아서 한 번
-  const w0 = await pg.evaluate(() => window.__writes.length);
+  // 저장은 모아서 한 번. 명단 등록(usageRegisterMe)은 여는 순간 한 번 따로 나간다.
+  const w0 = await pg.evaluate(() => window.__writes.filter(w => w.path.startsWith('usage/')).length);
   check('탭을 누를 때마다 저장하지 않는다', w0 === 0, w0);
   await pg.evaluate(() => window.usageFlush());
-  const w = await pg.evaluate(() => window.__writes);
+  const w = await pg.evaluate(() => window.__writes.filter(x => x.path.startsWith('usage/')));
   check('한 번만 저장한다', w.length === 1, w.length);
   check('내 문서에 쓴다', /^usage\/kim@yeungnam\.hs\.kr\/m\/\d{4}-\d{2}$/.test(w[0].path), w[0].path);
   check('merge 로 쓴다', w[0].merge === true);
   const today = await pg.evaluate(() => window.usageDate());
   check('그날 줄만 담는다', Object.keys(w[0].data.days).join() === today, Object.keys(w[0].data.days));
-  check('탭 횟수가 실려 간다', w[0].data.days[today].tabs.timetable === 3, w[0].data.days[today]);
+  // 규칙상 이 문서는 '읽기는 관리자만' 이다. 그래서 이전 값을 모르는 채로 쌓아야 한다.
+  check('더하기로 보낸다 (읽지 않고 쌓는다)',
+        w[0].data.days[today].opens.__inc === 1 && w[0].data.days[today].tabs.timetable.__inc === 3,
+        w[0].data.days[today]);
+  const key = 'usage/kim@yeungnam.hs.kr/m/' + today.slice(0,7);
+  const st1 = await pg.evaluate(k => window.__store[k], key);
+  check('저장소에는 누적값이 남는다',
+        st1.days[today].opens === 1 && st1.days[today].tabs.timetable === 3, st1.days[today]);
+
+  d = await pg.evaluate(() => window.__day());
+  check('보낸 뒤 손에 든 것은 비운다', d.opens === 0 && Object.keys(d.tabs).length === 0, d);
+  await pg.evaluate(() => window.usageFlush());
+  check('보낼 것이 없으면 또 쓰지 않는다',
+        (await pg.evaluate(() => window.__writes.filter(x => x.path.startsWith('usage/')).length)) === 1);
 }
 
-console.log('\n■ 다시 열면 이어서 센다 — 지난 날은 안 건드린다');
+console.log('\n■ 다시 열어도 서버에서 더해진다 (자기 기록을 못 읽어도)');
 {
-  await pg.evaluate(() => {
-    window.__store['usage/kim@yeungnam.hs.kr/m/' + window.usageDate().slice(0,7)].days['1999-01-01'] =
-      { opens: 9, first: '08:00', last: '09:00', tabs: { meal: 4 } };
+  const today = await pg.evaluate(() => window.usageDate());
+  const key = 'usage/kim@yeungnam.hs.kr/m/' + today.slice(0,7);
+  await pg.evaluate(k => {
+    window.__store[k].days['1999-01-01'] = { opens: 9, last: '09:00', tabs: { meal: 4 } };
     window.__writes = [];
-  });
+  }, key);
+  // 이 하네스의 getDoc 은 되지만, 실제로는 규칙이 막는다. usageStart 가 읽지 않는지 본다.
+  const readsBefore = await pg.evaluate(() => window.__reads ? window.__reads.length : -1);
+  void readsBefore;
   await pg.evaluate(() => window.usageStart('kim@yeungnam.hs.kr'));
   const d = await pg.evaluate(() => window.__day());
-  check('연 횟수가 이어진다 (1 → 2)', d.opens === 2, d.opens);
-  check('탭 횟수도 이어진다', d.tabs.timetable === 3, d.tabs);
-  await pg.evaluate(() => { window.usageTab('meal'); window.usageFlush(); });
-  const store = await pg.evaluate(() => window.__store);
-  const doc0 = store['usage/kim@yeungnam.hs.kr/m/' + (await pg.evaluate(() => window.usageDate())).slice(0,7)];
-  check('예전 날짜가 그대로 남아 있다', doc0.days['1999-01-01'].opens === 9, Object.keys(doc0.days));
+  check('여는 순간 손에 든 것은 1회뿐', d.opens === 1 && Object.keys(d.tabs).length === 0, d);
+  await pg.evaluate(() => { window.usageTab('timetable'); window.usageFlush(); });
+  const st = await pg.evaluate(k => window.__store[k], key);
+  check('연 횟수가 서버에서 이어진다 (1 → 2)', st.days[today].opens === 2, st.days[today].opens);
+  check('탭 횟수도 이어진다 (3 → 4)', st.days[today].tabs.timetable === 4, st.days[today].tabs);
+  check('예전 날짜가 그대로 남아 있다', st.days['1999-01-01'].opens === 9, Object.keys(st.days));
+}
+
+console.log('\n■ 저장이 실패하면 되돌려 다시 보낸다');
+{
+  const today = await pg.evaluate(() => window.usageDate());
+  const key = 'usage/kim@yeungnam.hs.kr/m/' + today.slice(0,7);
+  await pg.evaluate(() => { window.__fail = true; window.usageStart('kim@yeungnam.hs.kr');
+                            window.usageTab('meal'); window.usageTab('meal'); });
+  await pg.evaluate(() => window.usageFlush());
+  let d = await pg.evaluate(() => window.__day());
+  check('실패하면 센 탭을 되돌린다', d.tabs.meal === 2, d.tabs);
+  check('실패하면 연 횟수도 되돌린다', d.opens === 1, d.opens);
+  await pg.evaluate(() => { window.__fail = false; });
+  await pg.evaluate(() => window.usageFlush());
+  const st = await pg.evaluate(k => window.__store[k], key);
+  check('다음 기회에 제대로 들어간다', st.days[today].tabs.meal === 2, st.days[today].tabs);
+  check('연 횟수도 빠짐없이 들어간다', st.days[today].opens === 3, st.days[today].opens);
+}
+
+console.log('\n■ 스스로 명단에 이름을 올린다');
+{
+  // 사용 현황 명단은 시간표·교원 명렬에서 만든다. 둘 다에 없는 선생님은 기록이
+  // 쌓여도 화면에 안 뜬다 — 실제로 쓰고 있는데 안 보인다는 얘기가 나왔다.
+  check('화면이 그 명단도 본다', /getDoc\(doc\(fbDb, 'appdata', 'usageRoster'\)\)/.test(PAGE));
+  await pg.evaluate(() => { window.__writes = []; window.__setWho('kim@yeungnam.hs.kr'); });
+  await pg.evaluate(() => window.usageStart('kim@yeungnam.hs.kr'));
+  const r = (await pg.evaluate(() => window.__writes)).find(w => w.path === 'appdata/usageRoster');
+  check('여는 순간 명단에 올린다', !!r, await pg.evaluate(() => window.__writes.map(w => w.path)));
+  check('내 계정으로 올린다', r && 'kim@yeungnam.hs.kr' in r.data, r && r.data);
+  check('merge 로 올린다 (남의 것을 지우지 않는다)', r && r.merge === true);
 }
 
 console.log('\n■ 남기지 않아야 할 때');
