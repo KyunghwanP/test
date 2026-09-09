@@ -1715,6 +1715,9 @@
   .pts-bar-row.clickable:hover{ background:var(--paper-soft); }
   /* 선도 관심 목록: 이름+학번+벌점이 안 잘리게 라벨 칸 넓힘 */
   .pts-lead-list .pts-bar-row{ grid-template-columns:172px 1fr auto; }
+  /* 이제 열 명에서 자르지 않는다. 많으면 카드 안에서 스크롤한다 —
+     화면을 통째로 밀어내면 아래 카드들이 안 보인다. */
+  .pts-lead-list{max-height:60vh;overflow-y:auto;}
   .pts-bar-label{
     font-size:13.5px;font-weight:700;color:var(--ink);
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
@@ -5500,7 +5503,7 @@
 
               <!-- 벌점 상위 학생 -->
               <div class="pts-stat-card">
-                <div class="pts-stat-card-title">⚠️ 선도 관심 학생 <span class="pts-stat-sub">(합계 낮은 순)</span></div>
+                <div class="pts-stat-card-title">⚠️ 선도 관심 학생 <span class="pts-stat-sub">(벌점 10점 이상 · 합계 낮은 순)</span> <span class="pts-stat-sub" id="ptsDemeritCount"></span></div>
                 <div class="pts-stat-hint">이름을 누르면 상세 내역이 열립니다.</div>
                 <div id="ptsDemeritTop" class="pts-lead-list"></div>
               </div>
@@ -6301,7 +6304,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.24';
+const APP_VER = 'ver7.25';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -17739,6 +17742,9 @@ function ptsEntriesWithin(students, room, grade, days, today) {
 // 누적 벌점 경고. 합계(상점 + 벌점 + 상계 감점)가 기준 이하인 학생 — 상계 봉사까지
 // 반영된 실질 점수라 선도 기준에 맞춰 보기 좋다. 기준값은 학교 규정에 맞춰 바꾼다.
 const PTS_WARN_TOTAL = -5;
+// 선도 관심 학생 목록의 기준. 합계가 아니라 '벌점' 으로 본다 — 상계 봉사로 합계가
+// 올라가도 벌점을 받은 사실은 남아 있어, 선도 대상을 추릴 때는 그쪽을 본다.
+const PTS_DEMERIT_WATCH = 10;
 // 리로스쿨은 전출·자퇴로 학적변동이 나도 자료 보관 때문에 계정을 바로 안 지운다.
 // 그래서 그 학생의 누적 벌점이 계속 남아 '선도관심학생'에 뜬다 — 이미 학교에 없는
 // 학생을 챙기라고 띄우는 셈이다. 명렬(students/main)에 없으면 뺀다.
@@ -18206,21 +18212,33 @@ function renderPtsStats(){
 
   renderPtsRoomRank();
 
-  // 선도 관심 학생 (합계 낮은 순)
-  const dtop = arr.filter(s => (s.total||0) < 0)
-    .map(s => ({ s, v: s.total||0 }))
-    .sort((a,b) => a.v - b.v)
-    .slice(0, 10);
+  const dtop = ptsWatchList(arr);
   _ptsStatDemeritTop = dtop.map(x => x.s);
-  const dmax = dtop.length ? Math.abs(dtop[0].v) : 1;
+  // 막대는 벌점 기준으로 그린다. 합계로 그리면 상점이 많아 합계가 양수인 학생의
+  // 막대가 거꾸로 길어진다.
+  const dmax = Math.max(1, ...dtop.map(x => x.d));
+  const cnt = document.getElementById('ptsDemeritCount');
+  if (cnt) cnt.textContent = dtop.length ? `${dtop.length}명` : '';
   document.getElementById('ptsDemeritTop').innerHTML = dtop.length
     ? dtop.map((x,i) => {
         const s = x.s;
-        const dm = Math.abs(s.demerit||0);
-        const label = `${escapeHtml(s.name)} <span class="pts-bar-sub">${s.grade}-${s.room}-${String(s.num).padStart(2,'0')}${dm?` · 벌점${dm}`:''}</span>`;
-        return ptsBarRow(label, `${x.v}`, Math.abs(x.v)/dmax, 'red', `showPtsStatStudent(${i})`);
+        const label = `${escapeHtml(s.name)} <span class="pts-bar-sub">${s.grade}-${s.room}-${String(s.num).padStart(2,'0')} · 벌점${x.d}</span>`;
+        return ptsBarRow(label, `${x.v}`, x.d/dmax, 'red', `showPtsStatStudent(${i})`);
       }).join('')
-    : '<div class="pts-stat-empty">합계가 음수인 학생이 없습니다. 👍</div>';
+    : `<div class="pts-stat-empty">벌점 ${PTS_DEMERIT_WATCH}점 이상인 학생이 없습니다. 👍</div>`;
+}
+
+// 선도 관심 학생 고르기 — 벌점이 기준 이상인 학생을 전부, 합계 낮은 순.
+// 예전에는 합계가 음수인 학생 중 열 명만 잘라 보여줬다. 열한 번째부터는 아무리
+// 벌점이 많아도 안 보였다 — 선도 대상을 추리는 자리라 자르면 안 된다.
+// 기준을 합계가 아니라 벌점으로 본다: 상계 봉사로 합계가 올라가도 벌점을 받은
+// 사실은 남아 있고, 선도는 그쪽을 본다.
+function ptsWatchList(students, min) {
+  const limit = min == null ? PTS_DEMERIT_WATCH : min;
+  return (students || [])
+    .map(s => ({ s, v: Number(s.total || 0), d: Math.abs(Number(s.demerit || 0)) }))
+    .filter(x => x.d >= limit)
+    .sort((a, b) => a.v - b.v);
 }
 
 function renderPtsRoomRank(){
