@@ -4768,9 +4768,6 @@
     <div class="tab-item" data-page="room" id="tabRoom" style="display:none;">
       <span class="tab-item-icon">🚪</span>특별실 예약
     </div>
-    <div class="tab-item" data-page="notice" id="tabNotice" style="display:none;">
-      <span class="tab-item-icon">📢</span>전체 공지 쓰기
-    </div>
     <div class="tab-item" data-page="docs">
       <span class="tab-item-icon">📋</span>업무자료
     </div>
@@ -4782,6 +4779,9 @@
     </div>
     <div class="tab-item" data-page="meal">
       <span class="tab-item-icon">🍱</span>식단표
+    </div>
+    <div class="tab-item" data-page="notice" id="tabNotice" style="display:none;">
+      <span class="tab-item-icon">📢</span>전체 공지 쓰기
     </div>
   </div>
   </div>
@@ -4827,9 +4827,6 @@
       <div class="main-nav-item" data-page="room" id="navRoom" style="display:none;">
         <span class="main-nav-icon">🚪</span>특별실 예약
       </div>
-      <div class="main-nav-item" data-page="notice" id="navNotice" style="display:none;">
-        <span class="main-nav-icon">📢</span>전체 공지 쓰기
-      </div>
       <div class="main-nav-item" data-page="docs">
         <span class="main-nav-icon">📋</span>업무자료
       </div>
@@ -4841,6 +4838,9 @@
       </div>
       <div class="main-nav-item" data-page="meal">
         <span class="main-nav-icon">🍱</span>식단표
+      </div>
+      <div class="main-nav-item" data-page="notice" id="navNotice" style="display:none;">
+        <span class="main-nav-icon">📢</span>전체 공지 쓰기
       </div>
     <div class="nav-version" title="Made by 박경환">ver6.97</div>
     </nav>
@@ -6301,7 +6301,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.22';
+const APP_VER = 'ver7.23';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -17610,6 +17610,11 @@ async function loadPtsViewData() {
         }
       }
     }
+    // 전출·자퇴한 학생을 여기서 한 번 걸러 낸다. 통계·반별 목록·검색·선도관심이
+    // 모두 ptsViewData 를 쓰므로, 한 군데씩 거르면 어디선가 빠뜨리게 된다.
+    // 명렬을 못 읽었으면 안 거른다(전원이 사라지느니 낫다).
+    const _roster = ptsRosterSet(allStudents);
+    if (_roster) ptsViewData = ptsViewData.filter(s => _roster.has(ptsRosterKey(s)));
     ptsViewLoaded = true;
     renderPtsGroups();
     // 담임(관리자는 고른 반)이면 '우리 반 최근 항목'을 언제든 열 수 있게
@@ -17726,10 +17731,12 @@ const PTS_WARN_TOTAL = -5;
 // 그래서 그 학생의 누적 벌점이 계속 남아 '선도관심학생'에 뜬다 — 이미 학교에 없는
 // 학생을 챙기라고 띄우는 셈이다. 명렬(students/main)에 없으면 뺀다.
 //
-// 이름까지 열쇠에 넣는다. 번호만 보면, 전출로 빈 번호에 다른 학생이 들어왔을 때
-// 옛 학생이 그대로 걸린다.
-const ptsRosterKey = s =>
-  `${parseInt(s.grade)}-${parseInt(s.room)}-${parseInt(s.num)}-${String(s.name || '').replace(/\s+/g, '')}`;
+// 열쇠는 '이름'만 쓴다. 학년·반·번호까지 맞추면 학기 중 반을 옮긴 학생이나
+// 리로 자료에 학년이 빠져 온 학생이 명렬에 있는데도 안 맞아 사라진다 —
+// 있는 학생을 선도관심에서 지우는 쪽이 없는 학생이 하나 남는 것보다 나쁘다.
+// 전출로 빈 번호에 다른 학생이 들어온 경우도, 나간 학생 이름은 명렬에 없으므로
+// 이름만으로 걸러진다. 공백은 무시한다(원본에 '김 하나' 처럼 섞여 온다).
+const ptsRosterKey = s => String(s && s.name || '').replace(/\s+/g, '');
 // 명렬을 아직 못 읽었으면 null 을 돌려 '거르지 않음'으로 둔다.
 // 빈 명렬로 거르면 선도관심학생이 통째로 사라진다 — 안 뜨는 것보다 낫다.
 function ptsRosterSet(list) {
@@ -17801,7 +17808,8 @@ function openPtsRecentModal() {
   if (!hr) return;
   const [grade, room] = hr.split('-');
   const title = `🗓 최근 ${PTS_RECENT_DAYS}일 상벌점`;
-  const warns = ptsWarnStudents(ptsViewData, room, grade, null, ptsRosterSet(allStudents));
+  // ptsViewData 는 불러올 때 이미 명렬로 걸러져 있다 — 여기서 또 넘기지 않는다
+  const warns = ptsWarnStudents(ptsViewData, room, grade);
   const within = ptsEntriesWithin(ptsViewData, room, grade, PTS_RECENT_DAYS);
   if (within.length) {
     renderPtsNewModal(hr, within, title, `${hr} · ${within.length}건`, warns);

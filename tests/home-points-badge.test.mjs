@@ -80,10 +80,17 @@ console.log('\n■ 기준선과 무관하게 "최근 항목"을 볼 수 있는�
 check('조회 화면에 최근 항목 버튼이 있다', /id="ptsViewRecentBtn"[\s\S]{0,120}openPtsRecentModal\(\)/.test(HTML));
 check('최근 창은 7일', /const PTS_RECENT_DAYS = 7;/.test(HTML));
 check('최근 7일 모달에 누적 경고를 함께 넘긴다',
-      /const warns = ptsWarnStudents\(ptsViewData, room, grade, null, ptsRosterSet\(allStudents\)\)/.test(HTML)
+      /const warns = ptsWarnStudents\(ptsViewData, room, grade\)/.test(HTML)
       && /renderPtsNewModal\(hr, within, title, [^,]+, warns\)/.test(HTML));
 check('선도관심은 명렬에 있는 학생만 (전출·자퇴가 계속 뜨던 자리)',
       /\.filter\(s => !roster \|\| roster\.has\(ptsRosterKey\(s\)\)\)/.test(HTML));
+// 통계·반별 목록·검색이 모두 ptsViewData 를 쓴다. 한 군데씩 거르면 어디선가
+// 빠뜨리므로 불러올 때 한 번에 걸러 낸다.
+check('조회 자료 자체를 명렬로 거른다 (통계·목록·검색이 다 이걸 쓴다)',
+      /if \(_roster\) ptsViewData = ptsViewData\.filter\(s => _roster\.has\(ptsRosterKey\(s\)\)\);/.test(HTML));
+check('거르는 것이 통계를 그리기 전이다',
+      HTML.indexOf('ptsViewData = ptsViewData.filter(s => _roster.has') < HTML.indexOf('ptsViewLoaded = true;'));
+check('명렬을 못 읽었으면 안 거른다', /const _roster = ptsRosterSet\(allStudents\);/.test(HTML));
 check('배지 쪽도 명렬을 읽고 나서 그린다',
       /ensurePtsRoster\(\)\.then\(\(\) => renderHomeroomPtsBadge/.test(HTML));
 check('조회 화면도 명렬을 같이 읽는다', /await ensurePtsRoster\(\);/.test(HTML));
@@ -536,8 +543,8 @@ console.log('\n■ 선도관심학생 — 전출·자퇴한 학생은 뺀다');
     { grade:1, room:1, num:3,  name:'김하나' },
     { grade:1, room:1, num:20, name:'최나래' },             // 20번은 이제 다른 사람
   ];
-  const warn = (pts, roster) => pg.evaluate(a =>
-    window.ptsWarnStudents(a[0], 1, 1, -5, window.ptsRosterSet(a[1])).map(s => s.name), [pts, roster]);
+  const warn = (pts, roster, grade = 1) => pg.evaluate(a =>
+    window.ptsWarnStudents(a[0], 1, a[2], -5, window.ptsRosterSet(a[1])).map(s => s.name), [pts, roster, grade]);
 
   check('명렬이 없으면 안 거른다 (전원이 사라지느니 낫다)',
         (await warn(PTS, [])).join() === '이두리,김하나,박세찬', await warn(PTS, []));
@@ -550,9 +557,17 @@ console.log('\n■ 선도관심학생 — 전출·자퇴한 학생은 뺀다');
   // 이름에 공백이 섞여 들어와도 같은 사람으로 본다
   const spaced = await warn([{ grade:1, room:1, num:3, name:'김 하나', total:-7 }], ROSTER);
   check('이름의 공백은 무시한다', spaced.length === 1, spaced);
-  // 학년·반·번호가 글자로 와도 같은 사람으로 본다(원본이 섞여 들어온다)
+
+  // 여기가 위험한 쪽이다. 있는 학생을 지우면 선도관심에서 조용히 사라진다 —
+  // 없는 학생이 하나 남는 것보다 나쁘다. 명렬에 이름만 있으면 살린다.
+  const moved = await warn([{ grade:1, room:1, num:9, name:'김하나', total:-7 }], ROSTER);
+  check('반·번호가 바뀌어도 명렬에 있으면 남는다', moved.length === 1, moved);
+  // 배지 쪽은 학년을 안 걸고 부른다(문서 하나가 곧 한 학년이라). 그 경로에서
+  // 리로 자료에 학년이 빠져 와도 명렬 대조 때문에 사라지면 안 된다.
+  const noGrade = await warn([{ room:1, num:3, name:'김하나', total:-7 }], ROSTER, null);
+  check('리로 자료에 학년이 빠져 있어도 남는다', noGrade.length === 1, noGrade);
   const strNum = await warn([{ grade:'1', room:'1', num:'3', name:'김하나', total:-7 }], ROSTER);
-  check('숫자가 글자로 와도 같은 사람', strNum.join() === '김하나', strNum);
+  check('숫자가 글자로 와도 같은 사람', strNum.length === 1, strNum);
 }
 
 console.log(errs.length ? '\n❌ 런타임 오류:\n' + errs.slice(0,4).join('\n') : '\n✅ 런타임 오류 없음');
