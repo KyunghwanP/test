@@ -23,17 +23,17 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
 const pg = await b.newPage({ viewport:{width:900,height:800} });
 const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
 await pg.setContent(`<style>${css}</style><body style="background:#eee">${modal}<script>
-${gc('NOTICE_TAGS')}\n${gc('NOTICE_DROP')}\n${gc('NOTICE_STYLES')}\n${gc('NOTICE_KEY_RE')}\n${gc('NOTICE_ZWSP')}
+${gc('RT_TAGS')}\n${gc('RT_DROP')}\n${gc('RT_STYLES')}\n${gc('RT_SEG')}\n${gc('RT_KEY_RE')}\n${gc('RT_ZWSP')}
 ${gc('NOTICE_STATE_TEXT')}\n${gc('noticeLiveList')}\n${gc('_noticeAutoIdx')}
-let _noticeList=[], _noticeAuto=true, _noticeOpenId='', _noticeObjUrls=[];
+let _noticeList=[], _noticeAuto=true, _noticeOpenId='', _rtObjUrls=[];
 const _IS_ADMIN=()=>true;
 const escapeHtml=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function noticeLoadImages(){} function noticeReleaseImages(){} function noticeMarkSeen(){}
+function rtLoadImages(){} function rtReleaseImages(){} function noticeMarkSeen(){}
 function noticeSnoozeToday(){ window.__snoozed='today'; closeNoticeModalBtn(); }
 function noticeSnoozeEver(){ window.__snoozed='ever'; closeNoticeModalBtn(); }
 function closeNoticeModalBtn(){ document.getElementById('noticeModal').classList.remove('open'); window.__closed=true; }
 function startNoticeEdit(){}
-${grab('noticeCleanStyle')}\n${grab('noticeSanitize')}\n${grab('noticeTitleOf')}
+${grab('rtCleanStyle')}\n${grab('rtSanitize')}\n${grab('noticeTitleOf')}
 ${grab('noticeStateOf')}\n${grab('noticeStateChip')}\n${grab('noticeVisibleList')}
 ${grab('noticePeriodText')}\n${grab('noticeWhenText')}
 ${grab('renderNoticeAutoStep')}\n${grab('noticeAutoStep')}\n${grab('renderNoticeModal')}

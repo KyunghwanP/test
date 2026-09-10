@@ -104,16 +104,17 @@ pg.on('pageerror', e => errs.push(e.message));
 await pg.route('https://ynhs.test/**', r => r.fulfill({
   contentType: 'text/html; charset=utf-8',
   body: `<!doctype html><meta charset="utf-8"><body><script>
-    ${grabConst('NOTICE_TAGS')}
-    ${grabConst('NOTICE_DROP')}
-    ${grabConst('NOTICE_STYLES')}
-    ${grabConst('NOTICE_KEY_RE')}
-    ${grabConst('NOTICE_ZWSP')}
+    ${grabConst('RT_TAGS')}
+    ${grabConst('RT_DROP')}
+    ${grabConst('RT_STYLES')}
+    ${grabConst('RT_SEG')}
+    ${grabConst('RT_KEY_RE')}
+    ${grabConst('RT_ZWSP')}
     const NOTICE_SEEN_KEY = 'noticeSeenAt';
     let _noticeList = [];
-    ${grab('noticeCleanStyle')}
-    ${grab('noticeSanitize')}
-    ${grab('noticeKeysIn')}
+    ${grab('rtCleanStyle')}
+    ${grab('rtSanitize')}
+    ${grab('rtKeysIn')}
     ${grab('noticeStateOf')}
     ${grabConst('noticeLiveList')}
     ${grab('noticeUnseen')}
@@ -140,8 +141,8 @@ await pg.route('https://ynhs.test/**', r => r.fulfill({
     ${grab('noticeToInput')}
     ${grab('noticeFromInput')}
     ${grab('noticeWhenText')}
-    window.clean   = h => noticeSanitize(h);
-    window.keys    = h => noticeKeysIn(h);
+    window.clean   = h => rtSanitize(h);
+    window.keys    = h => rtKeysIn(h);
     window.state   = (d, now) => noticeStateOf(d, now);
     window.live    = (list, now) => { _noticeList = list; return noticeLiveList(now).map(n => n.id); };
     window.titleOf = n => noticeTitleOf(n);

@@ -2602,35 +2602,49 @@
   }
 
   /* ── 편집기 ── */
-  .notice-toolbar{
+  .rt-toolbar{
     display:flex;align-items:center;gap:4px;flex-wrap:wrap;
     padding:8px 10px;border:1px solid var(--rule);border-bottom:none;
     border-radius:9px 9px 0 0;background:var(--paper-soft);
   }
-  .notice-tool{
+  .rt-tool{
     min-width:30px;height:30px;padding:0 7px;border-radius:7px;
     border:1px solid transparent;background:transparent;color:var(--ink);
     font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;
     display:flex;align-items:center;justify-content:center;
   }
-  .notice-tool:hover{background:var(--rule);}
-  .notice-tool-sep{width:1px;height:18px;background:var(--rule);margin:0 3px;}
-  .notice-tool-swatch{
+  .rt-tool:hover{background:var(--rule);}
+  .rt-tool-sep{width:1px;height:18px;background:var(--rule);margin:0 3px;}
+  .rt-tool-swatch{
     width:20px;height:20px;border-radius:5px;border:1px solid var(--rule);
     cursor:pointer;padding:0;
   }
-  .notice-editor{
+  .rt-editor{
     border:1px solid var(--rule);border-radius:0 0 9px 9px;
     padding:12px 14px;min-height:220px;max-height:46vh;overflow-y:auto;
     background:var(--paper);color:var(--ink);
     font-size:14px;line-height:1.65;outline:none;
   }
-  .notice-editor:focus{border-color:var(--mon);}
-  .notice-editor img, .notice-view img{
+  .rt-editor:focus{border-color:var(--mon);}
+  /* 업무캘린더 메모용 — 공지 본문만큼 클 이유가 없다. 모달 안이라 더 그렇다. */
+  .rt-editor.compact{min-height:clamp(90px,14vh,170px);max-height:34vh;font-size:15px;}
+  .rt-editor:empty::before{content:attr(data-ph);color:var(--ink-soft);opacity:.7;}
+  .mytask-memo-hint{
+    display:flex;gap:8px;align-items:baseline;justify-content:space-between;
+    font-size:12px;color:var(--ink-soft);margin-top:5px;line-height:1.5;
+  }
+  .mytask-memo-msg{color:var(--mon);font-weight:700;flex-shrink:0;}
+  /* 읽기 쪽 상자. 저장된 서식을 그대로 보여 준다. */
+  .rt-view{font-size:14px;line-height:1.65;color:var(--ink);word-break:break-word;}
+  .rt-view p{margin:0 0 6px;}
+  .rt-view ul,.rt-view ol{margin:4px 0;padding-left:20px;}
+  .rt-view img{max-width:100%;height:auto;border-radius:8px;display:block;margin:8px 0;cursor:zoom-in;}
+  .rt-view img.pending{opacity:0.45;}
+  .rt-editor img, .notice-view img, .rt-view img{
     max-width:100%;height:auto;border-radius:8px;display:block;margin:8px 0;
   }
   /* 아직 안 올라간(또는 워커가 없어 못 받은) 그림 자리 */
-  .notice-editor img.pending{opacity:0.45;}
+  .rt-editor img.pending{opacity:0.45;}
   .notice-view{font-size:14px;line-height:1.7;color:var(--ink);}
   .notice-view p{margin:0 0 8px;}
   .notice-hint{margin-top:8px;font-size:12px;font-weight:600;color:var(--ink-soft);}
@@ -2713,7 +2727,7 @@
   .notice-edit-state.before,
   .notice-edit-state.after{color:#854d0e;border-color:rgba(202,138,4,0.4);background:rgba(202,138,4,0.14);}
   .notice-edit-state.dirty{color:#991b1b;border-color:rgba(153,27,27,0.4);background:rgba(220,38,38,0.12);}
-  #noticePage .notice-editor{max-height:none;min-height:320px;}
+  #noticePage .rt-editor{max-height:none;min-height:320px;}
 
   .notice-state{
     margin-bottom:12px;padding:9px 12px;border-radius:8px;
@@ -5892,9 +5906,17 @@
             oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
             onkeydown="if(event.key==='Enter'){event.preventDefault();}"></textarea>
         </div>
-        <div class="mytask-modal-field">
+        <div class="mytask-modal-field" id="mytaskMemoField">
           <label>메모</label>
-          <textarea id="mytaskMemo" placeholder="상세 내용 (선택)" autocomplete="off" spellcheck="false"></textarea>
+          <!-- 도구 모음은 모달을 열 때 rtToolbarHtml() 로 채운다. 여기에 그대로
+               적어 두면 공지 쪽 도구가 바뀔 때 이쪽만 옛것으로 남는다. -->
+          <div id="mytaskMemoBar"></div>
+          <div class="rt-editor compact" id="mytaskMemoEd" contenteditable="true"
+               spellcheck="false" data-ph="상세 내용 (선택)"></div>
+          <div class="mytask-memo-hint">
+            <span>그림은 <b>Ctrl+V 로 붙여넣기</b>. 학생 신상이 담긴 자료는 넣지 마세요.</span>
+            <span class="mytask-memo-msg" id="mytaskMemoMsg"></span>
+          </div>
         </div>
         <div class="mytask-modal-dates">
           <div class="mytask-modal-field">
@@ -6304,7 +6326,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.30';
+const APP_VER = 'ver7.31';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -8611,13 +8633,15 @@ let _noticeList  = [];        // 이 배포의 공지들. 최근에 고친 것�
 let _noticeEditing = false;   // 공지 쓰기 화면(편집)에 있는가
 let _noticeDirty   = false;   // 그 안에서 실제로 고친 것이 있는가
 let _noticeDraft   = null;    // 지금 고치고 있는 공지 { id, title, html, keys, from, until, isNew }
-let _noticeObjUrls = [];      // 화면에서 뗄 때 되돌려줄 blob 주소
+// 화면에서 뗄 때 되돌려줄 blob 주소. 어느 상자에 그린 것인지 같이 적어 둔다 —
+// 공지 모달과 캘린더 모달이 동시에 떠 있어도 서로의 그림을 끊지 않게.
+let _rtObjUrls = [];      // [{ url, root }]
 
 // ── 걸러내기 ────────────────────────────────────────────────────────────────
 // 글은 관리자만 쓰므로 남이 심을 일은 없지만, 붙여넣기로 바깥 HTML 이 통째로
 // 들어온다 — 한글·워드·웹페이지에서 복사하면 스크립트도 표도 다 딸려 온다.
 // 그래서 '쓸 수 있는 것'만 남기고 나머지는 글자만 건진다.
-const NOTICE_TAGS = new Set(['B','STRONG','I','EM','U','S','STRIKE','SPAN','DIV','P','BR',
+const RT_TAGS = new Set(['B','STRONG','I','EM','U','S','STRIKE','SPAN','DIV','P','BR',
                              'UL','OL','LI','A','IMG','H1','H2','H3','H4']);
 // 이것들은 태그를 벗기는 게 아니라 안의 것까지 통째로 버린다. 벗기기만 하면
 // 스크립트 태그의 알맹이가 그냥 글자로 공지에 남는다.
@@ -8625,20 +8649,29 @@ const NOTICE_TAGS = new Set(['B','STRONG','I','EM','U','S','STRIKE','SPAN','DIV'
 // 닫는 태그 글자가 나오는 순간 이 스크립트를 그 자리에서 끊어 버린다 — 실제로
 // 그래서 아래 12,000줄이 HTML 로 읽혀 로그인부터 먹통이 됐다.
 // tests/html-scripts.test.mjs 가 이걸 잡는다.
-const NOTICE_DROP = new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','NOSCRIPT',
+const RT_DROP = new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','NOSCRIPT',
                              'TEMPLATE','LINK','META','FORM','INPUT','BUTTON','SVG']);
 // 주간교육활동 원본을 그릴 때 쓰는 것과 같은 여섯 가지. 이 밖의 것(position,
 // display, 배경 이미지 …)이 들어오면 공지 하나가 화면을 덮을 수 있다.
-const NOTICE_STYLES = ['color','font-size','font-weight','font-style',
+const RT_STYLES = ['color','font-size','font-weight','font-style',
                        'text-decoration','background-color'];
-const NOTICE_KEY_RE = /^notices\/[A-Za-z0-9_-]{1,40}\/[A-Za-z0-9_-]{1,40}\/[A-Za-z0-9_-]{1,40}\.jpg$/;
+// 그림 키(= R2 안의 파일 경로). 두 갈래를 받는다.
+//   notices/<배포>/<공지id>/<파일id>.jpg          — 전체 공지. 관리자만 쓴다.
+//   tasks/<배포>/<올린이uid>/<일정id>/<파일id>.jpg — 업무캘린더 메모. 교사 누구나 쓴다.
+// 캘린더 쪽에 올린이 uid 가 한 칸 더 들어가는 것이 핵심이다. 그 칸이 곧 담이라,
+// 청소(안 쓰는 그림 지우기)가 남의 그림까지 훑고 갈 수 없다. 워커는 저 칸을
+// 요청에 적힌 값이 아니라 '토큰을 확인한 결과'에서 꺼내 쓴다 — 남의 칸 이름을
+// 적어 보내는 길을 아예 막는다.
+const RT_SEG = '[A-Za-z0-9_-]{1,40}';
+const RT_KEY_RE = new RegExp(
+  `^(?:notices/${RT_SEG}/${RT_SEG}|tasks/${RT_SEG}/${RT_SEG}/${RT_SEG})/${RT_SEG}\\.jpg$`);
 // 크기만 고르고 아직 아무것도 안 친 자리를 잡아 두는 보이지 않는 글자.
 // 저장할 때 걸러내기가 지운다 — 안 지우면 공지에 빈 칸이 섞여 남는다.
-const NOTICE_ZWSP = '​';
+const RT_ZWSP = '​';
 
-function noticeCleanStyle(el){
+function rtCleanStyle(el){
   const keep = [];
-  for (const prop of NOTICE_STYLES) {
+  for (const prop of RT_STYLES) {
     const v = el.style.getPropertyValue(prop);
     // url(...) 은 통째로 버린다 — 색 자리에 넣어 바깥으로 요청을 내보낼 수 있다.
     if (v && !/url\s*\(|expression|javascript:/i.test(v)) keep.push(prop + ':' + v);
@@ -8647,15 +8680,15 @@ function noticeCleanStyle(el){
   else el.removeAttribute('style');
 }
 
-function noticeSanitize(html){
+function rtSanitize(html){
   const box = document.createElement('div');
   box.innerHTML = String(html || '');
   const walk = node => {
     for (const child of [...node.childNodes]) {
       if (child.nodeType === 3) continue;                       // 글자
       if (child.nodeType !== 1) { child.remove(); continue; }    // 주석 등
-      if (NOTICE_DROP.has(child.tagName)) { child.remove(); continue; }
-      if (!NOTICE_TAGS.has(child.tagName)) {
+      if (RT_DROP.has(child.tagName)) { child.remove(); continue; }
+      if (!RT_TAGS.has(child.tagName)) {
         // 태그만 벗기고 안의 글자는 살린다(문단이 통째로 사라지면 더 놀란다)
         walk(child);
         child.replaceWith(...child.childNodes);
@@ -8670,11 +8703,11 @@ function noticeSanitize(html){
       if (child.tagName === 'IMG') {
         // 그림은 R2 키로만 남는다. src 는 그릴 때 붙인다 — 바깥 주소를 그대로
         // 두면 공지를 여는 사람 전원이 그 서버로 요청을 보내게 된다.
-        if (!NOTICE_KEY_RE.test(dataK || '')) { child.remove(); continue; }
+        if (!RT_KEY_RE.test(dataK || '')) { child.remove(); continue; }
         child.setAttribute('data-k', dataK);
         continue;                                   // 그림 안에는 아무것도 없다
       }
-      if (style) { child.setAttribute('style', style); noticeCleanStyle(child); }
+      if (style) { child.setAttribute('style', style); rtCleanStyle(child); }
       if (child.tagName === 'A') {
         // javascript: 같은 것을 거른다. 주소가 성하지 않으면 글자만 남긴다.
         if (/^https?:\/\//i.test(href || '')) {
@@ -8695,18 +8728,18 @@ function noticeSanitize(html){
   // 없어진 껍데기도 치운다(크기만 고르고 안 친 자리).
   const it = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
   const texts = []; while (it.nextNode()) texts.push(it.currentNode);
-  for (const t of texts) t.data = t.data.split(NOTICE_ZWSP).join('');
+  for (const t of texts) t.data = t.data.split(RT_ZWSP).join('');
   for (const el of [...box.querySelectorAll('span')])
     if (!el.textContent && !el.querySelector('img,br')) el.remove();
   return box.innerHTML;
 }
 
 // 글에 실제로 쓰이는 그림 키. 저장할 때 문서에 같이 넣고, 청소의 기준이 된다.
-function noticeKeysIn(html){
+function rtKeysIn(html){
   const box = document.createElement('div');
   box.innerHTML = String(html || '');
   return [...new Set([...box.querySelectorAll('img[data-k]')]
-    .map(i => i.getAttribute('data-k')).filter(k => NOTICE_KEY_RE.test(k)))];
+    .map(i => i.getAttribute('data-k')).filter(k => RT_KEY_RE.test(k)))];
 }
 
 // 제목을 안 적었으면 본문 첫 줄에서 만든다. 목록에 '(제목 없음)' 만 늘어서면
@@ -8724,7 +8757,7 @@ function noticeTitleOf(n){
 }
 
 // ── 워커 ────────────────────────────────────────────────────────────────────
-async function noticeApi(payload){
+async function rtApi(payload){
   const idToken = await fbAuth.currentUser.getIdToken();
   const res = await fetch(NOTICE_WORKER, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -8735,21 +8768,21 @@ async function noticeApi(payload){
 
 // 그림은 <img src> 로 못 받는다 — 워커가 토큰을 요구하는데 브라우저는 이미지
 // 요청에 Authorization 헤더를 못 붙인다. 받아서 blob 주소로 바꿔 끼운다.
-async function noticeLoadImages(root){
+async function rtLoadImages(root){
   const imgs = [...root.querySelectorAll('img[data-k]')];
   if (!imgs.length) return;
   let idToken = '';
   try { idToken = await fbAuth.currentUser.getIdToken(); } catch(e){ return; }
   await Promise.all(imgs.map(async img => {
     const k = img.getAttribute('data-k');
-    if (!NOTICE_KEY_RE.test(k || '')) { img.remove(); return; }
+    if (!RT_KEY_RE.test(k || '')) { img.remove(); return; }
     img.classList.add('pending');
     try {
       const res = await fetch(`${NOTICE_WORKER}/img?k=${encodeURIComponent(k)}`,
                               { headers: { Authorization: `Bearer ${idToken}` } });
       if (!res.ok || !(res.headers.get('Content-Type')||'').startsWith('image/')) throw 0;
       const url = URL.createObjectURL(await res.blob());
-      _noticeObjUrls.push(url);
+      _rtObjUrls.push({ url, root });
       img.src = url;
       img.classList.remove('pending');
     } catch(e){
@@ -8759,17 +8792,21 @@ async function noticeLoadImages(root){
   }));
 }
 
-function noticeReleaseImages(){
-  for (const u of _noticeObjUrls) { try { URL.revokeObjectURL(u); } catch(e){} }
-  _noticeObjUrls = [];
+function rtReleaseImages(root){
+  const rest = [];
+  for (const it of _rtObjUrls) {
+    if (root && it.root !== root) { rest.push(it); continue; }   // 남의 것은 둔다
+    try { URL.revokeObjectURL(it.url); } catch(e){}
+  }
+  _rtObjUrls = rest;
 }
 
 // 이 배포의 모든 공지가 쓰는 그림 키. 청소는 반드시 이걸 기준으로 해야 한다 —
 // 지금 고치는 공지의 키만 넘기면 다른 공지의 그림이 통째로 지워진다.
 function noticeAllKeys(extra){
   const set = new Set();
-  for (const n of _noticeList) for (const k of (n.keys || [])) if (NOTICE_KEY_RE.test(k)) set.add(k);
-  for (const k of (extra || [])) if (NOTICE_KEY_RE.test(k)) set.add(k);
+  for (const n of _noticeList) for (const k of (n.keys || [])) if (RT_KEY_RE.test(k)) set.add(k);
+  for (const k of (extra || [])) if (RT_KEY_RE.test(k)) set.add(k);
   return [...set];
 }
 
@@ -9057,7 +9094,7 @@ function noticeStateChip(st){
 }
 
 function renderNoticeModal(){
-  noticeReleaseImages();
+  rtReleaseImages();
   const body = document.getElementById('noticeBody');
   const foot = document.getElementById('noticeFoot');
   const when = document.getElementById('noticeWhen');
@@ -9119,9 +9156,9 @@ function renderNoticeModal(){
   }
   const view = document.createElement('div');
   view.className = 'notice-view';
-  view.innerHTML = noticeSanitize(show.html);
+  view.innerHTML = rtSanitize(show.html);
   body.appendChild(view);
-  noticeLoadImages(view);
+  rtLoadImages(view);
 
   const back = list.length > 1
     ? `<button class="notice-btn" onclick="noticeBackToList()">‹ 목록</button>` : '';
@@ -9150,9 +9187,9 @@ function renderNoticeAutoStep(list){
   body.innerHTML = '';
   const view = document.createElement('div');
   view.className = 'notice-view';
-  view.innerHTML = noticeSanitize(n.html);
+  view.innerHTML = rtSanitize(n.html);
   body.appendChild(view);
-  noticeLoadImages(view);
+  rtLoadImages(view);
   // 넘길 때 맨 위에서 시작하는 것은 본문을 비우는 것만으로 된다(브라우저가
   // 스크롤을 0 으로 되돌린다) — 확인하고 따로 손대지 않는다.
 
@@ -9210,6 +9247,12 @@ function bindNoticeZoom(){
     const img = e.target.closest('.notice-view img');
     if (img && img.src) openNoticeZoom(img.src);
   });
+  // 업무캘린더 메모의 그림도 같은 창으로 크게 본다. 크게 보기(z-index 9200)가
+  // 캘린더 모달(9100) 위에 뜨고, ESC·뒤로가기도 이미 이쪽을 먼저 닫는다.
+  document.getElementById('mytaskRecvInfo')?.addEventListener('click', e => {
+    const img = e.target.closest('.rt-view img');
+    if (img && img.src) openNoticeZoom(img.src);
+  });
   const ov = document.getElementById('noticeImgZoom');
   document.getElementById('noticeZoomImg')?.addEventListener('click', e => {
     e.stopPropagation(); toggleNoticeZoomActual();
@@ -9240,7 +9283,7 @@ function closeNoticeModal(e){
 function closeNoticeModalBtn(){ closeNoticeModal(null); }
 function doCloseNoticeModal(){
   _noticeAuto = false;
-  noticeReleaseImages();
+  rtReleaseImages();
   document.getElementById('noticeModal')?.classList.remove('open');
   document.getElementById('noticeBody').innerHTML = '';
   document.getElementById('noticeFoot').innerHTML = '';
@@ -9276,7 +9319,7 @@ function renderNoticeAdminList(){
   _noticeEditing = false;
   _noticeDirty = false;
   _noticeDraft = null;
-  noticeReleaseImages();
+  rtReleaseImages();
   document.getElementById('noticePreviewBtn').style.display = 'none';
   document.getElementById('noticeCheckBtn').style.display = '';
   document.getElementById('noticeNewBtn').style.display = '';
@@ -9309,7 +9352,7 @@ function openNoticeEditor(id){
     : { id: noticeNewId(), title: '', html: '', keys: [], from: 0, until: 0, isNew: true };
   _noticeEditing = true;
   _noticeDirty = false;
-  noticeReleaseImages();
+  rtReleaseImages();
   document.getElementById('noticePreviewBtn').style.display = '';
   document.getElementById('noticeCheckBtn').style.display = 'none';
   document.getElementById('noticeNewBtn').style.display = 'none';
@@ -9318,21 +9361,8 @@ function openNoticeEditor(id){
   body.innerHTML = `
     <input type="text" id="noticeTitleIn" class="notice-title-in" maxlength="60"
            placeholder="제목 (비우면 본문 첫 줄을 씁니다)">
-    <div class="notice-toolbar">
-      <button type="button" class="notice-tool" data-cmd="bold"      title="굵게 (Ctrl+B)"><b>B</b></button>
-      <button type="button" class="notice-tool" data-cmd="italic"    title="기울임 (Ctrl+I)"><i>I</i></button>
-      <button type="button" class="notice-tool" data-cmd="underline" title="밑줄 (Ctrl+U)"><u>U</u></button>
-      <span class="notice-tool-sep"></span>
-      <select class="notice-tool" id="noticeSizeSel" title="글자 크기" style="width:auto;padding:0 6px;">
-        ${NOTICE_SIZES.map(([n,v],i) => `<option value="${v}"${i===1?' selected':''}>${n}</option>`).join('')}
-      </select>
-      <span class="notice-tool-sep"></span>
-      ${NOTICE_COLORS.map(c => `<button type="button" class="notice-tool-swatch" data-color="${c}" style="background:${c};" title="글자색"></button>`).join('')}
-      <span class="notice-tool-sep"></span>
-      <button type="button" class="notice-tool" data-cmd="insertUnorderedList" title="목록">•—</button>
-      <button type="button" class="notice-tool" data-cmd="removeFormat" title="서식 지우기">✕서식</button>
-    </div>
-    <div class="notice-editor" id="noticeEditor" contenteditable="true" spellcheck="false"></div>
+    ${rtToolbarHtml('noticeSizeSel')}
+    <div class="rt-editor" id="noticeEditor" contenteditable="true" spellcheck="false"></div>
     <div class="notice-hint">그림은 <b>Ctrl+V 로 붙여넣기</b> 하시면 됩니다. 웹주소가 없는 캡처도 됩니다.</div>
     <div class="notice-period">
       <span class="notice-period-lbl">게시 기간</span>
@@ -9356,9 +9386,14 @@ function openNoticeEditor(id){
   document.getElementById('noticeUntil').addEventListener('change', noticeMarkDirty);
 
   const ed = document.getElementById('noticeEditor');
-  ed.innerHTML = noticeSanitize(_noticeDraft.html);
-  noticeLoadImages(ed);
-  bindNoticeEditor(ed);
+  ed.innerHTML = rtSanitize(_noticeDraft.html);
+  rtLoadImages(ed);
+  rtBindEditor(ed, {
+    toolbar: body.querySelector('.rt-toolbar'),
+    onDirty: noticeMarkDirty,
+    put:     () => ({ kind: 'notice', noticeId: _noticeDraft.id }),
+    status:  m => { const el = document.getElementById('noticeSaveMsg'); if (el) el.textContent = m; }
+  });
 
   document.getElementById('noticeEditFoot').innerHTML = `
     <span class="notice-foot-msg" id="noticeSaveMsg"></span>
@@ -9412,35 +9447,50 @@ function noticeCloseEditor(){
 function cancelNoticeEdit(){ noticeCloseEditor(); }
 
 // ── 편집기 조작 ─────────────────────────────────────────────────────────────
-const NOTICE_COLORS = ['#111827','#dc2626','#ea580c','#ca8a04','#16a34a','#2563eb','#7c3aed'];
+const RT_COLORS = ['#111827','#dc2626','#ea580c','#ca8a04','#16a34a','#2563eb','#7c3aed'];
 // 본문 기본은 14px 이다. '작게'를 14px 로 두면 골라도 아무 일이 안 일어난 것처럼
 // 보이므로, 기본보다 확실히 작은 값에서 시작한다.
-const NOTICE_SIZES  = [['작게','12px'],['보통','14px'],['크게','19px'],['아주 크게','25px']];
+const RT_SIZES  = [['작게','12px'],['보통','14px'],['크게','19px'],['아주 크게','25px']];
 
-function bindNoticeEditor(ed){
+// 편집기 한 대를 배선한다 — 공지와 업무캘린더가 같은 것을 쓴다.
+//   ed   : contenteditable 요소
+//   opts : {
+//     toolbar  이 편집기의 도구 모음 요소. 한 화면에 편집기가 둘 이상 있어도
+//              서로의 단추를 잡지 않게, 문서 전체가 아니라 이 안에서만 찾는다.
+//     onDirty  뭔가 고쳐졌을 때 부를 것
+//     put      그림을 어디에 올릴지 → () => ({ kind:'task', taskId })
+//              없으면 그림 붙여넣기를 안 받는다(글자만).
+//     onKey    올린 그림 키를 알려 준다. 저장 안 하고 나갔을 때 치우는 데 쓴다.
+//     status   진행 상황을 적을 곳 → (msg) => {}
+//   }
+function rtBindEditor(ed, opts){
+  const o = ed._rt = (opts || {});
+  const bar   = o.toolbar || document;
+  const dirty = () => { try { o.onDirty && o.onDirty(); } catch(e){} };
+
   // 색·굵기를 span 으로 넣는다. 안 켜면 <font> 태그가 나와 걸러내기에서 사라진다.
   try { document.execCommand('styleWithCSS', false, true); } catch(e){}
 
-  document.querySelectorAll('#noticeEditBody .notice-tool[data-cmd]').forEach(b => {
+  bar.querySelectorAll('.rt-tool[data-cmd]').forEach(b => {
     // mousedown 에서 막아야 커서(선택 영역)가 살아 있다. click 때는 이미 풀린다.
     b.addEventListener('mousedown', e => e.preventDefault());
     b.addEventListener('click', () => {
       ed.focus();
       try { document.execCommand(b.dataset.cmd, false, null); } catch(e){}
-      noticeMarkDirty();
+      dirty();
     });
   });
-  document.querySelectorAll('#noticeEditBody .notice-tool-swatch').forEach(b => {
+  bar.querySelectorAll('.rt-tool-swatch').forEach(b => {
     b.addEventListener('mousedown', e => e.preventDefault());
     b.addEventListener('click', () => {
       ed.focus();
       try { document.execCommand('foreColor', false, b.dataset.color); } catch(e){}
-      noticeMarkDirty();
+      dirty();
     });
   });
-  const sel = document.getElementById('noticeSizeSel');
+  const sel = bar.querySelector('.rt-size-sel');
   // focus() 를 여기서 먼저 부르면 안 된다. 커서 자리를 챙기는 것이 먼저다.
-  sel?.addEventListener('change', () => { noticeSetFontSize(sel.value); noticeMarkDirty(); });
+  sel?.addEventListener('change', () => { rtSetFontSize(ed, sel.value); dirty(); });
 
   // 한글 워드프로세서처럼 Ctrl+B/I/U — 브라우저가 기본으로 주는 것이지만,
   // contenteditable 밖에서 눌렸을 때 엉뚱한 곳에 걸리지 않게 여기서 받는다.
@@ -9452,14 +9502,31 @@ function bindNoticeEditor(ed){
       document.execCommand({ b:'bold', i:'italic', u:'underline' }[k], false, null);
     }
   });
-  ed.addEventListener('paste', onNoticePaste);
-  ed.addEventListener('input',   noticeMarkDirty);
-  ed.addEventListener('keyup',   noticeSyncSizeSel);
-  ed.addEventListener('mouseup', noticeSyncSizeSel);
+  ed.addEventListener('paste', e => rtOnPaste(e, ed));
+  ed.addEventListener('input',   dirty);
+  ed.addEventListener('keyup',   () => rtSyncSizeSel(ed));
+  ed.addEventListener('mouseup', () => rtSyncSizeSel(ed));
 }
 
-function noticeSetFontSize(px){
-  const ed = document.getElementById('noticeEditor');
+// 도구 모음 생김새는 한 군데서만 만든다. 두 곳에 따로 적어 두면 한쪽만 바뀐다.
+function rtToolbarHtml(selId){
+  return `<div class="rt-toolbar">
+      <button type="button" class="rt-tool" data-cmd="bold"      title="굵게 (Ctrl+B)"><b>B</b></button>
+      <button type="button" class="rt-tool" data-cmd="italic"    title="기울임 (Ctrl+I)"><i>I</i></button>
+      <button type="button" class="rt-tool" data-cmd="underline" title="밑줄 (Ctrl+U)"><u>U</u></button>
+      <span class="rt-tool-sep"></span>
+      <select class="rt-tool rt-size-sel"${selId ? ` id="${selId}"` : ''} title="글자 크기" style="width:auto;padding:0 6px;">
+        ${RT_SIZES.map(([n,v],i) => `<option value="${v}"${i===1?' selected':''}>${n}</option>`).join('')}
+      </select>
+      <span class="rt-tool-sep"></span>
+      ${RT_COLORS.map(c => `<button type="button" class="rt-tool-swatch" data-color="${c}" style="background:${c};" title="글자색"></button>`).join('')}
+      <span class="rt-tool-sep"></span>
+      <button type="button" class="rt-tool" data-cmd="insertUnorderedList" title="목록">•—</button>
+      <button type="button" class="rt-tool" data-cmd="removeFormat" title="서식 지우기">✕서식</button>
+    </div>`;
+}
+
+function rtSetFontSize(ed, px){
   if (!ed) return;
   // 고른 자리를 먼저 챙긴다 — 목록(select)을 누르는 순간 편집기는 포커스를 잃는다.
   const sel = getSelection();
@@ -9473,7 +9540,7 @@ function noticeSetFontSize(px){
   // 그때는 씌울 글자가 없으므로, 보이지 않는 글자 하나로 자리를 만들고 그 안에
   // 커서를 넣는다. 이어서 치는 글자가 그 안으로 들어간다.
   if (r0.collapsed) {
-    span.appendChild(document.createTextNode(NOTICE_ZWSP));
+    span.appendChild(document.createTextNode(RT_ZWSP));
     r0.insertNode(span);
     ed.focus();
     try {
@@ -9512,9 +9579,9 @@ function noticeSetFontSize(px){
 
 // 커서가 놓인 자리의 크기를 골라 놓은 값에 비춘다. 안 맞추면 목록은 늘 '보통'인데
 // 글자는 크게 나와, 고르는 사람이 무엇이 걸려 있는지 알 수 없다.
-function noticeSyncSizeSel(){
-  const selEl = document.getElementById('noticeSizeSel');
-  const ed = document.getElementById('noticeEditor');
+function rtSyncSizeSel(ed){
+  const bar = ed && ed._rt && ed._rt.toolbar;
+  const selEl = bar && bar.querySelector('.rt-size-sel');
   if (!selEl || !ed) return;
   const s = getSelection();
   const r = s && s.rangeCount ? s.getRangeAt(0) : null;
@@ -9526,30 +9593,36 @@ function noticeSyncSizeSel(){
   if (node && node.nodeType === 3) node = node.parentElement;
   if (!node || !ed.contains(node)) return;
   const px = node ? getComputedStyle(node).fontSize : '';
-  const hit = NOTICE_SIZES.find(([, v]) => v === px);
-  selEl.value = hit ? hit[1] : NOTICE_SIZES[1][1];
+  const hit = RT_SIZES.find(([, v]) => v === px);
+  selEl.value = hit ? hit[1] : RT_SIZES[1][1];
 }
 
 // ── 붙여넣기 ────────────────────────────────────────────────────────────────
 // 글은 걸러서 넣고, 그림은 R2 로 올린 뒤 자리에 끼운다.
-async function onNoticePaste(e){
+async function rtOnPaste(e, ed){
   const dt = e.clipboardData;
   if (!dt) return;
+  const o = (ed && ed._rt) || {};
   const files = [...(dt.items || [])].filter(i => i.kind === 'file' && /^image\//.test(i.type));
   if (files.length) {
+    // 그림을 못 받는 편집기면 브라우저 기본 동작에 맡기지 않는다 — 기본 동작은
+    // 그림을 data: 주소째로 본문에 박아 넣어, 문서 하나가 몇 MB 가 된다.
     e.preventDefault();
-    for (const it of files) { const f = it.getAsFile(); if (f) await noticeInsertImage(f); }
+    // put() 이 null 을 돌려주는 때도 있다(보기 모드 등) — 그때도 못 받는 것으로 본다.
+    if (!o.put || !o.put()) { alert(o.noPutMsg || '여기에는 그림을 넣을 수 없습니다.'); return; }
+    for (const it of files) { const f = it.getAsFile(); if (f) await rtInsertImage(ed, f); }
     return;
   }
   const html = dt.getData('text/html');
   if (!html) return;                       // 그냥 글자면 브라우저에 맡긴다
   e.preventDefault();
-  document.execCommand('insertHTML', false, noticeSanitize(html));
-  noticeMarkDirty();
+  // 남의 문서에서 온 그림(<img src="http...">)은 걸러내기가 이미 지운다.
+  document.execCommand('insertHTML', false, rtSanitize(html));
+  try { o.onDirty && o.onDirty(); } catch(err){}
 }
 
 // 붙여넣은 그림을 줄여서 dataURL 로. 원본 그대로 올리면 캡처 한 장이 몇 MB 다.
-function noticeShrink(file){
+function rtShrink(file){
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -9571,32 +9644,46 @@ function noticeShrink(file){
   });
 }
 
-const noticeFileId = () => 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const rtFileId = () => 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
-async function noticeInsertImage(file){
-  const msg = document.getElementById('noticeSaveMsg');
-  if (msg) msg.textContent = '그림 올리는 중...';
+// 붙여넣은 그림 한 장을 R2 로 올리고 그 자리에 끼운다.
+// 본문에는 키만 남는다 — dataUrl 은 지금 화면에 보여 주려고 잠깐 쓸 뿐이고,
+// 저장할 때 걸러내기가 src 를 통째로 떼어 낸다.
+async function rtInsertImage(ed, file){
+  const o = (ed && ed._rt) || {};
+  const where = o.put && o.put();
+  if (!where) return;
+  const say = m => { try { o.status && o.status(m); } catch(e){} };
+  say('그림 올리는 중...');
   try {
-    const dataUrl = await noticeShrink(file);
-    const r = await noticeApi({ action: 'put', noticeId: _noticeDraft.id,
-                                fileId: noticeFileId(), dataUrl });
-    if (!r || !r.success) throw new Error(noticeErrText(r && r.error));
+    const dataUrl = await rtShrink(file);
+    const r = await rtApi({ action: 'put', ...where, fileId: rtFileId(), dataUrl });
+    if (!r || !r.success) throw new Error(rtErrText(r && r.error, where.kind));
+    // 워커가 만든 키라도 그대로 태그에 박기 전에 한 번 더 본다.
+    if (!RT_KEY_RE.test(r.key || '')) throw new Error('저장소가 이상한 답을 보냈습니다.');
+    try { o.onKey && o.onKey(r.key); } catch(e){}
+    ed.focus();
     document.execCommand('insertHTML', false,
       `<img data-k="${r.key}" src="${dataUrl}"><br>`);
-    noticeMarkDirty();
-    if (msg) msg.textContent = '';
+    try { o.onDirty && o.onDirty(); } catch(e){}
+    say('');
   } catch(err){
-    if (msg) msg.textContent = '';
+    say('');
     alert('그림을 올리지 못했습니다.\n' + (err.message || err));
   }
 }
 
-function noticeErrText(err){
+function rtErrText(err, kind){
   if (err === 'NO_BUCKET')  return '그림 저장소가 아직 연결되지 않았습니다(Cloudflare 설정 전).';
   if (err === 'TOO_BIG')    return '그림이 너무 큽니다.';
   if (err === 'BAD_IMAGE')  return '그림 형식을 알 수 없습니다.';
-  if (err === 'FORBIDDEN')  return '공지를 쓸 수 있는 계정이 아닙니다.';
   if (err === 'AUTH')       return '로그인이 만료되었습니다. 새로고침해 주세요.';
+  // 캘린더 메모는 교사 누구나 그림을 넣을 수 있다. 그런데도 '권한 없음'이 온다면
+  // 저장소가 아직 옛 워커다(그때는 관리자만 올릴 수 있었다). 앱만 새로 올라가고
+  // 워커 재배포가 빠졌을 때 반드시 겪는 길이라, 그 말을 그대로 적어 준다.
+  if (kind === 'task' && (err === 'FORBIDDEN' || err === 'BAD_KEY' || err === 'UNKNOWN_ACTION'))
+    return '그림 저장소가 아직 새 버전으로 바뀌지 않았습니다.\n관리자에게 알려 주세요.';
+  if (err === 'FORBIDDEN')  return '이 그림을 올릴 수 있는 계정이 아닙니다.';
   return '연결에 실패했습니다. 잠시 뒤 다시 시도해 주세요.';
 }
 
@@ -9606,7 +9693,7 @@ async function saveNotice(){
   const btn = document.getElementById('noticeSaveBtn');
   const msg = document.getElementById('noticeSaveMsg');
   if (!ed || !_noticeDraft) return;
-  const html = noticeSanitize(ed.innerHTML);
+  const html = rtSanitize(ed.innerHTML);
   // 글자도 그림도 없으면 빈 공지다 — 저장 대신 지우는 것으로 본다
   const bare = html.replace(/<[^>]*>/g, '').replace(/&nbsp;|\s/g, '');
   if (!bare && !/\<img/i.test(html)) { alert('내용이 비어 있습니다.'); return; }
@@ -9621,7 +9708,7 @@ async function saveNotice(){
   if (btn) btn.disabled = true;
   if (msg) msg.textContent = '저장 중...';
   try {
-    const keys  = noticeKeysIn(html);
+    const keys  = rtKeysIn(html);
     const title = String(document.getElementById('noticeTitleIn')?.value || '').trim();
     await setDoc(doc(fbDb, 'appNotice', _noticeDraft.id), {
       scope: NOTICE_SCOPE, title, html, keys, from, until,
@@ -9632,7 +9719,7 @@ async function saveNotice(){
     // '무엇이 쓰이는지'가 확정된 유일한 시점이라 여기서 치운다.
     // 반드시 '모든 공지'의 키를 넘긴다 — 이 공지 것만 넘기면 다른 공지의 그림이
     // 안 쓰이는 것으로 보여 통째로 지워진다.
-    noticeApi({ action: 'sweep', keep: noticeAllKeys(keys) }).catch(() => {});
+    rtApi({ action: 'sweep', keep: noticeAllKeys(keys) }).catch(() => {});
 
     _noticeDraft = { ..._noticeDraft, title, html, keys, from, until,
                      updatedAt: Date.now(), isNew: false };
@@ -9663,7 +9750,7 @@ async function deleteNotice(){
     // 지운 공지의 키는 빼고 나머지 전부를 남긴다
     const gone = new Set(_noticeDraft.keys || []);
     const keep = noticeAllKeys().filter(k => !gone.has(k));
-    noticeApi({ action: 'sweep', keep }).catch(() => {});
+    rtApi({ action: 'sweep', keep }).catch(() => {});
     _noticeList = _noticeList.filter(n => n.id !== _noticeDraft.id);
     _noticeDirty = false;
     renderNoticeAdminList();
@@ -9694,9 +9781,9 @@ function previewNotice(){
   body.appendChild(tag);
   const view = document.createElement('div');
   view.className = 'notice-view';
-  view.innerHTML = noticeSanitize(ed.innerHTML);
+  view.innerHTML = rtSanitize(ed.innerHTML);
   body.appendChild(view);
-  noticeLoadImages(view);
+  rtLoadImages(view);
   document.getElementById('noticeFoot').innerHTML = '';
   m.classList.add('open');
   history.pushState({ modal: 'notice' }, '');
@@ -9713,16 +9800,16 @@ async function noticeCheckWorker(){
   const c = document.createElement('canvas'); c.width = c.height = 1;
   const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,1,1);
   try {
-    const put = await noticeApi({ action: 'put', noticeId: 'selftest',
+    const put = await rtApi({ action: 'put', noticeId: 'selftest',
                                   fileId: 'selftest', dataUrl: c.toDataURL('image/jpeg', 0.5) });
-    if (!put || !put.success) throw new Error(noticeErrText(put && put.error));
+    if (!put || !put.success) throw new Error(rtErrText(put && put.error));
 
     const idToken = await fbAuth.currentUser.getIdToken();
     const got = await fetch(`${NOTICE_WORKER}/img?k=${encodeURIComponent(put.key)}`,
                             { headers: { Authorization: `Bearer ${idToken}` } });
     if (!got.ok) throw new Error('올리기는 됐는데 내려받기가 안 됩니다(' + got.status + ').');
 
-    const del = await noticeApi({ action: 'del', key: put.key });
+    const del = await rtApi({ action: 'del', key: put.key });
     if (!del || !del.success) throw new Error('올리기·보기는 되는데 지우기가 안 됩니다.');
 
     say('✅ 그림 저장소 정상 — 붙여넣기로 그림을 올릴 수 있습니다.');
@@ -16868,7 +16955,7 @@ function navigateTo(page) {
     if (uf && uf.src && uf.src !== 'about:blank') uf.src = 'about:blank';
   }
   if(page === 'notice') initNoticePage();
-  else if(currentPage === 'notice') { _noticeEditing = false; _noticeDirty = false; noticeReleaseImages(); }
+  else if(currentPage === 'notice') { _noticeEditing = false; _noticeDirty = false; rtReleaseImages(); }
   if(page !== 'consult') stopConsultWatch();
   if(page !== 'room') stopRoomWatch();
   if(page === 'room') initRoomPage();
@@ -19446,6 +19533,9 @@ window.togglePanelConsult  = togglePanelConsult;
 let mytaskYear      = new Date().getFullYear();
 let mytaskMonth     = new Date().getMonth();
 let mytaskTasks     = [];
+// 내 일정 목록이 실제로 한 번이라도 도착했는가. 그림 청소가 이걸 본다 —
+// 안 왔는데 청소하면 '쓰는 그림이 하나도 없다'로 읽혀 전부 지워진다.
+let mytaskLoadedOnce = false;
 let mytaskShared    = [];
 let mytaskEditId    = null;
 let mytaskEditOwner = null;
@@ -19959,8 +20049,14 @@ async function ttMeetAddToCalendar(){
   try {
     const set = (id, v) => { const el = document.getElementById(id); if(el) el.value = v; };
     set('mytaskTitle', '협의');
-    set('mytaskMemo', `대상: ${ttMeetPicked.join(', ')}`
-      + (sel.busy.length ? `\n※ ${sel.busy.join(', ')} 선생님은 이 시간 수업이 있습니다.` : ''));
+    // 메모는 이제 입력칸(value)이 아니라 편집기(innerHTML)다. 여기에 글자를 그대로
+    // 넣으면 이름 안의 <, & 가 태그로 읽히므로 escapeHtml 을 거친다.
+    const memoEd = document.getElementById('mytaskMemoEd');
+    if (memoEd) {
+      const lines = [`대상: ${ttMeetPicked.join(', ')}`];
+      if (sel.busy.length) lines.push(`※ ${sel.busy.join(', ')} 선생님은 이 시간 수업이 있습니다.`);
+      memoEd.innerHTML = lines.map(l => escapeHtml(l)).join('<br>');
+    }
     const b = BELL_SCHEDULE.find(x => String(x.period) === String(sel.key));
     if(b){ setMytaskTimeSelect('mytaskStartTime', b.start); setMytaskTimeSelect('mytaskEndTime', b.end); }
     renderMytaskSharedList();
@@ -20480,6 +20576,7 @@ async function loadMytasks() {
     collection(fbDb, 'tasks', myUid, 'items'),
     snap => {
       const myTasks = snap.docs.map(d => ({ id: d.id, ownerUid: myUid, ...d.data() }));
+      mytaskLoadedOnce = true;
       mytaskHealShareIds(myTasks, myUid);   // 이름으로 저장된 공유 대상을 이메일로 정정
       // 공유받은 일정(ownerUid !== myUid)은 유지, 내 일정만 교체
       mytaskTasks = [...myTasks, ...mytaskTasks.filter(t => t.ownerUid !== myUid)];
@@ -21409,9 +21506,17 @@ function renderMytaskRecvInfo(t, isOwner = false){
     const until = t.repeat.until ? ` (${escapeHtml(t.repeat.until)} 까지)` : '';
     html += row('반복', escapeHtml(MYTASK_REPEAT_LABEL[rep] || rep) + until);
   }
-  if (t.memo) html += row('메모', escapeHtml(t.memo), 'mrv-text');
+  // 메모는 두 모양으로 저장돼 있다.
+  //   memoHtml — 서식·그림이 있는 새 메모
+  //   memo     — 그 전에 쓴 순수 글자 (지금도 글자만 있는 메모는 이쪽으로도 남는다)
+  // 옛 메모를 HTML 로 넣으면 줄바꿈이 전부 사라지므로 길을 갈라 둔다.
+  if (t.memoHtml) html += row('메모', `<div class="rt-view">${rtSanitize(t.memoHtml)}</div>`);
+  else if (t.memo) html += row('메모', escapeHtml(t.memo), 'mrv-text');
   el.innerHTML = html;
   el.style.display = 'block';
+  // 그림은 <img src> 로 못 받는다(워커가 토큰을 요구한다). 받아서 끼운다.
+  const view = el.querySelector('.rt-view');
+  if (view) rtLoadImages(view);
 }
 
 // 요약 → 편집 폼. 작성자가 '수정'을 눌렀을 때만.
@@ -21590,6 +21695,86 @@ function getMytaskTimeValue(id) {
   return document.getElementById(id).value;
 }
 
+// ── 업무캘린더 메모 편집기 ──────────────────────────────────────────────────
+// 공지와 같은 편집기를 쓴다. 다른 것은 그림이 들어가는 자리뿐이다.
+//   공지     notices/<배포>/<공지id>/...        — 관리자만
+//   메모     tasks/<배포>/<내uid>/<일정id>/...  — 교사 누구나, 자기 칸에만
+let _mytaskMemoBound = false;   // 배선은 한 번만 (모달은 다시 안 만들어진다)
+let _mytaskDocId     = '';      // 지금 고치는 일정 id. 새 일정도 미리 정해 둔다.
+let _mytaskPutKeys   = [];      // 이번에 올린 그림 키 — 안 쓰고 나가면 지운다
+
+// 새 일정도 id 를 먼저 받아 둔다. 그림 경로에 일정 id 가 들어가는데, 저장할
+// 때까지 id 가 없으면 붙여넣은 그림을 어디에 둘지 정할 수 없다.
+function mytaskNewDocId(){
+  const u = fbAuth.currentUser;
+  try { return u ? doc(collection(fbDb, 'tasks', u.uid, 'items')).id : ''; }
+  catch(e){ return ''; }
+}
+
+// 저장된 메모를 편집기에 올릴 모양으로.
+// 옛 메모는 순수 글자다. 그대로 innerHTML 에 넣으면 줄바꿈이 전부 사라진다.
+function mytaskMemoHtml(t){
+  if (t && t.memoHtml) return rtSanitize(t.memoHtml);
+  const plain = String((t && t.memo) || '');
+  return plain ? escapeHtml(plain).split('\n').join('<br>') : '';
+}
+
+// 서식을 뺀 글자만. 두 곳에 쓴다 — '비었나' 보는 것과, 아직 새 앱을 못 받은
+// 화면(캐시된 옛 버전)이 읽을 memo 칸을 채우는 것.
+function rtPlainText(html){
+  const box = document.createElement('div');
+  box.innerHTML = String(html || '')
+    .replace(/<\/(p|div|h[1-4]|li|ul|ol)>|<br\s*\/?>/gi, '\n');
+  return (box.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function mytaskMemoLoad(t){
+  const ed  = document.getElementById('mytaskMemoEd');
+  const bar = document.getElementById('mytaskMemoBar');
+  if (!ed || !bar) return;
+  rtReleaseImages(ed);
+  _mytaskPutKeys = [];
+  if (!bar.firstElementChild) bar.innerHTML = rtToolbarHtml();
+  ed.innerHTML = mytaskMemoHtml(t);
+  rtLoadImages(ed);
+  if (_mytaskMemoBound) return;
+  _mytaskMemoBound = true;
+  rtBindEditor(ed, {
+    toolbar: bar.querySelector('.rt-toolbar'),
+    // '다른 선생님으로 보기' 중에는 그림을 안 받는다. 그림은 로그인한 계정의
+    // 칸에 들어가는데 일정은 보고 있는 선생님 것이라, 둘이 어긋난다.
+    put:      () => (isViewAs() ? null : { kind: 'task', taskId: _mytaskDocId }),
+    noPutMsg: '보기 모드에서는 그림을 넣을 수 없습니다.',
+    onKey:    k => _mytaskPutKeys.push(k),
+    status:   m => { const el = document.getElementById('mytaskMemoMsg'); if (el) el.textContent = m; }
+  });
+}
+
+// 내 일정 전부가 쓰는 그림 키. 청소(안 쓰는 그림 지우기)의 기준이다.
+// 기준이 틀리면 내 그림이 통째로 지워지므로, 못 믿을 때는 아예 안 한다는
+// 뜻으로 null 을 돌려준다.
+//   · 목록이 아직 한 번도 안 왔다     → 쓰는 그림을 하나도 모른다
+//   · 다른 선생님으로 보기 중이다     → 목록이 내 것이 아니다
+function mytaskAllKeys(extra){
+  const u = fbAuth.currentUser;
+  if (!u || isViewAs() || !mytaskLoadedOnce) return null;
+  const set = new Set();
+  for (const t of mytaskTasks) {
+    if (t.ownerUid !== u.uid) continue;
+    for (const k of (t.memoKeys || [])) if (RT_KEY_RE.test(k)) set.add(k);
+  }
+  for (const k of (extra || [])) if (RT_KEY_RE.test(k)) set.add(k);
+  return [...set];
+}
+
+// 올렸다가 안 쓴 그림을 지운다. 저장할 때와 그냥 닫을 때 모두 부른다.
+function mytaskDropUnused(usedKeys){
+  const used = new Set(usedKeys || []);
+  const gone = _mytaskPutKeys.filter(k => !used.has(k));
+  _mytaskPutKeys = [];
+  if (gone.length) rtApi({ action: 'del', keys: gone }).catch(() => {});
+}
+
 async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
   const user      = fbAuth.currentUser;
   mytaskEditId    = id;
@@ -21636,7 +21821,8 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
     const t = mytaskTasks.find(t => t.id === id) || mytaskShared.find(t => t.id === id);
     if (t) {
       document.getElementById('mytaskTitle').value     = t.title || '';
-      document.getElementById('mytaskMemo').value      = t.memo  || '';
+      _mytaskDocId = id;
+      mytaskMemoLoad(t);
       document.getElementById('mytaskStartDate').value = t.startDate || '';
       document.getElementById('mytaskEndDate').value   = t.endDate   || '';
       setMytaskTimeSelect('mytaskStartTime', t.startTime || '');
@@ -21654,7 +21840,9 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
   } else {
     const todayDefault = new Date().toISOString().slice(0,10);
     document.getElementById('mytaskTitle').value     = '';
-    document.getElementById('mytaskMemo').value      = '';
+    // 저장 전에도 그림을 받아야 하므로 id 를 먼저 받아 둔다
+    _mytaskDocId = mytaskNewDocId();
+    mytaskMemoLoad(null);
     document.getElementById('mytaskStartDate').value = dateStr || todayDefault;
     document.getElementById('mytaskEndDate').value   = dateStr || todayDefault;
     setMytaskTimeSelect('mytaskStartTime', '');
@@ -21740,7 +21928,13 @@ window.setMytaskRepeat = setMytaskRepeat;
 
 function closeMytaskModal() {
   document.getElementById('mytaskModal').classList.remove('show');
-  mytaskEditId = null; mytaskEditOwner = null;
+  // 붙여넣었다가 저장하지 않고 닫은 그림은 R2 에 그대로 남는다. 저장은
+  // 자기가 치우고 나가므로(_mytaskPutKeys 를 비운다), 여기까지 온 것은
+  // 안 쓰인 것이다.
+  mytaskDropUnused([]);
+  const ed = document.getElementById('mytaskMemoEd');
+  if (ed) { rtReleaseImages(ed); ed.innerHTML = ''; }
+  mytaskEditId = null; mytaskEditOwner = null; _mytaskDocId = '';
 }
 function closeMytaskModalOverlay(e) {
   if (e.target === document.getElementById('mytaskModal')) closeMytaskModal();
@@ -21762,7 +21956,14 @@ async function saveMytask() {
     return;
   }
   const title     = document.getElementById('mytaskTitle').value.trim();
-  const memo      = document.getElementById('mytaskMemo').value.trim();
+  const memoEd    = document.getElementById('mytaskMemoEd');
+  const memoHtml  = memoEd ? rtSanitize(memoEd.innerHTML) : '';
+  const memoKeys  = rtKeysIn(memoHtml);
+  const memoPlain = rtPlainText(memoHtml);
+  // memo(글자만)도 같이 남긴다. 아직 새 앱을 못 받은 화면 — 서비스 워커가
+  // 옛 index.html 을 물고 있는 컴퓨터·폰 — 은 memoHtml 을 모른다. 그 화면에서
+  // 메모가 통째로 빈칸으로 보이지 않게 하는 것이 이 칸의 몫이다.
+  const memo      = memoPlain || (memoKeys.length ? '(그림)' : '');
   const startDate = document.getElementById('mytaskStartDate').value;
   const endDate   = document.getElementById('mytaskEndDate').value;
   const startTime = getMytaskTimeValue('mytaskStartTime');
@@ -21779,7 +21980,7 @@ async function saveMytask() {
     : null;
   const existing = mytaskEditId ? (mytaskTasks.find(t => t.id === mytaskEditId) || {}) : {};
   const data = {
-    title, memo, startDate, endDate,
+    title, memo, memoHtml, memoKeys, startDate, endDate,
     startTime: startTime || null,
     endTime: endTime || null,
     status: mytaskCurrentStatus,
@@ -21792,11 +21993,21 @@ async function saveMytask() {
     updatedAt: new Date().toISOString()
   };
   try {
-    if (mytaskEditId) {
-      await setDoc(doc(fbDb, 'tasks', user.uid, 'items', mytaskEditId), data);
-    } else {
-      await addDoc(collection(fbDb, 'tasks', user.uid, 'items'), data);
-    }
+    // 새 일정도 id 를 미리 받아 뒀다(그림 경로에 들어간다). 그래서 addDoc 이
+    // 아니라 그 id 로 setDoc 한다 — addDoc 을 쓰면 id 가 하나 더 생겨,
+    // 붙여넣은 그림이 아무 일정에도 안 딸린 자리에 남는다.
+    const docId = mytaskEditId || _mytaskDocId || mytaskNewDocId();
+    await setDoc(doc(fbDb, 'tasks', user.uid, 'items', docId), data);
+
+    // 이제 무엇이 쓰이는지가 확정됐다. 넣었다 뺀 그림을 치운다.
+    mytaskDropUnused(memoKeys);
+    // 그리고 내 칸에 남아 있는 '아무 일정도 안 쓰는 그림'까지 훑어 치운다.
+    // 창이 갑자기 닫혀 위의 치우기를 못 부른 경우가 여기서 걸린다.
+    // 기준을 못 믿을 때(mytaskAllKeys 가 null)는 건너뛴다 — 잘못 훑으면
+    // 내 그림이 통째로 지워진다.
+    const keep = mytaskAllKeys(memoKeys);
+    if (keep) rtApi({ action: 'sweep', kind: 'task', keep }).catch(() => {});
+
     closeMytaskModal();
     // 렌더링은 onSnapshot이 자동으로 처리
   } catch(e) { alert('저장 실패: ' + e.message); }
@@ -21831,9 +22042,15 @@ async function deleteMytask() {
     return;
   }
 
-  if (!confirm('이 일정을 삭제할까요?')) return;
+  const gone = mytaskTasks.find(t => t.id === mytaskEditId && t.ownerUid === user.uid);
+  const goneKeys = (gone && gone.memoKeys || []).filter(k => RT_KEY_RE.test(k));
+  if (!confirm(goneKeys.length
+        ? '이 일정을 삭제할까요? 메모에 붙인 그림도 함께 지워집니다.'
+        : '이 일정을 삭제할까요?')) return;
   try {
     await deleteDoc(doc(fbDb, 'tasks', user.uid, 'items', mytaskEditId));
+    // 일정이 없어지면 그 그림을 아무도 안 쓴다. 문서만 지우면 R2 에 계속 남는다.
+    if (goneKeys.length) rtApi({ action: 'del', keys: goneKeys }).catch(() => {});
     mytaskTasks = mytaskTasks.filter(t => t.id !== mytaskEditId);
     closeMytaskModal();
     // 현황판 업데이트

@@ -67,7 +67,12 @@ async function verifyTeacher(env, idToken) {
   const email = String(u && u.email || '').toLowerCase();
   if (!u || !u.emailVerified || !email.endsWith('@yeungnam.hs.kr')) return null;
   if (/^[0-9]{7}@yeungnam\.hs\.kr$/.test(email)) return null;    // 학생 계정 제외
-  const who = { email, admin: email === String(env.ADMIN_EMAIL || ADMIN_EMAIL).toLowerCase() };
+  // uid 는 반드시 여기서만 꺼낸다. 요청 본문에 적힌 값을 믿으면 남의 칸에
+  // 쓰거나 남의 칸을 청소할 수 있다 — 캘린더 그림의 담이 바로 이 한 줄이다.
+  const uid = String(u.localId || '');
+  if (!SAFE.test(uid)) return null;
+  const who = { email, uid,
+                admin: email === String(env.ADMIN_EMAIL || ADMIN_EMAIL).toLowerCase() };
   if (_teacherCache.size > 200) _teacherCache.clear();
   _teacherCache.set(idToken, { who, exp: nowSec() + TEACHER_TTL });
   return who;
@@ -85,16 +90,35 @@ async function whoFromHeader(env, request) {
 // 바깥에서 받은 문자열을 그대로 경로에 쓰면 '../' 로 남의 자리를 건드릴 수 있다.
 // 글자 종류를 좁혀서 애초에 그런 문자가 못 들어오게 한다.
 const SAFE = /^[A-Za-z0-9_-]{1,40}$/;
-function imgKey(scope, noticeId, fileId) {
-  if (!SAFE.test(String(scope || '')) ) return null;
-  if (!SAFE.test(String(noticeId || ''))) return null;
-  if (!SAFE.test(String(fileId || ''))) return null;
+const safe = v => SAFE.test(String(v || ''));
+
+// 공지 그림 — notices/<배포>/<공지id>/<파일id>.jpg
+function noticeKey(scope, noticeId, fileId) {
+  if (!safe(scope) || !safe(noticeId) || !safe(fileId)) return null;
   return `notices/${scope}/${noticeId}/${fileId}.jpg`;
+}
+// 업무캘린더 메모 그림 — tasks/<배포>/<올린이uid>/<일정id>/<파일id>.jpg
+// uid 칸이 한 칸 더 있는 것이 요점이다. 교사 누구나 그림을 올리므로, 각자의
+// 칸을 갈라 두지 않으면 청소 한 번에 남의 그림까지 쓸려 나간다.
+function taskKey(scope, uid, taskId, fileId) {
+  if (!safe(scope) || !safe(uid) || !safe(taskId) || !safe(fileId)) return null;
+  return `tasks/${scope}/${uid}/${taskId}/${fileId}.jpg`;
 }
 // 키 문자열을 되받을 때도 같은 모양인지 다시 본다(조작 방지).
 function validKey(k) {
-  const m = /^notices\/([A-Za-z0-9_-]{1,40})\/([A-Za-z0-9_-]{1,40})\/([A-Za-z0-9_-]{1,40})\.jpg$/.exec(String(k || ''));
-  return m ? { scope: m[1], noticeId: m[2], fileId: m[3] } : null;
+  const s = String(k || '');
+  let m = /^notices\/([A-Za-z0-9_-]{1,40})\/([A-Za-z0-9_-]{1,40})\/([A-Za-z0-9_-]{1,40})\.jpg$/.exec(s);
+  if (m) return { kind: 'notice', scope: m[1], id: m[2], fileId: m[3] };
+  m = /^tasks\/([A-Za-z0-9_-]{1,40})\/([A-Za-z0-9_-]{1,40})\/([A-Za-z0-9_-]{1,40})\/([A-Za-z0-9_-]{1,40})\.jpg$/.exec(s);
+  if (m) return { kind: 'task', scope: m[1], uid: m[2], id: m[3], fileId: m[4] };
+  return null;
+}
+// 이 사람이 이 그림을 지울 수 있나. 공지는 관리자만, 캘린더는 자기 칸만.
+function mayWrite(who, key) {
+  const k = typeof key === 'string' ? validKey(key) : key;
+  if (!k) return false;
+  if (k.kind === 'notice') return !!who.admin;
+  return k.uid === who.uid || !!who.admin;
 }
 
 const MAX_BYTES = 3 * 1024 * 1024;   // 장당 3MB. 화면에서 줄여 보내므로 넉넉한 상한이다.
@@ -125,9 +149,19 @@ async function handleImgPut(env, body) {
   if (!env.NOTICES) return { success: false, error: 'NO_BUCKET' };
   const who = await verifyTeacher(env, String(body.idToken || ''));
   if (!who) return { success: false, error: 'AUTH' };
-  if (!who.admin) return { success: false, error: 'FORBIDDEN' };
 
-  const key = imgKey(body.scope, body.noticeId, body.fileId);
+  // 어디에 올리는 그림인가로 권한이 갈린다.
+  //   notice — 전 교사가 보는 공지다. 관리자만.
+  //   task   — 자기 업무 메모다. 교사 누구나. 단, 칸 이름(uid)은 요청이 아니라
+  //            토큰을 확인한 결과에서 꺼낸다. 남의 칸을 적어 보낼 길이 없다.
+  const kind = body.kind === 'task' ? 'task' : 'notice';
+  let key;
+  if (kind === 'notice') {
+    if (!who.admin) return { success: false, error: 'FORBIDDEN' };
+    key = noticeKey(body.scope, body.noticeId, body.fileId);
+  } else {
+    key = taskKey(body.scope, who.uid, body.taskId, body.fileId);
+  }
   if (!key) return { success: false, error: 'BAD_KEY' };
 
   const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(body.dataUrl || ''));
@@ -147,11 +181,16 @@ async function handleImgDel(env, body) {
   if (!env.NOTICES) return { success: false, error: 'NO_BUCKET' };
   const who = await verifyTeacher(env, String(body.idToken || ''));
   if (!who) return { success: false, error: 'AUTH' };
-  if (!who.admin) return { success: false, error: 'FORBIDDEN' };
 
-  const keys = Array.isArray(body.keys) ? body.keys : [body.key];
-  const ok = keys.filter(validKey);
-  if (!ok.length) return { success: false, error: 'BAD_KEY' };
+  // 키 하나하나를 따로 본다. 공지 그림은 관리자만, 캘린더 그림은 자기 것만.
+  // 넘어온 목록에 남의 것이 섞여 있으면 그것만 빼고 나머지를 지운다.
+  // '모양이 틀린 키'와 '내 것이 아닌 키'는 다른 이야기라 답도 갈라 준다 —
+  // 합쳐 두면 화면에서 무엇이 잘못됐는지 알 수 없다.
+  const keys  = Array.isArray(body.keys) ? body.keys : [body.key];
+  const valid = keys.filter(validKey);
+  if (!valid.length) return { success: false, error: 'BAD_KEY' };
+  const ok = valid.filter(k => mayWrite(who, k));
+  if (!ok.length) return { success: false, error: 'FORBIDDEN' };
   await Promise.all(ok.map(k => env.NOTICES.delete(k)));
   return { success: true, deleted: ok.length };
 }
@@ -163,13 +202,33 @@ async function handleSweep(env, body) {
   if (!env.NOTICES) return { success: false, error: 'NO_BUCKET' };
   const who = await verifyTeacher(env, String(body.idToken || ''));
   if (!who) return { success: false, error: 'AUTH' };
-  if (!who.admin) return { success: false, error: 'FORBIDDEN' };
   const scope = String(body.scope || '');
-  if (!SAFE.test(scope)) return { success: false, error: 'BAD_KEY' };
+  if (!safe(scope)) return { success: false, error: 'BAD_KEY' };
+
+  // 어디를 훑을지가 이 기능의 전부다. 훑는 자리를 잘못 잡으면 남의 그림이
+  // '안 쓰이는 것'으로 보여 통째로 지워진다.
+  //
+  //   notice — 관리자는 모든 공지를 볼 수 있다. 그래서 배포 전체를 훑어도 된다.
+  //   task   — 자기 일정만 볼 수 있다. 남의 일정이 무슨 그림을 쓰는지 모르는
+  //            채로 배포 전체를 훑으면 남의 것을 다 지운다. 그래서 훑는 자리를
+  //            자기 칸 안으로 못 박는다. 칸 이름은 토큰에서 나온 uid 다.
+  const kind = body.kind === 'task' ? 'task' : 'notice';
+  let prefix;
+  if (kind === 'notice') {
+    if (!who.admin) return { success: false, error: 'FORBIDDEN' };
+    prefix = `notices/${scope}/`;
+  } else {
+    prefix = `tasks/${scope}/${who.uid}/`;
+  }
 
   const keep = new Set((Array.isArray(body.keep) ? body.keep : []).filter(validKey));
-  const list = await env.NOTICES.list({ prefix: `notices/${scope}/`, limit: 1000 });
-  const gone = list.objects.map(o => o.key).filter(k => !keep.has(k));
+  // 한 번에 1000개까지만 본다. 그 위로는 다음 청소 때 이어서 지워진다 —
+  // 한 사람 칸에 그만큼 쌓일 일이 없으므로 이어받기(cursor)는 두지 않는다.
+  const list = await env.NOTICES.list({ prefix, limit: 1000 });
+  // prefix 로 이미 갈렸지만 한 번 더 본다. 목록에 엉뚱한 것이 섞여 들어오는
+  // 경우(버킷을 다른 데서 같이 쓰는 등)에도 남의 것을 지우지 않게.
+  const gone = list.objects.map(o => o.key)
+    .filter(k => !keep.has(k) && k.startsWith(prefix) && mayWrite(who, k));
   await Promise.all(gone.map(k => env.NOTICES.delete(k)));
   return { success: true, deleted: gone.length, kept: keep.size };
 }

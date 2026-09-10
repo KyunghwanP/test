@@ -76,7 +76,7 @@ console.log('\n■ 실제 동작 (Chromium)');
   // 작성자가 연 상태를 흉내낸다: 요약 보이고 편집 영역 숨김
   await pg.evaluate(t => {
     document.getElementById('mytaskTitle').value = t.title;
-    document.getElementById('mytaskMemo').value  = t.memo;
+    document.getElementById('mytaskMemoEd').textContent = t.memo;
     document.getElementById('mytaskOwnerSection').style.display = 'none';
     document.getElementById('mytaskEditBtn').style.display = 'block';
     document.getElementById('mytaskSaveBtn').textContent = '상태 저장';

@@ -40,35 +40,37 @@ const errs = [];
 pg.on('pageerror', e => errs.push(e.message));
 
 await pg.setContent(`<!doctype html><meta charset="utf-8">
-<style>.notice-editor{font-size:14px;}</style>
+<style>.rt-editor{font-size:14px;}</style>
 <div id="noticeTitle"></div><div id="noticeWhen"></div>
 <span id="noticeEditState"></span><button id="noticePreviewBtn"></button><button id="noticeCheckBtn"></button><button id="noticeNewBtn"></button>
 <div id="noticeEditBody"></div><div id="noticeEditFoot"></div>
 <script>
-  ${grabConst('NOTICE_TAGS')}
-  ${grabConst('NOTICE_DROP')}
-  ${grabConst('NOTICE_STYLES')}
-  ${grabConst('NOTICE_KEY_RE')}
+  ${grabConst('RT_TAGS')}
+  ${grabConst('RT_DROP')}
+  ${grabConst('RT_STYLES')}
+  ${grabConst('RT_SEG')}
+  ${grabConst('RT_KEY_RE')}
   ${grab('noticeToInput')}
   ${grab('noticeFromInput')}
   ${grab('noticePeriodText')}
-    ${grabConst('NOTICE_ZWSP')}
-  ${grabConst('NOTICE_COLORS')}
-  ${grabConst('NOTICE_SIZES')}
+    ${grabConst('RT_ZWSP')}
+  ${grabConst('RT_COLORS')}
+  ${grabConst('RT_SIZES')}
   let _noticeData = { html:'', keys:[], updatedAt:0, by:'', from:0, until:0 };
   let _noticeEditing = false, _noticeDirty = false;
   const _IS_ADMIN = () => true;
   function previewNotice(){}
   function noticeCheckWorker(){}
   function deleteNotice(){}
-  function noticeLoadImages(){}
-  function noticeReleaseImages(){}
-  function onNoticePaste(){}
-  ${grab('noticeCleanStyle')}
-  ${grab('noticeSanitize')}
-  ${grab('noticeSetFontSize')}
-  ${grab('noticeSyncSizeSel')}
-  ${grab('bindNoticeEditor')}
+  function rtLoadImages(){}
+  function rtReleaseImages(){}
+  function rtOnPaste(){}
+  ${grab('rtCleanStyle')}
+  ${grab('rtSanitize')}
+  ${grab('rtSetFontSize')}
+  ${grab('rtSyncSizeSel')}
+  ${grab('rtToolbarHtml')}
+  ${grab('rtBindEditor')}
   ${grab('renderNoticeEditState')}
   ${grab('noticeMarkDirty')}
   ${grab('noticeMayLeave')}
@@ -90,11 +92,11 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
     const t = e.firstChild.nodeType === 3 ? e.firstChild : e.firstChild.firstChild;
     const r = document.createRange(); r.setStart(t, 0); r.setEnd(t, n);
     const s = getSelection(); s.removeAllRanges(); s.addRange(r); };
-  window.size  = px => noticeSetFontSize(px);
-  window.tool  = cmd => document.querySelector('#noticeEditBody .notice-tool[data-cmd="'+cmd+'"]').click();
-  window.color = c   => document.querySelector('#noticeEditBody .notice-tool-swatch[data-color="'+c+'"]').click();
+  window.size  = px => rtSetFontSize(document.getElementById('noticeEditor'), px);
+  window.tool  = cmd => document.querySelector('#noticeEditBody .rt-tool[data-cmd="'+cmd+'"]').click();
+  window.color = c   => document.querySelector('#noticeEditBody .rt-tool-swatch[data-color="'+c+'"]').click();
   window.sizeSel = () => document.getElementById('noticeSizeSel');
-  window.sizes = () => NOTICE_SIZES;
+  window.sizes = () => RT_SIZES;
   window.openWith = d => { _noticeList = [{ id:'x', title:'', keys:[], from:0, until:0, updatedAt:1, ...d }];
                            openNoticeEditor('x'); };
   window.dirty  = () => _noticeDirty;
@@ -182,7 +184,7 @@ console.log('\n■ 걸러내기를 통과한다 (저장하면 지워지면 안 �
   await pg.evaluate(() => window.open_('감독 1교시'));
   await pg.evaluate(() => window.selectAll());
   await pg.evaluate(v => window.size(v), SIZES[2][1]);
-  const kept = await pg.evaluate(() => noticeSanitize(window.html_()));
+  const kept = await pg.evaluate(() => rtSanitize(window.html_()));
   check('저장해도 크기가 살아남는다', kept.includes(SIZES[2][1]), kept);
 }
 
@@ -204,7 +206,7 @@ console.log('\n■ 굵게·기울임·밑줄·색');
   let h = await pg.evaluate(() => window.html_());
   check('굵게가 걸린다', /<b>|font-weight/.test(h), h);
   check('굵게도 걸러내기를 통과한다',
-        /<b>|font-weight/.test(await pg.evaluate(() => noticeSanitize(window.html_()))), h);
+        /<b>|font-weight/.test(await pg.evaluate(() => rtSanitize(window.html_()))), h);
 
   await pg.evaluate(() => window.open_('감독'));
   await pg.evaluate(() => window.selectAll());
@@ -215,7 +217,7 @@ console.log('\n■ 굵게·기울임·밑줄·색');
   // 걸러내기에서 통째로 사라진다
   check('색이 <font> 로 안 나온다', !/<font/i.test(h), h);
   check('색도 걸러내기를 통과한다',
-        /color:/.test(await pg.evaluate(() => noticeSanitize(window.html_()))), h);
+        /color:/.test(await pg.evaluate(() => rtSanitize(window.html_()))), h);
 }
 
 console.log('\n■ 크기를 걸고 나서 색도 걸 수 있다 (선택이 살아 있어야 한다)');
@@ -231,8 +233,8 @@ console.log('\n■ 크기를 걸고 나서 색도 걸 수 있다 (선택이 살�
   // 나온다. 그러면 저장할 때 걸러내기에서 색이 통째로 사라진다.
   check('크기를 건 뒤에도 색이 <font> 로 안 나온다', !/<font/i.test(h), h);
   check('크기를 건 뒤의 색도 저장에서 살아남는다',
-        /color:/.test(await pg.evaluate(() => noticeSanitize(window.html_()))),
-        await pg.evaluate(() => noticeSanitize(window.html_())));
+        /color:/.test(await pg.evaluate(() => rtSanitize(window.html_()))),
+        await pg.evaluate(() => rtSanitize(window.html_())));
 }
 
 // ── 여기서부터는 함수를 부르지 않는다. 사람이 하는 순서 그대로 화면을 조작한다.
@@ -263,7 +265,7 @@ console.log('\n■ 사람이 하는 순서 그대로 (도구모음을 실제로 
         (h.match(/font-size/g) || []).length >= 2, h);
 
   // 저장했을 때 보이지 않는 자리표시가 안 남아야 한다
-  const saved = await pg.evaluate(() => noticeSanitize(window.html_()));
+  const saved = await pg.evaluate(() => rtSanitize(window.html_()));
   check('저장본에 보이지 않는 글자가 없다', !saved.includes('\u200B'), JSON.stringify(saved));
   check('저장본에도 두 크기가 남는다',
         saved.includes(SIZES[3][1]) && saved.includes(SIZES[0][1]), saved);
@@ -287,7 +289,7 @@ console.log('\n■ 사람이 하는 순서 그대로 (도구모음을 실제로 
   await reopen();
   await type('감독');
   await pickSize(SIZES[3][1]);
-  const saved2 = await pg.evaluate(() => noticeSanitize(window.html_()));
+  const saved2 = await pg.evaluate(() => rtSanitize(window.html_()));
   check('크기만 고르고 안 치면 빈 껍데기가 안 남는다',
         !/<span[^>]*><\/span>/.test(saved2) && !saved2.includes('\u200B'), JSON.stringify(saved2));
 }

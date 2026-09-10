@@ -41,10 +41,16 @@ globalThis.fetch = async (url, init = {}) => {
   }
   throw new Error('예상 못 한 바깥 호출: ' + url);
 };
-// 토큰 검증 결과를 워커가 120초 재사용하므로, 사람마다 토큰 문자열을 달리 준다
-const tok = email => { const t = 'tok-' + email; TOKENS[t] = { email, emailVerified: true }; return t; };
-const T_ADMIN   = tok(ADMIN);
-const T_TEACHER = tok(TEACHER);
+// 토큰 검증 결과를 워커가 120초 재사용하므로, 사람마다 토큰 문자열을 달리 준다.
+// localId(= Firebase uid)도 같이 준다 — 캘린더 메모 그림의 '칸 이름'이 이 값이다.
+const tok = (email, uid) => {
+  const t = 'tok-' + email;
+  TOKENS[t] = { email, emailVerified: true, localId: uid || ('uid' + email.split('@')[0]) };
+  return t;
+};
+const T_ADMIN   = tok(ADMIN,   'uidAdmin');
+const T_TEACHER = tok(TEACHER, 'uidHong');
+const T_KIM     = tok('kim@yeungnam.hs.kr', 'uidKim');
 tok('2350101@yeungnam.hs.kr');                       // 학생 계정 (형식만 만들어 둔다)
 const T_STUDENT = 'tok-2350101@yeungnam.hs.kr';
 
@@ -186,6 +192,107 @@ console.log('\n■ 청소 — 쓰이는 그림은 남긴다');
   const badScope = await (await post({ action: 'sweep', idToken: T_ADMIN, scope: '..', keep: [] })).json();
   check('이상한 배포 이름은 거절', badScope.error === 'BAD_KEY', badScope);
   check('그동안 아무것도 더 안 지워졌다', env.NOTICES._store.size === 3, env.NOTICES._store.size);
+}
+
+console.log('\n■ 업무캘린더 메모 그림 — 교사 누구나, 대신 자기 칸에만');
+{
+  reset();
+  const putTask = (token, taskId, fileId) =>
+    post({ action: 'put', kind: 'task', idToken: token, scope: 'test', taskId, fileId, dataUrl: PNG });
+
+  const hong = await (await putTask(T_TEACHER, 'task1', 'a')).json();
+  check('관리자가 아닌 교사도 올릴 수 있다', hong.success === true, hong);
+  check('키에 올린이 uid 가 들어간다', hong.key === 'tasks/test/uidHong/task1/a.jpg', hong.key);
+
+  const kim = await (await putTask(T_KIM, 'task9', 'b')).json();
+  check('사람이 다르면 칸도 다르다', kim.key === 'tasks/test/uidKim/task9/b.jpg', kim.key);
+
+  // 여기가 핵심이다. uid 를 요청에 적어 보내도 워커는 토큰에서 꺼낸 값만 쓴다.
+  const spoof = await (await post({ action: 'put', kind: 'task', idToken: T_TEACHER,
+    scope: 'test', uid: 'uidKim', taskId: 'task9', fileId: 'c', dataUrl: PNG })).json();
+  check('남의 uid 를 적어 보내도 자기 칸에 들어간다',
+        spoof.key === 'tasks/test/uidHong/task9/c.jpg', spoof.key);
+
+  const student = await (await putTask(T_STUDENT, 'task1', 'z')).json();
+  check('학생 계정은 올리지 못한다', student.error === 'AUTH', student);
+
+  const badId = await (await putTask(T_TEACHER, '../..', 'd')).json();
+  check('일정 id 에 이상한 글자가 오면 거절', badId.error === 'BAD_KEY', badId);
+}
+
+console.log('\n■ 캘린더 그림 지우기 — 남의 것은 못 지운다');
+{
+  const mine   = 'tasks/test/uidHong/task1/a.jpg';
+  const theirs = 'tasks/test/uidKim/task9/b.jpg';
+
+  const no = await (await post({ action: 'del', idToken: T_TEACHER, key: theirs })).json();
+  check('남의 그림은 못 지운다', no.error === 'FORBIDDEN', no);
+  check('그래서 남의 그림이 그대로 있다', env.NOTICES._store.has(theirs));
+
+  const mixed = await (await post({ action: 'del', idToken: T_TEACHER, keys: [mine, theirs] })).json();
+  check('섞어 보내도 내 것만 지운다', mixed.success === true && mixed.deleted === 1, mixed);
+  check('내 그림은 지워졌다', !env.NOTICES._store.has(mine));
+  check('남의 그림은 살아남았다', env.NOTICES._store.has(theirs));
+
+  const asAdmin = await (await post({ action: 'del', idToken: T_ADMIN, key: theirs })).json();
+  check('관리자는 뒤처리를 할 수 있다', asAdmin.success === true, asAdmin);
+}
+
+console.log('\n■ 캘린더 청소 — 자기 칸 밖으로 나가지 않는다');
+{
+  reset();
+  const putTask = (token, taskId, fileId) =>
+    post({ action: 'put', kind: 'task', idToken: token, scope: 'test', taskId, fileId, dataUrl: PNG });
+  await putTask(T_TEACHER, 'task1', 'keep');
+  await putTask(T_TEACHER, 'task1', 'orphan');
+  await putTask(T_KIM,     'task9', 'kim1');
+  await putTask(T_KIM,     'task9', 'kim2');
+  await post({ action: 'put', idToken: T_ADMIN, scope: 'test', noticeId: 'board', fileId: 'n1', dataUrl: PNG });
+
+  // 홍 선생님이 청소한다. 자기가 쓰는 그림 하나만 남기라고 보낸다.
+  const r = await (await post({ action: 'sweep', kind: 'task', idToken: T_TEACHER,
+    scope: 'test', keep: ['tasks/test/uidHong/task1/keep.jpg'] })).json();
+  check('청소가 된다', r.success === true, r);
+  check('내 칸의 안 쓰는 그림만 지운다', r.deleted === 1, r);
+  check('내가 쓰는 그림은 남는다', env.NOTICES._store.has('tasks/test/uidHong/task1/keep.jpg'));
+  check('내 안 쓰는 그림은 사라진다', !env.NOTICES._store.has('tasks/test/uidHong/task1/orphan.jpg'));
+  // 여기가 이 기능에서 제일 위험한 자리다 — 범위를 잘못 잡으면 전 교사의 그림이 날아간다
+  check('남의 그림은 건드리지 않는다',
+        env.NOTICES._store.has('tasks/test/uidKim/task9/kim1.jpg') &&
+        env.NOTICES._store.has('tasks/test/uidKim/task9/kim2.jpg'));
+  check('공지 그림도 건드리지 않는다', env.NOTICES._store.has('notices/test/board/n1.jpg'));
+
+  // keep 을 비워 보내도 남의 칸은 여전히 안전하다(내 것은 다 지워진다)
+  const r2 = await (await post({ action: 'sweep', kind: 'task', idToken: T_TEACHER,
+    scope: 'test', keep: [] })).json();
+  check('빈 목록이면 내 칸은 비워진다', r2.deleted === 1, r2);
+  check('그래도 남의 칸은 그대로다',
+        env.NOTICES._store.has('tasks/test/uidKim/task9/kim1.jpg'));
+
+  // 교사가 공지 쪽 청소를 부르면 여전히 막힌다
+  const asNotice = await (await post({ action: 'sweep', idToken: T_TEACHER, scope: 'test', keep: [] })).json();
+  check('교사는 공지 청소를 못 부른다', asNotice.error === 'FORBIDDEN', asNotice);
+  check('그래서 공지 그림이 남아 있다', env.NOTICES._store.has('notices/test/board/n1.jpg'));
+
+  // 배포가 다르면 서로 안 섞인다
+  await putTask(T_TEACHER, 'task1', 'liveish');
+  const r3 = await (await post({ action: 'sweep', kind: 'task', idToken: T_TEACHER,
+    scope: 'live', keep: [] })).json();
+  check('다른 배포를 청소해도 이쪽은 그대로', r3.deleted === 0 &&
+        env.NOTICES._store.has('tasks/test/uidHong/task1/liveish.jpg'), r3);
+}
+
+console.log('\n■ 캘린더 그림 내려받기');
+{
+  const k = 'tasks/test/uidKim/task9/kim1.jpg';
+  const mine = await getImg(k, T_TEACHER);
+  // 일정은 공유받은 사람만 보지만, 그림은 키를 아는 교사면 받을 수 있다.
+  // 워커가 Firestore 를 안 보기 때문이다 — 알고 받아들인 선택이라 여기 적어 둔다.
+  check('키를 알면 다른 교사도 받을 수 있다 (알고 있는 한계)', mine.status === 200, mine.status);
+  const anon = await getImg(k, '');
+  check('로그인 안 했으면 못 받는다', anon.status === 403, anon.status);
+  const stu = await getImg(k, T_STUDENT);
+  check('학생 계정은 못 받는다', stu.status === 403, stu.status);
 }
 
 console.log('\n■ 버킷을 안 붙였을 때 (설정 전이거나 되돌렸을 때)');
