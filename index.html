@@ -6332,7 +6332,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.33';
+const APP_VER = 'ver7.34';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -10690,13 +10690,52 @@ function stopWeeklyWatch(){
 }
 
 
-async function fetchViaProxy(url) {
-  const res = await fetch(APPS_SCRIPT_PROXY + '?url=' + encodeURIComponent(url),
-    {signal: AbortSignal.timeout(15000)});
-  if(!res.ok) throw new Error('HTTP ' + res.status);
-  const text = await res.text();
-  if(text.length < 200) throw new Error('응답이 너무 짧음');
-  return text;
+// Apps Script 웹앱은 한동안 안 부르면 잠들어 있다. 깨어나는 데만 십수 초가
+// 걸리고, 거기에 구글 사이트를 긁는 시간이 더해져 첫 호출이 자주 제한을 넘긴다.
+// 두 번째부터는 따뜻해져 금방 온다 — 그래서 '다시 누르면 된다'.
+// 사람이 다시 누르는 대신 여기서 한 번 더 부른다.
+//
+// 1차를 짧게 끊는 것은 일부러다. 따뜻할 때는 몇 초면 오므로 12초면 넉넉하고,
+// 잠들어 있을 때는 빨리 포기하는 편이 낫다 — 끊어도 그쪽 컨테이너는 이미 깨는
+// 중이라, 그 시간이 버려지지 않고 2차가 그 덕을 본다.
+const WEEKLY_FETCH_MS = [12000, 35000];
+
+// 'signal timed out' 같은 브라우저 말투를 그대로 보여 주면 무슨 일인지 알 수 없다.
+function weeklyErrText(e){
+  const m = String((e && e.message) || e || '');
+  if (/timed out|abort/i.test(m))   return '사이트가 제때 응답하지 않았습니다. 잠시 뒤 다시 시도해 주세요.';
+  if (/응답이 너무 짧음/.test(m))    return '사이트에서 받아온 내용이 비어 있습니다.';
+  if (/^HTTP /.test(m))             return '사이트에 연결하지 못했습니다 (' + m + ').';
+  if (/Failed to fetch|NetworkError/i.test(m)) return '연결이 끊겼습니다. 인터넷을 확인해 주세요.';
+  return m;
+}
+
+// 다시 부르는 동안 화면에 그렇게 적는다. 첫 호출이 끊기고 두 번째를 기다리는
+// 사이 아무 말이 없으면 멈춘 것처럼 보인다 — 실제로 제일 오래 걸리는 구간이다.
+function weeklySayRetry(){
+  const msg = '사이트가 깨어나는 중입니다. 다시 불러오고 있습니다...';
+  if (weeklyPageLoading && weeklyPageLoading.style.display !== 'none') {
+    weeklyPageLoading.textContent = msg;
+    return;
+  }
+  const box = weeklyPageContent && weeklyPageContent.querySelector('.weekly-page-loading');
+  if (box) box.textContent = msg;
+}
+
+async function fetchViaProxy(url, onRetry) {
+  let lastErr;
+  for (let i = 0; i < WEEKLY_FETCH_MS.length; i++) {
+    if (i) { try { onRetry && onRetry(); } catch(e){} }
+    try {
+      const res = await fetch(APPS_SCRIPT_PROXY + '?url=' + encodeURIComponent(url),
+        { signal: AbortSignal.timeout(WEEKLY_FETCH_MS[i]) });
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
+      if(text.length < 200) throw new Error('응답이 너무 짧음');
+      return text;
+    } catch(e) { lastErr = e; }
+  }
+  throw new Error(weeklyErrText(lastErr));
 }
 
 async function initWeeklyPage(){
@@ -10742,7 +10781,7 @@ function weeklyCacheId(url){
 // 한 주차를 받아 그리고 캐시에 넣는다. 칩을 누를 때와 '새로 받기' 가 같이 쓴다 —
 // 두 벌로 두면 한쪽만 고쳐진다.
 async function loadWeekViaAppsScript(url){
-  const raw  = await fetchViaProxy(url);
+  const raw  = await fetchViaProxy(url, weeklySayRetry);
   const data = parseSitesResponse(raw, []);
   renderContent(data.contentHtml);
   setDoc(doc(fbDb, 'weeklyData', weeklyCacheId(url)), {
@@ -10788,7 +10827,7 @@ async function weeklyReload(){
 window.weeklyReload = weeklyReload;
 
 async function loadViaAppsScript(){
-  const raw = await fetchViaProxy(SITES_BASE);
+  const raw = await fetchViaProxy(SITES_BASE, weeklySayRetry);
   const absPattern = /https:\/\/sites\.google\.com\/yeungnam\.hs\.kr\/202633\/[^\s"'<>\n\r]+/g;
   const relPattern = /\/yeungnam\.hs\.kr\/202633\/[^\s"'<>\n\r]+/g;
   const slugPattern = /\/202633\/([^\s"'<>\n\r#?]+)/g;
@@ -11758,7 +11797,7 @@ function renderWeekChips(navLinks, activeHref){
       weeklyOpenLink.href = link.href;
       weeklyPageContent.innerHTML = '<div class="weekly-page-loading" style="padding:24px;">불러오는 중...</div>';
       try{
-        const raw  = await fetchViaProxy(link.href);
+        const raw  = await fetchViaProxy(link.href, weeklySayRetry);
         const data = parseSitesResponse(raw);
         renderContent(data.contentHtml || raw);
       }catch(e){

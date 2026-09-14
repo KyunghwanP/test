@@ -19,6 +19,13 @@ const GAS  = fs.readFileSync(import.meta.dirname + '/../gas/Code.gs', 'utf8');
 const SCRAPER_PATH = import.meta.dirname + '/../scripts/scrape-weekly.js';
 const SCRAPER = fs.existsSync(SCRAPER_PATH) ? fs.readFileSync(SCRAPER_PATH, 'utf8') : null;
 
+// 원본에서 그대로 떼어 온다 — 베껴 적으면 원본이 바뀌어도 통과해 버린다
+const grabConst = name => {
+  const m = new RegExp(`^const ${name}\\b[^\\n]*(\\n(?![a-zA-Z/]).*)*`, 'm').exec(HTML);
+  if (!m) throw new Error('못 찾음: ' + name);
+  return m[0];
+};
+
 let pass = 0, fail = 0, skip = 0;
 const check = (n, c, x) => c ? (pass++, console.log('  ✅', n))
                              : (fail++, console.log('  ❌', n, x !== undefined ? '\n       → ' + JSON.stringify(x).slice(0, 300) : ''));
@@ -79,6 +86,86 @@ console.log('\n■ 앱 — 새로 받기 (관리자만, 원본보기 왼쪽)');
   // 이미 화면에서 떨어져 나갔다 — 지금 붙어 있는 것을 다시 찾아야 한다.
   check('끝나면 지금 붙어 있는 단추를 되돌린다',
         /\} finally \{[\s\S]{0,260}const now = document\.getElementById\('weeklyReloadBtn'\);[\s\S]{0,80}now\.disabled = false;/.test(HTML));
+}
+
+console.log('\n■ 첫 호출이 넘어가는 것 — Apps Script 가 잠들어 있다');
+{
+  // 증상: 탭을 열면 '불러오기 실패: signal timed out' 이 뜨고, 다시 누르면 된다.
+  // 까닭: 웹앱이 한동안 안 불리면 잠든다. 깨는 데만 십수 초가 걸려 첫 호출이
+  //      제한을 넘기고, 두 번째부터는 따뜻해져 금방 온다.
+  check('기다리는 시간이 두 단계다', /const WEEKLY_FETCH_MS = \[12000, 35000\];/.test(HTML));
+  check('1차를 짧게 끊는다(깨우는 값은 버려지지 않는다)', /\[12000,/.test(HTML));
+  check('2차는 넉넉히 기다린다', /35000\]/.test(HTML));
+  check('사람이 다시 누르는 대신 한 번 더 부른다',
+        /for \(let i = 0; i < WEEKLY_FETCH_MS\.length; i\+\+\)/.test(HTML));
+  check('부르는 곳 세 군데 모두 알림을 넘긴다',
+        (HTML.match(/fetchViaProxy\([^)]*weeklySayRetry\)/g) || []).length === 3);
+  check('다시 부르는 동안 화면에 알린다', /function weeklySayRetry\(\)\{/.test(HTML));
+
+  // 'signal timed out' 은 브라우저 말투다. 그대로 보여 주면 무슨 일인지 모른다.
+  check('오류 말을 사람 말로 바꾼다', /function weeklyErrText\(e\)\{/.test(HTML));
+  check('시간 초과를 알아본다', /if \(\/timed out\|abort\/i\.test\(m\)\)/.test(HTML));
+}
+
+console.log('\n■ 실제로 다시 부르는가 (fetch 를 흉내내서)');
+{
+  const { chromium } = await import('playwright');
+  const br = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+  const pg = await br.newPage();
+  pg.on('pageerror', e => { console.log('  ⚠ 페이지 오류:', e.message); fail++; });
+
+  const grabFn = name => {
+    const m = new RegExp(`^(?:async )?function ${name}\\(`, 'm').exec(HTML);
+    let i = HTML.indexOf('{', m.index), d = 0;
+    for (let j = i; j < HTML.length; j++) {
+      if (HTML[j] === '{') d++;
+      else if (HTML[j] === '}' && --d === 0) return HTML.slice(m.index, j + 1);
+    }
+  };
+
+  await pg.setContent(`<!doctype html><meta charset="utf-8"><body><script>
+    const APPS_SCRIPT_PROXY = 'https://example.invalid/exec';
+    ${grabConst('WEEKLY_FETCH_MS')}
+    ${grabFn('weeklyErrText')}
+    ${grabFn('fetchViaProxy')}
+    // 첫 번째는 시간 초과, 두 번째는 성공하도록 흉내낸다
+    let calls = 0, waited = [];
+    window.__setup = mode => {
+      calls = 0; waited = [];
+      window.fetch = (url, opt) => {
+        calls++;
+        waited.push(opt.signal ? 'signal' : 'none');
+        if (calls === 1 || mode === 'always') {
+          const e = new Error('signal timed out'); e.name = 'TimeoutError';
+          return Promise.reject(e);
+        }
+        return Promise.resolve({ ok: true, text: () => Promise.resolve('x'.repeat(500)) });
+      };
+    };
+    window.__try = async mode => {
+      window.__setup(mode);
+      let retried = 0;
+      try {
+        const t = await fetchViaProxy('https://sites.google.com/x', () => retried++);
+        return { ok: true, calls, retried, len: t.length };
+      } catch(e) {
+        return { ok: false, calls, retried, msg: e.message };
+      }
+    };
+  <\/script></body>`);
+
+  const once = await pg.evaluate(() => window.__try('firstFails'));
+  check('첫 번째가 넘어가도 두 번째로 받아 온다', once.ok === true, once);
+  check('두 번 부른다', once.calls === 2, once);
+  check('다시 부른다고 한 번 알린다', once.retried === 1, once);
+
+  const never = await pg.evaluate(() => window.__try('always'));
+  check('둘 다 실패하면 거기서 멈춘다 (무한정 안 부른다)', never.calls === 2, never);
+  check('그때 사람 말로 알린다',
+        never.msg === '사이트가 제때 응답하지 않았습니다. 잠시 뒤 다시 시도해 주세요.', never.msg);
+  check("'signal timed out' 을 그대로 보여 주지 않는다", !/signal timed out/.test(never.msg), never.msg);
+
+  await br.close();
 }
 
 console.log('\n■ 스크래퍼 — 본문 캐시 비우기');
