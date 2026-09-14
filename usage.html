@@ -66,6 +66,16 @@
   .gate .err{color:var(--warn);font-size:12.5px;margin-top:14px;line-height:1.6;}
 
   /* 📊 사용 현황 */
+  .ug-views{display:flex;gap:0;margin:0 0 14px;border:1px solid var(--rule);
+    border-radius:10px;overflow:hidden;width:max-content;}
+  .ug-view{background:var(--paper,#fff);border:0;border-right:1px solid var(--rule);
+    padding:7px 16px;font:inherit;font-size:13px;font-weight:700;color:var(--ink-soft);cursor:pointer;}
+  .ug-view:last-child{border-right:0;}
+  .ug-view.on{background:var(--mon,#3B82F6);color:#fff;}
+  /* 접속 기록 — 날짜가 같은 줄끼리 묶여 보이게 첫 줄만 날짜를 적는다 */
+  .ug-log-date{font-family:'IBM Plex Mono',monospace;white-space:nowrap;}
+  .ug-log-date.same{color:transparent;}
+  .ug-log-wk{color:var(--warn,#b45309);}
   .ug-chips{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px;}
   .ug-chip{background:var(--paper,#fff);border:1px solid var(--rule);border-radius:11px;
     padding:9px 15px;display:flex;flex-direction:column;gap:2px;min-width:104px;}
@@ -161,6 +171,10 @@
   <button class="btn" id="homeBtn">← 대시보드</button>
   <span id="usageNote"></span>
 </div>
+<div class="ug-views" id="usageViews">
+  <button type="button" class="ug-view on"  data-view="summary">요약</button>
+  <button type="button" class="ug-view"     data-view="log">접속 기록</button>
+</div>
 <div id="usageBody"></div>
 
 <script type="module">
@@ -181,7 +195,7 @@ const firebaseConfig = {
   measurementId: "G-MTXQWT10P1"
 };
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
-const APP_VER = 'ver7.36';
+const APP_VER = 'ver7.37';
 
 const fbApp  = initializeApp(firebaseConfig);
 const fbAuth = getAuth(fbApp);
@@ -215,6 +229,12 @@ const _selEmails = new Set();
 // 표의 검색·정렬·필터도 같은 이유로 화면 밖에 둔다(달을 바꿔도 풀리지 않게).
 // 기능별 사용량에서 내 것을 빼는 것도 여기 — 오류를 잡느라 이리저리 돌아다니면
 // 실사용이 뻥튀기된다.
+// 보고 있는 화면(요약 / 접속 기록). 달을 바꿔도 보던 화면에 그대로 있어야 한다.
+let _ugView      = 'summary';
+let _ugLogQuery  = '';
+let _ugLogHideMe = false;
+let _ugLastRows  = [], _ugLastYm = '';
+let _ugLogAll    = [];     // 이 달의 모든 줄 (거르기 전)
 let _ugExcludeMe = true;
 let _ugQuery     = '';
 let _ugOnlyOld   = false;
@@ -261,10 +281,144 @@ async function loadUsage(){
       return { ...p, days };
     }));
     note.textContent = `${ym} · 교직원 ${rows.length}명`;
-    renderUsage(rows, ym);
+    _ugLastRows = rows; _ugLastYm = ym;
+    renderView();
   } catch(e){
     body.innerHTML = `<div style="padding:24px;color:var(--warn);font-size:13px;">불러오기 실패: ${escapeHtml(e.message)}</div>`;
   } finally { _usageBusy = false; }
+}
+
+// 어느 화면을 그릴지 고른다. 달을 다시 읽지 않고 갈아 끼우기만 한다 —
+// 사람마다 문서 하나씩 읽으므로 탭을 누를 때마다 다시 읽으면 아깝다.
+function renderView(){
+  document.querySelectorAll('#usageViews .ug-view').forEach(b =>
+    b.classList.toggle('on', b.dataset.view === _ugView));
+  if (!_ugLastYm) return;
+  if (_ugView === 'log') renderUsageLog(_ugLastRows, _ugLastYm);
+  else                   renderUsage(_ugLastRows, _ugLastYm);
+}
+document.getElementById('usageViews')?.addEventListener('click', e => {
+  const b = e.target.closest('.ug-view');
+  if (!b || b.dataset.view === _ugView) return;
+  _ugView = b.dataset.view;
+  renderView();
+});
+
+// ── 접속 기록 ────────────────────────────────────────────────────────────────
+// 요약은 '이 달에 누가 얼마나' 를 보지만, 가끔 궁금한 것은 '며칠에 누가 들어왔나'
+// 다. 그건 이미 쌓여 있다 — usage/{이메일}/m/{연-월} 의 days 가 날짜별이다.
+// 새로 남길 것 없이 그 자료를 날짜순으로 펴서 보여 주기만 하면 된다.
+//
+// 시각은 '마지막으로 쓴 때' 하나뿐이다. 들어온 시각은 안 남긴다 — 남기려면
+// 하루 첫 기록인지를 알아야 하는데, 이 문서는 규칙상 본인이 못 읽는다.
+const UG_DOW = ['일','월','화','수','목','금','토'];
+
+// 지금 검색·필터에 맞는 줄만. 최근 날이 위로, 같은 날이면 늦게까지 쓴 사람이 위로.
+function ugLogFiltered(){
+  const q = _ugLogQuery.trim().toLowerCase();
+  return _ugLogAll.filter(l =>
+      (!_ugLogHideMe || l.email !== ADMIN_EMAIL) &&
+      (!q || String(l.name || '').toLowerCase().includes(q)
+          || String(l.email || '').toLowerCase().includes(q)))
+    .sort((a, b) => b.date.localeCompare(a.date)
+                 || String(b.last).localeCompare(String(a.last))
+                 || String(a.name).localeCompare(String(b.name), 'ko'));
+}
+
+// 같은 날이 이어지면 날짜를 한 번만 적는다 — 날짜 덩어리가 눈에 잡히게.
+function ugLogRowsHtml(shown){
+  let prev = '';
+  return shown.map(l => {
+    const w = new Date(l.date + 'T00:00:00').getDay();
+    const same = l.date === prev; prev = l.date;
+    return `<tr>
+      <td class="ug-log-date${same ? ' same' : ''}">${escapeHtml(l.date.slice(5))}
+        <span class="${w === 0 || w === 6 ? 'ug-log-wk' : 'dim'}">${UG_DOW[w]}</span></td>
+      <td class="nm">${escapeHtml(l.name)}</td>
+      <td class="num">${l.opens || ''}</td>
+      <td class="dim">${escapeHtml(l.last)}</td>
+      <td class="num">${l.stu ? `${l.stu}<span class="dim"> / ${l.hit || l.stu}회</span>` : ''}</td>
+      <td class="num">${l.clicks || ''}</td>
+      <td class="dim">${l.top.map(t => `${escapeHtml(USAGE_TABS[t[0]] || t[0])} ${t[1]}`).join(' · ')}</td>
+      <td class="${l.ver && l.ver !== APP_VER ? 'old' : 'dim'}">${escapeHtml(l.ver)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// 검색어를 칠 때는 본문만 갈아 끼운다. 화면을 통째로 다시 만들면 입력칸이 글자를
+// 칠 때마다 새로 생겨 포커스가 튄다 — 사람별 표가 같은 이유로 그렇게 한다.
+function ugLogRefresh(){
+  const shown = ugLogFiltered();
+  const tb = document.getElementById('ugLogBody');
+  if (tb) tb.innerHTML = ugLogRowsHtml(shown)
+    || '<tr><td colspan="8" class="dim" style="padding:18px;">기록이 없습니다.</td></tr>';
+  const cnt = document.getElementById('ugLogCount');
+  if (cnt) cnt.textContent = `${shown.length.toLocaleString()} / ${_ugLogAll.length.toLocaleString()}줄`;
+}
+
+function renderUsageLog(rows, ym){
+  const nameOf = new Map(rows.map(r => [r.email, r.name]));
+  const logs = [];
+  for (const r of rows) {
+    for (const [date, row] of Object.entries(r.days || {})) {
+      if (!row) continue;
+      const tabs = row.tabs || {};
+      logs.push({
+        date, email: r.email, name: r.name,
+        opens:  Number(row.opens) || 0,
+        last:   row.last || '',
+        ver:    row.ver  || '',
+        stu:    Number((row.counts || {}).stu)    || 0,   // 본 학생 수
+        hit:    Number((row.counts || {}).stuHit) || 0,   // 조회 건수
+        clicks: Object.values(tabs).reduce((a, b) => a + (Number(b) || 0), 0),
+        top:    Object.entries(tabs).sort((a,b) => b[1]-a[1]).slice(0, 3),
+      });
+    }
+  }
+  _ugLogAll = logs;
+  const shown = ugLogFiltered();
+
+  const chip = (l, v) => `<div class="ug-chip"><span>${l}</span><b>${v}</b></div>`;
+  const stuAll   = shown.reduce((a, l) => a + l.stu, 0);
+  const hitAll   = shown.reduce((a, l) => a + (l.hit || l.stu), 0);
+  const opensAll = shown.reduce((a, l) => a + l.opens, 0);
+  const dayCnt   = new Set(shown.map(l => l.date)).size;
+  const whoCnt   = new Set(shown.map(l => l.email)).size;
+
+  const body = ugLogRowsHtml(shown);
+
+  document.getElementById('usageBody').innerHTML = `
+    <div class="ug-chips">
+      ${chip('기록', `${shown.length.toLocaleString()}줄`)}
+      ${chip('사람', `${whoCnt}명`)}
+      ${chip('날', `${dayCnt}일`)}
+      ${chip('앱 연 횟수', opensAll.toLocaleString())}
+      ${chip('학생 조회', `${stuAll.toLocaleString()}명<small> / ${hitAll.toLocaleString()}회</small>`)}
+    </div>
+    <div class="ug-card">
+      <div class="ug-h">접속 기록 <small>하루에 한 줄씩 · 최근이 위</small></div>
+      <div class="ug-tools">
+        <input type="search" id="ugLogSearch" placeholder="이름으로 찾기" value="${escapeHtml(_ugLogQuery)}">
+        <label><input type="checkbox" id="ugLogHideMe" ${_ugLogHideMe ? 'checked' : ''}> 내 기록 빼기</label>
+        <span class="dim" id="ugLogCount">${shown.length.toLocaleString()} / ${logs.length.toLocaleString()}줄</span>
+      </div>
+      <div class="ug-tblwrap"><table class="ug-tbl">
+        <thead><tr><th>날짜</th><th>이름</th><th>연 횟수</th><th>마지막</th>
+          <th title="본 학생 수 / 조회 건수 · 누구인지는 기록하지 않습니다">학생 조회</th>
+          <th>탭 이동</th><th>많이 쓴 기능</th><th>버전</th></tr></thead>
+        <tbody id="ugLogBody">${body || '<tr><td colspan="8" class="dim" style="padding:18px;">기록이 없습니다.</td></tr>'}</tbody>
+      </table></div>
+    </div>
+    <div class="ug-foot">기록은 <b>앱을 연 횟수</b>와 <b>탭 이름·횟수</b>, 그리고
+      <b>학생 종합검색에서 본 학생 수·조회 건수</b>뿐입니다. <b>누구를 봤는지는 담지 않습니다.</b>
+      (연락처 조회는 법에 따라 따로 남습니다.)</div>`;
+
+  const q2 = document.getElementById('ugLogSearch');
+  q2?.addEventListener('input', () => { _ugLogQuery = q2.value; ugLogRefresh(); });
+  // 내 것을 빼면 위 요약 숫자도 달라져야 하므로 통째로 다시 그린다
+  document.getElementById('ugLogHideMe')?.addEventListener('change', e => {
+    _ugLogHideMe = e.target.checked; renderUsageLog(rows, ym);
+  });
 }
 
 function renderUsage(rows, ym){
@@ -283,13 +437,16 @@ function renderUsage(rows, ym){
   const todayKey = isThisMonth ? dstr(_now.getDate()) : '';
 
   const people = rows.map(r => {
-    let opens = 0, used = 0, last = '', tabs = {}, ver = '';
+    let opens = 0, used = 0, last = '', tabs = {}, ver = '', stu = 0, hit = 0;
     for(let d = 1; d <= nDays; d++){
       const row = r.days[dstr(d)];
       if(!row) continue;
       const o = Number(row.opens) || 0;
       opens += o; used++;
       if(row.ver) ver = row.ver;                 // 마지막으로 쓴 화면 버전
+      // 학생 종합검색 — 본 학생 수와 조회 건수. 누구인지는 안 담긴다.
+      stu += Number((row.counts || {}).stu)    || 0;
+      hit += Number((row.counts || {}).stuHit) || 0;
       perDay[d-1].users++; perDay[d-1].opens += o;
       if(row.date || row.last) last = `${dstr(d).slice(5)} ${row.last || ''}`.trim();
       const mine = r.email === ADMIN_EMAIL;
@@ -306,7 +463,7 @@ function renderUsage(rows, ym){
     const tday = todayKey ? (r.days[todayKey] || null) : null;
     const todayTabs = tday ? Object.entries(tday.tabs || {}).sort((a,b) => b[1]-a[1]) : [];
     const todayOpens = tday ? (Number(tday.opens) || 0) : 0;
-    return { ...r, opens, used, last, tabs, top, ver, todayTabs, todayOpens,
+    return { ...r, opens, used, last, tabs, top, ver, todayTabs, todayOpens, stu, hit,
              clicks: Object.values(tabs).reduce((a,b)=>a+b,0) };
   }).sort((a,b) => b.opens - a.opens || b.used - a.used || a.name.localeCompare(b.name,'ko'));
 
@@ -361,6 +518,7 @@ function renderUsage(rows, ym){
     <td class="num">${p.opens || ''}</td>
     <td class="num">${p.used || ''}</td>
     <td class="num">${p.clicks || ''}</td>
+    <td class="num">${p.stu ? `${p.stu}<span class="dim"> / ${p.hit || p.stu}회</span>` : ''}</td>
     <td class="dim">${escapeHtml(p.last)}</td>
     <td class="${p.ver && p.ver !== APP_VER ? 'old' : 'dim'}">${escapeHtml(p.ver)}</td>
     <td class="dim">${p.top.map(t => `${escapeHtml(USAGE_TABS[t[0]] || t[0])} ${t[1]}`).join(' · ')}</td>
@@ -374,6 +532,7 @@ function renderUsage(rows, ym){
       ${chip('쓴 사람', `${usersAll}<small> / ${people.length}명</small>`)}
       ${chip('앱 연 횟수', opensAll.toLocaleString())}
       ${chip('탭 이동', clickAll.toLocaleString())}
+      ${chip('학생 조회', `${people.reduce((a,p) => a + (p.stu||0), 0).toLocaleString()}명<small> / ${people.reduce((a,p) => a + (p.hit||p.stu||0), 0).toLocaleString()}회</small>`)}
       ${chip('사용한 날', `${daysWithUse}일`)}
       ${chip('하루 평균', `${avgUsers.toFixed(1)}명`)}
       ${chip('평일 평균', `${avgWeekday.toFixed(1)}명`)}
@@ -407,7 +566,9 @@ function renderUsage(rows, ym){
         </div>
         <div class="ug-tblwrap"><table class="ug-tbl">
           <thead><tr><th data-sort="name">이름</th><th data-sort="opens">연 횟수</th><th data-sort="used">쓴 날</th>
-            <th data-sort="clicks">탭 이동</th><th data-sort="last">마지막</th><th data-sort="ver">버전</th>
+            <th data-sort="clicks">탭 이동</th>
+            <th data-sort="stu" title="본 학생 수 / 조회 건수 — 누구인지는 기록하지 않습니다">학생 조회</th>
+            <th data-sort="last">마지막</th><th data-sort="ver">버전</th>
             <th>많이 쓴 기능 <small>이 달</small></th>
             ${todayKey ? `<th data-sort="todayOpens">오늘 쓴 기능</th>` : ''}</tr></thead>
           <tbody id="ugTbody"></tbody>
@@ -417,8 +578,9 @@ function renderUsage(rows, ym){
       </div>
     </div>
 
-    <div class="ug-foot">기록은 <b>앱을 연 횟수</b>와 <b>탭 이름·횟수</b>뿐입니다.
-      무엇을 검색했는지·누구를 조회했는지 같은 내용은 담지 않습니다.
+    <div class="ug-foot">기록은 <b>앱을 연 횟수</b>와 <b>탭 이름·횟수</b>, 그리고
+      <b>학생 종합검색에서 본 학생 수</b>뿐입니다.
+      무엇을 검색했는지·<b>누구를 조회했는지는 담지 않습니다.</b>
       (연락처 조회는 법에 따라 따로 남습니다.)</div>`;
 
   ugRenderRows(rowHtml);

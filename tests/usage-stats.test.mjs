@@ -168,6 +168,9 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   ${grab('usageStart')}
   ${grab('usageRegisterMe')}
   ${grab('usageTab')}
+  ${grab('usageCount')}
+  let _usageStuSeen = new Set(); let _usageStuLast = '';
+  ${grab('usageStudentSeen')}
   ${grab('usageMark')}
   ${grab('usageFlush')}
   ${grabConst('USAGE_TABS', PAGE)}
@@ -202,7 +205,8 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   ${grab('ugBindPickBoxes', PAGE)}
   ${grab('updateSelBar', PAGE)}
 
-  Object.assign(window, { usageStart, usageTab, usageFlush, usageDate, loadUsage,
+  Object.assign(window, { usageStart, usageTab, usageCount, usageStudentSeen,
+                          usageFlush, usageDate, loadUsage,
                           renderUsage, initUsageEasterEgg, closeUsagePage,
                           watchReloadSignal, isBusyTyping, APP_VER,
                           saveResumePoint, applyResumePoint });
@@ -230,6 +234,41 @@ const reloadedSince = base => serves - base;
 
 const tap = async n => { for (let i = 0; i < n; i++) await pg.click('#homeMemoCard .home-section-title'); };
 const active = () => pg.evaluate(() => document.querySelector('.page-view.active')?.id);
+
+console.log('\n■ 학생 조회 — 수만 세고 누구인지는 안 남긴다');
+{
+  // 종합검색에서 학생 상세로 들어오는 문이 넷인데 모두 s360ShowDetail 을 지난다.
+  // 검색해서 들어오든, 반별 목록에서 그냥 클릭하든, 3열 명렬에서 고르든 다 센다.
+  check('세는 자리가 상세 화면 입구다',
+        /async function s360ShowDetail\(s, targetEl\)\{[\s\S]{0,400}usageStudentSeen\(spotKey\(s\)\)/.test(HTML));
+  const doors = (HTML.match(/s360ShowDetail\(/g) || []).length;
+  // 정의 1 + 부르는 곳 3
+  check('상세로 드는 문이 그것 하나뿐이다 (부르는 곳 셋)', doors === 4, doors);
+
+  check('같은 학생은 한 명으로 센다', /_usageStuSeen\.has\(key\)/.test(HTML));
+  // 이어서 다시 그리는 것과 다른 학생을 봤다가 돌아오는 것을 가른다
+  check('이어서 다시 그리면 건수를 안 센다',
+        /if \(key !== _usageStuLast\) \{ _usageStuLast = key; usageCount\('stuHit'\); \}/.test(HTML));
+  check('날이 바뀌면 둘 다 다시 센다',
+        /_usageStuSeen = new Set\(\); _usageStuLast = '';/.test(HTML));
+
+  // 여기가 요점이다 — 이름·학번 같은 것이 기록에 실리면 안 된다.
+  check('세는 함수는 수만 받는다', /function usageCount\(key, n = 1\)/.test(HTML));
+  check('보낼 때도 수만 실린다', /cntInc\[k\] = increment\(v\)/.test(HTML));
+  check('학생 키는 세었는지 확인하는 데만 쓰고 보내지 않는다',
+        !/counts[\s\S]{0,200}spotKey/.test(HTML));
+
+  // 실패하면 되돌려 다시 보낸다 — tabs 와 같은 대접
+  check('저장이 실패하면 counts 도 되돌린다',
+        /usageDay\.counts\[k\] = \(usageDay\.counts\[k\] \|\| 0\) \+ v/.test(HTML));
+  check('보낸 뒤에는 비운다', /usageDay\.counts = \{\};/.test(HTML));
+
+  // 화면 쪽 문구 — 무엇을 담고 무엇을 안 담는지 적혀 있어야 한다
+  check('누구를 봤는지는 안 담는다고 적어 둔다',
+        /누구를 조회했는지는 담지 않습니다/.test(PAGE));
+  check('무엇을 담는지도 적어 둔다',
+        /학생 종합검색에서 본 학생 수/.test(PAGE));
+}
 
 console.log('\n■ 관리자 말고는 못 들어간다');
 {
@@ -319,6 +358,42 @@ console.log('\n■ 다시 열어도 서버에서 더해진다 (자기 기록을 
   check('연 횟수가 서버에서 이어진다 (1 → 2)', st.days[today].opens === 2, st.days[today].opens);
   check('탭 횟수도 이어진다 (3 → 4)', st.days[today].tabs.timetable === 4, st.days[today].tabs);
   check('예전 날짜가 그대로 남아 있다', st.days['1999-01-01'].opens === 9, Object.keys(st.days));
+}
+
+console.log('\n■ 학생 조회 — 두 숫자가 실제로 서버에 쌓인다');
+{
+  // 돌연변이 검사에서 드러난 구멍이다. counts 를 만들어 놓고 보낼 글에 안 실어도
+  // 앞의 검사들이 다 통과했다 — 만드는 것과 보내는 것은 다른 이야기다.
+  const today = await pg.evaluate(() => window.usageDate());
+  // 다른 검사와 같은 문서를 쓰면 서로 값을 흐트러뜨린다 — 계정을 따로 쓴다.
+  const key = 'usage/stu@yeungnam.hs.kr/m/' + today.slice(0,7);
+  await pg.evaluate(() => { window.__fail = false; window.usageStart('stu@yeungnam.hs.kr'); });
+
+  // A → A(다시 그림) → B → A(되돌아옴)
+  // 이어서 같은 학생을 다시 그리는 것은 안 센다(창 넓히기·자료 도착 등).
+  // 다른 학생을 봤다가 돌아오면 그때는 한 번 더 센다.
+  await pg.evaluate(() => { ['1-1-01','1-1-01','1-1-02','1-1-01'].forEach(window.usageStudentSeen); });
+  const d0 = await pg.evaluate(() => window.__day());
+  check('본 학생은 둘', d0.counts.stu === 2, d0.counts);
+  check('조회 건수는 셋 (돌아온 것도 센다)', d0.counts.stuHit === 3, d0.counts);
+
+  await pg.evaluate(() => window.usageFlush());
+  const st = await pg.evaluate(k => window.__store[k], key);
+  check('보낸 글에 counts 가 실린다', !!(st.days[today] && st.days[today].counts), st.days[today]);
+  check('본 학생 수가 서버에 쌓인다', st.days[today].counts.stu === 2, st.days[today].counts);
+  check('조회 건수도 같이 쌓인다', st.days[today].counts.stuHit === 3, st.days[today].counts);
+  check('보낸 뒤 손에 든 것은 비워진다',
+        Object.keys((await pg.evaluate(() => window.__day())).counts).length === 0);
+
+  // 이어서 더 보면 덮어쓰지 않고 더해져야 한다
+  await pg.evaluate(() => { window.usageStudentSeen('3-5-11'); window.usageFlush(); });
+  const st2 = await pg.evaluate(k => window.__store[k], key);
+  check('다음에 본 학생이 더해진다 (2 → 3)', st2.days[today].counts.stu === 3, st2.days[today].counts);
+  check('건수도 더해진다 (3 → 4)', st2.days[today].counts.stuHit === 4, st2.days[today].counts);
+
+  // 기록에 학생을 가리키는 것이 하나도 없어야 한다
+  const wrote = JSON.stringify(st2.days[today]);
+  check('보낸 글에 학생 번호가 없다', !/1-1-01|1-1-02|3-5-11/.test(wrote), wrote.slice(0, 200));
 }
 
 console.log('\n■ 저장이 실패하면 되돌려 다시 보낸다');
@@ -579,7 +654,8 @@ console.log('\n■ usage.html 을 실제로 띄워 본다');
         if(r.path==='acl/emailByName') return {exists:()=>true,
           data:()=>({'김하나':'a@yeungnam.hs.kr','이두리':'b@yeungnam.hs.kr','박세찬':'c@yeungnam.hs.kr'})};
         if(r.path.startsWith('usage/a@')) return {exists:()=>true, data:()=>({days:{
-          ['${YM}-03']:{opens:4,first:'08:10',last:'16:40',ver:'${CUR_VER}',tabs:{timetable:9,pass:2}} }})};
+          ['${YM}-03']:{opens:4,first:'08:10',last:'16:40',ver:'${CUR_VER}',tabs:{timetable:9,pass:2},counts:{stu:7,stuHit:12}},
+          ['${YM}-05']:{opens:2,last:'11:20',ver:'${CUR_VER}',tabs:{search:5},counts:{stu:3,stuHit:5}} }})};
         if(r.path.startsWith('usage/b@')) return {exists:()=>true, data:()=>({days:{
           ['${YM}-03']:{opens:1,first:'09:00',last:'09:30',ver:'ver1.00',tabs:{meal:3}} }})};
         if(r.path==='appNotice/reload') return {exists:()=>true,data:()=>({n:41})};
@@ -603,7 +679,7 @@ console.log('\n■ usage.html 을 실제로 띄워 본다');
   check('명단을 acl/emailByName 에서 읽는다',
         /교직원 3명/.test(await up.$eval('#usageNote', e => e.innerText)),
         await up.$eval('#usageNote', e => e.innerText));
-  check('집계가 나온다', /쓴 사람\s*2 \/ 3명/.test(txt) && /앱 연 횟수\s*5/.test(txt), txt.slice(0,180));
+  check('집계가 나온다', /쓴 사람\s*2 \/ 3명/.test(txt) && /앱 연 횟수\s*7/.test(txt), txt.slice(0,180));
   check('기능별 막대가 그려진다', (await up.$$eval('.ug-trow', e => e.length)) > 0);
   check('옛 버전을 짚어 준다',
         (await up.$$eval('.ug-tbl td.old', e => e.map(x => x.textContent))).join() === 'ver1.00',
@@ -655,6 +731,56 @@ console.log('\n■ usage.html 을 실제로 띄워 본다');
   check('달을 바꿔도 골라 둔 사람이 유지된다',
         (await up.$eval('#ugSelCount', e => e.textContent)) === '1');
   await up.click('#ugSelClearBtn');
+
+  // ── 학생 조회 수 ──
+  // 누구를 봤는지는 안 남긴다. 수만 센다.
+  check('요약 칩에 명 수와 건수가 같이 나온다',
+        /학생 조회\s*10명\s*\/\s*17회/.test(txt), txt.slice(0,320));
+  const stuCol = await up.$$eval('.ug-tbl tbody tr:first-child td',
+    e => e.map(x => x.textContent.replace(/\s+/g,' ').trim()));
+  check('사람별 표에도 명 수 / 건수가 나온다',
+        stuCol.some(c => /^10 \/ 17회$/.test(c)), stuCol);
+
+  // ── 접속 기록 탭 ──
+  check('탭이 둘이다', (await up.$$eval('#usageViews .ug-view', e => e.length)) === 2);
+  check('처음에는 요약이 켜져 있다',
+        (await up.$eval('#usageViews .ug-view', e => e.classList.contains('on'))));
+
+  await up.click('#usageViews .ug-view[data-view="log"]');
+  await up.waitForTimeout(250);
+  const log = await up.$eval('#usageBody', e => e.innerText.replace(/\s+/g,' '));
+  check('접속 기록으로 바뀐다', /접속 기록/.test(log), log.slice(0,160));
+  // 날마다 한 줄 — a@ 는 이틀, b@ 는 하루라 셋이어야 한다
+  const nRows = await up.$$eval('#ugLogBody tr', e => e.length);
+  check('날짜별로 한 줄씩 펴진다 (3줄)', nRows === 3, nRows);
+  check('최근 날이 위에 온다',
+        (await up.$eval('#ugLogBody tr:first-child .ug-log-date', e => e.textContent)).includes('05'),
+        await up.$eval('#ugLogBody tr:first-child .ug-log-date', e => e.textContent));
+  check('학생 조회 합이 나온다', /학생 조회\s*10명\s*\/\s*17회/.test(log), log.slice(0,220));
+
+  // 이름으로 거르면 본문만 바뀐다 — 화면을 통째로 다시 만들면 입력칸 포커스가 튄다
+  await up.fill('#ugLogSearch', '김하나');
+  await up.waitForTimeout(200);
+  check('이름으로 거른다', (await up.$$eval('#ugLogBody tr', e => e.length)) === 2);
+  check('거르는 동안 입력칸이 살아 있다',
+        (await up.evaluate(() => document.activeElement?.id)) === 'ugLogSearch',
+        await up.evaluate(() => document.activeElement?.id));
+  await up.fill('#ugLogSearch', '');
+  await up.waitForTimeout(200);
+  check('비우면 다시 다 나온다', (await up.$$eval('#ugLogBody tr', e => e.length)) === 3);
+
+  // 내 기록 빼기 — 여기 자료에는 내(관리자) 줄이 없으므로 그대로여야 한다
+  await up.check('#ugLogHideMe');
+  await up.waitForTimeout(250);
+  check('내 기록 빼기가 켜진다', await up.$eval('#ugLogHideMe', e => e.checked));
+  await up.uncheck('#ugLogHideMe');
+  await up.waitForTimeout(250);
+
+  // 요약으로 돌아와도 멀쩡한가
+  await up.click('#usageViews .ug-view[data-view="summary"]');
+  await up.waitForTimeout(250);
+  check('요약으로 돌아온다',
+        (await up.$$eval('.ug-trow', e => e.length)) > 0);
 
   // 앱 안(iframe)으로 열렸을 때 — '대시보드' 버튼이 살아 있으면 프레임 안이
   // 앱으로 바뀌어 앱 속에 앱이 뜬다.
@@ -815,11 +941,15 @@ console.log('\n■ 오늘 쓴 기능도 같이 보여준다');
     [...tr.querySelectorAll('td')].map(td => td.textContent.trim())));
   const 하나 = cells.find(c => c[0].includes('김하나'));
   const 두리 = cells.find(c => c[0].includes('이두리'));
+  const col = label => heads.findIndex(h => h.startsWith(label));
+  const iMonth = col('많이 쓴 기능'), iToday = col('오늘 쓴 기능');
+  check('칸 자리를 머리글로 찾을 수 있다', iMonth >= 0 && iToday >= 0, heads);
 
-  check('많이 쓴 기능은 달 전체', 하나[6].includes('시간표 30'), 하나[6]);
-  check('오늘 쓴 기능은 오늘 것만', 하나[7].includes('외출증 4') && !하나[7].includes('시간표'), 하나[7]);
-  check('오늘 안 쓴 사람은 빈 표시', 두리[7] === '—', 두리[7]);
-  check('그래도 달 전체는 남아 있다', 두리[6].includes('시간표 8'), 두리[6]);
+  check('많이 쓴 기능은 달 전체', 하나[iMonth].includes('시간표 30'), 하나[iMonth]);
+  check('오늘 쓴 기능은 오늘 것만',
+        하나[iToday].includes('외출증 4') && !하나[iToday].includes('시간표'), 하나[iToday]);
+  check('오늘 안 쓴 사람은 빈 표시', 두리[iToday] === '—', 두리[iToday]);
+  check('그래도 달 전체는 남아 있다', 두리[iMonth].includes('시간표 8'), 두리[iMonth]);
 
   // 오늘 많이 쓴 사람 찾기 — 정렬이 되어야 쓸모가 있다
   await pg.evaluate(() => document.querySelector('.ug-tbl th[data-sort="todayOpens"]').click());

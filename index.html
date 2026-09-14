@@ -6332,7 +6332,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.36';
+const APP_VER = 'ver7.37';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -10286,7 +10286,7 @@ if (IMPERSONATE) {
 const USAGE_FLUSH_MS = 45000;      // 바뀐 게 있으면 이 간격으로 한 번만 보낸다
 // usageDay 에 담기는 opens·tabs 는 '아직 안 보낸 것'이다(누적값이 아니다).
 // 보낸 뒤에는 0 으로 비우고, 서버에서 increment 로 더한다 — 아래 usageFlush 참고.
-let usageDay = null;               // { date, opens, last, tabs }
+let usageDay = null;               // { date, opens, last, tabs, counts }
 let usageRef = null, usageDirty = false, usageTimer = null;
 
 const usageKst = () => new Date(Date.now() + 9 * 3600 * 1000);
@@ -10303,7 +10303,8 @@ function usageStart(email) {
   // 늘 실패하고 그날 값이 매번 처음부터 다시 세어졌다. 앱을 여러 번 열면 연 횟수가
   // 1 로 돌아가고, 그 전에 센 탭 횟수를 이번 것으로 덮어썼다.
   // 이제 읽지 않는다. 안 보낸 것만 들고 있다가 서버에서 increment 로 더한다.
-  usageDay = { date, opens: 1, last: usageHhmm(), ver: APP_VER, tabs: {} };
+  usageDay = { date, opens: 1, last: usageHhmm(), ver: APP_VER, tabs: {}, counts: {} };
+  _usageStuSeen = new Set(); _usageStuLast = '';   // 날이 바뀌면 다시 센다
   usageRegisterMe(email);
   usageMark();
 }
@@ -10328,6 +10329,39 @@ function usageTab(page) {
   usageMark();
 }
 
+// 탭 횟수 말고 따로 세는 것들. 지금은 '학생 종합검색에서 본 학생 수' 하나다.
+//
+// 누구를 봤는지는 남기지 않는다 — 수만 센다. 학생 이름이 기록에 남으면 그것은
+// 사용 현황이 아니라 열람 기록이 되고, 그때부터는 다루는 법이 완전히 달라진다.
+function usageCount(key, n = 1) {
+  if (!usageDay || !key || !n) return;
+  if (usageDate() !== usageDay.date) { usageFlush(); usageStart(fbAuth.currentUser?.email); return; }
+  usageDay.counts[key] = (usageDay.counts[key] || 0) + n;
+  usageMark();
+}
+
+// 학생 조회는 두 가지를 센다. 하나만으로는 읽히지 않는다.
+//   stuHit  조회 건수 — 학생을 바꿔 볼 때마다
+//   stu     본 학생 수 — 같은 학생은 한 번만
+// 그래야 '세 명을 열두 번 봤다' 처럼 읽힌다. 한 학생을 붙들고 오래 본 것인지
+// 여러 명을 훑은 것인지가 갈린다.
+//
+// 건수는 '바로 앞에 보던 학생과 다를 때' 만 센다. 상세 화면은 창을 넓히거나
+// 자료가 늦게 도착해도 다시 그려지는데, 그때마다 세면 누른 적 없는 횟수가
+// 쌓인다. 다른 학생을 봤다가 돌아오면 그때는 한 번 더 센 것이 맞다.
+//
+// 명 수는 앱을 켜 둔 동안만 기억한다. 새로고침하면 다시 세어지므로 조금 부풀 수
+// 있다 — 정확히 하려면 누구를 봤는지 남겨야 하고, 그건 안 한다.
+let _usageStuSeen = new Set();
+let _usageStuLast = '';
+function usageStudentSeen(key) {
+  if (!key) return;
+  if (key !== _usageStuLast) { _usageStuLast = key; usageCount('stuHit'); }
+  if (_usageStuSeen.has(key)) return;
+  _usageStuSeen.add(key);
+  usageCount('stu');
+}
+
 function usageMark() {
   if (!usageDay) return;
   usageDay.last = usageHhmm();
@@ -10338,15 +10372,18 @@ function usageMark() {
 function usageFlush() {
   if (!usageDirty || !usageRef || !usageDay) return;
   usageDirty = false;
-  const { date, opens, tabs, last, ver } = usageDay;
+  const { date, opens, tabs, counts, last, ver } = usageDay;
   // 보낼 것을 떼어 내고 손에 든 것은 비운다. 실패하면 되돌려 다음 기회에 다시 보낸다.
   usageDay.opens = 0;
   usageDay.tabs = {};
-  const tabInc = {};
+  usageDay.counts = {};
+  const tabInc = {}, cntInc = {};
   for (const [k, v] of Object.entries(tabs)) if (v) tabInc[k] = increment(v);
+  for (const [k, v] of Object.entries(counts || {})) if (v) cntInc[k] = increment(v);
   const row = { last, ver };
   if (opens) row.opens = increment(opens);
   if (Object.keys(tabInc).length) row.tabs = tabInc;
+  if (Object.keys(cntInc).length) row.counts = cntInc;
   // 더하기는 서버가 한다 — 이 문서를 읽을 권한이 없어도 정확히 쌓인다.
   // 기기를 두 대 쓰거나 탭을 여러 개 열어 둬도 서로 덮어쓰지 않는다.
   _fsSetDoc(usageRef, { email: fbAuth.currentUser?.email || '', ym: date.slice(0, 7),
@@ -10355,6 +10392,7 @@ function usageFlush() {
       usageDirty = true;
       usageDay.opens += opens;
       for (const [k, v] of Object.entries(tabs)) usageDay.tabs[k] = (usageDay.tabs[k] || 0) + v;
+      for (const [k, v] of Object.entries(counts || {})) usageDay.counts[k] = (usageDay.counts[k] || 0) + v;
     });
 }
 
@@ -14248,6 +14286,10 @@ async function s360LoadElectives(s){
 }
 
 async function s360ShowDetail(s, targetEl){
+  // 몇 명을 봤는지만 센다. 누구인지는 남기지 않는다.
+  // 여기가 학생 상세로 들어오는 단 하나의 문이라, 목록에서 눌렀든 3열 패널이든
+  // 다 지나간다. 같은 학생을 다시 열어도 한 명으로 센다.
+  try { if (s) usageStudentSeen(spotKey(s)); } catch(e){}
   const paneMode = !!targetEl;              // 3열 모드: 상세 패널에 렌더(전체 교체 아님)
   if (!paneMode) s360View = 'detail';
   const main = targetEl || document.getElementById('s360Body');
