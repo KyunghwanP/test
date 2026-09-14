@@ -101,6 +101,26 @@ async function main() {
     });
     console.log('  → 주차 목록 저장 완료');
 
+    // 3-1) 본문 캐시 비우기
+    //
+    // 본문 HTML 은 이 스크립트가 만들지 않는다. 앱이 Apps Script 프록시로 긁어
+    // weeklyData/cache-* 에 스스로 넣고, 한 시간 동안 그것을 다시 읽는다.
+    // 그래서 사이트를 고치고 이 액션을 돌려도 화면은 그대로였다 — 목록만 새것이고
+    // 본문은 한 시간 전 것이었다. 여기서 캐시를 비워, '액션을 다시 돌린다' 가
+    // 곧 '본문도 다시 받는다' 가 되게 한다. 다음에 그 탭을 여는 사람이 새로 긁는다.
+    //
+    // index 와 summary 는 본문 캐시가 아니다. 지우면 주차 칩과 AI 요약이 사라지므로
+    // 반드시 'cache-' 로 시작하는 것만 고른다.
+    try {
+      const all   = await db.collection('weeklyData').listDocuments();
+      const stale = all.filter(d => d.id.startsWith('cache-'));
+      await Promise.all(stale.map(d => d.delete()));
+      console.log(`  → 본문 캐시 ${stale.length}개 비움 (남긴 것: ${all.length - stale.length}개)`);
+    } catch (e) {
+      // 캐시를 못 지워도 목록·학사일정은 이미 들어갔다. 여기서 멈출 일은 아니다.
+      console.warn('  ⚠️  본문 캐시 비우기 실패:', e.message);
+    }
+
     // 4) 학사일정 (GAS 경유) 읽기 및 저장
     try {
       const schedule = await fetchSchedule();

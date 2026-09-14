@@ -122,7 +122,10 @@ function triggerWeeklySummary() {
       .setMimeType(ContentService.MimeType.JSON);
   }
   var OWNER = 'KyunghwanP';
-  var REPO  = 'ynhs';
+  // 스크래핑·요약 워크플로와 scripts/ 는 test 저장소에만 있다. ynhs 로 쏘면
+  // 404 가 돌아온다(그동안 아래 success:true 에 가려 안 보였다).
+  // 두 배포가 같은 Firebase 프로젝트(ynhs-7b5ba)를 보므로 한 곳에서만 돌리면 된다.
+  var REPO  = 'test';
   var headers = {
     'Authorization': 'Bearer ' + GITHUB_TOKEN,
     'Accept': 'application/vnd.github+json',
@@ -141,17 +144,28 @@ function triggerWeeklySummary() {
   Utilities.sleep(60000);
 
   // 3. AI 요약 실행
+  // 파일 이름은 대문자 S 다(Summarize.yml). GitHub 는 이 경로의 대소문자를
+  // 가리므로 summarize.yml 로 쏘면 404 가 온다.
   var sumRes = UrlFetchApp.fetch(
-    'https://api.github.com/repos/' + OWNER + '/' + REPO + '/actions/workflows/summarize.yml/dispatches',
+    'https://api.github.com/repos/' + OWNER + '/' + REPO + '/actions/workflows/Summarize.yml/dispatches',
     { method: 'POST', headers: headers, payload: payload, muteHttpExceptions: true }
   );
 
+  // 응답 코드를 실제로 본다. 전에는 success:true 를 박아 두어, 워크플로가 없어
+  // 404 가 와도 성공으로 보였다 — 안 돌고 있다는 것을 알 길이 없었다.
+  // dispatch 가 받아들여지면 204 다.
+  var scrapeOk = (scrapeRes.getResponseCode() === 204);
+  var sumOk    = (sumRes.getResponseCode() === 204);
+  var out = {
+    success: scrapeOk && sumOk,
+    scrape:  scrapeRes.getResponseCode(),
+    summary: sumRes.getResponseCode()
+  };
+  if (!scrapeOk) out.scrapeError = scrapeRes.getContentText().slice(0, 300);
+  if (!sumOk)    out.summaryError = sumRes.getContentText().slice(0, 300);
+
   return ContentService
-    .createTextOutput(JSON.stringify({
-      success: true,
-      scrape:  scrapeRes.getResponseCode(),
-      summary: sumRes.getResponseCode()
-    }))
+    .createTextOutput(JSON.stringify(out))
     .setMimeType(ContentService.MimeType.JSON);
 }
 

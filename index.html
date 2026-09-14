@@ -2020,6 +2020,15 @@
   .wk-modes button.on{background:var(--mon);color:#fff;font-weight:700;}
 
   /* 별도 버튼 행 숨김 (제목 바에 통합) */
+  .weekly-reload-btn{
+    align-self:flex-end;flex-shrink:0;margin:4px 0 6px;
+    padding:5px 10px;border-radius:8px;border:1px solid var(--rule);
+    background:var(--paper);color:var(--ink-soft);
+    font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;
+    transition:color .12s,border-color .12s;
+  }
+  .weekly-reload-btn:hover:not(:disabled){color:var(--mon);border-color:var(--mon);}
+  .weekly-reload-btn:disabled{opacity:.55;cursor:default;}
   .weekly-btn-row{display:none;}
   .weekly-dept{
     background:var(--paper);border-radius:8px;margin-bottom:10px;overflow:hidden;
@@ -5279,6 +5288,10 @@
           <div class="weekly-top-bar" id="weeklyTopBar">
             <div class="weekly-page-loading" id="weeklyPageLoading">주간교육활동을 불러오는 중...</div>
             <div class="weekly-week-bar" id="weeklyWeekBar" style="display:none;"></div>
+            <!-- 내용은 한 시간짜리 캐시로 돈다. 사이트를 고친 직후에는 그 시간을
+                 기다릴 수 없으므로 지금 다시 받는 길을 둔다. -->
+            <button type="button" class="weekly-reload-btn" id="weeklyReloadBtn"
+                    style="display:none;" title="사이트에서 지금 다시 받아옵니다">↻ 새로 받기</button>
           </div>
           <div class="weekly-btn-row" style="display:none;">
             <a id="weeklyOpenLink" href="https://sites.google.com/yeungnam.hs.kr/202633"
@@ -6326,7 +6339,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.31';
+const APP_VER = 'ver7.32';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -10697,6 +10710,16 @@ async function initWeeklyPage(){
   weeklyInitialized = true;
   weeklyPageLoading.textContent = '주간교육활동을 불러오는 중...';
   weeklyPageLoading.style.display = '';
+  // '새로 받기' 는 여기서 한 번만 붙인다. 불러오기가 실패했을 때도 눌러야 하므로
+  // 성공 여부와 상관없이 띄운다.
+  const reloadBtn = document.getElementById('weeklyReloadBtn');
+  if (reloadBtn) {
+    reloadBtn.style.display = '';
+    if (!reloadBtn.dataset.bound) {
+      reloadBtn.dataset.bound = '1';
+      reloadBtn.addEventListener('click', weeklyReload);
+    }
+  }
   weeklyWeekBar.style.display = 'none';
   weeklyPageContent.innerHTML = '';
   try{
@@ -10705,12 +10728,11 @@ async function initWeeklyPage(){
     watchWeeklyIndex();
     renderWeeklyModeBar();
     // 현재 주차: Firestore 캐시 확인
-    const mainCacheSnap = await getDoc(doc(fbDb, 'weeklyData', 'cache-current'));
-    const ONE_HOUR = 60 * 60 * 1000;
+    const mainCacheSnap = await getDoc(doc(fbDb, 'weeklyData', weeklyCacheId(SITES_BASE)));
     if(mainCacheSnap.exists()){
       const cached = mainCacheSnap.data();
       const age = Date.now() - new Date(cached.fetchedAt).getTime();
-      if(age < ONE_HOUR && cached.html){
+      if(age < WEEKLY_TTL && cached.html){
         weeklyPageLoading.style.display = 'none';
         renderContent(cached.html);
         return;
@@ -10722,6 +10744,47 @@ async function initWeeklyPage(){
     weeklyPageLoading.textContent = '불러오기 실패: ' + e.message;
   }
 }
+
+// 본문은 Firestore 에 한 시간짜리 캐시로 들어 있다(앱이 스스로 넣는다).
+// 스크래핑 액션은 주차 '목록'만 갱신하고 본문은 건드리지 않는다 — 사이트를 고친
+// 직후 그 한 시간을 기다리지 않으려면 여기 길로 다시 받아야 한다.
+const WEEKLY_TTL = 60 * 60 * 1000;
+
+// 한 주차의 캐시 문서 이름. 첫 화면(SITES_BASE)만 이름이 따로다.
+function weeklyCacheId(url){
+  if (!url || url === SITES_BASE) return 'cache-current';
+  return 'cache-' + encodeURIComponent(url).replace(/%/g,'_').slice(-40);
+}
+
+// 한 주차를 받아 그리고 캐시에 넣는다. 칩을 누를 때와 '새로 받기' 가 같이 쓴다 —
+// 두 벌로 두면 한쪽만 고쳐진다.
+async function loadWeekViaAppsScript(url){
+  const raw  = await fetchViaProxy(url);
+  const data = parseSitesResponse(raw, []);
+  renderContent(data.contentHtml);
+  setDoc(doc(fbDb, 'weeklyData', weeklyCacheId(url)), {
+    html: data.contentHtml,
+    sourceUrl: url,
+    fetchedAt: new Date().toISOString(),
+  }).catch(()=>{});
+}
+
+// 캐시를 건너뛰고 지금 다시 받는다. 보고 있는 주차가 대상이다.
+async function weeklyReload(){
+  const btn = document.getElementById('weeklyReloadBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '받는 중...'; }
+  try {
+    const url = weeklyCurrentUrl || SITES_BASE;
+    // 첫 화면은 주차 칩까지 같이 뽑아야 하므로 그쪽 길로 보낸다.
+    if (url === SITES_BASE) await loadViaAppsScript();
+    else                    await loadWeekViaAppsScript(url);
+  } catch(e) {
+    alert('다시 받지 못했습니다.\n' + (e.message || e));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ 새로 받기'; }
+  }
+}
+window.weeklyReload = weeklyReload;
 
 async function loadViaAppsScript(){
   const raw = await fetchViaProxy(SITES_BASE);
@@ -10742,7 +10805,7 @@ async function loadViaAppsScript(){
   }
   renderContent(data.contentHtml);
   // Firestore에 현재 주차 캐시 저장
-  setDoc(doc(fbDb, 'weeklyData', 'cache-current'), {
+  setDoc(doc(fbDb, 'weeklyData', weeklyCacheId(SITES_BASE)), {
     html: data.contentHtml,
     fetchedAt: new Date().toISOString(),
   }).catch(()=>{});
@@ -10789,33 +10852,17 @@ function renderWeekChipsFromFirestore(weeks){
       weeklyPageContent.innerHTML = '<div class="weekly-page-loading" style="padding:24px;">불러오는 중...</div>';
       try{
         // Firestore 캐시 확인 (1시간 이내면 캐시 사용)
-        const cacheSlug = 'cache-' + encodeURIComponent(week.href).replace(/%/g,'_').slice(-40);
-        const cacheSnap = await getDoc(doc(fbDb, 'weeklyData', cacheSlug));
-        const ONE_HOUR = 60 * 60 * 1000;
-        const now = Date.now();
-
+        const cacheSnap = await getDoc(doc(fbDb, 'weeklyData', weeklyCacheId(week.href)));
         if(cacheSnap.exists()){
           const cached = cacheSnap.data();
-          const age = now - new Date(cached.fetchedAt).getTime();
-          if(age < ONE_HOUR && cached.html){
-            // 캐시 유효 → 바로 렌더링
+          const age = Date.now() - new Date(cached.fetchedAt).getTime();
+          if(age < WEEKLY_TTL && cached.html){
             renderContent(cached.html);
             return;
           }
         }
-
         // 캐시 없거나 만료 → Apps Script fetch
-        const raw = await fetchViaProxy(week.href);
-        const data = parseSitesResponse(raw, []);
-        renderContent(data.contentHtml);
-
-        // Firestore에 캐시 저장 (비동기, 실패해도 무시)
-        setDoc(doc(fbDb, 'weeklyData', cacheSlug), {
-          html: data.contentHtml,
-          sourceUrl: week.href,
-          fetchedAt: new Date().toISOString(),
-        }).catch(()=>{});
-
+        await loadWeekViaAppsScript(week.href);
       }catch(e){
         weeklyPageContent.innerHTML = `<div class="weekly-page-loading">실패: ${e.message}</div>`;
       }
