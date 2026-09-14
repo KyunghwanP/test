@@ -90,7 +90,7 @@ console.log('\n■ 부르는 함수가 원본에 있는가');
     'Number','String','Object','Array','Math','Date','Promise','JSON','Set','Map','parseInt',
     'parseFloat','isNaN','setTimeout','clearTimeout','require','await','new','RegExp',
     'var', 'confirm', 'alert', 'getComputedStyle', 'setInterval', 'clearInterval',
-    'async', 'else', 'do', 'URLSearchParams']);
+    'async', 'else', 'do', 'of', 'URLSearchParams']);
   // firebase 에서 들여온 이름(getDoc·doc 등)도 '있는' 것이다
   const imported = new Set([...PAGE.matchAll(/^import \{([^}]+)\}\s*from/gm)]
     .flatMap(m => m[1].split(',').map(x => x.trim().split(/\s+as\s+/).pop())));
@@ -358,6 +358,26 @@ console.log('\n■ 다시 열어도 서버에서 더해진다 (자기 기록을 
   check('연 횟수가 서버에서 이어진다 (1 → 2)', st.days[today].opens === 2, st.days[today].opens);
   check('탭 횟수도 이어진다 (3 → 4)', st.days[today].tabs.timetable === 4, st.days[today].tabs);
   check('예전 날짜가 그대로 남아 있다', st.days['1999-01-01'].opens === 9, Object.keys(st.days));
+}
+
+console.log('\n■ 개인정보 열람 기록은 앱이 못 건드린다');
+{
+  const RULES = fs.readFileSync(import.meta.dirname + '/../firestore.rules', 'utf8');
+  // 교사가 자기 기록을 지우거나 고칠 수 있으면 접속기록의 뜻이 없다.
+  check('규칙이 쓰기를 아예 막는다',
+        /match \/accessLogs\/\{docId\} \{[\s\S]{0,200}allow write: if false;/.test(RULES));
+  check('읽기는 관리자만', /match \/accessLogs\/\{docId\} \{[\s\S]{0,120}allow read: if isAppAdmin\(\);/.test(RULES));
+  // 남기는 것은 워커(서비스 계정)다
+  const W = fs.readFileSync(import.meta.dirname + '/../workers/teacher-api.js', 'utf8');
+  check('워커가 남긴다', /writeUpdate\(env, 'accessLogs'/.test(W));
+  check('앱은 accessLogs 를 경로로 쓰지 않는다', !/'accessLogs'/.test(HTML));
+  // 화면이 쓰는 상수가 워커 것과 어긋나면 안내가 거짓말이 된다
+  const lim = /const CONTACT_DAILY_LIMIT = (\d+);/.exec(W);
+  const max = /const LOG_MAX_ITEMS = (\d+);/.exec(W);
+  check('하루 상한이 워커와 같다',
+        new RegExp(`const PRIV_DAILY_LIMIT = ${lim[1]};`).test(PAGE), lim && lim[1]);
+  check('상세 상한도 워커와 같다',
+        new RegExp(`const PRIV_MAX_ITEMS   = ${max[1]};`).test(PAGE), max && max[1]);
 }
 
 console.log('\n■ 학생 조회 — 두 숫자가 실제로 서버에 쌓인다');
@@ -650,6 +670,16 @@ console.log('\n■ usage.html 을 실제로 띄워 본다');
     if (u.includes('firebase-firestore')) body = `
       export const getFirestore=()=>({}); export const doc=(d,...p)=>({path:p.join('/')});
       window.__wrote=[]; export const setDoc=async(r,d)=>{ window.__wrote.push([r.path,d]); };
+      // 개인정보 열람 기록은 문서가 사람×날짜라 컬렉션을 훑는다.
+      export const collection=(d,name)=>({col:name});
+      export const where=(f,op,v)=>({f,op,v});
+      export const query=(c,...w)=>({col:c.col,where:w});
+      export const getDocs=async q=>{
+        window.__queried=q;
+        const all=(window.__accessLogs||[]).filter(r=>
+          q.where.every(w=> w.op==='>=' ? r[w.f]>=w.v : w.op==='<=' ? r[w.f]<=w.v : true));
+        return { docs: all.map(r=>({data:()=>r})) };
+      };
       export const getDoc=async r=>{
         if(r.path==='acl/emailByName') return {exists:()=>true,
           data:()=>({'김하나':'a@yeungnam.hs.kr','이두리':'b@yeungnam.hs.kr','박세찬':'c@yeungnam.hs.kr'})};
@@ -668,6 +698,13 @@ console.log('\n■ usage.html 을 실제로 띄워 본다');
     r.fulfill({ contentType:'text/html; charset=utf-8', body: PAGE_SRC }));
 
   await up.addInitScript(w => { window.__WHO = w; }, 'pkh910518@yeungnam.hs.kr');
+  // 연락처 열람 기록 — 워커가 남기는 모양 그대로
+  await up.addInitScript(ym => { window.__accessLogs = [
+    { email:'a@yeungnam.hs.kr', date: ym+'-03', count:3, people:3,
+      items:[{t:'09:12',target:'S 2-3-7'},{t:'09:20',target:'T 문광섭'},{t:'14:02',target:'S 1-1-1'}] },
+    { email:'b@yeungnam.hs.kr', date: ym+'-05', count:92, people:85,
+      items:[{t:'11:00',target:'S 3-9-21'}] },   // count 가 items 보다 많다 = 상세가 안 쌓인 날
+  ]; }, YM);
   await up.goto('https://ynhs.test/usage.html');
   await up.waitForTimeout(900);
 
@@ -742,7 +779,7 @@ console.log('\n■ usage.html 을 실제로 띄워 본다');
         stuCol.some(c => /^10 \/ 17회$/.test(c)), stuCol);
 
   // ── 접속 기록 탭 ──
-  check('탭이 둘이다', (await up.$$eval('#usageViews .ug-view', e => e.length)) === 2);
+  check('탭이 셋이다', (await up.$$eval('#usageViews .ug-view', e => e.length)) === 3);
   check('처음에는 요약이 켜져 있다',
         (await up.$eval('#usageViews .ug-view', e => e.classList.contains('on'))));
 
@@ -774,6 +811,51 @@ console.log('\n■ usage.html 을 실제로 띄워 본다');
   await up.waitForTimeout(250);
   check('내 기록 빼기가 켜진다', await up.$eval('#ugLogHideMe', e => e.checked));
   await up.uncheck('#ugLogHideMe');
+  await up.waitForTimeout(250);
+
+  // ── 개인정보(연락처) 열람 기록 ──
+  // 이것이 법이 요구하는 접속기록이다. 앱이 아니라 워커가 남긴다.
+  await up.click('#usageViews .ug-view[data-view="priv"]');
+  await up.waitForTimeout(350);
+  const priv = await up.$eval('#usageBody', e => e.innerText.replace(/\s+/g,' '));
+  check('개인정보 열람 탭이 열린다', /연락처 열람 기록/.test(priv), priv.slice(0,160));
+
+  // 문서가 사람×날짜라 이름을 하나씩 맞춰 볼 수 없다 — date 범위로 훑어야 한다
+  const qy = await up.evaluate(() => window.__queried);
+  check('accessLogs 를 훑는다', qy && qy.col === 'accessLogs', qy);
+  check('그 달만 범위로 건다',
+        qy.where.length === 2 && qy.where[0].op === '>=' && qy.where[1].op === '<='
+        && qy.where[0].f === 'date', qy.where);
+
+  // items 한 건이 한 줄 — a@ 셋 + b@ 하나
+  const pRows = await up.$$eval('.ug-tbl tbody tr', e => e.length);
+  check('한 건이 한 줄로 펴진다 (4줄)', pRows === 4, pRows);
+  check('누가·언제·누구를 가 다 나온다',
+        /09:12/.test(priv) && /김하나/.test(priv) && /학생 2-3-7/.test(priv), priv.slice(0,400));
+  check('교직원 대상도 읽어 준다', /교직원 문광섭/.test(priv), priv.slice(0,400));
+  check('열람 건수를 센다', /열람 건수\s*4/.test(priv), priv.slice(0,200));
+
+  // 상세가 안 쌓인 날(count 92 > items 1)을 짚어 준다 — 안 그러면 조용히 빈다
+  check('상세가 안 남은 조회를 알려 준다', /91건/.test(priv), priv.slice(-300));
+  // 하루 100명 상한에 가까운 날(85명)
+  check('상한에 가까운 날을 짚어 준다', /상한에 가까운 날/.test(priv) && /85명/.test(priv),
+        priv.slice(0,400));
+
+  // 학생/교직원 가르기
+  await up.click('input[name=privKind][value="staff"]');
+  await up.waitForTimeout(250);
+  check('교직원만 거른다', (await up.$$eval('.ug-tbl tbody tr', e => e.length)) === 1);
+  await up.click('input[name=privKind][value="student"]');
+  await up.waitForTimeout(250);
+  check('학생만 거른다', (await up.$$eval('.ug-tbl tbody tr', e => e.length)) === 3);
+  await up.click('input[name=privKind][value="all"]');
+  await up.waitForTimeout(250);
+
+  // 이름·대상으로 찾기
+  await up.fill('#ugPrivSearch', '2-3-7');
+  await up.waitForTimeout(250);
+  check('대상으로 찾는다', (await up.$$eval('.ug-tbl tbody tr', e => e.length)) === 1);
+  await up.fill('#ugPrivSearch', '');
   await up.waitForTimeout(250);
 
   // 요약으로 돌아와도 멀쩡한가

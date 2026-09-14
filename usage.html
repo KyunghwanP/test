@@ -174,6 +174,7 @@
 <div class="ug-views" id="usageViews">
   <button type="button" class="ug-view on"  data-view="summary">요약</button>
   <button type="button" class="ug-view"     data-view="log">접속 기록</button>
+  <button type="button" class="ug-view"     data-view="priv">🔒 개인정보 열람</button>
 </div>
 <div id="usageBody"></div>
 
@@ -182,7 +183,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebas
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged,
          setPersistence, browserLocalPersistence, indexedDBLocalPersistence }
   from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc }
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where }
   from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -195,7 +196,7 @@ const firebaseConfig = {
   measurementId: "G-MTXQWT10P1"
 };
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
-const APP_VER = 'ver7.37';
+const APP_VER = 'ver7.38';
 
 const fbApp  = initializeApp(firebaseConfig);
 const fbAuth = getAuth(fbApp);
@@ -235,6 +236,9 @@ let _ugLogQuery  = '';
 let _ugLogHideMe = false;
 let _ugLastRows  = [], _ugLastYm = '';
 let _ugLogAll    = [];     // 이 달의 모든 줄 (거르기 전)
+// 개인정보(연락처) 열람 기록. 달마다 한 번만 읽어 둔다.
+let _privRows = null, _privYm = '', _privBusy = false, _privErr = '';
+let _privQuery = '', _privKind = 'all';
 let _ugExcludeMe = true;
 let _ugQuery     = '';
 let _ugOnlyOld   = false;
@@ -294,8 +298,9 @@ function renderView(){
   document.querySelectorAll('#usageViews .ug-view').forEach(b =>
     b.classList.toggle('on', b.dataset.view === _ugView));
   if (!_ugLastYm) return;
-  if (_ugView === 'log') renderUsageLog(_ugLastRows, _ugLastYm);
-  else                   renderUsage(_ugLastRows, _ugLastYm);
+  if      (_ugView === 'log')  renderUsageLog(_ugLastRows, _ugLastYm);
+  else if (_ugView === 'priv') renderPrivacyLog(_ugLastYm);
+  else                         renderUsage(_ugLastRows, _ugLastYm);
 }
 document.getElementById('usageViews')?.addEventListener('click', e => {
   const b = e.target.closest('.ug-view');
@@ -303,6 +308,148 @@ document.getElementById('usageViews')?.addEventListener('click', e => {
   _ugView = b.dataset.view;
   renderView();
 });
+
+// ── 개인정보(연락처) 열람 기록 ───────────────────────────────────────────────
+// 개인정보 보호법 제29조가 요구하는 접속기록이다. 앱이 남기는 것이 아니라
+// 워커(서비스 계정)가 accessLogs 에 남긴다 — 교사가 자기 기록을 지우거나 고칠
+// 수 없어야 하기 때문이다. 규칙도 '쓰기 금지 · 읽기는 관리자만' 이다.
+//
+//   accessLogs/{이메일}_{날짜} = {
+//     email, date,
+//     count   그날 조회 횟수
+//     people  서로 다른 대상 수 (하루 상한 100명의 기준)
+//     items   [{ t:'HH:MM', target:'S 2-3-7' | 'T 홍길동' }]  최대 500개
+//   }
+//
+// 문서가 사람×날짜라 한 달치를 다 읽으려면 이름을 하나씩 맞춰 볼 수가 없다.
+// date 로 범위를 걸어 컬렉션을 훑는다(기본 색인으로 된다).
+const PRIV_DAILY_LIMIT = 100;   // 워커의 CONTACT_DAILY_LIMIT 과 같은 값
+const PRIV_MAX_ITEMS   = 500;   // 워커의 LOG_MAX_ITEMS — 넘으면 상세가 안 쌓인다
+
+async function loadPrivacy(ym){
+  if (_privBusy) return;
+  _privBusy = true; _privErr = '';
+  try {
+    const snap = await getDocs(query(collection(fbDb, 'accessLogs'),
+      where('date', '>=', ym + '-01'), where('date', '<=', ym + '-31')));
+    _privRows = snap.docs.map(d => d.data());
+    _privYm = ym;
+  } catch(e){
+    _privRows = []; _privErr = e.message || String(e);
+  } finally { _privBusy = false; }
+}
+
+// 사람 이름을 알아야 읽을 만하다. 이 달 명단(_ugLastRows)에 이메일→이름이 있다.
+function privName(email){
+  const hit = (_ugLastRows || []).find(r => r.email === email);
+  return (hit && hit.name) || String(email || '').split('@')[0];
+}
+// 'S 2-3-7' → 학생 2학년 3반 7번 / 'T 홍길동' → 교직원 홍길동
+function privTarget(t){
+  const s = String(t || '');
+  if (s.startsWith('S ')) return { kind:'student', label:'학생 ' + s.slice(2) };
+  if (s.startsWith('T ')) return { kind:'staff',   label:'교직원 ' + s.slice(2) };
+  return { kind:'etc', label:s };
+}
+
+async function renderPrivacyLog(ym){
+  const body = document.getElementById('usageBody');
+  if (_privYm !== ym || _privRows === null) {
+    body.innerHTML = '<div style="padding:24px;color:var(--ink-soft);font-size:13px;">열람 기록을 불러오는 중…</div>';
+    await loadPrivacy(ym);
+    if (_ugView !== 'priv') return;          // 그 사이 다른 탭으로 갔다
+  }
+  if (_privErr) {
+    body.innerHTML = `<div style="padding:24px;color:var(--warn);font-size:13px;">
+      열람 기록을 불러오지 못했습니다: ${escapeHtml(_privErr)}</div>`;
+    return;
+  }
+
+  // 한 줄에 한 건. 시각이 있는 것은 items 에서, 없는 것(500개 넘어 상세가
+  // 안 쌓인 날)은 '건수만' 으로 따로 알린다.
+  const rows = [];
+  let overflow = 0;
+  for (const r of (_privRows || [])) {
+    const items = Array.isArray(r.items) ? r.items : [];
+    for (const it of items) {
+      const t = privTarget(it && it.target);
+      rows.push({ date: r.date, time: (it && it.t) || '', email: r.email,
+                  name: privName(r.email), target: t.label, kind: t.kind });
+    }
+    const cnt = Number(r.count) || 0;
+    if (cnt > items.length) overflow += cnt - items.length;
+  }
+
+  const q = _privQuery.trim().toLowerCase();
+  const shown = rows.filter(x =>
+    (_privKind === 'all' || x.kind === _privKind) &&
+    (!q || x.name.toLowerCase().includes(q)
+        || x.target.toLowerCase().includes(q)
+        || String(x.email).toLowerCase().includes(q)));
+  shown.sort((a, b) => b.date.localeCompare(a.date)
+                    || String(b.time).localeCompare(String(a.time))
+                    || String(a.name).localeCompare(String(b.name), 'ko'));
+
+  const chip = (l, v) => `<div class="ug-chip"><span>${l}</span><b>${v}</b></div>`;
+  const whoCnt = new Set(shown.map(x => x.email)).size;
+  const tgtCnt = new Set(shown.map(x => x.target)).size;
+  // 하루 상한에 가까운 사람 — 많이 본 날이 있으면 짚어 준다
+  const near = (_privRows || []).filter(r => (Number(r.people) || 0) >= PRIV_DAILY_LIMIT * 0.8);
+
+  let prev = '';
+  const tbody = shown.map(x => {
+    const same = x.date === prev; prev = x.date;
+    const w = new Date(x.date + 'T00:00:00').getDay();
+    return `<tr>
+      <td class="ug-log-date${same ? ' same' : ''}">${escapeHtml(x.date.slice(5))}
+        <span class="${w === 0 || w === 6 ? 'ug-log-wk' : 'dim'}">${UG_DOW[w]}</span></td>
+      <td class="dim">${escapeHtml(x.time)}</td>
+      <td class="nm">${escapeHtml(x.name)}</td>
+      <td>${escapeHtml(x.target)}</td>
+    </tr>`;
+  }).join('');
+
+  body.innerHTML = `
+    <div class="ug-chips">
+      ${chip('열람 건수', shown.length.toLocaleString())}
+      ${chip('열람한 사람', `${whoCnt}명`)}
+      ${chip('열람 대상', `${tgtCnt}명`)}
+      ${chip('하루 상한 근접', near.length
+        ? `<span style="color:var(--warn)">${near.length}건</span>` : '없음')}
+    </div>
+    ${near.length ? `<div class="ug-card" style="border-color:var(--warn);">
+      <div class="ug-h">하루 ${PRIV_DAILY_LIMIT}명 상한에 가까운 날</div>
+      <div style="font-size:12.5px;line-height:1.8;">${near
+        .sort((a,b) => (b.people||0) - (a.people||0))
+        .map(r => `${escapeHtml(r.date)} · <b>${escapeHtml(privName(r.email))}</b> ${r.people}명`)
+        .join(' &nbsp;/&nbsp; ')}</div></div>` : ''}
+    <div class="ug-card">
+      <div class="ug-h">연락처 열람 기록 <small>누가 · 언제 · 누구를 조회했는지</small></div>
+      <div class="ug-tools">
+        <input type="search" id="ugPrivSearch" placeholder="교사 이름 · 대상으로 찾기" value="${escapeHtml(_privQuery)}">
+        <label><input type="radio" name="privKind" value="all"     ${_privKind==='all'?'checked':''}> 전체</label>
+        <label><input type="radio" name="privKind" value="student" ${_privKind==='student'?'checked':''}> 학생</label>
+        <label><input type="radio" name="privKind" value="staff"   ${_privKind==='staff'?'checked':''}> 교직원</label>
+        <span class="dim">${shown.length.toLocaleString()} / ${rows.length.toLocaleString()}건</span>
+      </div>
+      <div class="ug-tblwrap"><table class="ug-tbl">
+        <thead><tr><th>날짜</th><th>시각</th><th>조회한 사람</th><th>대상</th></tr></thead>
+        <tbody>${tbody || '<tr><td colspan="4" class="dim" style="padding:18px;">이 달에는 열람 기록이 없습니다.</td></tr>'}</tbody>
+      </table></div>
+      ${overflow ? `<div class="ug-idle">하루 ${PRIV_MAX_ITEMS}건이 넘어 상세가 안 남은 조회가
+        <b>${overflow.toLocaleString()}건</b> 있습니다 (건수는 셉니다).</div>` : ''}
+    </div>
+    <div class="ug-foot">개인정보 보호법 제29조에 따른 접속기록입니다.
+      앱이 아니라 <b>워커(서비스 계정)</b>가 남기며, 교사는 고치거나 지울 수 없습니다.
+      400일 뒤 자동으로 지워집니다.</div>`;
+
+  const qi = document.getElementById('ugPrivSearch');
+  qi?.addEventListener('input', () => { _privQuery = qi.value; renderPrivacyLog(ym);
+    const el = document.getElementById('ugPrivSearch');
+    if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } });
+  document.querySelectorAll('input[name=privKind]').forEach(r =>
+    r.addEventListener('change', () => { _privKind = r.value; renderPrivacyLog(ym); }));
+}
 
 // ── 접속 기록 ────────────────────────────────────────────────────────────────
 // 요약은 '이 달에 누가 얼마나' 를 보지만, 가끔 궁금한 것은 '며칠에 누가 들어왔나'
