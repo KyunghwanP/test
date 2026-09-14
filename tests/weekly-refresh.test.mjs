@@ -105,6 +105,13 @@ console.log('\n■ 첫 호출이 넘어가는 것 — Apps Script 가 잠들어 
   // 'signal timed out' 은 브라우저 말투다. 그대로 보여 주면 무슨 일인지 모른다.
   check('오류 말을 사람 말로 바꾼다', /function weeklyErrText\(e\)\{/.test(HTML));
   check('시간 초과를 알아본다', /if \(\/timed out\|abort\/i\.test\(m\)\)/.test(HTML));
+  // 404 는 구글 사이트가 아니라 중계(Apps Script) 주소가 낸 것이다. doGet 은 사이트를
+  // muteHttpExceptions 로 부르고 상태 코드를 넘기지 않으므로, 사이트가 404 여도
+  // 앱에는 200 + 짧은 내용으로 온다. '사이트에 연결 못 했다'고 적으면 엉뚱한 곳을 본다.
+  check('404 는 중계 주소를 가리킨다', /if \(\/\^HTTP 404\/\.test\(m\)\)/.test(HTML));
+  check("404 문구가 '사이트'를 탓하지 않는다",
+        !/HTTP 404[\s\S]{0,120}사이트에 연결하지 못했습니다/.test(HTML));
+  check('그 문구가 어디를 볼지 알려 준다', /배포가 바뀌었는지 확인해 주세요/.test(HTML));
 }
 
 console.log('\n■ 실제로 다시 부르는가 (fetch 를 흉내내서)');
