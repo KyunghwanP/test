@@ -93,9 +93,13 @@ console.log('\n■ 첫 호출이 넘어가는 것 — Apps Script 가 잠들어 
   // 증상: 탭을 열면 '불러오기 실패: signal timed out' 이 뜨고, 다시 누르면 된다.
   // 까닭: 웹앱이 한동안 안 불리면 잠든다. 깨는 데만 십수 초가 걸려 첫 호출이
   //      제한을 넘기고, 두 번째부터는 따뜻해져 금방 온다.
-  check('기다리는 시간이 두 단계다', /const WEEKLY_FETCH_MS = \[12000, 35000\];/.test(HTML));
-  check('1차를 짧게 끊는다(깨우는 값은 버려지지 않는다)', /\[12000,/.test(HTML));
-  check('2차는 넉넉히 기다린다', /35000\]/.test(HTML));
+  check('기다리는 시간이 두 단계다', /const WEEKLY_FETCH_MS = \[20000, 35000\];/.test(HTML));
+  // 1차를 12초로 짧게 끊었더니 404 가 새로 생겼다. /exec 는 본문을 일회용 주소로
+  // 넘기는데, 넘겨받는 중간에 끊고 곧바로 다시 부르면 그 주소가 어그러진다.
+  check('1차를 너무 짧게 끊지 않는다', !/\[12000,/.test(HTML));
+  check('다시 부르기 전에 쉰다', /const WEEKLY_RETRY_GAP = 1500;/.test(HTML));
+  check('쉬는 것이 실제로 재시도 앞에 있다',
+        /await new Promise\(r => setTimeout\(r, WEEKLY_RETRY_GAP\)\);/.test(HTML));
   check('사람이 다시 누르는 대신 한 번 더 부른다',
         /for \(let i = 0; i < WEEKLY_FETCH_MS\.length; i\+\+\)/.test(HTML));
   check('부르는 곳 세 군데 모두 알림을 넘긴다',
@@ -133,6 +137,7 @@ console.log('\n■ 실제로 다시 부르는가 (fetch 를 흉내내서)');
   await pg.setContent(`<!doctype html><meta charset="utf-8"><body><script>
     const APPS_SCRIPT_PROXY = 'https://example.invalid/exec';
     ${grabConst('WEEKLY_FETCH_MS')}
+    ${grabConst('WEEKLY_RETRY_GAP')}
     ${grabFn('weeklyErrText')}
     ${grabFn('fetchViaProxy')}
     // 첫 번째는 시간 초과, 두 번째는 성공하도록 흉내낸다
