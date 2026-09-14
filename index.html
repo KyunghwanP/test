@@ -2020,15 +2020,12 @@
   .wk-modes button.on{background:var(--mon);color:#fff;font-weight:700;}
 
   /* 별도 버튼 행 숨김 (제목 바에 통합) */
-  .weekly-reload-btn{
-    align-self:flex-end;flex-shrink:0;margin:4px 0 6px;
-    padding:5px 10px;border-radius:8px;border:1px solid var(--rule);
-    background:var(--paper);color:var(--ink-soft);
-    font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;
-    transition:color .12s,border-color .12s;
-  }
-  .weekly-reload-btn:hover:not(:disabled){color:var(--mon);border-color:var(--mon);}
+  /* '새로 받기' — 제목줄의 원본보기 왼쪽. 생김새는 원본보기와 같은 것을 쓴다. */
+  .weekly-reload-btn{cursor:pointer;}
   .weekly-reload-btn:disabled{opacity:.55;cursor:default;}
+  /* .weekly-title-btn 은 margin-left:auto 로 오른쪽에 붙는다. 둘이 나란히 서면
+     뒤엣것까지 auto 가 걸려 사이가 벌어지므로, 두 번째부터는 고정 간격으로 둔다. */
+  .weekly-title-btn + .weekly-title-btn{margin-left:6px;}
   .weekly-btn-row{display:none;}
   .weekly-dept{
     background:var(--paper);border-radius:8px;margin-bottom:10px;overflow:hidden;
@@ -5288,10 +5285,6 @@
           <div class="weekly-top-bar" id="weeklyTopBar">
             <div class="weekly-page-loading" id="weeklyPageLoading">주간교육활동을 불러오는 중...</div>
             <div class="weekly-week-bar" id="weeklyWeekBar" style="display:none;"></div>
-            <!-- 내용은 한 시간짜리 캐시로 돈다. 사이트를 고친 직후에는 그 시간을
-                 기다릴 수 없으므로 지금 다시 받는 길을 둔다. -->
-            <button type="button" class="weekly-reload-btn" id="weeklyReloadBtn"
-                    style="display:none;" title="사이트에서 지금 다시 받아옵니다">↻ 새로 받기</button>
           </div>
           <div class="weekly-btn-row" style="display:none;">
             <a id="weeklyOpenLink" href="https://sites.google.com/yeungnam.hs.kr/202633"
@@ -6339,7 +6332,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.32';
+const APP_VER = 'ver7.33';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -10710,16 +10703,6 @@ async function initWeeklyPage(){
   weeklyInitialized = true;
   weeklyPageLoading.textContent = '주간교육활동을 불러오는 중...';
   weeklyPageLoading.style.display = '';
-  // '새로 받기' 는 여기서 한 번만 붙인다. 불러오기가 실패했을 때도 눌러야 하므로
-  // 성공 여부와 상관없이 띄운다.
-  const reloadBtn = document.getElementById('weeklyReloadBtn');
-  if (reloadBtn) {
-    reloadBtn.style.display = '';
-    if (!reloadBtn.dataset.bound) {
-      reloadBtn.dataset.bound = '1';
-      reloadBtn.addEventListener('click', weeklyReload);
-    }
-  }
   weeklyWeekBar.style.display = 'none';
   weeklyPageContent.innerHTML = '';
   try{
@@ -10769,6 +10752,21 @@ async function loadWeekViaAppsScript(url){
   }).catch(()=>{});
 }
 
+// '새로 받기' 단추를 만든다 — 관리자만. 제목줄은 본문을 다시 그릴 때마다 새로
+// 만들어지므로, 한 번 붙여 두는 대신 그릴 때마다 만들어 넣는다.
+// 관리자가 아니면 null 이다(넣을 것이 없다).
+function weeklyReloadBtnEl(){
+  if (typeof _IS_ADMIN !== 'function' || !_IS_ADMIN()) return null;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.id = 'weeklyReloadBtn';
+  b.className = 'weekly-title-btn weekly-reload-btn';
+  b.textContent = '↻ 새로 받기';
+  b.title = '사이트에서 지금 다시 받아옵니다';
+  b.addEventListener('click', weeklyReload);
+  return b;
+}
+
 // 캐시를 건너뛰고 지금 다시 받는다. 보고 있는 주차가 대상이다.
 async function weeklyReload(){
   const btn = document.getElementById('weeklyReloadBtn');
@@ -10781,7 +10779,10 @@ async function weeklyReload(){
   } catch(e) {
     alert('다시 받지 못했습니다.\n' + (e.message || e));
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '↻ 새로 받기'; }
+    // 본문을 다시 그리면서 제목줄이 통째로 새로 만들어졌을 수 있다. 처음에 잡아 둔
+    // 것은 이미 화면에서 떨어져 나갔으므로 지금 붙어 있는 것을 다시 찾는다.
+    const now = document.getElementById('weeklyReloadBtn');
+    if (now) { now.disabled = false; now.textContent = '↻ 새로 받기'; }
   }
 }
 window.weeklyReload = weeklyReload;
@@ -11629,6 +11630,8 @@ function renderWeeklyHtml(title, html){
   btn.className = 'weekly-title-btn';
   btn.textContent = '원본보기';
   titleBar.appendChild(titleSpan);
+  const rb1 = weeklyReloadBtnEl();
+  if (rb1) titleBar.appendChild(rb1);      // 원본보기 왼쪽
   titleBar.appendChild(btn);
   wrap.appendChild(titleBar);
 
@@ -11664,6 +11667,8 @@ function renderSections(title, sections){
   btn.className = 'weekly-title-btn';
   btn.textContent = '원본보기';
   titleBar.appendChild(titleSpan);
+  const rb2 = weeklyReloadBtnEl();
+  if (rb2) titleBar.appendChild(rb2);      // 원본보기 왼쪽
   titleBar.appendChild(btn);
   div.appendChild(titleBar);
 
@@ -11835,7 +11840,8 @@ function renderContent(html){
     const ob = document.createElement('a');
     ob.href = weeklyCurrentUrl; ob.target = '_blank';
     ob.className = 'weekly-title-btn'; ob.textContent = '↗ 원본보기';
-    head.append(ttl, ob);
+    const rb3 = weeklyReloadBtnEl();
+    head.append(ttl, ...(rb3 ? [rb3] : []), ob);   // 원본보기 왼쪽
     wrap.appendChild(head);
     // 그림자 영역 — 앱 CSS 가 넘어가지 못한다.
     const host = document.createElement('div');

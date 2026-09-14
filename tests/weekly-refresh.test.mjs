@@ -39,24 +39,46 @@ console.log('\n■ 앱 — 캐시 키와 받아오기를 한 군데로');
   check('칩 클릭이 그 공용 함수를 쓴다', /await loadWeekViaAppsScript\(week\.href\);/.test(HTML));
 }
 
-console.log('\n■ 앱 — 새로 받기');
+console.log('\n■ 앱 — 새로 받기 (관리자만, 원본보기 왼쪽)');
 {
-  check('단추가 있다', /id="weeklyReloadBtn"/.test(HTML));
-  check('처음엔 숨어 있다', /id="weeklyReloadBtn"[\s\S]{0,120}style="display:none;"/.test(HTML));
-  check('탭을 열면 띄운다', /reloadBtn\.style\.display = '';/.test(HTML));
-  // 불러오기가 실패했을 때야말로 누르고 싶은 단추다
-  check('불러오기 성공 여부와 무관하게 띄운다',
-        HTML.indexOf("reloadBtn.style.display = ''") < HTML.indexOf('const mainCacheSnap'));
-  check('한 번만 배선한다', /if \(!reloadBtn\.dataset\.bound\)/.test(HTML));
+  // 정적 markup 에 두면 관리자가 아닌 사람에게도 잠깐 보였다가 사라진다.
+  // 아예 관리자일 때만 만든다.
+  check('정적 markup 에 단추가 없다', !/id="weeklyReloadBtn"/.test(HTML));
+  check('만드는 함수가 있다', /function weeklyReloadBtnEl\(\)\{/.test(HTML));
+  check('관리자가 아니면 안 만든다',
+        /if \(typeof _IS_ADMIN !== 'function' \|\| !_IS_ADMIN\(\)\) return null;/.test(HTML));
+  check('누르면 새로 받는다', /b\.addEventListener\('click', weeklyReload\);/.test(HTML));
+
+  // 제목줄은 본문을 다시 그릴 때마다 새로 만들어진다. 세 갈래 모두에 넣어야 한다
+  // (보통 보기 둘 + '원본 그대로' 보기 하나).
+  const made = (HTML.match(/weeklyReloadBtnEl\(\);/g) || []).length;
+  check('제목줄 세 갈래 모두에 넣는다', made === 3, made);
+
+  // 순서 — 원본보기 '왼쪽' 이어야 한다.
+  // 넣는 줄과 원본보기를 붙이는 줄이 실제로 이 차례로 붙어 있는지 본다.
+  const adjacent = (rb) => new RegExp(
+    `if \\(${rb}\\) titleBar\\.appendChild\\(${rb}\\);[^\\n]*\\n\\s*titleBar\\.appendChild\\(btn\\);`
+  ).test(HTML);
+  check('제목줄 ①: 원본보기 바로 왼쪽에 붙는다', adjacent('rb1'));
+  check('제목줄 ②: 원본보기 바로 왼쪽에 붙는다', adjacent('rb2'));
+  check("제목줄 ③('원본 그대로'): 원본보기보다 앞에 온다",
+        /head\.append\(ttl, \.\.\.\(rb3 \? \[rb3\] : \[\]\), ob\);/.test(HTML));
+
+  // .weekly-title-btn 은 margin-left:auto 다. 둘이 나란히 서면 뒤엣것까지 auto 가
+  // 걸려 사이가 벌어진다.
+  check('나란히 선 두 단추 사이가 벌어지지 않는다',
+        /\.weekly-title-btn \+ \.weekly-title-btn\{margin-left:6px;\}/.test(HTML));
 
   check('캐시를 안 보고 바로 받는다',
         /async function weeklyReload\(\)\{[\s\S]{0,600}await loadViaAppsScript\(\);[\s\S]{0,120}await loadWeekViaAppsScript\(url\);/.test(HTML));
   check('보고 있는 주차를 받는다', /const url = weeklyCurrentUrl \|\| SITES_BASE;/.test(HTML));
-  // 첫 화면은 주차 칩까지 다시 뽑아야 한다
   check('첫 화면은 칩까지 뽑는 길로 보낸다',
         /if \(url === SITES_BASE\) await loadViaAppsScript\(\);/.test(HTML));
   check('받는 동안 다시 눌리지 않는다', /btn\.disabled = true;[\s\S]{0,80}받는 중/.test(HTML));
-  check('끝나면 반드시 되돌린다', /\} finally \{[\s\S]{0,140}btn\.disabled = false;/.test(HTML));
+  // 다 받으면 본문을 다시 그리므로 제목줄이 통째로 바뀐다. 처음에 잡아 둔 단추는
+  // 이미 화면에서 떨어져 나갔다 — 지금 붙어 있는 것을 다시 찾아야 한다.
+  check('끝나면 지금 붙어 있는 단추를 되돌린다',
+        /\} finally \{[\s\S]{0,260}const now = document\.getElementById\('weeklyReloadBtn'\);[\s\S]{0,80}now\.disabled = false;/.test(HTML));
 }
 
 console.log('\n■ 스크래퍼 — 본문 캐시 비우기');

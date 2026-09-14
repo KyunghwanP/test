@@ -160,6 +160,11 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grab('wkStripDupTitle')}
   ${grab('wkGroupDepts')}
   ${grab('renderWeeklyModeBar')}
+  ${grabConst('_IS_ADMIN')}
+  let _reloadCalls = 0;
+  function weeklyReload(){ _reloadCalls++; }
+  window.__reloadCalls = () => _reloadCalls;
+  ${grab('weeklyReloadBtnEl')}
   ${grab('renderContent')}
   window.setMode = m => { weeklyMode = m; };
   window.render = h => renderContent(h);
@@ -196,6 +201,63 @@ console.log('\n■ 글꼴·색만 원본 — 실제로는 글꼴만 달라진다
   check('사이트 글꼴이 살아난다', /Courier/.test(p.ff), p.ff);
   check('링크 색도 사이트 것', a.color === 'rgb(11, 87, 208)', a.color);
   check('크기는 그대로(원래도 인라인이 이겼다)', h2.fs === '22px', h2.fs);
+}
+
+console.log('\n■ 새로 받기 — 관리자만, 원본보기 바로 왼쪽');
+{
+  // 제목줄은 본문을 다시 그릴 때마다 새로 만들어진다. 그때마다 제대로 끼워지는지를
+  // 소스가 아니라 실제로 그려진 화면에서 본다.
+  const look = () => pg.evaluate(() => {
+    // 제목줄은 보통 보기('.weekly-forced-title')와 원본 그대로('.wk-orig-head') 둘 중 하나다
+    const head = document.querySelector('.weekly-forced-title, .wk-orig-head');
+    if (!head) return { head:false };
+    const kids = [...head.children].map(el => el.id || el.className);
+    const rb = head.querySelector('#weeklyReloadBtn');
+    const ob = [...head.querySelectorAll('a')].find(a => /원본보기/.test(a.textContent));
+    return {
+      head: true, kids,
+      has: !!rb,
+      // 둘 다 있으면 새로 받기가 원본보기보다 앞(왼쪽)이어야 한다
+      leftOfOrig: !!(rb && ob) &&
+        (rb.compareDocumentPosition(ob) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+      text: rb ? rb.textContent : ''
+    };
+  });
+
+  await pg.evaluate(e => window.__setWho(e), 'pkh910518@yeungnam.hs.kr');
+  await pg.evaluate(h => { window.setMode('orig'); window.render(h); }, SITE);
+  let v = await look();
+  check('제목줄이 그려졌다', v.head, v);
+  check('관리자에게는 단추가 있다', v.has, v.kids);
+  check('원본보기 왼쪽이다', v.leftOfOrig, v.kids);
+  check('이름이 새로 받기다', /새로 받기/.test(v.text), v.text);
+
+  // 눌리는지 — 단추만 있고 안 붙어 있으면 아무 일도 안 일어난다
+  await pg.click('#weeklyReloadBtn');
+  check('누르면 새로 받기가 돈다', (await pg.evaluate(() => window.__reloadCalls())) === 1);
+
+  // 나란히 선 두 단추가 붙어 보여야 한다(.weekly-title-btn 의 margin-left:auto 가
+  // 뒤엣것에도 걸리면 사이가 화면 끝까지 벌어진다)
+  const gap = await pg.evaluate(() => {
+    const head = document.querySelector('.weekly-forced-title, .wk-orig-head');
+    const rb = head.querySelector('#weeklyReloadBtn');
+    const ob = [...head.querySelectorAll('a')].find(a => /원본보기/.test(a.textContent));
+    return Math.round(ob.getBoundingClientRect().left - rb.getBoundingClientRect().right);
+  });
+  check('두 단추가 나란히 붙어 있다 (밀려나지 않는다)', gap >= 0 && gap <= 24, gap);
+
+  // 관리자가 아니면 아예 안 만든다
+  await pg.evaluate(e => window.__setWho(e), 'hong@yeungnam.hs.kr');
+  await pg.evaluate(h => { window.setMode('orig'); window.render(h); }, SITE);
+  v = await look();
+  check('다른 선생님께는 단추가 없다', !v.has, v.kids);
+  const ob2 = await pg.evaluate(() => {
+    const head = document.querySelector('.weekly-forced-title, .wk-orig-head');
+    return [...head.querySelectorAll('a')].some(a => /원본보기/.test(a.textContent));
+  });
+  check('원본보기는 그대로 있다', ob2);
+
+  await pg.evaluate(e => window.__setWho(e), 'pkh910518@yeungnam.hs.kr');
 }
 
 console.log('\n■ 원본 그대로 — 앱 CSS 가 아예 안 닿는다');
