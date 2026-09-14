@@ -18,6 +18,13 @@ import fs from 'node:fs';
 
 const HTML = fs.readFileSync(import.meta.dirname + '/../index.html', 'utf8');
 
+// 사진 고르기 검사에 쓸 작은 그림 두 장. 내용은 상관없다 — 올리는 길만 본다.
+const TMP  = fs.mkdtempSync('/tmp/rtimg-');
+const DOT  = TMP + '/dot.png';
+const DOT2 = TMP + '/dot2.png';
+const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+fs.writeFileSync(DOT, PNG1); fs.writeFileSync(DOT2, PNG1);
+
 let pass = 0, fail = 0;
 const check = (n, c, x) => c ? (pass++, console.log('  ✅', n))
                              : (fail++, console.log('  ❌', n, x !== undefined ? '\n       → ' + JSON.stringify(x).slice(0, 300) : ''));
@@ -45,7 +52,8 @@ console.log('\n■ 배선 (정적)');
         /<div class="rt-editor compact" id="mytaskMemoEd" contenteditable="true"/.test(HTML));
   check('옛 textarea 는 남아 있지 않다', !/id="mytaskMemo"[^E]/.test(HTML));
   check('도구 모음은 공용 만들개로 채운다', /bar\.innerHTML = rtToolbarHtml\(\);/.test(HTML));
-  check('그림은 붙여넣기로 넣는다고 적어 둔다', /Ctrl\+V 로 붙여넣기<\/b>\. 학생 신상이/.test(HTML));
+  check('붙여넣기 길을 적어 둔다', /<b>Ctrl\+V<\/b>/.test(HTML));
+  check('폰에서 쓸 길도 적어 둔다', /폰에서는 <b>🖼 사진<\/b> 단추로/.test(HTML));
   // 그림을 키를 아는 교사면 받을 수 있다는 한계를 알고 쓰는 것이므로,
   // 민감한 자료를 넣지 말라는 말이 화면에 있어야 한다.
   check('민감한 자료를 넣지 말라고 적어 둔다', /학생 신상이 담긴 자료는 넣지 마세요/.test(HTML));
@@ -74,6 +82,18 @@ console.log('\n■ 배선 (정적)');
   check('ESC 는 크게 보기를 캘린더보다 먼저 닫는다',
         HTML.indexOf("noticeImgZoom')?.classList.contains('open')") <
         HTML.lastIndexOf("mytaskModal')?.classList.contains('show')"));
+
+  // 폰에는 Ctrl+V 가 없다. 사진첩에서 골라 넣는 길이 있어야 한다.
+  check('도구 모음에 사진 단추가 있다', /class="rt-tool rt-img-btn"/.test(HTML));
+  check('사진첩을 여는 파일칸이 있다',
+        /<input type="file" class="rt-img-in" accept="image\/\*" multiple hidden>/.test(HTML));
+  check('그림을 못 받는 편집기에서는 단추를 감춘다',
+        /if \(!o\.put\) \{ imgBtn\.hidden = true; \}/.test(HTML));
+  // 파일 고르는 창이 뜨면 커서 자리가 사라진다 — 적어 뒀다가 되살려야 제자리에 들어간다
+  check('누를 때 커서 자리를 적어 둔다', /saved = \(r && ed\.contains\(r\.commonAncestorContainer\)\) \? r\.cloneRange\(\) : null;/.test(HTML));
+  check('돌아와서 그 자리를 되살린다', /sl\.removeAllRanges\(\); sl\.addRange\(saved\);/.test(HTML));
+  check('같은 사진을 다시 고를 수 있게 비운다', /imgIn\.value = '';/.test(HTML));
+  check('그림 아닌 파일은 거른다', /\.filter\(f => \/\^image\\\/\/\.test\(f\.type\)\)/.test(HTML));
 
   check('일정을 지우면 그림도 지운다',
         /if \(goneKeys\.length\) rtApi\(\{ action: 'del', keys: goneKeys \}\)/.test(HTML));
@@ -294,6 +314,44 @@ console.log('\n■ 실제로 단추를 눌러 본다 (편집기가 둘일 때)')
   B = await pg2.evaluate(() => window.look('B'));
   check('A 는 작게가 걸린다', A.size === SIZES[0][1], A);
   check('B 는 아주 크게 그대로', B.size === SIZES[3][1], B);
+
+  // ── 사진 단추 ──
+  // 폰에는 Ctrl+V 가 없다. 이 단추가 유일한 길이라 실제로 눌러 본다.
+  check('그림을 못 받는 편집기에서는 단추가 숨는다',
+        await pg2.$eval('#barA .rt-img-btn', e => e.hidden));
+
+  // 그림을 받는 편집기를 하나 더 띄운다
+  await pg2.evaluate(() => {
+    const bar = document.createElement('div'); bar.id = 'barC';
+    const ed  = document.createElement('div');
+    ed.id = 'edC'; ed.className = 'rt-editor compact'; ed.contentEditable = 'true';
+    document.body.append(bar, ed);
+    bar.innerHTML = rtToolbarHtml();
+    ed.innerHTML = '<div>앞글자</div>';
+    window.__put = [];
+    window.rtInsertImage = async (e, f) => { window.__put.push(f.name); e.innerHTML += '[' + f.name + ']'; };
+    rtBindEditor(ed, { toolbar: bar.querySelector('.rt-toolbar'),
+                       put: () => ({ kind:'task', taskId:'t1' }) });
+  });
+  check('그림을 받는 편집기에서는 단추가 보인다',
+        !(await pg2.$eval('#barC .rt-img-btn', e => e.hidden)));
+
+  // 사진첩에서 고른 것처럼 파일을 넣는다
+  await pg2.setInputFiles('#barC .rt-img-in', DOT);
+  await pg2.waitForTimeout(200);
+  const put = await pg2.evaluate(() => window.__put);
+  check('고른 사진이 올라간다', put.length === 1 && /\.png$/.test(put[0]), put);
+  check('본문에 들어간다',
+        (await pg2.$eval('#edC', e => e.innerHTML)).includes('[dot.png]'));
+  check('같은 사진을 또 고를 수 있게 파일칸을 비운다',
+        (await pg2.$eval('#barC .rt-img-in', e => e.value)) === '');
+
+  // 두 장을 한 번에
+  await pg2.setInputFiles('#barC .rt-img-in', [DOT, DOT2]);
+  await pg2.waitForTimeout(250);
+  check('여러 장도 한 번에 들어간다',
+        (await pg2.evaluate(() => window.__put)).length === 3,
+        await pg2.evaluate(() => window.__put));
 
   await pg2.close();
 }
