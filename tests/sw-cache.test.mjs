@@ -230,5 +230,26 @@ console.log('\n■ 안내 화면 — 빠져나갈 길을 함께 준다');
         /nosw/.test(fs.readFileSync('index.html', 'utf8')));
 }
 
+console.log('\n■ 화면에 찍히는 버전은 한 군데서만 나온다');
+{
+  // 실제로 어긋나 있었다 — APP_VER 이 ver7.4x 인데 로그인 화면은 ver6.97 에
+  // 멈춰 있었다. 손으로 적어 둔 숫자는 반드시 뒤처진다. 선생님께 '버전 뭐라고
+  // 떠요?' 하고 물어보는 자리라, 틀린 숫자는 없느니만 못하다.
+  const html = fs.readFileSync('index.html', 'utf8');
+  const APP  = html.match(/const APP_VER = '([^']+)'/)[1];
+
+  // 태그 사이에 박아 둔 버전 문자열(<div ...>ver6.97</div>)이 남아 있으면 안 된다.
+  const hard = [...html.matchAll(/>\s*(ver\d+\.\d+)\s*</g)].map(m => m[1]);
+  check('마크업에 버전을 적어 두지 않는다', hard.length === 0, hard);
+
+  check('로그인 화면에 버전 자리가 있다', /id="loginVer"/.test(html));
+  check('그 자리를 APP_VER 로 채운다', /loginVer\.textContent = APP_VER/.test(html));
+  check('옆 메뉴 버전도 APP_VER 로 채운다',
+        /nav-version'\)[\s\S]{0,80}el\.textContent = APP_VER/.test(html));
+
+  // 한 판은 셋이 같이 올라간다. 하나만 올리면 옛 화면이 남는다.
+  check('usage.html 도 같은 버전', fs.readFileSync('usage.html', 'utf8').includes(`'${APP}'`), APP);
+}
+
 console.log(`\n통과 ${pass} / 실패 ${fail}\n`);
 process.exit(fail ? 1 : 0);

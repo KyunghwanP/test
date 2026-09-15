@@ -4737,7 +4737,11 @@
       다른 계정으로 로그인
     </button>
     <div id="authStatus" style="margin-top:12px;"></div>
-    <div style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;">ver6.97</div>
+    <!-- 숫자를 여기 적지 않는다. 손으로 적어 두면 반드시 어긋난다 — 실제로
+         APP_VER 이 ver7.4x 까지 갔는데 이 자리는 ver6.97 에 멈춰 있었다.
+         로그인 화면의 이 숫자는 '이 폰이 새 앱을 받았나'를 보는 유일한 자리라,
+         틀린 숫자가 떠 있으면 없느니만 못하다. APP_VER 한 군데서만 채운다. -->
+    <div id="loginVer" style="margin-top:16px;font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-soft);opacity:0.4;"></div>
   </div>
 </div>
 
@@ -4881,7 +4885,7 @@
       <div class="main-nav-item" data-page="notice" id="navNotice" style="display:none;">
         <span class="main-nav-icon">📢</span>전체 공지 쓰기
       </div>
-    <div class="nav-version" title="Made by 박경환">ver6.97</div>
+    <div class="nav-version" title="Made by 박경환"></div>
     </nav>
 
     <!-- 업무캘린더 FAB (우하단 고정) -->
@@ -6348,7 +6352,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.48';
+const APP_VER = 'ver7.49';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -6414,6 +6418,10 @@ try {
   document.querySelectorAll('.nav-version').forEach(el => {
     el.textContent = APP_VER + ' · ' + (location.hostname || '?') + ' NL:' + nlKeys.length + (IS_NEUTRALINO ? ' 앱✓' : '');
   });
+  // 로그인 화면은 진단 꼬리표 없이 숫자만. 선생님께 '버전 뭐라고 떠요?' 하고
+  // 물어볼 유일한 자리라, 읽어서 그대로 불러 줄 수 있어야 한다.
+  const loginVer = document.getElementById('loginVer');
+  if (loginVer) loginVer.textContent = APP_VER;
   console.log('[진단] host:', location.hostname, '| NL 전역:', nlKeys, '| Neutralino:', IS_NEUTRALINO, '| UA:', navigator.userAgent);
 } catch(e){}
 
