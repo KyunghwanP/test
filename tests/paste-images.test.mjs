@@ -66,6 +66,7 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grab('rtFillPending')}
   ${grab('rtStillFilling')}
   ${grab('rtOnPaste')}
+  ${grab('rtInsertFromClipboard')}
   ${grabConst('rtFileId')}
 
   // ── 바깥 세계만 흉내낸다 ──
@@ -117,6 +118,19 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
     const ev = new ClipboardEvent('paste', { clipboardData: dt, cancelable: true, bubbles: true });
     await rtOnPaste(ev, ed);
     return ev.defaultPrevented;
+  };
+
+  // 클립보드를 직접 읽는 길. 폰에서 붙여넣기 몸짓이 사진을 안 들고 올 때 쓴다.
+  // read() 가 무엇을 주느냐만 바꿔 끼운다.
+  window.setClip_ = spec => {
+    const items = spec === 'deny' ? null : spec.map(([type, bytes]) => ({
+      types: [type],
+      getType: async t => new Blob([bytes], { type: t }),
+    }));
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { read: async () => { if (!items) throw new Error('거절'); return items; } },
+    });
   };
 
   window.html_  = () => ed.innerHTML;
@@ -272,6 +286,49 @@ console.log('\n■ 그림을 못 받는 자리');
   await ev('', [['a.png', 'X']]);
   check('그림만 복사했으면 알림만', (await pg.evaluate(() => ALERTS)).length === 1 &&
                                     (await imgs()).length === 0);
+}
+
+console.log('\n■ 클립보드에서 바로 받기 (📋 단추)');
+{
+  // 사진첩 단추(🖼)는 '저장된 파일'만 고른다. 카톡이나 웹에서 이미지만 복사한
+  // 경우에는 고를 파일이 없다 — 그 구멍을 메우는 길이다.
+  await reset();
+  await pg.evaluate(() => setClip_([['image/png', 'CLIPIMG']]));
+  await pg.evaluate(() => rtInsertFromClipboard(document.getElementById('ed')));
+  check('클립보드의 사진이 올라간다', JSON.stringify(await put()) === '["CLIPIMG"]', await put());
+  check('본문에 들어간다', (await imgs()).length === 1, await imgs());
+
+  await reset();
+  await pg.evaluate(() => setClip_([['image/png', 'A'], ['image/png', 'B']]));
+  await pg.evaluate(() => rtInsertFromClipboard(document.getElementById('ed')));
+  check('여러 장도 다 넣는다', JSON.stringify(await put()) === '["A","B"]', await put());
+
+  // 글자만 복사해 놓고 눌렀을 때. 아무 일도 안 일어나면 '단추가 고장났다'로 보인다.
+  await reset();
+  await pg.evaluate(() => setClip_([['text/plain', '그냥 글']]));
+  await pg.evaluate(() => rtInsertFromClipboard(document.getElementById('ed')));
+  check('사진이 없으면 아무것도 안 올린다', (await put()).length === 0);
+  check('사진이 없다고 말해 준다', /사진이 없습니다/.test((await pg.evaluate(() => ALERTS))[0] || ''),
+        await pg.evaluate(() => ALERTS));
+
+  // 사파리는 '붙여넣기' 확인 단추를 띄운다. 거절하면 예외가 난다.
+  await reset();
+  await pg.evaluate(() => setClip_('deny'));
+  await pg.evaluate(() => rtInsertFromClipboard(document.getElementById('ed')));
+  check('못 읽으면 왜 안 됐는지 말해 준다',
+        /클립보드를 읽지 못했습니다/.test((await pg.evaluate(() => ALERTS))[0] || ''),
+        await pg.evaluate(() => ALERTS));
+  check('그때 아무것도 안 올린다', (await put()).length === 0);
+
+  // 단추가 실제로 달려 있고, 읽을 길이 없는 브라우저에서는 감춰지는가.
+  const bar = grab('rtToolbarHtml');
+  check('도구모음에 단추가 있다', /rt-clip-btn/.test(bar) && /hidden/.test(bar), bar.slice(-300));
+  const bind = grab('rtBindEditor');
+  check('읽을 길이 있을 때만 보인다',
+        /navigator\.clipboard && navigator\.clipboard\.read/.test(bind) &&
+        /clipBtn\.hidden = false/.test(bind));
+  check('그림을 못 받는 자리에서는 안 보인다', /clipBtn && o\.put &&/.test(bind));
+  check('눌렀을 때 클립보드를 읽는다', /rtInsertFromClipboard\(ed\)/.test(bind));
 }
 
 console.log('\n■ 저장이 덜 채운 자리를 날려먹지 않는다');

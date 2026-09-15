@@ -65,6 +65,21 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   function rtLoadImages(){}
   function rtReleaseImages(){}
   function rtOnPaste(){}
+  // 📋 클립보드 단추가 실제로 이 길을 타는지 본다. 올리는 쪽만 흉내낸다.
+  window.PUT_BYTES = [];
+  window.ALERTS = [];
+  window.alert = m => ALERTS.push(m);
+  async function rtInsertImage(ed, blob){ PUT_BYTES.push(await blob.text()); }
+  ${grab('rtInsertFromClipboard')}
+  window.setClip_ = spec => {
+    const items = spec === 'deny' ? null : spec.map(([type, bytes]) => ({
+      types: [type], getType: async t => new Blob([bytes], { type: t }) }));
+    Object.defineProperty(navigator, 'clipboard', { configurable: true,
+      value: { read: async () => { if (!items) throw new Error('거절'); return items; } } });
+  };
+  window.dropClip_ = () => Object.defineProperty(navigator, 'clipboard',
+                                                 { configurable: true, value: undefined });
+  window.clipBtn_ = () => document.querySelector('#noticeEditBody .rt-clip-btn');
   ${grabConst('RT_FONT_PX')}
 ${grab('rtCleanStyle')}
 ${grab('rtPreserveStyles')}
@@ -428,6 +443,30 @@ console.log('\n■ 목록이 지금 크기를 가리킨다');
   check('크게 건 자리에서는 그 크기가 골라져 있다',
         (await pg.evaluate(() => window.sizeSel().value)) === SIZES[3][1],
         await pg.evaluate(() => window.sizeSel().value));
+}
+
+console.log('\n■ 📋 클립보드 단추');
+{
+  // 사진첩 단추(🖼)는 저장된 파일만 고른다. 카톡이나 웹에서 이미지만 복사하면
+  // 고를 파일이 없다 — 폰에서는 이 단추가 유일한 길이 된다.
+  await pg.evaluate(() => setClip_([['image/png', 'FROMCLIP']]));
+  await pg.evaluate(() => window.open_('본문'));
+  check('클립보드를 읽을 수 있으면 단추가 보인다',
+        (await pg.evaluate(() => clipBtn_() && !clipBtn_().hidden)) === true);
+
+  await pg.evaluate(() => { PUT_BYTES = []; ALERTS = []; });
+  await pg.evaluate(() => clipBtn_().click());
+  await pg.waitForFunction(() => PUT_BYTES.length > 0 || ALERTS.length > 0);
+  check('누르면 클립보드의 사진이 들어간다',
+        JSON.stringify(await pg.evaluate(() => PUT_BYTES)) === '["FROMCLIP"]',
+        await pg.evaluate(() => [PUT_BYTES, ALERTS]));
+
+  // 읽을 길이 없는 브라우저에서는 있으나 마나 한 단추를 안 보여 준다.
+  await pg.evaluate(() => dropClip_());
+  await pg.evaluate(() => window.open_('본문'));
+  check('읽을 길이 없으면 단추를 감춘다',
+        (await pg.evaluate(() => clipBtn_() && clipBtn_().hidden)) === true);
+  await pg.evaluate(() => setClip_([['image/png', 'X']]));
 }
 
 console.log(errs.length ? '\n❌ 런타임 오류:\n' + errs.slice(0, 4).join('\n') : '\n✅ 런타임 오류 없음');
