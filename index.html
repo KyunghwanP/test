@@ -6332,7 +6332,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.42';
+const APP_VER = 'ver7.43';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -8890,7 +8890,11 @@ const noticeLiveList = now => _noticeList.filter(n => noticeStateOf(n, now) === 
 // 떠 있을 이유가 없다.
 // 관리자는 예정·종료도 창에서 보므로 하나라도 있으면 띄운다.
 function noticeBtnVisible(){
-  if (_IS_ADMIN()) return _noticeList.length > 0;
+  // 확성기는 '지금 볼 공지가 있다' 는 표시다. 관리자에게도 같은 뜻이어야 한다.
+  // 예전에는 관리자만 _noticeList.length(= 게시 끝난 것까지) 로 봤는데, 그러면
+  // 눌러도 볼 것이 없는 확성기가 떠 있었다. 끝난 공지를 손보는 길은 확성기가
+  // 아니라 '전체 공지 쓰기' 탭이다.
+  if (_IS_ADMIN()) return noticeLiveList().length > 0;
   return false && noticeLiveList().length > 0;   // 전체 공개할 때 이 false 를 지운다
 }
 
@@ -9104,11 +9108,11 @@ function initNotice(){
 let _noticeOpenId = '';        // 목록에서 고른 공지. 빈 값이면 목록 화면.
 
 function noticeVisibleList(){
-  // 저절로 뜬 창은 '지금 붙어 있는 것'만 보여준다. 관리자라고 끝난 공지·예약해 둔
-  // 공지까지 앞에 띄우면, 오늘 볼 것이 무엇인지가 오히려 흐려진다.
-  // 끝난 것과 예약한 것은 확성기를 눌러서·쓰기 탭에서 본다.
-  if (_noticeAuto) return noticeLiveList();
-  return _IS_ADMIN() ? _noticeList : noticeLiveList();
+  // 확성기로 여는 창은 '지금 붙어 있는 것'만 보여준다 — 관리자도 마찬가지다.
+  // 끝난 공지·예약해 둔 공지까지 섞이면 오늘 볼 것이 무엇인지가 흐려지고,
+  // 여러 건일 때는 넘겨보다 끝난 것이 튀어나온다.
+  // 끝난 것과 예약한 것은 '전체 공지 쓰기' 탭에서 본다. 거기가 손보는 자리다.
+  return noticeLiveList();
 }
 
 // 쓰기 탭 목록에서는 칩을 눌러 바로 내리거나 다시 올릴 수 있게 한다.

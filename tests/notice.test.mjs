@@ -47,7 +47,11 @@ check('관리자에게만 그린다', /function noticeBtnVisible\(\)/.test(HTML)
 // 쓰러 들어가는 문은 '전체 공지 쓰기' 탭이 따로 있다. 볼 것이 없는데 확성기만
 // 떠 있을 이유가 없다.
 check('볼 것이 없으면 관리자에게도 안 뜬다',
-      /if \(_IS_ADMIN\(\)\) return _noticeList\.length > 0;/.test(HTML));
+      /if \(_IS_ADMIN\(\)\) return noticeLiveList\(\)\.length > 0;/.test(HTML));
+// 게시가 끝난 공지만 남았을 때도 확성기가 떠 있었다 — 눌러도 볼 것이 없다.
+// 관리자에게도 '지금 뜨는 것' 기준이어야 한다(끝난 것은 쓰기 탭에서 손본다).
+check('게시 끝난 것만 있으면 관리자에게도 안 뜬다',
+      !/if \(_IS_ADMIN\(\)\) return _noticeList\.length > 0;/.test(HTML));
 check('전체 공개는 한 줄만 풀면 된다', /return false && noticeLiveList\(\)\.length > 0;/.test(HTML));
 check('기간이 바뀌는 그 시각에 맞춰 깨운다 (30초마다 들여다보지 않는다)',
       /function noticeNextBoundary\(\)/.test(HTML) &&
@@ -409,8 +413,10 @@ console.log('\n■ 처음 들어올 때 저절로 띄우기');
         /last\s*\n?\s*\? '<button class="notice-btn primary" onclick="closeNoticeModalBtn\(\)">닫기/.test(HTML));
   check('배선 — 저절로 열 때는 첫 장부터', /_noticeAutoIdx = 0;\s*\n\s*openNoticeModal\(true\);/.test(HTML));
 
-  check('저절로 뜬 창은 게시중인 것만 보여준다',
-        /if \(_noticeAuto\) return noticeLiveList\(\);[\s\S]{0,120}return _IS_ADMIN\(\) \? _noticeList/.test(HTML));
+  check('확성기로 연 창도 게시중인 것만 보여준다 (관리자도)',
+        /function noticeVisibleList\(\)\{[\s\S]{0,400}return noticeLiveList\(\);\s*\n\}/.test(HTML));
+  check('관리자라고 끝난 공지를 섞지 않는다',
+        !/return _IS_ADMIN\(\) \? _noticeList/.test(HTML));
 
   await pg.evaluate(() => window.snoozeReset());
   const N = (id, upd) => ({ id, html: '감독 변경', updatedAt: upd });
