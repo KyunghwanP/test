@@ -227,6 +227,53 @@ console.log('\n■ 그림 — 키만 남고, 키가 아니면 사라진다');
   check('공지 키도 키로 읽힌다', nk.length === 1, nk);
 }
 
+console.log('\n■ 메모 칸은 좌우를 다 쓴다 (폰에서 답답하지 않게)');
+{
+  // 이름표('메모')를 옆에 두면 글이 들어갈 폭이 그만큼 깎인다. 폰에서는 특히
+  // 답답하고, 그림이 들어가면 더 그렇다. 눈대중이 아니라 실제로 재 본다.
+  await pg.setViewportSize({ width: 390, height: 780 });   // 폰 크기
+  await pg.evaluate(() => window.show({ title:'출결 마감', startDate:'2026-09-01',
+    endDate:'2026-09-01', sharedWith:['a@yeungnam.hs.kr'],
+    memoHtml:'<div>여기에 제법 긴 메모가 들어간다. 폰에서는 이 글이 들어갈 폭이 중요하다.</div>' }));
+
+  const m = await pg.evaluate(() => {
+    const box  = document.getElementById('mytaskRecvInfo');
+    const wide = box.querySelector('.mrv-row.wide');
+    const val  = wide && wide.querySelector('.mrv-v');
+    const key  = wide && wide.querySelector('.mrv-k');
+    // 견줄 대상 — 짧은 줄(기간)은 지금처럼 이름표를 옆에 둔다
+    const norm = [...box.querySelectorAll('.mrv-row:not(.wide)')][0];
+    const nval = norm && norm.querySelector('.mrv-v');
+    const r = e => e ? e.getBoundingClientRect() : null;
+    return { boxW: r(box).width, valW: r(val)?.width, normW: r(nval)?.width,
+             keyBottom: r(key)?.bottom, valTop: r(val)?.top,
+             keyLeft: r(key)?.left, valLeft: r(val)?.left };
+  });
+
+  check('메모 줄이 아래로 펴진 모양이다', m.valW != null, m);
+  // 이름표가 위, 글이 아래 — 좌우로 나란히면 top 이 비슷하다
+  check('이름표가 글 위에 온다', m.valTop >= m.keyBottom - 1, m);
+  check('왼쪽 끝이 이름표와 같다 (들여쓰기 없음)', Math.abs(m.valLeft - m.keyLeft) <= 1, m);
+  // 이것이 요점이다 — 상자 폭을 거의 다 쓴다
+  check('상자 폭을 거의 다 쓴다 (95% 이상)', m.valW >= m.boxW * 0.95,
+        { valW: Math.round(m.valW), boxW: Math.round(m.boxW) });
+  // 그리고 옆에 두던 때보다 확실히 넓어야 한다
+  check('짧은 줄(기간)보다 넓다', m.valW > m.normW + 40,
+        { memo: Math.round(m.valW), 기간: Math.round(m.normW) });
+
+  // 짧은 줄은 그대로 옆에 둔다 — 다 아래로 펴면 창만 길어진다
+  const norm = await pg.evaluate(() => {
+    const box = document.getElementById('mytaskRecvInfo');
+    const r0  = [...box.querySelectorAll('.mrv-row:not(.wide)')][0];
+    const k = r0.querySelector('.mrv-k').getBoundingClientRect();
+    const v = r0.querySelector('.mrv-v').getBoundingClientRect();
+    return { sameLine: Math.abs(k.top - v.top) < 6 };
+  });
+  check('기간 같은 짧은 줄은 그대로 옆에 둔다', norm.sameLine, norm);
+
+  await pg.setViewportSize({ width: 640, height: 700 });
+}
+
 console.log('\n■ 그림이 있는 메모');
 {
   const k = 'tasks/test/uidKim/task1/f1.jpg';

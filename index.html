@@ -1305,6 +1305,11 @@
   /* 메모는 칩이 아니라 글이다. .mrv-v 는 칩을 늘어놓으려고 flex 라서 줄바꿈이
      공백으로 접힌다 — 원본에 줄바꿈이 있어도 한 줄로 뭉쳐 보였다. */
   .mrv-v.mrv-text{display:block;white-space:pre-wrap;word-break:break-word;line-height:1.65;font-weight:500;}
+  /* 아래로 펴는 줄 — 이름표를 위에 두고 내용이 좌우를 다 쓴다.
+     메모처럼 긴 글·그림이 들어가는 칸에 쓴다. */
+  .mrv-row.wide{flex-direction:column;gap:5px;}
+  .mrv-row.wide .mrv-k{flex:none;}
+  .mrv-row.wide .mrv-v{width:100%;}
   .mrv-none{color:var(--ink-soft);font-weight:400;}
   .mytask-share-chip{
     display:flex;align-items:center;gap:4px;
@@ -6332,7 +6337,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.43';
+const APP_VER = 'ver7.44';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -21796,6 +21801,10 @@ function renderMytaskRecvInfo(t, isOwner = false){
     return (!isOwner && (v === myEmail || v === myName)) ? `${nm} (나)` : nm;
   });
   const row = (k, v, cls) => `<div class="mrv-row"><span class="mrv-k">${k}</span><span class="mrv-v${cls ? ' ' + cls : ''}">${v}</span></div>`;
+  // 메모는 이름표를 옆에 두면 글이 들어갈 폭이 그만큼 깎인다. 폰에서는 특히
+  // 답답하고, 그림이 들어가면 더 그렇다. 이름표를 위로 올리고 글은 좌우를
+  // 다 쓰게 한다. 기간·공유자처럼 짧은 것은 지금처럼 옆에 두는 편이 낫다.
+  const rowWide = (k, v, cls) => `<div class="mrv-row wide"><span class="mrv-k">${k}</span><span class="mrv-v${cls ? ' ' + cls : ''}">${v}</span></div>`;
   const chips = names => names.map(n => `<span class="mrv-chip">${escapeHtml(n)}</span>`).join('');
   const rep   = t.repeat?.type && t.repeat.type !== 'none' ? t.repeat.type : null;
 
@@ -21815,8 +21824,8 @@ function renderMytaskRecvInfo(t, isOwner = false){
   //   memoHtml — 서식·그림이 있는 새 메모
   //   memo     — 그 전에 쓴 순수 글자 (지금도 글자만 있는 메모는 이쪽으로도 남는다)
   // 옛 메모를 HTML 로 넣으면 줄바꿈이 전부 사라지므로 길을 갈라 둔다.
-  if (t.memoHtml) html += row('메모', `<div class="rt-view">${rtSanitize(t.memoHtml)}</div>`);
-  else if (t.memo) html += row('메모', escapeHtml(t.memo), 'mrv-text');
+  if (t.memoHtml) html += rowWide('메모', `<div class="rt-view">${rtSanitize(t.memoHtml)}</div>`);
+  else if (t.memo) html += rowWide('메모', escapeHtml(t.memo), 'mrv-text');
   el.innerHTML = html;
   el.style.display = 'block';
   // 그림은 <img src> 로 못 받는다(워커가 토큰을 요구한다). 받아서 끼운다.
