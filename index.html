@@ -6332,7 +6332,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.39';
+const APP_VER = 'ver7.40';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -8686,9 +8686,50 @@ function rtCleanStyle(el){
   else el.removeAttribute('style');
 }
 
+// <font> 의 size 는 1~7 단계다. px 로 옮겨 놓아야 우리 크기 목록과 같은 말이 된다.
+const RT_FONT_PX = { '1':'10px','2':'13px','3':'16px','4':'18px','5':'24px','6':'32px','7':'48px' };
+
+// 걸러내기 전에, 사라질 자리에 붙은 서식을 안쪽으로 내려 둔다.
+//
+// 굵게만 살아남고 색·크기는 없어지던 까닭이 여기 있었다. 굵게는 <b> 라는 '태그'라
+// 살아남는데, 색·크기는 대개 태그가 아니라
+//   · 옛 <font color size> 태그        (한글·워드·오래된 웹에서 아직 이렇게 온다)
+//   · 표 칸(<td>) 같은 '모르는 태그' 의 style
+// 에 실려 온다. 둘 다 벗겨지는 쪽이라, 벗길 때 서식도 같이 버려졌다.
+//
+// 그래서 벗기기 전에 span 으로 옮겨 둔다. span 은 남는 태그다.
+function rtPreserveStyles(box){
+  // ① <font color size> → <span style>
+  for (const f of [...box.querySelectorAll('font')]) {
+    const sp = document.createElement('span');
+    const c  = f.getAttribute('color');
+    const sz = RT_FONT_PX[String(f.getAttribute('size') || '').trim()];
+    if (c)  sp.style.color = c;
+    if (sz) sp.style.fontSize = sz;
+    const st = f.getAttribute('style');
+    if (st) sp.setAttribute('style', (sp.getAttribute('style') || '') + ';' + st);
+    sp.append(...f.childNodes);
+    f.replaceWith(sp);
+  }
+  // ② 곧 벗겨질 태그의 색·크기를 안쪽 span 으로 내린다.
+  //    버릴 태그(script 등)는 건드리지 않는다 — 알맹이째 없어질 것들이다.
+  for (const el of [...box.querySelectorAll('*')]) {
+    if (RT_TAGS.has(el.tagName) || RT_DROP.has(el.tagName)) continue;
+    const st = el.getAttribute('style');
+    if (!st || !el.childNodes.length) continue;
+    const sp = document.createElement('span');
+    sp.setAttribute('style', st);
+    rtCleanStyle(sp);                       // 쓸 수 있는 여섯 가지만 남는다
+    if (!sp.getAttribute('style')) continue; // 건질 것이 없으면 그냥 둔다
+    sp.append(...el.childNodes);
+    el.appendChild(sp);
+  }
+}
+
 function rtSanitize(html){
   const box = document.createElement('div');
   box.innerHTML = String(html || '');
+  rtPreserveStyles(box);
   const walk = node => {
     for (const child of [...node.childNodes]) {
       if (child.nodeType === 3) continue;                       // 글자
@@ -9264,7 +9305,7 @@ function bindNoticeZoom(){
     e.stopPropagation(); toggleNoticeZoomActual();
   });
   // 그림 밖(어두운 자리)을 누르면 닫는다
-  ov?.addEventListener('click', () => closeNoticeZoom());
+  ov?.addEventListener('click', e => { if (isSamePress(e)) closeNoticeZoom(); });
 }
 
 function noticeBackToList(){ _noticeOpenId = ''; renderNoticeModal(); }
@@ -12314,7 +12355,7 @@ function initPassPage(){
     document.getElementById('passSearch').addEventListener('input', passRenderSearch);
     document.getElementById('passSearch').addEventListener('keydown', passSearchKey);
     document.getElementById('passModalOverlay').addEventListener('click', e => {
-      if(e.target.id === 'passModalOverlay') passCloseForm();
+      if(isOutsideClick(e, document.getElementById('passModalOverlay'))) passCloseForm();
     });
     document.getElementById('passDetailOverlay').addEventListener('click', e => {
       if(e.target.id !== 'passDetailOverlay') return;
@@ -13047,7 +13088,7 @@ function showContactDetail(c) {
     setTimeout(() => overlay.remove(), 200);
   };
   overlay.querySelector('.cd-close').addEventListener('click', close);
-  overlay.addEventListener('click', e => { if(e.target === overlay) close(); });
+  overlay.addEventListener('click', e => { if(isOutsideClick(e, overlay)) close(); });
 
   // 휴대폰 채우기 — 이 사람 1명분만 받아온다.
   const slot = overlay.querySelector('#cdPhoneRow > div');
@@ -13261,7 +13302,7 @@ function showClubInfo(club){
     requestAnimationFrame(() => overlay.classList.add('open'));
     const close = () => { overlay.classList.remove('open'); setTimeout(() => overlay.remove(), 200); };
     overlay.querySelector('.cd-close').addEventListener('click', close);
-    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    overlay.addEventListener('click', e => { if (isOutsideClick(e, overlay)) close(); });
   };
   if (!clubMetaLoaded) loadClubMeta().then(openIt); else openIt();
 }
@@ -13461,7 +13502,7 @@ function showStudentDetail(s) {
   requestAnimationFrame(() => overlay.classList.add('open'));
   const close = () => { overlay.classList.remove('open'); setTimeout(() => overlay.remove(), 200); };
   overlay.querySelector('.cd-close').addEventListener('click', close);
-  overlay.addEventListener('click', e => { if(e.target === overlay) close(); });
+  overlay.addEventListener('click', e => { if(isOutsideClick(e, overlay)) close(); });
 
   // 이 학생 1명분만 받아 채운다.
   const box      = overlay.querySelector('#cdStuContact');
@@ -14782,7 +14823,7 @@ function closeClassOrgModal(){
   document.getElementById('classOrgModal').classList.remove('open');
 }
 document.getElementById('classOrgModalClose').addEventListener('click', closeClassOrgModal);
-document.getElementById('classOrgModal').addEventListener('click', e => { if (e.target.id === 'classOrgModal') closeClassOrgModal(); });
+document.getElementById('classOrgModal').addEventListener('click', e => { if (isOutsideClick(e)) closeClassOrgModal(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeClassOrgModal(); });
 document.getElementById('classOrgModalBody').addEventListener('click', e => {
   const cell = e.target.closest('.co-tname, .co-cnt2');
@@ -15890,7 +15931,7 @@ async function saveRoomAdmin() {
 }
 // 모달 배경 클릭으로 닫기
 document.getElementById('roomModalOverlay')?.addEventListener('click', e => {
-  if (e.target === e.currentTarget) closeRoomModal();
+  if (isOutsideClick(e)) closeRoomModal();
 });
 window.initRoomPage = initRoomPage;
 window.stopRoomWatch = stopRoomWatch;
@@ -18151,7 +18192,7 @@ function openPtsRecentModal() {
 }
 window.openPtsRecentModal = openPtsRecentModal;
 function closePtsNewModal(e) {
-  if (e.target === document.getElementById('ptsNewModal')) closePtsNewModalBtn();
+  if (isOutsideClick(e, document.getElementById('ptsNewModal'))) closePtsNewModalBtn();
 }
 function closePtsNewModalBtn() {
   document.getElementById('ptsNewModal').classList.remove('show');
@@ -18415,7 +18456,7 @@ function showPtsDetail(idx, encoded) {
 }
 
 function closePtsDetail(e) {
-  if (e.target === document.getElementById('ptsDetailModal')) closePtsDetailBtn();
+  if (isOutsideClick(e, document.getElementById('ptsDetailModal'))) closePtsDetailBtn();
 }
 function closePtsDetailBtn() {
   document.getElementById('ptsDetailModal').classList.remove('show');
@@ -19513,6 +19554,30 @@ let _groups = { default: [], custom: [] };
 let _groupEditorId = null;
 let _groupEditorMembers = [];
 let _groupEditorScope = 'custom';
+// ── 모달 바깥 눌러 닫기 ──────────────────────────────────────────────────────
+// 창 안의 글을 드래그해서 고르다가 손을 바깥에서 떼면, 브라우저는 그것도 '바깥
+// 클릭' 으로 친다(click 은 누른 자리와 뗀 자리의 공통 조상에서 난다). 그래서
+// 고르던 중에 창이 닫히고 적던 것이 날아갔다.
+//
+// 누르기 시작한 자리까지 같이 본다. 둘 다 바깥일 때만 진짜 바깥 클릭이다.
+// 열 곳이 넘는 창이 각자 바깥 클릭을 받으므로, 판정은 여기 한 군데만 둔다.
+let _pressStartedOn = null, _pressEndedOn = null;
+document.addEventListener('pointerdown', e => { _pressStartedOn = e.target; }, true);
+document.addEventListener('pointerup',   e => { _pressEndedOn   = e.target; }, true);
+// 포인터 이벤트가 안 오는 아주 옛 브라우저를 위한 보조
+document.addEventListener('mousedown',   e => { _pressStartedOn = e.target; }, true);
+document.addEventListener('mouseup',     e => { _pressEndedOn   = e.target; }, true);
+// 누른 자리·뗀 자리·클릭 대상이 모두 바깥일 때만 진짜 바깥 클릭이다.
+// 셋 중 하나라도 어긋나면 끌었다는 뜻이다(안→밖, 밖→안 둘 다).
+function isOutsideClick(e, el){
+  const target = el || e.currentTarget;
+  return !!target && e.target === target
+      && _pressStartedOn === target && _pressEndedOn === target;
+}
+// 어두운 자리 아무 데나 눌러 닫는 창(그림 크게 보기)용. 어디를 눌렀든 닫되,
+// 누른 자리와 뗀 자리가 같을 때만 — 끌다가 뗀 것은 클릭이 아니다.
+function isSamePress(e){ return _pressStartedOn === e.target && _pressEndedOn === e.target; }
+
 const _IS_ADMIN = () => !isViewAs() && fbAuth.currentUser?.email === ADMIN_EMAIL;
 
 async function loadGroups() {
@@ -19845,7 +19910,7 @@ function bindConsultForm(){
   // 공강 모달 컨트롤
   document.getElementById('caCloseBtn').addEventListener('click', closeConsultAutoModal);
   document.getElementById('consultAutoModal').addEventListener('click', (e) => {
-    if(e.target.id === 'consultAutoModal') closeConsultAutoModal();
+    if(isOutsideClick(e, document.getElementById('consultAutoModal'))) closeConsultAutoModal();
   });
   document.getElementById('caDate').addEventListener('change', renderCaList);
   document.querySelectorAll('.ca-unit-btn').forEach(btn => {
@@ -19871,7 +19936,7 @@ function bindConsultForm(){
   document.getElementById('cmSaveBtn').addEventListener('click', saveConsultModal);
   document.getElementById('cmDeleteBtn').addEventListener('click', deleteConsultModalSlot);
   document.getElementById('consultModal').addEventListener('click', (e) => {
-    if(e.target.id === 'consultModal') closeConsultModal();
+    if(isOutsideClick(e, document.getElementById('consultModal'))) closeConsultModal();
   });
   // 직접 예약 추가 버튼 (신규 모드로 모달 열기)
   document.getElementById('consultDirectBtn').addEventListener('click', () => openConsultModal(null));
@@ -20246,7 +20311,7 @@ document.getElementById('ttMeetBtn')?.addEventListener('click', ttMeetOpen);
 document.getElementById('ttMeetClose')?.addEventListener('click', ttMeetClose);
 document.getElementById('ttMeetAdd')?.addEventListener('click', ttMeetAddToCalendar);
 document.getElementById('ttMeetModal')?.addEventListener('click', e => {
-  if(e.target.id === 'ttMeetModal') ttMeetClose();      // 바깥 클릭으로 닫기
+  if(isOutsideClick(e, document.getElementById('ttMeetModal'))) ttMeetClose();   // 바깥 클릭으로 닫기
 });
 document.getElementById('ttMeetSearch')?.addEventListener('input', e => ttMeetRenderSugg(e.target.value));
 // 이름 치고 엔터 → 첫 후보를 바로 넣는다. 정확히 일치하는 이름이 있으면 그쪽을 우선한다
@@ -21210,7 +21275,7 @@ function closeMytaskDayModal() {
   document.getElementById('mytaskDayModal').classList.remove('show');
 }
 function closeMytaskDayModalOverlay(e) {
-  if (e.target === document.getElementById('mytaskDayModal')) closeMytaskDayModal();
+  if (isOutsideClick(e, document.getElementById('mytaskDayModal'))) closeMytaskDayModal();
 }
 
 // ── 목록 렌더링 (전체 월, 월 구분선) ──
@@ -22116,7 +22181,7 @@ function closeMytaskModal() {
   mytaskEditId = null; mytaskEditOwner = null; _mytaskDocId = '';
 }
 function closeMytaskModalOverlay(e) {
-  if (e.target === document.getElementById('mytaskModal')) closeMytaskModal();
+  if (isOutsideClick(e, document.getElementById('mytaskModal'))) closeMytaskModal();
 }
 
 async function saveMytask() {

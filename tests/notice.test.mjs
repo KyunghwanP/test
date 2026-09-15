@@ -112,7 +112,9 @@ await pg.route('https://ynhs.test/**', r => r.fulfill({
     ${grabConst('RT_ZWSP')}
     const NOTICE_SEEN_KEY = 'noticeSeenAt';
     let _noticeList = [];
-    ${grab('rtCleanStyle')}
+    ${grabConst('RT_FONT_PX')}
+${grab('rtCleanStyle')}
+${grab('rtPreserveStyles')}
     ${grab('rtSanitize')}
     ${grab('rtKeysIn')}
     ${grab('noticeStateOf')}
@@ -287,13 +289,17 @@ console.log('\n■ 게시 기간');
 
 console.log('\n■ 여러 건일 때 — 지금 뜨는 것만 고른다');
 {
-  const T = (y,m,d,h,mi) => new Date(y, m-1, d, h, mi).getTime();
-  const NOON = T(2026,9,8,12,0);
+  // 날짜를 달력에 박아 두면 안 된다. 예전에는 '다음 주 예약' 을 2026-09-15 로
+  // 적어 뒀는데, 그날이 오자 그 공지가 '지금 뜨는 것' 이 되어 테스트가 깨졌다.
+  // 아래 unseen 은 (live 와 달리) 지금 시각을 직접 본다 - 그래서 더 그렇다.
+  // 지금을 기준으로 앞뒤를 잡는다.
+  const D = 86400e3;
+  const NOON = Date.now();
   const LIST = [
     { id:'a', html:'늘 뜨는 것',   updatedAt: 30 },
-    { id:'b', html:'오늘 하루',     updatedAt: 20, from: T(2026,9,8,7,0),  until: T(2026,9,8,17,0) },
-    { id:'c', html:'다음 주 예약',  updatedAt: 40, from: T(2026,9,15,7,0) },
-    { id:'d', html:'지난 주에 끝남', updatedAt: 10, until: T(2026,9,1,17,0) },
+    { id:'b', html:'오늘 하루',     updatedAt: 20, from: NOON - 5*3600e3, until: NOON + 5*3600e3 },
+    { id:'c', html:'다음 주 예약',  updatedAt: 40, from: NOON + 7*D },
+    { id:'d', html:'지난 주에 끝남', updatedAt: 10, until: NOON - 7*D },
   ];
   const live = await pg.evaluate(a => window.live(a[0], a[1]), [LIST, NOON]);
   check('기간에 걸린 것만 나온다', JSON.stringify(live) === '["a","b"]', live);

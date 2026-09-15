@@ -125,7 +125,9 @@ ${grabConst('RT_ZWSP')}
 ${grabConst('RT_COLORS')}
 ${grabConst('RT_SIZES')}
 ${grab('escapeHtml')}
+${grabConst('RT_FONT_PX')}
 ${grab('rtCleanStyle')}
+${grab('rtPreserveStyles')}
 ${grab('rtSanitize')}
 ${grab('rtKeysIn')}
 ${grab('rtPlainText')}

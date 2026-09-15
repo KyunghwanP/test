@@ -33,7 +33,9 @@ function noticeSnoozeToday(){ window.__snoozed='today'; closeNoticeModalBtn(); }
 function noticeSnoozeEver(){ window.__snoozed='ever'; closeNoticeModalBtn(); }
 function closeNoticeModalBtn(){ document.getElementById('noticeModal').classList.remove('open'); window.__closed=true; }
 function startNoticeEdit(){}
-${grab('rtCleanStyle')}\n${grab('rtSanitize')}\n${grab('noticeTitleOf')}
+${gc('RT_FONT_PX')}
+${grab('rtCleanStyle')}
+${grab('rtPreserveStyles')}\n${grab('rtSanitize')}\n${grab('noticeTitleOf')}
 ${grab('noticeStateOf')}\n${grab('noticeStateChip')}\n${grab('noticeVisibleList')}
 ${grab('noticePeriodText')}\n${grab('noticeWhenText')}
 ${grab('renderNoticeAutoStep')}\n${grab('noticeAutoStep')}\n${grab('renderNoticeModal')}

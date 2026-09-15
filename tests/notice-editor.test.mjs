@@ -65,7 +65,9 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   function rtLoadImages(){}
   function rtReleaseImages(){}
   function rtOnPaste(){}
-  ${grab('rtCleanStyle')}
+  ${grabConst('RT_FONT_PX')}
+${grab('rtCleanStyle')}
+${grab('rtPreserveStyles')}
   ${grab('rtSanitize')}
   ${grab('rtSetFontSize')}
   ${grab('rtSyncSizeSel')}
