@@ -64,7 +64,20 @@ check('예전 문서(공지 하나이던 시절)도 계속 읽는다',
       /NOTICE_LEGACY_ID = \{ test: 'board-test', live: 'board' \}/.test(HTML));
 check('전체 새로고침 신호는 공지로 안 센다', /if \(d\.id === 'reload'\) return;/.test(HTML));
 check('청소는 모든 공지의 키를 기준으로 한다 (안 그러면 남의 그림이 지워진다)',
-      /keep: noticeAllKeys\(keys\)/.test(HTML));
+      /const keep = noticeAllKeys\(keys\);/.test(HTML));
+// 기준이 되는 목록이 아직 안 왔는데 청소하면, 기존 그림이 전부 '안 쓰이는 것' 으로
+// 보여 지워진다. 못 믿을 때는 빈 목록이 아니라 null 을 주고 청소를 건너뛴다.
+check('목록이 안 왔으면 청소를 건너뛴다',
+      /if \(!_noticeLoadedOnce\) return null;/.test(HTML)
+      && /if \(keep\) rtApi\(\{ action: 'sweep', keep \}\)/.test(HTML));
+check('지울 때도 마찬가지다',
+      /if \(all\) rtApi\(\{ action: 'sweep', keep: all\.filter/.test(HTML));
+// 목록은 '이 배포 것 · 글이 있는 것' 만 담는다. 거기서 빠진 공지의 그림도
+// 지켜져야 하므로, 청소 기준은 목록과 따로 모은다.
+check('청소 기준은 화면 목록과 따로 모은다',
+      /for \(const k of \(Array\.isArray\(v\.keys\) \? v\.keys : \[\]\)\) if \(RT_KEY_RE\.test\(k\)\) allKeys\.add\(k\);/.test(HTML));
+check('그 모으기가 걸러내기보다 먼저다',
+      HTML.indexOf('allKeys.add(k)') < HTML.indexOf('if (scope !== NOTICE_SCOPE) return;'));
 check('로그인 뒤에 켠다', /watchReloadSignal\(\);\s*\n\s*initNotice\(\);/.test(HTML));
 check('목록을 스냅샷으로 본다', /onSnapshot\(collection\(fbDb, 'appNotice'\)/.test(HTML));
 check('뒤로가기로 닫힌다',
@@ -112,6 +125,7 @@ await pg.route('https://ynhs.test/**', r => r.fulfill({
     ${grabConst('RT_ZWSP')}
     const NOTICE_SEEN_KEY = 'noticeSeenAt';
     let _noticeList = [];
+    let _noticeKeysAll = [], _noticeLoadedOnce = true;
     ${grabConst('RT_FONT_PX')}
 ${grab('rtCleanStyle')}
 ${grab('rtPreserveStyles')}
@@ -148,7 +162,14 @@ ${grab('rtPreserveStyles')}
     window.state   = (d, now) => noticeStateOf(d, now);
     window.live    = (list, now) => { _noticeList = list; return noticeLiveList(now).map(n => n.id); };
     window.titleOf = n => noticeTitleOf(n);
-    window.allKeys = (list, extra) => { _noticeList = list; return noticeAllKeys(extra); };
+    window.allKeys = (list, extra) => {
+      _noticeList = list;
+      _noticeLoadedOnce = true;
+      // 실제로는 스냅샷이 모든 문서에서 키를 모은다(글이 없거나 배포가 달라도).
+      _noticeKeysAll = [...new Set(list.flatMap(n => (n.keys || []).filter(k => RT_KEY_RE.test(k))))];
+      return noticeAllKeys(extra);
+    };
+    window.allKeysBeforeLoad = () => { _noticeLoadedOnce = false; return noticeAllKeys(['x']); };
     window.snoozeReset = () => { localStorage.removeItem(NOTICE_SNOOZE_KEY); window.__closed = false; };
     window.snoozeNow   = list => { _noticeList = list; noticeSnoozeToday(); return window.__closed; };
     window.snoozeEver  = list => { _noticeList = list; noticeSnoozeEver();  return window.__closed; };
@@ -314,6 +335,26 @@ console.log('\n■ 여러 건일 때 — 지금 뜨는 것만 고른다');
   check('다 봤으면 점이 사라진다',     (await u(LIVE_ONLY, 30)) === false);
   check('게시중인 것이 없으면 점도 없다',
         (await u(LIST.filter(n => n.id === 'c'), null)) === false);
+}
+
+console.log('\n■ 청소 기준 — 틀리면 남의 그림이 날아간다');
+{
+  const K = n => `notices/test/board${n}/f${n}.jpg`;
+  const LIST = [
+    { id:'a', keys:[K(1), K(2)] },
+    { id:'b', keys:[K(3)] },
+  ];
+  const all = await pg.evaluate(a => window.allKeys(a[0], a[1]), [LIST, [K(9)]]);
+  check('모든 공지의 키가 다 들어간다',
+        [K(1),K(2),K(3),K(9)].every(k => all.includes(k)), all);
+  check('방금 저장한 것도 얹는다', all.includes(K(9)), all);
+  check('이상한 키는 안 담는다',
+        !(await pg.evaluate(a => window.allKeys(a, ['../../x']), LIST)).includes('../../x'));
+
+  // 여기가 핵심이다. 목록이 아직 안 왔으면 빈 목록이 아니라 null 이어야 한다.
+  // 빈 목록을 주면 저장소는 '아무도 안 쓴다' 로 읽고 전부 지운다.
+  check('목록이 안 왔으면 null (빈 목록이 아니다)',
+        (await pg.evaluate(() => window.allKeysBeforeLoad())) === null);
 }
 
 console.log('\n■ 그림 크게 보기');

@@ -22,7 +22,8 @@
  *  · GET  /img?k=<key>              공지 이미지 내려주기 (교사면 누구나)
  *  · POST {action:'put'}            이미지 올리기 (관리자만) → { key }
  *  · POST {action:'del'}            이미지 지우기 (관리자만)
- *  · POST {action:'sweep'}          문서에 안 쓰이는 이미지 청소 (관리자만)
+ *  · POST {action:'sweep'}          공지에 안 쓰이는 이미지 청소 (관리자만)
+ *  · POST {action:'sweepTask'}      내 캘린더 메모에 안 쓰이는 이미지 청소 (교사 각자)
  *
  * 지우는 경로를 왜 처음부터 두나
  *  공지를 고치거나 지우면 R2 파일은 저절로 사라지지 않는다. 나중에 붙이면
@@ -212,16 +213,34 @@ async function handleSweep(env, body) {
   //   task   — 자기 일정만 볼 수 있다. 남의 일정이 무슨 그림을 쓰는지 모르는
   //            채로 배포 전체를 훑으면 남의 것을 다 지운다. 그래서 훑는 자리를
   //            자기 칸 안으로 못 박는다. 칸 이름은 토큰에서 나온 uid 다.
-  const kind = body.kind === 'task' ? 'task' : 'notice';
+  // 훑을 자리는 '무슨 청소인가' 로 정한다. 이름이 아예 다른 두 동작이다 —
+  // sweep(공지) · sweepTask(캘린더). 한 동작에 kind 같은 곁가지를 달았더니
+  // 사고가 났다(아래 참고).
   let prefix;
-  if (kind === 'notice') {
+  if (body.action === 'sweepTask') {
+    prefix = `tasks/${scope}/${who.uid}/`;
+  } else {
     if (!who.admin) return { success: false, error: 'FORBIDDEN' };
     prefix = `notices/${scope}/`;
-  } else {
-    prefix = `tasks/${scope}/${who.uid}/`;
   }
 
-  const keep = new Set((Array.isArray(body.keep) ? body.keep : []).filter(validKey));
+  // 지켜 달라는 키가 훑을 자리와 어긋나면 아무것도 지우지 않는다.
+  //
+  // 2026-09: 앱에는 캘린더 사진이 들어갔는데 워커는 아직 옛 코드였다. 앱이
+  // {action:'sweep', kind:'task', keep:['tasks/...']} 를 보냈고, 옛 워커는
+  //   · kind 를 몰라 공지 자리를 훑고
+  //   · tasks/ 키를 '모양이 틀린 것' 으로 전부 걸러 keep 을 비우고
+  //   · 빈 keep 을 '아무도 안 쓴다' 로 읽어
+  // 공지 그림을 통째로 지웠다. 되돌릴 길이 없었다.
+  //
+  // 그래서 두 가지를 바꿨다. 새 동작에는 새 이름을 준다(옛 워커는 모르는
+  // action 을 만나면 아무 일도 안 한다). 그리고 여기서 서로 다른 것을
+  // 말하고 있는지 본다 — 어긋나면 지우는 쪽이 아니라 멈추는 쪽으로 간다.
+  const raw = Array.isArray(body.keep) ? body.keep : [];
+  if (raw.some(k => !validKey(k) || !String(k).startsWith(prefix))) {
+    return { success: false, error: 'KEEP_MISMATCH' };
+  }
+  const keep = new Set(raw);
   // 한 번에 1000개까지만 본다. 그 위로는 다음 청소 때 이어서 지워진다 —
   // 한 사람 칸에 그만큼 쌓일 일이 없으므로 이어받기(cursor)는 두지 않는다.
   const list = await env.NOTICES.list({ prefix, limit: 1000 });
@@ -286,7 +305,8 @@ export default {
       switch (body.action) {
         case 'put':   return json(await handleImgPut(env, body),  200, cors);
         case 'del':   return json(await handleImgDel(env, body),  200, cors);
-        case 'sweep': return json(await handleSweep(env, body),   200, cors);
+        case 'sweep':     return json(await handleSweep(env, body), 200, cors);
+        case 'sweepTask': return json(await handleSweep(env, body), 200, cors);
         default:      return json({ success: false, error: 'UNKNOWN_ACTION' }, 400, cors);
       }
     } catch (e) {

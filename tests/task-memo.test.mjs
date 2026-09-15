@@ -97,8 +97,11 @@ console.log('\n■ 배선 (정적)');
 
   check('일정을 지우면 그림도 지운다',
         /if \(goneKeys\.length\) rtApi\(\{ action: 'del', keys: goneKeys \}\)/.test(HTML));
-  check('청소는 기준을 못 믿으면 건너뛴다', /if \(keep\) rtApi\(\{ action: 'sweep', kind: 'task', keep \}\)/.test(HTML));
-  check('청소 요청에 kind:task 를 싣는다', /action: 'sweep', kind: 'task'/.test(HTML));
+  check('청소는 기준을 못 믿으면 건너뛴다', /if \(keep\) rtApi\(\{ action: 'sweepTask', keep \}\)/.test(HTML));
+  // 한 동작에 kind 곁가지를 달았다가, 그 곁가지를 모르는 옛 워커가 공지 자리를
+  // 훑어 공지 그림을 통째로 지운 일이 있었다. 새 동작에는 새 이름을 준다.
+  check('캘린더 청소는 이름이 다른 동작이다', /action: 'sweepTask'/.test(HTML));
+  check('옛 곁가지(kind)로 청소하지 않는다', !/action: 'sweep', kind: 'task'/.test(HTML));
   check('목록이 실제로 온 뒤에만 청소한다', /mytaskLoadedOnce = true;/.test(HTML));
   check('보기 모드에서는 청소하지 않는다',
         /if \(!u \|\| isViewAs\(\) \|\| !mytaskLoadedOnce\) return null;/.test(HTML));

@@ -6332,7 +6332,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.40';
+const APP_VER = 'ver7.41';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -8635,6 +8635,12 @@ const NOTICE_SEEN_KEY = 'noticeSeenAt';
 const NOTICE_LEGACY_ID = { test: 'board-test', live: 'board' }[NOTICE_SCOPE];
 
 let _noticeUnsub = null;
+// 청소의 기준이 되는 '모든 공지가 쓰는 그림 키'. 화면에 그리는 _noticeList 와
+// 따로 둔다 — 그 목록은 이 배포 것만, 그리고 글이 있는 것만 담기 때문이다.
+// 거기서 빠진 공지의 그림은 '아무도 안 쓰는 것'으로 보여 청소에 지워진다.
+// 청소는 어차피 notices/<배포>/ 안만 훑으므로, 키는 넉넉히 담는 편이 안전하다.
+let _noticeKeysAll  = [];
+let _noticeLoadedOnce = false;   // 목록이 실제로 한 번이라도 도착했는가
 let _noticeList  = [];        // 이 배포의 공지들. 최근에 고친 것이 앞.
 let _noticeEditing = false;   // 공지 쓰기 화면(편집)에 있는가
 let _noticeDirty   = false;   // 그 안에서 실제로 고친 것이 있는가
@@ -8850,9 +8856,13 @@ function rtReleaseImages(root){
 
 // 이 배포의 모든 공지가 쓰는 그림 키. 청소는 반드시 이걸 기준으로 해야 한다 —
 // 지금 고치는 공지의 키만 넘기면 다른 공지의 그림이 통째로 지워진다.
+// 청소의 기준. 기준이 틀리면 남의 그림이 통째로 지워지므로, 못 믿을 때는
+// 빈 목록이 아니라 null 을 준다 — 빈 목록은 '아무도 안 쓴다'는 뜻이 되어 최악이다.
+// 업무캘린더 쪽(mytaskAllKeys)과 같은 규칙이다.
 function noticeAllKeys(extra){
+  if (!_noticeLoadedOnce) return null;      // 목록이 아직 안 왔다
   const set = new Set();
-  for (const n of _noticeList) for (const k of (n.keys || [])) if (RT_KEY_RE.test(k)) set.add(k);
+  for (const k of _noticeKeysAll) set.add(k);
   for (const k of (extra || [])) if (RT_KEY_RE.test(k)) set.add(k);
   return [...set];
 }
@@ -8989,10 +8999,13 @@ function startNoticeClock(){
 function watchNotice(){
   if (_noticeUnsub) return;
   _noticeUnsub = onSnapshot(collection(fbDb, 'appNotice'), snap => {
-    const out = [];
+    const out = [], allKeys = new Set();
     snap.forEach(d => {
       const v = d.data() || {};
       if (d.id === 'reload') return;                       // 전체 새로고침 신호
+      // 청소 기준은 여기서 먼저 담는다 — 아래 걸러내기(배포·빈 공지)에 걸려
+      // 목록에서 빠지더라도 그림은 지켜져야 한다.
+      for (const k of (Array.isArray(v.keys) ? v.keys : [])) if (RT_KEY_RE.test(k)) allKeys.add(k);
       // 예전 문서에는 scope 가 없다. 이름으로 어느 배포 것인지 가린다.
       const scope = v.scope || (d.id === NOTICE_LEGACY_ID ? NOTICE_SCOPE : '');
       if (scope !== NOTICE_SCOPE) return;
@@ -9005,6 +9018,8 @@ function watchNotice(){
     // 최근에 고친 것이 앞. 목록에서 방금 쓴 것을 찾느라 헤매지 않게.
     out.sort((a, b) => b.updatedAt - a.updatedAt);
     _noticeList = out;
+    _noticeKeysAll = [...allKeys];
+    _noticeLoadedOnce = true;
     _noticeLastSig = noticeStateSig();
     renderNoticeBtn();
     const modal = document.getElementById('noticeModal');
@@ -9802,7 +9817,8 @@ async function saveNotice(){
     // '무엇이 쓰이는지'가 확정된 유일한 시점이라 여기서 치운다.
     // 반드시 '모든 공지'의 키를 넘긴다 — 이 공지 것만 넘기면 다른 공지의 그림이
     // 안 쓰이는 것으로 보여 통째로 지워진다.
-    rtApi({ action: 'sweep', keep: noticeAllKeys(keys) }).catch(() => {});
+    const keep = noticeAllKeys(keys);
+    if (keep) rtApi({ action: 'sweep', keep }).catch(() => {});
 
     _noticeDraft = { ..._noticeDraft, title, html, keys, from, until,
                      updatedAt: Date.now(), isNew: false };
@@ -9832,8 +9848,8 @@ async function deleteNotice(){
     await deleteDoc(doc(fbDb, 'appNotice', _noticeDraft.id));
     // 지운 공지의 키는 빼고 나머지 전부를 남긴다
     const gone = new Set(_noticeDraft.keys || []);
-    const keep = noticeAllKeys().filter(k => !gone.has(k));
-    rtApi({ action: 'sweep', keep }).catch(() => {});
+    const all  = noticeAllKeys();
+    if (all) rtApi({ action: 'sweep', keep: all.filter(k => !gone.has(k)) }).catch(() => {});
     _noticeList = _noticeList.filter(n => n.id !== _noticeDraft.id);
     _noticeDirty = false;
     renderNoticeAdminList();
@@ -22250,7 +22266,11 @@ async function saveMytask() {
     // 기준을 못 믿을 때(mytaskAllKeys 가 null)는 건너뛴다 — 잘못 훑으면
     // 내 그림이 통째로 지워진다.
     const keep = mytaskAllKeys(memoKeys);
-    if (keep) rtApi({ action: 'sweep', kind: 'task', keep }).catch(() => {});
+    // 이름이 'sweep' 이 아니라 'sweepTask' 인 것이 중요하다. 예전에 한 동작에
+    // kind 곁가지를 달았다가, 아직 그 곁가지를 모르는 옛 워커가 공지 자리를
+    // 훑어 공지 그림을 통째로 지웠다. 새 동작에는 새 이름을 준다 — 모르는
+    // 이름을 받은 워커는 아무 일도 안 한다.
+    if (keep) rtApi({ action: 'sweepTask', keep }).catch(() => {});
 
     closeMytaskModal();
     // 렌더링은 onSnapshot이 자동으로 처리

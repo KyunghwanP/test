@@ -250,7 +250,7 @@ console.log('\n■ 캘린더 청소 — 자기 칸 밖으로 나가지 않는다
   await post({ action: 'put', idToken: T_ADMIN, scope: 'test', noticeId: 'board', fileId: 'n1', dataUrl: PNG });
 
   // 홍 선생님이 청소한다. 자기가 쓰는 그림 하나만 남기라고 보낸다.
-  const r = await (await post({ action: 'sweep', kind: 'task', idToken: T_TEACHER,
+  const r = await (await post({ action: 'sweepTask', idToken: T_TEACHER,
     scope: 'test', keep: ['tasks/test/uidHong/task1/keep.jpg'] })).json();
   check('청소가 된다', r.success === true, r);
   check('내 칸의 안 쓰는 그림만 지운다', r.deleted === 1, r);
@@ -263,7 +263,7 @@ console.log('\n■ 캘린더 청소 — 자기 칸 밖으로 나가지 않는다
   check('공지 그림도 건드리지 않는다', env.NOTICES._store.has('notices/test/board/n1.jpg'));
 
   // keep 을 비워 보내도 남의 칸은 여전히 안전하다(내 것은 다 지워진다)
-  const r2 = await (await post({ action: 'sweep', kind: 'task', idToken: T_TEACHER,
+  const r2 = await (await post({ action: 'sweepTask', idToken: T_TEACHER,
     scope: 'test', keep: [] })).json();
   check('빈 목록이면 내 칸은 비워진다', r2.deleted === 1, r2);
   check('그래도 남의 칸은 그대로다',
@@ -276,7 +276,7 @@ console.log('\n■ 캘린더 청소 — 자기 칸 밖으로 나가지 않는다
 
   // 배포가 다르면 서로 안 섞인다
   await putTask(T_TEACHER, 'task1', 'liveish');
-  const r3 = await (await post({ action: 'sweep', kind: 'task', idToken: T_TEACHER,
+  const r3 = await (await post({ action: 'sweepTask', idToken: T_TEACHER,
     scope: 'live', keep: [] })).json();
   check('다른 배포를 청소해도 이쪽은 그대로', r3.deleted === 0 &&
         env.NOTICES._store.has('tasks/test/uidHong/task1/liveish.jpg'), r3);
@@ -315,6 +315,46 @@ console.log('\n■ 그 밖');
   const del = await worker.fetch(new Request('https://notice-api.test/', {
     method: 'DELETE', headers: { Origin: ORIGIN } }), env);
   check('POST·GET 말고는 405', del.status === 405);
+}
+
+console.log('\n■ 청소가 엉뚱한 자리를 훑지 않는다 (실제로 났던 사고)');
+{
+  reset();
+  await post({ action: 'put', idToken: T_ADMIN, scope: 'test', noticeId: 'board', fileId: 'n1', dataUrl: PNG });
+  await post({ action: 'put', idToken: T_ADMIN, scope: 'test', noticeId: 'board', fileId: 'n2', dataUrl: PNG });
+  const NK1 = 'notices/test/board/n1.jpg', NK2 = 'notices/test/board/n2.jpg';
+
+  // 2026-09 에 난 일: 앱에는 캘린더 사진이 들어갔는데 워커는 아직 옛 코드였다.
+  // 옛 워커는 kind 를 모르고 늘 공지 자리를 훑었고, tasks/ 키는 '모양이 틀린 것'
+  // 으로 전부 걸러져 keep 이 비었다. 그 빈 목록을 '아무도 안 쓴다' 로 읽어
+  // 공지 그림을 통째로 지웠다.
+  //
+  // 이제 지켜 달라는 키가 훑을 자리와 어긋나면 아무것도 안 지운다.
+  const mixed = await (await post({ action: 'sweep', idToken: T_ADMIN, scope: 'test',
+    keep: ['tasks/test/uidHong/task1/a.jpg'] })).json();
+  check('자리가 어긋나면 거절한다', mixed.error === 'KEEP_MISMATCH', mixed);
+  check('그리고 아무것도 안 지운다',
+        env.NOTICES._store.has(NK1) && env.NOTICES._store.has(NK2));
+
+  // 모양이 틀린 키가 섞여 있어도 마찬가지다 — 조용히 걸러 내면 keep 이 줄어
+  // '안 쓰이는 것' 이 늘어난다. 그게 사고의 씨앗이었다.
+  const bad = await (await post({ action: 'sweep', idToken: T_ADMIN, scope: 'test',
+    keep: [NK1, '../../etc/passwd'] })).json();
+  check('이상한 키가 섞여도 거절한다', bad.error === 'KEEP_MISMATCH', bad);
+  check('그때도 아무것도 안 지운다',
+        env.NOTICES._store.has(NK1) && env.NOTICES._store.has(NK2));
+
+  // 제대로 된 요청은 그대로 돈다
+  const ok = await (await post({ action: 'sweep', idToken: T_ADMIN, scope: 'test', keep: [NK1] })).json();
+  check('자리가 맞으면 청소한다', ok.success === true && ok.deleted === 1, ok);
+  check('지켜 달라는 것은 남는다', env.NOTICES._store.has(NK1));
+  check('안 쓰는 것은 지워진다', !env.NOTICES._store.has(NK2));
+
+  // 옛 워커였다면 여기서 공지가 날아갔다. 새 이름을 모르는 워커는 아무 일도 안 한다 —
+  // 그것이 새 동작에 새 이름을 준 까닭이다.
+  const unknown = await (await post({ action: 'sweepEverything', idToken: T_ADMIN, scope: 'test' })).json();
+  check('모르는 청소 이름은 거절한다', unknown.error === 'UNKNOWN_ACTION', unknown);
+  check('그때도 그림은 그대로다', env.NOTICES._store.has(NK1));
 }
 
 console.log(`\n${fail ? '❌' : '✅'} 통과 ${pass} / 실패 ${fail}`);
