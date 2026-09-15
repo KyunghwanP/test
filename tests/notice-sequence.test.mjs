@@ -28,7 +28,7 @@ ${gc('NOTICE_STATE_TEXT')}\n${gc('noticeLiveList')}\n${gc('_noticeAutoIdx')}
 let _noticeList=[], _noticeAuto=true, _noticeOpenId='', _rtObjUrls=[];
 const _IS_ADMIN=()=>true;
 const escapeHtml=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function rtLoadImages(){} function rtReleaseImages(){} function noticeMarkSeen(){}
+function rtLoadImages(){} function rtReleaseImages(){} function rtFitFontSizes(){} function noticeMarkSeen(){}
 function noticeSnoozeToday(){ window.__snoozed='today'; closeNoticeModalBtn(); }
 function noticeSnoozeEver(){ window.__snoozed='ever'; closeNoticeModalBtn(); }
 function closeNoticeModalBtn(){ document.getElementById('noticeModal').classList.remove('open'); window.__closed=true; }

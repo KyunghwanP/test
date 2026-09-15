@@ -133,6 +133,9 @@ ${grab('rtCleanStyle')}
 ${grab('rtPreserveStyles')}
 ${grab('rtSanitize')}
 ${grab('rtKeysIn')}
+${grabConst('RT_FIT_W')}
+${grabConst('RT_FIT_MAX')}
+${grab('rtFitFontSizes')}
 ${grab('rtPlainText')}
 ${grab('mytaskMemoHtml')}
 ${grab('rtToolbarHtml')}
@@ -141,6 +144,7 @@ ${/const MYTASK_REPEAT_LABEL = \{[^}]*\};/.exec(HTML)[0]}
 const TEACHERS = [{ name:'김민준', email:'kim@yeungnam.hs.kr', uid:'u-kim' }];
 const fbAuth = { currentUser:{ uid:'u-kim', email:'kim@yeungnam.hs.kr', displayName:'김민준' } };
 function rtLoadImages(root){ window.__loaded = [...root.querySelectorAll('img[data-k]')].map(i => i.getAttribute('data-k')); }
+window.fit = () => rtFitFontSizes(document.querySelector('.rt-view'));
 ${grab('renderMytaskRecvInfo')}
 window.show = t => { renderMytaskRecvInfo(t, true); return document.getElementById('mytaskRecvInfo').innerHTML; };
 window.toEd = t => mytaskMemoHtml(t);
@@ -272,6 +276,60 @@ console.log('\n■ 메모 칸은 좌우를 다 쓴다 (폰에서 답답하지 �
   check('기간 같은 짧은 줄은 그대로 옆에 둔다', norm.sameLine, norm);
 
   await pg.setViewportSize({ width: 640, height: 700 });
+}
+
+console.log('\n■ 폰에서는 큰 글자를 눌러 준다');
+{
+  // PC 에서 32px 로 쓴 제목이 폰에서도 32px 이면 340px 폭에서 열 몇 글자 만에
+  // 줄이 넘어간다. 저장된 값은 그대로 두고 보여줄 때만 누른다.
+  //
+  // 재는 것은 창이 아니라 '글이 들어갈 상자' 다. 같은 폰이라도 창 안이냐 3열
+  // 가운데 한 칸이냐에 따라 실제 폭이 다르기 때문이다. 그래서 여기서도 창을
+  // 늘렸다 줄이는 대신 상자 폭을 직접 준다.
+  const MEMO = '<div><span style="font-size:32px">아주 큰 제목</span>'
+             + '<span style="font-size:19px">크게</span>'
+             + '<span style="font-size:14px">보통</span>'
+             + '<span style="font-size:12px">작게</span></div>';
+  const at = async px => {
+    await pg.evaluate(w => {
+      const box = document.getElementById('mytaskRecvInfo');
+      box.style.width = w + 'px';
+      window.fit();
+    }, px);
+    return pg.evaluate(() => [...document.querySelectorAll('.rt-view span')]
+      .map(e => Math.round(parseFloat(getComputedStyle(e).fontSize))));
+  };
+
+  await pg.evaluate(x => window.show({ title:'t', startDate:'2026-09-01', endDate:'2026-09-01',
+                                       memoHtml:x }), MEMO);
+
+  const phone = await at(360);
+  check('좁으면 큰 것이 눌린다 (32 → 19)', phone[0] === 19, phone);
+  check('원래 작은 것은 안 건드린다',
+        phone[1] === 19 && phone[2] === 14 && phone[3] === 12, phone);
+
+  // 저장된 값까지 눌리면 PC 에서도 작아진다. 원래 값을 따로 적어 둬야 한다.
+  const kept = await pg.evaluate(() =>
+    [...document.querySelectorAll('.rt-view span')].map(e => e.dataset.rtFs));
+  check('원래 크기를 적어 둔다', kept[0] === '32px', kept);
+
+  const wide = await at(900);
+  check('넓어지면 원래대로 돌아온다 (19 → 32)', wide[0] === 32, wide);
+  check('그때도 나머지는 그대로', wide[1] === 19 && wide[2] === 14 && wide[3] === 12, wide);
+
+  // 한 번 눌러 놓고 끝이면 가로로 돌렸다 되돌릴 때 어긋난다
+  check('다시 좁히면 또 눌린다', (await at(360))[0] === 19);
+
+  // 경계 — 480 미만일 때만 누른다
+  check('480 이상이면 안 누른다', (await at(480))[0] === 32);
+  check('479 면 누른다',        (await at(479))[0] === 19);
+
+  check('창 크기를 바꾸면 다시 잰다', /addEventListener\('resize'/.test(HTML)
+        && /\.rt-view, \.notice-view/.test(HTML));
+  check('공지 본문에도 같이 건다',
+        (HTML.match(/rtLoadImages\(view\);\s*\n\s*rtFitFontSizes\(view\);/g) || []).length === 3);
+
+  await pg.evaluate(() => { document.getElementById('mytaskRecvInfo').style.width = ''; });
 }
 
 console.log('\n■ 그림이 있는 메모');

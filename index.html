@@ -1307,6 +1307,10 @@
   .mrv-v.mrv-text{display:block;white-space:pre-wrap;word-break:break-word;line-height:1.65;font-weight:500;}
   /* 아래로 펴는 줄 — 이름표를 위에 두고 내용이 좌우를 다 쓴다.
      메모처럼 긴 글·그림이 들어가는 칸에 쓴다. */
+  /* 서식 있는 메모가 들어가는 칸. .mrv-v 는 칩을 늘어놓으려고 flex 라서, 안의
+     상자가 flex 자식이 되어 폭을 안 채운다 — 넓은 화면에서 글이 가운데 좁게
+     몰린다. 글이 들어가는 칸은 그냥 블록으로 둔다. */
+  .mrv-v.mrv-html{display:block;}
   .mrv-row.wide{flex-direction:column;gap:5px;}
   .mrv-row.wide .mrv-k{flex:none;}
   .mrv-row.wide .mrv-v{width:100%;}
@@ -6337,7 +6341,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.44';
+const APP_VER = 'ver7.45';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -8850,6 +8854,40 @@ async function rtLoadImages(root){
   }));
 }
 
+// 폰에서 붙여넣은 글자가 너무 크게 나온다. PC 에서 25px 로 쓴 제목이 폰에서도
+// 25px 이라, 340px 폭에서는 열 몇 글자 만에 줄이 넘어간다.
+//
+// 저장된 값은 건드리지 않는다 — 보여줄 때만 눌러 준다. 원래 값을 요소에 적어
+// 두었다가 화면이 다시 넓어지면(가로로 돌리면) 그대로 되돌린다.
+//
+// 재는 것은 창이 아니라 '글이 들어갈 상자' 다. 같은 폰이라도 창 안에 그리느냐
+// 3열 가운데 한 칸에 그리느냐에 따라 실제 폭이 다르다.
+const RT_FIT_W   = 480;   // 상자가 이보다 좁으면 누른다
+const RT_FIT_MAX = 19;    // 눌러도 이만큼은 둔다 ('크게' 단계와 같다)
+
+function rtFitFontSizes(root){
+  if (!root) return;
+  const w = root.clientWidth;
+  if (!w) return;                       // 아직 화면에 안 붙었다 — 재도 0 이다
+  const narrow = w < RT_FIT_W;
+  for (const el of root.querySelectorAll('[style*="font-size"], [data-rt-fs]')) {
+    if (el.dataset.rtFs === undefined) el.dataset.rtFs = el.style.fontSize || '';
+    el.style.fontSize = el.dataset.rtFs;            // 재기 전에 원래대로
+    if (!narrow) continue;
+    const px = parseFloat(getComputedStyle(el).fontSize) || 0;
+    if (px > RT_FIT_MAX) el.style.fontSize = RT_FIT_MAX + 'px';
+  }
+}
+
+// 가로로 돌리거나 창을 넓히면 다시 잰다. 지금 떠 있는 읽기 상자만 본다.
+let _rtFitTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(_rtFitTimer);
+  _rtFitTimer = setTimeout(() => {
+    document.querySelectorAll('.rt-view, .notice-view').forEach(rtFitFontSizes);
+  }, 150);
+});
+
 function rtReleaseImages(root){
   const rest = [];
   for (const it of _rtObjUrls) {
@@ -9230,6 +9268,7 @@ function renderNoticeModal(){
   view.innerHTML = rtSanitize(show.html);
   body.appendChild(view);
   rtLoadImages(view);
+  rtFitFontSizes(view);
 
   const back = list.length > 1
     ? `<button class="notice-btn" onclick="noticeBackToList()">‹ 목록</button>` : '';
@@ -9261,6 +9300,7 @@ function renderNoticeAutoStep(list){
   view.innerHTML = rtSanitize(n.html);
   body.appendChild(view);
   rtLoadImages(view);
+  rtFitFontSizes(view);
   // 넘길 때 맨 위에서 시작하는 것은 본문을 비우는 것만으로 된다(브라우저가
   // 스크롤을 0 으로 되돌린다) — 확인하고 따로 손대지 않는다.
 
@@ -9933,6 +9973,7 @@ function previewNotice(){
   view.innerHTML = rtSanitize(ed.innerHTML);
   body.appendChild(view);
   rtLoadImages(view);
+  rtFitFontSizes(view);
   document.getElementById('noticeFoot').innerHTML = '';
   m.classList.add('open');
   history.pushState({ modal: 'notice' }, '');
@@ -21824,13 +21865,13 @@ function renderMytaskRecvInfo(t, isOwner = false){
   //   memoHtml — 서식·그림이 있는 새 메모
   //   memo     — 그 전에 쓴 순수 글자 (지금도 글자만 있는 메모는 이쪽으로도 남는다)
   // 옛 메모를 HTML 로 넣으면 줄바꿈이 전부 사라지므로 길을 갈라 둔다.
-  if (t.memoHtml) html += rowWide('메모', `<div class="rt-view">${rtSanitize(t.memoHtml)}</div>`);
+  if (t.memoHtml) html += rowWide('메모', `<div class="rt-view">${rtSanitize(t.memoHtml)}</div>`, 'mrv-html');
   else if (t.memo) html += rowWide('메모', escapeHtml(t.memo), 'mrv-text');
   el.innerHTML = html;
   el.style.display = 'block';
   // 그림은 <img src> 로 못 받는다(워커가 토큰을 요구한다). 받아서 끼운다.
   const view = el.querySelector('.rt-view');
-  if (view) rtLoadImages(view);
+  if (view) { rtLoadImages(view); rtFitFontSizes(view); }
 }
 
 // 요약 → 편집 폼. 작성자가 '수정'을 눌렀을 때만.
