@@ -20,11 +20,14 @@ const check = (n, c, x) => c ? (pass++, console.log('  ✅', n))
 
 // ── 가짜 R2 버킷 ──
 const mkBucket = () => {
-  const store = new Map();          // key → Uint8Array
+  const store = new Map();          // key → { bytes, httpMetadata }
   return {
     _store: store,
-    async put(k, bytes) { store.set(k, bytes); },
-    async get(k) { return store.has(k) ? { body: store.get(k) } : null; },
+    // 형식(contentType)까지 흉내낸다. 예전에는 무엇을 올리든 jpeg 로 박아
+    // 뒀는데, 화면이 webp 를 보내기 시작하면서 그게 어긋나게 됐다.
+    async put(k, bytes, opt) { store.set(k, { bytes, httpMetadata: (opt && opt.httpMetadata) || null }); },
+    async get(k) { const v = store.get(k);
+                   return v ? { body: v.bytes, httpMetadata: v.httpMetadata } : null; },
     async delete(k) { store.delete(k); },
     async list({ prefix, limit }) {
       return { objects: [...store.keys()].filter(k => k.startsWith(prefix)).slice(0, limit).map(key => ({ key })) };
@@ -140,7 +143,8 @@ console.log('\n■ 내려주기 — 교사면 누구나, 캐시는 개인용');
 
   const mine = await getImg(KEY, T_TEACHER);
   check('관리자가 아닌 교사도 볼 수 있다', mine.status === 200, mine.status);
-  check('JPEG 으로 내려준다', mine.headers.get('Content-Type') === 'image/jpeg');
+  check('올린 형식 그대로 내려준다', mine.headers.get('Content-Type') === 'image/png',
+        mine.headers.get('Content-Type'));
   const cc = mine.headers.get('Cache-Control') || '';
   check('브라우저가 오래 잡아둔다', /max-age=604800/.test(cc), cc);
   check('공용 캐시에는 안 남긴다(private)', /private/.test(cc), cc);
@@ -293,6 +297,38 @@ console.log('\n■ 캘린더 그림 내려받기');
   check('로그인 안 했으면 못 받는다', anon.status === 403, anon.status);
   const stu = await getImg(k, T_STUDENT);
   check('학생 계정은 못 받는다', stu.status === 403, stu.status);
+}
+
+console.log('\n■ 형식 — 올린 그대로 기억하고 그대로 내려준다');
+{
+  reset();
+  const WEBP = 'data:image/webp;base64,' + btoa('fake-webp-bytes-'.repeat(4));
+  const JPG  = 'data:image/jpeg;base64,' + btoa('fake-jpeg-bytes-'.repeat(4));
+
+  // 화면이 webp 를 보내기 시작했다. 예전처럼 jpeg 로 박아 두면 형식과 실제가
+  // 어긋난다 — 브라우저가 알아서 읽어 주더라도 옳지 않고, 언제 깨질지 모른다.
+  const w = await (await post({ action: 'put', idToken: T_ADMIN, scope: 'test',
+    noticeId: 'board', fileId: 'w1', dataUrl: WEBP })).json();
+  check('webp 도 받는다', w.success === true, w);
+  check('버킷에 webp 로 적힌다',
+        env.NOTICES._store.get(w.key).httpMetadata.contentType === 'image/webp',
+        env.NOTICES._store.get(w.key).httpMetadata);
+  const gw = await getImg(w.key, T_TEACHER);
+  check('webp 로 내려준다', gw.headers.get('Content-Type') === 'image/webp',
+        gw.headers.get('Content-Type'));
+
+  const j = await (await post({ action: 'put', idToken: T_ADMIN, scope: 'test',
+    noticeId: 'board', fileId: 'j1', dataUrl: JPG })).json();
+  const gj = await getImg(j.key, T_TEACHER);
+  check('jpeg 은 jpeg 으로 내려준다', gj.headers.get('Content-Type') === 'image/jpeg',
+        gj.headers.get('Content-Type'));
+
+  // 이 고침 전에 올라간 것들은 적힌 형식이 없을 수 있다. 그때는 예전처럼 jpeg.
+  env.NOTICES._store.set('notices/test/board/old.jpg', { bytes: new Uint8Array([1,2,3]), httpMetadata: null });
+  const go = await getImg('notices/test/board/old.jpg', T_TEACHER);
+  check('형식이 안 적힌 옛 그림은 jpeg 으로 내려준다',
+        go.status === 200 && go.headers.get('Content-Type') === 'image/jpeg',
+        go.headers.get('Content-Type'));
 }
 
 console.log('\n■ 버킷을 안 붙였을 때 (설정 전이거나 되돌렸을 때)');

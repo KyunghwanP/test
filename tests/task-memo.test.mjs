@@ -363,6 +363,83 @@ console.log('\n■ 실제로 단추를 눌러 본다 (편집기가 둘일 때)')
 
 await browser.close();
 
+console.log('\n■ 그림 줄이기 — 화질과 용량');
+{
+  const { chromium } = await import('playwright');
+  const br2 = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+  const pg3 = await br2.newPage();
+  pg3.on('pageerror', e => { console.log('  ⚠ 페이지 오류:', e.message); fail++; });
+
+  const gc = name => {
+    const m = new RegExp(`^const ${name}\\b[^\\n]*(\\n(?![a-zA-Z/]).*)*`, 'm').exec(HTML);
+    if (!m) throw new Error('못 찾음: ' + name);
+    return m[0];
+  };
+  await pg3.setContent(`<!doctype html><meta charset="utf-8"><body><script>
+    ${gc('RT_IMG_MAX')}
+    ${gc('RT_IMG_Q')}
+    ${gc('RT_IMG_BYTES')}
+    let _rtWebp = null;
+    ${grab('rtCanWebp')}
+    ${gc('rtDataBytes')}
+    ${grab('rtShrink')}
+    // 시정표 캡처를 흉내낸다 — 흰 바탕에 가는 선과 작은 글자
+    window.mk = (w, h) => new Promise(res => {
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      g.fillStyle = '#fff'; g.fillRect(0,0,w,h);
+      g.strokeStyle = '#333';
+      for (let x = 40; x < w; x += 190) { g.beginPath(); g.moveTo(x+.5,20); g.lineTo(x+.5,h-20); g.stroke(); }
+      g.fillStyle = '#111'; g.font = '16px sans-serif';
+      for (let y = 60; y < h-20; y += 70) g.fillText('3-7 수학 김', 50, y);
+      c.toBlob(b => res(new File([b], 'cap.png', { type: 'image/png' })), 'image/png');
+    });
+    window.shrink = async (w, h) => {
+      const f = await window.mk(w, h);
+      const u = await rtShrink(f);
+      const im = new Image(); im.src = u; await im.decode();
+      return { type: u.slice(5, u.indexOf(';')), kb: Math.round(rtDataBytes(u)/1024),
+               w: im.naturalWidth, h: im.naturalHeight };
+    };
+    window.webpOk = () => rtCanWebp();
+  <\/script></body>`);
+
+  check('이 브라우저는 webp 를 만든다', await pg3.evaluate(() => window.webpOk()));
+
+  // 요즘 폰 캡처 크기. 줄이지 않는 것이 화질의 대부분이다.
+  const big = await pg3.evaluate(() => window.shrink(2900, 1700));
+  check('2900px 은 안 줄인다', big.w === 2900 && big.h === 1700, big);
+  check('webp 로 만든다', big.type === 'image/webp', big.type);
+
+  // 그보다 큰 것은 2900 으로 맞춘다
+  const huge = await pg3.evaluate(() => window.shrink(4000, 3000));
+  check('더 크면 긴 변을 2900 으로', huge.w === 2900 && huge.h === 2175, huge);
+
+  // 작은 그림을 억지로 키우지 않는다
+  const small = await pg3.evaluate(() => window.shrink(800, 600));
+  check('작은 그림은 그대로 둔다', small.w === 800 && small.h === 600, small);
+
+  // 워커가 3MB 에서 거절한다. 그 앞에서 스스로 막아야 한다.
+  check('3MB 안으로 들어온다', big.kb * 1024 <= 2.6*1024*1024, big.kb + 'KB');
+
+  // 옛 방식(JPEG 1600)보다 화질이 좋고 용량은 안 늘어야 값이 있다
+  const old = await pg3.evaluate(async () => {
+    const f = await window.mk(2900, 1700);
+    const url = URL.createObjectURL(f); const im = new Image(); im.src = url; await im.decode();
+    const r = 1600 / 2900;
+    const c = document.createElement('canvas');
+    c.width = Math.round(2900*r); c.height = Math.round(1700*r);
+    const x = c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height);
+    x.drawImage(im,0,0,c.width,c.height); URL.revokeObjectURL(url);
+    const u = c.toDataURL('image/jpeg', 0.85);
+    return { kb: Math.round((u.length - u.indexOf(',') - 1)*0.75/1024), w: c.width };
+  });
+  check('옛 방식보다 해상도가 높다', big.w > old.w, { new: big.w, old: old.w });
+  check('그러면서 용량이 더 늘지 않는다', big.kb <= old.kb, { new: big.kb + 'KB', old: old.kb + 'KB' });
+
+  await br2.close();
+}
+
 console.log('\n■ 청소 기준 (내가 쓰는 그림 목록)');
 {
   // mytaskAllKeys 는 Firestore 없이도 도는 순수 계산이라 여기서 바로 돌린다.

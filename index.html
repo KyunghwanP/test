@@ -6332,7 +6332,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.41';
+const APP_VER = 'ver7.42';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -9720,22 +9720,63 @@ async function rtOnPaste(e, ed){
 }
 
 // 붙여넣은 그림을 줄여서 dataURL 로. 원본 그대로 올리면 캡처 한 장이 몇 MB 다.
+// 화질을 깎는 것은 형식보다 '줄이는 것' 이다. 시정표 캡처로 재보니 화면 크기로
+// 맞춘 뒤 원본과의 차이가
+//   1600px  3.2
+//   2900px  0.9      ← 요즘 폰 캡처가 2400~2900 이라 대개 안 줄이게 된다
+// 였다. 줄였다가 화면에서 다시 키우는 과정에서 글자가 뭉개진 것이지, 코덱 탓이
+// 절반도 아니었다. 그래서 웬만하면 안 줄이는 크기로 잡는다.
+const RT_IMG_MAX = 2900;
+
+// webp 는 선·글자가 많은 그림에서 같은 화질에 절반 이하다(위 시정표 2900px 기준
+// 210KB 대 492KB). 현황판은 모든 교사가 매번 여는 화면이라 그 차이가 그대로
+// 데이터 요금이 된다. 못 만드는 브라우저는 jpeg 로 떨어진다.
+const RT_IMG_Q = [0.92, 0.85, 0.75, 0.65];
+// 워커가 3MB 에서 거절한다(TOO_BIG). 그 앞에서 스스로 막는다 — 시정표 캡처는
+// 2900px 라도 200KB 대지만, 풍경 사진은 같은 크기라도 훨씬 무겁다.
+const RT_IMG_BYTES = 2.6 * 1024 * 1024;
+
+let _rtWebp = null;
+function rtCanWebp(){
+  if (_rtWebp !== null) return _rtWebp;
+  try {
+    const c = document.createElement('canvas');
+    c.width = c.height = 1;
+    _rtWebp = c.toDataURL('image/webp').startsWith('data:image/webp');
+  } catch(e){ _rtWebp = false; }
+  return _rtWebp;
+}
+// dataURL 의 실제 바이트 수(대략). base64 는 3바이트를 4글자로 적는다.
+const rtDataBytes = u => Math.round((String(u).length - (String(u).indexOf(',') + 1)) * 0.75);
+
 function rtShrink(file){
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      const MAX = 1600;
-      const r = Math.min(1, MAX / Math.max(img.width, img.height));
+      const r = Math.min(1, RT_IMG_MAX / Math.max(img.width, img.height));
       const c = document.createElement('canvas');
       c.width = Math.max(1, Math.round(img.width * r));
       c.height = Math.max(1, Math.round(img.height * r));
       const ctx = c.getContext('2d');
-      // 시정표 캡처는 대개 흰 바탕이다. 투명 PNG 를 JPEG 로 바꾸면 검게 나오므로 깔아준다.
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      // 시정표 캡처는 대개 흰 바탕이다. 투명한 자리를 그대로 두면 검게 나오므로 깔아준다.
       ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
       ctx.drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(url);
-      resolve(c.toDataURL('image/jpeg', 0.85));
+
+      const want = rtCanWebp() ? 'image/webp' : 'image/jpeg';
+      let out = '';
+      for (const q of RT_IMG_Q) {
+        out = c.toDataURL(want, q);
+        // 그 형식을 못 만들면 브라우저가 말없이 png 를 준다 — 그때는 jpeg 로 간다.
+        if (!out.startsWith('data:' + want)) out = c.toDataURL('image/jpeg', q);
+        // 너무 무거우면 크기를 줄이는 대신 품질을 한 단계 낮춘다. 크기를 줄이면
+        // 위에서 본 대로 글자가 뭉개진다 — 그쪽이 더 아프다.
+        if (rtDataBytes(out) <= RT_IMG_BYTES) break;
+      }
+      resolve(out);
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('그림을 읽지 못했습니다.')); };
     img.src = url;

@@ -139,7 +139,10 @@ async function handleImgGet(env, request, cors) {
   if (!obj) return json({ success: false, error: 'NOT_FOUND' }, 404, cors);
   return new Response(obj.body, {
     status: 200,
-    headers: { ...cors, 'Content-Type': 'image/jpeg',
+    // 올릴 때 적어 둔 형식 그대로 돌려준다. 그 전에 올라간 것들은 적힌 것이
+    // 없거나 jpeg 라, 예전처럼 jpeg 로 나간다.
+    headers: { ...cors,
+               'Content-Type': (obj.httpMetadata && obj.httpMetadata.contentType) || 'image/jpeg',
                // 키가 파일마다 새로 생기므로(같은 키를 덮어쓰지 않는다) 오래 잡아둬도 안전하다.
                'Cache-Control': 'private, max-age=604800, immutable' }
   });
@@ -171,8 +174,12 @@ async function handleImgPut(env, body) {
   if (!bytes.length) return { success: false, error: 'BAD_IMAGE' };
   if (bytes.length > MAX_BYTES) return { success: false, error: 'TOO_BIG', limit: MAX_BYTES };
 
+  // 실제 형식을 적어 둔다. 전에는 무엇이 오든 'image/jpeg' 로 박아 뒀는데,
+  // 화면이 webp 를 보내기 시작하면서 형식과 이름이 어긋나게 됐다.
+  // (키의 .jpg 는 이제 그냥 파일 이름이다 — 이미 올라간 것들이 그 이름을 쓰고
+  //  있어 바꾸지 않는다. 형식은 여기 적힌 것이 기준이다.)
   await env.NOTICES.put(key, bytes, {
-    httpMetadata: { contentType: 'image/jpeg' },
+    httpMetadata: { contentType: 'image/' + m[1] },
   });
   return { success: true, key };
 }
