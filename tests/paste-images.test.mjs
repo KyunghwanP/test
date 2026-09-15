@@ -67,6 +67,7 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
   ${grab('rtStillFilling')}
   ${grab('rtOnPaste')}
   ${grab('rtInsertFromClipboard')}
+  ${grab('rtSweepDataImages')}
   ${grabConst('rtFileId')}
 
   // ── 바깥 세계만 흉내낸다 ──
@@ -131,6 +132,17 @@ await pg.setContent(`<!doctype html><meta charset="utf-8">
       configurable: true,
       value: { read: async () => { if (!items) throw new Error('거절'); return items; } },
     });
+  };
+
+  // 폰에서 실제로 겪는 길: 붙여넣기 이벤트에는 아무것도 안 실려 오는데,
+  // 브라우저가 제 손으로 data: 그림을 편집기에 꽂아 넣는다. 그 순서를 흉내낸다.
+  window.pasteByBrowser_ = async inserted => {
+    const dt = new DataTransfer();              // 우리가 알아볼 것이 없는 클립보드
+    ed.focus();
+    const ev = new ClipboardEvent('paste', { clipboardData: dt, cancelable: true, bubbles: true });
+    await rtOnPaste(ev, ed);
+    ed.innerHTML += inserted;                   // ← 브라우저 기본 동작
+    return ev.defaultPrevented;
   };
 
   window.html_  = () => ed.innerHTML;
@@ -286,6 +298,52 @@ console.log('\n■ 그림을 못 받는 자리');
   await ev('', [['a.png', 'X']]);
   check('그림만 복사했으면 알림만', (await pg.evaluate(() => ALERTS)).length === 1 &&
                                     (await imgs()).length === 0);
+}
+
+console.log('\n■ 브라우저가 제 손으로 꽂아 넣은 그림 (폰에서 실제로 났던 일)');
+{
+  // '붙여넣기는 되는데 저장하면 사진이 사라진다' — 붙여넣기 이벤트에는 아무것도
+  // 안 실려 오는데 화면에는 그림이 뜬다. 우리 것이 아니라 저장할 때 떨어져 나갔다.
+  const IMG = 'data:image/png;base64,' + Buffer.from('BYBROWSER').toString('base64');
+  await reset();
+  const prevented = await pg.evaluate(src => window.pasteByBrowser_('<img src="' + src + '">'), IMG);
+  check('기본 동작을 막지 않는다', prevented === false);
+  // 훑기는 기본 동작이 끝난 뒤(setTimeout)에 도는 일이라 잠깐 기다린다.
+  // 안 돌면 여기서 조용히 넘어가고 아래 검사가 무엇이 빠졌는지 말해 준다.
+  await pg.waitForFunction(() => putBytes_().length > 0 || ALERTS.length > 0, null, { timeout: 3000 })
+          .catch(() => {});
+  check('꽂힌 그림을 우리 것으로 만든다', JSON.stringify(await put()) === '["BYBROWSER"]', await put());
+  const im = await imgs();
+  check('본문의 그림에 키가 붙는다', im.length === 1 && /^notices\//.test(im[0].k), im);
+  check('저장해도 안 사라진다',
+        /data-k="notices\//.test(await pg.evaluate(() => rtSanitize(html_()))),
+        await pg.evaluate(() => rtSanitize(html_())));
+
+  // 이미 우리 것이거나 지금 채우는 중인 자리는 다시 집으면 안 된다.
+  await reset();
+  await pg.evaluate(() => {
+    const ed = document.getElementById('ed');
+    ed.innerHTML = '<img data-k="notices/test/n1/f9.jpg" src="data:image/png;base64,QUJD">' +
+                   '<img class="rt-hold" src="' + RT_HOLD_SRC + '">';
+  });
+  await pg.evaluate(() => rtSweepDataImages(document.getElementById('ed')));
+  check('이미 올린 그림은 다시 안 올린다', (await put()).length === 0, await put());
+  check('채우는 중인 자리도 안 건드린다', (await imgs()).length === 2, await imgs());
+
+  // 그림을 못 받는 자리에 꽂혔으면, 조용히 두면 저장할 때 사라진다 — 지금 말한다.
+  await reset();
+  await pg.evaluate(() => { PUT = null; });
+  await pg.evaluate(src => { document.getElementById('ed').innerHTML = '<p>글</p><img src="' + src + '">'; }, IMG);
+  await pg.evaluate(() => rtSweepDataImages(document.getElementById('ed')));
+  check('못 받는 자리면 그 자리에서 알린다',
+        /그림을 넣을 수 없습니다/.test((await pg.evaluate(() => ALERTS))[0] || ''),
+        await pg.evaluate(() => ALERTS));
+  check('그때 글자는 남는다', (await txt()).includes('글'), await txt());
+
+  // 글자만 붙여넣었을 때 괜히 일하지 않는다
+  await reset();
+  await pg.evaluate(() => window.pasteByBrowser_('그냥 글'));
+  check('꽂힌 그림이 없으면 아무 일도 안 한다', (await put()).length === 0);
 }
 
 console.log('\n■ 클립보드에서 바로 받기 (📋 단추)');

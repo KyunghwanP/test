@@ -6348,7 +6348,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.47';
+const APP_VER = 'ver7.48';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -9806,6 +9806,34 @@ function rtSyncSizeSel(ed){
 
 // ── 붙여넣기 ────────────────────────────────────────────────────────────────
 // 글은 걸러서 넣고, 그림은 R2 로 올린 뒤 자리에 끼운다.
+// 브라우저가 제 손으로 꽂아 넣은 data: 그림을 우리 것으로 만든다.
+//
+// 붙여넣기 이벤트에 아무것도 안 실려 왔을 때 부른다. 폰에서 실제로 겪는 길이다 —
+// 화면에는 그림이 떴는데 클립보드에서는 못 본 상태라, 그냥 두면 저장할 때
+// 걸러내기가 떼어 낸다.
+//
+// 자리를 data-rt-src 로 바꿔 두고 rtFillPending 에 넘긴다. 붙여넣기가 남긴
+// 빈 자리를 채우는 것과 똑같은 일이라, 채우는 코드를 또 만들지 않는다.
+async function rtSweepDataImages(ed){
+  if (!ed) return;
+  const o = ed._rt || {};
+  // 이미 우리 것(data-k)과 지금 채우는 중인 자리(rt-hold)는 건드리지 않는다.
+  // rt-hold 의 자리 표시 그림도 data: 라, 빼 두지 않으면 그것까지 다시 집는다.
+  const found = [...ed.querySelectorAll('img:not([data-k]):not(.rt-hold):not([data-rt-src])')]
+    .filter(i => /^data:image\//i.test(i.getAttribute('src') || ''));
+  if (!found.length) return;
+
+  const where = o.put && o.put();
+  if (!where) {
+    // 그림을 못 받는 자리다. 그냥 두면 저장할 때 조용히 사라지므로 지금 말한다.
+    for (const img of found) img.remove();
+    alert(o.noPutMsg || '여기에는 그림을 넣을 수 없습니다.');
+    return;
+  }
+  for (const img of found) img.setAttribute('data-rt-src', img.getAttribute('src'));
+  await rtFillPending(ed, [], where);
+}
+
 // 클립보드를 직접 읽어 사진을 넣는다. 📋 단추가 부른다.
 //
 // 브라우저가 물어보는 경우가 있다(사파리는 '붙여넣기' 확인 단추를 띄운다).
@@ -9861,7 +9889,18 @@ async function rtOnPaste(e, ed){
     .filter(i => i.kind === 'file' && /^image\//.test(i.type))
     .map(i => i.getAsFile()).filter(Boolean);
   const html = dt.getData('text/html');
-  if (!files.length && !html) return;       // 그냥 글자면 브라우저에 맡긴다
+  if (!files.length && !html) {
+    // 클립보드에서 우리가 알아볼 것이 없다. 브라우저 기본 동작에 맡긴다.
+    //
+    // 그런데 폰에서는 그 기본 동작이 그림을 data: 주소째로 편집기에 꽂아 넣는
+    // 일이 있다 — 붙여넣기 이벤트에는 아무것도 안 실려 오는데 화면에는 그림이
+    // 뜬다. 그 그림은 우리 것이 아니라 저장할 때 걸러내기가 떼어 낸다.
+    // 선생님 눈에는 '붙여넣기는 되는데 저장하면 사진이 사라진다'가 된다.
+    //
+    // 그래서 기본 동작이 끝난 뒤에 한 번 훑어서, 꽂힌 그림을 올려 둔다.
+    setTimeout(() => rtSweepDataImages(ed), 0);
+    return;
+  }
 
   // 그림을 못 받는 편집기면 브라우저 기본 동작에 맡기지 않는다 — 기본 동작은
   // 그림을 data: 주소째로 본문에 박아 넣어, 문서 하나가 몇 MB 가 된다.
