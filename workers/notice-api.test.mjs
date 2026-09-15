@@ -36,13 +36,37 @@ const mkBucket = () => {
 };
 
 let TOKENS = {};   // idToken → Identity Toolkit 응답의 users[0]
+// fetchImg 가 바깥으로 나가는 곳. 주소 → 응답. 여기에 없는 주소를 부르면 터진다 —
+// '부르지 말았어야 할 주소를 불렀다'가 그대로 실패로 드러나야 한다.
+let EXT = {};
+let EXT_CALLS = [];
 globalThis.fetch = async (url, init = {}) => {
   if (String(url).includes('identitytoolkit.googleapis.com')) {
     const t = TOKENS[JSON.parse(init.body).idToken];
     return new Response(JSON.stringify({ users: t ? [t] : [] }),
                         { status: 200, headers: { 'Content-Type': 'application/json' } });
   }
-  throw new Error('예상 못 한 바깥 호출: ' + url);
+  // 리다이렉트를 어떻게 다루는지가 이 스텁의 요점이다. 플랫폼은 redirect 를
+  // 'manual' 로 주지 않으면 3xx 를 대신 따라가 마지막 응답만 돌려준다 — 그러면
+  // 도착지가 주소 검사를 한 번도 안 거친다. 그 차이를 실제로 흉내낸다.
+  const auto = (init.redirect || 'follow') !== 'manual';
+  let at = String(url);
+  for (let i = 0; i < 6; i++) {
+    EXT_CALLS.push(at);
+    const r = EXT[at];
+    if (!r) throw new Error('예상 못 한 바깥 호출: ' + at);
+    const is3xx = r.status >= 300 && r.status < 400;
+    if (is3xx && auto) { at = new URL((r.headers || {}).Location, at).toString(); continue; }
+    if (is3xx) {
+      // Response 로 3xx 를 만들면 규격상 Location 을 못 실으므로 최소 객체를 쓴다.
+      return { status: r.status, ok: false,
+               headers: { get: k => (r.headers || {})[k] ?? null },
+               arrayBuffer: async () => new ArrayBuffer(0) };
+    }
+    return new Response(r.body === undefined ? 'x' : r.body,
+                        { status: r.status || 200, headers: r.headers || {} });
+  }
+  throw new Error('리다이렉트가 너무 깊다: ' + url);
 };
 // 토큰 검증 결과를 워커가 120초 재사용하므로, 사람마다 토큰 문자열을 달리 준다.
 // localId(= Firebase uid)도 같이 준다 — 캘린더 메모 그림의 '칸 이름'이 이 값이다.
@@ -391,6 +415,101 @@ console.log('\n■ 청소가 엉뚱한 자리를 훑지 않는다 (실제로 났
   const unknown = await (await post({ action: 'sweepEverything', idToken: T_ADMIN, scope: 'test' })).json();
   check('모르는 청소 이름은 거절한다', unknown.error === 'UNKNOWN_ACTION', unknown);
   check('그때도 그림은 그대로다', env.NOTICES._store.has(NK1));
+}
+
+// ── 바깥 그림 받아오기 ──────────────────────────────────────────────────────
+// 이 동작은 R2 에 아무것도 안 쓴다. 그래서 위험이 '쓰기' 가 아니라 '워커가 아무
+// 주소나 대신 불러 준다' 쪽에 있다. 여기서 보는 것은 그 주소 검사다.
+console.log('\n■ 바깥 그림 받아오기 (fetchImg)');
+{
+  reset();
+  const IMG = 'https://cdn.example/photo.png';
+  EXT = { [IMG]: { status: 200, body: 'PNGBYTES', headers: { 'Content-Type': 'image/png' } } };
+
+  const anon = await (await post({ action: 'fetchImg', url: IMG })).json();
+  check('로그인 안 했으면 거절한다', anon.error === 'AUTH', anon);
+
+  EXT_CALLS = [];
+  const ok = await (await post({ action: 'fetchImg', idToken: T_TEACHER, url: IMG })).json();
+  check('교사면 관리자가 아니어도 받아 온다', ok.success === true, ok);
+  check('dataURL 로 돌려준다', /^data:image\/png;base64,/.test(ok.dataUrl || ''), ok.dataUrl);
+  check('내용이 그대로다', atob(String(ok.dataUrl).split(',')[1]) === 'PNGBYTES');
+
+  // 주소 검사 — 통과하면 안 되는 것들. 하나라도 새면 워커가 공짜 프록시가 된다.
+  const nope = {
+    'http 는 안 받는다':        'http://cdn.example/a.png',
+    'IP 로 직접 부르지 않는다': 'https://169.254.169.254/latest/meta-data/',
+    '사설 IP 도 마찬가지':      'https://10.0.0.5/a.png',
+    'localhost 는 막는다':      'https://localhost/a.png',
+    '.internal 은 막는다':      'https://metadata.internal/a.png',
+    '.local 은 막는다':         'https://printer.local/a.png',
+    'file:// 은 막는다':        'file:///etc/passwd',
+    '주소가 아니면 막는다':      'not-a-url',
+  };
+  for (const [name, url] of Object.entries(nope)) {
+    EXT_CALLS = [];
+    const r = await (await post({ action: 'fetchImg', idToken: T_TEACHER, url })).json();
+    check(name, r.error === 'BAD_URL' && EXT_CALLS.length === 0, { r, EXT_CALLS });
+  }
+
+  // 리다이렉트를 따라갈 때도 칸마다 다시 본다. 안 보면 'https://정상주소 →
+  // http://내부주소' 한 번으로 위 검사가 전부 무의미해진다.
+  EXT = {
+    ...EXT,
+    'https://cdn.example/hop': { status: 302, headers: { Location: 'https://cdn.example/photo.png' } },
+    'https://cdn.example/evil': { status: 302, headers: { Location: 'http://10.0.0.5/a.png' } },
+    'https://cdn.example/loop': { status: 302, headers: { Location: 'https://cdn.example/loop' } },
+  };
+  const hop = await (await post({ action: 'fetchImg', idToken: T_TEACHER, url: 'https://cdn.example/hop' })).json();
+  check('제대로 된 리다이렉트는 따라간다', hop.success === true, hop);
+
+  EXT_CALLS = [];
+  const evil = await (await post({ action: 'fetchImg', idToken: T_TEACHER, url: 'https://cdn.example/evil' })).json();
+  check('리다이렉트로 내부 주소에 가려 하면 멈춘다', evil.success !== true, evil);
+  check('그 주소는 부르지도 않는다', !EXT_CALLS.includes('http://10.0.0.5/a.png'), EXT_CALLS);
+
+  const loop = await (await post({ action: 'fetchImg', idToken: T_TEACHER, url: 'https://cdn.example/loop' })).json();
+  check('고리를 돌면 멈춘다', loop.success !== true, loop);
+
+  // 그림이 아닌 것
+  EXT['https://cdn.example/page'] = { status: 200, body: '<html>', headers: { 'Content-Type': 'text/html' } };
+  const page = await (await post({ action: 'fetchImg', idToken: T_TEACHER, url: 'https://cdn.example/page' })).json();
+  check('그림이 아니면 거절한다', page.error === 'NOT_IMAGE', page);
+
+  EXT['https://cdn.example/evil.svg'] = { status: 200, body: '<svg onload="x()">',
+                                          headers: { 'Content-Type': 'image/svg+xml' } };
+  const svg = await (await post({ action: 'fetchImg', idToken: T_TEACHER, url: 'https://cdn.example/evil.svg' })).json();
+  check('svg 도 그림 취급 안 한다', svg.error === 'NOT_IMAGE', svg);
+
+  EXT['https://cdn.example/empty'] = { status: 200, body: '', headers: { 'Content-Type': 'image/png' } };
+  const empty = await (await post({ action: 'fetchImg', idToken: T_TEACHER, url: 'https://cdn.example/empty' })).json();
+  check('빈 응답은 거절한다', empty.error === 'NOT_IMAGE', empty);
+
+  EXT['https://cdn.example/404'] = { status: 404, body: 'nope', headers: { 'Content-Type': 'image/png' } };
+  const gone = await (await post({ action: 'fetchImg', idToken: T_TEACHER, url: 'https://cdn.example/404' })).json();
+  check('없는 그림은 거절한다', gone.error === 'FETCH_FAIL', gone);
+
+  // 크기 — 적힌 길이로 먼저 자른다(다 받아 놓고 자르면 그만큼 이미 받은 것이다)
+  EXT['https://cdn.example/huge'] = { status: 200, body: 'x',
+    headers: { 'Content-Type': 'image/png', 'Content-Length': String(20 * 1024 * 1024) } };
+  const huge = await (await post({ action: 'fetchImg', idToken: T_TEACHER, url: 'https://cdn.example/huge' })).json();
+  check('너무 큰 그림은 거절한다', huge.error === 'TOO_BIG', huge);
+
+  // 실제로 받아 보니 큰 경우도 막는다(Content-Length 를 안 주는 서버가 있다)
+  EXT['https://cdn.example/lie'] = { status: 200, body: 'y'.repeat(7 * 1024 * 1024),
+                                     headers: { 'Content-Type': 'image/png' } };
+  const lie = await (await post({ action: 'fetchImg', idToken: T_TEACHER, url: 'https://cdn.example/lie' })).json();
+  check('길이를 안 적어도 받아 보고 막는다', lie.error === 'TOO_BIG', lie);
+
+  // 횟수 제한 — 한 사람이 이 길을 계속 두드리지 못하게. 다른 사람은 안 걸린다.
+  let capped = null;
+  for (let i = 0; i < 80; i++) {
+    const r = await (await post({ action: 'fetchImg', idToken: T_TEACHER, url: IMG })).json();
+    if (!r.success) { capped = r; break; }
+  }
+  check('한 사람이 너무 많이 부르면 막는다', capped && capped.error === 'RATE', capped);
+  const other = await (await post({ action: 'fetchImg', idToken: T_KIM, url: IMG })).json();
+  check('다른 사람까지 같이 막지는 않는다', other.success === true, other);
 }
 
 console.log(`\n${fail ? '❌' : '✅'} 통과 ${pass} / 실패 ${fail}`);

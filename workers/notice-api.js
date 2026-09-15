@@ -24,6 +24,7 @@
  *  · POST {action:'del'}            이미지 지우기 (관리자만)
  *  · POST {action:'sweep'}          공지에 안 쓰이는 이미지 청소 (관리자만)
  *  · POST {action:'sweepTask'}      내 캘린더 메모에 안 쓰이는 이미지 청소 (교사 각자)
+ *  · POST {action:'fetchImg'}       바깥 주소의 그림 받아오기 (교사면 누구나) → { dataUrl }
  *
  * 지우는 경로를 왜 처음부터 두나
  *  공지를 고치거나 지우면 R2 파일은 저절로 사라지지 않는다. 나중에 붙이면
@@ -45,6 +46,15 @@ function bytesFromB64(b64) {
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
+}
+// Uint8Array → 표준 base64. 한 번에 넘기면 인자 수 제한에 걸리므로 잘라서 잇는다.
+function b64FromBytes(bytes) {
+  const CH = 0x8000;
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += CH) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  }
+  return btoa(bin);
 }
 const nowSec = () => Math.floor(Date.now() / 1000);
 
@@ -184,6 +194,93 @@ async function handleImgPut(env, body) {
   return { success: true, key };
 }
 
+// ── 바깥 그림 받아오기 ───────────────────────────────────────────────────────
+// 선생님이 다른 곳(교육청 공문, 블로그 …)에서 글을 영역째 복사해 붙이면
+// 클립보드에는 <img src="https://..."> 주소만 실려 온다. 그림 자체는 없다.
+// 브라우저는 남의 서버에서 그 바이트를 읽을 수 없다(CORS). 그래서 여기서
+// 대신 받아 화면에 돌려주고, 줄이고 올리는 일은 지금 쓰던 길 그대로 화면이
+// 한다 — 워커에 크기 줄이기·webp 변환을 또 만들지 않으려는 것이다.
+//
+// 이 동작은 R2 에 아무것도 쓰지 않는다. 그래서 관리자가 아니어도 된다
+// (캘린더 메모에도 붙여넣기 때문에). 대신 '남이 우리 워커를 공짜 프록시로
+// 쓰는 것'을 막아야 해서 교사 인증 + 횟수 제한 + 주소 검사를 건다.
+const FETCH_MAX_BYTES  = 6 * 1024 * 1024;   // 받아올 원본 상한. 화면에서 다시 줄인다.
+const FETCH_TIMEOUT_MS = 8000;
+const FETCH_HOPS       = 4;                 // 리다이렉트 따라가는 횟수
+const FETCH_TYPES      = /^image\/(jpeg|png|webp|gif|bmp)$/;
+
+// 부를 수 있는 주소인가. 통과하면 정규화된 주소를, 아니면 null 을 준다.
+function fetchUrlOk(raw) {
+  let u;
+  try { u = new URL(String(raw || '')); } catch { return null; }
+  if (u.protocol !== 'https:') return null;          // http 는 안 받는다
+  const h = u.hostname.toLowerCase();
+  // 이름 없이 IP 로 바로 부르는 요청은 그림을 가져오려는 것이 아니다.
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return null;
+  if (h.includes(':') || h.startsWith('[')) return null;   // IPv6
+  if (!h.includes('.')) return null;                       // localhost 등 한 토막 이름
+  if (/(^|\.)(localhost|local|internal|intranet|home|lan)$/.test(h)) return null;
+  return u.toString();
+}
+
+// 사람마다 횟수를 센다. 워커는 요청마다 다른 작업틀에서 돌 수 있어 이 숫자가
+// 전부를 세지는 못한다 — 여기서 막으려는 것은 '실수로 도는 고리'와 '한 사람이
+// 이 길을 계속 두드리는 것'이지, 작정한 공격이 아니다. 그쪽은 교사 로그인이 막는다.
+const _fetchHits   = new Map();        // 사람 → { n, until }
+const FETCH_WINDOW = 600;              // 초
+const FETCH_LIMIT  = 60;               // 그 동안 받아올 수 있는 장 수
+function fetchQuotaOk(who) {
+  const now = nowSec();
+  const cur = _fetchHits.get(who);
+  if (!cur || cur.until <= now) { _fetchHits.set(who, { n: 1, until: now + FETCH_WINDOW }); return true; }
+  if (cur.n >= FETCH_LIMIT) return false;
+  cur.n++;
+  return true;
+}
+
+async function handleImgFetch(env, body) {
+  const who = await verifyTeacher(env, String(body.idToken || ''));
+  if (!who) return { success: false, error: 'AUTH' };
+  let target = fetchUrlOk(body.url);
+  if (!target) return { success: false, error: 'BAD_URL' };
+  if (!fetchQuotaOk(who.uid || who.email)) return { success: false, error: 'RATE' };
+
+  // 리다이렉트를 브라우저처럼 자동으로 따라가지 않는다. 따라가면 마지막에
+  // 닿는 주소는 위 검사를 안 거친 주소가 된다. 한 칸씩 직접 걷고, 칸마다 다시 본다.
+  let res = null;
+  for (let hop = 0; hop < FETCH_HOPS; hop++) {
+    try {
+      res = await fetch(target, {
+        redirect: 'manual',
+        headers: { Accept: 'image/*' },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+    } catch { return { success: false, error: 'FETCH_FAIL' }; }
+    if (res.status < 300 || res.status >= 400) break;
+    const loc = res.headers.get('Location');
+    let next = null;
+    try { next = loc ? fetchUrlOk(new URL(loc, target).toString()) : null; } catch { next = null; }
+    if (!next) return { success: false, error: 'FETCH_FAIL' };
+    target = next;
+    res = null;
+  }
+  if (!res) return { success: false, error: 'FETCH_FAIL' };
+  if (!res.ok) return { success: false, error: 'FETCH_FAIL', status: res.status };
+
+  const ct = String(res.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
+  if (!FETCH_TYPES.test(ct)) return { success: false, error: 'NOT_IMAGE' };
+  // 적힌 길이로 먼저 거른다. 안 적혀 있으면 다 받아 본 뒤에 다시 잰다.
+  if (Number(res.headers.get('Content-Length') || 0) > FETCH_MAX_BYTES) {
+    return { success: false, error: 'TOO_BIG' };
+  }
+  let buf;
+  try { buf = await res.arrayBuffer(); } catch { return { success: false, error: 'FETCH_FAIL' }; }
+  if (!buf.byteLength) return { success: false, error: 'NOT_IMAGE' };
+  if (buf.byteLength > FETCH_MAX_BYTES) return { success: false, error: 'TOO_BIG' };
+
+  return { success: true, dataUrl: 'data:' + ct + ';base64,' + b64FromBytes(new Uint8Array(buf)) };
+}
+
 // 이미지 지우기 — 관리자만. 공지에서 그림을 빼거나 공지를 지울 때 부른다.
 async function handleImgDel(env, body) {
   if (!env.NOTICES) return { success: false, error: 'NO_BUCKET' };
@@ -314,6 +411,7 @@ export default {
         case 'del':   return json(await handleImgDel(env, body),  200, cors);
         case 'sweep':     return json(await handleSweep(env, body), 200, cors);
         case 'sweepTask': return json(await handleSweep(env, body), 200, cors);
+        case 'fetchImg':  return json(await handleImgFetch(env, body), 200, cors);
         default:      return json({ success: false, error: 'UNKNOWN_ACTION' }, 400, cors);
       }
     } catch (e) {
