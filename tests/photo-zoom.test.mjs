@@ -168,7 +168,11 @@ console.log('\n■ 두 번 탭 — 원래 크기');
   check('크게 본 상태로 표시된다', (await pg.evaluate(() => zoomed_())) === true);
   check('닫히지 않는다', (await isOpen()) === true);
   check('이제 어떻게 되돌리는지 알려 준다',
-        /두 번 누르면 전체/.test(await pg.evaluate(() => hint_())), await pg.evaluate(() => hint_()));
+        /누르면 전체/.test(await pg.evaluate(() => hint_())), await pg.evaluate(() => hint_()));
+  // 안내는 실제로 되는 것만 적어야 한다. 크게 본 자리에서는 한 번만 눌러도
+  // 전체로 돌아오는데 '두 번 누르면' 이라고 적어 뒀다가 어긋났던 적이 있다.
+  check('안내가 한 번 탭으로 돌아오는 것과 어긋나지 않는다',
+        !/두 번 누르면/.test(await pg.evaluate(() => hint_())), await pg.evaluate(() => hint_()));
 
   await pg.evaluate(() => { tap_(); tap_(); });
   check('다시 두 번 탭하면 화면에 맞는다', (await scale()) === 1);
