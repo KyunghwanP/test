@@ -368,13 +368,13 @@ console.log('\n■ 그림 크게 보기');
         /closest\('\.notice-view img'\)[\s\S]{0,80}openNoticeZoom\(img\.src\)/.test(HTML));
   check('다시 그려도 계속 눌린다 (위임으로 받는다)',
         /getElementById\('noticeBody'\)\?\.addEventListener\('click'/.test(HTML));
-  check('처음에는 화면에 맞춰 전체를 보여준다', /ov\.classList\.remove\('actual'\);/.test(HTML));
-  check('누르면 원래 크기로 바뀐다', /function toggleNoticeZoomActual\(\)/.test(HTML));
-  check('원래 크기에서는 훑어볼 수 있다',
-        /\.notice-zoom\.actual \.notice-zoom-scroll\{display:block;\}/.test(HTML) &&
-        /\.notice-zoom-scroll\{[^}]*overflow:auto/.test(HTML));
-  check('표는 왼쪽 위부터 보게 맞춘다', /sc\.scrollTop = 0; sc\.scrollLeft = 0;/.test(HTML));
-  check('닫으면 그림을 놓아준다(메모리)', /getElementById\('noticeZoomImg'\)\.src = '';/.test(HTML));
+  // 다루는 몸짓(탭·아래로 밀기·두 번 탭·손가락 벌리기)은 tests/photo-zoom.test.mjs
+  // 가 진짜 손가락 이벤트로 확인한다. 여기서는 공지 쪽에 제대로 붙어 있는지만 본다.
+  check('처음에는 화면에 맞춰 전체를 보여준다', /_nzScale = 1; _nzX = 0; _nzY = 0;/.test(HTML));
+  check('크게 보는 길이 있다 (시정표는 맞추면 글자가 안 보인다)',
+        /function nzSet\(scale, ease\)/.test(HTML) && /_nzFull =/.test(HTML));
+  check('닫으면 그림을 놓아준다(메모리)',
+        /function closeNoticeZoom\(\)[\s\S]{0,400}img\.src = '';/.test(HTML));
   check('뒤로가기로 공지 창보다 먼저 닫힌다',
         /noticeImgZoom'\)\?\.classList\.contains\('open'\)\) \{\s*\n\s*closeNoticeZoom\(\); armExitGuard\(\); return;[\s\S]{0,200}noticeModal'\)\?\.classList\.contains\('open'\)/.test(HTML));
   check('ESC 로도 공지 창보다 먼저 닫힌다',
