@@ -135,6 +135,59 @@ console.log('\n■ 넘길 때마다 위에서부터 읽는다');
         (await pg.evaluate(() => document.getElementById('noticeBody').scrollTop)) === 0);
 }
 
+console.log('\n■ 아래쪽 단추들 — 손가락으로 누를 수 있나');
+{
+  // 예전에는 '오늘 그만보기 / 다시 보지 않기' 가 12.5px 밑줄 글자였다. 넘기는
+  // 단추와 구분은 됐지만 폰에서 누를 자리가 너무 작았다 — 구분하자고 못 누르게
+  // 만든 꼴이었다. 실제로 그려 놓고 재 본다. 숫자를 옮겨 적으면 의미가 없다.
+  const box = () => pg.evaluate(() =>
+    [...document.querySelectorAll('#noticeFoot button')].map(b => {
+      const r = b.getBoundingClientRect(), s = getComputedStyle(b);
+      return { 글: b.textContent.trim(), 높이: Math.round(r.height), 너비: Math.round(r.width),
+               테두리: parseFloat(s.borderTopWidth), 채움: s.backgroundColor,
+               밑줄: s.textDecorationLine, 글자: parseFloat(s.fontSize) };
+    }));
+
+  await pg.evaluate(l => window.go(l), THREE);
+  const wide = await box();
+  // 첫 장에는 '이전' 이 없다 — 그만보기 둘 + 다음 하나.
+  check('첫 장에는 단추가 셋 (그만보기 둘 + 다음)', wide.length === 3,
+        wide.map(b => b.글));
+  check('모두 40px 이상 — 누를 자리가 된다',
+        wide.every(b => b.높이 >= 40), wide.map(b => [b.글, b.높이]));
+  check('글자도 12.5px 아래로는 안 내려간다',
+        wide.every(b => b.글자 >= 12.5), wide.map(b => [b.글, b.글자]));
+
+  const skip = wide.filter(b => /그만보기|보지 않기/.test(b.글));
+  check('그만보기 둘 다 테두리를 두른다 (닫기처럼 감싼다)',
+        skip.length === 2 && skip.every(b => b.테두리 >= 1), skip);
+  check('밑줄은 없앴다', skip.every(b => !/underline/.test(b.밑줄)), skip);
+  check('그래도 채운 단추와는 구분된다 (빈 상자)',
+        skip.every(b => /rgba\(0, 0, 0, 0\)|transparent/.test(b.채움)), skip.map(b => b.채움));
+
+  // 가운데 장에는 '이전' 까지 넷이 선다. 그때도 자리가 남아야 한다.
+  await 다음();
+  const mid = await box();
+  check('가운데 장에는 넷 (그만보기 둘 + 이전·다음)', mid.length === 4, mid.map(b => b.글));
+  check('넷이 서도 모두 40px 이상', mid.every(b => b.높이 >= 40), mid.map(b => [b.글, b.높이]));
+
+  // 폰 폭에서 줄이 넘치거나 단추가 눌린 채 찌그러지면 안 된다.
+  await pg.setViewportSize({ width: 390, height: 780 });
+  await pg.evaluate(l => window.go(l), THREE);
+  const narrow = await box();
+  check('폰 폭에서도 모두 40px 이상',
+        narrow.every(b => b.높이 >= 40), narrow.map(b => [b.글, b.높이]));
+  check('폰 폭에서 가로로 안 넘친다',
+        (await pg.evaluate(() => {
+          const f = document.getElementById('noticeFoot');
+          return f.scrollWidth <= f.clientWidth + 1;
+        })) === true);
+  check('그만보기 둘이 한 줄을 나눠 갖는다 (글자가 안 잘린다)',
+        narrow.filter(b => /그만보기|보지 않기/.test(b.글)).every(b => b.너비 >= 110),
+        narrow.map(b => [b.글, b.너비]));
+  await pg.setViewportSize({ width: 900, height: 800 });
+}
+
 // 하네스에는 창 바깥을 누르는 길(closeNoticeModal)이 없다 — 그 오류만 걸러낸다
 const real = errs.filter(e => !/closeNoticeModal is not defined/.test(e));
 console.log(real.length ? '\n❌ 런타임 오류:\n' + real.slice(0,4).join('\n') : '\n✅ 런타임 오류 없음');
