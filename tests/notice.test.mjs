@@ -413,6 +413,20 @@ console.log('\n■ 처음 들어올 때 저절로 띄우기');
         /last\s*\n?\s*\? '<button class="notice-btn primary" onclick="closeNoticeModalBtn\(\)">닫기/.test(HTML));
   check('배선 — 저절로 열 때는 첫 장부터', /_noticeAutoIdx = 0;\s*\n\s*openNoticeModal\(true\);/.test(HTML));
 
+  // 위젯 칸에는 절대 뜨면 안 된다. 실제로 났던 일 — 위젯을 여섯 개 띄워 뒀더니
+  // 여섯 칸이 한꺼번에 공지 창으로 덮였다. 시간표를 보려고 띄운 칸들이다.
+  check('위젯 창에서는 공지를 아예 안 켠다',
+        /function initNotice\(\)\{[\s\S]{0,700}if \(IS_WIDGET_WV\) return;[\s\S]{0,120}watchNotice\(\);/.test(HTML));
+  check('듣는 것도 안 건다 (창 수만큼 Firestore 를 읽는다)',
+        /if \(IS_WIDGET_WV\) return;[\s\S]{0,200}watchNotice\(\)/.test(HTML));
+  check('저절로 띄우는 쪽에도 같은 문을 둔다',
+        /function noticeAutoOpen\(\)\{[\s\S]{0,200}if \(IS_WIDGET_WV\) return;/.test(HTML));
+
+  // 공지를 내렸는데 저절로 뜬 창이 '올라온 공지가 없습니다' 만 띄운 채 남아
+  // 있었다. 선생님이 띄운 것도 아닌 창을 손으로 닫게 만들면 안 된다.
+  check('배선 — 공지가 바뀌면 창을 계속 둘지 묻는다',
+        /if \(noticeKeepOpen\(\)\) renderNoticeModal\(\);\s*\n\s*else closeNoticeModal\(null\);/.test(HTML));
+
   check('확성기로 연 창도 게시중인 것만 보여준다 (관리자도)',
         /function noticeVisibleList\(\)\{[\s\S]{0,400}return noticeLiveList\(\);\s*\n\}/.test(HTML));
   check('관리자라고 끝난 공지를 섞지 않는다',

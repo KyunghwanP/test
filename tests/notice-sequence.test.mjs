@@ -28,7 +28,7 @@ ${gc('NOTICE_STATE_TEXT')}\n${gc('noticeLiveList')}\n${gc('_noticeAutoIdx')}
 let _noticeList=[], _noticeAuto=true, _noticeOpenId='', _rtObjUrls=[];
 const _IS_ADMIN=()=>true;
 const escapeHtml=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function rtLoadImages(){} function rtReleaseImages(){} function rtFitFontSizes(){} function noticeMarkSeen(){}
+function rtLoadImages(){} function rtReleaseImages(){} function rtFitFontSizes(){} function rtFitDarkColors(){} function noticeMarkSeen(){}
 function noticeSnoozeToday(){ window.__snoozed='today'; closeNoticeModalBtn(); }
 function noticeSnoozeEver(){ window.__snoozed='ever'; closeNoticeModalBtn(); }
 function closeNoticeModalBtn(){ document.getElementById('noticeModal').classList.remove('open'); window.__closed=true; }
@@ -39,6 +39,7 @@ ${grab('rtPreserveStyles')}\n${grab('rtSanitize')}\n${grab('noticeTitleOf')}
 ${grab('noticeStateOf')}\n${grab('noticeStateChip')}\n${grab('noticeVisibleList')}
 ${grab('noticePeriodText')}\n${grab('noticeWhenText')}
 ${grab('renderNoticeAutoStep')}\n${grab('noticeAutoStep')}\n${grab('renderNoticeModal')}
+${grab('noticeKeepOpen')}
 window.noticeAutoStep=noticeAutoStep; window.noticeSnoozeToday=noticeSnoozeToday; window.noticeSnoozeEver=noticeSnoozeEver;
 window.closeNoticeModalBtn=closeNoticeModalBtn;
 window.go=list=>{ _noticeList=list; _noticeAuto=true; _noticeAutoIdx=0;
@@ -133,6 +134,22 @@ console.log('\n■ 넘길 때마다 위에서부터 읽는다');
   await 다음();
   check('다음 장은 맨 위에서 시작한다',
         (await pg.evaluate(() => document.getElementById('noticeBody').scrollTop)) === 0);
+}
+
+console.log('\n■ 공지가 없어지면 저절로 뜬 창은 닫는다');
+{
+  // 실제로 났던 일 — 공지를 내렸는데 창이 '올라온 공지가 없습니다' 만 띄운 채
+  // 화면 앞에 남았다. 선생님이 띄운 것도 아닌 창을 손으로 닫게 만들면 안 된다.
+  await pg.evaluate(l => window.go(l), THREE);
+  check('세 건일 때는 계속 띄워 둔다', (await pg.evaluate(() => noticeKeepOpen())) === true);
+
+  await pg.evaluate(() => { _noticeList = []; });
+  check('다 내려가면 닫는다', (await pg.evaluate(() => noticeKeepOpen())) === false);
+
+  // 손으로 연 창은 비어도 남겨 둔다. 관리자가 '＋ 공지 쓰기' 를 누르러 온 자리라,
+  // 마지막 공지를 지웠다고 창까지 닫히면 쓰러 들어갈 길이 없어진다.
+  await pg.evaluate(() => { _noticeAuto = false; });
+  check('손으로 연 창은 비어도 그대로 둔다', (await pg.evaluate(() => noticeKeepOpen())) === true);
 }
 
 console.log('\n■ 아래쪽 단추들 — 손가락으로 누를 수 있나');

@@ -136,6 +136,7 @@ ${grab('rtKeysIn')}
 ${grabConst('RT_FIT_W')}
 ${grabConst('RT_FIT_MAX')}
 ${grab('rtFitFontSizes')}
+function rtFitDarkColors(){}
 ${grab('rtPlainText')}
 ${grab('mytaskMemoHtml')}
 ${grab('rtToolbarHtml')}
@@ -328,6 +329,11 @@ console.log('\n■ 폰에서는 큰 글자를 눌러 준다');
         && /\.rt-view, \.notice-view/.test(HTML));
   check('공지 본문에도 같이 건다',
         (HTML.match(/rtLoadImages\(view\);\s*\n\s*rtFitFontSizes\(view\);/g) || []).length === 3);
+  // 글자 크기를 누르는 자리마다 어두운 화면 색 맞추기도 같이 간다.
+  // 한쪽만 걸면 '글자는 작아졌는데 안 보이는' 자리가 생긴다.
+  check('색 맞추기도 같은 자리에 건다',
+        (HTML.match(/rtFitFontSizes\(view\); rtFitDarkColors\(view\);/g) || []).length === 4,
+        (HTML.match(/rtFitDarkColors\(view\)/g) || []).length);
 
   await pg.evaluate(() => { document.getElementById('mytaskRecvInfo').style.width = ''; });
 }

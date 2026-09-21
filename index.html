@@ -6364,7 +6364,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.52';
+const APP_VER = 'ver7.53';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -8928,14 +8928,88 @@ function rtFitFontSizes(root){
   }
 }
 
+// 어두운 화면에서 붙여넣은 글자가 바탕에 묻힌다.
+//
+// 붙여넣은 글은 '흰 종이'를 보고 고른 색을 그대로 들고 온다. 공문의 남색 제목,
+// 검은 본문 같은 것들이다. 어두운 화면에서는 그 색이 거의 안 보인다.
+//
+// 뒤집지는 않는다. 뒤집으면 남색이 주황이 되어 '무슨 색으로 썼는지'가 통째로
+// 바뀐다. 색조와 선명도는 그대로 두고 밝기만 올린다 — 남색은 하늘색이 되고
+// 붉은색은 분홍이 된다. 쓴 사람이 고른 뜻은 남는다.
+//
+// 거의 회색(검정 포함)은 색을 아예 뗀다. 회색을 밝히면 '흐린 회색 글자'가 되는데
+// 그건 화면 기본 글자색보다 읽기 나쁘다. 기본색에 맡기는 편이 낫다.
+//
+// 저장된 값은 건드리지 않는다. rtFitFontSizes 와 같은 방식으로, 원래 값을 요소에
+// 적어 두었다가 밝은 화면으로 돌아가면 그대로 되돌린다.
+const RT_DARK_L    = 0.62;   // 어두운 화면에서 글자가 가져야 할 최소 밝기
+const RT_DARK_S    = 0.85;   // 이보다 선명해지면 눈이 아프다
+const RT_DARK_GRAY = 0.18;   // 선명도가 이보다 낮으면 '색'이 아니라 회색으로 본다
+
+// 어떤 표기로 적혀 있든 getComputedStyle 이 rgb()/rgba() 로 돌려준다.
+function rtRgb(v){
+  const m = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i.exec(String(v || ''));
+  return m ? [+m[1] / 255, +m[2] / 255, +m[3] / 255] : null;
+}
+function rtHsl(r, g, b){
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+  if (mx === mn) return [0, 0, l];
+  const d = mx - mn;
+  const s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+  const h = mx === r ? ((g - b) / d + (g < b ? 6 : 0)) / 6
+          : mx === g ? ((b - r) / d + 2) / 6
+                     : ((r - g) / d + 4) / 6;
+  return [h, s, l];
+}
+
+// 형광펜 친 글자인가. 제 바탕을 깔고 있으면 그 위에서 이미 읽히므로 건드리지
+// 않는다 — 노란 바탕에 검은 글자를 밝히면 오히려 안 보인다.
+function rtOnOwnBg(el, root){
+  for (let p = el; p && p !== root; p = p.parentElement) {
+    const bg = p.style && p.style.backgroundColor;
+    if (bg && !/transparent|rgba\([^)]*,\s*0\s*\)/i.test(bg)) return true;
+  }
+  return false;
+}
+
+function rtFitDarkColors(root){
+  if (!root) return;
+  const dark = document.documentElement.classList.contains('dark');
+  for (const el of root.querySelectorAll('[style*="color"], [data-rt-col]')) {
+    if (el.dataset.rtCol === undefined) {
+      if (!el.style.color) continue;
+      el.dataset.rtCol = el.style.color;
+    }
+    el.style.color = el.dataset.rtCol;          // 손대기 전 상태로 되돌린다
+    if (!dark || !el.style.color) continue;
+    if (rtOnOwnBg(el, root)) continue;
+    const rgb = rtRgb(getComputedStyle(el).color);
+    if (!rgb) continue;
+    const [h, s, l] = rtHsl(rgb[0], rgb[1], rgb[2]);
+    if (s < RT_DARK_GRAY) { el.style.color = ''; continue; }   // 회색·검정은 기본색에 맡긴다
+    if (l >= RT_DARK_L) continue;                              // 이미 밝다
+    el.style.color = `hsl(${Math.round(h * 360)} ${Math.round(Math.min(s, RT_DARK_S) * 100)}% ${Math.round(RT_DARK_L * 100)}%)`;
+  }
+}
+
+const rtRefitAll = () =>
+  document.querySelectorAll('.rt-view, .notice-view').forEach(v => {
+    rtFitFontSizes(v); rtFitDarkColors(v);
+  });
+
 // 가로로 돌리거나 창을 넓히면 다시 잰다. 지금 떠 있는 읽기 상자만 본다.
 let _rtFitTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(_rtFitTimer);
-  _rtFitTimer = setTimeout(() => {
-    document.querySelectorAll('.rt-view, .notice-view').forEach(rtFitFontSizes);
-  }, 150);
+  _rtFitTimer = setTimeout(rtRefitAll, 150);
 });
+
+// 밝게/어둡게를 바꾸면 색을 다시 맞춘다. 바꾸는 길이 여럿이라(단추·다른 탭의
+// 설정 변경·시스템 설정) 각각에 손대는 대신 html 의 class 를 지켜본다.
+try {
+  new MutationObserver(rtRefitAll)
+    .observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+} catch(e){}
 
 function rtReleaseImages(root){
   const rest = [];
@@ -9119,7 +9193,10 @@ function watchNotice(){
     _noticeLastSig = noticeStateSig();
     renderNoticeBtn();
     const modal = document.getElementById('noticeModal');
-    if (modal?.classList.contains('open')) renderNoticeModal();
+    if (modal?.classList.contains('open')) {
+      if (noticeKeepOpen()) renderNoticeModal();
+      else closeNoticeModal(null);
+    }
     // 쓰는 중이면 화면을 안 건드린다 — 쓰던 글이 남의 저장으로 날아가면 못 되돌린다.
     if (!_noticeEditing) renderNoticeAdminList();
     renderNoticeEditState();
@@ -9171,6 +9248,7 @@ let _noticeAuto = false;        // 지금 창이 '저절로 뜬' 것인가 (단�
 let _noticeAutoDone = false;    // 앱을 연 뒤 한 번만
 function noticeAutoOpen(){
   if (_noticeAutoDone) return;
+  if (IS_WIDGET_WV) return;                              // 위젯 칸을 덮지 않는다 (initNotice 참고)
   if (!noticeBtnVisible()) return;                       // 볼 수 없는 사람에게는 안 띄운다
   const live = noticeLiveList();
   if (!live.length) return;
@@ -9185,6 +9263,15 @@ function noticeAutoOpen(){
 }
 
 function initNotice(){
+  // 위젯 창에서는 공지를 아예 켜지 않는다.
+  //
+  // 위젯 한 칸은 패널 하나만 띄우는 작은 창인데, 거기에 전체 공지 창이 뜨면
+  // 패널을 통째로 덮는다. 위젯을 여섯 개 띄워 두면 여섯 개가 한꺼번에 덮인다
+  // (실제로 그랬다). 시간표 위젯을 보려고 띄웠는데 공지 창만 보이는 꼴이다.
+  //
+  // 듣는 것(watchNotice)도 안 건다. 위젯 창마다 Firestore 리스너가 하나씩
+  // 붙으면 읽기 한도를 창 수만큼 갉아먹는다 — 아무에게도 안 보여 줄 것을 위해서.
+  if (IS_WIDGET_WV) return;
   renderNoticeBtn();
   watchNotice();
   startNoticeClock();
@@ -9317,7 +9404,7 @@ function renderNoticeModal(){
   view.innerHTML = rtSanitize(show.html);
   body.appendChild(view);
   rtLoadImages(view);
-  rtFitFontSizes(view);
+  rtFitFontSizes(view); rtFitDarkColors(view);
 
   const back = list.length > 1
     ? `<button class="notice-btn" onclick="noticeBackToList()">‹ 목록</button>` : '';
@@ -9349,7 +9436,7 @@ function renderNoticeAutoStep(list){
   view.innerHTML = rtSanitize(n.html);
   body.appendChild(view);
   rtLoadImages(view);
-  rtFitFontSizes(view);
+  rtFitFontSizes(view); rtFitDarkColors(view);
   // 넘길 때 맨 위에서 시작하는 것은 본문을 비우는 것만으로 된다(브라우저가
   // 스크롤을 0 으로 되돌린다) — 확인하고 따로 손대지 않는다.
 
@@ -9557,6 +9644,18 @@ function bindNoticeZoom(){
 }
 
 function noticeBackToList(){ _noticeOpenId = ''; renderNoticeModal(); }
+
+// 열려 있는 창을 계속 띄워 둘 것인가. 공지가 바뀔 때마다 묻는다.
+//
+// 저절로 뜬 창인데 보여 줄 것이 없어졌으면(공지를 내렸거나 게시 기간이 끝났다)
+// 닫는다. 그냥 다시 그리면 '올라온 공지가 없습니다' 만 띄운 빈 창이 화면 앞에
+// 남는다 — 선생님이 띄운 것도 아닌데 손으로 닫아야 한다.
+//
+// 손으로 연 창은 비어도 그대로 둔다. 관리자가 '＋ 공지 쓰기' 를 누르러 들어온
+// 자리라, 마지막 공지를 지웠다고 창까지 사라지면 쓰러 들어갈 길이 없어진다.
+function noticeKeepOpen(){
+  return !_noticeAuto || noticeVisibleList().length > 0;
+}
 
 function openNoticeModal(auto){
   const m = document.getElementById('noticeModal');
@@ -10381,7 +10480,7 @@ function previewNotice(){
   view.innerHTML = rtSanitize(ed.innerHTML);
   body.appendChild(view);
   rtLoadImages(view);
-  rtFitFontSizes(view);
+  rtFitFontSizes(view); rtFitDarkColors(view);
   document.getElementById('noticeFoot').innerHTML = '';
   m.classList.add('open');
   history.pushState({ modal: 'notice' }, '');
@@ -22279,7 +22378,7 @@ function renderMytaskRecvInfo(t, isOwner = false){
   el.style.display = 'block';
   // 그림은 <img src> 로 못 받는다(워커가 토큰을 요구한다). 받아서 끼운다.
   const view = el.querySelector('.rt-view');
-  if (view) { rtLoadImages(view); rtFitFontSizes(view); }
+  if (view) { rtLoadImages(view); rtFitFontSizes(view); rtFitDarkColors(view); }
 }
 
 // 요약 → 편집 폼. 작성자가 '수정'을 눌렀을 때만.
