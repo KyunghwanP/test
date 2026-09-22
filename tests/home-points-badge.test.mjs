@@ -29,7 +29,11 @@ const grab = (name) => {
 console.log('\n■ 원본 배선 (정적)');
 check('배지 CSS가 있다', /\.home-pts-tag\{/.test(HTML));
 check('우리반 시간표를 그릴 때 배지 진단도 부른다',
-      /window\._renderHomeClassTt\(\);\s*checkHomeroomNewPoints\(homeroomKey\);/.test(HTML));
+      /window\._renderHomeClassTt\(\);\s*(?:if \(widgetNeeds\('points'\)\) )?checkHomeroomNewPoints\(homeroomKey\);/.test(HTML));
+// 위젯 칸은 패널 하나만 보여 준다. 학급 시간표 칸이 아니면 상벌점을 듣지 않는다 —
+// 칸마다 리스너를 하나씩 붙이면 Firestore 읽기를 칸 수만큼 갉아먹는다.
+check('학급 시간표 칸이 아닌 위젯에서는 안 듣는다',
+      /if \(widgetNeeds\('points'\)\) checkHomeroomNewPoints\(/.test(HTML));
 check('한 번만 읽지 않는다 (컴퓨터를 안 끄면 새로 들어온 것이 영영 안 뜬다)',
       !/getDoc\(doc\(fbDb, `riro_points`/.test(HTML) &&
       /onSnapshot\(doc\(fbDb, 'riro_points', `grade\$\{grade\}`\)/.test(HTML));
