@@ -6048,9 +6048,12 @@
         <button id="mytaskMyDoneBtn" onclick="toggleMytaskMyDone()" style="display:none;margin-top:10px;width:100%;padding:11px;border-radius:10px;border:none;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;"></button>
       </div>
 
-      <!-- 상태 (본인+공유자 모두 가능 · 각자 완료 일정은 작성자만) -->
+      <!-- 상태 (본인+공유자 모두 가능 · 각자 완료 일정은 작성자만)
+           각자 완료 일정에서는 바로 위에 '내 업무 완료' 단추가 함께 떠 있다.
+           둘 다 '완료' 라고 적혀 있으면 어느 쪽이 내 몫인지 알 수 없으므로,
+           이쪽에는 '전체' 라고 못 박아 둔다. -->
       <div class="mytask-modal-field" id="mytaskStatusField">
-        <label>상태</label>
+        <label>상태 <span id="mytaskStatusScope" style="font-weight:600;color:var(--ink-soft);"></span></label>
         <div style="display:flex;gap:8px;">
           <button class="mytask-status-btn todo" data-status="todo" onclick="setMytaskStatusBtn('todo')">🔵 시작전</button>
           <button class="mytask-status-btn doing" data-status="doing" onclick="setMytaskStatusBtn('doing')">🟡 진행중</button>
@@ -6364,7 +6367,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.54';
+const APP_VER = 'ver7.55';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -21970,6 +21973,13 @@ function renderMytaskList() {
 async function updateMytaskStatus(id, ownerUid, status) {
   const user = fbAuth.currentUser;
   const uid  = ownerUid || user.uid;
+  // 각자 완료 일정에서 받은 사람이 부르면 전체 상태가 바뀐다(위 saveMytask 참고).
+  // 목록에서는 mytaskInlineStatusHtml 이 이 select 대신 '내 몫' select 를 그리지만,
+  // 이 함수는 window 에 노출되어 있어 다른 길로도 닿는다.
+  const cur = mytaskTasks.find(x => x.id === id) || mytaskShared.find(x => x.id === id);
+  if (cur && cur.perDone && cur.ownerUid && cur.ownerUid !== (window._myUid || user.uid)) {
+    return updateMytaskMyDoneInline(id, cur.ownerUid, status);
+  }
   try {
     await setDoc(doc(fbDb, 'tasks', uid, 'items', id), { status }, { merge: true });
     const t = mytaskTasks.find(t => t.id === id);
@@ -22045,6 +22055,20 @@ function mytaskHealShareIds(tasks, myUid){
   });
 }
 
+// 이 일정 작성자의 이메일. 문서에 적힌 것이 1순위다.
+//
+// 명렬(TEACHERS)의 이메일·uid 는 시간표를 새로 올릴 때마다 사라졌다가 선생님들이
+// 로그인하는 대로 다시 채워진다. 그 사이에는 작성자를 못 찾는다. 예전 문서에는
+// ownerEmail 이 없어 그 길밖에 없으므로, 못 찾으면 **못 찾았다고 답한다** —
+// 부르는 쪽이 '이미 완료' 로 치지 않게.
+function mytaskOwnerEmail(t){
+  if (!t) return null;
+  if (t.ownerEmail) return t.ownerEmail;
+  const myUid = window._myUid || fbAuth.currentUser?.uid || '';
+  if (t.ownerUid && t.ownerUid === myUid) return fbAuth.currentUser?.email || null;
+  return TEACHERS.find(x => x.uid && x.uid === t.ownerUid)?.email || null;
+}
+
 function mytaskResolveShareEmail(entry){   // sharedWith 항목(이름 또는 이메일) → 이메일
   if (!entry) return null;
   if (entry.includes('@')) return entry;
@@ -22063,13 +22087,15 @@ function mytaskPerDoneState(t){
     return { label: nm, email: em, done };
   });
   // 작성자도 개인 완료 대상에 포함 — 전체(직권) 완료는 상태 버튼으로 따로 분리
-  const isMine = t.ownerUid === (window._myUid || user?.uid || '');
   const ownerTeacher = TEACHERS.find(x => x.uid && x.uid === t.ownerUid);
-  const ownerEmail = isMine ? myEmail : (ownerTeacher?.email || null);
-  if (ownerEmail) {
+  const ownerEmail = mytaskOwnerEmail(t);
+  // 작성자를 못 찾아도 칸은 세운다. 빼 버리면 '1/1 완료' 처럼 보이는데 자동 완료는
+  // 안 돼서(위 판정) 화면과 동작이 어긋난다. 못 찾았으면 '아직' 으로 둔다.
+  {
     const ownerName = t.ownerName || ownerTeacher?.name
-      || TEACHERS.find(x => x.email === ownerEmail)?.name || user?.displayName || '작성자';
-    entries.unshift({ label: `${ownerName} (작성자)`, email: ownerEmail, done: doneBy.some(d => d.id === ownerEmail) });
+      || (ownerEmail && TEACHERS.find(x => x.email === ownerEmail)?.name) || '작성자';
+    entries.unshift({ label: `${ownerName} (작성자)`, email: ownerEmail,
+                      done: !!ownerEmail && doneBy.some(d => d.id === ownerEmail) });
   }
   return {
     total: entries.length,
@@ -22124,11 +22150,17 @@ async function mytaskSetMyDone(ownerUid, id, wantDone){
         const em = mytaskResolveShareEmail(s);
         return em ? doneBy.some(d => d.id === em) : doneBy.some(d => d.name === s);
       });
-      // 작성자 몫의 완료까지 포함해야 전원 완료 (작성자 이메일을 못 찾으면 공유자 기준)
+      // 작성자 몫까지 끝나야 전원 완료다.
+      //
+      // 예전에는 작성자 이메일을 못 찾으면 '이미 끝낸 것' 으로 쳤다(= true). 그래서
+      // 명렬에서 작성자가 잠깐 안 보이는 동안, 받은 사람 하나가 자기 몫을 완료하면
+      // 그것만으로 전원 완료가 되어 **모두에게 완료로 떴다.**
+      // 못 찾으면 자동 완료를 하지 않는다 — 덜 끝난 것으로 두는 쪽이 안전하다.
+      // (작성자는 언제든 상태 단추로 직권 완료할 수 있다.)
       const ownerEmail = (ownerUid === user.uid)
         ? user.email
-        : (TEACHERS.find(x => x.uid && x.uid === ownerUid)?.email || null);
-      const ownerDone = ownerEmail ? doneBy.some(d => d.id === ownerEmail) : true;
+        : (data.ownerEmail || TEACHERS.find(x => x.uid && x.uid === ownerUid)?.email || null);
+      const ownerDone = !!ownerEmail && doneBy.some(d => d.id === ownerEmail);
       const allDone = shareAllDone && ownerDone;
       if (allDone && data.status !== 'done') {
         u.status = 'done';
@@ -22211,9 +22243,19 @@ function mytaskEffTask(t){
 // 목록 인라인 상태 컨트롤: 각자 완료 방식 일정의 수신자에게도 일반 일정과 똑같은
 // 상태 셀렉트를 보여주되, '완료' 선택은 전체 상태가 아니라 내 몫 완료(doneBy)로 기록한다.
 // (전체 상태는 전원 완료 시 자동 전환 — 각자 완료 취지는 그대로 유지)
+// 각자 완료 일정의 목록 칸. 이 select 는 전체 상태가 아니라 **내 몫**을 다룬다.
+//
+// 예전에는 받은 사람에게만 이걸 주고 작성자는 제외했다(= 작성자는 전체 상태
+// select 를 받았다). 그래서 작성자가 목록에서 🟢완료를 고르면 그 순간 전체가
+// 완료가 되어 **받은 선생님들 목록에서 통째로 사라졌다.** 작성자 눈에는 자기
+// 일정을 자기가 완료한 것으로 보이니 무슨 일이 난 줄도 모른다.
+//
+// 목록에서는 누구도 전체를 끝낼 수 없게 한다. 작성자의 직권 완료는 창을 열어
+// 상태 단추로 해야 하는 일로 남긴다 — 그쪽이 되돌리기도 쉽고 확인도 붙어 있다.
 function mytaskInlineStatusHtml(t, home){
   const myUid = window._myUid || fbAuth.currentUser?.uid || '';
-  if (!(t.perDone && t.ownerUid && t.ownerUid !== myUid)) return null;
+  if (!t.perDone || !t.ownerUid) return null;
+  const isOwner = t.ownerUid === myUid;
   const st = mytaskPerDoneState(t);
   const v = (st.meDone || t.status === 'done') ? 'done' : (t.status || 'todo');
   const colors = { todo: '#6366F1', doing: '#F59E0B', done: '#10B981' };
@@ -22221,7 +22263,9 @@ function mytaskInlineStatusHtml(t, home){
     <option value="todo" ${v==='todo'?'selected':''}>🔵 시작전</option>
     <option value="doing" ${v==='doing'?'selected':''}>🟡 진행중</option>
     <option value="done" ${v==='done'?'selected':''}>🟢 완료</option>`;
-  const title = `각자 완료 방식(${st.done}/${st.total}) — 완료를 고르면 내 몫만 완료 처리됩니다`;
+  const title = isOwner
+    ? `각자 완료 방식(${st.done}/${st.total}) — 여기서 완료하면 내 몫만 처리됩니다. 전체 완료는 일정을 열어 상태에서`
+    : `각자 완료 방식(${st.done}/${st.total}) — 완료를 고르면 내 몫만 완료 처리됩니다`;
   const events = `onchange="updateMytaskMyDoneInline('${t.id}','${t.ownerUid}',this.value);event.stopPropagation();" onclick="event.stopPropagation();"`;
   if (home) {
     return `<select title="${title}" ${events}
@@ -22757,11 +22801,15 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
     renderMytaskPerDone(perT, isOwner);
     // 수신자는 전체 상태 대신 '내 완료' 버튼만 사용 (작성자는 직권 완료 가능)
     statusFld.style.display = isOwner ? 'block' : 'none';
+    const scope = document.getElementById('mytaskStatusScope');
+    if (scope) scope.textContent = '— 전체 상태 (공유받은 분들께도 그대로 적용됩니다)';
     saveBtn.style.display   = isOwner ? '' : 'none';
   } else {
     perField.style.display  = 'none';
     statusFld.style.display = 'block';
     saveBtn.style.display   = '';
+    const scope = document.getElementById('mytaskStatusScope');
+    if (scope) scope.textContent = '';
   }
   setMytaskStatusBtn(mytaskCurrentStatus);
   modal.classList.add('show');
@@ -22841,6 +22889,14 @@ async function saveMytask() {
   const user    = fbAuth.currentUser;
   const isOwner = !mytaskEditOwner || mytaskEditOwner === user.uid;
   if (!isOwner) {
+    // 각자 완료 일정에서는 받은 사람이 '전체 상태' 를 건드리면 안 된다.
+    // status 는 모두가 같이 보는 값이고, mytaskDoneForMe 가 그 값이 done 이면
+    // 누구에게나 완료로 답한다 — 한 사람이 눌러 전원이 완료로 바뀐다.
+    // 화면에서는 이미 상태 단추를 감추지만(openMytaskModal), 쓰는 길에도 문을 둔다.
+    // 감추는 것은 실수를 줄일 뿐 막지는 못한다.
+    const cur = mytaskTasks.find(x => x.id === mytaskEditId)
+             || mytaskShared.find(x => x.id === mytaskEditId);
+    if (cur && cur.perDone) { closeMytaskModal(); return; }
     try {
       await setDoc(doc(fbDb, 'tasks', mytaskEditOwner, 'items', mytaskEditId),
         { status: mytaskCurrentStatus }, { merge: true });
@@ -22877,12 +22933,31 @@ async function saveMytask() {
     ? { type: _mytaskRepeat, until: repeatUntil || null }
     : null;
   const existing = mytaskEditId ? (mytaskTasks.find(t => t.id === mytaskEditId) || {}) : {};
+  // 각자 완료 일정을 작성자가 직권으로 끝내면, 아직 자기 몫을 안 끝낸 분들
+  // 목록에서도 통째로 사라진다. 되돌릴 수는 있지만 그때는 이미 다들 못 본 뒤다.
+  // 그래서 남은 사람이 있을 때만 한 번 묻는다.
+  if (existing.perDone && mytaskCurrentStatus === 'done' && existing.status !== 'done') {
+    const st = mytaskPerDoneState(existing);
+    const left = st.total - st.done;
+    if (left > 0 && !confirm(
+        `아직 ${left}명이 자기 몫을 완료하지 않았습니다.\n` +
+        `전체를 완료 처리하면 그분들 목록에서도 이 일정이 사라집니다.\n\n` +
+        `그래도 완료로 저장할까요?\n` +
+        `(내 몫만 끝내려면 취소하고 '✔ 내 업무 완료 처리' 를 누르세요)`)) return;
+  }
   const data = {
     title, memo, memoHtml, memoKeys, startDate, endDate,
     startTime: startTime || null,
     endTime: endTime || null,
     status: mytaskCurrentStatus,
     sharedWith: mytaskCurrentShared,
+    // 작성자 이메일을 문서에 적어 둔다.
+    //
+    // 예전에는 안 적고 uid 로 명렬(TEACHERS)에서 찾았다. 그런데 명렬의 이메일·uid 는
+    // 시간표를 새로 올릴 때마다 사라지고 선생님들이 로그인하는 대로 다시 채워진다
+    // (README 2장). 그 사이에는 작성자를 못 찾는데, 그때 '각자 완료' 판정이
+    // 작성자를 이미 끝낸 사람으로 쳐서 남들 몫만으로 전체가 완료돼 버렸다.
+    ownerEmail: user.email,
     // 각자 완료 방식: 공유 대상이 있을 때만 유효, 완료 기록(doneBy)은 보존
     perDone: !!(document.getElementById('mytaskPerDoneChk')?.checked && mytaskCurrentShared.length),
     doneBy: existing.doneBy || [],
