@@ -6367,7 +6367,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.55';
+const APP_VER = 'ver7.56';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -19857,7 +19857,10 @@ function renderHomeTaskSection() {
   if (!section || !list) return;
   if (!mytaskInitialized && mytaskTasks.length === 0) return;
 
-  const todayStr   = new Date().toISOString().slice(0,10);
+  // toISOString() 은 UTC 다. 한국은 UTC+9 라 새벽 0시~아침 9시 사이에는 UTC 날짜가
+  // 아직 어제다 — 그 시간대에 D-day 가 하루씩 밀려 보였다. 하필 선생님들이
+  // 출근해서 현황판을 보는 시간이 그 안이다. 기기 시계 기준 날짜를 쓴다.
+  const todayStr   = ttISO(new Date());
   const statusColor= { todo:'#6366F1', doing:'#F59E0B' };
   // 각자 완료 일정에서 내 몫을 끝낸 수신자에게는 완료된 업무로 취급 (진행 목록에서 제외)
   const activeTasks= mytaskTasks.filter(t => !mytaskDoneForMe(t)).sort((a,b) => a.startDate.localeCompare(b.startDate));
@@ -21580,11 +21583,14 @@ function expandRepeatTasks(tasks, fromStr, toStr) {
       if (type === 'daily')        cur.setDate(cur.getDate() + 1);
       else if (type === 'weekly')  cur.setDate(cur.getDate() + 7);
       else if (type === 'monthly') cur.setMonth(cur.getMonth() + 1);
-      const curStr = cur.toISOString().slice(0,10);
+      // cur 은 'YYYY-MM-DD T00:00:00' 로 만들어져 기기 시계 기준 자정이다.
+      // 그것을 toISOString() 으로 찍으면 UTC 로 9시간 당겨져 **하루 전 날짜**가
+      // 나온다 — 반복 일정이 전부 하루씩 앞당겨져 잡혔다.
+      const curStr = ttISO(cur);
       if (curStr > limitStr || curStr > toStr) break;
       if (curStr < fromStr) { count++; continue; }
       const endCur = new Date(cur.getTime() + durMs);
-      result.push({ ...t, id: t.id + '_r' + count, startDate: curStr, endDate: endCur.toISOString().slice(0,10), _isRepeat: true });
+      result.push({ ...t, id: t.id + '_r' + count, startDate: curStr, endDate: ttISO(endCur), _isRepeat: true });
       count++;
     }
   }
@@ -22779,7 +22785,7 @@ async function openMytaskModal(id=null, ownerUid=null, dateStr=null) {
       renderMytaskComments(t.comments || []);
     }
   } else {
-    const todayDefault = new Date().toISOString().slice(0,10);
+    const todayDefault = ttISO(new Date());   // UTC 로 찍으면 아침엔 어제가 기본값이 된다
     document.getElementById('mytaskTitle').value     = '';
     // 저장 전에도 그림을 받아야 하므로 id 를 먼저 받아 둔다
     _mytaskDocId = mytaskNewDocId();
