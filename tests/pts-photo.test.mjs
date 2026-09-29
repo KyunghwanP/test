@@ -128,9 +128,9 @@ console.log('\n■ 사진이 있는 학생');
   await open({ name: '김가람', grade: 1, room: 3, num: 7 });
   let st = await state();
   check('작은 사진이 바로 뜬다', !st.hidden && st.shown && st.src === S1, st);
-  // 72×96 은 작아서 얼굴이 잘 안 보였다 → 1.5배. 이 크기면 휴대폰(3배 화면)에서
+  // 72×96 은 작아서 얼굴이 잘 안 보였다 → 120×160. 이 크기면 휴대폰(3배 화면)에서
   // 작은 사진(150×200)은 흐리고 고화질(600×800)이어야 또렷하다.
-  check('얼굴 칸 크기 108×144 (3:4)', st.w === 108 && st.h === 144, [st.w, st.h]);
+  check('얼굴 칸 크기 120×160 (3:4)', st.w === 120 && st.h === 160, [st.w, st.h]);
   check('반 문서를 한 번 읽었다', JSON.stringify(await reads()) === '["studentPhotos/1-3"]', await reads());
 
   await bigDone('1-3-7', B1);
