@@ -43,16 +43,20 @@ check('확성기가 헤더에 있다', /id="noticeBtn"/.test(HTML) && /📢/.tes
 check('종이 아니라 확성기다(상벌점 알림과 뜻이 겹치지 않게)',
       !/id="noticeBtn"[^>]*>🔔/.test(HTML));
 check('처음엔 숨어 있다', /id="noticeBtn"[^>]*style="display:none;"/.test(HTML));
-check('관리자에게만 그린다', /function noticeBtnVisible\(\)/.test(HTML));
-// 쓰러 들어가는 문은 '전체 공지 쓰기' 탭이 따로 있다. 볼 것이 없는데 확성기만
-// 떠 있을 이유가 없다.
-check('볼 것이 없으면 관리자에게도 안 뜬다',
-      /if \(_IS_ADMIN\(\)\) return noticeLiveList\(\)\.length > 0;/.test(HTML));
-// 게시가 끝난 공지만 남았을 때도 확성기가 떠 있었다 — 눌러도 볼 것이 없다.
-// 관리자에게도 '지금 뜨는 것' 기준이어야 한다(끝난 것은 쓰기 탭에서 손본다).
-check('게시 끝난 것만 있으면 관리자에게도 안 뜬다',
-      !/if \(_IS_ADMIN\(\)\) return _noticeList\.length > 0;/.test(HTML));
-check('전체 공개는 한 줄만 풀면 된다', /return false && noticeLiveList\(\)\.length > 0;/.test(HTML));
+// 보는 것은 전 교사에게 공개했다. 쓰는 것은 관리자만 — 아래 '쓰기는 관리자만' 참고.
+// 원본 함수를 그대로 떼어 와 관리자·다른 선생님 둘 다로 돌려 본다.
+{
+  const src = /function noticeBtnVisible\(\)\{[\s\S]*?\n\}/.exec(HTML)?.[0] || '';
+  const run = (admin, list) => new Function('_IS_ADMIN', 'noticeLiveList', '_noticeList',
+    src + '; return noticeBtnVisible();')(() => admin, () => list, list);
+  check('확성기 — 다른 선생님에게도 게시중인 공지가 있으면 뜬다', run(false, [{ id: 'a' }]) === true);
+  check('확성기 — 관리자에게도 뜬다', run(true, [{ id: 'a' }]) === true);
+  // 쓰러 들어가는 문은 '전체 공지 쓰기' 탭이 따로 있다. 볼 것이 없는데 확성기만
+  // 떠 있을 이유가 없다. 게시가 끝난 것만 남았을 때도 마찬가지다(끝난 것은 쓰기 탭에서 손본다).
+  check('볼 것이 없으면 아무에게도 안 뜬다', run(false, []) === false && run(true, []) === false);
+  check('게시 끝난 것 기준으로 띄우지 않는다', !/_noticeList\.length > 0/.test(src));
+  check('막아 두던 false 가 남아 있지 않다', !/false &&/.test(src));
+}
 check('기간이 바뀌는 그 시각에 맞춰 깨운다 (30초마다 들여다보지 않는다)',
       /function noticeNextBoundary\(\)/.test(HTML) &&
       /const wait = Math\.min\(next \? next - Date\.now\(\)/.test(HTML) &&
@@ -101,6 +105,11 @@ check('탭바에서도 맨 끝',
       tabOrder.at(-1) === 'notice' && tabOrder.at(-2) === 'meal', tabOrder.slice(-3));
 check('쓰기 탭도 관리자에게만 뜬다',
       /navN\.style\.display = admin \? '' : 'none'/.test(HTML) && /id="navNotice"[^>]*style="display:none;"/.test(HTML));
+// 보는 것을 전체에 열었어도 쓰는 문은 관리자에게만 남아야 한다.
+check('쓰기는 관리자만 — 탭', /tabN\.style\.display = admin \? '' : 'none'/.test(HTML)
+      && /const admin = _IS_ADMIN\(\);\s*\n\s*const navN/.test(HTML));
+check('쓰기는 관리자만 — 주소로 들어와도 홈으로 돌려보낸다',
+      /function initNoticePage\(\)\{\s*\n\s*if \(!_IS_ADMIN\(\)\) \{ navigateTo\('home'\); return; \}/.test(HTML));
 check('쓰기 탭이 navigateTo 목록에 있다', /'usage','notice'\]\.forEach/.test(HTML));
 check('쓰다 만 채로 나가면 되묻는다',
       /currentPage === 'notice' && page !== 'notice' && !noticeMayLeave\(\)\) return;/.test(HTML));
