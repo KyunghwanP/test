@@ -32,7 +32,9 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
 const pg = await b.newPage({ viewport: { width: 1200, height: 800 } });
 const errs = []; pg.on('pageerror', e => errs.push(e.message));
 // 원본 CSS(막대 부분)를 그대로 — 위치는 CSS 로 잡히므로 없으면 잴 수 없다
-const CSS = H.slice(H.indexOf('/* ─── 막대 보기 ───'), H.indexOf('        @media (max-width: 640px) {', H.indexOf('/* ─── 막대 보기 ───')));
+// 좁은 화면 규칙(@media)까지 — 휴대폰에서는 줄마다 선을 그리는지도 본다
+const CSS_END = '            .bar-track .bar-range, .bar-track .bar-me { display: block; }\n        }\n';
+const CSS = H.slice(H.indexOf('/* ─── 막대 보기 ───'), H.indexOf(CSS_END) + CSS_END.length);
 if (CSS.length < 500) throw new Error('막대 CSS 를 못 찾음');
 await pg.setContent(`<style>:root{--slate-50:#f8fafc;--slate-100:#f1f5f9;--slate-300:#cbd5e1;--slate-400:#94a3b8;--slate-500:#64748b;--indigo:#4f46e5}${CSS}</style><body><div id="out"></div>`);
 await pg.addScriptTag({ content: [
@@ -59,11 +61,20 @@ const draw = (recs, target, kind = '교과', range = 0.5) => pg.evaluate(([recs,
     const tr = r.querySelector('.bar-track').getBoundingClientRect();
     const rel = el => { if (!el) return null; const b = el.getBoundingClientRect(); return { l: (b.left - tr.left) / tr.width, r: (b.right - tr.left) / tr.width }; };
     const lab = r.querySelector('.lab');
-    return { b50: rel(r.querySelector('.b50')), b70: rel(r.querySelector('.b70')), me: rel(r.querySelector('.bar-me')), rg: rel(r.querySelector('.bar-range')),
+    const shown = el => el && getComputedStyle(el).display !== 'none' ? el : null;
+    return { b50: rel(r.querySelector('.b50')), b70: rel(r.querySelector('.b70')),
+             me: rel(shown(r.querySelector('.bar-me'))), rg: rel(shown(r.querySelector('.bar-range'))),
              lab: lab && lab.className + ' ' + lab.textContent, few: (r.querySelector('.few') || {}).textContent || '',
              cuts: r.querySelector('.bar-cuts').innerText.replace(/\s+/g, ' ').trim() };
   });
-  return { html, rows, note: (out.querySelector('.bar-note') || {}).textContent || '', tip: !!out.querySelector('.bar-note.tip'),
+  // 목록 전체를 가로지르는 한 벌(넓은 화면). 첫 줄 막대 칸을 기준으로 자리를 잰다.
+  const tr0 = out.querySelector('.bar-track') && out.querySelector('.bar-track').getBoundingClientRect();
+  const list = out.querySelector('.bar-rows') && out.querySelector('.bar-rows').getBoundingClientRect();
+  const ov = sel => { const el = out.querySelector(sel); if (!el || getComputedStyle(el.closest('.bar-lines')).display === 'none') return null;
+    const b = el.getBoundingClientRect(); return { l: (b.left - tr0.left) / tr0.width, r: (b.right - tr0.left) / tr0.width, top: b.top - list.top, bottom: list.bottom - b.bottom,
+      px: (b.left + b.right) / 2 - tr0.left, w: tr0.width }; };
+  const lines = tr0 ? { me: ov('.bar-lines.over .bar-me'), rg: ov('.bar-lines.under .bar-range') } : {};
+  return { html, rows, lines, note: (out.querySelector('.bar-note') || {}).textContent || '', tip: !!out.querySelector('.bar-note.tip'),
            ticks: [...out.querySelectorAll('.ticks span')].map(s => s.textContent) };
 }, [recs, target, kind, range]);
 const near = (a, b) => Math.abs(a - b) < 0.012;
@@ -77,17 +88,35 @@ console.log('\n■ 한 줄 = 전형 하나');
   check('눈금은 1.0~9.0 고정', r.ticks[0] === '1.0' && r.ticks[r.ticks.length - 1] === '9.0' && r.ticks.length === 17, r.ticks);
 }
 
-console.log('\n■ 막대 길이 · 내 등급선 · 검색 범위');
+console.log('\n■ 막대 길이');
 {
-  const r = await draw([rec('가', Y3, 3.5, 3.0)], 3.25);
-  const x = r.rows[0];
+  const x = (await draw([rec('가', Y3, 3.5, 3.0)], 3.25)).rows[0];
   check('두 막대 모두 1.0(왼쪽 끝)에서 시작', near(x.b50.l, 0) && near(x.b70.l, 0), [x.b50, x.b70]);
   check('50% 막대가 3.0 까지', near(x.b50.r, at(3.0)), x.b50);
   check('70% 막대가 3.5 까지', near(x.b70.r, at(3.5)), x.b70);
-  check('내 등급선이 3.25 자리에', near((x.me.l + x.me.r) / 2, at(3.25)), x.me);
-  check('검색 범위 띠 = 2.75~3.75 (±0.5)', x.rg && near(x.rg.l, at(2.75)) && near(x.rg.r, at(3.75)), x.rg);
+}
+
+console.log('\n■ 내 등급선 · 검색 범위 — 넓은 화면은 목록 전체에 한 벌');
+{
+  const r = await draw([rec('가', Y3, 3.5, 3.0), rec('나', Y3, 3.1, 2.9), rec('다', Y3, 3.3, 3.2)], 3.25);
+  const me = r.lines.me, rg = r.lines.rg;
+  // 비율로 재면 몇 px 어긋나도 통과한다 — 선은 막대 끝과 겹쳐 보이는 것이라 픽셀로 잰다
+  check('내 등급선이 3.25 자리에 — 막대 눈금과 1.5px 안으로 맞는다', me && Math.abs(me.px - at(3.25) * me.w) < 1.5, me && [me.px, at(3.25) * me.w]);
+  check('선이 줄 사이에서 끊기지 않는다 — 목록 위에서 아래까지', me && me.top <= 0.5 && me.bottom <= 0.5, me);
+  check('검색 범위 띠 = 2.75~3.75 (±0.5), 목록 끝까지', rg && near(rg.l, at(2.75)) && near(rg.r, at(3.75)) && rg.top <= 0.5 && rg.bottom <= 0.5, rg);
+  check('줄마다 따로 그린 선은 숨긴다(겹쳐 보이지 않게)', r.rows.every(x => !x.me && !x.rg), r.rows.map(x => [x.me, x.rg]));
   const all = await draw([rec('가', Y3, 3.5, 3.0)], 3.25, '교과', 'all');
-  check('범위가 "전체"면 범위 띠가 없다', !all.rows[0].rg);
+  check('범위가 "전체"면 범위 띠가 없다', !all.lines.rg && !!all.lines.me, all.lines);
+}
+
+console.log('\n■ 휴대폰 — 줄마다 그대로');
+{
+  await pg.setViewportSize({ width: 390, height: 800 });
+  const r = await draw([rec('가', Y3, 3.5, 3.0), rec('나', Y3, 3.1, 2.9)], 3.25);
+  check('목록 전체 선은 안 쓴다 (이름 글자를 가로지르므로)', !r.lines.me && !r.lines.rg, r.lines);
+  check('줄마다 내 등급선이 3.25 자리에', r.rows.every(x => x.me && near((x.me.l + x.me.r) / 2, at(3.25))), r.rows.map(x => x.me));
+  check('줄마다 범위 띠', r.rows.every(x => x.rg && near(x.rg.l, at(2.75)) && near(x.rg.r, at(3.75))), r.rows.map(x => x.rg));
+  await pg.setViewportSize({ width: 1200, height: 800 });
 }
 
 console.log('\n■ 비어 있는 값을 지어내지 않는다');
