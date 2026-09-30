@@ -43,7 +43,7 @@ await pg.addScriptTag({ content: [
   line(/const AMBITIOUS_EXTEND = [^\n]+/),
   line(/const BAR_MANY = [^\n]+/),
   line(/const barPct = [^\n]+/),
-  "let visibleCount = 150, admissionKind = '교과', currentFiltered = [], searchRange = 0.5, showAmbitious = false;",
+  "let visibleCount = 150, admissionKind = '교과', currentFiltered = [], searchRange = 0.5, showAmbitious = false, selectedUniversity = '';",
   grab('getBounds'), grab('classify'), grab('barsHtml'),
 ].join('\n') });
 
@@ -53,8 +53,8 @@ const rec = (name, y, a70, a50, extra = {}) => ({
   years: Object.fromEntries(y.map(k => [k, { grade70: a70 }])), averageGrade: a70, avg50: a50,
   yearCount: y.length, vol70: 0.2, ...extra });
 const Y3 = ['2025', '2026', '2027'];
-const draw = (recs, target, kind = '교과', range = 0.5) => pg.evaluate(([recs, target, kind, range]) => {
-  currentFiltered = recs; admissionKind = kind; searchRange = range;
+const draw = (recs, target, kind = '교과', range = 0.5, amb = false, uni = '') => pg.evaluate(([recs, target, kind, range, amb, uni]) => {
+  currentFiltered = recs; admissionKind = kind; searchRange = range; showAmbitious = amb; selectedUniversity = uni;
   const html = barsHtml(target);
   const out = document.getElementById('out'); out.innerHTML = html;
   const rows = [...out.querySelectorAll('.bar-row')].map(r => {
@@ -73,10 +73,10 @@ const draw = (recs, target, kind = '교과', range = 0.5) => pg.evaluate(([recs,
   const ov = sel => { const el = out.querySelector(sel); if (!el || getComputedStyle(el.closest('.bar-lines')).display === 'none') return null;
     const b = el.getBoundingClientRect(); return { l: (b.left - tr0.left) / tr0.width, r: (b.right - tr0.left) / tr0.width, top: b.top - list.top, bottom: list.bottom - b.bottom,
       px: (b.left + b.right) / 2 - tr0.left, w: tr0.width }; };
-  const lines = tr0 ? { me: ov('.bar-lines.over .bar-me'), rg: ov('.bar-lines.under .bar-range') } : {};
-  return { html, rows, lines, note: (out.querySelector('.bar-note') || {}).textContent || '', tip: !!out.querySelector('.bar-note.tip'),
+  const lines = tr0 ? { me: ov('.bar-lines.over .bar-me'), rg: ov('.bar-lines.under .bar-range:not(.ext)'), ext: ov('.bar-lines.under .bar-range.ext') } : {};
+  return { html, rows, lines, legend: ((out.querySelector('.bar-legend') || {}).textContent || '').replace(/\s+/g, ' ').trim(), note: (out.querySelector('.bar-note') || {}).textContent || '', tip: !!out.querySelector('.bar-note.tip'),
            ticks: [...out.querySelectorAll('.ticks span')].map(s => s.textContent) };
-}, [recs, target, kind, range]);
+}, [recs, target, kind, range, amb, uni]);
 const near = (a, b) => Math.abs(a - b) < 0.012;
 const at = v => (v - 1) / 8;       // 1.0~9.0 눈금에서의 자리
 
@@ -107,6 +107,25 @@ console.log('\n■ 내 등급선 · 검색 범위 — 넓은 화면은 목록 �
   check('줄마다 따로 그린 선은 숨긴다(겹쳐 보이지 않게)', r.rows.every(x => !x.me && !x.rg), r.rows.map(x => [x.me, x.rg]));
   const all = await draw([rec('가', Y3, 3.5, 3.0)], 3.25, '교과', 'all');
   check('범위가 "전체"면 범위 띠가 없다', !all.lines.rg && !!all.lines.me, all.lines);
+}
+
+console.log('\n■ 소신 지원 포함 — 상향 쪽 확장은 옅은 두 번째 겹으로');
+{
+  const off = await draw([rec('가', Y3, 3.5, 3.0)], 3.25, '교과', 0.5, false);
+  check('소신 끄면 한 겹만', !off.lines.ext && /목록 범위 2\.75~3\.75/.test(off.legend) && !/소신 확장/.test(off.legend), off.legend);
+  const on = await draw([rec('가', Y3, 3.5, 3.0)], 3.25, '교과', 0.5, true);
+  // ±0.5 에 소신을 켜면 상향 쪽이 1.0 까지 → 2.25~2.75 가 확장, 2.75~3.75 가 기본
+  check('기본 범위는 그대로 2.75~3.75', on.lines.rg && near(on.lines.rg.l, at(2.75)) && near(on.lines.rg.r, at(3.75)), on.lines.rg);
+  check('확장 겹은 2.25~2.75 — 기본 범위 바로 왼쪽', on.lines.ext && near(on.lines.ext.l, at(2.25)) && near(on.lines.ext.r, at(2.75)), on.lines.ext);
+  check('범례에 둘을 나눠 적는다', /목록 범위 2\.75~3\.75/.test(on.legend) && /소신 확장 2\.25~2\.75/.test(on.legend), on.legend);
+  check('무엇을 기준으로 거른 범위인지 적는다(70%컷)', /범위는 70%컷 기준/.test(on.legend), on.legend);
+}
+
+console.log('\n■ 대학명을 지정하면 — 목록을 범위로 거르지 않으므로 띠도 없다');
+{
+  const r = await draw([rec('가', Y3, 3.5, 3.0)], 3.25, '교과', 0.5, true, '가천');
+  check('범위 띠·확장 겹 없음', !r.lines.rg && !r.lines.ext && !/목록 범위|소신 확장|70%컷 기준/.test(r.legend), [r.lines, r.legend]);
+  check('내 등급선은 그대로', !!r.lines.me);
 }
 
 console.log('\n■ 휴대폰 — 줄마다 그대로');
