@@ -309,6 +309,55 @@
         /* 목록(자세히) 보기 — 카드 그리드 대신 한 줄 한 학과의 표.
            display:block 이 위 미디어쿼리의 grid-template-columns를 통째로 무력화한다(#id+.class 우선). */
         #data-list.list-mode { display: block; }
+
+        /* ─── 막대 보기 ───
+           전형 하나가 한 줄. 띠 = 합격자 50%컷~70%컷(있는 해들의 평균), 세로선 = 내 등급.
+           띠 색은 카드의 진단 라벨과 같다. 자료가 1~2년뿐이면 연하게 — 3년 평균과 똑같이 믿으면 안 된다. */
+        #data-list.bar-mode { display: block; }
+        .bar-wrap { background: #fff; border: 1px solid var(--slate-100); border-radius: 1.25rem; padding: 18px 18px 8px; }
+        .bar-note { font-size: 13px; line-height: 1.65; color: #78350f; background: #fffbeb; border: 1px solid #fde68a;
+                    border-radius: 12px; padding: 11px 14px; margin-bottom: 12px; }
+        .bar-note + .bar-note { margin-top: -4px; }
+        .bar-note.tip { color: #3730a3; background: var(--indigo-50); border-color: var(--indigo-100); }
+        .bar-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; font-size: 12.5px;
+                      color: var(--slate-500); margin: 2px 0 10px; }
+        .bar-legend .sw { display: inline-block; width: 22px; height: 10px; border-radius: 5px; vertical-align: -1px; margin-right: 5px; }
+        .bar-legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: -1px; margin-right: 5px; }
+        .bar-legend .me { display: inline-block; width: 2px; height: 13px; background: #ea580c; vertical-align: -2px; margin-right: 6px; }
+        .bar-axis, .bar-row { display: grid; grid-template-columns: minmax(0, 240px) 104px minmax(0, 1fr); gap: 0 14px; align-items: center; }
+        .bar-axis { padding-bottom: 6px; }
+        .bar-axis .ticks { position: relative; height: 20px; }
+        .bar-axis .ticks span { position: absolute; bottom: 0; transform: translateX(-50%); font-size: 11px; color: var(--slate-400);
+                                font-variant-numeric: tabular-nums; }
+        .bar-axis .ticks .me-lb { color: #c2410c; font-weight: 800; bottom: auto; top: -2px; white-space: nowrap; }
+        .bar-row { padding: 9px 0; border-top: 1px solid var(--slate-100); cursor: pointer; }
+        .bar-row:hover { background: var(--slate-50); }
+        .bar-name { min-width: 0; }
+        .bar-name .u { font-weight: 800; font-size: 14px; color: var(--slate-900); }
+        .bar-name .u .cp { font-weight: 600; font-size: 11.5px; color: var(--slate-400); margin-left: 4px; }
+        .bar-name .d { font-size: 12.5px; color: var(--slate-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bar-name .chip { display: inline-block; font-size: 10.5px; font-weight: 800; color: var(--slate-500); background: var(--slate-100);
+                          border-radius: 6px; padding: 1px 6px; margin: 3px 4px 0 0; }
+        .bar-cuts { font-size: 12px; line-height: 1.5; text-align: right; color: var(--slate-400); font-variant-numeric: tabular-nums; }
+        .bar-cuts b { color: var(--slate-800); font-size: 13px; }
+        .bar-track { position: relative; height: 26px; border-radius: 6px;
+                     background-image: linear-gradient(to right, var(--slate-100) 1px, transparent 1px); }
+        .bar-band { position: absolute; top: 7px; height: 12px; border-radius: 6px; min-width: 6px; }
+        .bar-dot  { position: absolute; top: 6px; width: 14px; height: 14px; border-radius: 50%; transform: translateX(-50%); }
+        .bar-me   { position: absolute; top: -9px; bottom: -9px; width: 2px; margin-left: -1px; background: #ea580c; }
+        .b-safe  { background: #3b82f6; }   /* 안정 */
+        .b-fit   { background: #22c55e; }   /* 적정 */
+        .b-reach { background: #eab308; }   /* 소신 */
+        .b-risk  { background: #ef4444; }   /* 위험 */
+        .b-none  { background: #818cf8; }   /* 종합전형 — 진단 라벨 없음 */
+        .bar-row.y1 .bar-band, .bar-row.y1 .bar-dot { opacity: .38; }
+        .bar-row.y2 .bar-band, .bar-row.y2 .bar-dot { opacity: .68; }
+        @media (max-width: 640px) {
+            .bar-wrap { padding: 14px 12px 6px; }
+            .bar-axis, .bar-row { grid-template-columns: minmax(0, 1fr) 92px; }
+            .bar-axis > .sp { display: none; }
+            .bar-axis .ticks, .bar-track { grid-column: 1 / -1; margin-top: 6px; }
+        }
         .uni-table-wrap { background: #fff; border: 1px solid var(--slate-100); border-radius: 1.25rem;
             box-shadow: 0 1px 3px rgba(0,0,0,.04); overflow: auto; max-height: 72vh; }
         table.uni-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; white-space: nowrap; }
@@ -549,6 +598,7 @@
                 <div class="lg-item"><span class="lg-sw" style="border:1px dashed var(--slate-400);color:var(--slate-500);">경계</span><span class="lg-tx">데이터 부족·경계선 — <b>단정 말고 참고</b></span></div>
                 <p class="sp-hint" style="margin-top:2px;">※ 완충 m = 그 학과 <b>3개년 컷 변동폭 ÷2</b> (0.15~0.4). 매년 출렁이는 학과일수록 넓게·보수적으로 판정.</p>
                 <p class="sp-hint" style="margin-top:2px;">※ <b>종합전형에는 진단 라벨을 표시하지 않습니다</b> — 성적 외 요소(활동·세특·면접)가 커 성적만으로 판단하면 혼선을 줍니다.</p>
+                <p class="sp-hint" style="margin-top:2px;">※ <b>등급컷은 대학마다 계산 기준이 다릅니다</b> — 반영 과목·과목별 비율·진로선택 처리가 달라 같은 학생도 대학마다 등급이 다르게 나옵니다. 합격 순위는 대학 환산점수로 매기므로 등급컷은 참고용이고, 가능성은 대학별 환산점수로 확인하세요.</p>
             </div>
             <hr class="lg-div">
             <div class="lg-group">
@@ -600,6 +650,7 @@
                     <div class="range-tabs" id="view-tabs">
                         <button class="range-tab" id="view-card" onclick="setViewMode('card')" title="카드로 보기">▦ 카드</button>
                         <button class="range-tab" id="view-list" onclick="setViewMode('list')" title="목록으로 보기 (열 제목 클릭 시 정렬)">☰ 자세히</button>
+                        <button class="range-tab" id="view-bar" onclick="setViewMode('bar')" title="막대로 보기 (합격선 구간과 내 등급을 한눈에)">📊 막대</button>
                     </div>
                     <div class="found-pill">
                         <span class="k">Departments Found</span>
@@ -755,8 +806,8 @@
         let currentFiltered = [];              // 현재 필터 결과 (모달·더 보기에서 참조)
         let visibleCount = 150;
         const PAGE_SIZE = 150;
-        // 결과 표시 방식: 'card' 카드 그리드 | 'list' 목록(자세히). 선택은 브라우저에 기억한다.
-        let viewMode = (function(){ try { return localStorage.getItem('jindan-view') === 'list' ? 'list' : 'card'; } catch(e) { return 'card'; } })();
+        // 결과 표시 방식: 'card' 카드 그리드 | 'list' 목록(자세히) | 'bar' 막대. 선택은 브라우저에 기억한다.
+        let viewMode = (function(){ try { const v = localStorage.getItem('jindan-view'); return (v === 'list' || v === 'bar') ? v : 'card'; } catch(e) { return 'card'; } })();
         let listSort = null;                   // {f, asc} — null이면 카드 보기와 같은 기본 정렬
 
         const VERSIONS = [
@@ -1131,6 +1182,7 @@
         function syncViewTabs() {
             document.getElementById('view-card').classList.toggle('active', viewMode === 'card');
             document.getElementById('view-list').classList.toggle('active', viewMode === 'list');
+            document.getElementById('view-bar').classList.toggle('active', viewMode === 'bar');
         }
         // 열 제목 클릭: 오름차순 → 내림차순 → 기본순 (더 보기로 펼친 행 수는 유지)
         function setListSort(f) {
@@ -1285,11 +1337,13 @@
         function renderList(target) {
             const emptyState = document.getElementById('empty-state');
             const list = document.getElementById('data-list');
-            list.querySelectorAll('.uni-card, .uni-table-wrap, #load-more-wrap').forEach(el => el.remove());
+            list.querySelectorAll('.uni-card, .uni-table-wrap, .bar-wrap, #load-more-wrap').forEach(el => el.remove());
             list.classList.toggle('list-mode', viewMode === 'list');
+            list.classList.toggle('bar-mode', viewMode === 'bar');
             syncViewTabs();
             emptyState.style.display = currentFiltered.length ? 'none' : 'block';
-            list.insertAdjacentHTML('afterbegin', viewMode === 'list' ? tableHtml(target) : cardsHtml(target));
+            list.insertAdjacentHTML('afterbegin',
+                viewMode === 'list' ? tableHtml(target) : viewMode === 'bar' ? barsHtml(target) : cardsHtml(target));
             if (viewMode === 'list') placeStickyCols(list);
             if (currentFiltered.length > visibleCount) {
                 list.insertAdjacentHTML('beforeend', `<div id="load-more-wrap" style="grid-column:1/-1;text-align:center;padding:8px 0;">
@@ -1386,6 +1440,75 @@
             }).join('');
             return `<div class="uni-table-wrap"><table class="uni-table">
                 <thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+        }
+        // 막대 보기. 결과 하나가 '대학·전형·모집단위' 한 줄이라 전형을 섞어 평균 내지 않는다
+        // (여러 전형을 평균 내면 어느 전형에도 없는 컷이 나온다 — 지역전형 1.27 과 일반전형 4.18 이 2.72 로).
+        //  · 띠 = 50%컷~70%컷(있는 해들의 평균, 카드·진단과 같은 값). 두 값 중 작은 쪽~큰 쪽으로 그린다 —
+        //    등급컷은 대학 환산점수 순위의 50%째·70%째 학생 '등급'이라 순서가 뒤바뀌는 일이 실제로 있다.
+        //  · 50%컷이 없으면 띠 대신 70%컷 점 하나. 없는 값을 지어내지 않는다.
+        //  · 자료가 1~2년뿐이면 연하게 + 'n년' 표시, 최신 해가 비었으면 '최근 미공개'.
+        const BAR_CLS = { 'lab-safe': 'b-safe', 'lab-fit': 'b-fit', 'lab-reach': 'b-reach', 'lab-risk': 'b-risk' };
+        const BAR_MANY = 60;
+        function barScale(rows, target) {
+            let lo = target, hi = target;
+            rows.forEach(r => [r.averageGrade, r.avg50].forEach(v => { if (v != null && !isNaN(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }));
+            lo = Math.max(1, Math.floor((lo - 0.1) * 2) / 2);
+            hi = Math.min(9, Math.ceil((hi + 0.1) * 2) / 2);
+            if (hi - lo < 1) { hi = Math.min(9, lo + 1); lo = Math.max(1, hi - 1); }
+            return { lo, hi, pct: v => ((v - lo) / (hi - lo) * 100).toFixed(2) + '%' };
+        }
+        function barsHtml(target) {
+            const rows = currentFiltered.slice(0, visibleCount);
+            if (!rows.length) return '';                   // 결과가 없으면 '검색 결과 없음' 안내만
+            const isJonghap = admissionKind === '종합';
+            const sc = barScale(rows, target);
+            const grid = `background-size:${(50 / (sc.hi - sc.lo)).toFixed(3)}% 100%;`;   // 0.5등급마다 옅은 세로줄
+            const ticks = [];
+            for (let v = sc.lo; v <= sc.hi + 1e-9; v += 0.5) ticks.push(`<span style="left:${sc.pct(v)}">${v.toFixed(1)}</span>`);
+            const latest = SURVEY_YEARS[SURVEY_YEARS.length - 1];
+            const body = rows.map((r, idx) => {
+                const d = isJonghap ? null : classify(target, r);
+                const a70 = r.averageGrade, a50 = r.avg50;
+                const no50 = (a50 == null || isNaN(a50));
+                const cls = d ? BAR_CLS[d.cls] : 'b-none';
+                const lo = no50 ? a70 : Math.min(a50, a70), hi = no50 ? a70 : Math.max(a50, a70);
+                const mark = no50
+                    ? `<span class="bar-dot ${cls}" style="left:${sc.pct(a70)}"></span>`
+                    : `<span class="bar-band ${cls}" style="left:${sc.pct(lo)};width:calc(${sc.pct(hi)} - ${sc.pct(lo)})"></span>`;
+                const chips = []
+                    .concat(d ? [`<span class="chip">${d.label}${d.uncertain ? '·경계' : ''}</span>`] : [])
+                    .concat(r.yearCount < SURVEY_YEARS.length ? [`<span class="chip">${r.yearCount}년 자료</span>`] : [])
+                    .concat(yearCut(r, latest) == null ? ['<span class="chip">최근 미공개</span>'] : [])
+                    .join('');
+                return `<div class="bar-row y${r.yearCount}" onclick="openDetail(${idx})">
+                    <div class="bar-name">
+                        <div class="u">${r.university}<span class="cp">${r.campus}</span></div>
+                        <div class="d">${r.department} · ${r.admissionName}</div>
+                        <div>${chips}</div>
+                    </div>
+                    <div class="bar-cuts">50% <b>${no50 ? '–' : a50.toFixed(2)}</b><br>70% <b>${a70.toFixed(2)}</b></div>
+                    <div class="bar-track" style="${grid}">${mark}<span class="bar-me" style="left:${sc.pct(target)}"></span></div>
+                </div>`;
+            }).join('');
+            const legend = isJonghap
+                ? '<span><i class="sw b-none"></i>합격자 50%~70%컷</span>'
+                : '<span><i class="sw b-safe"></i>안정</span><span><i class="sw b-fit"></i>적정</span><span><i class="sw b-reach"></i>소신</span><span><i class="sw b-risk"></i>위험</span>';
+            const many = currentFiltered.length > BAR_MANY
+                ? `<div class="bar-note tip">막대가 ${currentFiltered.length.toLocaleString()}개입니다. 위 <b>학과명 검색</b>(예: 전자공학)이나 대학명으로 좁히면 비교하기 쉽습니다.</div>` : '';
+            return `<div class="bar-wrap">
+                <div class="bar-note"><b>등급컷은 대학마다 계산 기준이 다릅니다.</b> 반영 과목(전 교과·국영수사과 등)·과목별 비율·진로선택과목 처리가 대학마다 달라, 같은 학생도 대학마다 등급이 다르게 나옵니다. 합격 순위는 <b>대학 환산점수</b>로 매기므로 등급컷은 참고용이며, 합격 가능성은 대학별 환산점수(모집요강·성적 산출)로 확인하세요. 그래서 50%컷이 70%컷보다 좋은 곳도 있습니다 — 오류가 아닙니다.</div>
+                ${many}
+                <div class="bar-legend">
+                    <span>띠 = 합격자 <b>50%컷~70%컷</b> (${SURVEY_YEARS.length}년 중 있는 해 평균)</span>
+                    ${legend}
+                    <span><i class="dot b-none"></i>50%컷 없음(70%컷만)</span>
+                    <span><i class="sw b-none" style="opacity:.38"></i>연하면 1~2년 자료</span>
+                    <span><i class="me"></i>내 등급 ${target.toFixed(2)}</span>
+                </div>
+                <div class="bar-axis"><div class="sp"></div><div class="sp"></div>
+                    <div class="ticks">${ticks.join('')}</div></div>
+                ${body}
+            </div>`;
         }
         function loadMore() { visibleCount += PAGE_SIZE; renderList(getTargetGrade()); }
 
