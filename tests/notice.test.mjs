@@ -70,6 +70,8 @@ check('배포를 문서 안의 scope 로 가른다',
       /const NOTICE_SCOPE\s*=\s*'(test|live)'/.test(HTML) && /if \(scope !== NOTICE_SCOPE\) return;/.test(HTML));
 check('예전 문서(공지 하나이던 시절)도 계속 읽는다',
       /NOTICE_LEGACY_ID = \{ test: 'board-test', live: 'board' \}/.test(HTML));
+// test 에도 실사용 선생님이 계셔서 공지를 합쳤다. 운영·test 가 같은 공지를 봐야 한다.
+check('운영·test 가 같은 공지를 본다 — 둘 다 live', /^const NOTICE_SCOPE\s*=\s*'live';/m.test(HTML));
 check('전체 새로고침 신호는 공지로 안 센다', /if \(d\.id === 'reload'\) return;/.test(HTML));
 check('청소는 모든 공지의 키를 기준으로 한다 (안 그러면 남의 그림이 지워진다)',
       /const keep = noticeAllKeys\(keys\);/.test(HTML));
