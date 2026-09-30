@@ -311,52 +311,55 @@
         #data-list.list-mode { display: block; }
 
         /* ─── 막대 보기 ───
-           전형 하나가 한 줄. 띠 = 합격자 50%컷~70%컷(있는 해들의 평균), 세로선 = 내 등급.
-           띠 색은 카드의 진단 라벨과 같다. 자료가 1~2년뿐이면 연하게 — 3년 평균과 똑같이 믿으면 안 된다. */
+           전형 하나가 한 줄. 막대 둘 — 50%컷(진한) · 70%컷(연한). 모두 1.0 에서 시작하는 '길이' 막대이고
+           눈금은 1.0~9.0 고정이라 줄끼리 길이를 바로 견줄 수 있다. 옅은 띠 = 지금 검색 범위, 세로선 = 내 등급.
+           (처음엔 50~70%컷 구간을 떠 있는 띠로 그렸는데, 띠가 제각각 떠 있어 눈이 어지러웠다) */
         #data-list.bar-mode { display: block; }
-        .bar-wrap { background: #fff; border: 1px solid var(--slate-100); border-radius: 1.25rem; padding: 18px 18px 8px; }
-        .bar-note { font-size: 13px; line-height: 1.65; color: #78350f; background: #fffbeb; border: 1px solid #fde68a;
-                    border-radius: 12px; padding: 11px 14px; margin-bottom: 12px; }
-        .bar-note + .bar-note { margin-top: -4px; }
-        .bar-note.tip { color: #3730a3; background: var(--indigo-50); border-color: var(--indigo-100); }
-        .bar-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; font-size: 12.5px;
-                      color: var(--slate-500); margin: 2px 0 10px; }
-        .bar-legend .sw { display: inline-block; width: 22px; height: 10px; border-radius: 5px; vertical-align: -1px; margin-right: 5px; }
-        .bar-legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: -1px; margin-right: 5px; }
+        .bar-wrap { background: #fff; border: 1px solid var(--slate-100); border-radius: 1.25rem; padding: 16px 18px 18px; }
+        .bar-note { font-size: 12.5px; line-height: 1.6; color: #dc2626; margin: 0 0 10px; }
+        .bar-note.tip { color: var(--indigo); }
+        .bar-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; font-size: 12.5px; color: var(--slate-500);
+                      background: var(--slate-50); border: 1px solid var(--slate-100); border-radius: 10px; padding: 9px 14px; margin-bottom: 12px; }
+        .bar-legend .sw { display: inline-block; width: 22px; height: 9px; border-radius: 5px; margin-right: 6px; }
+        .bar-legend .rg { display: inline-block; width: 18px; height: 12px; background: #fff4e0; vertical-align: -2px; margin-right: 6px;
+                          border-left: 1px dashed #f59e0b; border-right: 1px dashed #f59e0b; }
         .bar-legend .me { display: inline-block; width: 2px; height: 13px; background: #ea580c; vertical-align: -2px; margin-right: 6px; }
-        .bar-axis, .bar-row { display: grid; grid-template-columns: minmax(0, 240px) 104px minmax(0, 1fr); gap: 0 14px; align-items: center; }
-        .bar-axis { padding-bottom: 6px; }
-        .bar-axis .ticks { position: relative; height: 20px; }
-        .bar-axis .ticks span { position: absolute; bottom: 0; transform: translateX(-50%); font-size: 11px; color: var(--slate-400);
-                                font-variant-numeric: tabular-nums; }
-        .bar-axis .ticks .me-lb { color: #c2410c; font-weight: 800; bottom: auto; top: -2px; white-space: nowrap; }
-        .bar-row { padding: 9px 0; border-top: 1px solid var(--slate-100); cursor: pointer; }
-        .bar-row:hover { background: var(--slate-50); }
-        .bar-name { min-width: 0; }
-        .bar-name .u { font-weight: 800; font-size: 14px; color: var(--slate-900); }
-        .bar-name .u .cp { font-weight: 600; font-size: 11.5px; color: var(--slate-400); margin-left: 4px; }
-        .bar-name .d { font-size: 12.5px; color: var(--slate-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .bar-name .chip { display: inline-block; font-size: 10.5px; font-weight: 800; color: var(--slate-500); background: var(--slate-100);
-                          border-radius: 6px; padding: 1px 6px; margin: 3px 4px 0 0; }
-        .bar-cuts { font-size: 12px; line-height: 1.5; text-align: right; color: var(--slate-400); font-variant-numeric: tabular-nums; }
-        .bar-cuts b { color: var(--slate-800); font-size: 13px; }
-        .bar-track { position: relative; height: 26px; border-radius: 6px;
-                     background-image: linear-gradient(to right, var(--slate-100) 1px, transparent 1px); }
-        .bar-band { position: absolute; top: 7px; height: 12px; border-radius: 6px; min-width: 6px; }
-        .bar-dot  { position: absolute; top: 6px; width: 14px; height: 14px; border-radius: 50%; transform: translateX(-50%); }
-        .bar-me   { position: absolute; top: -9px; bottom: -9px; width: 2px; margin-left: -1px; background: #ea580c; }
-        .b-safe  { background: #3b82f6; }   /* 안정 */
-        .b-fit   { background: #22c55e; }   /* 적정 */
-        .b-reach { background: #eab308; }   /* 소신 */
-        .b-risk  { background: #ef4444; }   /* 위험 */
-        .b-none  { background: #818cf8; }   /* 종합전형 — 진단 라벨 없음 */
-        .bar-row.y1 .bar-band, .bar-row.y1 .bar-dot { opacity: .38; }
-        .bar-row.y2 .bar-band, .bar-row.y2 .bar-dot { opacity: .68; }
+        .bar-grid { border-top: 2px solid var(--slate-300); }
+        .bar-axis, .bar-row { display: grid; grid-template-columns: minmax(0, 220px) 58px minmax(0, 1fr); align-items: center; }
+        .bar-axis { font-size: 11.5px; color: var(--slate-500); font-weight: 700; padding: 8px 0 6px; }
+        .bar-axis .h1 { padding-left: 16px; }
+        .bar-axis .h2 { text-align: center; line-height: 1.35; font-size: 11px; }
+        .bar-axis .ticks { position: relative; height: 16px; margin: 0 14px 0 8px; }
+        .bar-axis .ticks span { position: absolute; transform: translateX(-50%); font-variant-numeric: tabular-nums; }
+        .bar-row { margin-top: 6px; border: 1px solid #dbe7ff; border-left: 4px solid #2563eb; border-radius: 8px; background: #fff; cursor: pointer; }
+        .bar-row:nth-child(odd) { background: #f8fafc; }
+        .bar-row:hover { border-color: #93c5fd; border-left-color: #2563eb; }
+        .bar-name { padding: 10px 10px 10px 12px; min-width: 0; }
+        .bar-name .u { font-weight: 800; font-size: 14px; color: #1d4ed8; }
+        .bar-name .u .cp { font-weight: 600; font-size: 11.5px; color: var(--slate-400); margin-left: 3px; }
+        .bar-name .u .lab { font-size: 10.5px; font-weight: 800; border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: 1px; }
+        .bar-name .d { font-size: 12px; color: var(--slate-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bar-name .few { font-size: 11px; color: var(--slate-400); margin-top: 1px; }
+        .bar-cuts { text-align: center; font-size: 13px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;
+                    display: flex; flex-direction: column; gap: 12px; }
+        .bar-cuts .c50 { color: #1d4ed8; }
+        .bar-cuts .c70 { color: #60a5fa; }
+        .bar-track { position: relative; align-self: stretch; min-height: 50px; margin: 0 14px 0 8px;
+                     background-image: linear-gradient(to right, var(--slate-100) 1px, transparent 1px); background-size: 6.25% 100%; }
+        .bar-range { position: absolute; top: 0; bottom: 0; background: #fff4e0; border-left: 1px dashed #f59e0b; border-right: 1px dashed #f59e0b; }
+        .bar-b { position: absolute; left: 0; height: 13px; border-radius: 0 7px 7px 0; }
+        .bar-b.b50 { top: calc(50% - 16px); background: #0b6bff; }
+        .bar-b.b70 { top: calc(50% + 3px); background: #9ec5fe; }
+        .bar-row:nth-child(even) .bar-b.b50 { background: #0e7490; }
+        .bar-row:nth-child(even) .bar-b.b70 { background: #a5d8e6; }
+        .bar-me { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #ea580c; }
         @media (max-width: 640px) {
-            .bar-wrap { padding: 14px 12px 6px; }
-            .bar-axis, .bar-row { grid-template-columns: minmax(0, 1fr) 92px; }
-            .bar-axis > .sp { display: none; }
-            .bar-axis .ticks, .bar-track { grid-column: 1 / -1; margin-top: 6px; }
+            .bar-wrap { padding: 14px 10px 14px; }
+            .bar-axis, .bar-row { grid-template-columns: minmax(0, 1fr) 52px; }
+            .bar-axis .h1, .bar-axis .h2 { display: none; }
+            .bar-axis .ticks, .bar-track { grid-column: 1 / -1; }
+            .bar-axis .ticks .half { display: none; }
+            .bar-track { min-height: 44px; margin: 0 10px 8px; }
         }
         .uni-table-wrap { background: #fff; border: 1px solid var(--slate-100); border-radius: 1.25rem;
             box-shadow: 0 1px 3px rgba(0,0,0,.04); overflow: auto; max-height: 72vh; }
@@ -1443,71 +1446,58 @@
         }
         // 막대 보기. 결과 하나가 '대학·전형·모집단위' 한 줄이라 전형을 섞어 평균 내지 않는다
         // (여러 전형을 평균 내면 어느 전형에도 없는 컷이 나온다 — 지역전형 1.27 과 일반전형 4.18 이 2.72 로).
-        //  · 띠 = 50%컷~70%컷(있는 해들의 평균, 카드·진단과 같은 값). 두 값 중 작은 쪽~큰 쪽으로 그린다 —
-        //    등급컷은 대학 환산점수 순위의 50%째·70%째 학생 '등급'이라 순서가 뒤바뀌는 일이 실제로 있다.
-        //  · 50%컷이 없으면 띠 대신 70%컷 점 하나. 없는 값을 지어내지 않는다.
-        //  · 자료가 1~2년뿐이면 연하게 + 'n년' 표시, 최신 해가 비었으면 '최근 미공개'.
-        const BAR_CLS = { 'lab-safe': 'b-safe', 'lab-fit': 'b-fit', 'lab-reach': 'b-reach', 'lab-risk': 'b-risk' };
+        //  · 값은 카드·진단과 같은 것(있는 해들의 평균)
+        //  · 50%컷이 없으면 50% 막대를 그리지 않는다. 없는 값을 지어내지 않는다
+        //  · 50%컷이 70%컷보다 큰 곳도 그대로 그린다 — 등급컷은 대학 환산점수 순위의 50%째·70%째 학생
+        //    '등급'이라 순서가 뒤바뀌는 일이 실제로 있다(오류가 아니다)
+        //  · 자료가 1~2년뿐이거나 최신 해가 비었으면 이름 아래 회색 글씨로 알린다
         const BAR_MANY = 60;
-        function barScale(rows, target) {
-            let lo = target, hi = target;
-            rows.forEach(r => [r.averageGrade, r.avg50].forEach(v => { if (v != null && !isNaN(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }));
-            lo = Math.max(1, Math.floor((lo - 0.1) * 2) / 2);
-            hi = Math.min(9, Math.ceil((hi + 0.1) * 2) / 2);
-            if (hi - lo < 1) { hi = Math.min(9, lo + 1); lo = Math.max(1, hi - 1); }
-            return { lo, hi, pct: v => ((v - lo) / (hi - lo) * 100).toFixed(2) + '%' };
-        }
+        const barPct = v => ((Math.min(9, Math.max(1, v)) - 1) / 8 * 100).toFixed(2) + '%';   // 1.0~9.0 고정 눈금
         function barsHtml(target) {
             const rows = currentFiltered.slice(0, visibleCount);
             if (!rows.length) return '';                   // 결과가 없으면 '검색 결과 없음' 안내만
             const isJonghap = admissionKind === '종합';
-            const sc = barScale(rows, target);
-            const grid = `background-size:${(50 / (sc.hi - sc.lo)).toFixed(3)}% 100%;`;   // 0.5등급마다 옅은 세로줄
+            const bd = getBounds(target);
+            const hasRange = searchRange !== 'all';
+            const range = hasRange
+                ? `<span class="bar-range" style="left:${barPct(bd.lower)};width:calc(${barPct(bd.upper)} - ${barPct(bd.lower)})"></span>` : '';
             const ticks = [];
-            for (let v = sc.lo; v <= sc.hi + 1e-9; v += 0.5) ticks.push(`<span style="left:${sc.pct(v)}">${v.toFixed(1)}</span>`);
+            for (let v = 1; v <= 9.001; v += 0.5) ticks.push(`<span class="${v % 1 ? 'half' : ''}" style="left:${barPct(v)}">${v.toFixed(1)}</span>`);
             const latest = SURVEY_YEARS[SURVEY_YEARS.length - 1];
             const body = rows.map((r, idx) => {
                 const d = isJonghap ? null : classify(target, r);
                 const a70 = r.averageGrade, a50 = r.avg50;
                 const no50 = (a50 == null || isNaN(a50));
-                const cls = d ? BAR_CLS[d.cls] : 'b-none';
-                const lo = no50 ? a70 : Math.min(a50, a70), hi = no50 ? a70 : Math.max(a50, a70);
-                const mark = no50
-                    ? `<span class="bar-dot ${cls}" style="left:${sc.pct(a70)}"></span>`
-                    : `<span class="bar-band ${cls}" style="left:${sc.pct(lo)};width:calc(${sc.pct(hi)} - ${sc.pct(lo)})"></span>`;
-                const chips = []
-                    .concat(d ? [`<span class="chip">${d.label}${d.uncertain ? '·경계' : ''}</span>`] : [])
-                    .concat(r.yearCount < SURVEY_YEARS.length ? [`<span class="chip">${r.yearCount}년 자료</span>`] : [])
-                    .concat(yearCut(r, latest) == null ? ['<span class="chip">최근 미공개</span>'] : [])
-                    .join('');
-                return `<div class="bar-row y${r.yearCount}" onclick="openDetail(${idx})">
+                const few = [];
+                if (r.yearCount < SURVEY_YEARS.length) few.push(`${r.yearCount}년 자료`);
+                if (yearCut(r, latest) == null) few.push('최근 미공개');
+                return `<div class="bar-row" onclick="openDetail(${idx})">
                     <div class="bar-name">
-                        <div class="u">${r.university}<span class="cp">${r.campus}</span></div>
+                        <div class="u">${r.university}<span class="cp">${r.campus}</span>${d ? `<span class="lab ${d.cls}">${d.label}</span>` : ''}</div>
                         <div class="d">${r.department} · ${r.admissionName}</div>
-                        <div>${chips}</div>
+                        ${few.length ? `<div class="few">${few.join(' · ')}</div>` : ''}
                     </div>
-                    <div class="bar-cuts">50% <b>${no50 ? '–' : a50.toFixed(2)}</b><br>70% <b>${a70.toFixed(2)}</b></div>
-                    <div class="bar-track" style="${grid}">${mark}<span class="bar-me" style="left:${sc.pct(target)}"></span></div>
+                    <div class="bar-cuts"><span class="c50">${no50 ? '–' : a50.toFixed(2)}</span><span class="c70">${a70.toFixed(2)}</span></div>
+                    <div class="bar-track">${range}${no50 ? '' : `<span class="bar-b b50" style="width:${barPct(a50)}"></span>`}<span class="bar-b b70" style="width:${barPct(a70)}"></span><span class="bar-me" style="left:${barPct(target)}"></span></div>
                 </div>`;
             }).join('');
-            const legend = isJonghap
-                ? '<span><i class="sw b-none"></i>합격자 50%~70%컷</span>'
-                : '<span><i class="sw b-safe"></i>안정</span><span><i class="sw b-fit"></i>적정</span><span><i class="sw b-reach"></i>소신</span><span><i class="sw b-risk"></i>위험</span>';
             const many = currentFiltered.length > BAR_MANY
-                ? `<div class="bar-note tip">막대가 ${currentFiltered.length.toLocaleString()}개입니다. 위 <b>학과명 검색</b>(예: 전자공학)이나 대학명으로 좁히면 비교하기 쉽습니다.</div>` : '';
+                ? `<p class="bar-note tip">ⓘ 막대가 ${currentFiltered.length.toLocaleString()}개입니다. 위 <b>학과명 검색</b>(예: 전자공학)이나 대학명으로 좁히면 비교하기 쉽습니다.</p>` : '';
             return `<div class="bar-wrap">
-                <div class="bar-note"><b>등급컷은 대학마다 계산 기준이 다릅니다.</b> 반영 과목(전 교과·국영수사과 등)·과목별 비율·진로선택과목 처리가 대학마다 달라, 같은 학생도 대학마다 등급이 다르게 나옵니다. 합격 순위는 <b>대학 환산점수</b>로 매기므로 등급컷은 참고용이며, 합격 가능성은 대학별 환산점수(모집요강·성적 산출)로 확인하세요. 그래서 50%컷이 70%컷보다 좋은 곳도 있습니다 — 오류가 아닙니다.</div>
+                <p class="bar-note">ⓘ 등급컷은 대학마다 계산 기준이 다릅니다. 반영 과목·과목별 비율·진로선택과목 처리가 달라 같은 학생도 대학마다 등급이 다르게 나오고, 합격 순위는 대학 환산점수로 매깁니다. 참고용으로 보고 합격 가능성은 대학별 환산점수로 확인하세요. (그래서 50%컷이 70%컷보다 큰 곳도 있습니다 — 오류가 아닙니다)</p>
                 ${many}
                 <div class="bar-legend">
-                    <span>띠 = 합격자 <b>50%컷~70%컷</b> (${SURVEY_YEARS.length}년 중 있는 해 평균)</span>
-                    ${legend}
-                    <span><i class="dot b-none"></i>50%컷 없음(70%컷만)</span>
-                    <span><i class="sw b-none" style="opacity:.38"></i>연하면 1~2년 자료</span>
+                    <span><i class="sw" style="background:#0b6bff"></i>50%컷</span>
+                    <span><i class="sw" style="background:#9ec5fe"></i>70%컷</span>
+                    ${hasRange ? `<span><i class="rg"></i>검색 범위 ${bd.lower.toFixed(2)}~${bd.upper.toFixed(2)}</span>` : ''}
                     <span><i class="me"></i>내 등급 ${target.toFixed(2)}</span>
+                    <span>· ${SURVEY_YEARS.length}년 중 있는 해 평균</span>
                 </div>
-                <div class="bar-axis"><div class="sp"></div><div class="sp"></div>
-                    <div class="ticks">${ticks.join('')}</div></div>
-                ${body}
+                <div class="bar-grid">
+                    <div class="bar-axis"><div class="h1">대학 · 학과</div><div class="h2">50%컷<br>70%컷</div>
+                        <div class="ticks">${ticks.join('')}</div></div>
+                    ${body}
+                </div>
             </div>`;
         }
         function loadMore() { visibleCount += PAGE_SIZE; renderList(getTargetGrade()); }
