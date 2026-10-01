@@ -6,6 +6,9 @@
 
 배포 URL은 `scripts/scrape-weekly.js` 의 `GAS_URL`, `parent.html` 의 GAS 경로에서 씁니다.
 
+`overtime/` 은 **다른 스크립트**입니다 — 초과근무 관리대장 시트에 붙어 학교 계정이 따로
+소유·배포합니다. 설치와 규칙은 `overtime/README.md`.
+
 ## 하는 일
 
 | `?action=` | 쓰는 곳 |

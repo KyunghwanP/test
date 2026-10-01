@@ -120,6 +120,21 @@ node tests/cal-consult.test.mjs                    # 업무 캘린더의 상담 
 
 가짜 Firestore를 물려 목록 렌더·사진 표시·발급 폼·저장 payload를 실제 DOM에서 본다.
 
+### 초과근무 (overtime.html · gas/overtime)
+
+```bash
+node tests/overtime-gas.test.mjs      # 학교 계정 Apps Script 단독 — 설치 불필요(가짜 구글)
+node tests/overtime-page.test.mjs     # 화면 → 스크립트 (Chromium)
+node tests/overtime-tab.test.mjs      # 앱의 탭 배선 (Chromium)
+```
+
+원본은 학교 계정의 시트라 여기서는 실제 시트를 못 연다. `overtime-fake.mjs` 가
+시트·메일·잠금·캐시·로그인 토큰 확인을 흉내 내고, **진짜 `Code.gs`** 를 그 위에서
+돌린다. 화면 검사도 화면이 부르는 요청을 같은 가짜 환경의 `Code.gs` 로 답하므로,
+화면과 스크립트가 같은 말(요청 이름·인자·응답 모양)을 하는지까지 본다.
+'돌아간다'가 아니라 **시트에 무엇이 남는지**를 칸 단위로 본다 — 감사 근거로 쓰는
+문서라 틀린 기록이 남는 것이 가장 나쁘다.
+
 ### 사용 현황 (usage.html · 🥚 빠른 메모 제목 5연타)
 
 화면은 **`usage.html` 로 따로 뺐고, 앱 안에서 iframe 으로 띄운다**(자리 배치와 같은

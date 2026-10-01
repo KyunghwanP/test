@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>초과근무 — 영남고 교사 대시보드</title>
+<link rel="icon" href="favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script>
+  // 앱이 기억해 둔 다크모드를 따른다. 앱 안 iframe 으로 뜨는데 여기만 밝으면 튄다.
+  try{ if(localStorage.getItem('ynhs-dark')==='1') document.documentElement.classList.add('dark'); }catch(e){}
+  window.addEventListener('storage', e => {
+    if (e.key === 'ynhs-dark') document.documentElement.classList.toggle('dark', e.newValue === '1');
+  });
+  if (/[?&]in=1/.test(location.search)) document.documentElement.classList.add('in-app');
+</script>
+<!--
+  4시간 초과근무 관리 — 화면
+  원본은 학교 계정 소유의 관리대장 시트다. 이 화면은 그 시트에 붙은 Apps Script
+  (gas/overtime/Code.gs) 와만 이야기한다. 신청 내용은 앱의 Firebase 에 두지 않는다.
+  보내는 것은 로그인 토큰과 요청뿐이고, 누구인지는 스크립트가 구글에 물어 확인한다.
+  index.html 의 '초과근무' 탭이 이 파일을 iframe 으로 띄운다(?in=1).
+-->
+<style>
+  :root{
+    --bg:#F1F5F9; --paper:#FFFFFF; --soft:#F8FAFC; --ink:#0F172A; --ink2:#475569; --ink3:#64748B; --rule:#E2E8F0;
+    --accent:#2563EB; --accent-soft:#EFF6FF; --on-accent:#FFFFFF;
+    --ok:#15803D; --ok-soft:#DCFCE7; --warn:#B45309; --warn-soft:#FEF3C7; --bad:#B91C1C; --bad-soft:#FEE2E2;
+    --info:#1D4ED8; --info-soft:#DBEAFE; --fix:#6D28D9; --fix-soft:#EDE9FE; --mute-soft:#F1F5F9;
+    --shadow:0 1px 2px rgba(15,23,42,.05);
+  }
+  html.dark{
+    --bg:#0B1220; --paper:#151F33; --soft:#1D2A44; --ink:#E2E8F0; --ink2:#B6C3D6; --ink3:#8FA3BD; --rule:#26354F;
+    --accent:#60A5FA; --accent-soft:#16263F; --on-accent:#0B1220;
+    --ok:#4ADE80; --ok-soft:#14321F; --warn:#FBBF24; --warn-soft:#3A2A0B; --bad:#F87171; --bad-soft:#3B1515;
+    --info:#93C5FD; --info-soft:#172554; --fix:#C4B5FD; --fix-soft:#2A1F45; --mute-soft:#1D2A44;
+    --shadow:none; color-scheme:dark;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{min-height:100%;background:var(--bg);}
+  body{font-family:'Noto Sans KR','Pretendard','Malgun Gothic',sans-serif;color:var(--ink);font-size:14.5px;
+       line-height:1.55;letter-spacing:-.01em;-webkit-font-smoothing:antialiased;}
+  button,input,textarea,select{font:inherit;color:inherit;}
+  button{cursor:pointer;}
+  button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .wrap{max-width:760px;margin:0 auto;padding:14px 16px 48px;display:flex;flex-direction:column;gap:12px;}
+  .wrap.wide{max-width:1120px;}
+
+  /* 머리 — 이름 · 부서 · 새로고침, 그 아래 권한별 화면 고르기 */
+  .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .top h1{font-size:18px;font-weight:800;letter-spacing:-.02em;}
+  .in-app .top h1{display:none;}
+  .who{font-size:13px;color:var(--ink3);}
+  .who b{color:var(--ink);font-weight:700;}
+  .top .sp{flex:1;}
+  .icon-btn{border:1px solid var(--rule);background:var(--paper);border-radius:9px;padding:5px 11px;font-size:12.5px;
+            font-weight:700;color:var(--ink2);display:inline-flex;align-items:center;gap:5px;}
+  .icon-btn:disabled{opacity:.5;cursor:default;}
+  .views{display:flex;gap:6px;flex-wrap:wrap;}
+  .view-btn{border:1px solid var(--rule);background:var(--paper);border-radius:999px;padding:5px 14px;font-size:13px;
+            font-weight:700;color:var(--ink2);display:inline-flex;align-items:center;gap:6px;}
+  .view-btn.on{background:var(--ink);border-color:var(--ink);color:var(--paper);}
+  .badge-n{background:var(--bad);color:#fff;border-radius:999px;font-size:11px;font-weight:700;padding:0 7px;line-height:18px;}
+
+  .box{background:var(--paper);border:1px solid var(--rule);border-radius:13px;padding:12px 14px;display:flex;
+       flex-direction:column;gap:9px;box-shadow:var(--shadow);min-width:0;}
+  .box h2{font-size:13px;font-weight:800;color:var(--ink2);display:flex;align-items:center;gap:8px;}
+  .box h2 .sp{flex:1;}
+  .box h2 small{font-weight:600;color:var(--ink3);}
+  .sep{height:1px;background:var(--rule);}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;
+       background:none;border:0;padding:0;font-size:14px;}
+  .row .l{min-width:0;display:flex;flex-direction:column;}
+  .row .l b{font-weight:700;font-size:14px;}
+  .row .l span{font-size:12.5px;color:var(--ink3);overflow-wrap:anywhere;}
+  .row .r{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+  button.row:hover .l b{text-decoration:underline;text-underline-offset:3px;}
+  .more{background:var(--soft);border-radius:9px;padding:9px 11px;font-size:13px;color:var(--ink2);display:flex;
+        flex-direction:column;gap:6px;white-space:pre-wrap;overflow-wrap:anywhere;}
+  .more .k{color:var(--ink3);font-size:12px;}
+  .empty{font-size:13px;color:var(--ink3);padding:2px 0;}
+
+  .pill{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:1px 9px;white-space:nowrap;}
+  .p-wait{background:var(--warn-soft);color:var(--warn);} .p-ok{background:var(--ok-soft);color:var(--ok);}
+  .p-bad{background:var(--bad-soft);color:var(--bad);}   .p-mute{background:var(--mute-soft);color:var(--ink3);}
+  .p-info{background:var(--info-soft);color:var(--info);} .p-fix{background:var(--fix-soft);color:var(--fix);}
+
+  .btn{display:inline-flex;justify-content:center;align-items:center;gap:6px;font-size:13.5px;font-weight:700;
+       border-radius:10px;padding:9px 12px;border:1px solid var(--rule);background:var(--paper);color:var(--ink);}
+  .btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent);}
+  .btn.ok{background:var(--ok-soft);border-color:transparent;color:var(--ok);}
+  .btn.bad{background:var(--bad-soft);border-color:transparent;color:var(--bad);}
+  .btn.sm{padding:4px 10px;font-size:12.5px;border-radius:8px;}
+  .btn.full{width:100%;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .btns{display:flex;gap:8px;} .btns .btn{flex:1;}
+  .linkish{background:none;border:0;padding:0;color:var(--accent);font-size:12.5px;font-weight:700;align-self:flex-start;}
+
+  .alert{background:var(--warn-soft);border:1px solid transparent;border-radius:12px;padding:11px 13px;display:flex;
+         flex-direction:column;gap:7px;font-size:13.5px;color:var(--ink);}
+  .alert h3{font-size:13.5px;font-weight:800;color:var(--warn);}
+  .alert p{font-size:13px;color:var(--ink2);overflow-wrap:anywhere;}
+  .alert.info{background:var(--accent-soft);} .alert.info h3{color:var(--accent);}
+  .alert.bad{background:var(--bad-soft);} .alert.bad h3{color:var(--bad);}
+
+  /* 입력 */
+  .field{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink2);font-weight:700;}
+  .input{font-size:14px;font-weight:500;color:var(--ink);background:var(--soft);border:1px solid var(--rule);
+         border-radius:9px;padding:8px 10px;min-height:38px;width:100%;}
+  textarea.input{min-height:76px;resize:vertical;line-height:1.5;}
+  textarea.mono{font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;font-size:12.5px;min-height:140px;}
+  .hint{font-size:12px;color:var(--ink3);font-weight:500;}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .chip{font-size:13px;font-weight:700;border:1px solid var(--rule);background:var(--soft);color:var(--ink2);
+        border-radius:999px;padding:5px 11px;text-align:left;}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent);}
+  .chip:disabled{opacity:.45;cursor:default;}
+  .pick-list{display:flex;flex-direction:column;border:1px solid var(--rule);border-radius:9px;overflow:hidden;}
+  .pick-list:empty{display:none;}
+  .pick-list button{background:var(--paper);border:0;border-bottom:1px solid var(--rule);padding:7px 10px;text-align:left;
+                    font-size:13.5px;display:flex;gap:8px;align-items:baseline;}
+  .pick-list button:last-child{border-bottom:0;}
+  .pick-list button span{font-size:12px;color:var(--ink3);font-weight:500;}
+  .pick-list button:hover{background:var(--soft);}
+  .chosen{display:flex;align-items:center;gap:8px;background:var(--accent-soft);border-radius:9px;padding:7px 10px;}
+  .chosen b{font-size:14px;} .chosen span{font-size:12.5px;color:var(--ink3);flex:1;}
+  .chosen .x{background:none;border:0;color:var(--ink3);font-size:13px;padding:0 4px;}
+
+  /* 아래에서 올라오는 입력 창 */
+  .scrim{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:40;display:flex;justify-content:center;
+         align-items:flex-end;padding:0;}
+  .scrim[hidden]{display:none;}
+  .sheet{background:var(--bg);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;
+         padding:14px 16px 22px;display:flex;flex-direction:column;gap:11px;}
+  @media (min-width:700px){ .scrim{align-items:center;padding:20px;} .sheet{border-radius:16px;} }
+  .sheet-top{display:flex;align-items:center;gap:8px;}
+  .sheet-top h2{font-size:16px;font-weight:800;flex:1;}
+  .sheet-top .x{background:none;border:0;font-size:14px;color:var(--ink3);padding:4px 6px;}
+
+  /* 표 */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--rule);border-radius:10px;background:var(--paper);}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;}
+  th,td{padding:6px 8px;border-bottom:1px solid var(--rule);text-align:left;white-space:nowrap;vertical-align:middle;}
+  th{background:var(--soft);color:var(--ink2);font-weight:700;font-size:12px;}
+  th.grp{text-align:center;border-left:1px solid var(--rule);}
+  td.g1{border-left:1px solid var(--rule);}
+  tr:last-child td{border-bottom:0;}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  td.err{color:var(--bad);font-weight:700;}
+  td .sub{display:block;font-size:11px;font-weight:600;}
+  td.cell{min-width:64px;}
+  td.cell button{background:none;border:0;padding:2px 4px;border-radius:6px;font-size:12.5px;font-weight:600;color:inherit;width:100%;text-align:left;}
+  td.cell button:hover{background:var(--soft);}
+  .k-교체{background:var(--warn-soft);} .k-긴급{background:var(--bad-soft);}
+  .k-사후{background:var(--info-soft);} .k-정정{background:var(--fix-soft);}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--ink3);}
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:4px;vertical-align:-1px;}
+
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px;}
+  .kv dt{color:var(--ink3);font-weight:700;} .kv dd{overflow-wrap:anywhere;}
+  .stat{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;}
+  .stat b{font-variant-numeric:tabular-nums;}
+
+  /* 처음·로그인·준비 안내 */
+  .gate{max-width:440px;margin:56px auto;padding:0 16px;display:flex;flex-direction:column;gap:12px;text-align:center;}
+  .gate h1{font-size:18px;font-weight:800;} .gate p{font-size:13.5px;color:var(--ink2);}
+  .gate .box{text-align:left;}
+  ol.steps{padding-left:1.2em;display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink2);}
+
+  .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%) translateY(20px);opacity:0;z-index:60;
+         background:var(--ink);color:var(--paper);font-size:13.5px;font-weight:700;border-radius:10px;padding:10px 16px;
+         max-width:min(92vw,520px);pointer-events:none;transition:opacity .18s,transform .18s;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast.err{background:var(--bad);color:#fff;}
+  .loading{font-size:13px;color:var(--ink3);padding:24px 0;text-align:center;}
+  @media (prefers-reduced-motion:reduce){ *{transition:none !important;} }
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">불러오는 중…</div></div>
+<div class="scrim" id="scrim" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, setPersistence, indexedDBLocalPersistence, browserLocalPersistence }
+  from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+
+// ── 연결 ───────────────────────────────────────────────────────────────────
+// 학교 계정으로 배포한 Apps Script 웹앱 주소(…/exec). 비어 있으면 연결 안내가 뜬다.
+// 관리자는 배포 직후 이 기기에서만 먼저 시험해 볼 수 있다(아래 연결 안내 화면에서 붙여 넣기).
+const OVERTIME_API = '';
+const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
+// 지금은 관리자 혼자 시험한다. 여러 선생님께 열 때 true 로 바꾸고, index.html 의 탭 조건도 같이 푼다.
+const OPEN_TO_ALL = false;
+const LS_API = 'ynhs-overtime-api';
+const API_RE = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec$/;
+
+const fbApp = initializeApp({
+  apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
+  authDomain: "ynhs-7b5ba.firebaseapp.com",
+  projectId: "ynhs-7b5ba",
+  storageBucket: "ynhs-7b5ba.firebasestorage.app",
+  messagingSenderId: "1031618043470",
+  appId: "1:1031618043470:web:edb5b8d1f98db029916d1f"
+});
+const fbAuth = getAuth(fbApp);
+setPersistence(fbAuth, indexedDBLocalPersistence).catch(() => setPersistence(fbAuth, browserLocalPersistence)).catch(() => {});
+
+const isTeacher = u => !!u && /@yeungnam\.hs\.kr$/.test(u.email || '') && !/^[0-9]{7}@/.test(u.email || '');
+const isAdmin = () => fbAuth.currentUser?.email === ADMIN_EMAIL;
+function deviceApi(){ try { const v = localStorage.getItem(LS_API) || ''; return API_RE.test(v) ? v : ''; } catch(e){ return ''; } }
+const apiUrl = () => (isAdmin() && deviceApi()) || OVERTIME_API;
+
+// ── 도구 ───────────────────────────────────────────────────────────────────
+const $ = s => document.querySelector(s);
+const esc = v => v == null ? '' : String(v).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const DOW = '일월화수목금토';
+const dow = d => DOW[new Date(d + 'T12:00:00Z').getUTCDay()];
+const short = d => d ? `${d.slice(5, 7)}.${d.slice(8, 10)} (${dow(d)})` : '';
+const hm = t => String(t || '').slice(5).replace('-', '.');           // '2026-10-05 09:00' → '10.05 09:00'
+const bandShort = b => String(b || '').replace(/(\d)시간 초과 ~ (\d)시간 이하/, '$1~$2시간');
+const slotKey = s => `${s.date}|${s.g}|${s.r}`;
+const roleLabel = r => '감독' + r + (r === 3 ? ' (심야)' : '');
+const slotLabel = s => `${s.g}학년 ${roleLabel(s.r)}`;
+const PILL = { '대기':'p-wait', '승인':'p-ok', '완료':'p-ok', '반려':'p-bad', '거절':'p-bad', '취소':'p-mute', '만료':'p-mute' };
+const pill = (t, cls) => `<span class="pill ${cls || PILL[t] || 'p-mute'}">${esc(t)}</span>`;
+const KIND_CLASS = { '교체':'k-교체', '긴급':'k-긴급', '사후 정정':'k-사후', '정정':'k-정정' };
+
+let toastTimer = null;
+function toast(msg, err){
+  const t = $('#toast');
+  t.textContent = msg; t.classList.toggle('err', !!err); t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), err ? 4200 : 2600);
+}
+
+// Apps Script 는 text/plain 으로 보낸다. 다른 머리글을 붙이면 사전 요청(OPTIONS)이 가는데
+// Apps Script 는 그것을 받지 못한다. 그래서 토큰도 본문에 넣는다.
+async function api(action, params = {}){
+  const url = apiUrl();
+  if (!url) throw new Error('연결할 주소가 없습니다.');
+  const idToken = await fbAuth.currentUser.getIdToken();
+  let res;
+  try {
+    res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                             body: JSON.stringify(Object.assign({ action, idToken }, params)) });
+  } catch(e) {
+    throw new Error('연결하지 못했습니다. 인터넷을 확인하고, 계속되면 웹앱 배포의 액세스가 「모든 사용자」인지 확인해 주세요.');
+  }
+  let data;
+  try { data = await res.json(); } catch(e) { throw new Error(`응답을 읽지 못했습니다 (${res.status}).`); }
+  if (data && data.state) ME = data.state;            // 실패해도 새 상태가 오면 반영한다(자동 취소 등)
+  if (!data || !data.ok) { const e = new Error((data && data.msg) || '처리하지 못했습니다.'); e.code = data && data.error; throw e; }
+  return data;
+}
+
+// 버튼을 누른 동안 막고, 끝나면 결과를 알린다
+let BUSY = false;
+async function run(btn, fn){
+  if (BUSY) return;
+  BUSY = true;
+  const keep = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.textContent = '처리 중…'; }
+  try { await fn(); }
+  catch(e) { toast(e.message, true); }
+  finally {
+    BUSY = false;
+    if (btn && btn.isConnected) { btn.disabled = false; btn.innerHTML = keep; }
+    render();
+  }
+}
+
+// ── 상태 ───────────────────────────────────────────────────────────────────
+let ME = null;                  // 스크립트의 me_ — 내 신청·감독·받은 요청·명렬(이름·부서만)
+let VIEW = 'mine';              // mine | admin | assign | ops
+let GATE = null;                // 화면 대신 띄울 안내 { kind, msg }
+let ADMIN = null, ADMIN_MONTH = '';
+let GRID = null, GRID_MONTH = '';
+let ASSIGN = { grade: 0, text: '', res: null };
+let STATUS = null;
+let SHEET = null;               // 열린 입력 창
+let REJECTING = '';             // 반려 사유를 적는 중인 신청 번호
+let REJECT_TEXT = '';
+const OPEN = new Set();         // 펼친 줄
+let lastLoad = 0;
+
+async function loadMe(){
+  const d = await api('me');
+  ME = d.state; lastLoad = Date.now();
+  if (VIEW === 'admin' && !ME.roles.view) VIEW = 'mine';
+  if (VIEW === 'assign' && !ME.roles.grades.length) VIEW = 'mine';
+  if (VIEW === 'ops' && !(ME.roles.operator || ME.roles.approve)) VIEW = 'mine';
+}
+
+// ── 그리기 ─────────────────────────────────────────────────────────────────
+function render(){
+  const app = $('#app');
+  if (GATE) { app.innerHTML = gateHtml(); return; }
+  if (!ME) { app.innerHTML = '<div class="loading">불러오는 중…</div>'; return; }
+  const wide = VIEW === 'assign' || VIEW === 'admin';
+  app.innerHTML = `<div class="wrap${wide ? ' wide' : ''}">${topHtml()}${
+    VIEW === 'admin' ? adminHtml() : VIEW === 'assign' ? assignHtml() : VIEW === 'ops' ? opsHtml() : mineHtml()}</div>`;
+}
+
+function topHtml(){
+  const r = ME.roles;
+  const views = [['mine', '내 것']];
+  if (r.view) views.push(['admin', `승인${ME.pendingCount ? ` <span class="badge-n">${ME.pendingCount}</span>` : ''}`]);
+  if (r.grades.length) views.push(['assign', '감독 배정']);
+  if (r.operator || r.approve) views.push(['ops', '운영']);
+  return `<div class="top"><h1>초과근무</h1><span class="who"><b>${esc(ME.me.name)}</b>${ME.me.dept ? ' · ' + esc(ME.me.dept) : ''}</span>
+    <span class="sp"></span><button class="icon-btn" data-act="refresh" title="다시 불러오기"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>새로고침</button></div>
+    ${views.length > 1 ? `<div class="views" role="tablist">${views.map(([k, t]) =>
+      `<button class="view-btn${VIEW === k ? ' on' : ''}" role="tab" aria-selected="${VIEW === k}" data-act="view" data-view="${k}">${t}</button>`).join('')}</div>` : ''}
+    ${!ME.me.inRoster ? `<div class="alert"><p>교원 명렬에서 찾지 못해 구글 계정 이름(${esc(ME.me.name)})으로 표시합니다. 부서가 비어 있으면 운영 담당에게 알려 주세요.</p></div>` : ''}`;
+}
+
+// 내 것 — 받은 요청, 내 신청, 내 감독, 버튼
+function mineHtml(){
+  const out = [];
+  ME.inbox.forEach(w => out.push(inboxCard(w)));
+  out.push(`<div class="box"><h2>내 신청 <small>기타 업무 · 4시간 초과</small></h2>${
+    ME.requests.length ? ME.requests.map(reqRow).join('<div class="sep"></div>') : '<p class="empty">낸 신청이 없습니다.</p>'}</div>`);
+  const up = ME.slots.filter(s => !s.past);
+  out.push(`<div class="box"><h2>내 감독 일정</h2>${
+    up.length ? up.map(slotRow).join('<div class="sep"></div>') : '<p class="empty">앞으로 배정된 감독이 없습니다.</p>'}</div>`);
+  const corr = ME.outbox.filter(w => w.kind === '사후 정정');
+  if (corr.length) out.push(`<div class="box"><h2>보낸 정정 요청</h2>${corr.map(w => `
+    <div class="row"><div class="l"><b>${short(w.date)} · ${esc(w.label)}</b>
+      <span>기록 ${esc(w.holderName)} → 실제 ${esc(w.actualName)} · 확인 기한 ${hm(w.deadline)}</span></div>
+      <div class="r">${pill('대기')}<button class="btn sm" data-act="withdraw" data-id="${esc(w.id)}">요청 취소</button></div></div>`).join('<div class="sep"></div>')}</div>`);
+  if (ME.recent.length) out.push(`<div class="box"><h2>최근 7일 <small>교체·정정 결과</small></h2>${ME.recent.map(recentRow).join('<div class="sep"></div>')}</div>`);
+  out.push(`<button class="btn pri full" data-act="openSubmit">기타 업무 4시간 초과 신청</button>
+    <div class="btns"><button class="btn" data-act="openEmergency">다른 선생님 감독 맡기</button>
+    <button class="btn" data-act="openCorrect">지난 감독 정정</button></div>
+    <p class="hint" style="text-align:center">감독(야간·심야 자율학습)은 신청하지 않습니다. 배정이 곧 근거입니다.</p>`);
+  return out.join('');
+}
+
+function inboxCard(w){
+  const corr = w.kind === '사후 정정';
+  return `<div class="alert"><h3>${corr ? '지난 감독 정정 확인' : '감독 교체 요청'} — ${short(w.date)} ${esc(w.label)}</h3>
+    <p>${corr
+      ? `${esc(w.byName)} 선생님이 기록을 고쳐 달라고 합니다. 기록: ${esc(w.holderName)} → 실제: ${esc(w.actualName)}`
+      : `${esc(w.byName)} 선생님이 ${w.mode === '맞교환' ? '맞바꾸자고' : '대신 서 달라고'} 요청했습니다.${
+          w.s2 ? ` 대신 내 칸(${short(w.s2.date)} ${esc(w.slot2Label)})은 ${esc(w.byName)} 선생님이 맡습니다.` : ''}`}</p>
+    ${w.reason ? `<p>사유: ${esc(w.reason)}</p>` : ''}
+    <p class="hint">${corr ? '확인' : '수락'} 기한 ${hm(w.deadline)}${corr ? '' : ' — 지나면 요청이 저절로 취소됩니다'}</p>
+    <div class="btns"><button class="btn ok" data-act="respond" data-id="${esc(w.id)}" data-yes="1">${corr ? '확인' : '수락'}</button>
+    <button class="btn bad" data-act="respond" data-id="${esc(w.id)}" data-yes="0">거절</button></div></div>`;
+}
+
+function reqRow(q){
+  const open = OPEN.has('q' + q.id);
+  const canCancel = (q.status === '대기' || q.status === '승인') && q.date >= ME.today;
+  const sub = q.status === '반려' && q.note ? '반려: ' + q.note.replace(/^당일 신청 · /, '') : q.type;
+  return `<button class="row" data-act="toggle" data-key="q${esc(q.id)}" aria-expanded="${open}">
+      <div class="l"><b>${short(q.date)} · ${esc(bandShort(q.band))}</b><span>${esc(sub)}</span></div>${pill(q.status)}</button>
+    ${open ? `<div class="more"><span><span class="k">사유</span> ${esc(q.reason)}</span>
+      <span><span class="k">예정</span> ${esc(q.band)} · ${esc(q.type)}</span>
+      <span><span class="k">접수</span> ${hm(q.at)}${q.by ? ` · <span class="k">처리</span> ${esc(q.by)} ${hm(q.byAt)}` : ''}</span>
+      ${q.note ? `<span><span class="k">비고</span> ${esc(q.note)}</span>` : ''}
+      ${canCancel ? `<button class="btn sm bad" style="align-self:flex-start" data-act="cancelReq" data-id="${esc(q.id)}">신청 취소</button>` : ''}
+    </div>` : ''}`;
+}
+
+function slotRow(s){
+  const w = ME.outbox.find(x => x.kind === '교체' && x.s && slotKey(x.s) === slotKey(s));
+  const tags = (s.r === 3 ? '심야 · 통합조회에 올라감' : '') ;
+  return `<div class="row"><div class="l"><b>${short(s.date)} · ${esc(s.label)}</b>
+      <span>${w ? `${esc(w.actualName)} 선생님 수락 대기${w.s2 ? ' (맞교환)' : ''} · 기한 ${hm(w.deadline)}` : esc(tags) || '&nbsp;'}</span></div>
+    <div class="r">${w ? `<button class="btn sm" data-act="withdraw" data-id="${esc(w.id)}">요청 취소</button>`
+                       : `<button class="btn sm" data-act="openSwap" data-slot="${esc(slotKey(s))}">교체 요청</button>`}</div></div>`;
+}
+
+function recentRow(w){
+  const what = `${short(w.date)} ${esc(w.label)}`;
+  const desc = w.kind === '긴급 교체' ? `긴급 교체 · ${esc(w.holderName)} → ${esc(w.actualName)}`
+             : w.kind === '담당자 정정' ? `담당자 정정 · ${esc(w.holderName)} → ${esc(w.actualName)}`
+             : `${esc(w.kind)} · ${esc(w.holderName)} → ${esc(w.actualName)}`;
+  return `<div class="row"><div class="l"><b>${what}</b><span>${desc}</span></div>${pill(w.status)}</div>`;
+}
+
+// ── 승인 (관리자) ──────────────────────────────────────────────────────────
+function adminHtml(){
+  if (!ADMIN) return '<div class="loading">불러오는 중…</div>';
+  const A = ADMIN, sm = A.summary;
+  const card = q => {
+    const open = OPEN.has('a' + q.id);
+    const tags = [q.sameDay ? pill('당일 신청', 'p-info') : '', q.self ? pill('본인 신청', 'p-fix') : ''].join(' ');
+    return `<div class="box">
+      <div class="row"><div class="l"><b>${esc(q.name)}${q.dept ? ' · ' + esc(q.dept) : ''}</b>
+        <span>${short(q.date)} · ${esc(q.band)} · ${esc(q.type)}</span></div><div class="r">${tags}${pill('대기')}</div></div>
+      ${open ? `<div class="more">${esc(q.reason)}<span class="k">접수 ${hm(q.at)}</span></div>
+               <button class="linkish" data-act="toggle" data-key="a${esc(q.id)}">▾ 사유 접기</button>`
+             : `<button class="linkish" data-act="toggle" data-key="a${esc(q.id)}">▸ 사유 보기</button>`}
+      ${A.canDecide ? (REJECTING === q.id
+        ? `<label class="field">반려 사유 (필수 — 신청한 분이 보완할 때 봅니다)
+             <textarea class="input" data-field="reject" maxlength="300">${esc(REJECT_TEXT)}</textarea></label>
+           <div class="btns"><button class="btn bad" data-act="rejectSend" data-id="${esc(q.id)}">반려하기</button>
+             <button class="btn" data-act="rejectStop">그만두기</button></div>`
+        : `<div class="btns"><button class="btn ok" data-act="approve" data-id="${esc(q.id)}">승인</button>
+             <button class="btn bad" data-act="rejectStart" data-id="${esc(q.id)}">반려</button></div>`) : ''}
+    </div>`;
+  };
+  const top = sm.top.length ? sm.top.slice(0, 3).map(p => `${esc(p.name)} ${p.n}회${p.night && p.other ? ` (심야 ${p.night} · 기타 ${p.other})` : ''}`).join(', ') : '—';
+  return `
+    <div class="box"><h2>승인 대기${A.pending.length ? ` <span class="badge-n">${A.pending.length}</span>` : ''}<span class="sp"></span>
+      ${ME.sheetUrl ? `<a class="linkish" href="${esc(ME.sheetUrl)}" target="_blank" rel="noopener">시트 열기 ↗</a>` : ''}</h2>
+      ${A.pending.length ? '' : '<p class="empty">기다리는 신청이 없습니다.</p>'}
+      ${!A.canDecide ? '<p class="hint">보기 권한입니다. 승인·반려는 승인 관리자가 합니다.</p>' : ''}</div>
+    ${A.pending.map(card).join('')}
+    <div class="box"><h2>월 요약<span class="sp"></span><input type="month" class="input" style="width:auto;min-height:0;padding:3px 8px" data-act-change="adminMonth" value="${esc(A.month)}"></h2>
+      <div class="stat"><span>승인 · 반려 · 대기</span><b>${sm.approved} · ${sm.rejected} · ${sm.pending}</b></div>
+      <div class="stat"><span>심야 감독 (배정)</span><b>${sm.night}</b></div>
+      <div class="stat"><span>가장 많은 사람</span><b>${top}</b></div>
+      <div class="stat"><span>긴급 교체</span><b>${sm.emergency}</b></div></div>
+    <div class="box"><h2>${esc(A.month.replace('-', '년 '))}월 처리한 신청 <small>${A.decided.length}건</small></h2>
+      ${A.decided.length ? A.decided.map(q => `<div class="row"><div class="l"><b>${short(q.date)} · ${esc(q.name)}</b>
+        <span>${esc(bandShort(q.band))} · ${esc(q.type)}${q.by ? ` · ${esc(q.by)} ${hm(q.byAt)}` : ''}${q.status === '반려' && q.note ? ` · ${esc(q.note)}` : ''}</span></div>${pill(q.status)}</div>`).join('<div class="sep"></div>')
+        : '<p class="empty">아직 없습니다.</p>'}</div>`;
+}
+
+// ── 감독 배정 (학년 기획 담당) ─────────────────────────────────────────────
+function assignHtml(){
+  const gs = ME.roles.grades;
+  if (!ASSIGN.grade || !gs.includes(ASSIGN.grade)) ASSIGN.grade = gs[0];
+  const R = ASSIGN.res;
+  const prev = R ? `<div class="box" id="assignPrev"><h2>미리보기<span class="sp"></span><small>${R.preview.length}줄 · 넣을 날 ${R.ready} · 건너뜀 ${R.skipped} · 확인 필요 ${R.errors}</small></h2>
+    <div class="tbl-wrap"><table><tr><th>줄</th><th>날짜</th><th>감독1</th><th>감독2</th><th>감독3 (심야)</th><th>상태</th></tr>
+    ${R.preview.map(p => `<tr><td class="num">${p.line}</td><td>${p.date ? short(p.date) : `<span class="hint">${esc(p.raw.slice(0, 16))}</span>`}</td>
+      ${[0, 1, 2].map(i => `<td class="${p.bad[i] ? 'err' : ''}">${esc(p.names[i] || '')}${p.bad[i] ? `<span class="sub">${esc(p.bad[i])}</span>` : ''}</td>`).join('')}
+      <td>${p.state === 'ok' ? pill('통과', 'p-ok') : p.state === 'same' ? pill('이미 같음', 'p-mute')
+          : p.state === 'exists' ? `${pill('이미 있음', 'p-wait')}<span class="hint"> ${esc((p.current || []).join(' · '))} — 덮지 않음</span>`
+          : `${pill('확인 필요', 'p-bad')}${p.err ? `<span class="hint"> ${esc(p.err)}</span>` : ''}`}</td></tr>`).join('')}
+    </table></div>
+    ${R.committed ? '' : `<button class="btn pri full" data-act="assignCommit" ${R.errors || !R.ready ? 'disabled' : ''}>${
+      R.errors ? `확정 (확인 필요 ${R.errors}줄을 고친 뒤)` : R.ready ? `${R.ready}일 확정` : '넣을 날이 없습니다'}</button>`}
+    <p class="hint">확정하면 시트에 들어가고 이력이 남습니다. 이미 확정된 날짜는 덮지 않습니다 — 바꾸려면 아래 감독표에서 정정하세요.</p></div>` : '';
+  return `
+    <div class="box"><h2>${gs.length > 1 ? `<span class="chips">${gs.map(g => `<button class="chip${g === ASSIGN.grade ? ' on' : ''}" data-act="grade" data-g="${g}">${g}학년</button>`).join('')}</span>` : `${ASSIGN.grade}학년 감독 배정`}</h2>
+      <label class="field">감독표 붙여넣기 — 엑셀에서 날짜·감독1·감독2·감독3 네 열을 복사
+        <textarea class="input mono" data-field="assignText" placeholder="10/06&#9;김○○&#9;이○○&#9;박○○">${esc(ASSIGN.text)}</textarea></label>
+      <span class="hint">날짜는 10/06 · 10.6 · 2026-10-06 · 10월 6일(화) 모두 됩니다. 빈 칸은 비워 둔 채로 들어갑니다. ${ASSIGN.grade}학년 세 칸만 채웁니다.</span>
+      <button class="btn" data-act="assignPreview">미리보기</button></div>
+    ${prev}
+    ${gridHtml()}`;
+}
+
+function gridHtml(){
+  if (!GRID) return '<div class="box"><p class="loading">감독표를 불러오는 중…</p></div>';
+  const can = GRID.fixGrades || [];
+  return `<div class="box"><h2>감독표<span class="sp"></span>
+      <input type="month" class="input" style="width:auto;min-height:0;padding:3px 8px" data-act-change="gridMonth" value="${esc(GRID.month)}"></h2>
+    <div class="legend"><span><i class="k-교체"></i>교체</span><span><i class="k-긴급"></i>긴급 교체</span>
+      <span><i class="k-사후"></i>사후 정정</span><span><i class="k-정정"></i>담당자 정정</span>
+      ${can.length ? `<span>· ${can.join('·')}학년 칸을 누르면 정정합니다</span>` : ''}</div>
+    ${GRID.days.length ? `<div class="tbl-wrap"><table>
+      <tr><th rowspan="2">근무일</th>${[1, 2, 3].map(g => `<th colspan="3" class="grp">${g}학년</th>`).join('')}</tr>
+      <tr>${[1, 2, 3].map(() => [1, 2, 3].map(r => `<th${r === 1 ? ' class="grp"' : ''}>감독${r}${r === 3 ? ' 심야' : ''}</th>`).join('')).join('')}</tr>
+      ${GRID.days.map(d => `<tr><td>${short(d.date)}</td>${d.cells.map((c, i) => {
+        const g = Math.floor(i / 3) + 1, r = i % 3 + 1;
+        const cls = ['cell', KIND_CLASS[c.k] || '', r === 1 ? 'g1' : ''].join(' ');
+        const inner = esc(c.n) + (c.known ? '' : ' ?');
+        return `<td class="${cls}" title="${esc(c.note)}">${can.includes(g)
+          ? `<button data-act="openFix" data-slot="${esc(d.date)}|${g}|${r}" data-cur="${esc(c.n)}">${inner || '<span class="hint">—</span>'}</button>` : inner}</td>`;
+      }).join('')}</tr>`).join('')}
+    </table></div>` : '<p class="empty">이 달에는 배정된 감독이 없습니다.</p>'}</div>`;
+}
+
+// ── 운영 ───────────────────────────────────────────────────────────────────
+function opsHtml(){
+  const S = STATUS;
+  const dev = deviceApi();
+  const list = (t, a) => `<dt>${t}</dt><dd>${a && a.length ? esc(a.join(', ')) : '<span class="hint">비어 있음</span>'}</dd>`;
+  return `
+    ${S ? `<div class="box"><h2>설치 상태<span class="sp"></span><a class="linkish" href="${esc(S.sheetUrl)}" target="_blank" rel="noopener">시트 열기 ↗</a></h2>
+      <dl class="kv">
+        ${list('승인', S.lists.approve)}${list('보기', S.lists.view)}
+        ${list('1학년 기획', S.lists.g1)}${list('2학년 기획', S.lists.g2)}${list('3학년 기획', S.lists.g3)}${list('운영', S.lists.operator)}
+        <dt>교원 명렬</dt><dd>${S.staff}명</dd>
+        <dt>교체 수락 기한</dt><dd>근무일 ${esc(S.deadline)}</dd>
+        <dt>미리 신청</dt><dd>${S.horizon}일 뒤까지</dd>
+        <dt>메일 알림</dt><dd>${S.mailOn ? pill('켬', 'p-ok') : pill('끔', 'p-mute') + ' <span class="hint">시험하는 동안은 끔이 맞습니다</span>'}</dd>
+        <dt>15분 시계</dt><dd>${S.trigger ? pill('돌고 있음', 'p-ok') : pill('없음', 'p-bad') + ' <span class="hint">편집기에서 setup 을 다시 실행하세요</span>'}</dd>
+        <dt>스크립트</dt><dd>${esc(S.version)}</dd>
+      </dl>
+      ${S.unresolved.length ? `<div class="alert bad"><h3>설정에서 못 찾은 이름</h3><p>${esc(S.unresolved.join(', '))} — 교원 명렬에 없거나 동명이인입니다. 이메일로 적으면 확실합니다. 이 이름에는 권한이 가지 않습니다.</p></div>` : ''}
+    </div>` : '<div class="box"><p class="loading">불러오는 중…</p></div>'}
+    ${ME.roles.operator ? `<div class="box"><h2>교원 명렬 보내기</h2>
+      <p class="hint">앱의 교원 명렬(이름·학교 계정)과 교원연락망의 부서를 시트의 「교원 명렬」 탭으로 보냅니다. 교체할 선생님을 이름으로 고르고, 신청서의 이름·부서를 채울 때 씁니다. 명렬을 새로 올린 뒤 한 번 눌러 주세요.</p>
+      <button class="btn" data-act="rosterSync">교원 명렬 보내기 (앱 → 시트)</button></div>` : ''}
+    ${isAdmin() ? `<div class="box"><h2>연결 주소</h2>
+      <p class="hint">${OVERTIME_API ? '앱에 넣어 둔 주소를 씁니다.' : '앱에는 아직 주소가 없습니다.'}${dev ? ' 이 기기에서는 따로 붙여 넣은 주소로 시험하고 있습니다.' : ''}</p>
+      ${dev ? `<p class="hint" style="overflow-wrap:anywhere">${esc(dev)}</p><button class="btn sm" data-act="clearDevice">이 기기 주소 지우기</button>` : ''}</div>` : ''}`;
+}
+
+// ── 처음·로그인·준비 안내 ─────────────────────────────────────────────────
+function gateHtml(){
+  const g = GATE;
+  if (g.kind === 'setup') return `<div class="gate"><h1>초과근무 — 아직 연결 전입니다</h1>
+    <p>학교 계정의 관리대장 시트에 스크립트를 붙이고 웹앱으로 배포하면 이 화면이 열립니다.</p>
+    <div class="box"><ol class="steps">
+      <li>학교 계정으로 새 스프레드시트를 만들고 「확장 프로그램 → Apps Script」</li>
+      <li>저장소의 <b>gas/overtime/Code.gs</b> 를 통째로 붙여 넣고 <b>setup</b> 실행</li>
+      <li>「배포 → 새 배포 → 웹 앱」 — 실행: 나, 액세스: 모든 사용자</li>
+      <li>받은 주소(…/exec)를 아래에 붙여 넣어 이 기기에서 시험</li>
+    </ol>
+    <label class="field">웹앱 주소<input class="input" data-field="deviceApi" placeholder="https://script.google.com/macros/s/…/exec"></label>
+    <button class="btn pri" data-act="saveDevice">연결 확인</button>
+    <p class="hint">자세한 순서는 저장소의 gas/overtime/README.md</p></div></div>`;
+  return `<div class="gate"><h1>${esc(g.title || '초과근무')}</h1><p>${esc(g.msg)}</p>
+    ${g.retry ? '<button class="btn" data-act="retry">다시 시도</button>' : ''}</div>`;
+}
+
+// ── 입력 창 ────────────────────────────────────────────────────────────────
+function openSheet(s){ SHEET = s; renderSheet(); $('#scrim').hidden = false; setTimeout(() => $('#sheet').querySelector('input,textarea,button.chip')?.focus(), 30); }
+function closeSheet(){ SHEET = null; $('#scrim').hidden = true; $('#sheet').innerHTML = ''; }
+
+function picker(key, chosen, ph){
+  if (chosen) return `<div class="chosen"><b>${esc(chosen.name)}</b><span>${esc(chosen.dept || '')}</span>
+    <button class="x" data-act="unpick" data-key="${key}" aria-label="다시 고르기">✕ 다시 고르기</button></div>`;
+  return `<input class="input" type="search" data-pick="${key}" placeholder="${esc(ph)}" autocomplete="off" aria-label="${esc(ph)}"><div class="pick-list" id="pick-${key}"></div>`;
+}
+function pickList(key, q){
+  const box = document.getElementById('pick-' + key);
+  if (!box) return;
+  q = q.trim();
+  if (!q) { box.innerHTML = ''; return; }
+  const hit = ME.staff.filter(p => p.id !== ME.me.id && (p.name.includes(q) || (p.dept || '').includes(q))).slice(0, 8);
+  box.innerHTML = hit.length ? hit.map(p => `<button type="button" data-act="pick" data-key="${key}" data-id="${esc(p.id)}">${esc(p.name)} <span>${esc(p.dept || '')}</span></button>`).join('')
+                             : '<button type="button" disabled><span>명렬에서 찾지 못했습니다</span></button>';
+}
+const slotChip = (s, on, act, extra = '') => `<button class="chip${on ? ' on' : ''}" data-act="${act}" data-slot="${esc(slotKey(s))}" ${extra}>${short(s.date)} · ${esc(slotLabel(s))}</button>`;
+const parseSlot = k => { const [date, g, r] = String(k).split('|'); return { date, g: +g, r: +r }; };
+const sameSlot = (a, b) => !!a && !!b && slotKey(a) === slotKey(b);
+
+function renderSheet(){
+  const S = SHEET, el = $('#sheet');
+  if (!S) return;
+  const head = t => `<div class="sheet-top"><h2>${t}</h2><button class="x" data-act="closeSheet" aria-label="닫기">닫기 ✕</button></div>`;
+  let body = '';
+  if (S.type === 'submit') {
+    const max = addDays(ME.today, ME.cfg.horizon);
+    body = head('4시간 초과 신청') + `<div class="box">
+      <label class="field">근무일<input class="input" type="date" data-field="date" min="${ME.today}" max="${max}" value="${esc(S.date)}"></label>
+      <span class="hint" id="sameDayHint" ${S.date === ME.today ? '' : 'hidden'}>오늘 근무를 오늘 신청하면 「당일 신청」 으로 표시됩니다.</span>
+      <div class="field">예정 시간외근무 (구간)<div class="chips">${ME.cfg.bands.map(b => `<button class="chip${S.band === b ? ' on' : ''}" data-act="set" data-k="band" data-v="${esc(b)}">${esc(b)}</button>`).join('')}</div>
+        <span class="hint">4시간 이하는 이 신청이 필요 없습니다. 나이스에만 입력하세요.</span></div>
+      <div class="field">유형<div class="chips">${ME.cfg.types.map(t => `<button class="chip${S.typ === t ? ' on' : ''}" data-act="set" data-k="typ" data-v="${esc(t)}">${esc(t)}</button>`).join('')}</div></div>
+      <label class="field">사유 (필수)<textarea class="input" data-field="reason" maxlength="500" placeholder="예: 2학기 학업성적관리위원회 회의자료 작성 (업무분장: 학적·성적 관리)">${esc(S.reason)}</textarea>
+        <span class="hint">업무분장 기준으로 무엇을 하는지 구체적으로. 감사 때 근거가 됩니다.</span></label></div>
+      <button class="btn pri full" data-act="submit">신청하기</button>
+      <p class="hint" style="text-align:center">이름·부서·신청 시각은 자동으로 들어갑니다. 신청한 뒤에는 고칠 수 없고 취소만 됩니다.</p>`;
+  }
+  if (S.type === 'swap') {
+    const theirs = (S.toSlots || []).filter(x => !x.past);
+    body = head('감독 교체') + `<div class="box">
+      <div class="row"><div class="l"><b>${short(S.slot.date)} · ${esc(slotLabel(S.slot))}</b><span>지금 감독: 나</span></div></div>
+      <div class="field">방식<div class="chips"><button class="chip${S.mode === 'cover' ? ' on' : ''}" data-act="set" data-k="mode" data-v="cover">대신 서기</button>
+        <button class="chip${S.mode === 'trade' ? ' on' : ''}" data-act="set" data-k="mode" data-v="trade">맞교환</button></div>
+        <span class="hint">${S.mode === 'trade' ? '상대의 감독 칸 하나와 맞바꿉니다. 역할이 달라도 됩니다.' : '상대가 이 칸을 맡고, 나는 빠집니다.'}</span></div>
+      <div class="field">맡아 줄 선생님${picker('to', S.to, '이름 또는 부서로 찾기')}
+        <span class="hint">그날 이미 다른 감독 칸에 있는 분은 요청이 막힙니다.</span></div>
+      ${S.mode === 'trade' && S.to ? `<div class="field">${esc(S.to.name)} 선생님의 감독 중 맞바꿀 칸${
+        S.toSlots == null ? '<span class="hint">불러오는 중…</span>' : theirs.length
+          ? `<div class="chips">${theirs.map(x => slotChip(x, sameSlot(S.slot2, x), 'set2')).join('')}</div>` : '<span class="hint">앞으로 배정된 감독이 없습니다.</span>'}</div>` : ''}
+      <label class="field">사유 (선택)<input class="input" data-field="reason" maxlength="200" placeholder="예: 가족 행사" value="${esc(S.reason)}"></label></div>
+      <button class="btn pri full" data-act="swapSend">교체 요청 보내기</button>
+      <div class="box" style="gap:6px"><h2>이후 흐름</h2>
+        <div class="stat"><span>상대 선생님께 앱·메일로 요청</span>${pill('수락 대기', 'p-wait')}</div>
+        <div class="stat"><span>수락하는 순간 시트 반영·이력 기록</span>${pill('교체 완료', 'p-ok')}</div>
+        <div class="stat"><span>근무일 ${esc(ME.cfg.deadline)}까지 수락이 없으면</span>${pill('자동 취소', 'p-bad')}</div></div>`;
+  }
+  if (S.type === 'emergency') {
+    const aSlots = (S.whoSlots || []).filter(x => !x.past);
+    const aDates = new Set((S.whoSlots || []).map(x => x.date));
+    const mine = S.slot ? ME.slots.filter(x => x.date > ME.today && x.date !== S.slot.date && x.r === S.slot.r && !aDates.has(x.date)) : [];
+    body = head('다른 선생님 감독 맡기') + `<div class="box">
+      <p class="hint">감독인 선생님이 급한 일(상고 등)로 앱을 쓸 수 없을 때, 대신 서는 분이 등록합니다. 등록하는 즉시 바뀝니다.</p>
+      <div class="field">누구의 감독을${picker('who', S.who, '이름 또는 부서로 찾기')}</div>
+      ${S.who ? `<div class="field">어느 칸을${S.whoSlots == null ? '<span class="hint">불러오는 중…</span>' : aSlots.length
+        ? `<div class="chips">${aSlots.map(x => slotChip(x, sameSlot(S.slot, x), 'setSlot')).join('')}</div>`
+        : '<span class="hint">오늘과 이후에 배정된 감독이 없습니다.</span>'}
+        <span class="hint">오늘과 이후 날짜만 보입니다. 오늘 칸은 오늘 자정까지 등록할 수 있습니다.</span></div>` : ''}
+      ${S.slot ? `<div class="field">방식<div class="chips"><button class="chip${S.mode === 'cover' ? ' on' : ''}" data-act="set" data-k="mode" data-v="cover">대신 서기</button>
+        <button class="chip${S.mode === 'trade' ? ' on' : ''}" data-act="set" data-k="mode" data-v="trade">맞교환 · 내 감독과</button></div></div>` : ''}
+      ${S.slot && S.mode === 'trade' ? `<div class="field">${esc(S.who.name)} 선생님이 대신 맡을 내 감독${mine.length
+        ? `<div class="chips">${mine.map(x => slotChip(x, sameSlot(S.mySlot, x), 'setMine')).join('')}</div>`
+        : '<span class="hint">맞바꿀 수 있는 내 감독이 없습니다.</span>'}
+        <span class="hint">같은 역할(${esc(roleLabel(S.slot.r))})만, ${esc(S.who.name)} 선생님이 그날 비어 있는 칸만 보입니다.</span></div>` : ''}
+      <label class="field">사유 (필수)<input class="input" data-field="reason" maxlength="200" placeholder="예: ○○○ 선생님 상고" value="${esc(S.reason)}"></label>
+      ${S.slot ? `<div class="alert info"><p>등록하는 즉시 ${S.mode === 'trade' && S.mySlot
+        ? `두 칸이 서로 바뀝니다 — ${short(S.slot.date)} 칸은 나, ${short(S.mySlot.date)} 칸은 ${esc(S.who.name)} 선생님.`
+        : `${short(S.slot.date)} ${esc(slotLabel(S.slot))} 칸이 내 이름으로 바뀝니다.`} ${esc(S.who.name)} 선생님과 학년 기획 담당·관리자에게 알림이 갑니다.</p></div>` : ''}
+      </div>
+      <button class="btn pri full" data-act="emergencySend">지금 맡기 (즉시 반영)</button>`;
+  }
+  if (S.type === 'correct') {
+    const past = ME.slots.filter(x => x.past);
+    const theirPast = (S.whoSlots || []).filter(x => x.past);
+    body = head('지난 감독 정정') + `<div class="box">
+      <div class="field">어떤 경우인가요<div class="chips">
+        <button class="chip${S.side === 'mine' ? ' on' : ''}" data-act="set" data-k="side" data-v="mine">내 감독을 다른 선생님이 섰음</button>
+        <button class="chip${S.side === 'theirs' ? ' on' : ''}" data-act="set" data-k="side" data-v="theirs">다른 선생님 감독을 내가 섰음</button></div></div>
+      ${S.side === 'mine' ? `<div class="field">어느 칸을${past.length ? `<div class="chips">${past.map(x => slotChip(x, sameSlot(S.slot, x), 'setSlot')).join('')}</div>`
+          : '<span class="hint">이번 달 지난 감독이 없습니다.</span>'}</div>
+        <div class="field">실제로 선 선생님${picker('actual', S.actual, '이름 또는 부서로 찾기')}</div>`
+      : `<div class="field">누구의 감독을${picker('who', S.who, '이름 또는 부서로 찾기')}</div>
+        ${S.who ? `<div class="field">어느 칸을${S.whoSlots == null ? '<span class="hint">불러오는 중…</span>' : theirPast.length
+          ? `<div class="chips">${theirPast.map(x => slotChip(x, sameSlot(S.slot, x), 'setSlot')).join('')}</div>` : '<span class="hint">이번 달 지난 감독이 없습니다.</span>'}</div>` : ''}`}
+      <label class="field">사유 (필수)<input class="input" data-field="reason" maxlength="200" placeholder="예: 구두로 바꾸고 등록을 잊음" value="${esc(S.reason)}"></label>
+      <span class="hint">상대 선생님이 확인해야 바뀝니다. 근무한 달의 말일까지 고칠 수 있고, 그 뒤로는 학년 기획 담당이나 관리자에게 요청하세요.</span></div>
+      <button class="btn pri full" data-act="correctSend">정정 요청</button>`;
+  }
+  if (S.type === 'fix') {
+    body = head('감독 정정 — 담당자') + `<div class="box">
+      <div class="row"><div class="l"><b>${short(S.slot.date)} · ${esc(slotLabel(S.slot))}</b><span>지금: ${esc(S.cur || '(빈 칸)')}</span></div></div>
+      <div class="field">바꿀 사람${S.clear ? `<div class="chosen"><b>(비우기)</b><span>이 칸을 빈 칸으로</span><button class="x" data-act="set" data-k="clear" data-v="">✕ 다시 고르기</button></div>`
+        : picker('to', S.to, '이름 또는 부서로 찾기')}
+        ${!S.clear && !S.to && S.cur ? '<button class="linkish" data-act="set" data-k="clear" data-v="1">이 칸 비우기</button>' : ''}</div>
+      <label class="field">정정 사유 (필수)<input class="input" data-field="reason" maxlength="300" placeholder="예: 배정 실수 / 당사자 확인 어려움" value="${esc(S.reason)}"></label>
+      <span class="hint">당사자 확인 없이 바로 바뀝니다. 바뀐 두 분께 알림이 가고 이력에 남습니다.</span></div>
+      <button class="btn pri full" data-act="fixSend">정정</button>`;
+  }
+  el.innerHTML = body;
+}
+
+async function loadWhoSlots(key){
+  const S = SHEET;
+  const who = key === 'who' ? S.who : S.to;
+  if (!who) return;
+  const want = who.id;
+  try {
+    const d = await api('slotsOf', { id: want });
+    if (SHEET !== S) return;                                 // 그새 닫았거나 다른 창
+    if ((key === 'who' ? S.who : S.to)?.id !== want) return; // 그새 다른 사람을 골랐다
+    if (key === 'who') S.whoSlots = d.slots; else S.toSlots = d.slots;
+  } catch(e) { toast(e.message, true); if (key === 'who') S.whoSlots = []; else S.toSlots = []; }
+  renderSheet();
+}
+
+// ── 보내기 ─────────────────────────────────────────────────────────────────
+const after = (d) => { closeSheet(); toast(d.done || '처리했습니다.'); };
+const SENDERS = {
+  async submit(){
+    const S = SHEET;
+    if (!S.date || S.date < ME.today) throw new Error('근무일을 확인해 주세요.');
+    if (!S.band) throw new Error('예정 시간 구간을 골라 주세요.');
+    if (!S.typ) throw new Error('유형을 골라 주세요.');
+    if (S.reason.trim().length < 5) throw new Error('사유를 구체적으로 적어 주세요.');
+    after(await api('submit', { date: S.date, band: S.band, type: S.typ, reason: S.reason }));
+  },
+  async swapSend(){
+    const S = SHEET;
+    if (!S.to) throw new Error('맡아 줄 선생님을 골라 주세요.');
+    if (S.mode === 'trade' && !S.slot2) throw new Error('맞바꿀 칸을 골라 주세요.');
+    after(await api('swapRequest', { slot: S.slot, mode: S.mode, to: S.to.id, slot2: S.mode === 'trade' ? S.slot2 : null, reason: S.reason }));
+  },
+  async emergencySend(){
+    const S = SHEET;
+    if (!S.slot) throw new Error('맡을 칸을 골라 주세요.');
+    if (S.mode === 'trade' && !S.mySlot) throw new Error('맞바꿀 내 감독을 골라 주세요.');
+    if (S.reason.trim().length < 2) throw new Error('사유를 적어 주세요.');
+    after(await api('emergency', { slot: S.slot, mode: S.mode, mySlot: S.mode === 'trade' ? S.mySlot : null, reason: S.reason }));
+  },
+  async correctSend(){
+    const S = SHEET;
+    if (!S.slot) throw new Error('정정할 칸을 골라 주세요.');
+    if (S.side === 'mine' && !S.actual) throw new Error('실제로 선 선생님을 골라 주세요.');
+    if (S.reason.trim().length < 2) throw new Error('사유를 적어 주세요.');
+    after(await api('correct', { slot: S.slot, actual: S.side === 'mine' ? S.actual.id : '', reason: S.reason }));
+  },
+  async fixSend(){
+    const S = SHEET;
+    if (!S.clear && !S.to) throw new Error('바꿀 사람을 고르거나 비우기를 골라 주세요.');
+    if (S.reason.trim().length < 2) throw new Error('정정 사유를 적어 주세요.');
+    const d = await api('fix', { slot: S.slot, to: S.clear ? '' : S.to.id, reason: S.reason });
+    GRID = d.grid;
+    after(d);
+  },
+};
+
+// ── 누르기 ─────────────────────────────────────────────────────────────────
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b) { if (e.target === $('#scrim') && downOnScrim) closeSheet(); return; }
+  const act = b.dataset.act, id = b.dataset.id;
+  const S = SHEET;
+  switch (act) {
+    case 'refresh': return run(b, async () => { await loadMe(); await loadView(); toast('새로 불러왔습니다.'); });
+    case 'retry': GATE = null; render(); return start();
+    case 'view': VIEW = b.dataset.view; render(); return loadView().then(render).catch(err => toast(err.message, true));
+    case 'toggle': { const k = b.dataset.key; OPEN.has(k) ? OPEN.delete(k) : OPEN.add(k); return render(); }
+    case 'cancelReq':
+      if (!confirm('이 신청을 취소할까요? 취소한 뒤 다시 내려면 새로 신청해야 합니다.')) return;
+      return run(b, async () => { const d = await api('cancel', { id }); toast(d.done); });
+    case 'respond': {
+      const yes = b.dataset.yes === '1';
+      return run(b, async () => { const d = await api('respond', { id, accept: yes }); toast(d.done); });
+    }
+    case 'withdraw': return run(b, async () => { const d = await api('withdraw', { id }); toast(d.done); });
+    case 'openSubmit': return openSheet({ type: 'submit', date: addDays(ME.today, 1), band: '', typ: '', reason: '' });
+    case 'openSwap': return openSheet({ type: 'swap', slot: parseSlot(b.dataset.slot), mode: 'cover', to: null, toSlots: null, slot2: null, reason: '' });
+    case 'openEmergency': return openSheet({ type: 'emergency', who: null, whoSlots: null, slot: null, mode: 'cover', mySlot: null, reason: '' });
+    case 'openCorrect': return openSheet({ type: 'correct', side: 'mine', slot: null, actual: null, who: null, whoSlots: null, reason: '' });
+    case 'openFix': return openSheet({ type: 'fix', slot: parseSlot(b.dataset.slot), cur: b.dataset.cur, to: null, clear: false, reason: '' });
+    case 'closeSheet': return closeSheet();
+    case 'set': {
+      const k = b.dataset.k, v = b.dataset.v;
+      if (k === 'clear') { S.clear = !!v; S.to = null; }
+      else if (k === 'side') { if (S.side !== v) Object.assign(S, { side: v, slot: null, actual: null, who: null, whoSlots: null }); }
+      else if (k === 'mode') { S.mode = v; S.slot2 = null; S.mySlot = null;
+        if (S.type === 'swap' && v === 'trade' && S.to && S.toSlots == null) loadWhoSlots('to'); }
+      else S[k] = v;
+      return renderSheet();
+    }
+    case 'set2': S.slot2 = parseSlot(b.dataset.slot); return renderSheet();
+    case 'setSlot': S.slot = parseSlot(b.dataset.slot); S.mySlot = null; return renderSheet();
+    case 'setMine': S.mySlot = parseSlot(b.dataset.slot); return renderSheet();
+    case 'pick': {
+      const p = ME.staff.find(x => x.id === id);
+      if (!p) return;
+      const key = b.dataset.key;
+      if (key === 'who') { Object.assign(S, { who: p, whoSlots: null, slot: null, mySlot: null }); renderSheet(); return loadWhoSlots('who'); }
+      if (key === 'to') { S.to = p; S.toSlots = null; S.slot2 = null; renderSheet(); if (S.type === 'swap' && S.mode === 'trade') loadWhoSlots('to'); return; }
+      S[key] = p; return renderSheet();
+    }
+    case 'unpick': {
+      const key = b.dataset.key;
+      if (key === 'who') Object.assign(S, { who: null, whoSlots: null, slot: null, mySlot: null });
+      else if (key === 'to') Object.assign(S, { to: null, toSlots: null, slot2: null });
+      else S[key] = null;
+      renderSheet();
+      return document.querySelector(`[data-pick="${key}"]`)?.focus();
+    }
+    case 'submit': case 'swapSend': case 'emergencySend': case 'correctSend': case 'fixSend': {
+      const fn = SENDERS[act];
+      return run(b, fn);
+    }
+    case 'approve': return run(b, async () => { ADMIN = await api('decide', { id, decision: '승인', month: ADMIN_MONTH }); ME.pendingCount = ADMIN.pending.length; toast(ADMIN.done); });
+    case 'rejectStart': REJECTING = id; REJECT_TEXT = ''; render(); return document.querySelector('[data-field="reject"]')?.focus();
+    case 'rejectStop': REJECTING = ''; return render();
+    case 'rejectSend':
+      if (REJECT_TEXT.trim().length < 2) return toast('반려 사유를 적어 주세요.', true);
+      return run(b, async () => { ADMIN = await api('decide', { id, decision: '반려', reason: REJECT_TEXT, month: ADMIN_MONTH }); ME.pendingCount = ADMIN.pending.length; REJECTING = ''; toast(ADMIN.done); });
+    case 'grade': ASSIGN.grade = +b.dataset.g; ASSIGN.res = null; return render();
+    case 'assignPreview':
+      if (!ASSIGN.text.trim()) return toast('감독표를 붙여 넣어 주세요.', true);
+      return run(b, async () => { ASSIGN.res = await api('assign', { grade: ASSIGN.grade, text: ASSIGN.text, dryRun: true }); });
+    case 'assignCommit':
+      return run(b, async () => {
+        const d = await api('assign', { grade: ASSIGN.grade, text: ASSIGN.text });
+        ASSIGN.res = d;
+        if (d.committed) { toast(d.done); ASSIGN.text = ''; ASSIGN.res = null; GRID = await api('grid', { month: GRID_MONTH }); await loadMe(); }
+        else toast('확인이 필요한 줄이 있어 넣지 않았습니다.', true);
+      });
+    case 'rosterSync': return run(b, async () => {
+      const rows = await readAppRoster();
+      if (rows.length < 10) throw new Error(`앱의 교원 명렬이 너무 짧습니다 (${rows.length}명).`);
+      if (!confirm(`교원 ${rows.length}명을 시트의 「교원 명렬」 탭으로 보낼까요? 지금 있는 내용은 바뀝니다.`)) return;
+      const d = await api('roster', { rows });
+      toast(d.done); STATUS = (await api('status')).status; await loadMe();
+    });
+    case 'clearDevice': try { localStorage.removeItem(LS_API); } catch(e) {} toast('이 기기 주소를 지웠습니다.'); return start();
+    case 'saveDevice': {
+      const v = ($('[data-field="deviceApi"]')?.value || '').trim();
+      if (!API_RE.test(v)) return toast('…/macros/s/…/exec 로 끝나는 웹앱 주소를 붙여 넣어 주세요.', true);
+      return run(b, async () => {
+        const r = await fetch(v, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: '{"action":"ping"}' })
+          .then(x => x.json()).catch(() => null);
+        if (!r || !r.ok) throw new Error('그 주소에서 답이 없습니다. 배포의 액세스가 「모든 사용자」인지 확인해 주세요.');
+        try { localStorage.setItem(LS_API, v); } catch(e) {}
+        toast('연결했습니다.'); GATE = null; await start();
+      });
+    }
+  }
+});
+
+let downOnScrim = false;
+document.addEventListener('pointerdown', e => { downOnScrim = e.target === $('#scrim'); }, true);
+
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.pick) return pickList(t.dataset.pick, t.value);
+  const f = t.dataset.field;
+  if (!f) return;
+  if (f === 'reject') { REJECT_TEXT = t.value; return; }
+  if (f === 'assignText') { ASSIGN.text = t.value; if (ASSIGN.res) { ASSIGN.res = null; document.getElementById('assignPrev')?.remove(); } return; }
+  if (SHEET && f in SHEET) {
+    SHEET[f] = t.value;
+    if (f === 'date') { const h = document.getElementById('sameDayHint'); if (h) h.hidden = t.value !== ME.today; }
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  const a = t.dataset.actChange;
+  if (a === 'adminMonth') { ADMIN_MONTH = t.value; run(null, async () => { ADMIN = await api('adminList', { month: ADMIN_MONTH }); }); }
+  if (a === 'gridMonth') { GRID_MONTH = t.value; run(null, async () => { GRID = await api('grid', { month: GRID_MONTH }); }); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && SHEET) { e.preventDefault(); closeSheet(); }
+});
+// 앱에서 다른 탭에 갔다가 이 탭으로 돌아오면 앱이 알려 준다(iframe 은 그대로 살아 있다)
+window.addEventListener('message', e => {
+  if (e.origin !== location.origin || !e.data || e.data.type !== 'ot-refresh') return;
+  if (ME && !BUSY && !SHEET && Date.now() - lastLoad > 15000) loadMe().then(loadView).then(render).catch(() => {});
+});
+// 다른 탭을 보다가 돌아오면 다시 읽는다(교체 수락 등은 다른 사람이 한다)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && ME && !BUSY && !SHEET && Date.now() - lastLoad > 30000)
+    loadMe().then(loadView).then(render).catch(() => {});
+});
+
+async function loadView(){
+  if (VIEW === 'admin') ADMIN = await api('adminList', { month: ADMIN_MONTH });
+  if (VIEW === 'assign') GRID = await api('grid', { month: GRID_MONTH });
+  if (VIEW === 'ops') STATUS = (await api('status')).status;
+}
+
+// 앱의 교원 명렬 — acl/emailByName(이름→계정) + 교원연락망(contacts/main)의 부서
+async function readAppRoster(){
+  const { getFirestore, doc, getDoc } = await import('https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js');
+  const db = getFirestore(fbApp);
+  const [a, c] = await Promise.all([getDoc(doc(db, 'acl', 'emailByName')), getDoc(doc(db, 'contacts', 'main'))]);
+  const byName = a.exists() ? (a.data() || {}) : {};
+  const dept = {};
+  (c.exists() ? (c.data().staff || []) : []).forEach(p => { if (p && p.name && !(p.name in dept)) dept[p.name] = p.dept || ''; });
+  return Object.entries(byName).filter(([, e]) => typeof e === 'string' && e.includes('@'))
+    .map(([name, email]) => ({ name, email, dept: dept[name] || '' }));
+}
+
+function addDays(d, n){
+  const t = new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10) + n, 12));
+  return t.toISOString().slice(0, 10);
+}
+
+// ── 시작 ───────────────────────────────────────────────────────────────────
+let started = false;
+async function start(){
+  const u = fbAuth.currentUser;
+  if (!isTeacher(u)) { GATE = { title: '초과근무', msg: '앱에서 학교 계정으로 로그인한 뒤 열어 주세요.' }; return render(); }
+  if (!OPEN_TO_ALL && !isAdmin()) { GATE = { title: '초과근무', msg: '준비 중인 화면입니다.' }; return render(); }
+  if (!apiUrl()) { GATE = isAdmin() ? { kind: 'setup' } : { title: '초과근무', msg: '아직 연결 전입니다. 준비되면 알려 드리겠습니다.' }; return render(); }
+  GATE = null; ME = null; render();
+  try { await loadMe(); }
+  catch(e) {
+    GATE = { title: '불러오지 못했습니다', msg: e.message, retry: true };
+    if (isAdmin() && !e.code && deviceApi()) GATE.msg += ' (이 기기에 붙여 넣은 주소를 쓰고 있습니다 — 운영 화면에서 지울 수 있습니다)';
+  }
+  render();
+}
+onAuthStateChanged(fbAuth, () => { if (started) return; started = true; start(); });
+</script>
+</body>
+</html>
