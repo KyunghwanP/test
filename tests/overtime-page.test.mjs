@@ -263,6 +263,8 @@ console.log('\n■ 학년 기획 담당 — 감독 배정 붙여넣기');
 pg = await openAs(P1, { part: 'duty' });
 await pg.click('[data-view="assign"]');
 await pg.waitForSelector('[data-field="assignText"]');
+check('배정 화면에 엑셀 양식 받기 (저장소의 docs/duty-template.xlsx)', await pg.getAttribute('a[download="감독표_양식.xlsx"]', 'href') === 'docs/duty-template.xlsx'
+      && fs.existsSync(new URL('../docs/duty-template.xlsx', import.meta.url)));
 await pg.fill('[data-field="assignText"]', '10/06\t김민수\t이서연\t장미래\n10/07\t이서연\t이서연\t없는이\n10/08\t장미래\t\t김민수');
 await pg.click('[data-act="assignPreview"]');
 await pg.waitForSelector('#assignPrev');

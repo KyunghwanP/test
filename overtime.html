@@ -91,6 +91,7 @@
 
   .btn{display:inline-flex;justify-content:center;align-items:center;gap:6px;font-size:13.5px;font-weight:700;
        border-radius:10px;padding:9px 12px;border:1px solid var(--rule);background:var(--paper);color:var(--ink);}
+  a.btn{text-decoration:none;}
   .btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent);}
   .btn.ok{background:var(--ok-soft);border-color:transparent;color:var(--ok);}
   .btn.bad{background:var(--bad-soft);border-color:transparent;color:var(--bad);}
@@ -487,7 +488,8 @@ function assignHtml(){
       <label class="field">감독표 붙여넣기 — 엑셀에서 날짜·감독1·감독2·감독3 네 열을 복사
         <textarea class="input mono" data-field="assignText" placeholder="10/06&#9;김○○&#9;이○○&#9;박○○">${esc(ASSIGN.text)}</textarea></label>
       <span class="hint">날짜는 10/06 · 10.6 · 2026-10-06 · 10월 6일(화) 모두 됩니다. 빈 칸은 비워 둔 채로 들어갑니다. ${ASSIGN.grade}학년 세 칸만 채웁니다.</span>
-      <button class="btn" data-act="assignPreview">미리보기</button></div>
+      <div class="btns"><a class="btn" href="docs/duty-template.xlsx" download="감독표_양식.xlsx">엑셀 양식 받기</a>
+        <button class="btn" data-act="assignPreview">미리보기</button></div></div>
     ${prev}`;
 }
 
