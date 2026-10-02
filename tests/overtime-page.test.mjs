@@ -108,9 +108,10 @@ check('주소가 없으면 관리자에게 연결 안내 (붙여 넣기 칸)', /
 await pg.fill('[data-field="deviceApi"]', 'https://evil.example.com/exec');
 await pg.click('[data-act="saveDevice"]');
 check('워커·웹앱 주소 꼴이 아니면 받지 않는다 (토큰을 엉뚱한 곳에 보내지 않게)', await toastIs(pg, /워커 주소/) && apiCalls.length === 0);
-await pg.fill('[data-field="deviceApi"]', API);
+await pg.fill('[data-field="deviceApi"]', API.replace('https://', ''));
 await pg.click('[data-act="saveDevice"]');
 await pg.waitForSelector('.top', { timeout: 8000 });
+check('https:// 없이 붙여 넣어도 붙여서 받는다', await pg.evaluate(() => localStorage.getItem('ynhs-overtime-api')) === API);
 check('붙여 넣은 주소로 연결 확인(ping) 뒤 이 기기에 기억', apiCalls[0] && /"action":"ping"/.test(apiCalls[0].body)
       && await pg.evaluate(() => localStorage.getItem('ynhs-overtime-api')) === API);
 const call0 = apiCalls.find(c => /"action":"me"/.test(c.body));

@@ -775,7 +775,9 @@ document.addEventListener('click', e => {
     });
     case 'clearDevice': try { localStorage.removeItem(LS_API); } catch(e) {} toast('이 기기 주소를 지웠습니다.'); return start();
     case 'saveDevice': {
-      const v = ($('[data-field="deviceApi"]')?.value || '').trim();
+      // 주소창에서 복사하면 https:// 가 빠지는 경우가 많다 — 없으면 붙인다
+      let v = ($('[data-field="deviceApi"]')?.value || '').trim();
+      if (v && !/^[a-z]+:\/\//i.test(v)) v = 'https://' + v;
       if (!API_RE.test(v)) return toast('…workers.dev 로 끝나는 워커 주소를 붙여 넣어 주세요.', true);
       return run(b, async () => {
         const r = await fetch(v, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: '{"action":"ping"}' })
