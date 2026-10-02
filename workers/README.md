@@ -1,12 +1,16 @@
 # Cloudflare Workers
 
-워커가 **셋**입니다. 경계는 '누가 부르느냐', 그리고 '깨지면 뭐가 같이 죽느냐'입니다.
+워커가 **넷**입니다. 경계는 '누가 부르느냐', 그리고 '깨지면 뭐가 같이 죽느냐'입니다.
 
 | 파일 | 워커 이름 | 담당 | 호출자 |
 |---|---|---|---|
 | `consult-api.js` | `consult-api` | 상담 인증·예약·취소 | **학부모** (인증 전 아무나 두드릴 수 있는 입구) |
 | `teacher-api.js` | `teacher-api` | 학생 사진, 연락처 조회 | **교사** (모든 경로가 토큰 검증 뒤) |
 | `notice-api.js` | `notice-api` | 전체 공지 + **업무캘린더 메모**의 이미지 | **교사** (보기는 전원 / 공지 올리기는 관리자, 메모는 각자 자기 칸) |
+| `overtime-api.js` | `overtime-api` | 초과근무 — 관리대장 시트(공용 계정 소유) 읽기·쓰기 | **교사** (모든 경로가 토큰 검증 뒤, 권한은 시트의 「설정」) |
+
+> `overtime-api.js` 는 **만든 파일**입니다. 원본은 `overtime-api.src.js` 와 `gas/overtime/Code.gs`
+> (처리 규칙)이고 `node workers/build-overtime.mjs` 로 만듭니다. 설치 순서는 `gas/overtime/README.md`.
 
 ### 왜 나눴나
 
@@ -26,6 +30,7 @@
 node workers/teacher-api.test.mjs     # 워커 로직 (fetch를 스텁으로 물려 실제 경로를 태움)
 node workers/notice-api.test.mjs      # 공지 이미지 (권한·키·청소)
 node workers/roster-split.test.mjs    # upload.html 분리 저장 → 워커 조회가 이어지는지
+node tests/overtime-worker.test.mjs   # 초과근무 — Apps Script 와 같은 결과인지 + 잠금·실패·크론
 ```
 
 > `roster-split.test.mjs`는 `upload.html`을 읽습니다. 업로드 도구는 **test 저장소에만**

@@ -37,7 +37,14 @@ check('보기 모드 토큰은 넘기지 않는다 (남의 이름으로 신청�
 check('overtime.html 도 지금은 관리자만', /const OPEN_TO_ALL = false;/.test(OT) && /if \(!OPEN_TO_ALL && !isAdmin\(\)\)/.test(OT));
 check('overtime.html 은 Firebase 에 신청을 쓰지 않는다 (명렬 읽기만)',
       !/setDoc|addDoc|updateDoc|deleteDoc|writeBatch|runTransaction/.test(OT) && /getDoc\(doc\(db, 'acl', 'emailByName'\)\)/.test(OT));
-check('웹앱 주소는 script.google.com …/exec 꼴만 받는다', /const API_RE = \/\^https:\\\/\\\/script\\\.google\\\.com\\\/macros\\\/s\\\//.test(OT));
+{
+  const API_RE = eval(/const API_RE = (\/.*\/);/.exec(OT)[1]);
+  check('연결 주소는 워커(…workers.dev)와 Apps Script(…/exec) 꼴만 받는다 — 토큰을 엉뚱한 곳에 안 보낸다',
+        API_RE.test('https://overtime-api.kyunghwanp.workers.dev') && API_RE.test('https://overtime-api.kyunghwanp.workers.dev/')
+        && API_RE.test('https://script.google.com/macros/s/AKfycbTESTDEPLOYMENT0123456789abcdef/exec')
+        && !API_RE.test('https://evil.example.com/exec') && !API_RE.test('https://workers.dev.evil.com/')
+        && !API_RE.test('https://a.b.workers.dev/x') && !API_RE.test('http://overtime-api.k.workers.dev'));
+}
 
 console.log('\n■ 프레임 — 처음엔 띄우고, 다음부터는 새로 읽으라고만');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });

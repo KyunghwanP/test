@@ -123,7 +123,8 @@ node tests/cal-consult.test.mjs                    # 업무 캘린더의 상담 
 ### 초과근무 (overtime.html · gas/overtime)
 
 ```bash
-node tests/overtime-gas.test.mjs      # 학교 계정 Apps Script 단독 — 설치 불필요(가짜 구글)
+node tests/overtime-gas.test.mjs      # 처리 규칙(Code.gs) 단독 — 설치 불필요(가짜 구글)
+node tests/overtime-worker.test.mjs   # 워커 — Apps Script 와 칸 하나까지 같은지 + 잠금·실패·크론 (설치 불필요)
 node tests/overtime-page.test.mjs     # 화면 → 스크립트 (Chromium)
 node tests/overtime-tab.test.mjs      # 앱의 탭 배선 (Chromium)
 ```

@@ -19,9 +19,10 @@
 </script>
 <!--
   4시간 초과근무 관리 — 화면
-  원본은 학교 계정 소유의 관리대장 시트다. 이 화면은 그 시트에 붙은 Apps Script
-  (gas/overtime/Code.gs) 와만 이야기한다. 신청 내용은 앱의 Firebase 에 두지 않는다.
-  보내는 것은 로그인 토큰과 요청뿐이고, 누구인지는 스크립트가 구글에 물어 확인한다.
+  원본은 학교 계정 소유의 관리대장 시트다. 이 화면은 초과근무 워커(workers/overtime-api.js)와만
+  이야기하고, 워커가 그 시트를 읽고 쓴다(처리 규칙은 gas/overtime/Code.gs 그대로).
+  신청 내용은 앱의 Firebase 에 두지 않는다. 보내는 것은 로그인 토큰과 요청뿐이고,
+  누구인지는 워커가 구글에 물어 확인한다.
   index.html 의 '초과근무' 탭이 이 파일을 iframe 으로 띄운다(?in=1).
 -->
 <style>
@@ -197,7 +198,10 @@ const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 지금은 관리자 혼자 시험한다. 여러 선생님께 열 때 true 로 바꾸고, index.html 의 탭 조건도 같이 푼다.
 const OPEN_TO_ALL = false;
 const LS_API = 'ynhs-overtime-api';
-const API_RE = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec$/;
+// 워커(…workers.dev) 또는 예전 Apps Script 웹앱(…/exec). 다른 곳으로는 로그인 토큰을 보내지 않는다.
+const API_RE = /^https:\/\/(script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec|[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev\/?)$/;
+// 지난번에 받은 내 화면. 열자마자 이것부터 보여 주고 새 것으로 바꾼다(이 기기에만 남는다).
+const LS_LAST = 'ynhs-overtime-last:';
 
 const fbApp = initializeApp({
   apiKey: "AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA",
@@ -248,11 +252,11 @@ async function api(action, params = {}){
     res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                              body: JSON.stringify(Object.assign({ action, idToken }, params)) });
   } catch(e) {
-    throw new Error('연결하지 못했습니다. 인터넷을 확인하고, 계속되면 웹앱 배포의 액세스가 「모든 사용자」인지 확인해 주세요.');
+    throw new Error('연결하지 못했습니다. 인터넷을 확인하고 잠시 뒤 다시 해 주세요.');
   }
   let data;
   try { data = await res.json(); } catch(e) { throw new Error(`응답을 읽지 못했습니다 (${res.status}).`); }
-  if (data && data.state) ME = data.state;            // 실패해도 새 상태가 오면 반영한다(자동 취소 등)
+  if (data && data.state) { ME = data.state; STALE = false; saveLast(); }   // 실패해도 새 상태가 오면 반영한다(자동 취소 등)
   if (!data || !data.ok) { const e = new Error((data && data.msg) || '처리하지 못했습니다.'); e.code = data && data.error; throw e; }
   return data;
 }
@@ -287,6 +291,10 @@ let REJECT_TEXT = '';
 const OPEN = new Set();         // 펼친 줄
 let lastLoad = 0;
 
+let STALE = false;              // 지난번 내용을 보여 주는 중(새로 받는 중)
+function saveLast(){ try { localStorage.setItem(LS_LAST + fbAuth.currentUser.email, JSON.stringify(ME)); } catch(e) {} }
+function readLast(){ try { return JSON.parse(localStorage.getItem(LS_LAST + fbAuth.currentUser.email) || 'null'); } catch(e) { return null; } }
+
 async function loadMe(){
   const d = await api('me');
   ME = d.state; lastLoad = Date.now();
@@ -312,6 +320,7 @@ function topHtml(){
   if (r.grades.length) views.push(['assign', '감독 배정']);
   if (r.operator || r.approve) views.push(['ops', '운영']);
   return `<div class="top"><h1>초과근무</h1><span class="who"><b>${esc(ME.me.name)}</b>${ME.me.dept ? ' · ' + esc(ME.me.dept) : ''}</span>
+    ${STALE ? '<span class="hint" id="staleHint">새로 불러오는 중…</span>' : ''}
     <span class="sp"></span><button class="icon-btn" data-act="refresh" title="다시 불러오기"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>새로고침</button></div>
     ${views.length > 1 ? `<div class="views" role="tablist">${views.map(([k, t]) =>
       `<button class="view-btn${VIEW === k ? ' on' : ''}" role="tab" aria-selected="${VIEW === k}" data-act="view" data-view="${k}">${t}</button>`).join('')}</div>` : ''}
@@ -502,14 +511,13 @@ function opsHtml(){
 function gateHtml(){
   const g = GATE;
   if (g.kind === 'setup') return `<div class="gate"><h1>초과근무 — 아직 연결 전입니다</h1>
-    <p>학교 계정의 관리대장 시트에 스크립트를 붙이고 웹앱으로 배포하면 이 화면이 열립니다.</p>
+    <p>학교 계정의 관리대장 시트와 초과근무 워커를 이으면 이 화면이 열립니다.</p>
     <div class="box"><ol class="steps">
-      <li>학교 계정으로 새 스프레드시트를 만들고 「확장 프로그램 → Apps Script」</li>
-      <li>저장소의 <b>gas/overtime/Code.gs</b> 를 통째로 붙여 넣고 <b>setup</b> 실행</li>
-      <li>「배포 → 새 배포 → 웹 앱」 — 실행: 나, 액세스: 모든 사용자</li>
-      <li>받은 주소(…/exec)를 아래에 붙여 넣어 이 기기에서 시험</li>
+      <li>관리대장 시트를 만들고 Apps Script 의 <b>setup</b> 실행 (gas/overtime/README.md)</li>
+      <li>Cloudflare 에 <b>overtime-api</b> 워커를 만들고 비밀값·크론 넣기 (workers/README.md)</li>
+      <li>워커 주소(…workers.dev)를 아래에 붙여 넣어 이 기기에서 시험</li>
     </ol>
-    <label class="field">웹앱 주소<input class="input" data-field="deviceApi" placeholder="https://script.google.com/macros/s/…/exec"></label>
+    <label class="field">워커 주소<input class="input" data-field="deviceApi" placeholder="https://overtime-api.○○○.workers.dev"></label>
     <button class="btn pri" data-act="saveDevice">연결 확인</button>
     <p class="hint">자세한 순서는 저장소의 gas/overtime/README.md</p></div></div>`;
   return `<div class="gate"><h1>${esc(g.title || '초과근무')}</h1><p>${esc(g.msg)}</p>
@@ -768,11 +776,11 @@ document.addEventListener('click', e => {
     case 'clearDevice': try { localStorage.removeItem(LS_API); } catch(e) {} toast('이 기기 주소를 지웠습니다.'); return start();
     case 'saveDevice': {
       const v = ($('[data-field="deviceApi"]')?.value || '').trim();
-      if (!API_RE.test(v)) return toast('…/macros/s/…/exec 로 끝나는 웹앱 주소를 붙여 넣어 주세요.', true);
+      if (!API_RE.test(v)) return toast('…workers.dev 로 끝나는 워커 주소를 붙여 넣어 주세요.', true);
       return run(b, async () => {
         const r = await fetch(v, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: '{"action":"ping"}' })
           .then(x => x.json()).catch(() => null);
-        if (!r || !r.ok) throw new Error('그 주소에서 답이 없습니다. 배포의 액세스가 「모든 사용자」인지 확인해 주세요.');
+        if (!r || !r.ok) throw new Error('그 주소에서 답이 없습니다. 워커의 ALLOWED_ORIGINS 에 앱 주소가 들어 있는지 확인해 주세요.');
         try { localStorage.setItem(LS_API, v); } catch(e) {}
         toast('연결했습니다.'); GATE = null; await start();
       });
@@ -845,9 +853,12 @@ async function start(){
   if (!isTeacher(u)) { GATE = { title: '초과근무', msg: '앱에서 학교 계정으로 로그인한 뒤 열어 주세요.' }; return render(); }
   if (!OPEN_TO_ALL && !isAdmin()) { GATE = { title: '초과근무', msg: '준비 중인 화면입니다.' }; return render(); }
   if (!apiUrl()) { GATE = isAdmin() ? { kind: 'setup' } : { title: '초과근무', msg: '아직 연결 전입니다. 준비되면 알려 드리겠습니다.' }; return render(); }
-  GATE = null; ME = null; render();
+  GATE = null;
+  ME = readLast(); STALE = !!ME;
+  render();
   try { await loadMe(); }
   catch(e) {
+    if (STALE) { toast('새로 불러오지 못했습니다 — 지난번 내용입니다. ' + e.message, true); return render(); }
     GATE = { title: '불러오지 못했습니다', msg: e.message, retry: true };
     if (isAdmin() && !e.code && deviceApi()) GATE.msg += ' (이 기기에 붙여 넣은 주소를 쓰고 있습니다 — 운영 화면에서 지울 수 있습니다)';
   }

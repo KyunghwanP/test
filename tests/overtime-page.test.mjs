@@ -45,6 +45,7 @@ const STUB = {
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const apiCalls = [];
+let apiDelay = 0;
 // email: 로그인한 계정. open: OPEN_TO_ALL 을 켠 판(여러 선생님께 연 뒤의 모습). wired: 앱에 주소를 넣은 판
 async function openAs(email, { open = true, wired = true, device = '', dark = false, width = 1100 } = {}) {
   const ctx = await b.newContext({ viewport: { width, height: 900 } });
@@ -59,7 +60,8 @@ async function openAs(email, { open = true, wired = true, device = '', dark = fa
   });
   await ctx.route('https://fonts.googleapis.com/**', r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   await ctx.route('https://fonts.gstatic.com/**', r => r.abort());
-  await ctx.route('https://script.google.com/**', r => {
+  await ctx.route('https://script.google.com/**', async r => {
+    if (apiDelay) await new Promise(res => setTimeout(res, apiDelay));
     const req = r.request();
     apiCalls.push({ url: req.url(), headers: req.headers(), method: req.method(), body: req.postData() || '' });
     const out = G.post(req.postData() || '{}');
@@ -105,7 +107,7 @@ pg = await openAs(OP, { open: false, wired: false });
 check('주소가 없으면 관리자에게 연결 안내 (붙여 넣기 칸)', /아직 연결 전/.test(await text(pg)) && await pg.locator('[data-field="deviceApi"]').count() === 1);
 await pg.fill('[data-field="deviceApi"]', 'https://evil.example.com/exec');
 await pg.click('[data-act="saveDevice"]');
-check('웹앱 주소 꼴이 아니면 받지 않는다', await toastIs(pg, /웹앱 주소/) && apiCalls.length === 0);
+check('워커·웹앱 주소 꼴이 아니면 받지 않는다 (토큰을 엉뚱한 곳에 보내지 않게)', await toastIs(pg, /워커 주소/) && apiCalls.length === 0);
 await pg.fill('[data-field="deviceApi"]', API);
 await pg.click('[data-act="saveDevice"]');
 await pg.waitForSelector('.top', { timeout: 8000 });
@@ -165,6 +167,15 @@ check('시트 ② 에 들어갔다', G.sheet('② 기타 업무').table()[0][3] 
 await pg.click('[data-act="toggle"][data-key="qR0001"]');
 check('줄을 누르면 사유·접수 시각·취소 단추', /수시 원서 접수 전/.test(await text(pg)) && await pg.locator('[data-act="cancelReq"]').count() === 1);
 check('사유 속 태그는 글자로만 (실행되지 않음)', await pg.evaluate(() => window.__xss) === undefined && /<img src=x/.test(await text(pg)));
+apiDelay = 2500;
+await pg.reload();
+await pg.waitForSelector('.top', { timeout: 1500 }).catch(() => {});
+t = await text(pg);
+check('다시 열면 지난번 내용을 바로 보여 준다 (답을 기다리지 않음)', /10\.08 \(목\) · 5~6시간/.test(t) && /새로 불러오는 중/.test(t), t.slice(0, 200));
+apiDelay = 0;
+await pg.waitForFunction(() => !document.getElementById('staleHint'), null, { timeout: 6000 }).catch(() => {});
+check('새 내용이 오면 「새로 불러오는 중」 이 사라진다', !(await text(pg)).includes('새로 불러오는 중'));
+check('지난번 내용은 내 계정 이름으로만 이 기기에 남는다', await pg.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('ynhs-overtime-last:'))).then(k => k.length === 1 && k[0] === 'ynhs-overtime-last:kim@yeungnam.hs.kr'));
 check('화면 오류 없음', pg.errors.length === 0, pg.errors);
 await pg.context().close();
 

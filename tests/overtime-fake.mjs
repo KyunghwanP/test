@@ -100,7 +100,8 @@ class FakeSheet {
 }
 
 class FakeSpreadsheet {
-  constructor() { this.sheets = [new FakeSheet(this, '시트1')]; this.formulas = []; }
+  constructor() { this.sheets = [new FakeSheet(this, '시트1')]; this.formulas = []; this.editors = [OWNER]; }
+  addEditor(e) { if (!this.editors.includes(e)) this.editors.push(e); return this; }
   getId() { return 'SHEET-ID-1'; }
   getUrl() { return 'https://docs.google.com/spreadsheets/d/SHEET-ID-1/edit'; }
   getSheetByName(n) { return this.sheets.find(s => s.name === n) || null; }

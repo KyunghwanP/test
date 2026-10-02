@@ -435,6 +435,32 @@ check('손으로 고친 이름은 명렬로 다시 찾는다 (옛 이메일을 �
   check('같은 날짜 두 줄은 한 줄로 — 아래에 옛 줄이 남지 않는다', rows.length === before - 1 && rows.filter(r => r[0].startsWith('2026-11-03')).length === 1, rows.map(r => r[0]));
   check('숨김 탭도 같은 줄 수 (날짜 줄만)', G.sheet('감독 상세').table(2).length === rows.length - 1);
 }
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n■ 워커로 옮긴 뒤 — 이 스크립트는 메일만');
+G.setCfg('메일 알림', '켬');
+const WORKER = 'overtime@ynhs-7b5ba.iam.gserviceaccount.com';
+const SECRET = 's'.repeat(32);
+G.props.set('MAIL_SECRET', SECRET);
+G.props.set('WORKER_EMAIL', WORKER);
+check('시트 요청은 받지 않고 새로 고치라고 한다', G.call(KIM, 'me').error === 'MOVED');
+check('ping 은 그대로', G.post({ action: 'ping' }).ok === true);
+mail0 = G.mails.length;
+check('비밀값이 틀리면 메일을 안 보낸다', G.post({ action: 'mail', secret: 'x'.repeat(32), mails: [{ to: KIM, subject: 'a', body: 'b' }] }).error === 'AUTH' && G.mails.length === mail0);
+check('비밀값이 없으면 안 보낸다', G.post({ action: 'mail', mails: [{ to: KIM, subject: 'a', body: 'b' }] }).error === 'AUTH');
+const relay = G.post({ action: 'mail', secret: SECRET, mails: [
+  { to: KIM + ',' + LEE, subject: '[초과근무] 시험', body: '본문' }, { to: 'x@gmail.com', subject: 'a', body: 'b' },
+  ...Array.from({ length: 60 }, () => ({ to: KIM, subject: 'n', body: 'n' })) ] });
+check('맞으면 학교 주소로만, 한 번에 50통까지', relay.ok && relay.sent === 49 && G.mails[mail0].to === KIM + ',' + LEE
+      && G.mails.slice(mail0).every(m => !m.to.includes('gmail')) && G.mails[mail0].name === '초과근무 관리', relay);
+const nT = swaps().length; mail0 = G.mails.length;
+G.setNow('2026-11-10T18:45:00+09:00');
+G.tick();
+check('이 스크립트의 시계는 쉰다 (워커가 돈다)', swaps().length === nT && G.mails.length === mail0);
+G.setup();
+check('setup 이 워커 계정을 시트 편집자로 더한다', G.ss.editors.includes(WORKER));
+check('잠금 안에서도 워커만 쓸 수 있다 (주인 + 워커)', G.ss.getSheets().every(sh => sh.protection.editors.length === 2 && sh.protection.editors.includes(WORKER)));
+check('이 스크립트의 시계는 없앤다', G.triggers.length === 0);
+G.props.delete('MAIL_SECRET'); G.props.delete('WORKER_EMAIL');
 check('어느 칸에도 수식이 들어가지 않았다', G.ss.formulas.length === 0, G.ss.formulas);
 check('서버 오류 기록 없음', !G.logs.some(l => l.startsWith('ERR')), G.logs.filter(l => l.startsWith('ERR')));
 
