@@ -37,6 +37,7 @@ check('들어오면 프레임을 연다', /if\(page === 'overtime' \|\| page ===
 check('껍데기는 탭마다 iframe 하나', /<div class="page-view" id="overtimePage">\s*<iframe id="overtimePageFrame" title="초과근무"/.test(HTML)
       && /<div class="page-view" id="dutyPage">\s*<iframe id="dutyPageFrame" title="감독표"/.test(HTML));
 check('보기 모드 토큰은 넘기지 않는다 (남의 이름으로 신청이 들어가면 안 된다)', !/overtime\.html[^\n]*impersonate/.test(HTML));
+check('앱에 넣은 연결 주소는 워커 주소 꼴', (() => { const v = /const OVERTIME_API = '([^']*)';/.exec(OT)[1]; return eval(/const API_RE = (\/.*\/);/.exec(OT)[1]).test(v) && /workers\.dev$/.test(v); })());
 check('overtime.html 도 지금은 관리자만', /const OPEN_TO_ALL = false;/.test(OT) && /if \(!OPEN_TO_ALL && !isAdmin\(\)\)/.test(OT));
 check('overtime.html 은 Firebase 에 신청을 쓰지 않는다 (명렬 읽기만)',
       !/setDoc|addDoc|updateDoc|deleteDoc|writeBatch|runTransaction/.test(OT) && /getDoc\(doc\(db, 'acl', 'emailByName'\)\)/.test(OT));

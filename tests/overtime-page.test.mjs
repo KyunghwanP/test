@@ -50,7 +50,8 @@ let apiDelay = 0;
 async function openAs(email, { open = true, wired = true, device = '', dark = false, width = 1100, part = '' } = {}) {
   const ctx = await b.newContext({ viewport: { width, height: 900 } });
   let html = HTML;
-  if (wired) html = html.replace("const OVERTIME_API = '';", `const OVERTIME_API = '${API}';`);
+  // 검사는 진짜 워커 대신 가짜 주소로 — 「주소가 아직 없는 판」 은 wired: false
+  html = html.replace(/const OVERTIME_API = '[^']*';/, `const OVERTIME_API = '${wired ? API : ''}';`);
   if (open) html = html.replace('const OPEN_TO_ALL = false;', 'const OPEN_TO_ALL = true;');
   await ctx.route(ORIGIN + '/test/overtime.html*', r => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html }));
   await ctx.route(ORIGIN + '/test/favicon-32.png', r => r.fulfill({ status: 404, body: '' }));
