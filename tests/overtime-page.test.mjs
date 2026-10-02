@@ -364,6 +364,13 @@ check('앱 안(?in=1)에서는 큰 제목을 숨긴다', await pg.locator('.top 
 check('화면 오류 없음', pg.errors.length === 0, pg.errors);
 await pg.context().close();
 
+console.log('\n■ 워커로 옮긴 뒤 — 기기에 남은 옛 Apps Script 주소');
+G.props.set('MAIL_SECRET', 'q'.repeat(32));
+pg = await openAs(OP, { open: false, wired: false, device: API });
+check('「주소가 바뀌었습니다」 와 함께 새 주소를 넣을 칸이 바로 뜬다', /주소가 바뀌었습니다/.test(await text(pg)) && await pg.locator('[data-field="deviceApi"]').count() === 1, (await text(pg)).slice(0, 200));
+await pg.context().close();
+G.props.delete('MAIL_SECRET');
+
 await b.close();
 console.log(`\n${fail ? '❌' : '✅'} 통과 ${pass} / 실패 ${fail}`);
 process.exit(fail ? 1 : 0);

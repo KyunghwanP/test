@@ -511,7 +511,7 @@ function opsHtml(){
 function gateHtml(){
   const g = GATE;
   if (g.kind === 'setup') return `<div class="gate"><h1>초과근무 — 아직 연결 전입니다</h1>
-    <p>학교 계정의 관리대장 시트와 초과근무 워커를 이으면 이 화면이 열립니다.</p>
+    <p>${g.note ? esc(g.note) + ' 새 워커 주소를 넣어 주세요.' : '학교 계정의 관리대장 시트와 초과근무 워커를 이으면 이 화면이 열립니다.'}</p>
     <div class="box"><ol class="steps">
       <li>관리대장 시트를 만들고 Apps Script 의 <b>setup</b> 실행 (gas/overtime/README.md)</li>
       <li>Cloudflare 에 <b>overtime-api</b> 워커를 만들고 비밀값·크론 넣기 (workers/README.md)</li>
@@ -858,6 +858,8 @@ async function start(){
   render();
   try { await loadMe(); }
   catch(e) {
+    // 예전 Apps Script 주소를 기억하고 있으면 '주소가 바뀌었습니다' 가 온다 — 새 주소를 넣을 칸을 바로 띄운다
+    if (e.code === 'MOVED' && isAdmin()) { ME = null; STALE = false; GATE = { kind: 'setup', note: e.message }; return render(); }
     if (STALE) { toast('새로 불러오지 못했습니다 — 지난번 내용입니다. ' + e.message, true); return render(); }
     GATE = { title: '불러오지 못했습니다', msg: e.message, retry: true };
     if (isAdmin() && !e.code && deviceApi()) GATE.msg += ' (이 기기에 붙여 넣은 주소를 쓰고 있습니다 — 운영 화면에서 지울 수 있습니다)';
