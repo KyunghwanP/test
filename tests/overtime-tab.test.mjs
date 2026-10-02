@@ -23,16 +23,19 @@ const grab = name => {
 console.log('\n■ 원본 배선 (정적)');
 check('사이드바·탭바 단추는 처음에 숨어 있다',
       /class="main-nav-item" data-page="overtime" id="navOvertime" style="display:none;"/.test(HTML)
-      && /class="tab-item" data-page="overtime" id="tabOvertime" style="display:none;"/.test(HTML));
+      && /class="tab-item" data-page="overtime" id="tabOvertime" style="display:none;"/.test(HTML)
+      && /class="main-nav-item" data-page="duty" id="navDuty" style="display:none;"/.test(HTML)
+      && /class="tab-item" data-page="duty" id="tabDuty" style="display:none;"/.test(HTML));
 const reveal = /\/\/ 초과근무 탭:[\s\S]{0,200}?if \(_IS_ADMIN\(\)\) \{([\s\S]{0,300}?)\n    \}/.exec(HTML);
-check('관리자일 때만 보인다 (_IS_ADMIN — 보기 모드 제외)', reveal && /navOt\.style\.display = ''/.test(reveal[1]) && /tabOt\.style\.display = ''/.test(reveal[1]));
-check('다른 곳에서 단추를 켜지 않는다', (HTML.match(/navOvertime/g) || []).length === 2 && (HTML.match(/tabOvertime/g) || []).length === 2);
+check('두 탭 모두 관리자일 때만 보인다 (_IS_ADMIN — 보기 모드 제외)', reveal && /\['navOvertime', 'tabOvertime', 'navDuty', 'tabDuty'\]\.forEach/.test(reveal[1]) && /el\.style\.display = ''/.test(reveal[1]));
+check('다른 곳에서 단추를 켜지 않는다', ['navOvertime', 'tabOvertime', 'navDuty', 'tabDuty'].every(id => (HTML.match(new RegExp(id, 'g')) || []).length === 2));
 check('특별실 예약 바로 아래 (공지 쓰기는 맨 끝 그대로)',
-      /data-page="room"[^]*?<\/div>\s*<div class="main-nav-item" data-page="overtime"/.test(HTML)
+      /data-page="room"[^]*?<\/div>\s*<div class="main-nav-item" data-page="overtime"[^]*?<\/div>\s*<div class="main-nav-item" data-page="duty"/.test(HTML)
       && [...HTML.matchAll(/class="main-nav-item" data-page="([a-z]+)"/g)].map(m => m[1]).at(-1) === 'notice');
-check('화면 목록에 들어 있다', /'seat','overtime','usage','notice'\]\.forEach/.test(HTML));
-check('들어오면 프레임을 연다', /if\(page === 'overtime'\) openOvertimeFrame\(\);/.test(HTML));
-check('껍데기는 iframe 하나', /<div class="page-view" id="overtimePage">\s*<iframe id="overtimePageFrame" title="초과근무"/.test(HTML));
+check('화면 목록에 들어 있다', /'seat','overtime','duty','usage','notice'\]\.forEach/.test(HTML));
+check('들어오면 프레임을 연다', /if\(page === 'overtime' \|\| page === 'duty'\) openOvertimeFrame\(page\);/.test(HTML));
+check('껍데기는 탭마다 iframe 하나', /<div class="page-view" id="overtimePage">\s*<iframe id="overtimePageFrame" title="초과근무"/.test(HTML)
+      && /<div class="page-view" id="dutyPage">\s*<iframe id="dutyPageFrame" title="감독표"/.test(HTML));
 check('보기 모드 토큰은 넘기지 않는다 (남의 이름으로 신청이 들어가면 안 된다)', !/overtime\.html[^\n]*impersonate/.test(HTML));
 check('overtime.html 도 지금은 관리자만', /const OPEN_TO_ALL = false;/.test(OT) && /if \(!OPEN_TO_ALL && !isAdmin\(\)\)/.test(OT));
 check('overtime.html 은 Firebase 에 신청을 쓰지 않는다 (명렬 읽기만)',
@@ -57,18 +60,20 @@ await pg.route('http://ot.test/**', r => {
     window.got = []; addEventListener('message', e => { got.push([e.origin, e.data && e.data.type]); });
     window.loads = (parent.loadCount = (parent.loadCount || 0) + 1);</script>` });
   return r.fulfill({ contentType: 'text/html', body: `<!doctype html><meta charset="utf-8">
-    <iframe id="overtimePageFrame"></iframe>
+    <iframe id="overtimePageFrame"></iframe><iframe id="dutyPageFrame"></iframe>
     <script>const APP_VER = 'ver9.99';\n${grab('openOvertimeFrame')}</script>` });
 });
 await pg.goto('http://ot.test/index.html');
-check('처음 열 때 주소: overtime.html?in=1&v=버전', await pg.evaluate(() => { openOvertimeFrame(); return document.getElementById('overtimePageFrame').getAttribute('src'); })
+check('처음 열 때 주소: overtime.html?in=1&v=버전', await pg.evaluate(() => { openOvertimeFrame('overtime'); return document.getElementById('overtimePageFrame').getAttribute('src'); })
       === 'overtime.html?in=1&v=ver9.99');
 await pg.waitForFunction(() => window.loadCount === 1);
-await pg.evaluate(() => openOvertimeFrame());
+await pg.evaluate(() => openOvertimeFrame('overtime'));
 await pg.waitForTimeout(150);
 const f = pg.frames().find(x => x.url().includes('overtime.html'));
 check('두 번째부터는 다시 띄우지 않는다 (쓰던 신청서가 남게)', await pg.evaluate(() => window.loadCount) === 1);
 check('대신 같은 출처로 「새로 읽기」 를 알린다', JSON.stringify(await f.evaluate(() => window.got)) === JSON.stringify([['http://ot.test', 'ot-refresh']]), await f.evaluate(() => window.got));
+check('감독표 탭은 자기 프레임에 ?part=duty 로', await pg.evaluate(() => { openOvertimeFrame('duty'); return document.getElementById('dutyPageFrame').getAttribute('src'); })
+      === 'overtime.html?in=1&part=duty&v=ver9.99');
 check('화면 오류 없음', errs.length === 0, errs);
 await b.close();
 

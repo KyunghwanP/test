@@ -61,7 +61,7 @@ function createOvertime(__g) {
  *  · 신청자는 자기 신청만 본다. 남의 업무 내용은 관리자에게만 간다.
  */
 
-const OT_VERSION = '2026-10-02';
+const OT_VERSION = '2026-10-03';
 
 // Firebase 웹 API 키 — 앱(index.html)에 이미 공개된 값이라 비밀이 아니다.
 // 앱이 보낸 로그인 토큰을 구글에 확인할 때만 쓴다.
@@ -1076,8 +1076,8 @@ function readDate_(s, today, whole) {
 }
 
 // 학년 기획 담당·관리자가 보는 한 달 감독표
+// 한 달 감독표 — 감독 배정은 원래 모두 아는 내용이라 누구나 본다. 고치는 것(fixGrades)만 담당자·관리자.
 function actGrid_(ctx, b) {
-  if (!(ctx.role.view || ctx.role.grades.length)) fail('학년 기획 담당과 관리자만 볼 수 있습니다.', 'FORBIDDEN');
   const ym = /^\d{4}-\d{2}$/.test(String(b.month || '')) ? b.month : ctx.today.slice(0, 7);
   const days = loadDuty_(ctx).days;
   const list = Object.keys(days).filter(d => d.slice(0, 7) === ym).sort().map(d => ({

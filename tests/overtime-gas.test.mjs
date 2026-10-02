@@ -417,7 +417,8 @@ check('트리거가 18:30 지난 교체 요청을 닫는다', swaps().slice(-1)[
 console.log('\n■ 그 밖');
 const grid = G.call(P1, 'grid', { month: '2026-10' });
 check('담당자 감독표 — 칸마다 이름·메모', grid.ok && grid.days.length === 6 && grid.days[0].cells[2].note.includes('교체 수락') && grid.fixGrades.join() === '1');
-check('교사는 감독표 화면을 못 본다', G.call(KIM, 'grid').error === 'FORBIDDEN');
+{ const kg = G.call(KIM, 'grid', { month: '2026-10' });
+  check('교사도 감독표는 본다 — 고칠 칸은 없다', kg.ok && kg.days.length === 6 && kg.fixGrades.length === 0, kg); }
 const so = G.call(KIM, 'slotsOf', { id: id('장미래') });
 check('다른 선생님 감독 칸 보기 (긴급 교체용) — 이번 달부터', so.ok && so.who.name === '장미래' && so.slots.every(s => s.date >= '2026-11-01'), so);
 G.setCfg('메일 알림', '끔');

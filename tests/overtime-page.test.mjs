@@ -47,7 +47,7 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
 const apiCalls = [];
 let apiDelay = 0;
 // email: 로그인한 계정. open: OPEN_TO_ALL 을 켠 판(여러 선생님께 연 뒤의 모습). wired: 앱에 주소를 넣은 판
-async function openAs(email, { open = true, wired = true, device = '', dark = false, width = 1100 } = {}) {
+async function openAs(email, { open = true, wired = true, device = '', dark = false, width = 1100, part = '' } = {}) {
   const ctx = await b.newContext({ viewport: { width, height: 900 } });
   let html = HTML;
   if (wired) html = html.replace("const OVERTIME_API = '';", `const OVERTIME_API = '${API}';`);
@@ -77,7 +77,7 @@ async function openAs(email, { open = true, wired = true, device = '', dark = fa
   pg.errors = [];
   pg.on('pageerror', e => pg.errors.push(e.message));
   pg.on('dialog', d => d.accept());
-  await pg.goto(PAGE);
+  await pg.goto(PAGE + (part ? '&part=' + part : ''));
   await pg.waitForFunction(() => !document.querySelector('#app .loading'), null, { timeout: 8000 }).catch(() => {});
   return pg;
 }
@@ -143,7 +143,8 @@ G.setCfg('메일 알림', '켬');
 console.log('\n■ 교사 — 4시간 초과 신청 (2026-10-05 월)');
 pg = await openAs(KIM);
 t = await text(pg);
-check('내 것 화면 — 이름·부서, 빈 목록 안내', /김민수/.test(t) && /1학년부/.test(t) && /낸 신청이 없습니다/.test(t) && /배정된 감독이 없습니다/.test(t));
+check('초과근무 탭 — 이름·부서, 내 신청만 (감독 일정·교체는 감독표 탭)', /김민수/.test(t) && /1학년부/.test(t) && /낸 신청이 없습니다/.test(t)
+      && !/내 감독 일정/.test(t) && await pg.locator('[data-act="openEmergency"]').count() === 0);
 check('권한 없는 교사에게는 다른 화면 단추가 없다', await pg.locator('.views').count() === 0);
 check('교사 화면에 이메일이 보이지 않는다', !/@/.test(await pg.locator('#app').innerHTML()));
 await pg.click('[data-act="openSubmit"]');
@@ -258,7 +259,7 @@ await pg.context().close();
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n■ 학년 기획 담당 — 감독 배정 붙여넣기');
-pg = await openAs(P1);
+pg = await openAs(P1, { part: 'duty' });
 await pg.click('[data-view="assign"]');
 await pg.waitForSelector('[data-field="assignText"]');
 await pg.fill('[data-field="assignText"]', '10/06\t김민수\t이서연\t장미래\n10/07\t이서연\t이서연\t없는이\n10/08\t장미래\t\t김민수');
@@ -281,7 +282,7 @@ await pg.context().close();
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n■ 교체 — 장미래가 요청, 한도윤이 수락');
-pg = await openAs(JANG);
+pg = await openAs(JANG, { part: 'duty' });
 t = await text(pg);
 check('내 감독 일정 — 세 칸, 심야는 표시', /10\.06 \(화\) · 1학년 감독3 \(심야\)/.test(t) && /심야 · 통합조회에 올라감/.test(t) && await pg.locator('[data-act="openSwap"]').count() === 3);
 await pg.click('[data-act="openSwap"][data-slot="2026-10-06|1|3"]');
@@ -295,7 +296,7 @@ await idle(pg);
 t = await text(pg);
 check('그 칸에 「수락 대기 · 기한」 과 요청 취소 단추', /한도윤 선생님 수락 대기 · 기한 10\.06 18:30/.test(t) && await pg.locator('[data-act="withdraw"]').count() === 1);
 await pg.context().close();
-pg = await openAs(HAN);
+pg = await openAs(HAN, { part: 'duty' });
 t = await text(pg);
 check('받는 사람 — 맨 위에 요청 카드 (사유·기한)', /감독 교체 요청 — 10\.06 \(화\) 1학년 감독3 \(심야\)/.test(t) && /사유: 가족 행사/.test(t) && /수락 기한 10\.06 18:30/.test(t));
 await pg.click('[data-act="respond"][data-yes="1"]');
@@ -307,7 +308,7 @@ check('시트도 바뀌었다', G.sheet('① 자율학습 감독').table(2)[0][3
 await pg.context().close();
 
 console.log('\n■ 맞교환 — 상대 칸을 불러와 고른다');
-pg = await openAs(LEE);
+pg = await openAs(LEE, { part: 'duty' });
 await pg.click('[data-act="openSwap"][data-slot="2026-10-06|1|2"]');
 await pg.click('[data-k="mode"][data-v="trade"]');
 await pick(pg, 'to', '오세린', '오세린');
@@ -332,7 +333,7 @@ await pg.context().close();
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n■ 긴급 교체 — 다른 선생님 감독 맡기');
-pg = await openAs(OH);
+pg = await openAs(OH, { part: 'duty' });
 await pg.click('[data-act="openEmergency"]');
 await pick(pg, 'who', '김민수', '김민수');
 await pg.waitForSelector('[data-act="setSlot"]');
@@ -355,7 +356,7 @@ await pg.context().close();
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n■ 지난 감독 정정 — 둘 다 확인');
 G.setNow('2026-10-09T08:00:00+09:00');
-pg = await openAs(JANG);
+pg = await openAs(JANG, { part: 'duty' });
 await pg.click('[data-act="openCorrect"]');
 check('지난 내 감독만 칩으로', await pg.locator('[data-act="setSlot"]').count() === 2);
 await pg.click('[data-act="setSlot"][data-slot="2026-10-07|1|2"]');
@@ -366,7 +367,7 @@ check('정정 요청 — 상대 확인 안내', await toastIs(pg, /임동건 선
 await idle(pg);
 check('보낸 정정 요청 목록', /보낸 정정 요청/.test(await text(pg)) && /기록 장미래 → 실제 임동건/.test(await text(pg)));
 await pg.context().close();
-pg = await openAs(LIM);
+pg = await openAs(LIM, { part: 'duty' });
 check('확인할 사람에게 카드', /지난 감독 정정 확인 — 10\.07 \(수\) 1학년 감독2/.test(await text(pg)));
 await pg.click('[data-act="respond"][data-yes="1"]');
 check('확인 — 기록이 바뀐다', await toastIs(pg, /정정을 확인했습니다/) && G.sheet('① 자율학습 감독').table(2)[1][2] === '임동건');
@@ -374,8 +375,8 @@ await pg.context().close();
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n■ 담당자 정정 — 감독표 칸을 눌러');
-pg = await openAs(P1);
-await pg.click('[data-view="assign"]');
+pg = await openAs(P1, { part: 'duty' });
+await pg.click('[data-view="grid"]');
 await pg.waitForSelector('td.cell button');
 check('바뀐 칸은 색으로 (교체·긴급·사후 정정)', await pg.locator('td.k-교체').count() === 1 && await pg.locator('td.k-긴급').count() === 1 && await pg.locator('td.k-사후').count() === 1);
 check('칸에 마우스를 올리면 바뀐 내력', /장미래 → 한도윤 · 교체 수락/.test(await pg.getAttribute('td.k-교체', 'title')));
@@ -392,6 +393,19 @@ check('다른 학년 칸은 누를 수 없다', await pg.locator('[data-act="ope
 await pg.context().close();
 
 // ─────────────────────────────────────────────────────────────────────────────
+console.log('\n■ 두 탭 — 초과근무와 감독표');
+pg = await openAs(KIM, { part: 'duty' });
+t = await text(pg);
+check('감독표 탭 — 제목 감독표, 화면 단추는 교체·감독표 (교사는 배정 없음)', /감독표/.test(await pg.locator('.top h1').textContent())
+      && JSON.stringify(await pg.locator('.view-btn').allInnerTexts()) === JSON.stringify(['교체', '감독표']), await pg.locator('.view-btn').allInnerTexts());
+check('교체 화면 — 내 감독 일정·맡기·정정, 4시간 초과 신청 단추는 없음', /내 감독 일정/.test(t) && await pg.locator('[data-act="openEmergency"]').count() === 1
+      && await pg.locator('[data-act="openSubmit"]').count() === 0);
+await pg.click('[data-view="grid"]');
+await pg.waitForSelector('table');
+check('교사도 한 달 감독표를 본다 — 고칠 칸은 없다', await pg.locator('td.cell').count() > 0 && await pg.locator('[data-act="openFix"]').count() === 0);
+check('화면 오류 없음', pg.errors.length === 0, pg.errors);
+await pg.context().close();
+
 console.log('\n■ 모양');
 pg = await openAs(KIM, { dark: true, width: 360 });
 const bg = await pg.evaluate(() => getComputedStyle(document.body).backgroundColor);

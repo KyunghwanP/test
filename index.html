@@ -4834,6 +4834,9 @@
     <div class="tab-item" data-page="overtime" id="tabOvertime" style="display:none;">
       <span class="tab-item-icon">⏱️</span>초과근무
     </div>
+    <div class="tab-item" data-page="duty" id="tabDuty" style="display:none;">
+      <span class="tab-item-icon">🌙</span>감독표
+    </div>
     <div class="tab-item" data-page="docs">
       <span class="tab-item-icon">📋</span>업무자료
     </div>
@@ -4895,6 +4898,9 @@
       </div>
       <div class="main-nav-item" data-page="overtime" id="navOvertime" style="display:none;">
         <span class="main-nav-icon">⏱️</span>초과근무
+      </div>
+      <div class="main-nav-item" data-page="duty" id="navDuty" style="display:none;">
+        <span class="main-nav-icon">🌙</span>감독표
       </div>
       <div class="main-nav-item" data-page="docs">
         <span class="main-nav-icon">📋</span>업무자료
@@ -5823,6 +5829,10 @@
       <div class="page-view" id="overtimePage">
         <iframe id="overtimePageFrame" title="초과근무" style="flex:1;width:100%;border:0;background:var(--bg-base);"></iframe>
       </div>
+      <!-- 감독표(자율학습 감독 교체·감독표·배정) — 같은 overtime.html 을 ?part=duty 로 띄운다 -->
+      <div class="page-view" id="dutyPage">
+        <iframe id="dutyPageFrame" title="감독표" style="flex:1;width:100%;border:0;background:var(--bg-base);"></iframe>
+      </div>
 
       <div class="page-view" id="seatPage">
         <div id="seatPageHead" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-shrink:0;">
@@ -6391,7 +6401,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.72';
+const APP_VER = 'ver7.73';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -10657,10 +10667,12 @@ function closeUsagePage(){
 // 않게. 돌아오면 새로 읽으라고만 알린다(교체 수락처럼 다른 사람이 바꾸는 것이 있다).
 // 주소에 버전을 붙이는 까닭은 사용 현황과 같다: 서비스 워커의 PRECACHE 에 없는
 // 페이지라 브라우저 HTTP 캐시에 걸리면 앱을 새로고침해도 옛 파일이 뜬다.
-function openOvertimeFrame(){
-  const f = document.getElementById('overtimePageFrame');
+// 초과근무와 감독표는 같은 overtime.html 을 띄우되 보여 주는 부분만 다르다(?part=duty).
+function openOvertimeFrame(page){
+  const duty = page === 'duty';
+  const f = document.getElementById(duty ? 'dutyPageFrame' : 'overtimePageFrame');
   if (!f) return;
-  if (!f.src || f.src === 'about:blank') { f.src = `overtime.html?in=1&v=${encodeURIComponent(APP_VER)}`; return; }
+  if (!f.src || f.src === 'about:blank') { f.src = `overtime.html?in=1${duty ? '&part=duty' : ''}&v=${encodeURIComponent(APP_VER)}`; return; }
   try { f.contentWindow.postMessage({ type: 'ot-refresh' }, location.origin); } catch (e) {}
 }
 
@@ -11215,10 +11227,10 @@ onAuthStateChanged(fbAuth, async (user) => {
     // 초과근무 탭: 지금은 관리자 혼자 시험한다(보기 모드에서는 숨김).
     // 여러 선생님께 열 때는 이 조건과 overtime.html 의 OPEN_TO_ALL 을 함께 푼다.
     if (_IS_ADMIN()) {
-      const navOt = document.getElementById('navOvertime');
-      const tabOt = document.getElementById('tabOvertime');
-      if (navOt) navOt.style.display = '';
-      if (tabOt) tabOt.style.display = '';
+      ['navOvertime', 'tabOvertime', 'navDuty', 'tabDuty'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = '';
+      });
     }
     // 특별실 예약 탭: 전체 교사에게 공개(시범 운영 종료)
     {
@@ -17893,7 +17905,7 @@ function navigateTo(page) {
   document.querySelectorAll('.mobile-tab-bar .tab-item').forEach(t => t.classList.toggle('active', t.dataset.page === page));
   // 'seat' 은 탭 버튼이 없는 화면이다 — 자리 배치 모달의 「페이지로」로만 들어온다.
   // 여기 목록에 없으면 다른 탭으로 옮겨도 안 닫힌다.
-  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult','docs','grades','search','room','pass','seat','overtime','usage','notice'].forEach(p => {
+  ['home','timetable','weekly','meal','contacts','students','schedule','points','mytask','consult','docs','grades','search','room','pass','seat','overtime','duty','usage','notice'].forEach(p => {
     const el = document.getElementById(p + 'Page');
     if(el) el.classList.toggle('active', p === page);
   });
@@ -17906,7 +17918,7 @@ function navigateTo(page) {
     const uf = document.getElementById('usagePageFrame');
     if (uf && uf.src && uf.src !== 'about:blank') uf.src = 'about:blank';
   }
-  if(page === 'overtime') openOvertimeFrame();
+  if(page === 'overtime' || page === 'duty') openOvertimeFrame(page);
   if(page === 'notice') initNoticePage();
   else if(currentPage === 'notice') { _noticeEditing = false; _noticeDirty = false; rtReleaseImages(); }
   if(page !== 'consult') stopConsultWatch();
