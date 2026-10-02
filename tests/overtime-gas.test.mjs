@@ -192,8 +192,20 @@ check('승인된 것도 근무일 전이면 취소 — 승인 기록은 지우�
 check('승인 건 취소는 관리자에게 알린다', mailsTo(VP).some(m => /승인된 신청이 취소/.test(m.subject)));
 check('취소하면 ③ 에서 빠진다', !allRows().some(r => r[2] === '김민수' && r[4].startsWith('기타 업무')));
 check('취소한 날은 다시 신청할 수 있다', G.call(KIM, 'submit', { date: '2026-10-08', band: BAND, type: '상담', reason: '수시 원서 접수 전 학부모 상담 4건' }).ok);
+G.call(LEE, 'submit', { date: '2026-10-20', band: BAND, type: '상담', reason: '여러 건 승인 시험 하나' });
+G.call(PARK, 'submit', { date: '2026-10-21', band: BAND, type: '상담', reason: '여러 건 승인 시험 둘' });
+const bulkIds = reqs().filter(r => /여러 건 승인 시험/.test(r[7])).map(r => r[0]);
+check('여러 건 반려는 안 된다 (사유를 한 건씩)', /한 건씩/.test(G.call(VP, 'decide', { ids: bulkIds, decision: '반려', reason: 'x' }).msg));
+check('보기 관리자는 여러 건 승인도 못 함', G.call(PR, 'decide', { ids: bulkIds, decision: '승인' }).error === 'FORBIDDEN');
+mail0 = G.mails.length;
+const bulk = G.call(VP, 'decide', { ids: bulkIds.concat(['R0001']), decision: '승인' });
+check('여러 건 한꺼번에 승인 — 이미 처리된 것은 건너뛰고 알려 준다', bulk.ok && /^2건을 승인했습니다\. \(1건은/.test(bulk.done)
+      && reqs().filter(r => bulkIds.includes(r[0])).every(r => r[8] === '승인' && r[10] === '정교감'), bulk.done);
+check('한 사람씩 승인 메일, 이력에 「2건 한꺼번에」', mailsTo(LEE, mail0).length === 1 && mailsTo(PARK, mail0).length === 1
+      && hist().filter(r => r[1] === '승인' && r[6] === '2건 한꺼번에').length === 2);
+check('모두 이미 처리된 것만 고르면 알려 준다', /모두 이미 처리/.test(G.call(VP, 'decide', { ids: bulkIds, decision: '승인' }).msg));
 const sm = G.call(VP, 'adminList', { month: '2026-10' }).summary;
-check('월 요약 — 승인·반려·대기·취소', sm.approved === 1 && sm.rejected === 1 && sm.pending === 2 && sm.cancelled === 1, sm);
+check('월 요약 — 승인·반려·대기·취소', sm.approved === 3 && sm.rejected === 1 && sm.pending === 2 && sm.cancelled === 1, sm);
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n■ ① 감독 배정 (학년 기획 담당이 엑셀에서 붙여넣기)');

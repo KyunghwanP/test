@@ -98,6 +98,12 @@
   .btn.full{width:100%;}
   .btn:disabled{opacity:.5;cursor:default;}
   .btns{display:flex;gap:8px;} .btns .btn{flex:1;}
+  .pick{display:flex;align-items:center;padding-right:4px;cursor:pointer;}
+  .pick input{width:20px;height:20px;accent-color:var(--accent);cursor:pointer;}
+  .box.picked{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset;}
+  .bulkbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+           background:var(--paper);border:1px solid var(--rule);border-radius:12px;padding:8px 12px;box-shadow:var(--shadow);}
+  .bulkbar .hint{flex:1;}
   .linkish{background:none;border:0;padding:0;color:var(--accent);font-size:12.5px;font-weight:700;align-self:flex-start;}
 
   .alert{background:var(--warn-soft);border:1px solid transparent;border-radius:12px;padding:11px 13px;display:flex;
@@ -287,6 +293,8 @@ let ASSIGN = { grade: 0, text: '', res: null };
 let STATUS = null;
 let SHEET = null;               // 열린 입력 창
 let REJECTING = '';             // 반려 사유를 적는 중인 신청 번호
+const PICKED = new Set();       // 한꺼번에 승인하려고 고른 신청
+const INFLIGHT = new Set();     // 승인·반려를 눌러 답을 기다리는 신청 — 화면에서는 이미 뺀다
 let REJECT_TEXT = '';
 const OPEN = new Set();         // 펼친 줄
 let lastLoad = 0;
@@ -397,15 +405,16 @@ function recentRow(w){
 function adminHtml(){
   if (!ADMIN) return '<div class="loading">불러오는 중…</div>';
   const A = ADMIN, sm = A.summary;
+  // 누른 것은 답을 기다리지 않고 바로 뺀다(INFLIGHT). 실패하면 다시 나타난다.
+  const pending = A.pending.filter(q => !INFLIGHT.has(q.id));
+  [...PICKED].forEach(id => { if (!pending.some(q => q.id === id)) PICKED.delete(id); });
   const card = q => {
-    const open = OPEN.has('a' + q.id);
     const tags = [q.sameDay ? pill('당일 신청', 'p-info') : '', q.self ? pill('본인 신청', 'p-fix') : ''].join(' ');
-    return `<div class="box">
-      <div class="row"><div class="l"><b>${esc(q.name)}${q.dept ? ' · ' + esc(q.dept) : ''}</b>
+    return `<div class="box${PICKED.has(q.id) ? ' picked' : ''}">
+      <div class="row">${A.canDecide ? `<label class="pick" title="골라서 한꺼번에 승인"><input type="checkbox" data-act="pickReq" data-id="${esc(q.id)}" ${PICKED.has(q.id) ? 'checked' : ''} aria-label="${esc(q.name)} 신청 고르기"></label>` : ''}
+        <div class="l" style="flex:1"><b>${esc(q.name)}${q.dept ? ' · ' + esc(q.dept) : ''}</b>
         <span>${short(q.date)} · ${esc(q.band)} · ${esc(q.type)}</span></div><div class="r">${tags}${pill('대기')}</div></div>
-      ${open ? `<div class="more">${esc(q.reason)}<span class="k">접수 ${hm(q.at)}</span></div>
-               <button class="linkish" data-act="toggle" data-key="a${esc(q.id)}">▾ 사유 접기</button>`
-             : `<button class="linkish" data-act="toggle" data-key="a${esc(q.id)}">▸ 사유 보기</button>`}
+      <div class="more">${esc(q.reason)}<span class="k">접수 ${hm(q.at)}</span></div>
       ${A.canDecide ? (REJECTING === q.id
         ? `<label class="field">반려 사유 (필수 — 신청한 분이 보완할 때 봅니다)
              <textarea class="input" data-field="reject" maxlength="300">${esc(REJECT_TEXT)}</textarea></label>
@@ -415,13 +424,19 @@ function adminHtml(){
              <button class="btn bad" data-act="rejectStart" data-id="${esc(q.id)}">반려</button></div>`) : ''}
     </div>`;
   };
+  const nPick = PICKED.size;
+  const bulk = A.canDecide && pending.length > 1 ? `<div class="bulkbar">
+      <button class="btn sm" data-act="pickAll">${nPick === pending.length ? '선택 풀기' : '전체 선택'}</button>
+      <span class="hint">${nPick ? nPick + '건 골랐습니다' : '체크해서 여러 건을 한꺼번에 승인할 수 있습니다'}</span>
+      <button class="btn ok sm" data-act="bulkApprove" ${nPick ? '' : 'disabled'}>선택 ${nPick}건 승인</button></div>` : '';
   const top = sm.top.length ? sm.top.slice(0, 3).map(p => `${esc(p.name)} ${p.n}회${p.night && p.other ? ` (심야 ${p.night} · 기타 ${p.other})` : ''}`).join(', ') : '—';
   return `
-    <div class="box"><h2>승인 대기${A.pending.length ? ` <span class="badge-n">${A.pending.length}</span>` : ''}<span class="sp"></span>
+    <div class="box"><h2>승인 대기${pending.length ? ` <span class="badge-n">${pending.length}</span>` : ''}<span class="sp"></span>
       ${ME.sheetUrl ? `<a class="linkish" href="${esc(ME.sheetUrl)}" target="_blank" rel="noopener">시트 열기 ↗</a>` : ''}</h2>
-      ${A.pending.length ? '' : '<p class="empty">기다리는 신청이 없습니다.</p>'}
+      ${pending.length ? '' : '<p class="empty">기다리는 신청이 없습니다.</p>'}
       ${!A.canDecide ? '<p class="hint">보기 권한입니다. 승인·반려는 승인 관리자가 합니다.</p>' : ''}</div>
-    ${A.pending.map(card).join('')}
+    ${bulk}
+    ${pending.map(card).join('')}
     <div class="box"><h2>월 요약<span class="sp"></span><input type="month" class="input" style="width:auto;min-height:0;padding:3px 8px" data-act-change="adminMonth" value="${esc(A.month)}"></h2>
       <div class="stat"><span>승인 · 반려 · 대기</span><b>${sm.approved} · ${sm.rejected} · ${sm.pending}</b></div>
       <div class="stat"><span>심야 감독 (배정)</span><b>${sm.night}</b></div>
@@ -749,12 +764,19 @@ document.addEventListener('click', e => {
       const fn = SENDERS[act];
       return run(b, fn);
     }
-    case 'approve': return run(b, async () => { ADMIN = await api('decide', { id, decision: '승인', month: ADMIN_MONTH }); ME.pendingCount = ADMIN.pending.length; toast(ADMIN.done); });
+    case 'approve': return decideNow([id], '승인', '');
+    case 'pickReq': PICKED.has(id) ? PICKED.delete(id) : PICKED.add(id); return render();
+    case 'pickAll': {
+      const vis = ADMIN.pending.filter(q => !INFLIGHT.has(q.id)).map(q => q.id);
+      if (PICKED.size === vis.length) PICKED.clear(); else vis.forEach(x => PICKED.add(x));
+      return render();
+    }
+    case 'bulkApprove': return PICKED.size ? decideNow([...PICKED], '승인', '') : undefined;
     case 'rejectStart': REJECTING = id; REJECT_TEXT = ''; render(); return document.querySelector('[data-field="reject"]')?.focus();
     case 'rejectStop': REJECTING = ''; return render();
     case 'rejectSend':
       if (REJECT_TEXT.trim().length < 2) return toast('반려 사유를 적어 주세요.', true);
-      return run(b, async () => { ADMIN = await api('decide', { id, decision: '반려', reason: REJECT_TEXT, month: ADMIN_MONTH }); ME.pendingCount = ADMIN.pending.length; REJECTING = ''; toast(ADMIN.done); });
+      return decideNow([id], '반려', REJECT_TEXT);
     case 'grade': ASSIGN.grade = +b.dataset.g; ASSIGN.res = null; return render();
     case 'assignPreview':
       if (!ASSIGN.text.trim()) return toast('감독표를 붙여 넣어 주세요.', true);
@@ -824,6 +846,27 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && ME && !BUSY && !SHEET && Date.now() - lastLoad > 30000)
     loadMe().then(loadView).then(render).catch(() => {});
 });
+
+// 승인·반려 — 누르는 즉시 화면에서 빼고, 저장은 뒤에서 한다. 실패하면 되살리고 알린다.
+// 여러 건은 요청 하나로 보낸다(기다리는 시간이 한 건 분량).
+async function decideNow(ids, decision, reason){
+  ids.forEach(x => { INFLIGHT.add(x); PICKED.delete(x); });
+  if (decision === '반려') REJECTING = '';
+  render();
+  toast(decision === '반려' ? '반려하는 중…' : ids.length > 1 ? ids.length + '건 승인하는 중…' : '승인하는 중…');
+  try {
+    const d = await api('decide', Object.assign(ids.length > 1 ? { ids } : { id: ids[0] }, { decision, reason, month: ADMIN_MONTH }));
+    ADMIN = d;
+    toast(d.done);
+  } catch(e) {
+    toast(e.message + ' — 화면을 되돌렸습니다.', true);
+    try { ADMIN = await api('adminList', { month: ADMIN_MONTH }); } catch(e2) {}
+  } finally {
+    ids.forEach(x => INFLIGHT.delete(x));
+    if (ADMIN) ME.pendingCount = ADMIN.pending.filter(q => !INFLIGHT.has(q.id)).length;
+    render();
+  }
+}
 
 async function loadView(){
   if (VIEW === 'admin') ADMIN = await api('adminList', { month: ADMIN_MONTH });

@@ -906,28 +906,42 @@ function summary_(ctx, ym) {
            night: night, top: top, emergency: emergency };
 }
 
+// 한 건(id) 또는 여러 건(ids) — 여러 건은 승인만. 반려는 사유를 한 건씩 적는다.
+// 여러 건 중 그 사이 다른 관리자가 처리한 것은 건너뛰고 몇 건인지 알려 준다.
 function actDecide_(ctx, b) {
   if (!ctx.role.approve) fail('승인 권한이 없습니다.', 'FORBIDDEN');
-  const q = loadReqs_(ctx).filter(x => x.id === b.id)[0];
-  if (!q) fail('신청을 찾지 못했습니다.');
-  if (q.status !== '대기') fail('이미 ' + q.status + ' 처리된 신청입니다.');
   const ok = b.decision === '승인';
   if (!ok && b.decision !== '반려') fail('승인 또는 반려를 골라 주세요.');
+  const many = Array.isArray(b.ids);
+  const ids = many ? b.ids.slice(0, 100).map(String) : [String(b.id || '')];
+  if (!ids.length) fail('승인할 신청을 골라 주세요.');
+  if (!ok && ids.length > 1) fail('반려는 한 건씩 사유를 적어 주세요.');
+  const reqs = loadReqs_(ctx);
+  const targets = ids.map(id => reqs.filter(x => x.id === id)[0]);
+  if (targets.some(q => !q)) fail('신청을 찾지 못했습니다.');
+  const todo = targets.filter(q => q.status === '대기');
+  if (!todo.length) fail(ids.length === 1 ? '이미 ' + targets[0].status + ' 처리된 신청입니다.' : '고른 신청이 모두 이미 처리되었습니다.');
   const reason = text_(b.reason, 300);
   if (!ok && reason.length < 2) fail('반려 사유를 적어 주세요. 신청한 분이 다시 낼 때 참고합니다.');
-  q.status = ok ? '승인' : '반려';
-  if (!ok) q.note = (q.note ? q.note + ' · ' : '') + reason;
-  q.by = ctx.me.name; q.byAt = ctx.now; q.byEmail = ctx.me.email;
-  touch_(ctx, SH.REQ, q);
-  const self = q.email === ctx.me.email;
-  log_(ctx, q.status, '② ' + short_(q.date) + ' ' + q.name, '대기', q.status,
-       (ok ? '' : '사유: ' + reason) + (self ? (ok ? '' : ' · ') + '본인 신청' : ''));
+  todo.forEach(q => {
+    q.status = ok ? '승인' : '반려';
+    if (!ok) q.note = (q.note ? q.note + ' · ' : '') + reason;
+    q.by = ctx.me.name; q.byAt = ctx.now; q.byEmail = ctx.me.email;
+    touch_(ctx, SH.REQ, q);
+    const self = q.email === ctx.me.email;
+    log_(ctx, q.status, '② ' + short_(q.date) + ' ' + q.name, '대기', q.status,
+         (ok ? '' : '사유: ' + reason) + (self ? (ok ? '' : ' · ') + '본인 신청' : '') + (todo.length > 1 ? (self ? ' · ' : '') + todo.length + '건 한꺼번에' : ''));
+    mail_(ctx, q.email, (ok ? '승인되었습니다' : '반려되었습니다') + ' — ' + short_(q.date), [
+      dateLabel_(q.date) + ' 4시간 초과 근무 신청(' + q.band + ')이 ' + (ok ? '승인' : '반려') + '되었습니다.',
+      ok ? '나이스에는 평소처럼 입력하시면 됩니다.' : '반려 사유: ' + reason,
+      ok ? '' : '필요하면 사유를 보완해 다시 신청해 주세요.']);
+  });
   if (ok) ctx.dirtyAll = true;
-  mail_(ctx, q.email, (ok ? '승인되었습니다' : '반려되었습니다') + ' — ' + short_(q.date), [
-    dateLabel_(q.date) + ' 4시간 초과 근무 신청(' + q.band + ')이 ' + (ok ? '승인' : '반려') + '되었습니다.',
-    ok ? '나이스에는 평소처럼 입력하시면 됩니다.' : '반려 사유: ' + reason,
-    ok ? '' : '필요하면 사유를 보완해 다시 신청해 주세요.']);
-  return Object.assign({ done: q.name + ' 선생님 신청을 ' + q.status + '했습니다.' }, actAdminList_(ctx, b));
+  const skipped = targets.length - todo.length;
+  const done = todo.length === 1 && !many
+    ? todo[0].name + ' 선생님 신청을 ' + todo[0].status + '했습니다.'
+    : todo.length + '건을 승인했습니다.' + (skipped ? ' (' + skipped + '건은 그 사이 처리되어 건너뜀)' : '');
+  return Object.assign({ done: done }, actAdminList_(ctx, b));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
