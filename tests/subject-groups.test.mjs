@@ -35,7 +35,11 @@ check('밑그림은 SEED 로 두고 실제 묶음은 바꿀 수 있다',
 check('시작할 때 연락망을 같이 받아 온다',
       /getDoc\(doc\(fbDb, 'contacts', 'main'\)\)[\s\S]{0,300}applySubjectGroups/.test(HTML));
 check('시간표를 보고 있으면 그 자리에서 다시 그린다',
-      /applySubjectGroups\(s\.data\(\)\.staff\)\) return;[\s\S]{0,260}reRenderTimetable/.test(HTML));
+      /applySubjectGroups\(s\.data\(\)\.staff\)\) return;[\s\S]{0,400}reRenderTimetable/.test(HTML));
+// 시간표를 안 보고 있을 때 도착해도 과목 단추는 바로 다시 그린다. 전에는 보고 있을 때만
+// 그려서 처음 그린 밑그림 단추가 남아 있다가, 검색하거나 과목을 누르는 순간 갑자기 바뀌었다.
+check('연락망이 오면 과목 단추는 화면과 상관없이 다시 그린다',
+      /applySubjectGroups\(s\.data\(\)\.staff\)\) return;(?:\s*\/\/[^\n]*)*\s*try \{ renderSubjectSelectors\(\); \} catch\(e\)\{\}\s*const tp = /.test(HTML));
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const pg = await b.newPage();
@@ -49,7 +53,11 @@ await pg.setContent(`<!doctype html><meta charset="utf-8"><script>
   const TEACHER_TO_SUBJECT = {};
   SUBJECT_GROUPS.forEach(g=> g.teachers.forEach(n => { TEACHER_TO_SUBJECT[n] = g.subject; }));
   let TEACHERS = [];
+  let selectedSubject = null;
   const UNGROUPED_NAMES = [];
+  ${grab('escapeHtml')}
+  ${grab('visibleSubjectGroups')}
+  ${grab('subjectButtonsHtml')}
   const ORDERED_TEACHER_NAMES = [];
   ${grab('subjectGroupsFromStaff')}
   ${grab('applySubjectGroups')}
@@ -60,6 +68,8 @@ await pg.setContent(`<!doctype html><meta charset="utf-8"><script>
   window.ordered = () => ORDERED_TEACHER_NAMES.slice();
   window.ungrouped = () => UNGROUPED_NAMES.slice();
   window.seed = () => SUBJECT_GROUPS_SEED;
+  window.buttons = () => [...new DOMParser().parseFromString(subjectButtonsHtml('subject-chip'), 'text/html')
+                           .querySelectorAll('button')].map(b => b.dataset.subject || '전체');
 </script>`);
 
 console.log('\n■ 연락망에서 묶음을 만든다');
@@ -104,6 +114,40 @@ console.log('\n■ 연락망에서 묶음을 만든다');
   check('전체 목록은 묶인 사람 다음에 안 묶인 사람',
         (await pg.evaluate(() => window.ordered())).at(-1) === '한동석',
         await pg.evaluate(() => window.ordered()));
+}
+
+console.log('\n■ 행정실·교무행정 직원의 담당과목 칸 — 과목 단추가 생기지 않는다');
+{
+  // 연락망에는 수업이 없는 직원도 있고, 그 '담당과목' 칸에는 업무가 적혀 있다.
+  // 시간표(TEACHERS)에 없는 사람뿐인 과목은 눌러도 아무도 안 나오는 단추가 된다.
+  const teachers = ['최영수', '이인태', '정승호', '김종욱', '정훈철', '김희재', '양영주', '김영순', '이소영', '전진송', '오세림'];
+  const staff = [
+    ...teachers.map((n, i) => ({ name: n, subject: ['국어','국어','수학','수학','영어','음악','미술','체육','한문','영어','스페인어'][i] })),
+    { name: '한동석', dept: '행정실', subject: '관인' },
+    { name: '박시설', dept: '행정실', subject: '시설' },
+    { name: '김업무', dept: '교무기획부', subject: '업무' },
+    { name: '이업무', dept: '행정실', subject: '업무' },
+  ];
+  await pg.evaluate(t => window.setTeachers(t), teachers);
+  check('갈아 끼운다', (await pg.evaluate(s => window.apply(s), staff)) === true);
+  const btns = await pg.evaluate(() => window.buttons());
+  check('관인·시설·업무 단추는 없다', !btns.some(b => ['관인', '시설', '업무'].includes(b)), btns);
+  check('수업이 있는 과목은 그대로 (밑그림에 없는 스페인어도)',
+        btns.join() === '전체,국어,수학,영어,음악,미술,체육,한문,스페인어', btns);
+  check('묶음 자료 자체는 그대로 둔다 (보강 정렬 등이 같이 쓴다)',
+        (await pg.evaluate(() => window.groups().map(g => g.subject))).includes('관인'));
+
+  // 1학기 보기처럼 시간표가 바뀌면 단추도 그 시간표로 다시 센다
+  await pg.evaluate(() => window.setTeachers(['최영수', '정승호', '한동석']));
+  const btns1 = await pg.evaluate(() => window.buttons());
+  check('시간표가 바뀌면 그 시간표에 있는 사람 기준으로 다시 센다', btns1.join() === '전체,국어,수학,관인', btns1);
+
+  // 연락망에서 온 값이라 그대로 HTML 에 넣지 않는다
+  await pg.evaluate(() => window.setTeachers(['최영수', '정승호', '김종욱', '정훈철', '김희재', '양영주', '김영순', '이소영', '오세림', '전진송', '이인태']));
+  await pg.evaluate(s => window.apply(s), [...staff.slice(0, 11), { name: '최영수', subject: '<img src=x onerror=alert(1)>' }]);
+  const raw = await pg.evaluate(() => subjectButtonsHtml('subject-chip'));
+  check('과목 이름은 이스케이프해서 넣는다', !/<img/.test(raw) && /&lt;img/.test(raw), raw.slice(-160));
+  await pg.evaluate(s => window.apply(s), staff);
 }
 
 console.log('\n■ 잘못 올린 파일 하나로 무너지지 않는다');
