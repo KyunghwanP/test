@@ -55,6 +55,17 @@ PS_FILE=/tmp/pyeonseong.xlsx node tests/upload-pyeonseong-page.test.mjs
 으로 취급돼 **선택과목이 통째로 삭제**되므로, 그 항목만 잠기고 명렬은 그대로
 저장돼야 한다.
 
+### 운영표 업로드
+
+```bash
+node tests/operating-upload.test.mjs   # 파일 필요 없음 — 검사가 운영표를 만들어 올린다
+```
+
+머리 행(`교시 · 1학년 · 2학년 · 3학년`)을 찾는 부분을 본다. 예전에는 제목 줄에 빈 칸이
+끼어 있거나(A1 제목 + H1 작성일) 표가 B열부터 시작하면 엑셀 행 배열의 구멍 때문에
+「Cannot read properties of undefined (reading 'replace')」 로 터졌다. 머리 행이 아래쪽에
+있어도, 머리 칸을 띄어 써도(`교 시`) 읽어야 하고, 못 찾으면 파일 맨 위 몇 줄을 보여 준다.
+
 ### 교원 비상연락망 다시 올리기
 
 ```bash

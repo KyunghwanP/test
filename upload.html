@@ -1011,20 +1011,33 @@ async function parseOperatingExcel(file) {
   if (!ws) throw new Error('시트를 찾을 수 없습니다.');
   const rows = XLSX.utils.sheet_to_json(ws, { header:1 });
   // 헤더 행(…교시…1학년…) 탐색 → 컬럼 인덱스 확정
+  // 행 배열에는 빈 칸 자리가 구멍으로 남는다(제목 줄 A1 + 작성일 H1 같은 행).
+  // .map 은 구멍을 그대로 두고 findIndex 는 구멍을 undefined 로 넘겨서 터졌다 → Array.from 으로 메운다.
+  // 칸 안 띄어쓰기('교 시', '1 학년')는 무시한다.
+  const HEAD_ROWS = 15;
+  const cellsOf = i => Array.from(rows[i] || [], c => (c==null ? '' : String(c).replace(/\s/g,'')));
   let hr = -1, ci = null;
-  for (let i = 0; i < Math.min(rows.length, 6); i++) {
-    const r = (rows[i] || []).map(c => (c==null?'':String(c).trim()));
-    const pIdx = r.findIndex(c => c === '교시');
-    const g1Idx = r.findIndex(c => c.replace(/\s/g,'') === '1학년');
+  for (let i = 0; i < Math.min(rows.length, HEAD_ROWS); i++) {
+    const r = cellsOf(i);
+    const pIdx = r.indexOf('교시');
+    const g1Idx = r.indexOf('1학년');
     if (pIdx >= 0 && g1Idx >= 0) {
       hr = i;
-      ci = { date: r.findIndex(c=>c.includes('일자')), day: r.findIndex(c=>c==='요일'),
+      ci = { date: r.findIndex(c=>c.includes('일자') || c==='날짜'), day: r.indexOf('요일'),
              period: pIdx, g1: g1Idx, g2: g1Idx+1, g3: g1Idx+2,
              remark: r.findIndex(c=>c.includes('비고')) };
       break;
     }
   }
-  if (hr < 0) throw new Error('헤더(교시·1학년…)를 찾지 못했습니다. 형식을 확인하세요.');
+  if (hr < 0) {
+    const seen = [];
+    for (let i = 0; i < Math.min(rows.length, HEAD_ROWS) && seen.length < 4; i++) {
+      const r = Array.from(rows[i] || [], c => (c==null ? '' : String(c).replace(/\s+/g,' ').trim())).filter(Boolean);
+      if (r.length) seen.push((i+1) + '행: ' + r.slice(0, 8).join(' · ') + (r.length > 8 ? ' …' : ''));
+    }
+    throw new Error('헤더 행(교시 · 1학년 · 2학년 · 3학년 이 한 줄에 있는 행)을 위에서 ' + HEAD_ROWS + '행 안에서 찾지 못했습니다.\n'
+      + '이 파일의 첫 시트(' + (wb.SheetNames[0] || '') + ') 맨 위:\n' + (seen.length ? seen.join('\n') : '(비어 있음)'));
+  }
 
   const semester = String(wb.SheetNames[0] || '').trim();
   const PH = /^([월화수목금])([1-7])$/;
