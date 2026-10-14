@@ -147,6 +147,54 @@ console.log('\n■ 시험일·휴일');
         TT.ttResolveCellOp(holi, classSchedule['1-1'], 1, '수', 6) === null);
 }
 
+console.log('\n■ 같은 요일 안에서 교시를 맞바꾼 날 — 10/15(목) 1교시 ↔ 7교시');
+{
+  // 실제 2학기 운영표 그대로. 평소 목요일은 1·2학년 1교시가 공강이고 3학년만 목1 수업이 있다.
+  // 이 날은 7교시 수업을 1교시로 당겨 1·2학년은 7교시가 공강, 3학년은 목1 ↔ 목7.
+  // 예전에는 '목7' 이 목요일 칸이라 요일만 보고 '정규 그대로' 로 여겼다 → 교사 화면에서
+  // 1교시로 온 수업은 버려지고(옮겨온 표시가 없어서) 7교시는 공강이라 수업이 통째로 사라졌다.
+  const cs = {
+    '1-1': { '목': [ {period:2, subject:'국어', class:'1-1', teacher:'이국어'},
+                     {period:7, subject:'영어', class:'1-1', teacher:'최영어'} ] },
+    '3-1': { '목': [ {period:1, subject:'물리', class:'3-1', teacher:'정물리'},
+                     {period:7, subject:'화학', class:'3-1', teacher:'한화학'} ] },
+  };
+  const T3 = new Function('classSchedule', 'classList', src)(cs, ['1-1', '3-1']);
+  const op = { day:'목', cells: { 1: ['목7','목7','목7'], 2: ['목2','공강','목2'], 7: ['공강','공강','목1'] } };
+  const at = (cls, p) => T3.ttResolveCellOp(op, cs[cls], +cls[0], '목', p);
+  const base = (t, p) => Object.values(cs).flatMap(c => c['목']).find(x => x.teacher === t && x.period === p) || null;
+
+  // 학급 화면
+  const a1 = at('1-1', 1), a7 = at('1-1', 7), a2 = at('1-1', 2), b1 = at('3-1', 1), b7 = at('3-1', 7);
+  check('1-1 1교시 = 7교시에 있던 영어, 옮겨온 칸으로 표시', a1 && a1.subject === '영어' && a1.teacher === '최영어' && a1._sub === true, a1);
+  check('1-1 7교시 = 공강', a7 === null, a7);
+  check('1-1 2교시(목2 그대로)는 바뀐 칸이 아니다', a2 && a2.subject === '국어' && !a2._sub, a2);
+  check('3-1 1교시 = 화학, 7교시 = 물리 (맞바꿈)', b1 && b1.subject === '화학' && b1._sub === true && b7 && b7.subject === '물리' && b7._sub === true, [b1, b7]);
+
+  // 교사 화면 — 현황판 '오늘 내 시간표'·협의 시간(ttTeacherDay)과 시간표 화면(ttTeacherOp) 둘 다
+  const day = T3.ttTeacherDay(op, '목');
+  T3.setWeek({ dates: { '2026-10-15': op } }, new Date(2026, 9, 12));
+  const wk = T3.ttTeacherOp();
+  const pullD = (t, p) => day[t] && day[t][p];
+  const pullW = (t, p) => wk[t] && wk[t]['목'] && wk[t]['목'][p];
+  for (const [label, pull] of [['하루 맵', pullD], ['주간 맵', pullW]]) {
+    const slot = (t, p) => T3.ttMaskTeacherSlot(op, base(t, p), pull(t, p), '목', p);
+    const s = (t, p) => { const x = slot(t, p); return x ? x.subject : null; };
+    check(`${label}: 최영어 1교시에 영어가 잡힌다 (신고된 오류)`, s('최영어', 1) === '영어', slot('최영어', 1));
+    check(`${label}: 최영어 7교시는 비어 있다`, s('최영어', 7) === null, slot('최영어', 7));
+    check(`${label}: 정물리 1교시는 비고 7교시에 물리`, s('정물리', 1) === null && s('정물리', 7) === '물리', [slot('정물리', 1), slot('정물리', 7)]);
+    check(`${label}: 한화학 1교시에 화학, 7교시는 빈다`, s('한화학', 1) === '화학' && s('한화학', 7) === null, [slot('한화학', 1), slot('한화학', 7)]);
+    check(`${label}: 이국어 2교시는 그대로, 바뀐 칸 표시 없음`, s('이국어', 2) === '국어' && !slot('이국어', 2)._sub, slot('이국어', 2));
+  }
+  check('주간 맵: 최영어 목요일 1교시가 옮겨온 칸으로 표시', !!(pullW('최영어', 1) && pullW('최영어', 1)._sub), wk['최영어']);
+}
+
+console.log('\n■ 현황판 「○요일 운영」 꼬리표 — 같은 요일 안에서 옮긴 것은 다른 요일 운영이 아니다');
+{
+  const m = /if\(_myCells\)\{ const cnt=\{\}; for\(const p in _myCells\)\{ const c=_myCells\[p\]; if\(([^)]*)\)/.exec(html);
+  check('꼬리표는 오늘과 다른 요일에서 당겨온 칸만 센다', !!m && /c\._src!==todayDay2/.test(m[1]), m && m[1]);
+}
+
 console.log('\n■ 같은 함정이 또 남아 있지 않은지');
 {
   // 교사별 배정 맵을 만드는 함수가 ttDayCross 로 '날 자체'를 걸러 버리면 이 버그가 다시 난다.
