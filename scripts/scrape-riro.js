@@ -14,15 +14,65 @@ if (!getApps().length) {
 }
 const db = getFirestore();
 
+// ── 진단 로그 ─────────────────────────────────────────────────────────
+// 저장소가 공개라 Actions 로그를 누구나 본다. 본문(학생 이름·점수, 계정 주인 이름이
+// 섞일 수 있다)은 찍지 않고 상태 코드·걸린 시간·응답한 서버·몇 가지 낱말 유무만 남긴다.
+// 2026-10-15 부터 '파싱 완료: 0명' 으로 매일 실패했는데, 상벌점 페이지가 25ms 만에
+// 끝났다(정상일 땐 2초 남짓). 한국 서버까지 갔다 올 수 없는 시간이라 중간에서 누가
+// 대신 답한 것으로 보인다 — 무엇이 답하는지 보려고 남긴다.
+function edgeOf(h = {}) {
+  const out = [];
+  if (h['server'])       out.push(`server=${h['server']}`);
+  if (h['cf-ray'])       out.push(`cloudflare=${String(h['cf-ray']).split('-').pop()}`);  // 응답한 지점(공항 코드)
+  if (h['x-amz-cf-pop']) out.push(`cloudfront=${h['x-amz-cf-pop']}`);
+  if (h['x-cache'])      out.push(`x-cache=${h['x-cache']}`);
+  if (h['via'])          out.push(`via=${h['via']}`);
+  return out.join(' ') || '-';
+}
+const MARKS = { 상벌점표: 'mypage_record_pc', 로그인화면: 'action=signin', 로그아웃: 'logout', 차단: '차단', 해외: '해외',
+                비밀번호변경: '비밀번호 변경', captcha: 'captcha', cloudflare: 'cloudflare', 'Access Denied': 'access denied',
+                Forbidden: 'forbidden', 'request blocked': 'request blocked' };
+function marksOf(text) {
+  const t = String(text || '').toLowerCase();
+  return Object.entries(MARKS).filter(([, k]) => t.includes(k)).map(([n]) => n).join(',') || '-';
+}
+async function go(page, label, url) {
+  const t = Date.now();
+  const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  const u = new URL(page.url());
+  const title = (await page.title().catch(() => '')).slice(0, 40);
+  console.log(`  ${label}: HTTP ${res ? res.status() : '-'} · ${Date.now() - t}ms · ${u.host}${u.pathname} · 제목「${title}」`
+    + ` · ${edgeOf(res ? res.headers() : {})} · 표시: ${marksOf(await page.content())}`);
+  return res;
+}
+// 브라우저 없이 같은 서버에서 한 번 — 막히는 게 이 컴퓨터(IP) 자체인지 본다
+async function probe(label, url) {
+  const t = Date.now();
+  try {
+    const r = await fetch(url, { redirect: 'manual' });
+    const body = await r.text();
+    const h = Object.fromEntries(r.headers.entries());
+    console.log(`  ${label}: HTTP ${r.status} · ${Date.now() - t}ms · ${body.length}자${h.location ? ' · →' + new URL(h.location, url).pathname : ''}`
+      + ` · ${edgeOf(h)} · 표시: ${marksOf(body)}`);
+  } catch (e) {
+    console.log(`  ${label}: 연결 실패 · ${Date.now() - t}ms · ${e.cause ? e.cause.code || e.cause.message : e.message}`);
+  }
+}
+
 async function main() {
+  console.log('접속 확인 (브라우저 없이)...');
+  await probe('로그인 화면', `${SITE}/user.php?action=signin`);
+  await probe('첫 화면', `${SITE}/`);
+
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
   const page    = await context.newPage();
 
   // 1. 로그인
   console.log('리로스쿨 로그인 중...');
-  await page.goto(`${SITE}/user.php?action=signin`, { waitUntil: 'domcontentloaded' });
-  await page.request.post(`${SITE}/ajax.php`, {
+  await go(page, '로그인 화면', `${SITE}/user.php?action=signin`);
+  const lt = Date.now();
+  const login = await page.request.post(`${SITE}/ajax.php`, {
     form: {
       app:      'user',
       mode:     'login',
@@ -31,17 +81,29 @@ async function main() {
       pw:       RIRO_PW,
     }
   });
+  {
+    // 응답 본문은 안 찍는다. JSON 이면 키 이름과 숫자·참거짓 값만 (문자열엔 이름이 있을 수 있다)
+    const body = await login.text();
+    let shape = '본문 JSON 아님';
+    try {
+      const j = JSON.parse(body);
+      shape = 'JSON ' + Object.keys(j).map(k => {
+        const v = j[k];
+        return (v === null || typeof v === 'number' || typeof v === 'boolean') ? `${k}=${v}` : `${k}(${typeof v === 'string' ? v.length + '자' : typeof v})`;
+      }).join(', ');
+    } catch (e) {}
+    console.log(`  로그인 요청: HTTP ${login.status()} · ${Date.now() - lt}ms · ${body.length}자 · ${shape}`
+      + ` · ${edgeOf(login.headers())} · 표시: ${marksOf(body)}`);
+  }
 
   // 로그인 후 메인 페이지 이동
-  await page.goto(`${SITE}`, { waitUntil: 'domcontentloaded' });
-  console.log('로그인 완료');
+  await go(page, '첫 화면', `${SITE}`);
+  console.log('로그인 요청 끝');
 
   // 2. 상벌점 전체 내역 페이지
   console.log('상벌점 페이지 로딩...');
-  await page.goto(
-    `${SITE}/my_page.php?club=index&action=record&Appwin=reload&Class=*45&yy=2026`,
-    { waitUntil: 'domcontentloaded', timeout: 60000 }
-  );
+  await go(page, '상벌점 페이지',
+    `${SITE}/my_page.php?club=index&action=record&Appwin=reload&Class=*45&yy=2026`);
 
   // 3. HTML 파싱
   console.log('데이터 파싱 중...');
