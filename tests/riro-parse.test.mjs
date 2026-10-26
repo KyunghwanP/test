@@ -50,6 +50,9 @@ console.log('\n■ 스크립트 파일 (학교 PC 는 Windows PowerShell 5.1)');
   check('눈에 안 보이는 특수 공백 글자가 없다 (정규식은 \\u 표기로)', odd.length === 0, odd);
   const code = txt.split('\n').filter(l => !/^\s*#/.test(l)).join('\n').replace(/'[^'\n]*'/g, "''").replace(/"[^"\n]*"/g, '""');
   check('PowerShell 7 에만 있는 문법을 안 쓴다 (&& || ?? ?. 삼항 -Parallel)', !/&&|\|\||\?\?|\?\.|\s\?\s[^:]+\s:\s|-Parallel/.test(code));
+  // 5.1 콘솔은 두 칸 글자가 줄 끝에 걸리면 Write-Host·진행 막대가 「인덱스가 배열 범위를 벗어났습니다」 로 터진다
+  check('Write-Host 를 쓰지 않는다 (콘솔에 바로 쓰는 Out-Line 으로)', !/\bWrite-Host\b/.test(code));
+  check('진행 막대를 끈다 ($ProgressPreference = SilentlyContinue)', /^\$ProgressPreference = 'SilentlyContinue'$/m.test(txt));
 }
 
 // ── 시험할 HTML ─────────────────────────────────────────────────────────

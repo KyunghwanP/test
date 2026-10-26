@@ -238,6 +238,22 @@ try {
   r = await ps(['-File', PS1, '-HomeDir', path.join(HOME, 'none'), '-RiroBase', RIRO]);
   check('설정 전이면 -Setup 하라고 알려 준다', r.code === 1 && /먼저 -Setup/.test(r.out), r.out.slice(-300));
 
+  console.log('\n■ 화면 출력이 터져도 끝까지 간다 (Windows PowerShell 5.1 콘솔의 두 칸 글자 버그)');
+  {
+    // 학교 PC 에서 Write-Host·진행 막대가 「인덱스가 배열 범위를 벗어났습니다」 로 터졌다 — 그대로 흉내낸다
+    await saveSecret({ id: ID, pw: PW, worker: WORKER, key: KEY });
+    MODE = 'normal';
+    const wrap = path.join(HOME, 'broken-console.ps1');
+    fs.writeFileSync(wrap, `param([string]$S, [string]$H, [string]$R)
+function Write-Host { throw [System.IndexOutOfRangeException]::new('인덱스가 배열 범위를 벗어났습니다.') }
+function Write-Progress { throw [System.IndexOutOfRangeException]::new('인덱스가 배열 범위를 벗어났습니다.') }
+& $S -HomeDir $H -RiroBase $R -Check
+exit $LASTEXITCODE
+`);
+    const w = await ps(['-File', wrap, '-S', PS1, '-H', HOME, '-R', RIRO]);
+    check('Write-Host·Write-Progress 가 터져도 -Check 가 끝까지 (워커 연결 정상 · 이상 없음)', w.code === 0 && /워커 연결: 정상/.test(w.out) && /확인 끝 — 이상 없습니다/.test(w.out) && !/인덱스가 배열/.test(w.out), w.out.slice(-500));
+  }
+
   console.log('\n■ -Check 는 해석이 막혀도 워커 연결을 본다 / -ShowKey / -Diagnose');
   await saveSecret({ id: ID, pw: PW, worker: WORKER, key: KEY });
   MODE = 'norecords';

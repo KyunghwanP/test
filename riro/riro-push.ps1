@@ -44,6 +44,10 @@ param(
 )
 
 $script:TaskName = 'ynhs-riro-sync'
+# Invoke-WebRequest 의 진행 막대를 끈다. Windows PowerShell 5.1 콘솔은 한글처럼 두 칸 글자가 줄 끝에
+# 걸리면 「인덱스가 배열 범위를 벗어났습니다」 로 터지는데, 진행 막대도 같은 코드로 그려서 요청 자체가
+# 실패했다(2026-10-26 학교 PC: 워커 연결 HTTP 0). 진행 막대는 1.5MB 페이지를 받을 때 느리게도 만든다.
+$ProgressPreference = 'SilentlyContinue'
 $script:DefaultWorker = 'https://riro-ingest.pkh910518.workers.dev'
 
 # PowerShell 5.1 은 TLS 1.2 가 꺼져 있을 수 있다
@@ -741,7 +745,7 @@ function Invoke-Diagnose {
   $lines = Get-RiroDiag $html $students
   $file = Join-Path $script:AppDir 'riro-diag.txt'
   Set-Content -Path $file -Value $lines -Encoding UTF8
-  foreach ($l in $lines) { if ($l -match '^\s*(record-p|p_wrapper|label-record|mypage_record_pc) |학생 줄') { Write-Host $l } }
+  foreach ($l in $lines) { if ($l -match '^\s*(record-p|p_wrapper|label-record|mypage_record_pc) |학생 줄') { Out-Line $l } }
   $out = $file
   try {
     $desk = [Environment]::GetFolderPath('Desktop')
@@ -752,9 +756,9 @@ function Invoke-Diagnose {
 }
 function Show-Key {
   $sec = Read-Secret
-  Write-Host '전송 암호 (Cloudflare 워커의 RIRO_KEY 에 넣을 값):' -ForegroundColor Yellow
-  Write-Host "  $($sec.key)"
-  try { Set-Clipboard -Value $sec.key; Write-Host '  (클립보드에 복사했습니다 — Ctrl+V 로 붙여 넣으세요)' } catch { }
+  Out-Line '전송 암호 (Cloudflare 워커의 RIRO_KEY 에 넣을 값):' 'Yellow'
+  Out-Line "  $($sec.key)"
+  try { Set-Clipboard -Value $sec.key; Out-Line '  (클립보드에 복사했습니다 — Ctrl+V 로 붙여 넣으세요)' } catch { }
 }
 
 # ══════════════════════════════════════════════════════════════════════
@@ -766,9 +770,20 @@ function Resolve-HomeDir {
   if (-not $base) { $base = [Environment]::GetFolderPath('LocalApplicationData') }
   return (Join-Path $base 'ynhs-riro')
 }
+# 화면에 한 줄. Write-Host 를 쓰지 않는다 — 위의 콘솔 버그로 Write-Host 와 오류 출력(out-lineoutput)까지
+# 터졌다. 콘솔에 바로 쓰고, 그마저 안 되면 조용히 넘어간다. 화면 때문에 동기화가 멈추면 안 된다.
+function Out-Line([string]$text, [string]$color = '') {
+  $old = $null
+  try {
+    if ($color) { $old = [Console]::ForegroundColor; [Console]::ForegroundColor = $color }
+    [Console]::Out.WriteLine($text)
+  }
+  catch { }
+  finally { if ($null -ne $old) { try { [Console]::ForegroundColor = $old } catch { } } }
+}
 function Write-Log([string]$msg, [switch]$Err) {
   $line = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + '  ' + $msg
-  if ($Err) { Write-Host $line -ForegroundColor Red } else { Write-Host $line }
+  if ($Err) { Out-Line $line 'Red' } else { Out-Line $line }
   if ($script:LogFile) { try { Add-Content -Path $script:LogFile -Value $line -Encoding UTF8 } catch { } }
 }
 function Limit-Log {
@@ -802,10 +817,10 @@ function New-RandomKey {
 }
 
 function Invoke-Setup {
-  Write-Host ''
-  Write-Host '리로스쿨 상벌점 → 앱 동기화 설정' -ForegroundColor Cyan
-  Write-Host '계정은 이 PC 의 이 Windows 사용자만 풀 수 있게 잠가서 저장합니다.'
-  Write-Host ''
+  Out-Line ''
+  Out-Line '리로스쿨 상벌점 → 앱 동기화 설정' 'Cyan'
+  Out-Line '계정은 이 PC 의 이 Windows 사용자만 풀 수 있게 잠가서 저장합니다.'
+  Out-Line ''
   $old = $null
   try { $old = Read-Secret } catch { }
   $id = Read-Host '리로스쿨 아이디'
@@ -822,19 +837,19 @@ function Invoke-Setup {
   $made = $false
   if (-not $key) { $key = New-RandomKey; $made = $true }
   Save-Secret @{ id = $id; pw = $pw; worker = $worker.TrimEnd('/'); key = $key }
-  Write-Host ''
-  Write-Host "저장했습니다: $script:AppDir" -ForegroundColor Green
+  Out-Line ''
+  Out-Line "저장했습니다: $script:AppDir" 'Green'
   if ($made) {
-    Write-Host ''
-    Write-Host '전송 암호를 새로 만들었습니다. Cloudflare 의 riro-ingest 워커에 RIRO_KEY 로 넣어 주세요:' -ForegroundColor Yellow
-    Write-Host "  $key"
-    try { Set-Clipboard -Value $key; Write-Host '  (클립보드에도 복사해 두었습니다)' } catch { }
+    Out-Line ''
+    Out-Line '전송 암호를 새로 만들었습니다. Cloudflare 의 riro-ingest 워커에 RIRO_KEY 로 넣어 주세요:' 'Yellow'
+    Out-Line "  $key"
+    try { Set-Clipboard -Value $key; Out-Line '  (클립보드에도 복사해 두었습니다)' } catch { }
   }
   else {
-    Write-Host '전송 암호는 전에 쓰던 것을 그대로 둡니다. (새로 만들려면 -Setup -NewKey)'
+    Out-Line '전송 암호는 전에 쓰던 것을 그대로 둡니다. (새로 만들려면 -Setup -NewKey)'
   }
-  Write-Host ''
-  Write-Host '다음: -Check 로 받아 보기 → -Install 로 자동 실행 등록'
+  Out-Line ''
+  Out-Line '다음: -Check 로 받아 보기 → -Install 로 자동 실행 등록'
 }
 
 function Install-Task {
@@ -858,18 +873,18 @@ function Install-Task {
   $ok = $false
   if ($logon) {
     try { Register-ScheduledTask -TaskName $script:TaskName -Action $action -Trigger ($triggers + $logon) -Settings $set -Description $desc -Force -ErrorAction Stop | Out-Null; $ok = $true }
-    catch { Write-Host '로그인할 때 실행은 권한이 없어 뺍니다.' -ForegroundColor Yellow }
+    catch { Out-Line '로그인할 때 실행은 권한이 없어 뺍니다.' 'Yellow' }
   }
   if (-not $ok) {
     Register-ScheduledTask -TaskName $script:TaskName -Action $action -Trigger $triggers -Settings $set -Description $desc -Force -ErrorAction Stop | Out-Null
   }
-  Write-Host "자동 실행을 등록했습니다: 평일 07:50 · 16:40$(if ($ok) { ' · 로그인 3분 뒤' })  (작업 이름 $script:TaskName)" -ForegroundColor Green
-  Write-Host "실행 파일: $dest"
-  Write-Host "기록: $script:LogFile"
+  Out-Line "자동 실행을 등록했습니다: 평일 07:50 · 16:40$(if ($ok) { ' · 로그인 3분 뒤' })  (작업 이름 $script:TaskName)" 'Green'
+  Out-Line "실행 파일: $dest"
+  Out-Line "기록: $script:LogFile"
 }
 function Uninstall-Task {
   Unregister-ScheduledTask -TaskName $script:TaskName -Confirm:$false -ErrorAction SilentlyContinue
-  Write-Host "자동 실행을 해제했습니다 ($script:TaskName). 저장한 계정은 $script:AppDir 에 남아 있습니다 — 지우려면 그 폴더를 지우세요."
+  Out-Line "자동 실행을 해제했습니다 ($script:TaskName). 저장한 계정은 $script:AppDir 에 남아 있습니다 — 지우려면 그 폴더를 지우세요."
 }
 
 function Invoke-Sync([switch]$DryRun) {
