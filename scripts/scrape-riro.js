@@ -128,18 +128,16 @@ async function main() {
       const demerit  = parseInt(tds[5]?.textContent?.trim()) || 0;
       const deducted = parseInt(tds[6]?.textContent?.trim()) || 0;
 
-      // 최근 기록
-      const recordEl = row.querySelector('.record-p');
+      // 최근 기록 — 날짜(.label-record) 와 그 바로 다음 요소(내용).
+      // 담는 상자 이름이 바뀐다(2026-10: .record-p → p.p_wrapper, 그때부터 상세가 0건이었다) —
+      // 상자 없이 줄 안에서 바로 찾는다. 학교 PC 의 riro/riro-push.ps1 도 같은 규칙이다.
       const records  = [];
-      if (recordEl) {
-        const labels = recordEl.querySelectorAll('.label-record');
-        labels.forEach(label => {
-          const date   = label.textContent.trim();
-          const span   = label.nextElementSibling;
-          const detail = span ? span.textContent.replace(/\s+/g, ' ').trim() : '';
-          if (date && detail) records.push({ date, detail });
-        });
-      }
+      row.querySelectorAll('.label-record').forEach(label => {
+        const date   = label.textContent.trim();
+        const span   = label.nextElementSibling;
+        const detail = span ? span.textContent.replace(/\s+/g, ' ').trim() : '';
+        if (date && detail) records.push({ date, detail });
+      });
 
       if (name) result.push({ hakbun, grade, room, num, name, total, merit, demerit, deducted, records });
     });

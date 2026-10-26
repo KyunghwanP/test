@@ -57,7 +57,7 @@ try { [Text.Encoding]::RegisterProvider([Text.CodePagesEncodingProvider]::Instan
 # 예전 스크래퍼가 브라우저 안에서 하던 것과 같은 결과를 낸다:
 #   document.querySelectorAll('table.mypage_record_pc tr[align="center"]') 중 td 가 7개 이상인 줄
 #   학번=td[1] 이름=td[2] 합계·상점·벌점·감점=td[3..6]
-#   상세=.record-p 안의 .label-record(날짜) 와 그 바로 다음 요소(내용)
+#   상세=줄 안의 .label-record(날짜) 와 그 바로 다음 요소(내용) — 담는 상자는 보지 않는다(이름이 바뀐다)
 # 브라우저가 없으니 HTML 을 직접 읽는다. 브라우저가 고쳐 읽는 규칙 중 결과에 닿는 것만 따른다
 # — 닫는 태그를 빠뜨린 td·tr, <p> 안에 블록 요소가 오면 p 가 닫힘, 스크립트·주석 안의 '<td>' 는 글자.
 # tests/riro-parse.test.mjs 가 같은 HTML 을 크로미움(원래 코드)과 이 함수에 넣어 결과를 맞춰 본다.
@@ -195,6 +195,10 @@ function Close-Tag($stack, [string]$tag) {
   if ($tag -eq 'p') {
     $i = Find-InScope $stack @('p') $script:ButtonScope
     if ($i -ge 0) { Pop-To $stack $i }
+    else {                                                   # 열린 p 가 없으면 브라우저는 빈 <p> 를 끼워 넣는다
+      $top = $stack[$stack.Count - 1]
+      [void]$top.c.Add((New-El 'p' '' $top))
+    }
   }
   # 나머지 닫는 태그는 Read-RecordTables 안에서 바로 처리한다
 }
@@ -323,16 +327,15 @@ function ConvertFrom-RiroHtml([string]$Html) {
       if ($hakbun.Length -lt 4) { continue }
       $name = Get-TrimJs (Get-Text $tds[2])
       if (-not $name) { continue }
+      # 상세: 날짜(.label-record) 와 그 바로 다음 요소(내용). 담는 상자 이름이 바뀐다
+      # (2026-10: .record-p → p.p_wrapper) — 상자 없이 줄 안에서 바로 찾는다 (scrape-riro.js 와 같다)
       $recs = New-Object System.Collections.Generic.List[object]
-      $rp = Find-Desc $row $null 'record-p' -First
-      if ($rp.Count -gt 0) {
-        foreach ($lb in (Find-Desc $rp[0] $null 'label-record')) {
-          $date = Get-TrimJs (Get-Text $lb)
-          $sib = Get-NextEl $lb
-          $detail = ''
-          if ($null -ne $sib) { $detail = Get-TrimJs ($script:WsRunRe.Replace((Get-Text $sib), ' ')) }
-          if ($date -and $detail) { $recs.Add(@{ date = $date; detail = $detail }) }
-        }
+      foreach ($lb in (Find-Desc $row $null 'label-record')) {
+        $date = Get-TrimJs (Get-Text $lb)
+        $sib = Get-NextEl $lb
+        $detail = ''
+        if ($null -ne $sib) { $detail = Get-TrimJs ($script:WsRunRe.Replace((Get-Text $sib), ' ')) }
+        if ($date -and $detail) { $recs.Add(@{ date = $date; detail = $detail }) }
       }
       $result.Add(@{
           hakbun   = $hakbun
@@ -680,7 +683,7 @@ function Get-RiroDiag([string]$html, $students) {
   $L.Add('만든 때 ' + (Get-Date -Format 'yyyy-MM-dd HH:mm') + " · 페이지 $($norm.Length) 자 · 읽은 학생 $($students.Count) · 상세 $recs")
   $L.Add('')
   $L.Add('■ 낱말이 나오는 곳')
-  foreach ($w in @('mypage_record_pc', 'mypage_record_mobile', 'record-p', 'label-record', 'record_p', 'label_record', 'record', '<script',
+  foreach ($w in @('mypage_record_pc', 'mypage_record_mobile', 'record-p', 'p_wrapper', 'label-record', 'record_p', 'label_record', 'record', '<script',
       'popover', 'tooltip', 'data-content', 'title=', 'onclick', '&lt;', 'ajax', '.html(', 'innerHTML', 'display:none', 'display: none')) {
     $L.Add(('  {0,-22} {1}' -f $w, (Get-WordPlaces $norm $w)))
   }
@@ -694,6 +697,8 @@ function Get-RiroDiag([string]$html, $students) {
       if ((Get-A $r)['align'] -ne 'center' -or $r.s -lt 0) { continue }
       if ((Find-Desc $r 'td' $null).Count -lt 7) { continue }
       $end = $norm.IndexOf('<tr', $r.s + 3, [StringComparison]::OrdinalIgnoreCase)
+      $tend = $norm.IndexOf('</table', $r.s + 3, [StringComparison]::OrdinalIgnoreCase)
+      if ($end -lt 0 -or ($tend -ge 0 -and $tend -lt $end)) { $end = $tend }      # 마지막 줄은 표 끝까지
       if ($end -lt 0) { $end = $norm.Length }
       $rows.Add(@{ el = $r; len = $end - $r.s })
     }
@@ -705,9 +710,10 @@ function Get-RiroDiag([string]$html, $students) {
     $best = $rows[0]
     foreach ($x in $rows) { if ($x.len -gt $best.len) { $best = $x } }
     $row = $best.el
-    $rp = Find-Desc $row $null 'record-p' -First
+    $box = @()
+    foreach ($c in @('record-p', 'p_wrapper')) { if ((Find-Desc $row $null $c -First).Count -gt 0) { $box += ".$c" } }
     $lb = Find-Desc $row $null 'label-record'
-    $L.Add("  가장 긴 학생 줄: 칸(td) $((Find-Desc $row 'td' $null).Count) 개 · .record-p $(if ($rp.Count -gt 0) { '있음' } else { '없음' }) · .label-record $($lb.Count) 개")
+    $L.Add("  가장 긴 학생 줄: 칸(td) $((Find-Desc $row 'td' $null).Count) 개 · 상세 상자 $(if ($box.Count) { $box -join ',' } else { '없음' }) · .label-record $($lb.Count) 개")
     $L.Add('  짜임 (해석기 기준 · 글자는 수만):')
     $sk = [System.Collections.Generic.List[string]]::new()
     Add-TreeSketch $row 2 $sk 150
@@ -735,7 +741,7 @@ function Invoke-Diagnose {
   $lines = Get-RiroDiag $html $students
   $file = Join-Path $script:AppDir 'riro-diag.txt'
   Set-Content -Path $file -Value $lines -Encoding UTF8
-  foreach ($l in $lines) { if ($l -match '^\s*(record-p|label-record|mypage_record_pc) |학생 줄') { Write-Host $l } }
+  foreach ($l in $lines) { if ($l -match '^\s*(record-p|p_wrapper|label-record|mypage_record_pc) |학생 줄') { Write-Host $l } }
   $out = $file
   try {
     $desk = [Environment]::GetFolderPath('Desktop')

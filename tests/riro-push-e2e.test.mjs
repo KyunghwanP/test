@@ -25,7 +25,8 @@ if (spawnSync(PWSH, ['-NoLogo', '-NoProfile', '-Command', '1'], { encoding: 'utf
   process.exit(0);
 }
 
-// ── 시험용 상벌점 페이지 (학생 400명) ──────────────────────────────────────────
+// ── 시험용 상벌점 페이지 (학생 400명) — 2026-10 부터의 실제 짜임 ──────────────────
+// 번호·학번·이름·합계·상점·벌점·감점 + 월별 12칸 + <p class="p_wrapper"> 안의 날짜·내용 (-Diagnose 로 본 것)
 const NAMES = [];
 function page(n = 400, withRecords = true) {
   const rows = [];
@@ -33,13 +34,16 @@ function page(n = 400, withRecords = true) {
     const g = 1 + (i % 3), r = 1 + (i % 10), num = 1 + Math.floor(i / 30);
     const nm = `학생${String(i).padStart(3, '0')}이름`;
     NAMES.push(nm);
-    let rs = '';
-    if (withRecords) for (let k = 0; k < (i % 6); k++) rs += `<span class="label label-record">[ 0${3 + (k % 7)}.1${k} ]</span><span class="txt">벌점 -1 &nbsp;지각 &lt;담임&gt; 비밀교사${k}</span><br>\n`;
-    rows.push(`<tr align="center"><td>${i + 1}</td><td>${g}${String(r).padStart(2, '0')}${String(num).padStart(2, '0')}</td><td>${nm}</td>` +
-      `<td>${(i % 7) - 3}</td><td>${i % 5}</td><td>-${i % 4}</td><td>${i % 2}</td><td><div class="record-p">${rs}</div></td></tr>`);
+    const rs = [];
+    if (withRecords) for (let k = 0; k < (i % 6); k++) rs.push(`<span class="label-record">0${3 + (k % 7)}.1${k}</span><span style="display: inline-block; margin-bottom: 5px;line-height: 130% !important;">벌점 &nbsp;지각 &lt;담임&gt; 비밀교사${k}(<font color="#ff0000">-1</font>)</span>`);
+    const months = Array.from({ length: 12 }, (_, m) => `<td>${(i + m) % 4 === 0 ? '0/<font color="#ff0000">-1</font>/0' : '&nbsp;'}</td>`).join('');
+    rows.push(`<tr align="center" height="40px">\n<td>${i + 1}</td>\n<td>${g}${String(r).padStart(2, '0')}${String(num).padStart(2, '0')}</td>\n<td>${nm}</td>\n` +
+      `<td>${(i % 7) - 3}</td><td>${i % 5}</td><td><font color="#ff0000">-${i % 4}</font></td><td>${i % 2}</td>${months}<td><p class="p_wrapper">${rs.join('<br>')}</p></td>\n</tr>`);
   }
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>리로스쿨</title></head><body><a href="/logout.php">로그아웃</a>
-    <table class="table mypage_record_pc"><tbody>${rows.join('\n')}</tbody></table></body></html>`;
+    <table class="mypage_record_pc table_box cross_table"><thead><tr width="100%"><th>번호</th><th>학번</th><th>이름</th><th>합계</th><th>상점</th><th>벌점</th><th>벌점감점</th>` +
+    `${Array.from({ length: 12 }, (_, m) => `<th>${m + 1}월</th>`).join('')}<th>최근 기록</th></tr></thead>${rows.join('')}</table>
+    <style>.table_box td:last-child { width: 300px; }</style></body></html>`;
 }
 const NORMAL = page(400), FEW = page(10), NOREC = page(400, false);
 // 상세를 스크립트가 그려 넣는 페이지 — 표의 상자는 비어 있고, 내용은 스크립트 안 JSON 에 있다
@@ -260,10 +264,10 @@ try {
     const { res, txt } = await diag('normal');
     check('-Diagnose (보통 페이지): 파일을 만든다', res.code === 0 && txt.length > 1000, res.out.slice(-400));
     check('  낱말 위치를 센다 (label-record 는 태그 속성에)', /label-record\s+\d+\s+\(태그 속성 [1-9]/.test(txt), txt.split('\n').filter(l => /label-record/.test(l)).slice(0, 2));
-    check('  가장 긴 학생 줄의 짜임: .record-p 있음 · 상세 5개 (시험 페이지에서 가장 많은 수)', /가장 긴 학생 줄: 칸\(td\) 8 개 · \.record-p 있음 · \.label-record 5 개/.test(txt), txt.split('\n').filter(l => /학생 줄/.test(l)));
+    check('  가장 긴 학생 줄의 짜임: 20칸 · 상세 상자 .p_wrapper · 상세 5개', /가장 긴 학생 줄: 칸\(td\) 20 개 · 상세 상자 \.p_wrapper · \.label-record 5 개/.test(txt), txt.split('\n').filter(l => /학생 줄/.test(l)));
     check('  줄 길이 통계', /학생 줄 400 개 · 원문 길이 가장 짧은 \d+ · 가운데 \d+ · 가장 긴 \d+ 자/.test(txt));
-    check('  짜임에 class 이름이 남는다 (div.record-p · span.label.label-record)', /div\.record-p/.test(txt) && /span\.label\.label-record/.test(txt));
-    check('  원문은 가려져 있다 ([ 00.00 ] · 가가가)', /\[ 00\.00 \]/.test(txt) && /가가/.test(txt));
+    check('  짜임에 class 이름이 남는다 (p.p_wrapper · span.label-record)', /p\.p_wrapper/.test(txt) && /span\.label-record/.test(txt));
+    check('  원문은 가려져 있다 (날짜 00.00 · 이름 가가000가가)', /class="label-record">00\.00</.test(txt) && /<td>가가000가가<\/td>/.test(txt), txt.slice(txt.indexOf('■ 그 줄의 원문'), txt.indexOf('■ 그 줄의 원문') + 400));
     noPii('보통 페이지', txt);
   }
   {

@@ -83,6 +83,16 @@ powershell -ExecutionPolicy Bypass -File "$d\riro-push.ps1" -Install    # 평일
 | 전송 암호를 다시 보고 싶다 | `-ShowKey` (화면에 보여 주고 클립보드에 복사) |
 | 상세가 안 읽힌다 | `-Diagnose` → 바탕화면의 `riro-diag.txt` (학생 정보는 가림: 한글 → 가, 숫자 → 0, 글자 속 영문 → a) |
 
+## 리로스쿨 화면이 바뀌면
+
+2026-10 에 상세를 담던 상자 이름이 `.record-p` → `<p class="p_wrapper">` 로 바뀌었다(월별 12칸도 새로
+생겼다). 그래서 지금은 상자 이름을 보지 않고 **줄 안의 `.label-record`(날짜) 와 그 다음 요소(내용)** 를
+바로 찾는다. 날짜는 `[ 09.04 ]` 에서 `09.04` 로 바뀌었는데 앱은 숫자만 읽으므로 그대로 된다.
+
+다시 바뀌어 상세가 0건으로 읽히면 저장을 멈추고 실패로 끝난다(아래). 그때는 `-Diagnose` 파일을 보고
+`riro-push.ps1` 의 `ConvertFrom-RiroHtml` 과 `scripts/scrape-riro.js` 를 **같이** 고친 뒤,
+`tests/riro-parse.test.mjs` 에 그 짜임을 넣어 크로미움과 맞춰 본다.
+
 ## 저장하지 않는 경우 (앱 자료는 그대로 남는다)
 
 잘못 읽은 표 하나로 앱의 상벌점이 통째로 비면 안 되므로, 아래면 **아무것도 쓰지 않고** 실패로 끝납니다.

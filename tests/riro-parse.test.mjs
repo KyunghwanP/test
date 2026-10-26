@@ -75,9 +75,12 @@ const CASES = {
     rec('09.01', '휴대폰&nbsp;사용 &lt;수업 중&gt; &#39;경고&#x27; &middot; 담임') + rec('09.02', 'A&amp;B &quot;인용&quot;')))),
   '공백 접기': doc(table(row('10401', '  홍길동\n  ', [1, 0, 0, 0],
     `<span class="label-record">\n  09.05\t</span>\n<span>  벌점\n\n -1\t\t복장   불량  </span>`))),
-  'p 안의 블록은 p 를 닫는다': doc(table(row('10501', '가', [0, 0, 0, 0],
-    '') .replace('<div class="record-p"></div>',
-    `<p class="record-p">${rec('09.01', '첫째')}<div>${rec('09.02', '둘째 — p 밖')}</div>${rec('09.03', '셋째 — p 밖')}</p>`))),
+  // 브라우저는 <p> 안에 블록이 오면 p 를 닫는다 → 첫 라벨의 '다음 요소' 가 없어져 빠진다
+  'p 안의 블록은 p 를 닫는다': doc(table(row('10501', '가', [0, 0, 0, 0], '').replace('<div class="record-p"></div>',
+    '<p class="p_wrapper"><span class="label-record">09.01</span><div>블록 — p 밖</div><span class="label-record">09.02</span><span>둘째</span></p>'))),
+  // 열린 p 가 없는데 </p> 가 오면 브라우저는 빈 <p> 를 끼워 넣는다 → 그게 라벨의 '다음 요소' 가 된다
+  '떠도는 </p> 는 빈 p 가 된다': doc(table(row('10551', '가', [0, 0, 0, 0], '').replace('<div class="record-p"></div>',
+    '<span class="label-record">09.01</span></p><span>빈 p 뒤 — 빠져야 함</span><span class="label-record">09.02</span><span>둘째</span>'))),
   '스크립트·주석·스타일 안의 태그는 글자': doc(table(
     row('10601', '<script>var s = "<td>가짜</td></tr><tr align=\'center\'>";</script>진짜', [1, 0, 0, 0], R2) +
     '<!-- <tr align="center"><td>1</td><td>19999</td><td>주석</td><td>1</td><td>1</td><td>1</td><td>1</td></tr> -->' +
@@ -107,7 +110,7 @@ const CASES = {
     '<span class="label-record">09.04</span>'))),
   '라벨 안의 라벨': doc(table(row('11101', '가', [0, 0, 0, 0],
     '<span class="label-record">09.01<span class="label-record">09.02</span><i>안쪽 다음</i></span><em>바깥 다음</em>'))),
-  'record-p 가 둘이면 첫째만': doc(table(row('11201', '가', [0, 0, 0, 0], rec('09.01', '첫째 상자')).replace('</td></tr>',
+  '상세 상자가 둘이면 둘 다 (줄 안의 라벨 전부)': doc(table(row('11201', '가', [0, 0, 0, 0], rec('09.01', '첫째 상자')).replace('</td></tr>',
     `<div class="record-p">${rec('09.09', '둘째 상자')}</div></td></tr>`))),
   '안 닫은 span·떠도는 닫는 태그': doc(table(
     '<tr align="center"><td>1</td><td>11301</td><td><span>안닫힘</td><td>4</span></td><td>5</td></div><td>-6</td><td>0</td>' +
@@ -123,17 +126,55 @@ const CASES = {
   '표 밖 리스트·폼 사이': doc('<form><ul><li>메뉴' + table(row('11901', '가', [1, 0, 0, 0], R2)) + '</ul></form>'),
 };
 
-// 실제 규모 (1033명) — 크기·시간도 같이 본다
+// ── 2026-10 부터의 실제 짜임 (학교 PC 의 -Diagnose 로 본 것) ─────────────────
+// 칸: 번호·학번·이름·합계·상점·벌점(빨간 글씨)·감점 + 월별 12칸(상점/벌점/감점 또는 &nbsp;) + 상세.
+// 상세는 <p class="p_wrapper"> 안에 날짜 span.label-record 와 내용 span(끝에 점수가 <font>) 이 <br> 로 이어진다.
+// 표에 tbody 가 없고, 표 뒤에 style·script 가 붙는다.
+const MONTHS = ['03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '01', '02'];
+const nrec = (d, t, pts) => `<span class="label-record">${d}</span><span style="display: inline-block; margin-bottom: 5px;line-height: 130% !important;">${t}(<font color="${pts < 0 ? '#ff0000' : '#0000ff'}">${pts}</font>)</span>`;
+const nrow = (no, hb, name, [tot, mer, dem, ded], recs) => `<tr align="center" height="40px">
+                            <td>${no}</td>
+                            <td>${hb}</td>
+                            <td>${name}</td>
+                            <td>${tot}</td>
+                            <td>${mer}</td>
+                            <td><font color="#ff0000">${dem}</font></td>
+                            <td>${ded}</td>
+                            ${MONTHS.map((m, k) => `<td>${(no + k) % 4 === 0 ? `0/<font color="#ff0000">-1</font>/0` : (no + k) % 5 === 0 ? '2/0/0' : '&nbsp;'}</td>`).join('')}
+                            <td><p class="p_wrapper">${recs.join('<br>')}</p></td>
+                        </tr>`;
+const ntable = rows => `<div class="mypage_text_wrap mypage_text_wrap_pc"><div class="fixed-space"></div><div class="sticky-space">
+    <div class="rd_head border_none mypage_record_head"><h2 class="h3">학생 상벌점 현황(상점/벌점/벌점감점)</h2></div></div>
+	<table class="mypage_record_pc table_box cross_table">
+	    <thead>
+	        <tr width="100%" height="40px">
+	            <th>번호</th><th>학번</th><th>이름</th><th>합계</th><th>상점</th><th>벌점</th><th>벌점감점</th>
+	            ${MONTHS.map(m => `<th style="width: 50px; min-width:50px;">${m}월</th>`).join('')}
+	            <th>최근 기록</th>
+            </tr>
+        </thead>
+	    ${rows}
+	</table>
+	<style>.table_box td:last-child { width: 300px; }</style>
+    <script>const myPageTopWrapHeight = parseInt($('.mypage_text_wrap').css('padding-top').split('px')[0]); $('.table_box thead tr').children().each(function (i, item) { });</script></div>`;
+CASES['2026-10 새 짜임 (p_wrapper · 20칸 · 월별 칸)'] = doc(ntable([
+  nrow(1, '10101', '김가나', [0, 0, 0, 0], []),
+  nrow(2, '10102', '이다라', [3, 3, 0, 0], [nrec('09.04', '#봉사활동 교내 환경 정화', 2), nrec('10.02', '수업 태도 우수,  발표 적극', 1)]),
+  nrow(3, '10103', '박마바', [-4, 2, -6, 0], [nrec('09.11', '지각', -1), nrec('09.18', '#교내 봉사 상계', 1), nrec('09.25', '휴대폰 사용 (수업 중)', -2),
+    nrec('10.06', '복장  불량', -1), nrec('10.13', '청소 불참&nbsp;/ 무단 이탈', -2)]),
+].join('')));
+
+// 실제 규모 (1033명, 새 짜임) — 크기·시간도 같이 본다
 const big = (() => {
   const rows = [];
   for (let i = 0; i < 1033; i++) {
     const g = 1 + (i % 3), r = 1 + (i % 12), n = 1 + (i % 30);
     const hb = `${g}${String(r).padStart(2, '0')}${String(n).padStart(2, '0')}`;
-    let rs = '';
-    for (let k = 0; k < (i % 16); k++) rs += rec(`${String(3 + (k % 9)).padStart(2, '0')}.${String(1 + k).padStart(2, '0')}`, `벌점 -1 &nbsp;지각(정당한 사유 없이) &lt;담임&gt; 김교사${k}`) + '\n';
-    rows.push(row(hb, `학생${i}`, [(i % 7) - 3, i % 5, -(i % 4), i % 2], rs));
+    const rs = [];
+    for (let k = 0; k < (i % 7); k++) rs.push(nrec(`${String(3 + (k % 9)).padStart(2, '0')}.${String(1 + k).padStart(2, '0')}`, `벌점 지각(정당한 사유 없이) &lt;담임&gt; 김교사${k}`, -1));
+    rows.push(nrow(i + 1, hb, `학생${i}`, [(i % 7) - 3, i % 5, -(i % 4), i % 2], rs));
   }
-  return doc(table(rows.join('\n')));
+  return doc(ntable(rows.join('')));
 })();
 CASES['실제 규모 1033명'] = big;
 
@@ -182,7 +223,11 @@ console.log('\n■ 시험 자료가 실제로 갈래를 건드리는지 (빈 결
 check('기본: 2명, 첫 학생 상세 2건', want['기본'].length === 2 && want['기본'][0].records.length === 2);
 check('닫는 태그 생략도 브라우저는 2명을 읽는다', want['닫는 td·tr 생략'].length === 2 && want['닫는 td·tr 생략'][0].records.length === 2);
 check('정렬: center 둘만 (left·없음·공백 낀 값 제외)', want['정렬 속성 여러 모양'].map(s => s.name).join() === '가,나', want['정렬 속성 여러 모양'].map(s => s.name));
-check('p 안 블록: 첫째만 상자 안', want['p 안의 블록은 p 를 닫는다'][0].records.map(r => r.detail).join() === '첫째', want['p 안의 블록은 p 를 닫는다'][0].records);
+check('p 안 블록: 첫 라벨은 다음 요소가 없어 빠지고 둘째만', want['p 안의 블록은 p 를 닫는다'][0].records.map(r => r.detail).join() === '둘째', want['p 안의 블록은 p 를 닫는다'][0].records);
+check('떠도는 </p>: 빈 p 가 끼어 첫 라벨이 빠진다', want['떠도는 </p> 는 빈 p 가 된다'][0].records.map(r => r.detail).join() === '둘째', want['떠도는 </p> 는 빈 p 가 된다'][0].records);
+{ const n = want['2026-10 새 짜임 (p_wrapper · 20칸 · 월별 칸)'];
+  check('새 짜임: 3명 · 상세 0·2·5건 · 내용에 점수 괄호까지', n.map(x => x.records.length).join() === '0,2,5' && n[1].records[0].date === '09.04'
+        && n[1].records[0].detail === '#봉사활동 교내 환경 정화(2)' && n[2].total === -4 && n[2].demerit === -6, n.map(x => [x.records.length, x.total, x.demerit, x.records[0]])); }
 check('스크립트 속 가짜 줄·주석 속 줄은 학생이 아니다', want['스크립트·주석·스타일 안의 태그는 글자'].length === 2);
 check('이름 칸 안의 작은 표 때문에 숫자 칸이 밀린다 (브라우저도 그렇게 읽는다)', want['이름 칸 안의 작은 표 (칸 순서가 밀린다)'][0].total !== 5);
 check('학번: 짧은 것·이름 빈 것은 빠지고 글자 학번은 학년이 비어 있다',
@@ -193,7 +238,7 @@ check('숫자: " -3 " → -3, "3점" → 3, "" → 0, "0x1A" → 26', (() => { c
 check('떠도는 </span> 이 상자를 닫지 않아 상세 1건', want['떠도는 닫는 태그는 블록을 못 넘는다'][0].records.length === 1);
 check('대문자 태그도 읽는다', want['대문자 태그'].length === 1 && want['대문자 태그'][0].records.length === 1);
 check('표가 둘이면 둘 다, 모바일 표는 빼고', want['상벌점 표가 두 개 + 모바일 표'].map(s => s.hakbun).join() === '11601,11602');
-check('1033명 · 상세 7,000건 이상', want['실제 규모 1033명'].length === 1033 && want['실제 규모 1033명'].reduce((s, x) => s + x.records.length, 0) > 7000);
+check('1033명 · 상세 3,000건 이상', want['실제 규모 1033명'].length === 1033 && want['실제 규모 1033명'].reduce((s, x) => s + x.records.length, 0) > 3000);
 const bigMs = Number(fs.readFileSync(path.join(TMP, `${names.indexOf('실제 규모 1033명')}.ms`), 'utf8'));
 console.log(`     (PowerShell 1033명 해석 ${(bigMs / 1000).toFixed(1)}초 · 전체 ${((Date.now() - t0) / 1000).toFixed(1)}초)`);
 
