@@ -131,6 +131,20 @@ node tests/cal-consult.test.mjs                    # 업무 캘린더의 상담 
 
 가짜 Firestore를 물려 목록 렌더·사진 표시·발급 폼·저장 payload를 실제 DOM에서 본다.
 
+### 리로스쿨 상벌점 (학교 PC · riro/riro-push.ps1)
+
+```bash
+node workers/riro-ingest.test.mjs                    # 워커 — 열쇠·주소·몸통 그대로 전달
+PWSH=/경로/pwsh node tests/riro-parse.test.mjs       # 표 해석 — 같은 HTML 을 크로미움(원래 코드)과 맞춰 봄
+PWSH=/경로/pwsh node tests/riro-push-e2e.test.mjs    # 가짜 리로스쿨 → PowerShell → 진짜 워커 코드 → 가짜 Firestore
+```
+
+리로스쿨이 해외 접속을 막아 학교 PC 가 받는다. PC 에는 브라우저가 없으니 PowerShell 이 HTML 을 직접
+읽는데, 브라우저가 고쳐 읽는 규칙(닫는 태그 생략, `<p>` 안의 블록, 스크립트 안의 `<td>` …)에서 갈라질
+수 있다. 그래서 같은 HTML 을 **크로미움 + scrape-riro.js 의 원래 코드**와 PowerShell 에 넣어 통째로 맞춰
+본다. 끝까지 검사는 저장된 학년별 문서를 풀어 예전 스크래퍼의 결과와 한 글자까지 비교하고, 기록에
+학생 이름·비밀번호가 없는지, 이상하면 아무것도 안 쓰는지도 본다. `pwsh` 가 없으면 건너뛴다.
+
 ### 초과근무 (overtime.html · gas/overtime)
 
 ```bash

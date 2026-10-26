@@ -1,8 +1,9 @@
 name: riro-points-scraper
 
+# 밤 예약은 껐다 — 리로스쿨이 2026-10-14 부터 해외 접속을 막아 GitHub(미국) 서버로는 매일 실패한다.
+# 이제 학교 PC 가 받는다 (riro/README.md). 손으로 돌리면 scrape-riro.js 가 각 단계의 상태·응답한
+# 서버를 기록하므로, 리로스쿨이 해외 차단을 풀었는지 볼 때 쓴다.
 on:
-  schedule:
-    - cron: '0 17 * * *'  # 매일 KST 02:00
   workflow_dispatch:
 
 jobs:
