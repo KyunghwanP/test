@@ -49,9 +49,11 @@ powershell -ExecutionPolicy Bypass -File "$d\riro-push.ps1" -Setup
 
 1. 대시보드 → **Workers & Pages** → **Create** → Worker → 이름 `riro-ingest` → **Deploy**
 2. **Edit code** → 저장소의 `workers/riro-ingest.js` 를 **통째로** 붙여 넣기 → **Deploy**
-3. **Settings → Variables and Secrets** → 둘 다 **Secret** 으로 추가 → **Deploy**
-   - `SA_JSON` — 서비스 계정 JSON 전체 (다른 워커에 넣은 것과 같은 것)
-   - `RIRO_KEY` — 2단계에서 복사한 전송 암호
+3. **Settings → Variables and Secrets** → **+ Add** 로 둘을 넣는다. 종류(Type)는 둘 다 **Secret** → **Deploy**
+   - `SA_JSON` — 서비스 계정 JSON 파일의 내용 **전체** (메모장으로 열어 Ctrl+A → Ctrl+C).
+     다른 워커에 넣은 값은 Cloudflare 에서 다시 볼 수 없으므로, 그 파일이 없으면 Firebase 콘솔 →
+     프로젝트 설정(톱니) → **서비스 계정** → **새 비공개 키 생성** 으로 새로 받는다 (다른 워커는 그대로 돈다).
+   - `RIRO_KEY` — 2단계에서 복사한 전송 암호. 다시 보려면 PC 에서 `-ShowKey`.
 
 ### 4. PC — 확인 → 한 번 저장 → 자동 실행
 
@@ -74,6 +76,8 @@ powershell -ExecutionPolicy Bypass -File "$d\riro-push.ps1" -Install    # 평일
 | 스크립트 새 판 | 2단계의 `Invoke-WebRequest` 줄만 다시 (자동 실행은 같은 파일을 부릅니다) |
 | PC 를 바꾼다 | 옛 PC 에서 `-Uninstall`, 새 PC 에서 2·4단계 (전송 암호를 새로 만들었으면 워커의 `RIRO_KEY` 도) |
 | 전송 암호를 바꾼다 | `-Setup -NewKey` → 워커의 `RIRO_KEY` 도 같은 값으로 |
+| 전송 암호를 다시 보고 싶다 | `-ShowKey` (화면에 보여 주고 클립보드에 복사) |
+| 상세가 안 읽힌다 | `-Diagnose` → 바탕화면의 `riro-diag.txt` (학생 정보는 가림: 한글 → 가, 숫자 → 0, 글자 속 영문 → a) |
 
 ## 저장하지 않는 경우 (앱 자료는 그대로 남는다)
 
@@ -87,7 +91,7 @@ powershell -ExecutionPolicy Bypass -File "$d\riro-push.ps1" -Install    # 평일
 |---|---|
 | 로그인이 되지 않았습니다 | 아이디·비밀번호 확인 → `-Setup` |
 | 해외 접속 차단 페이지가 왔습니다 | 그 PC 가 VPN 등으로 해외를 거쳐 나가는지 확인 |
-| 상벌점 표가 없는 페이지 / 상세 내역이 한 건도 | 리로스쿨 화면이 바뀜 → 해석 코드를 고쳐야 함 |
+| 상벌점 표가 없는 페이지 / 상세 내역이 한 건도 | 리로스쿨 화면이 바뀜 → `-Diagnose` 파일을 보고 해석 코드를 고쳐야 함 |
 | 전송 암호가 맞지 않습니다 (HTTP 401) | 워커의 `RIRO_KEY` 와 PC 의 암호가 다름 → `RIRO_KEY` 다시 넣기 |
 | HTTP 500 · SA | 워커의 `SA_JSON` 이 없거나 틀림 |
 

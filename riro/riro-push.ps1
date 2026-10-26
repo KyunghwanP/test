@@ -20,6 +20,8 @@
     powershell -ExecutionPolicy Bypass -File riro-push.ps1             한 번 받아서 저장
     powershell -ExecutionPolicy Bypass -File riro-push.ps1 -Install    평일 07:50 · 16:40 · 로그인할 때 자동 실행 등록
     powershell -ExecutionPolicy Bypass -File riro-push.ps1 -Uninstall  자동 실행 해제
+    powershell -ExecutionPolicy Bypass -File riro-push.ps1 -ShowKey    저장된 전송 암호 다시 보기 (워커의 RIRO_KEY)
+    powershell -ExecutionPolicy Bypass -File riro-push.ps1 -Diagnose   상세가 안 읽힐 때: 페이지 짜임만 가려서 파일로 (riro-diag.txt)
 
   계정·암호는 이 PC 의 이 Windows 사용자만 풀 수 있게(DPAPI) 저장한다.
   기록(riro.log)에는 학생 이름·점수를 남기지 않는다 — 몇 명·몇 건·HTTP 상태만.
@@ -31,6 +33,8 @@ param(
   [switch]$Check,
   [switch]$Install,
   [switch]$Uninstall,
+  [switch]$ShowKey,
+  [switch]$Diagnose,
   [switch]$NewKey,        # -Setup 때 전송 암호를 새로 만든다 (워커 쪽 RIRO_KEY 도 바꿔야 함)
   [switch]$LoadOnly,      # 검사용: 함수만 읽고 끝낸다
   [string]$HomeDir = '',
@@ -113,8 +117,8 @@ function Get-Attrs([string]$s) {
   return $h
 }
 # 요소: t=태그 ra=속성 원문 a=읽은 속성(필요할 때 읽는다) c=자식(요소·글자) p=부모
-function New-El([string]$tag, [string]$attrs, $parent) {
-  return @{ t = $tag; ra = $attrs; a = $null; c = [System.Collections.ArrayList]::new(); p = $parent }
+function New-El([string]$tag, [string]$attrs, $parent, [int]$start = -1) {
+  return @{ t = $tag; ra = $attrs; a = $null; c = [System.Collections.ArrayList]::new(); p = $parent; s = $start }
 }
 function Get-A($n) { if ($null -eq $n.a) { $n.a = Get-Attrs $n.ra }; return $n.a }
 function Test-Class($n, [string]$cls) {
@@ -144,7 +148,7 @@ function Add-Text($stack, [string]$s) {
   if ($c.Count -gt 0 -and $c[$c.Count - 1] -is [string]) { $c[$c.Count - 1] = $c[$c.Count - 1] + $s }
   else { [void]$c.Add($s) }
 }
-function Open-Tag($stack, [string]$tag, [string]$attrs, $roots) {
+function Open-Tag($stack, [string]$tag, [string]$attrs, $roots, [int]$start = -1) {
   if ($tag -eq 'td' -or $tag -eq 'th') {
     $i = Find-InScope $stack @('td', 'th') $script:TableScope
     if ($i -ge 0) { Pop-To $stack $i }                       # 앞 칸을 닫는다
@@ -166,7 +170,7 @@ function Open-Tag($stack, [string]$tag, [string]$attrs, $roots) {
       $i = Find-InScope $stack @('table') $script:AnyTableScope
       if ($i -ge 0) { Pop-To $stack $i }
       if ($stack.Count -eq 0) {
-        $el = New-El 'table' $attrs $null
+        $el = New-El 'table' $attrs $null $start
         if (Test-Class $el 'mypage_record_pc') { $roots.Add($el); $stack.Add($el) }
         return
       }
@@ -178,7 +182,7 @@ function Open-Tag($stack, [string]$tag, [string]$attrs, $roots) {
   }
   if ($stack.Count -eq 0) { return }
   $top = $stack[$stack.Count - 1]
-  $el = New-El $tag $attrs $top
+  $el = New-El $tag $attrs $top $start
   [void]$top.c.Add($el)
   if (-not $script:VoidTags.ContainsKey($tag)) { $stack.Add($el) }
 }
@@ -211,7 +215,7 @@ function Read-RecordTables([string]$Html) {
     $pos = $m.Index + $m.Length
     if ($stack.Count -eq 0) {
       if ($m.Groups[5].Success -and $m.Groups[4].Value -ne '/' -and $m.Groups[5].Value -eq 'table') {
-        $el = New-El 'table' $m.Groups[6].Value $null
+        $el = New-El 'table' $m.Groups[6].Value $null $m.Index
         if (Test-Class $el 'mypage_record_pc') { $roots.Add($el); $stack.Add($el) }
       }
       continue
@@ -219,7 +223,7 @@ function Read-RecordTables([string]$Html) {
     if ($m.Groups[1].Success) {                              # script·style 등: 안은 글자
       $tag = $m.Groups[1].Value.ToLowerInvariant()
       $top = $stack[$stack.Count - 1]
-      $el = New-El $tag $m.Groups[2].Value $top
+      $el = New-El $tag $m.Groups[2].Value $top $m.Index
       [void]$top.c.Add($el)
       $txt = $m.Groups[3].Value
       if ($tag -eq 'title' -or $tag -eq 'textarea') { $txt = [System.Net.WebUtility]::HtmlDecode($txt) }
@@ -238,9 +242,9 @@ function Read-RecordTables([string]$Html) {
       }
       continue
     }
-    if ($script:OpenRule.ContainsKey($tag)) { Open-Tag $stack $tag $m.Groups[6].Value $roots; continue }
+    if ($script:OpenRule.ContainsKey($tag)) { Open-Tag $stack $tag $m.Groups[6].Value $roots $m.Index; continue }
     $top = $stack[$stack.Count - 1]                          # Open-Tag 의 마지막 부분과 같다
-    $el = @{ t = $tag; ra = $m.Groups[6].Value; a = $null; c = [System.Collections.ArrayList]::new(); p = $top }
+    $el = @{ t = $tag; ra = $m.Groups[6].Value; a = $null; c = [System.Collections.ArrayList]::new(); p = $top; s = $m.Index }
     [void]$top.c.Add($el)
     if (-not $script:VoidTags.ContainsKey($tag)) { $stack.Add($el) }
   }
@@ -421,7 +425,7 @@ function New-RiroPlan($students, [datetime]$now, [int]$minTotal, [int]$minPerGra
   if ($total -lt $minTotal) { $problems.Add("학생이 $total 명만 읽혔습니다 (최소 $minTotal 명)") }
   foreach ($k in 1, 2, 3) { if ($g[$k].Count -lt $minPerGrade) { $problems.Add("$k 학년이 $($g[$k].Count) 명뿐입니다 (최소 $minPerGrade 명)") } }
   # 학년 초(3월)가 아니면 상세가 한 건도 없을 리 없다 — 화면이 바뀌어 상세만 못 읽은 것. 덮어쓰면 상세가 다 지워진다
-  if ($recs -eq 0 -and $now.Month -ne 3) { $problems.Add('상세 내역이 한 건도 읽히지 않았습니다 (리로스쿨 화면이 바뀌었을 수 있음)') }
+  if ($recs -eq 0 -and $now.Month -ne 3) { $problems.Add('상세 내역이 한 건도 읽히지 않았습니다 (리로스쿨 화면이 바뀌었을 수 있음 → -Diagnose 로 진단 파일을 만들어 보내 주세요)') }
   $iso = $now.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", [Globalization.CultureInfo]::InvariantCulture)
   $docs = New-Object System.Collections.Generic.List[object]
   foreach ($k in 1, 2, 3) { $docs.Add(@{ name = "grade$k"; json = (ConvertTo-FsGradeDoc $g[$k] $iso) }) }
@@ -556,6 +560,198 @@ function Test-Worker([string]$Worker, [string]$Key) {
 }
 
 # ══════════════════════════════════════════════════════════════════════
+#  진단 (-Diagnose) — 상세가 안 읽힐 때 페이지의 '짜임' 만 파일로 남긴다
+# ══════════════════════════════════════════════════════════════════════
+# 학생 이름·숫자·글자는 모두 가린다: ASCII 밖의 글자(한글 등) → 가, 숫자 → 0, 글자 속 영문 → a.
+# 태그 이름·class 이름처럼 짜임을 보여 주는 것만 남긴다. 파일을 열어 보면 확인할 수 있다.
+$script:NonAsciiRe = New-Object System.Text.RegularExpressions.Regex '[^ -~\t\n\r]'
+$script:DigitRe = New-Object System.Text.RegularExpressions.Regex '[0-9]'
+$script:LatinRe = New-Object System.Text.RegularExpressions.Regex '[A-Za-z]'
+$script:KeepAttrRe = New-Object System.Text.RegularExpressions.Regex '^(class|align|valign|style|colspan|rowspan|type|id|name|width|height|role|for|data-toggle|data-target|data-bs-toggle|data-bs-target|data-placement)$'
+$script:UrlAttrRe = New-Object System.Text.RegularExpressions.Regex '^(href|src|action)$'
+$script:JsStrRe = New-Object System.Text.RegularExpressions.Regex ('''(?:[^''\\\n]|\\.)*''|"(?:[^"\\\n]|\\.)*"')
+function Get-Masked([string]$s, [switch]$KeepLatin) {
+  $s = $script:NonAsciiRe.Replace($s, '가')
+  $s = $script:DigitRe.Replace($s, '0')
+  if (-not $KeepLatin) { $s = $script:LatinRe.Replace($s, 'a') }
+  return $s
+}
+function Get-MaskedUrl([string]$u) {                         # 주소의 뼈대는 두고 = 뒤의 값은 가린다
+  $u = Get-Masked $u -KeepLatin
+  return [regex]::Replace($u, '=([^&#]*)', [System.Text.RegularExpressions.MatchEvaluator] { param($m) '=' + (Get-Masked $m.Groups[1].Value) })
+}
+# 스크립트: 코드의 영문(함수·변수 이름)은 두고 따옴표 안은 가린다. 다만 HTML 조각은 짜임만,
+# 선택자('.record-p' 같은 것)와 객체 키("date": 같은 것)는 그대로
+function Get-MaskedCode([string]$code) {
+  $sb = [System.Text.StringBuilder]::new()
+  $pos = 0
+  foreach ($m in $script:JsStrRe.Matches($code)) {
+    if ($m.Index -gt $pos) { [void]$sb.Append((Get-Masked $code.Substring($pos, $m.Index - $pos) -KeepLatin)) }
+    $pos = $m.Index + $m.Length
+    $q = $m.Value.Substring(0, 1)
+    $inner = $m.Value.Substring(1, $m.Value.Length - 2)
+    $after = $code.Substring($pos, [Math]::Min(4, $code.Length - $pos)).TrimStart()
+    if ($inner.Contains('<')) { $mv = Get-MaskedHtml $inner }
+    elseif ($inner -match 'record|label|mypage|^[.#][A-Za-z]') { $mv = Get-Masked $inner -KeepLatin }
+    elseif ($after.StartsWith(':') -and $inner -match '^[A-Za-z_][A-Za-z0-9_]{0,30}$') { $mv = $inner }
+    else { $mv = Get-Masked $inner }
+    [void]$sb.Append($q).Append($mv).Append($q)
+  }
+  if ($pos -lt $code.Length) { [void]$sb.Append((Get-Masked $code.Substring($pos) -KeepLatin)) }
+  return $sb.ToString()
+}
+function Get-MaskedAttrs([string]$s) {
+  if (-not $s) { return '' }
+  $sb = [System.Text.StringBuilder]::new()
+  foreach ($m in $script:AttrRe.Matches($s)) {
+    $n = $m.Groups[1].Value
+    [void]$sb.Append(' ').Append((Get-Masked $n -KeepLatin))
+    if (-not ($m.Groups[2].Success -or $m.Groups[3].Success -or $m.Groups[4].Success)) { continue }
+    $v = $m.Groups[4].Value
+    if ($m.Groups[2].Success) { $v = $m.Groups[2].Value } elseif ($m.Groups[3].Success) { $v = $m.Groups[3].Value }
+    $dv = [System.Net.WebUtility]::HtmlDecode($v)
+    $ln = $n.ToLowerInvariant()
+    if ($ln.StartsWith('on')) { $mv = Get-MaskedCode $dv }
+    elseif ($script:UrlAttrRe.IsMatch($ln)) { $mv = Get-MaskedUrl $dv }
+    elseif ($script:KeepAttrRe.IsMatch($ln)) { $mv = Get-Masked $dv -KeepLatin }
+    elseif ($dv.Contains('<')) { $mv = '{HTML ' + (Get-MaskedHtml $dv) + '}' }
+    else { $mv = Get-Masked $dv }
+    [void]$sb.Append('="').Append($mv.Replace('"', "'")).Append('"')
+  }
+  return $sb.ToString()
+}
+function Get-MaskedHtml([string]$h) {
+  $sb = [System.Text.StringBuilder]::new()
+  $pos = 0
+  foreach ($m in $script:TokRe.Matches($h)) {
+    if ($m.Index -gt $pos) { [void]$sb.Append((Get-Masked $h.Substring($pos, $m.Index - $pos))) }
+    $pos = $m.Index + $m.Length
+    if ($m.Groups[1].Success) {
+      $t = $m.Groups[1].Value
+      $inner = $m.Groups[3].Value
+      if ($t -eq 'script') { $inner = Get-MaskedCode $inner } elseif ($t -eq 'style') { $inner = Get-Masked $inner -KeepLatin } else { $inner = Get-Masked $inner }
+      [void]$sb.Append('<' + $t + (Get-MaskedAttrs $m.Groups[2].Value) + '>' + $inner + '</' + $t + '>')
+    }
+    elseif ($m.Groups[5].Success) { [void]$sb.Append('<' + $m.Groups[4].Value + $m.Groups[5].Value + (Get-MaskedAttrs $m.Groups[6].Value) + '>') }
+    elseif ($m.Value.StartsWith('<!--')) { [void]$sb.Append('<!--' + (Get-MaskedHtml $m.Value.Substring(4)) + '[주석 끝]') }
+    else { [void]$sb.Append((Get-Masked $m.Value -KeepLatin)) }
+  }
+  if ($pos -lt $h.Length) { [void]$sb.Append((Get-Masked $h.Substring($pos))) }
+  return $sb.ToString()
+}
+# 낱말이 나오는 곳을 센다: 태그 속성 / 스크립트·스타일 안 / 주석 / 글자
+function Get-WordPlaces([string]$h, [string]$word) {
+  $idx = [System.Collections.Generic.List[int]]::new()
+  $i = $h.IndexOf($word, [StringComparison]::OrdinalIgnoreCase)
+  while ($i -ge 0) { $idx.Add($i); $i = $h.IndexOf($word, $i + 1, [StringComparison]::OrdinalIgnoreCase) }
+  if ($idx.Count -eq 0) { return '0' }
+  $tag = 0; $code = 0; $cmt = 0; $txt = 0; $k = 0
+  foreach ($m in $script:TokRe.Matches($h)) {
+    while ($k -lt $idx.Count -and $idx[$k] -lt $m.Index) { $txt++; $k++ }
+    $end = $m.Index + $m.Length
+    while ($k -lt $idx.Count -and $idx[$k] -lt $end) {
+      if ($m.Groups[1].Success) { $code++ } elseif ($m.Value.StartsWith('<!--')) { $cmt++ } else { $tag++ }
+      $k++
+    }
+    if ($k -ge $idx.Count) { break }
+  }
+  $txt += $idx.Count - $k
+  return "$($idx.Count)  (태그 속성 $tag · 스크립트·스타일 안 $code · 주석 $cmt · 글자 $txt)"
+}
+function Add-TreeSketch($n, [int]$depth, $lines, [int]$max) {
+  if ($lines.Count -ge $max) { return }
+  $a = Get-A $n
+  $d = $n.t
+  if ($a['class']) { $d += '.' + ((Get-Masked $a['class'] -KeepLatin).Trim() -replace '\s+', '.') }
+  foreach ($k in @($a.Keys | Sort-Object)) { if ($k -ne 'class') { $d += ' ' + $k } }
+  $len = 0
+  foreach ($c in $n.c) { if ($c -is [string]) { $len += $c.Trim().Length } }
+  if ($len -gt 0) { $d += "  [글자 $len]" }
+  $lines.Add(('  ' * $depth) + $d)
+  foreach ($c in $n.c) { if ($c -is [hashtable]) { Add-TreeSketch $c ($depth + 1) $lines $max } }
+}
+function Get-RiroDiag([string]$html, $students) {
+  $norm = $html.Replace("`r`n", "`n").Replace("`r", "`n")
+  $L = [System.Collections.Generic.List[string]]::new()
+  $recs = 0
+  foreach ($s in $students) { $recs += $s.records.Count }
+  $L.Add('리로스쿨 상벌점 페이지 진단 (riro-push.ps1 -Diagnose)')
+  $L.Add('학생 이름·숫자·글자는 가렸습니다: 한글 등 → 가, 숫자 → 0, 글자 속 영문 → a. 태그·class 이름만 남깁니다.')
+  $L.Add('만든 때 ' + (Get-Date -Format 'yyyy-MM-dd HH:mm') + " · 페이지 $($norm.Length) 자 · 읽은 학생 $($students.Count) · 상세 $recs")
+  $L.Add('')
+  $L.Add('■ 낱말이 나오는 곳')
+  foreach ($w in @('mypage_record_pc', 'mypage_record_mobile', 'record-p', 'label-record', 'record_p', 'label_record', 'record', '<script',
+      'popover', 'tooltip', 'data-content', 'title=', 'onclick', '&lt;', 'ajax', '.html(', 'innerHTML', 'display:none', 'display: none')) {
+    $L.Add(('  {0,-22} {1}' -f $w, (Get-WordPlaces $norm $w)))
+  }
+  $tables = Read-RecordTables $html
+  $L.Add('')
+  $L.Add("■ 해석기가 본 상벌점 표: $($tables.Count) 개")
+  # 학생 줄마다 원문 길이(다음 <tr 까지)를 재서 가장 긴 줄을 본다 — 상세가 어떤 꼴로든 들어 있다면 거기다
+  $rows = [System.Collections.Generic.List[object]]::new()
+  foreach ($tbl in $tables) {
+    foreach ($r in (Find-Desc $tbl 'tr' $null)) {
+      if ((Get-A $r)['align'] -ne 'center' -or $r.s -lt 0) { continue }
+      if ((Find-Desc $r 'td' $null).Count -lt 7) { continue }
+      $end = $norm.IndexOf('<tr', $r.s + 3, [StringComparison]::OrdinalIgnoreCase)
+      if ($end -lt 0) { $end = $norm.Length }
+      $rows.Add(@{ el = $r; len = $end - $r.s })
+    }
+  }
+  if ($rows.Count -eq 0) { $L.Add('  학생 줄을 못 찾았습니다') }
+  else {
+    $lens = @($rows | ForEach-Object { $_.len } | Sort-Object)
+    $L.Add("  학생 줄 $($rows.Count) 개 · 원문 길이 가장 짧은 $($lens[0]) · 가운데 $($lens[[int][Math]::Floor($lens.Count / 2)]) · 가장 긴 $($lens[$lens.Count - 1]) 자")
+    $best = $rows[0]
+    foreach ($x in $rows) { if ($x.len -gt $best.len) { $best = $x } }
+    $row = $best.el
+    $rp = Find-Desc $row $null 'record-p' -First
+    $lb = Find-Desc $row $null 'label-record'
+    $L.Add("  가장 긴 학생 줄: 칸(td) $((Find-Desc $row 'td' $null).Count) 개 · .record-p $(if ($rp.Count -gt 0) { '있음' } else { '없음' }) · .label-record $($lb.Count) 개")
+    $L.Add('  짜임 (해석기 기준 · 글자는 수만):')
+    $sk = [System.Collections.Generic.List[string]]::new()
+    Add-TreeSketch $row 2 $sk 150
+    $L.AddRange($sk)
+    $L.Add('')
+    $L.Add('■ 그 줄의 원문 (가림)')
+    $L.Add((Get-MaskedHtml $norm.Substring($row.s, [Math]::Min($best.len, 8000))))
+  }
+  foreach ($w in @('mypage_record_pc', 'label-record', 'record-p')) {
+    $i = $norm.IndexOf($w, [StringComparison]::OrdinalIgnoreCase)
+    if ($i -lt 0) { continue }
+    $a = [Math]::Max(0, $i - 1500)
+    $b = [Math]::Min($norm.Length, $i + 2500)
+    $L.Add('')
+    $L.Add("■ '$w' 가 처음 나오는 곳 앞뒤 (원문, 가림)")
+    $L.Add((Get-MaskedHtml $norm.Substring($a, $b - $a)))
+  }
+  return $L
+}
+function Invoke-Diagnose {
+  $sec = Read-Secret
+  Write-Log '진단 시작 (저장 안 함)'
+  $html = Invoke-RiroFetch $RiroBase $sec.id $sec.pw (Get-SchoolYear (Get-Date))
+  $students = ConvertFrom-RiroHtml $html
+  $lines = Get-RiroDiag $html $students
+  $file = Join-Path $script:AppDir 'riro-diag.txt'
+  Set-Content -Path $file -Value $lines -Encoding UTF8
+  foreach ($l in $lines) { if ($l -match '^\s*(record-p|label-record|mypage_record_pc) |학생 줄') { Write-Host $l } }
+  $out = $file
+  try {
+    $desk = [Environment]::GetFolderPath('Desktop')
+    if ($desk -and (Test-Path $desk)) { $out = Join-Path $desk 'riro-diag.txt'; Copy-Item -Path $file -Destination $out -Force }
+  }
+  catch { $out = $file }
+  Write-Log "진단 파일: $out  (학생 정보는 가렸습니다 — 열어서 확인한 뒤 보내 주세요)"
+}
+function Show-Key {
+  $sec = Read-Secret
+  Write-Host '전송 암호 (Cloudflare 워커의 RIRO_KEY 에 넣을 값):' -ForegroundColor Yellow
+  Write-Host "  $($sec.key)"
+  try { Set-Clipboard -Value $sec.key; Write-Host '  (클립보드에 복사했습니다 — Ctrl+V 로 붙여 넣으세요)' } catch { }
+}
+
+# ══════════════════════════════════════════════════════════════════════
 #  설정·기록
 # ══════════════════════════════════════════════════════════════════════
 function Resolve-HomeDir {
@@ -680,12 +876,15 @@ function Invoke-Sync([switch]$DryRun) {
   $students = ConvertFrom-RiroHtml $html
   $plan = New-RiroPlan $students $now $MinTotal $MinPerGrade
   Write-Log "  해석: $($plan.Summary) · $([Math]::Round($sw.Elapsed.TotalSeconds, 1))초"
-  if ($plan.Problems.Count -gt 0) { throw ('저장하지 않습니다 — ' + ($plan.Problems -join ' / ')) }
   if ($DryRun) {
-    if (-not (Test-Worker $sec.worker $sec.key)) { throw '워커 연결을 확인하세요.' }
+    # 해석에 문제가 있어도 워커 연결은 본다 — 워커 설정을 따로 확인할 수 있게
+    $workerOk = Test-Worker $sec.worker $sec.key
+    if ($plan.Problems.Count -gt 0) { throw ('저장하지 않습니다 — ' + ($plan.Problems -join ' / ')) }
+    if (-not $workerOk) { throw '워커 연결을 확인하세요.' }
     Write-Log '확인 끝 — 이상 없습니다. 저장은 하지 않았습니다.'
     return
   }
+  if ($plan.Problems.Count -gt 0) { throw ('저장하지 않습니다 — ' + ($plan.Problems -join ' / ')) }
   Send-RiroDocs $sec.worker $sec.key $plan.Docs
   Write-Log "동기화 끝 — $($plan.Summary) 저장"
 }
@@ -700,6 +899,8 @@ try {
   if ($Setup) { Invoke-Setup }
   elseif ($Install) { Install-Task }
   elseif ($Uninstall) { Uninstall-Task }
+  elseif ($ShowKey) { Show-Key }
+  elseif ($Diagnose) { Invoke-Diagnose }
   elseif ($Check) { Invoke-Sync -DryRun }
   else { Invoke-Sync }
   exit 0

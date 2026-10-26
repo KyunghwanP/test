@@ -42,6 +42,12 @@ function page(n = 400, withRecords = true) {
     <table class="table mypage_record_pc"><tbody>${rows.join('\n')}</tbody></table></body></html>`;
 }
 const NORMAL = page(400), FEW = page(10), NOREC = page(400, false);
+// 상세를 스크립트가 그려 넣는 페이지 — 표의 상자는 비어 있고, 내용은 스크립트 안 JSON 에 있다
+const SCRIPTED = NOREC.replace('</body>', `<script>
+  var REC = {"10101":[{"d":"[ 09.04 ]","t":"벌점 -1 지각 비밀교사스크립트 Minsu"}],"20101":[{"d":"[ 10.02 ]","t":"상점 +2 봉사"}]};
+  $('.record-p').each(function () { var k = $(this).closest('tr').find('td').eq(1).text();
+    (REC[k] || []).forEach(function (r) { $(this).append('<span class="label label-record">' + r.d + '</span><span class="txt">' + r.t + '</span><br>'); }); });
+</script></body>`);
 const LOGIN_PAGE = '<html><head><title>로그인</title></head><body><form action="/user.php?action=signin"><input name="id"></form></body></html>';
 const GEO_PAGE = '<html><head><title>에러페이지</title></head><body>해외에서는 접속할 수 없습니다.</body></html>';
 
@@ -49,7 +55,7 @@ const GEO_PAGE = '<html><head><title>에러페이지</title></head><body>해외�
 const ID = 'riro_teacher', PW = 'p@ss "w0rd&=한';
 const now = new Date();
 const YY = now.getMonth() + 1 >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-let MODE = 'normal';          // normal | geo | few | norecords
+let MODE = 'normal';          // normal | geo | few | norecords | scripted
 const SESS = new Map();
 let LOGINS = [], RECORD_HITS = [];
 const riro = http.createServer((req, res) => {
@@ -79,7 +85,7 @@ const riro = http.createServer((req, res) => {
     const q = u.searchParams;
     const right = q.get('club') === 'index' && q.get('action') === 'record' && q.get('Appwin') === 'reload' && q.get('Class') === '*45' && q.get('yy') === String(YY);
     if (!sid || !SESS.get(sid)?.loggedIn || !right) return send(LOGIN_PAGE);
-    return send(MODE === 'few' ? FEW : MODE === 'norecords' ? NOREC : NORMAL);
+    return send(MODE === 'few' ? FEW : MODE === 'norecords' ? NOREC : MODE === 'scripted' ? SCRIPTED : NORMAL);
   }
   res.writeHead(404); res.end('no');
 });
@@ -227,6 +233,47 @@ try {
 
   r = await ps(['-File', PS1, '-HomeDir', path.join(HOME, 'none'), '-RiroBase', RIRO]);
   check('설정 전이면 -Setup 하라고 알려 준다', r.code === 1 && /먼저 -Setup/.test(r.out), r.out.slice(-300));
+
+  console.log('\n■ -Check 는 해석이 막혀도 워커 연결을 본다 / -ShowKey / -Diagnose');
+  await saveSecret({ id: ID, pw: PW, worker: WORKER, key: KEY });
+  MODE = 'norecords';
+  r = await run('-Check');
+  check('상세 0건이어도 워커 연결: 정상 을 먼저 보여 준다', r.code === 1 && /워커 연결: 정상/.test(r.out) && /상세 내역이 한 건도/.test(r.out) && /-Diagnose/.test(r.out), r.out.slice(-500));
+  r = await run('-ShowKey');
+  check('-ShowKey 는 저장된 전송 암호를 보여 준다', r.code === 0 && r.out.includes(KEY), r.out.slice(-300));
+  check('-ShowKey 는 기록 파일에 암호를 남기지 않는다', !fs.readFileSync(path.join(HOME, 'riro.log'), 'utf8').includes(KEY));
+
+  const HAKBUN = [...new Set([...NORMAL.matchAll(/<td>(\d{5})<\/td>/g)].map(m => m[1]))];
+  const diag = async (mode) => {
+    MODE = mode;
+    try { fs.rmSync(path.join(HOME, 'riro-diag.txt')); } catch { }
+    const res = await run('-Diagnose');
+    const txt = fs.existsSync(path.join(HOME, 'riro-diag.txt')) ? fs.readFileSync(path.join(HOME, 'riro-diag.txt'), 'utf8') : '';
+    return { res, txt };
+  };
+  const noPii = (label, txt) => {
+    const leaks = [...NAMES.filter(n => txt.includes(n)), ...['비밀교사', 'Minsu', '09.04', '10.02', '봉사', '지각'].filter(w => txt.includes(w)),
+                   ...HAKBUN.filter(h => new RegExp(`(^|[^0-9])${h}([^0-9]|$)`).test(txt.split('\n').slice(3).join('\n')))];
+    check(`${label}: 학생 이름·학번·상세 글자·교사 이름이 없다`, leaks.length === 0, leaks.slice(0, 8));
+  };
+  {
+    const { res, txt } = await diag('normal');
+    check('-Diagnose (보통 페이지): 파일을 만든다', res.code === 0 && txt.length > 1000, res.out.slice(-400));
+    check('  낱말 위치를 센다 (label-record 는 태그 속성에)', /label-record\s+\d+\s+\(태그 속성 [1-9]/.test(txt), txt.split('\n').filter(l => /label-record/.test(l)).slice(0, 2));
+    check('  가장 긴 학생 줄의 짜임: .record-p 있음 · 상세 5개 (시험 페이지에서 가장 많은 수)', /가장 긴 학생 줄: 칸\(td\) 8 개 · \.record-p 있음 · \.label-record 5 개/.test(txt), txt.split('\n').filter(l => /학생 줄/.test(l)));
+    check('  줄 길이 통계', /학생 줄 400 개 · 원문 길이 가장 짧은 \d+ · 가운데 \d+ · 가장 긴 \d+ 자/.test(txt));
+    check('  짜임에 class 이름이 남는다 (div.record-p · span.label.label-record)', /div\.record-p/.test(txt) && /span\.label\.label-record/.test(txt));
+    check('  원문은 가려져 있다 ([ 00.00 ] · 가가가)', /\[ 00\.00 \]/.test(txt) && /가가/.test(txt));
+    noPii('보통 페이지', txt);
+  }
+  {
+    const { res, txt } = await diag('scripted');
+    check('-Diagnose (스크립트가 그리는 페이지): 파일을 만든다', res.code === 0 && txt.length > 1000, res.out.slice(-400));
+    check('  label-record 가 스크립트 안에만 있다고 센다', /label-record\s+1\s+\(태그 속성 0 · 스크립트·스타일 안 1/.test(txt), txt.split('\n').filter(l => /label-record/.test(l)).slice(0, 2));
+    check('  스크립트의 짜임이 보인다 (선택자·객체 키·HTML 조각)', txt.includes(".record-p'") && txt.includes('"d":"[ 00.00 ]"') && txt.includes('<span class="label label-record">'), txt.slice(txt.indexOf('<script')).slice(0, 400));
+    noPii('스크립트 페이지', txt);
+  }
+  MODE = 'normal';
 
   console.log('\n■ PowerShell 작은 부품');
   const unit = path.join(HOME, 'unit.ps1');
