@@ -37,9 +37,13 @@
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = 'Tls12'
 $d = "$env:LOCALAPPDATA\ynhs-riro"; New-Item -ItemType Directory -Force $d | Out-Null
-Invoke-WebRequest https://raw.githubusercontent.com/KyunghwanP/test/main/riro/riro-push.ps1 -OutFile "$d\riro-push.ps1" -UseBasicParsing
+Invoke-WebRequest https://kyunghwanp.github.io/test/riro/riro-push.ps1 -OutFile "$d\riro-push.ps1" -UseBasicParsing
 powershell -ExecutionPolicy Bypass -File "$d\riro-push.ps1" -Setup
 ```
+
+- 주소는 앱과 같은 곳(github.io)이다. 학교망에서 raw.githubusercontent.com 은 「기본 연결이 닫혔습니다」로
+  끊길 때가 있었다. 그래도 안 받아지면 Windows 에 들어 있는 curl 로:
+  `curl.exe -L -o "$d\riro-push.ps1" https://kyunghwanp.github.io/test/riro/riro-push.ps1`
 
 - 리로스쿨 아이디·비밀번호를 묻습니다. **이 PC 의 이 Windows 사용자만 풀 수 있게(DPAPI)** 잠가서 저장합니다.
 - 워커 주소는 그냥 Enter (`https://riro-ingest.pkh910518.workers.dev`).
@@ -73,7 +77,7 @@ powershell -ExecutionPolicy Bypass -File "$d\riro-push.ps1" -Install    # 평일
 |---|---|
 | 잘 도는지 보기 | `%LOCALAPPDATA%\ynhs-riro\riro.log` (몇 명·몇 건·HTTP 상태만 남습니다 — 학생 이름·점수는 없음) |
 | 리로스쿨 비밀번호를 바꿨다 | `-Setup` 다시 (전송 암호는 그대로 둡니다) |
-| 스크립트 새 판 | 2단계의 `Invoke-WebRequest` 줄만 다시 (자동 실행은 같은 파일을 부릅니다) |
+| 스크립트 새 판 | 2단계의 `Invoke-WebRequest` 줄만 다시 (자동 실행은 같은 파일을 부릅니다). 새 판인지는 `-ShowKey` 가 되는지로 |
 | PC 를 바꾼다 | 옛 PC 에서 `-Uninstall`, 새 PC 에서 2·4단계 (전송 암호를 새로 만들었으면 워커의 `RIRO_KEY` 도) |
 | 전송 암호를 바꾼다 | `-Setup -NewKey` → 워커의 `RIRO_KEY` 도 같은 값으로 |
 | 전송 암호를 다시 보고 싶다 | `-ShowKey` (화면에 보여 주고 클립보드에 복사) |
