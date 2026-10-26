@@ -28,11 +28,12 @@ GAS는 [`gas/README.md`](gas/README.md)에 있다. 여기에는 **그 문서들�
 | 서비스 | 무엇이 걸려 있나 | 계정 |
 |---|---|---|
 | **Firebase** (`ynhs-7b5ba`) | 로그인·전 데이터·보안 규칙 | `pkh910518@yeungnam.hs.kr` |
-| **Cloudflare** | 워커 3개(`*.pkh910518.workers.dev`)·R2 버킷 2개 | ⬜ 확인 필요 |
+| **Cloudflare** | 워커 5개(`*.pkh910518.workers.dev`)·R2 버킷 2개 | ⬜ 확인 필요 |
 | **GitHub** (`KyunghwanP`) | 코드·배포(Pages)·자동화 | 개인 계정 |
 | **Google Apps Script** | 주간교육활동·학사일정·상벌점·상담 | ⬜ 확인 필요 |
 | **Gemini API** | 주간교육활동 AI 요약 | ⬜ 확인 필요 |
-| **리로스쿨** | 상벌점 스크래핑 계정 | ⬜ 확인 필요 |
+| **리로스쿨** | 상벌점 받아 오는 계정 (학교 PC 에 잠가 저장) | ⬜ 확인 필요 |
+| **학교 PC** | 상벌점을 받아 워커로 보내는 작업 스케줄러 (`riro/`) | 선생님 Windows 계정 |
 
 ### 영구적 부재 — 의도대로
 
@@ -79,7 +80,7 @@ GAS는 [`gas/README.md`](gas/README.md)에 있다. 여기에는 **그 문서들�
 | 1 | [`README.md`](README.md) 1~3장 | 구성·데이터·권한. 이걸 모르면 나머지가 안 읽힌다 |
 | 2 | 이 문서 2·3장 | 무엇이 저절로 도는지, 비밀 값이 어디 있는지 |
 | 3 | [`README.md`](README.md) 6장 | 건드릴 때 주의할 점. **두 저장소 동기화**가 핵심 |
-| 4 | [`workers/README.md`](workers/README.md) 맨 앞 표 | 워커가 왜 셋인지 |
+| 4 | [`workers/README.md`](workers/README.md) 맨 앞 표 | 워커가 왜 나뉘어 있는지 |
 | 5 | [`tests/README.md`](tests/README.md) | 고치기 전에 돌려 볼 것 |
 
 [`BACKLOG.md`](BACKLOG.md)에는 하다 만 것·하기로 한 것이 쌓여 있다. 급하지 않다.
@@ -99,8 +100,10 @@ GAS는 [`gas/README.md`](gas/README.md)에 있다. 여기에는 **그 문서들�
          │                teacher-api            ynhs-notices   (공지·메모 그림)
          │                notice-api
          │                consult-api  ←── 학부모 (parent.html)
+         │                overtime-api ──→ 관리대장 시트 (초과근무, test 에서 시험 중)
+         │                riro-ingest  ←── 학교 PC (riro-push.ps1) ←── 리로스쿨 상벌점
          │
-         └── Google Apps Script ── 구글 사이트(주간교육활동) · 시트(학사일정·상벌점)
+         └── Google Apps Script ── 구글 사이트(주간교육활동) · 시트(학사일정·상벌점 입력)
 ```
 
 **코드를 고치는 곳은 사실상 `index.html` 하나다**(약 23,000줄). 나머지는 주변 도구다.
@@ -118,9 +121,17 @@ GAS는 [`gas/README.md`](gas/README.md)에 있다. 여기에는 **그 문서들�
 | `sync-grades` | 매일 05:30 | 모의고사 성적 동기화 | 성적 탭이 옛 회차에 멈춘다 |
 | `scrape` | 06:00~08:50 사이 여러 번 | 주간교육활동 구글 사이트 긁기 | 주간교육활동이 지난주에 멈춘다 |
 | `Summarize` | 매일 08:00 | 위 결과를 Gemini 로 요약 | 요약만 안 바뀐다(원본은 뜬다) |
-| `riro-points` | 매일 02:00 | 리로스쿨 상벌점 긁기 | 상벌점이 안 쌓인다 |
+| `riro-points` | **예약 꺼 둠** (손으로만) | 리로스쿨 상벌점 — 해외 차단으로 GitHub 에선 실패 | — |
 
 *시각은 전부 한국 시각. 워크플로 파일에는 UTC 로 적혀 있다.*
+
+### 상벌점은 학교 PC 가 받는다
+
+리로스쿨이 2026-10-14 부터 **해외 접속을 막아서** GitHub(미국) 서버로는 받을 수 없다
+(`riro-points` 예약은 꺼 두었다). 대신 선생님 학교 PC 의 작업 스케줄러가
+**평일 07:50 · 16:40 · 로그인 3분 뒤** `riro/riro-push.ps1` 을 돌려 받고, 워커 `riro-ingest` 가
+`riro_points` 에 쓴다. 그 PC 가 켜져 있고 선생님 계정으로 로그인돼 있어야 돈다.
+설치·PC 교체·문제 해결은 [`riro/README.md`](https://github.com/KyunghwanP/test/blob/main/riro/README.md).
 
 빌드 워크플로(`build-widget`·`build-app-ahk`·`build-desktop`)는 **양쪽 저장소에
 있고**, 해당 폴더가 바뀔 때만 돈다. 릴리스에 exe 를 올리며, 런처가 그것을 받아 간다.
@@ -148,7 +159,7 @@ GAS 의 `triggerWeeklySummary` 가 그 길이고, 앱의 '새로 받기' 가 그
 저장소에 파일을 안 남기는 것이 여기서는 불리하게 작용한다.
 
 평소에는 매일 손대니 상관없지만 **방학이 위험하다.** 두 달 놓으면 개학날 아침에
-주간교육활동·날씨·상벌점이 전부 안 돈다. 꺼지기 전에 GitHub 이 메일을 보낸다.
+주간교육활동·날씨·성적이 전부 안 돈다. 꺼지기 전에 GitHub 이 메일을 보낸다.
 
 막으려면 워크플로가 돌 때마다 자기 자신의 `enable` API 를 부르게 하면 된다
 (타이머가 초기화되고 커밋은 안 남는다). 빈 커밋을 미는 방법도 있지만 이력이
@@ -156,7 +167,7 @@ GAS 의 `triggerWeeklySummary` 가 그 길이고, 앱의 '새로 받기' 가 그
 
 **확인하는 곳**: GitHub → Actions 탭. 빨간 줄이 며칠 이어지면 대개 아래 둘 중 하나다.
 - 서비스 계정 키 만료·회수 → `FIREBASE_SERVICE_ACCOUNT` 다시 넣기
-- 긁어 오는 쪽(구글 사이트·리로스쿨)의 화면이 바뀜 → `scripts/` 의 해당 파일 수정
+- 긁어 오는 쪽(구글 사이트)의 화면이 바뀜 → `scripts/` 의 해당 파일 수정
 
 또 하나, GAS 가 **`triggerWeeklySummary`** 로 `scrape` → `Summarize` 를 연달아
 부르는 길이 있다(앱의 '새로 받기'가 이걸 쓴다). GAS 스크립트 속성의
@@ -166,16 +177,19 @@ GAS 의 `triggerWeeklySummary` 가 그 길이고, 앱의 '새로 받기' 가 그
 
 ## 3. 비밀 값이 사는 곳
 
-**저장소에는 하나도 없다.** 아래 네 곳에만 있고, 넷 다 한 번 넣으면 다시 볼 수 없다
+**저장소에는 하나도 없다.** 아래 다섯 곳에만 있고, 넣고 나면 다시 볼 수 없다
 (가려진 채로만 보인다). **원본은 따로 보관해야 한다.**
 
 | 사는 곳 | 이름 | 무엇 |
 |---|---|---|
 | GitHub Secrets (`test`) | `FIREBASE_SERVICE_ACCOUNT` | Firestore 쓰기용 서비스 계정 JSON |
 | | `GEMINI_API_KEY` | AI 요약 |
-| | `RIRO_ID` · `RIRO_PW` | 리로스쿨 로그인 |
+| | `RIRO_ID` · `RIRO_PW` | 리로스쿨 로그인 (예약을 꺼서 지금은 손으로 돌릴 때만) |
 | Cloudflare (`consult-api`) | `SA_JSON` | 서비스 계정 JSON |
 | Cloudflare (`teacher-api`) | `SA_JSON` | 〃 (**같은 값을 따로 넣은 것**) |
+| Cloudflare (`overtime-api`) | `SA_JSON` · `SHEET_ID` · `MAILER_URL` · `MAIL_SECRET` | 〃 + 관리대장 시트·메일 중계 ([`gas/overtime/README.md`](https://github.com/KyunghwanP/test/blob/main/gas/overtime/README.md)) |
+| Cloudflare (`riro-ingest`) | `SA_JSON` · `RIRO_KEY` | 〃 + 학교 PC 의 전송 암호 |
+| 학교 PC (`%LOCALAPPDATA%\ynhs-riro`) | 리로스쿨 계정 · 전송 암호 | DPAPI 로 잠김 — 그 PC·그 Windows 계정만 풂. 다시 보기는 `-ShowKey` |
 | Apps Script 속성 | `GITHUB_TOKEN` | 워크플로 실행 |
 | | `FIREBASE_SA_JSON` · `FIREBASE_PROJECT_ID` | Firestore REST |
 
@@ -260,6 +274,7 @@ GAS 의 `triggerWeeklySummary` 가 그 길이고, 앱의 '새로 받기' 가 그
 | 특정 기능만 죽음 | 워커 | `workers.dev` 주소를 주소창에 → `ORIGIN` 이 뜨면 살아 있음 |
 | 사진·그림만 안 뜸 | R2 바인딩 | 워커 Settings → Bindings (`PHOTOS` / `NOTICES`) |
 | 데이터가 어제에 멈춤 | Actions | GitHub → Actions 에 빨간 줄 |
+| 상벌점만 멈춤 (마지막 업데이트가 오래됨) | 학교 PC | 그 PC 의 `%LOCALAPPDATA%\ynhs-riro\riro.log` → 상세가 0건이면 `-Diagnose` ([`riro/README.md`](https://github.com/KyunghwanP/test/blob/main/riro/README.md)) |
 | 한 사람만 이상함 | 권한 | `acl/emailByName` 에 이름이 있는지, 표기가 같은지 |
 | 배포했는데 반영이 안 됨 | 서비스워커 | 주소 뒤에 `?nosw=1` — 이러면 워커를 건너뛰고 등록도 푼다 |
 

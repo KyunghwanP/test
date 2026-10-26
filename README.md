@@ -22,7 +22,8 @@
 | **통합앱** | `app/ynhs-app.ahk` | 포털 창 + 위젯 토글. AHK + WebView2 |
 | **데스크톱 앱** | `desktop/` | Rust(wry). 통합앱과 별개의 대안 |
 | **상담 예약 API** | `workers/consult-api.js` | Cloudflare Worker |
-| **자동화** | `.github/workflows/` | 성적·날씨·상벌점 동기화, exe 빌드 |
+| **자동화** | `.github/workflows/` | 성적·날씨 동기화, exe 빌드 |
+| **상벌점 받기** | `riro/riro-push.ps1` + `workers/riro-ingest.js` | 학교 PC 가 리로스쿨에서 받아 워커로 (리로스쿨 해외 차단, 2026-10~) |
 
 배포는 GitHub Pages. `KyunghwanP/ynhs` → `/ynhs/`, `KyunghwanP/test` → `/test/`.
 **두 저장소는 대부분 파일을 동일하게 유지**하며, `admin.html`·`upload.html`·`scripts/`는
