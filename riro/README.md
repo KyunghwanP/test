@@ -78,10 +78,48 @@ powershell -ExecutionPolicy Bypass -File "$d\riro-push.ps1" -Install    # 평일
 | 잘 도는지 보기 | `%LOCALAPPDATA%\ynhs-riro\riro.log` (몇 명·몇 건·HTTP 상태만 남습니다 — 학생 이름·점수는 없음) |
 | 리로스쿨 비밀번호를 바꿨다 | `-Setup` 다시 (전송 암호는 그대로 둡니다) |
 | 스크립트 새 판 | 2단계의 `Invoke-WebRequest` 줄만 다시 (자동 실행은 같은 파일을 부릅니다). 새 판인지는 `-ShowKey` 가 되는지로 |
-| PC 를 바꾼다 | 옛 PC 에서 `-Uninstall`, 새 PC 에서 2·4단계 (전송 암호를 새로 만들었으면 워커의 `RIRO_KEY` 도) |
+| PC 를 바꾼다 | 아래 「PC 를 바꿀 때」 |
 | 전송 암호를 바꾼다 | `-Setup -NewKey` → 워커의 `RIRO_KEY` 도 같은 값으로 |
 | 전송 암호를 다시 보고 싶다 | `-ShowKey` (화면에 보여 주고 클립보드에 복사) |
 | 상세가 안 읽힌다 | `-Diagnose` → 바탕화면의 `riro-diag.txt` (학생 정보는 가림: 한글 → 가, 숫자 → 0, 글자 속 영문 → a) |
+
+## PC 를 바꿀 때
+
+저장한 리로스쿨 계정은 **그 PC·그 Windows 계정에서만 풀리게(DPAPI) 잠겨 있어서** 폴더를 복사해 가도
+못 쓴다. 새 PC 에서 처음처럼 설정하고, 워커의 전송 암호만 새것으로 바꾼다.
+
+**1. 새 PC — 받아서 설정** (PowerShell)
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol = 'Tls12'
+$d = "$env:LOCALAPPDATA\ynhs-riro"; New-Item -ItemType Directory -Force $d | Out-Null
+Invoke-WebRequest https://kyunghwanp.github.io/test/riro/riro-push.ps1 -OutFile "$d\riro-push.ps1" -UseBasicParsing
+powershell -ExecutionPolicy Bypass -File "$d\riro-push.ps1" -Setup
+```
+
+리로스쿨 아이디·비밀번호 → 워커 주소는 Enter → 마지막에 **새 전송 암호**가 나오고 클립보드에 복사된다.
+
+**2. Cloudflare — 전송 암호만 바꾸기**
+
+`riro-ingest` → **Settings** → **Variables and Secrets** → `RIRO_KEY` 값을 새 전송 암호로 → **Deploy**.
+`SA_JSON` 은 그대로. 예전 암호는 이때부터 안 통한다.
+
+**3. 새 PC — 확인 → 자동 실행**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$d\riro-push.ps1" -Check     # 「워커 연결: 정상」 · 상세 ○○건
+powershell -ExecutionPolicy Bypass -File "$d\riro-push.ps1" -Install
+```
+
+**4. 옛 PC — 아직 쓸 수 있으면 정리** (이미 반납·초기화했으면 할 것 없음)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\ynhs-riro\riro-push.ps1" -Uninstall
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\ynhs-riro"
+```
+
+새 PC 도 평일에 켜서 선생님 계정으로 로그인해 쓰는 PC, 복원 프로그램이 없는 PC 로. 바꾸는 사이에는
+갱신만 멈추고 앱 자료는 그대로 남는다.
 
 ## 리로스쿨 화면이 바뀌면
 
