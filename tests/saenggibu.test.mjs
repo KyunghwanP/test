@@ -28,6 +28,7 @@ const check = (n, c, x) => c ? (pass++, console.log('  ✅', n))
 
 // ── 엑셀 만들기 ──
 const XSS = '<img src=x onerror=window.__xss=1>';
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 function sheets({ dropOfficers = false, robotText = '로봇 코딩 캠프에 참여하여 센서 제어를 익힘.' } = {}) {
   const list = [
     ['<누>창의(1학년 창체)', [
@@ -291,7 +292,7 @@ const ORIGIN = 'https://kyunghwanp.github.io';
 const STUB = {
   'firebase-app.js': 'export function initializeApp(){ return {}; }',
   'firebase-auth.js': `
-    const u = window.__TEST_EMAIL__ ? { email: window.__TEST_EMAIL__ } : null;
+    const u = window.__TEST_EMAIL__ ? { email: window.__TEST_EMAIL__, getIdToken: async () => 'tok' } : null;
     const auth = { currentUser: u };
     export function getAuth(){ return auth; }
     export function onAuthStateChanged(a, cb){ setTimeout(() => cb(a.currentUser), 0); return () => {}; }
@@ -326,6 +327,10 @@ async function openAs(email, { width = 1100, blockExcel = false } = {}) {
   await ctx.route('https://cdn.jsdelivr.net/**', ej);
   await ctx.route('https://cdnjs.cloudflare.com/**', r => r.request().url().includes('exceljs') ? ej(r)
     : r.fulfill({ status: 200, contentType: 'text/javascript', body: XLSXJS }));
+  // 고화질 사진 — 1-1-1 만 있다(나머지는 404 → 작은 사진 그대로)
+  await ctx.route('https://teacher-api.pkh910518.workers.dev/**', r => /g=1&r=1&n=1\b/.test(r.request().url())
+    ? r.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from(PNG.split(',')[1], 'base64') })
+    : r.fulfill({ status: 404, body: '' }));
   await ctx.route('https://fonts.googleapis.com/**', r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   await ctx.route('https://fonts.gstatic.com/**', r => r.abort());
   await ctx.addInitScript(([e, store]) => {
@@ -346,7 +351,7 @@ const keep = async page => { STORE = await page.evaluate(() => window.__FS__); }
 const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
 
 // 3-1 처음 — 아무것도 없을 때(학교 명렬은 있다)
-STORE = { 'students/main': { students: ROSTER } };
+STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: { 1: PNG }, updatedAt: 'v1' } };
 {
   const p = await openAs(ADMIN);
   await p.waitForSelector('#body .empty');
@@ -412,7 +417,7 @@ STORE = { 'students/main': { students: ROSTER } };
 
   // 학생별
   await p.waitForSelector('#stus .stu');
-  check('학생별 — 1학년 1반이 먼저, 번호·이름·자료 건수', (await p.$$eval('#stus .stu', bs => bs.map(x => [...x.children].map(c => c.textContent).join('/')))).join('|') === `1/김가람/3|2/${XSS}/1`,
+  check('학생별 — 1학년 1반이 먼저, 번호·이름·자료 건수', (await p.$$eval('#stus .stu', bs => bs.map(x => [...x.children].filter(c => c.tagName !== 'IMG').map(c => c.textContent).join('/')))).join('|') === `1/김가람/3|2/${XSS}/1`,
     await p.$$eval('#stus .stu', bs => bs.map(x => x.textContent)));
   check('반 목록 — 처음엔 보고 있는 학년(1)만 펼침', await p.isVisible('.cls-pc .cl-list[data-g="1"]') && !(await p.isVisible('.cls-pc .cl-list[data-g="3"]')));
   await p.click('.cls-pc .cl-grade[data-g="3"]');
@@ -426,6 +431,14 @@ STORE = { 'students/main': { students: ROSTER } };
   await p.waitForSelector('#stuOut .card');
   const shownCards = () => p.evaluate(() => [...document.querySelectorAll('#stuOut .card')].filter(c => !c.closest('.vol-split')).length);
   check('학생 1-1-1 — 카드 3장(로봇·수학·봉사활동 누가기록 표)', await shownCards() === 3);
+  check('명단에 작은 사진(사진 있는 학생만)', await p.$eval('#stus .stu[data-n="1"] .ph', i => i.classList.contains('on') && i.src.startsWith('data:image'))
+    && !(await p.$eval('#stus .stu[data-n="2"] .ph', i => i.classList.contains('on'))));
+  await p.waitForFunction(() => document.getElementById('sPhoto')?.src.startsWith('blob:'));
+  check('상세 사진 — 작은 사진 뒤 고화질(워커)로 바꿔 끼운다', await p.isVisible('#sPhoto'));
+  await p.click('#sPhoto');
+  check('사진을 누르면 크게, 이름·학년반번호', await p.isVisible('#zoom') && (await p.textContent('#zoomCap')).includes('김가람 · 1학년 1반 1번'));
+  await p.click('#zoom');
+  check('다시 누르면 닫힌다', !(await p.isVisible('#zoom')));
   check('학생별 카드에도 유의 사항(로봇)', await p.$$eval('#stuOut .card', cs => cs.some(c => c.textContent.includes('진로탐색 로봇공학 캠프') && c.querySelector('.note')?.textContent.includes('담임 교사가 최종 수정'))));
   const grps = await p.$$eval('#stuOut .grp', gs => gs.map(g => g.textContent.replace(/\s+/g, ' ').trim()));
   check('입력 영역별 묶음 — 자율·진로가 앞, 누가기록이 뒤', grps.length === 2 && grps[0].includes('자율') && grps[0].includes('진로')
@@ -444,6 +457,7 @@ STORE = { 'students/main': { students: ROSTER } };
   await p.press('#hakbun', 'Enter');
   await p.waitForFunction(() => document.querySelector('#stuOut .s-id')?.textContent.includes('30205'));
   const t3 = await p.textContent('#stuOut');
+  check('사진이 없는 학생은 사진 칸 없이', !(await p.isVisible('#sPhoto')));
   check('학번 30205 → 3학년 2반 5번', t3.includes('3학년 2반 5번') && t3.includes('30205') && t3.includes('박나래'));
   check('반 목록도 그 반으로 옮겨 간다', (await p.textContent('#clsPane .cl-item.on')).includes('2반') && (await p.textContent('.roster-head')).includes('3학년 2반'));
   check('활동명이 겹치면 시트 이름으로 가른다 [학급 임원]', t3.includes('학생회 임원') && t3.includes('[학급 임원]'));

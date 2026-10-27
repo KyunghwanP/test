@@ -114,6 +114,15 @@
   .sheet{max-width:980px;margin:0 auto;background:var(--paper);border-radius:14px;box-shadow:var(--shadow);
     border:1px solid var(--rule);padding:22px 26px 26px;}
   .s-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--rule);}
+  /* 사진 — 종합검색처럼 3:4. 명단에는 작은 얼굴 */
+  .s-photo{width:96px;height:128px;object-fit:cover;border-radius:10px;border:1px solid var(--rule);background:var(--paper-soft);cursor:zoom-in;flex-shrink:0;}
+  .stu .ph{display:none;width:28px;height:37px;object-fit:cover;border-radius:5px;border:1px solid var(--rule);flex-shrink:0;}
+  .stu .ph.on{display:block;}
+  .zoom{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.6);padding:16px;cursor:zoom-out;}
+  .zoom.open{display:flex;}
+  .zoom-box{background:var(--paper);border-radius:16px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:8px;}
+  .zoom-box img{width:min(360px,76vw);aspect-ratio:3/4;object-fit:cover;border-radius:10px;}
+  #zoomCap{font-size:15px;font-weight:800;}
   .s-name{font-size:26px;font-weight:900;letter-spacing:-.01em;}
   .s-id{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;color:var(--ink-soft);margin-top:9px;}
   .s-sum{display:flex;gap:6px;flex-wrap:wrap;width:100%;}
@@ -340,6 +349,9 @@
   <div id="body"><div class="empty">불러오는 중…</div></div>
 </div>
 <div class="toast" id="toast"></div>
+<div class="zoom" id="zoom" role="dialog" aria-label="사진 크게 보기">
+  <div class="zoom-box"><img id="zoomImg" alt=""><div id="zoomCap"></div></div>
+</div>
 
 <!-- 엑셀 → 자료. 순수 함수만 둔다(XLSX·Firebase 없이 시트 이름·숨김 여부·행 배열만 받는다).
      tests/saenggibu.test.mjs 가 이 블록을 그대로 떼어 돌린다. -->
@@ -988,6 +1000,9 @@ const firebaseConfig = {
 };
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 const XLSX_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+// 학생 사진 — 앱의 학생 종합검색과 같은 곳. 작은 사진은 반마다 Firestore 문서 하나(studentPhotos/{학년-반}),
+// 고화질은 teacher-api 워커가 로그인을 확인하고 내준다(없으면 작은 사진 그대로)
+const TEACHER_WORKER = 'https://teacher-api.pkh910518.workers.dev';
 // 서식(글꼴·칸 색·병합·인쇄 설정)을 읽고 쓰는 쪽. SheetJS 무료판은 서식을 못 쓴다. 앞 주소가 막히면 다음 주소.
 const EXCELJS_SRC = ['https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js',
                      'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'];
@@ -1067,6 +1082,50 @@ async function loadActGrade(a, g){
   return rows;
 }
 
+// ── 사진 ──
+const photoCache = {}, photoVer = {}, bigCache = {}, bigPending = {};
+async function classPhotos(ck){
+  if (photoCache[ck] !== undefined) return photoCache[ck];
+  try {
+    const snap = await getDoc(doc(fbDb, 'studentPhotos', ck));
+    const d = snap.exists() ? (snap.data() || {}) : {};
+    photoCache[ck] = d.photos || {};
+    photoVer[ck] = String(d.updatedAt || '');
+  } catch (e) { photoCache[ck] = {}; }
+  return photoCache[ck];
+}
+function bigPhoto(g, c, n){
+  const ck = `${g}-${c}`, key = `${ck}-${n}|${photoVer[ck] || ''}`;
+  if (bigCache[key] !== undefined) return Promise.resolve(bigCache[key]);
+  if (bigPending[key]) return bigPending[key];
+  bigPending[key] = (async () => {
+    try {
+      const tok = await fbAuth.currentUser.getIdToken();
+      const v = photoVer[ck] ? `&v=${encodeURIComponent(photoVer[ck])}` : '';
+      const res = await fetch(`${TEACHER_WORKER}/photo?g=${g}&r=${c}&n=${n}${v}`, { headers: { Authorization: `Bearer ${tok}` } });
+      if (!res.ok || !(res.headers.get('Content-Type') || '').startsWith('image/')) return null;
+      return URL.createObjectURL(await res.blob());
+    } catch (e) { return null; }
+  })().then(u => { bigCache[key] = u; delete bigPending[key]; return u; });
+  return bigPending[key];
+}
+// 명단의 작은 사진 — 명단을 그린 뒤 반 사진 문서를 받아 채운다
+async function fillRosterPhotos(){
+  const btns = [...document.querySelectorAll('#stus .stu')];
+  for (const ck of new Set(btns.map(b => b.dataset.k))){
+    const ph = await classPhotos(ck);
+    btns.filter(b => b.dataset.k === ck).forEach(b => {
+      const url = ph[String(parseInt(b.dataset.n, 10))], im = b.querySelector('.ph');
+      if (url && im){ im.src = url; im.classList.add('on'); }
+    });
+  }
+}
+function openZoom(src, cap){
+  const z = $('zoom');
+  $('zoomImg').src = src; $('zoomCap').textContent = cap;
+  z.classList.add('open');
+}
+
 // ── 그리기 ──
 const p2 = n => String(n).padStart(2, '0');
 const hakbunOf = (g, c, n) => `${g}${p2(c)}${p2(n)}`;
@@ -1130,7 +1189,7 @@ function rosterRows(list, withClass){
   const mv = movedSet();
   return list.map(r => { const m = mv.get(`${r.k}-${r.n}|${String(r.nm || '').replace(/\s+/g, '')}`);
     return `<button type="button" class="stu${m ? ' gone' : ''}${r.k === st.g + '-' + st.c && String(r.n) === String(st.n) ? ' on' : ''}" data-k="${r.k}" data-n="${r.n}">
-    <span class="num">${withClass ? esc(r.k) + '-' : ''}${r.n}</span><span class="nm">${esc(r.nm)}${m ? `<span class="moved-tag">${esc(m.kind || '학적 변동')}</span>` : ''}</span>${r.cnt ? `<span class="k">${r.cnt}</span>` : ''}</button>`; }).join('');
+    <img class="ph" alt="" loading="lazy"><span class="num">${withClass ? esc(r.k) + '-' : ''}${r.n}</span><span class="nm">${esc(r.nm)}${m ? `<span class="moved-tag">${esc(m.kind || '학적 변동')}</span>` : ''}</span>${r.cnt ? `<span class="k">${r.cnt}</span>` : ''}</button>`; }).join('');
 }
 async function renderStu(){
   const body = $('body');
@@ -1197,6 +1256,8 @@ async function renderStu(){
     const b = e.target.closest('.stu'); if (!b) return;
     openStudent(b.dataset.k, b.dataset.n);
   };
+  fillRosterPhotos();
+  fillRosterPhotos();
   if (st.n) await renderStuOut();
 }
 // 학생 하나 열기 — 명단 단추·이전/다음에서 같이 쓴다
@@ -1255,6 +1316,7 @@ async function renderStuOut(){
     </div>
     <div class="sheet">
     <div class="s-head">
+      <img class="s-photo" id="sPhoto" alt="" hidden>
       <div class="s-name">${esc(d.nm)}</div>
       <div class="s-id">${esc(st.g)}학년 ${esc(st.c)}반 ${esc(st.n)}번 · ${hakbunOf(st.g, st.c, st.n)}</div>
       ${out._all ? '<button type="button" class="btn line" id="copyAll">📋 기재 문안 전체 복사</button>' : ''}
@@ -1268,6 +1330,18 @@ async function renderStuOut(){
     }).join('')}
   </div>`;
   if ($('copyAll')) $('copyAll').onclick = () => copyText(out._all);
+  // 사진 — 작은 것(반 문서)을 먼저, 고화질(워커)이 오면 바꿔 끼운다. 누르면 크게
+  (async () => {
+    const g = parseInt(st.g, 10), c = parseInt(st.c, 10), n = parseInt(st.n, 10);
+    const small = (await classPhotos(`${g}-${c}`))[String(n)];
+    const im = $('sPhoto');
+    if (!small || !im || key !== `${st.g}-${st.c}-${st.n}`) return;
+    im.src = small; im.hidden = false;
+    const cap = `${d.nm} · ${g}학년 ${c}반 ${n}번`;
+    im.onclick = () => openZoom(im.src, cap);
+    const big = await bigPhoto(g, c, n);
+    if (big && $('sPhoto') === im) im.src = big;
+  })();
   $('mBack').onclick = () => {
     mList = true; $('stuPanes').classList.remove('has-detail');
     const on = document.querySelector('#stus .stu.on');
@@ -1429,6 +1503,8 @@ async function render(){
   return renderStu();
 }
 $('views').onclick = e => { const b = e.target.closest('button'); if (!b) return; st.view = b.dataset.view; save(); render(); };
+$('zoom').onclick = () => $('zoom').classList.remove('open');
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('zoom').classList.remove('open'); });
 // 위쪽 찾기 — 학번 다섯 자리면 Enter 로 바로 그 학생, 글자면 이름으로 명단을 거른다(목록만 쓰므로 읽기 없음)
 $('hakbun').addEventListener('keydown', e => {
   if (e.key !== 'Enter' || !META) return;
