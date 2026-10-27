@@ -121,6 +121,11 @@
   #upPanel ul{padding-left:18px;}
   #upPanel .acts-sum{max-height:220px;overflow:auto;margin:6px 0;border-top:1px solid var(--rule);padding-top:6px;}
   #upPanel .row{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap;}
+  #upPanel .sec{margin-top:10px;}
+  #upPanel .sec.miss{border:1px solid var(--warn);border-radius:9px;padding:8px 10px;}
+  #upPanel .miss-row{display:flex;align-items:baseline;gap:8px;padding:2px 0;}
+  #upPanel .miss-row select{font-size:12px;padding:2px 4px;border:1px solid var(--rule);border-radius:6px;
+    background:var(--paper);color:var(--ink);flex-shrink:0;}
 
   .gate{position:fixed;inset:0;background:var(--bg-base);display:none;
     align-items:center;justify-content:center;padding:20px;z-index:50;}
@@ -244,7 +249,7 @@ function sgbBookToSheets(XLSX, wb){
 // sheets: [{ name, hidden, rows: [[칸…]…] }] → 활동·창체 일정·학생별·활동별 자료
 function sgbParseBook(sheets){
   const activities = [], schedules = [], skipped = [];
-  const stu = new Map(), actRows = new Map(), ids = new Set();
+  const actRows = new Map(), ids = new Set();
   for (const sh of sheets){
     const name = String(sh.name || '').trim();
     if (sh.hidden){ skipped.push({ name, why: '숨긴 시트' }); continue; }
@@ -272,7 +277,9 @@ function sgbParseBook(sheets){
         if (v.some(Boolean)) out.push({ v });            // Firestore 는 배열 안 배열을 못 담는다
       }
       const g = +(((name + ' ' + base.title).match(/([1-3])\s*학년/) || [])[1] || 0);
-      schedules.push({ ...base, grade: g, cols: keep.map(j => labels[j]), rows: out });
+      const cols = keep.map(j => labels[j]);
+      schedules.push({ ...base, grade: g, cols, rows: out,
+        hash: sgbHash(JSON.stringify([base.title, base.area, base.path, base.note, cols, out])) + '.' + out.length });
       continue;
     }
 
@@ -304,18 +311,70 @@ function sgbParseBook(sheets){
       rowsOut.push({ g, c, n, nm, ...item });
       const ck = g + '-' + c;
       byClass[ck] = (byClass[ck] || 0) + 1;
-      const key = g + '-' + c + '-' + n;
-      if (!stu.has(key)) stu.set(key, { g, c, n, nm, items: [] });
-      const st = stu.get(key);
-      if (!st.nm && nm) st.nm = nm;
-      st.items.push(item);
     }
     actRows.set(id, rowsOut);
-    activities.push({ ...base, body: bi >= 0 ? labels[bi] : '', self: si >= 0 ? labels[si] : '',
-      extra: xi.map(j => labels[j] || ''), count: rowsOut.length, byClass });
+    const a = { ...base, body: bi >= 0 ? labels[bi] : '', self: si >= 0 ? labels[si] : '',
+      extra: xi.map(j => labels[j] || ''), count: rowsOut.length, byClass };
+    // 다시 올렸을 때 '바뀐 시트' 를 가르는 지문 — 학생 줄과 안내 칸까지
+    a.hash = sgbHash(JSON.stringify([a.title, a.dept, a.area, a.path, a.note, a.tags, a.body, a.self, a.extra, rowsOut])) + '.' + rowsOut.length;
+    activities.push(a);
   }
-  const students = [...stu.values()].sort((a, b) => a.g - b.g || a.c - b.c || a.n - b.n);
-  return { activities, schedules, skipped, students, actRows };
+  return { activities, schedules, skipped, students: sgbStudents(activities, actRows), actRows };
+}
+
+// 활동별 줄 → 학생별 묶음. 활동 순서대로 쌓는다.
+function sgbStudents(activities, actRows){
+  const stu = new Map();
+  for (const a of activities) for (const r of actRows.get(a.id) || []){
+    const key = r.g + '-' + r.c + '-' + r.n;
+    if (!stu.has(key)) stu.set(key, { g: r.g, c: r.c, n: r.n, nm: r.nm || '', items: [] });
+    const st = stu.get(key);
+    if (!st.nm && r.nm) st.nm = r.nm;
+    const it = { a: r.a };
+    if (r.b) it.b = r.b;
+    if (r.s) it.s = r.s;
+    if (r.x) it.x = r.x;
+    st.items.push(it);
+  }
+  return [...stu.values()].sort((a, b) => a.g - b.g || a.c - b.c || a.n - b.n);
+}
+
+// 이번 파일과 이미 올라가 있는 것(saenggibu/meta)을 시트 단위로 맞대 본다.
+// 같은 시트 = 같은 시트 이름(id). 지문이 없는 옛 기록은 '바뀜' 으로 본다.
+function sgbCompare(oldMeta, parsed){
+  const out = { added: [], changed: [], same: [], missing: [], old: oldMeta };
+  const sides = [['act', oldMeta?.activities, parsed.activities], ['sch', oldMeta?.schedules, parsed.schedules]];
+  for (const [kind, olds, curs] of sides){
+    const left = new Map((olds || []).map(o => [o.id, o]));
+    for (const cur of curs || []){
+      const old = left.get(cur.id);
+      left.delete(cur.id);
+      if (!old) out.added.push({ kind, cur });
+      else if (old.hash && old.hash === cur.hash) out.same.push({ kind, cur, old });
+      else out.changed.push({ kind, cur, old });
+    }
+    for (const old of left.values()) out.missing.push({ kind, old });
+  }
+  return out;
+}
+
+// 이번 파일 + 남기기로 한 옛 활동(줄은 saenggibuAct 에서 읽어 온 것)·옛 창체 일정 → 하나로.
+// 순서는 이미 올라가 있던 순서(order: 옛 목록의 id 차례)를 지키고 새 시트는 뒤에 —
+// 그래야 다시 올릴 때 화면 순서가 흔들리지 않고, 안 바뀐 학생 문서를 다시 쓰지 않는다.
+function sgbMerge(parsed, keepActs, keepScheds, order = []){
+  let activities = [...parsed.activities];
+  const actRows = new Map(parsed.actRows);
+  for (const { a, rows } of keepActs){
+    const { parts, ...rest } = a;
+    activities.push(rest);
+    actRows.set(a.id, rows);
+  }
+  const rank = new Map(order.map((id, i) => [id, i]));
+  const byOrder = list => list.map((x, i) => [x, rank.has(x.id) ? rank.get(x.id) : order.length + i])
+    .sort((p, q) => p[1] - q[1]).map(p => p[0]);
+  activities = byOrder(activities);
+  const schedules = byOrder([...parsed.schedules, ...keepScheds]);
+  return { ...parsed, activities, schedules, actRows, students: sgbStudents(activities, actRows) };
 }
 
 // 저장할 문서들. 학생 하나 = 문서 하나(학생별 보기 = 읽기 1번),
@@ -544,7 +603,7 @@ async function renderActOut(a, grades){
       <div class="card-h">${tagHtml(a.tags)}<span class="t">${titleHtml(a)}</span><span class="d">${esc(a.dept)}${roundTxt(a) ? ' · ' + roundTxt(a) : ''}</span></div>
       ${a.area || a.path ? `<div class="where">${esc(a.area)}${a.path ? '<br>' + esc(a.path) : ''}</div>` : ''}
       ${a.note ? `<details><summary>유의 사항</summary><div class="txt">${esc(a.note)}</div></details>` : ''}
-      <div class="where" style="margin:6px 0 0;">시트: ${esc(a.sheet)}</div>
+      <div class="where" style="margin:6px 0 0;">시트: ${esc(a.sheet)}${a.file ? ' · 파일: ' + esc(a.file) : ''}</div>
     </div>
     <div class="bar">
       <select id="selAG" aria-label="학년">${grades.map(g => `<option value="${g}"${g === st.ag ? ' selected' : ''}>${g}학년</option>`).join('')}</select>
@@ -611,6 +670,13 @@ function loadXlsx(){
 }
 let _pending = null;
 $('upBtn').onclick = () => $('upFile').click();
+
+const kindTxt = k => k === 'sch' ? '창체 일정' : '';
+const cntOf = x => x ? (x.count ?? (x.rows || []).length) : 0;
+function upItem(x, extra = ''){
+  return `<div>${tagHtml(x.tags)} ${kindTxt(x.kind) ? `<span class="d">[${kindTxt(x.kind)}]</span> ` : ''}${esc(x.title)}
+    <span style="color:var(--ink-soft)">· ${esc(x.dept)} · ${extra || cntOf(x) + '건'} · ${esc(x.sheet)}</span></div>`;
+}
 $('upFile').onchange = async e => {
   const f = e.target.files[0]; e.target.value = '';
   if (!f) return;
@@ -619,35 +685,76 @@ $('upFile').onchange = async e => {
     const XLSX = await loadXlsx();
     const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
     const parsed = sgbParseBook(sgbBookToSheets(XLSX, wb));
-    const built = sgbBuildDocs(parsed);
-    const metaBytes = new TextEncoder().encode(JSON.stringify(built.meta)).length;
-    _pending = { parsed, built, file: f.name };
-    const bad = metaBytes > 900000;
+    // 어느 파일에서 온 시트인지 남긴다(여러 파일을 더해 가며 올릴 수 있다). 지문에는 안 넣는다.
+    [...parsed.activities, ...parsed.schedules].forEach(a => { a.file = f.name; });
+    // 맞대 볼 기준은 지금 올라가 있는 목록 — 화면이 들고 있는 것 말고 새로 읽는다
+    const oldMeta = (await getDoc(doc(fbDb, 'saenggibu', 'meta'))).data() || null;
+    const cmp = sgbCompare(oldMeta, parsed);
+    const tagKind = (list, side) => list.map(x => ({ ...x[side], kind: x.kind }));
+    _pending = { parsed, cmp, file: f.name };
     p.innerHTML = `<h3>${esc(f.name)}</h3>
       <ul>
-        <li>활동 시트 <b>${parsed.activities.length}</b>개 · 창체 일정 <b>${parsed.schedules.length}</b>개 · 학생 <b>${parsed.students.length}</b>명 · 기재 <b>${parsed.activities.reduce((s, a) => s + a.count, 0).toLocaleString()}</b>건</li>
-        <li>저장할 문서 ${built.docs.size.toLocaleString()}개 (바뀐 것만 씁니다)</li>
-        ${parsed.skipped.length ? `<li>건너뛴 시트: ${parsed.skipped.map(s => `${esc(s.name)} <span style="color:var(--ink-soft)">(${esc(s.why)})</span>`).join(', ')}</li>` : ''}
-        ${bad ? `<li class="err">목록 문서가 너무 큽니다(${Math.round(metaBytes / 1024)}KB). 나눠 저장하도록 고쳐야 합니다.</li>` : ''}
+        <li>이 파일: 활동 시트 <b>${parsed.activities.length}</b>개 · 창체 일정 <b>${parsed.schedules.length}</b>개 · 학생 <b>${parsed.students.length}</b>명 · 기재 <b>${parsed.activities.reduce((n, a) => n + a.count, 0).toLocaleString()}</b>건</li>
+        ${parsed.skipped.length ? `<li>건너뛴 시트: ${parsed.skipped.map(x => `${esc(x.name)} <span style="color:var(--ink-soft)">(${esc(x.why)})</span>`).join(', ')}</li>` : ''}
       </ul>
-      <div class="acts-sum">${parsed.activities.map(a => `<div>${tagHtml(a.tags)} ${esc(a.title)} <span style="color:var(--ink-soft)">· ${esc(a.dept)} · ${a.count}건${a.body ? '' : ' · 기재 칸 없음'}</span></div>`).join('')}</div>
-      <div style="color:var(--ink-soft)">이 파일이 <b>전체 합본</b>이라고 보고 올립니다 — 이 파일에 없는 활동은 지워집니다.</div>
-      <div class="row"><button type="button" class="btn pri" id="upGo"${bad ? ' disabled' : ''}>올리기</button>
+      ${cmp.added.length ? `<div class="sec" id="upAdded"><b>새로 추가 ${cmp.added.length}</b>
+        <div class="acts-sum">${tagKind(cmp.added, 'cur').map(x => upItem(x)).join('')}</div></div>` : ''}
+      ${cmp.changed.length ? `<div class="sec" id="upChanged"><b>내용이 바뀜 ${cmp.changed.length}</b> <span style="color:var(--ink-soft)">— 이 파일 것으로 바꿉니다</span>
+        <div class="acts-sum">${cmp.changed.map(x => upItem({ ...x.cur, kind: x.kind }, `${cntOf(x.old)}건 → ${cntOf(x.cur)}건`)).join('')}</div></div>` : ''}
+      ${cmp.same.length ? `<div class="sec" style="color:var(--ink-soft)">그대로 ${cmp.same.length}</div>` : ''}
+      ${cmp.missing.length ? `<div class="sec miss" id="upMissing"><b>이 파일에 없는 기존 자료 ${cmp.missing.length}</b>
+          <span style="color:var(--ink-soft)">— 하나씩 남길지 지울지 고르세요</span>
+          <div class="row"><button type="button" class="btn" id="missKeepAll">모두 남기기 (더하기)</button>
+            <button type="button" class="btn" id="missDelAll">모두 지우기 (합본으로 바꾸기)</button></div>
+          <div class="acts-sum">${cmp.missing.map(x => `<label class="miss-row">
+              <select data-miss="${x.kind}:${esc(x.old.id)}" aria-label="${esc(x.old.title)} 남길지 지울지">
+                <option value="keep">남기기</option><option value="del">지우기</option></select>
+              ${upItem({ ...x.old, kind: x.kind })}</label>`).join('')}</div>
+        </div>` : ''}
+      ${!cmp.added.length && !cmp.changed.length && !cmp.missing.length ? '<div class="sec">올라가 있는 것과 같습니다 — 바뀌는 것이 없습니다.</div>' : ''}
+      <div class="row"><button type="button" class="btn pri" id="upGo">올리기</button>
         <button type="button" class="btn" id="upCancel">취소</button><span id="upMsg"></span></div>`;
+    const setAll = v => p.querySelectorAll('select[data-miss]').forEach(sel => { sel.value = v; });
+    if ($('missKeepAll')) $('missKeepAll').onclick = () => setAll('keep');
+    if ($('missDelAll')) $('missDelAll').onclick = () => setAll('del');
     $('upCancel').onclick = () => { _pending = null; p.style.display = 'none'; };
     $('upGo').onclick = doUpload;
   } catch (err) {
     p.innerHTML = `<span class="err">읽지 못했습니다: ${esc(err.message || err)}</span> <button type="button" class="btn" onclick="this.parentNode.style.display='none'">닫기</button>`;
   }
 };
-// 바뀐 문서만 쓰고, 이번 파일에 없는 문서는 지운다. 무엇을 썼는지는 saenggibu/manifest 에 지문으로 남긴다.
+
+// 남기기로 한 옛 활동의 줄을 저장된 조각에서 모은다. 하나라도 못 읽으면 멈춘다 —
+// 그대로 올리면 그 활동이 조용히 비어 버린다.
+async function loadAllRows(a){
+  const rows = [];
+  for (const [g, n] of Object.entries(a.parts || {})) for (let k = 0; k < n; k++){
+    const snap = await getDoc(doc(fbDb, 'saenggibuAct', `${a.id}-${g}-${k}`));
+    if (!snap.exists()) throw new Error(`남길 자료(${a.title})의 일부를 못 읽었습니다`);
+    rows.push(...(snap.data().rows || []));
+  }
+  return rows;
+}
+
+// 이 파일 + 남기기로 한 옛 자료를 합쳐 다시 짠 뒤, 바뀐 문서만 쓰고 이제 없는 문서는 지운다.
+// 무엇을 썼는지는 saenggibu/manifest 에 문서마다 지문으로 남긴다.
 async function doUpload(){
   if (!_pending) return;
-  const { built, file } = _pending;
+  const { parsed, cmp, file } = _pending;
   const msg = $('upMsg'), go = $('upGo');
   go.disabled = true;
   try {
-    msg.textContent = '이전 기록 확인 중…';
+    const pick = {};
+    $('upPanel').querySelectorAll('select[data-miss]').forEach(sel => { pick[sel.dataset.miss] = sel.value; });
+    const keep = cmp.missing.filter(x => pick[x.kind + ':' + x.old.id] !== 'del');
+    msg.textContent = keep.some(x => x.kind === 'act') ? '남길 자료 읽는 중…' : '이전 기록 확인 중…';
+    const keepActs = [];
+    for (const x of keep.filter(x => x.kind === 'act')) keepActs.push({ a: x.old, rows: await loadAllRows(x.old) });
+    const order = [...(cmp.old?.activities || []), ...(cmp.old?.schedules || [])].map(a => a.id);
+    const merged = sgbMerge(parsed, keepActs, keep.filter(x => x.kind === 'sch').map(x => x.old), order);
+    const built = sgbBuildDocs(merged);
+    const metaBytes = new TextEncoder().encode(JSON.stringify(built.meta)).length;
+    if (metaBytes > 900000) throw new Error(`목록 문서가 너무 큽니다(${Math.round(metaBytes / 1024)}KB) — 나눠 저장하도록 고쳐야 합니다`);
     const old = (await getDoc(doc(fbDb, 'saenggibu', 'manifest'))).data()?.h || {};
     const now = {};
     const writes = [];
@@ -676,7 +783,9 @@ async function doUpload(){
     await setDoc(doc(fbDb, 'saenggibu', 'meta'), { ...built.meta, file, at: new Date().toISOString(), by: fbAuth.currentUser.email });
     await setDoc(doc(fbDb, 'saenggibu', 'manifest'), { h: now });
     _pending = null;
-    $('upPanel').innerHTML = `✅ 올렸습니다 — 새로 쓰거나 바뀐 문서 ${writes.length}개, 지운 문서 ${dels.length}개.
+    const removed = cmp.missing.length - keep.length;
+    $('upPanel').innerHTML = `✅ 올렸습니다 — 추가 ${cmp.added.length} · 바뀜 ${cmp.changed.length} · 남김 ${keep.length} · 지움 ${removed}
+      <span style="color:var(--ink-soft)">(문서 ${writes.length}개 쓰고 ${dels.length}개 지움)</span>
       <button type="button" class="btn" onclick="this.parentNode.style.display='none'">닫기</button>`;
     await loadMeta();
     render();

@@ -98,7 +98,7 @@ const FILE2 = xlsxFile('sgb-5.xlsx', { dropOfficers: true, robotText: '로봇 �
 // ── 1. 해석 (페이지의 순수 함수 블록을 그대로) ──
 console.log('\n[해석]');
 const code = HTML.match(/<script id="sgbParser">([\s\S]*?)<\/script>/)[1];
-const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo };')();
+const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge };')();
 const wb1 = XLSX.read(fs.readFileSync(FILE1), { type: 'buffer' });
 const parsed = P.sgbParseBook(P.sgbBookToSheets(XLSX, wb1));
 const act = t => parsed.activities.find(a => a.sheet.includes(t));
@@ -149,6 +149,28 @@ const rp = tiny.meta.activities.find(a => a.id === robot.id).parts;
 const rows = [...tiny.docs].filter(([k]) => k.startsWith(`saenggibuAct/${robot.id}-1-`)).flatMap(([, v]) => v.rows);
 check('활동 문서가 크면 조각낸다 — 조각 수가 목록에 남고, 합치면 원래 줄', rp['1'] === 2 && rows.length === 2, rp);
 check('조각 크기 한도는 1MiB 보다 넉넉히 작다', /SGB_PART_BYTES = 600000/.test(code));
+
+// ── 2-1. 다시 올릴 때 맞대 보기 · 합치기 ──
+console.log('\n[맞대 보기 · 합치기]');
+const parsed2 = P.sgbParseBook(P.sgbBookToSheets(XLSX, XLSX.read(fs.readFileSync(FILE2), { type: 'buffer' })));
+const meta1 = P.sgbBuildDocs(parsed).meta;
+const cmp = P.sgbCompare(meta1, parsed2);
+check('같은 시트 이름 = 같은 활동 — 바뀐 것 1(로봇)', cmp.changed.length === 1 && cmp.changed[0].cur.id === robot.id, cmp.changed.map(x => x.cur.sheet));
+check('그대로 5 (활동 4 + 창체 일정 1)', cmp.same.length === 5, cmp.same.map(x => x.cur.sheet));
+check('이 파일에 없는 기존 시트 1(학급 임원), 추가 0', cmp.missing.length === 1 && cmp.missing[0].old.id === officer.id && cmp.added.length === 0);
+check('처음 올릴 때는 전부 추가', P.sgbCompare(null, parsed).added.length === 7);
+const noHash = { ...meta1, activities: meta1.activities.map(({ hash, ...a }) => a) };
+check('지문 없는 옛 기록은 「바뀜」 으로 (같다고 넘기지 않는다)', P.sgbCompare(noHash, parsed2).same.length === 1);
+const oldOfficer = meta1.activities.find(a => a.id === officer.id);
+const merged = P.sgbMerge(parsed2, [{ a: oldOfficer, rows: parsed.actRows.get(officer.id) }], []);
+const m325 = merged.students.find(x => x.g === 3 && x.c === 2 && x.n === 5);
+check('남기면 — 활동 목록에 돌아오고 학생 문서에도 다시 들어간다', merged.activities.some(a => a.id === officer.id) && m325.items.length === 3, m325);
+check('남긴 활동에 옛 조각 수(parts)는 안 따라온다 — 다시 센다', !('parts' in merged.activities.find(a => a.id === officer.id)));
+const ordered = P.sgbMerge(parsed2, [{ a: oldOfficer, rows: parsed.actRows.get(officer.id) }], [], meta1.activities.map(a => a.id));
+check('순서는 처음 올라간 차례대로 — 남긴 시트가 맨 뒤로 밀리지 않는다',
+  ordered.activities.map(a => a.id).join() === meta1.activities.map(a => a.id).join(), ordered.activities.map(a => a.sheet));
+const plusNew = P.sgbMerge(parsed, [], [], meta1.activities.filter(a => a.id !== robot.id).map(a => a.id));
+check('목록에 없던 시트(새 시트)는 뒤에', plusNew.activities.at(-1).id === robot.id);
 
 // ── 3. 화면 ──
 console.log('\n[화면]');
@@ -216,7 +238,7 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   check('올리기 전 미리보기 — 활동 6 · 창체 일정 1 · 학생 수', /활동 시트 6개/.test(panel) && /창체 일정 1개/.test(panel)
     && panel.includes(`학생 ${parsed.students.length}명`), panel.slice(0, 200));
   check('미리보기에 건너뛴 시트와 까닭', panel.includes('학생 개인별 조회') && panel.includes('숨긴 시트'));
-  check('미리보기 — 합본이라 없는 활동은 지워진다고 알린다', panel.includes('지워집니다'));
+  check('처음 올릴 때 — 전부 「새로 추가」, 물어볼 것 없음', panel.includes('새로 추가 7') && !(await p.$('#upMissing')), panel.slice(0, 300));
   await p.click('#upGo');
   await p.waitForFunction(() => document.getElementById('upPanel').textContent.includes('올렸습니다'));
   const fsKeys = await p.evaluate(() => Object.keys(window.__FS__));
@@ -224,6 +246,7 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
     && fsKeys.includes('saenggibuStu/1-1-1') && fsKeys.some(k => k.startsWith('saenggibuAct/')), fsKeys);
   const meta = await p.evaluate(() => window.__FS__['saenggibu/meta']);
   check('목록에 파일 이름·올린 사람·시각', meta.file === path.basename(FILE1) && meta.by === ADMIN && !!meta.at);
+  check('활동마다 어느 파일에서 왔는지', meta.activities.every(a => a.file === path.basename(FILE1)));
 
   // 학생별
   await p.waitForSelector('#stus .stu');
@@ -259,6 +282,7 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   await p.waitForSelector('#actRows .card');
   check('로봇 캠프 — 참여 학생 2명, 반별 수', (await p.$$('#actRows .card')).length === 2 && (await p.textContent('#actOut .counts')).includes('1반 2'));
   check('로봇 캠프 — 유의 사항은 접어서', (await p.textContent('#actOut')).includes('유의 사항'));
+  check('로봇 캠프 — 시트·파일 이름', (await p.textContent('#actOut')).includes('파일: sgb-4.xlsx'));
   const rowTxt = await p.textContent('#actRows');
   check('태그 섞인 문안도 글자 그대로', rowTxt.includes('<b>태그</b>') && await p.evaluate(() => !document.querySelector('#actRows b')));
   await p.fill('#actQ', '없는활동');
@@ -275,24 +299,76 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   await p.context().close();
 }
 
-// 3-2 다시 올리기 — 바뀐 것만 쓰고, 빠진 활동은 지운다
+// 3-2 다시 올리기(로봇 문안이 바뀌고 학급 임원 시트가 빠진 파일) — 빠진 것은 묻고, 기본은 남기기
 {
   const p = await openAs(ADMIN);
   await p.waitForSelector('#upBtn');
-  const before = await p.evaluate(() => Object.keys(window.__FS__).length);
   await p.evaluate(() => { window.__OPS__ = { get: 0, set: 0, del: 0 }; });
   await p.setInputFiles('#upFile', FILE2);
   await p.waitForSelector('#upGo');
+  const panel = await p.textContent('#upPanel');
+  check('미리보기 — 바뀐 시트와 건수(2건 → 2건)', panel.includes('내용이 바뀜 1') && (await p.textContent('#upChanged')).includes('2건 → 2건'), panel.slice(0, 400));
+  check('미리보기 — 그대로 5', panel.includes('그대로 5'));
+  const miss = await p.textContent('#upMissing');
+  check('미리보기 — 이 파일에 없는 기존 시트를 묻는다(학급 임원)', miss.includes('기존 자료 1') && miss.includes('학급 임원'), miss);
+  check('물어보는 칸의 기본값은 「남기기」', await p.$eval('#upMissing select', s => s.value) === 'keep');
   await p.click('#upGo');
   await p.waitForFunction(() => document.getElementById('upPanel').textContent.includes('올렸습니다'));
   const ops = await p.evaluate(() => window.__OPS__);
   const keys = await p.evaluate(() => Object.keys(window.__FS__));
   const msg = await p.textContent('#upPanel');
-  check('바뀐 문서만 쓴다(학생 1-1-1 · 로봇 활동 · 3-2-5 · 목록 둘)', ops.set === 5, ops);
-  check('빠진 활동(학급 임원) 문서는 지운다', ops.del === 1 && !keys.some(k => k.startsWith(`saenggibuAct/${officer.id}`)), [ops, keys.length, before]);
-  check('결과 안내 — 쓴 수·지운 수', /바뀐 문서 3개/.test(msg) && /지운 문서 1개/.test(msg), msg);
+  check('남기면 — 바뀐 문서만 쓴다(로봇 활동 · 학생 1-1-1 · 목록 둘)', ops.set === 4 && ops.del === 0, ops);
+  check('남긴 시트의 활동 문서가 그대로 있다', keys.some(k => k.startsWith(`saenggibuAct/${officer.id}`)));
+  check('결과 안내 — 추가·바뀜·남김·지움', msg.includes('추가 0 · 바뀜 1 · 남김 1 · 지움 0'), msg);
+  const s325 = await p.evaluate(() => window.__FS__['saenggibuStu/3-2-5']);
+  check('남긴 시트의 문안이 학생 문서에 그대로(3-2-5 세 건)', s325.items.length === 3, s325);
+  const meta = await p.evaluate(() => window.__FS__['saenggibu/meta']);
+  check('남긴 활동은 처음 파일 이름, 바뀐 활동은 새 파일 이름', meta.activities.find(a => a.id === officer.id).file === 'sgb-4.xlsx'
+    && meta.activities.find(a => a.id === robot.id).file === 'sgb-5.xlsx');
+  check('바뀐 문안이 화면에 — 로봇', (await p.evaluate(() => window.__FS__['saenggibuStu/1-1-1'].items.map(i => i.b || '').join('|'))).includes('발표함'));
+  await keep(p);
+  await p.context().close();
+}
+
+// 3-2a 남길 자료 일부를 못 읽으면 — 조용히 비우지 않고 멈춘다(아무것도 안 쓴다)
+{
+  const saved = STORE;
+  STORE = Object.fromEntries(Object.entries(saved).filter(([k]) => !k.startsWith(`saenggibuAct/${officer.id}`)));
+  const p = await openAs(ADMIN);
+  await p.waitForSelector('#upBtn');
+  await p.evaluate(() => { window.__OPS__ = { get: 0, set: 0, del: 0 }; });
+  await p.setInputFiles('#upFile', FILE2);
+  await p.waitForSelector('#upGo');
+  await p.click('#upGo');
+  await p.waitForFunction(() => /실패|올렸습니다/.test(document.getElementById('upPanel').textContent));
+  const ops = await p.evaluate(() => window.__OPS__);
+  check('남길 자료를 못 읽으면 실패로 멈추고 아무것도 안 쓴다', ops.set === 0 && ops.del === 0
+    && (await p.textContent('#upPanel')).includes('못 읽었습니다'), ops);
+  check('실패하면 다시 누를 수 있다', !!(await p.$('#upGo')) && await p.isEnabled('#upGo'));
+  await p.context().close();
+  STORE = saved;
+}
+
+// 3-2b 같은 파일을 한 번 더 — 이번엔 「모두 지우기」(합본으로 바꾸기)
+{
+  const p = await openAs(ADMIN);
+  await p.waitForSelector('#upBtn');
+  await p.evaluate(() => { window.__OPS__ = { get: 0, set: 0, del: 0 }; });
+  await p.setInputFiles('#upFile', FILE2);
+  await p.waitForSelector('#missDelAll');
+  check('같은 파일이면 바뀐 것 없음 — 남겨 둔 시트만 다시 묻는다', !(await p.$('#upChanged')) && (await p.textContent('#upPanel')).includes('그대로 6'));
+  await p.click('#missDelAll');
+  check('「모두 지우기」 를 누르면 칸이 전부 「지우기」', await p.$$eval('#upMissing select', ss => ss.every(s => s.value === 'del')));
+  await p.click('#upGo');
+  await p.waitForFunction(() => document.getElementById('upPanel').textContent.includes('올렸습니다'));
+  const ops = await p.evaluate(() => window.__OPS__);
+  const keys = await p.evaluate(() => Object.keys(window.__FS__));
+  check('지우면 — 그 활동 문서를 지우고 3-2-5 · 목록 둘만 쓴다', ops.del === 1 && ops.set === 3
+    && !keys.some(k => k.startsWith(`saenggibuAct/${officer.id}`)), ops);
+  check('결과 안내 — 지움 1', (await p.textContent('#upPanel')).includes('남김 0 · 지움 1'));
   const s325 = await p.evaluate(() => window.__FS__['saenggibuStu/3-2-5']);
   check('3-2-5 학생 문서에서도 그 활동이 빠졌다', s325.items.length === 2, s325);
+  check('오류 없음(다시 올리기)', p.errors.length === 0, p.errors);
   await keep(p);
   await p.context().close();
 }
