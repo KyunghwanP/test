@@ -42,7 +42,7 @@ for (const [gi, [grade, total]] of GRADES.entries()) {
   for (let i = 0; i < total % ROOMS; i++) per[i]++;
   const s = SUBJ[grade];
   // 주소 ‖ 이번학년 과목… | 단위수 | (빈 열) | 직전학년 과목… | 비고
-  const head = [...HEAD, ...s.now, '단위수', '', ...s.prev, '비고'];
+  const head = [...HEAD, ...s.now, '단위수', '', ...s.prev, '비고', '학적사항'];
   const aoa  = [['2026학년도 편성표'], [], head];
 
   for (let room = 1; room <= ROOMS; room++) {
@@ -68,7 +68,13 @@ for (const [gi, [grade, total]] of GRADES.entries()) {
                 ...mark(s.now, 0), '', '', ...mark(s.prev, 1), sci ? '과학중점' : '']);
     }
   }
-  for (let i = 0; i < DROP[gi]; i++) aoa.push(['', '', '', `전출${grade}_${i}`]);
+  // 떠난 학생은 표 맨 아래, 반·번호 없이. 학적사항 칸에 구분·날짜(셋째마다 비움 — 칸이 빈 경우도 있다)
+  const MOVE = ['전출(2026.05.10.)', '자퇴 2026-06-01 사유 생략', ''];
+  for (let i = 0; i < DROP[gi]; i++){
+    const row = ['', '', '', `전출${grade}_${i}`];
+    row[head.length - 1] = MOVE[i % 3];
+    aoa.push(row);
+  }
 
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), `${grade}학년`);
 }

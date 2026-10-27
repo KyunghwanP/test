@@ -1745,6 +1745,16 @@ function psFindCols(headerRow) {
   return { at };
 }
 
+// 학적사항 칸('자퇴(2026.05.10.)', '전출 2026-06-01 ○○고' …) → 구분과 날짜만.
+// 사유 글은 옮기지 않는다 — students/changed 는 교사 전체가 읽는다(생기부 보조자료가 맞대 본다).
+const PS_MOVE_KINDS = /(전출|자퇴|퇴학|제적|전학|유학|유예|면제|휴학|사망|정원외)/;
+function psMoveOf(v) {
+  const t = String(v ?? '').trim();
+  const k = t.match(PS_MOVE_KINDS);
+  const d = t.match(/(\d{4})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})/);
+  return { kind: k ? k[1] : '', date: d ? `${d[1]}.${d[2].padStart(2, '0')}.${d[3].padStart(2, '0')}.` : '' };
+}
+
 // 시트 하나 → { rows, dropped, error }
 function psParseSheet(ws, sheetName) {
   const grade = parseInt(String(sheetName).replace(/[^0-9]/g, ''), 10);
@@ -1755,6 +1765,8 @@ function psParseSheet(ws, sheetName) {
   const found = psFindCols(raw[hi]);
   if (found.error) return { error: `${sheetName}: ${found.error}` };
   const at = found.at;
+  // 학적사항 칸은 없어도 된다(있으면 떠난 학생의 구분·날짜를 읽는다)
+  const moveAt = raw[hi].findIndex(h => String(h || '').replace(/\s/g, '').startsWith('학적'));
 
   const rows = [], dropped = [];
   for (let i = hi + 1; i < raw.length; i++) {
@@ -1763,8 +1775,9 @@ function psParseSheet(ws, sheetName) {
     if (!name) continue;
     const room = String(r[at.room] ?? '').trim();
     const num  = String(r[at.num]  ?? '').trim();
-    // 반·번호가 없으면 전출·자퇴다. 명렬에 넣지 않는다.
-    if (!/^\d+$/.test(room) || !/^\d+$/.test(num)) { dropped.push({ grade, name }); continue; }
+    // 반·번호가 없으면 전출·자퇴다(그 줄은 표 맨 아래로 옮겨져 있다). 명렬에 넣지 않고,
+    // 학년·이름·구분·날짜만 따로 남긴다 — 생기부 보조자료에 그 학생의 옛 학번 기록이 남아 있다.
+    if (!/^\d+$/.test(room) || !/^\d+$/.test(num)) { dropped.push({ grade, name, ...psMoveOf(moveAt >= 0 ? r[moveAt] : '') }); continue; }
     rows.push({
       grade: String(grade), room: String(parseInt(room, 10)), num: String(parseInt(num, 10)),
       name,
@@ -2027,6 +2040,8 @@ function psRender() {
     + list('자리 주인이 바뀜', d.tookOver, x => `${psEsc(x.key)} ${psEsc(x.from)}→${psEsc(x.to)}`, 'err')
     + list('반·번호가 바뀜', d.reseated, x => `${psEsc(x.name)} ${psEsc(x.from)}→${psEsc(x.to)}`, 'warn')
     + list('이름이 바뀜', d.renamed, x => `${psEsc(x.key)} ${psEsc(x.from)}→${psEsc(x.to)}`, 'warn')
+    + list('학적 변동(반·번호 없음) — 학년·이름·구분·날짜만 students/changed 에 따로', psParsed.dropped,
+        x => `${psEsc(x.grade)}학년 ${psEsc(x.name)}${x.kind ? ' ' + psEsc(x.kind) : ''}${x.date ? ' ' + psEsc(x.date) : ''}`, 'info')
     + list('새로 들어옴', d.added, x => `${psEsc(x.grade)}-${psEsc(x.room)}-${psEsc(x.num)} ${psEsc(x.name)}`, 'info')
     + list('빠짐', d.removed, x => `${psEsc(x.grade)}-${psEsc(x.room)}-${psEsc(x.num)} ${psEsc(x.name)}`, 'info')
     + ((d.tookOver.length || d.reseated.length || d.renamed.length)
@@ -2132,8 +2147,11 @@ document.getElementById('psSaveBtn').addEventListener('click', async () => {
       const merged = psMerge(psRows, psPrevFull());
       await saveSplit('students', 'students', 'studentsContact', merged,
                       STU_CONTACT_FIELDS, ['grade', 'room', 'num']);
+      // 떠난 학생 — 생기부 보조자료가 '명렬에 없는 학번' 을 학적 변동으로 가를 때 쓴다
+      const changed = psParsed.dropped.map(x => ({ grade: String(x.grade), name: x.name, kind: x.kind || '', date: x.date || '' }));
+      await setDoc(doc(db, 'students', 'changed'), { students: changed, at: new Date().toISOString() });
       loadDbStudents();
-      return `${merged.length}명 저장`;
+      return `${merged.length}명 저장 · 학적 변동 ${changed.length}명 따로`;
     },
     electives: () => elSaveParsed(psEl, (i, n) =>
       psProgress(done, `선택과목 ${i}/${n}반`)),

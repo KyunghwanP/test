@@ -231,6 +231,15 @@ check('명렬과 맞대 보기 — 이름 다름 1(1-1-2), 명렬에 없는 학�
 check('그 이름이 명렬에서 실제로 어디 있는지 알려 준다(이보람 → 2-1-2)', mis.find(m => m.g === 2).hint === '2-1-2');
 check('띄어쓰기·앞에 0 붙은 반·번호는 같은 것으로(박 나래, 01)', !mis.some(m => m.g === 3 || (m.g === 1 && m.n === 1)));
 const selfOnly = P.sgbMismatches([{ id: 'q', sheet: 'S' }], new Map([['q', [{ g: 1, c: 1, n: 1, nm: '가' }, { g: 1, c: 1, n: 1, nm: '가' }, { g: 1, c: 1, n: 1, nm: '나' }]]]), []);
+const ROSTER2 = ROSTER.filter(x => x.name !== '이보람');                    // 이보람이 떠났다
+const GONE = [{ grade: '2', name: '이보람', kind: '전출', date: '2026.05.10.' }];
+const mv = P.sgbMismatches(parsed.activities, parsed.actRows, ROSTER2, GONE);
+check('학적 변동 — 명렬에 없는 학번인데 떠난 학생 목록에 있으면 오류가 아니라 「학적 변동」(구분·날짜)',
+  mv.filter(m => !m.moved).length === 1 && mv.some(m => m.moved && m.nm === '이보람' && m.kind === '전출' && m.date === '2026.05.10.'), mv);
+check('같은 학년에 그 이름이 아직 있으면 학적 변동으로 넘기지 않는다(동명이인일 수 있다)',
+  !P.sgbMismatches(parsed.activities, parsed.actRows, ROSTER, GONE).some(m => m.moved));
+const reuse = [...ROSTER2, { grade: 2, room: 1, num: 1, name: '새학생' }];      // 떠난 자리에 다른 학생이 들어옴
+check('떠난 학생 번호를 다른 학생이 받았어도 학적 변동', P.sgbMismatches(parsed.activities, parsed.actRows, reuse, GONE).some(m => m.moved && m.nm === '이보람'));
 check('명렬이 없으면 시트끼리 — 같은 학번에 적은 쪽 이름을 짚는다', selfOnly.length === 1 && selfOnly[0].nm === '나' && selfOnly[0].why === '시트마다 이름이 다름', selfOnly);
 
 // ── 2-2. 원본 양식 뜨기 ──
@@ -624,6 +633,34 @@ STORE = { 'students/main': { students: ROSTER } };
   check('로그인 전에는 로그인 화면', await q.isVisible('#loginBtn'));
   await q.context().close();
 }
+// 3-4b 학적 변동 — 떠난 학생 목록(students/changed)이 있을 때
+{
+  const saved = STORE;
+  STORE = { 'students/main': { students: ROSTER2 }, 'students/changed': { students: GONE } };
+  const p = await openAs(ADMIN);
+  await p.waitForSelector('#upBtn');
+  await p.setInputFiles('#upFile', FILE1);
+  await p.waitForSelector('#upGo');
+  check('미리보기 — 확인 필요 1건, 학적 변동 기록은 따로(확인할 필요 없음)', (await p.textContent('#upMis')).includes('확인 1건')
+    && (await p.textContent('#upMoved')).includes('학적 변동'));
+  await p.click('#upGo');
+  await p.waitForFunction(() => document.getElementById('upPanel').textContent.includes('올렸습니다'));
+  check('「⚠ 확인 필요」 는 학적 변동을 빼고 1', (await p.textContent('#chkTab')).includes('1'));
+  await p.click('#chkTab');
+  await p.waitForSelector('table.chk');
+  check('확인 필요 화면 아래에 학적 변동 학생(학번·이름·구분·날짜)을 회색으로', (await p.textContent('.moved-list')).includes('2-1-1 이보람 · 전출 2026.05.10.')
+    && (await p.$$('table.chk tbody tr')).length === 1);
+  await p.click('#views button[data-view="stu"]');
+  await p.waitForSelector('#stus .stu');
+  await p.click('.cls-pc .cl-grade[data-g="2"]').catch(() => {});
+  await p.click('.cls-pc .cl-item[data-k="2-1"]');
+  await p.waitForFunction(() => document.querySelector('.roster-head').textContent.includes('2학년 1반'));
+  check('명단에 「전출」 꼬리표', (await p.textContent('#stus .stu.gone')).includes('전출'));
+  check('오류 없음(학적 변동)', p.errors.length === 0, p.errors);
+  await p.context().close();
+  STORE = saved;
+}
+
 // 3-5 서식 도구를 못 받았을 때 — 올리기는 되고, 받을 때 단순한 틀
 {
   STORE = {};

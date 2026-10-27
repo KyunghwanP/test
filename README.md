@@ -39,6 +39,7 @@
 | `appdata/operating` | 수업시수 운영표(요일 대체·창체·시험) | `upload.html` |
 | `contacts/main` | 교원 연락망 | `upload.html` |
 | `students/main` | 학생 명렬 | `upload.html` |
+| `students/changed` | 편성표에서 반·번호가 빈 학생(전출·자퇴 등) — 학년·이름·구분·날짜만 | `upload.html`(편성표) |
 | `electives/{학년-반}` | 학생 선택과목 | `upload.html` |
 | `gradesMock` `gradesSusi` `gradesIpgyeol` | 성적·입결 | Actions(서비스계정) |
 | `acl/*` | 권한 관련 (아래 참조) | Actions + 관리자 |

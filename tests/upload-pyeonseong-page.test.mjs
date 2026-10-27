@@ -126,7 +126,10 @@ console.log('\n■ 세 항목이 순서대로 저장된다');
   const el  = writes.filter(w => w[1] === 'electives');
   const sh  = writes.filter(w => w[1] === 'docsSheets');
   const stu = writes.filter(w => w[1] === 'students' || w[1] === 'studentsContact');
-  check('명렬을 썼다',       stu.length === 2, stu.map(w => w[1]));
+  check('명렬을 썼다(+ 떠난 학생 students/changed)', stu.length === 3 && stu.some(w => w[1] === 'students' && w[2] === 'changed'), stu.map(w => w[1] + '/' + w[2]));
+  const chg = (stu.find(w => w[2] === 'changed') || [])[3];
+  check('떠난 학생 55명 — 학년·이름·구분·날짜만(생년월일·연락처 없음)', chg && chg.students.length === 55
+    && Object.keys(chg.students[0]).sort().join() === 'date,grade,kind,name' && chg.students[0].kind === '전출', chg && chg.students.slice(0, 2));
   check('선택과목을 썼다',   el.length === 34, el.length);          // index + 반 33개
   check('선택과목 index 가 먼저', el[0] && el[0][2] === 'index', el[0]);
   check('원본 파일을 썼다',  sh.length >= 2, sh.map(w => w[2]));    // 청크 + 메타

@@ -49,7 +49,7 @@ const XLSX = createRequire(path.join(here, '..', 'package.json'))('xlsx');
 globalThis.XLSX = XLSX;
 const up = await import('data:text/javascript,' + encodeURIComponent([
   constOf(html,'PS_SHEETS'), constOf(html,'PS_COLS'),
-  grab(html,'psBirth'), grab(html,'psPhone'), grab(html,'psFindCols'),
+  grab(html,'psBirth'), grab(html,'psPhone'), grab(html,'psFindCols'), constOf(html,'PS_MOVE_KINDS'), grab(html,'psMoveOf'),
   grab(html,'psParseSheet'), grab(html,'psParseBook'),
   constOf(html,'PS_FIELDS'), constOf(html,'PS_KEEP_IF_BLANK'), constOf(html,'psKey'),
   grab(html,'psMerge'), grab(html,'splitRoster'),
