@@ -248,8 +248,11 @@ GAS 의 `triggerWeeklySummary` 가 그 길이고, 앱의 '새로 받기' 가 그
 
 ### 한 번만 해 두면 되는 것 (아직 안 한 것)
 
-- [ ] **Firestore TTL 정책** — 컬렉션 `accessLogs`, 필드 `expireAt`.
-      안 만들어도 돌지만 연락처 조회 기록이 계속 쌓인다
+- [ ] **`accessLogs` 를 손으로 지우는 시점 정하기** — 연락처 조회 기록이 계속 쌓인다.
+      TTL 은 무료 요금제에서 켤 수 없다([`BACKLOG.md`](BACKLOG.md) '`accessLogs` 정리')
+- [ ] **상벌점 전송 암호 새로 만들기** — 학교 PC 를 바꿀 때 같이. `-Setup -NewKey` 후
+      Cloudflare `riro-ingest` 의 `RIRO_KEY` 를 바꾼다
+      ([`riro/README.md`](https://github.com/KyunghwanP/test/blob/main/riro/README.md) 「PC 를 바꿀 때」)
 - [ ] **`adiga-pdf-proxy` 에 도메인 제한** — 아무 주소나 중계하는 **열린 프록시**다.
       남이 발견하면 무료 한도를 갉아먹는다
 - [ ] **자리 비울 때 어떻게 할지 정하기** — 0장. 정하지 않는 것도 답이지만,
