@@ -627,6 +627,8 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
   check('다른 교사 — 자료는 보이고 올리기 단추는 없다', !(await p.isVisible('#upBtn')));
   check('폰 폭에서 가로로 넘치지 않는다', await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
   // 폰 — 학년 탭 → 반 격자 → 학생 큰 단추 → 상세만, ◀ ▶ 로 넘기고 ← 로 돌아오기
+  check('폰: 명단은 한 줄에 한 명(번호 차례대로 위에서 아래로)', await p.evaluate(() => { const b = [...document.querySelectorAll('#stus .stu')];
+    return b.length > 1 && b.every((x, i) => i === 0 || x.getBoundingClientRect().top > b[i - 1].getBoundingClientRect().top); }));
   check('폰: 반은 학년 탭 + 격자(PC 목록은 숨김)', await p.isVisible('.cls-m .g-tab') && !(await p.isVisible('.cls-pc')) && !(await p.isVisible('#stuOut')));
   await p.click('.cls-m .g-tab[data-g="3"]');
   await p.waitForFunction(() => document.querySelector('.roster-head').textContent.includes('3학년 2반'));
