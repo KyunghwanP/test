@@ -12,6 +12,9 @@
 
 > `overtime-api.js` 는 **만든 파일**입니다. 원본은 `overtime-api.src.js` 와 `gas/overtime/Code.gs`
 > (처리 규칙)이고 `node workers/build-overtime.mjs` 로 만듭니다. 설치 순서는 `gas/overtime/README.md`.
+>
+> `overtime-api` · `riro-ingest` 의 원본과 검사는 **test 저장소에만** 있습니다
+> (루트 `README.md` 6장 「두 저장소 동기화」 ②). ynhs 에서 이 두 파일이 안 보이는 게 정상입니다.
 
 ### 왜 나눴나
 
