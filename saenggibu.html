@@ -202,8 +202,10 @@
   table.sch th{background:var(--paper-soft);text-align:center;color:var(--ink-soft);font-size:13.5px;font-weight:800;
     border-bottom:1px solid var(--rule);padding:9px 10px;white-space:nowrap;position:sticky;top:0;}
   table.sch td{padding:7px 10px;border-bottom:1px solid var(--rule);vertical-align:top;text-align:center;font-variant-numeric:tabular-nums;}
-  table.sch td.long{text-align:left;min-width:200px;}
+  table.sch td.long,table.sch th.long{text-align:left;}
+  table.sch td.long{min-width:120px;}
   table.sch tr.sum td{background:var(--paper-soft);font-weight:800;}
+  .sch-sum{font-size:14px;font-weight:800;color:var(--ink-soft);}
 
   /* ── 올리기 (관리자) ── */
   .up{background:var(--paper);border:1px solid var(--mon);border-radius:12px;padding:14px 16px;font-size:14.5px;line-height:1.7;}
@@ -487,6 +489,32 @@ function sgbVolunteerRows(items, actOf){
   let sum = 0;
   for (const r of out){ const h = parseFloat(r.hours); if (!isNaN(h)) sum += h; r.total = Math.round(sum * 10) / 10; }
   return out;
+}
+
+// ── 창체 일정 거르기 — 자율(자율·자치) · 진로 · 동아리 ──
+// 줄마다 '활동 영역' 칸으로 가르고, 그 칸이 비면 자율·동아리·진로 시간 칸에 값이 있는지로 가른다.
+// 소계·누계 줄은 어느 영역도 아니다.
+const SGB_SCH_KINDS = [['ja', '자율·자치', '자율'], ['jin', '진로', '진로'], ['club', '동아리', '동아리']];
+function sgbSchKind(cols, v){
+  const at = name => (cols || []).findIndex(c => sgbNorm(c) === name);
+  const first = (v || [])[0] || '';
+  if (/계/.test(first)) return '';
+  const area = sgbNorm((v || [])[at('활동영역')] || '');
+  for (const [k, , word] of SGB_SCH_KINDS) if (area.includes(word)) return k;
+  for (const [k, , word] of SGB_SCH_KINDS){ const j = at(word); if (j >= 0 && String((v || [])[j] || '').trim()) return k; }
+  return '';
+}
+// 활동 내용이 빈 줄(소계·누계·빈 칸)은 화면에서 없는 줄로 본다. 엑셀로 받을 때는 원본 그대로.
+function sgbSchFilter(sc, kind){
+  const ci = (sc.cols || []).findIndex(c => sgbNorm(c) === '활동내용');
+  // 소계·누계 줄도 활동이 아니다(활동 내용 칸에 메모가 적힌 소계 줄이 있다)
+  const rows = (sc.rows || []).filter(r => !/소계|누계|합계/.test((r.v || [])[0] || '')
+    && (ci >= 0 ? String((r.v || [])[ci] || '').trim() : (r.v || []).some(Boolean)));
+  if (!kind) return { rows, hours: null };
+  const hi = (sc.cols || []).findIndex(c => sgbNorm(c) === '이수시간');
+  const out = rows.filter(r => sgbSchKind(sc.cols, r.v) === kind);
+  const hours = out.reduce((s, r) => s + (parseFloat((r.v || [])[hi]) || 0), 0);
+  return { rows: out, hours: hi >= 0 ? hours : null };
 }
 
 // 활동별 줄 → 학생별 묶음. 활동 순서대로 쌓는다.
@@ -869,7 +897,7 @@ const esc = v => v == null ? '' : String(v)
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
   .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const LS = 'ynhs-sgb';
-let st = { view: 'stu', g: '', c: '', n: '', act: '', ag: '', ac: '', q: '', sg: '', find: '' };
+let st = { view: 'stu', g: '', c: '', n: '', act: '', ag: '', ac: '', q: '', sg: '', sf: '', find: '' };
 try { Object.assign(st, JSON.parse(localStorage.getItem(LS) || '{}')); } catch (e) {}
 st.find = '';                       // 이름 찾기는 다시 열면 비운다
 const save = () => { try { localStorage.setItem(LS, JSON.stringify(st)); } catch (e) {} };
@@ -1157,18 +1185,28 @@ function renderSch(){
   if (!list.some(s => s.id === st.sg)) st.sg = list[0].id;
   save();
   const s = list.find(x => x.id === st.sg);
-  const rows = (s.rows || []).filter(r => (r.v || []).some(Boolean));
+  if (!['', ...SGB_SCH_KINDS.map(k => k[0])].includes(st.sf || '')) st.sf = '';
+  const { rows, hours } = sgbSchFilter(s, st.sf || '');
+  const cnt = k => sgbSchFilter(s, k).rows.length;
+  // 글 칸(활동 영역·활동 내용)은 길이가 제각각이라 늘 왼쪽 정렬 — 위아래로 훑어 읽기 쉽게. 숫자·날짜 칸은 가운데
+  const textCols = new Set((s.cols || []).map((c, j) => /활동(영역|내용)/.test(sgbNorm(c)) ? j : -1).filter(j => j >= 0));
   body.innerHTML = `<div class="sch-wrap">
-    <div class="seg" id="schTabs">${list.map(x => `<button type="button" data-id="${x.id}" class="${x.id === st.sg ? 'on' : ''}">${x.grade ? x.grade + '학년' : esc(x.title)}</button>`).join('')}</div>
+    <div class="bar" style="margin-top:0;">
+      <div class="seg" id="schTabs">${list.map(x => `<button type="button" data-id="${x.id}" class="${x.id === st.sg ? 'on' : ''}">${x.grade ? x.grade + '학년' : esc(x.title)}</button>`).join('')}</div>
+      <div class="counts" id="schKinds" style="margin:0;">${[['', '전체']].concat(SGB_SCH_KINDS.map(k => [k[0], k[1]])).map(([k, label]) =>
+        `<button type="button" class="chip${(st.sf || '') === k ? ' on' : ''}" data-k="${k}">${label}${k ? ` <b>${cnt(k)}</b>` : ''}</button>`).join('')}</div>
+      ${st.sf ? `<span class="sch-sum">${rows.length}건${hours != null ? ` · 이수 ${Math.round(hours * 10) / 10}시간` : ''}</span>` : ''}
+    </div>
     <div class="sheet" style="margin-top:14px;">
       <div class="card-h">${tagHtml(s.tags)}<span class="t" style="font-size:20px;">${esc(s.title)}</span><span class="d">${esc(s.dept)}</span></div>
       ${s.area ? `<div class="where">${esc(s.area)}</div>` : ''}
       ${s.path ? `<details><summary>입력 경로·안내 보기</summary><div class="txt">${esc(s.path)}</div></details>` : ''}
       ${s.note ? `<details><summary>유의 사항 보기</summary><div class="txt">${esc(s.note)}</div></details>` : ''}
-      <div class="tblwrap"><table class="sch"><thead><tr>${(s.cols || []).map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
-        <tbody>${rows.map(r => `<tr${/계/.test((r.v || [])[0] || '') ? ' class="sum"' : ''}>${(r.v || []).map(v => `<td${v.length > 14 ? ' class="long"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+      <div class="tblwrap"><table class="sch"><thead><tr>${(s.cols || []).map((c, j) => `<th${textCols.has(j) ? ' class="long"' : ''}>${esc(c)}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map(r => `<tr>${(r.v || []).map((v, j) => `<td${textCols.has(j) ? ' class="long"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
     </div></div>`;
   $('schTabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; st.sg = b.dataset.id; renderSch(); };
+  $('schKinds').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; st.sf = b.dataset.k; renderSch(); };
 }
 
 async function render(){

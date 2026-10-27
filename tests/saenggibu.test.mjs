@@ -37,6 +37,10 @@ function sheets({ dropOfficers = false, robotText = '로봇 코딩 캠프에 참
       [3, 9, '월', 1, 1, 1, null, null, null, '자율·자치활동', '도서관 활용교육'],
       [],
       [3, 11, '수', 7, 1, null, 1, null, null, '동아리활동', '동아리 편성'],
+      [3, 13, '금', 5, 1, null, null, null, 1, null, '진로 롤모델 조사'],   // 활동 영역 칸이 비어도 진로 시간 칸으로
+      ['3월 소계', null, null, null, 3, 1, 1, 0, 1, null, null],            // 활동 내용 없음 — 화면에선 없는 줄
+      ['1학기 진로 소계', null, null, null, 16, 0, 0, 0, 16, null, '이수시간은 학급별로 상이'],   // 내용 칸에 메모가 있어도 소계는 없는 줄
+      [3, 20, '금', 6, 1, 1, null, null, null, '자율·자치활동', null],       // 활동 내용 없음
     ]],
     ['<누>창의(봉사)', [
       ['창의교육부', null, null, '⊙ 활  동  명:', null, '교과학습도우미'],
@@ -150,7 +154,7 @@ const vol = act('봉사');
 check('봉사 — 기재 칸이 없으면 나머지 칸을 정보로', vol.body === '' && vol.extra.join() === '시작일자,요일,시간,봉사활동내용', vol);
 check('머리 이름이 빈 칸이라도 요일 글자뿐이면 「요일」 로 읽는다', vol.extra[1] === '요일');
 const sch = parsed.schedules[0];
-check('창체 일정 — 1학년, 11칸, 중간 빈 줄은 자리 그대로(내려받을 때 원본 줄 자리)', sch.grade === 1 && sch.cols.length === 11 && sch.rows.length === 3
+check('창체 일정 — 1학년, 11칸, 중간 빈 줄은 자리 그대로(내려받을 때 원본 줄 자리)', sch.grade === 1 && sch.cols.length === 11 && sch.rows.length === 7
   && !sch.rows[1].v.some(Boolean)
   && sch.rows[0]?.v?.[10] === '도서관 활용교육', sch);
 const s111 = parsed.students.find(s => s.g === 1 && s.c === 1 && s.n === 1);
@@ -364,6 +368,7 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   check('수학 — 학년반번호 칸에 10101', out.getWorksheet(math.sheet).getCell('A4').value === '10101');
   check('이름 없는 숨긴 학번 칸도 채운다(로봇 A6 = 10101)', rw.getCell('A6').value === '10101');
   check('창체 일정 시트 — 표 그대로', out.getWorksheet(sch.sheet).getCell('K4').value === '도서관 활용교육');
+  check('창체 일정 엑셀은 원본 그대로(소계 줄도)', out.getWorksheet(sch.sheet).getCell('A8').value === '3월 소계');
 
   // 학생별
   await p.waitForSelector('#stus .stu');
@@ -446,7 +451,20 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   // 창체 일정
   await p.click('#views button[data-view="sch"]');
   await p.waitForSelector('table tbody tr');
-  check('창체 일정 — 표 2줄', (await p.$$('table tbody tr')).length === 2 && (await p.textContent('table')).includes('도서관 활용교육'));
+  check('창체 일정 — 활동 내용이 있는 줄만(소계·내용 없는 줄은 없는 줄로) 3줄', (await p.$$('table tbody tr')).length === 3
+    && (await p.textContent('table')).includes('도서관 활용교육') && !(await p.textContent('table')).includes('소계'));
+  check('창체 일정 — 거르기 칩: 전체 · 자율·자치 1 · 진로 1 · 동아리 1', (await p.$$eval('#schKinds .chip', cs => cs.map(c => c.textContent.replace(/\s+/g, '')))).join() === '전체,자율·자치1,진로1,동아리1');
+  await p.click('#schKinds .chip[data-k="jin"]');
+  await p.waitForFunction(() => document.querySelectorAll('table tbody tr').length === 1);
+  check('진로만 — 활동 영역이 비어도 진로 시간 칸으로 가른다, 건수·이수시간', (await p.textContent('table tbody')).includes('진로 롤모델 조사')
+    && (await p.textContent('.sch-sum')).includes('1건') && (await p.textContent('.sch-sum')).includes('이수 1시간'));
+  await p.click('#schKinds .chip[data-k="club"]');
+  await p.waitForFunction(() => document.querySelector('table tbody').textContent.includes('동아리 편성'));
+  check('동아리만', (await p.$$('table tbody tr')).length === 1);
+  check('활동 내용·활동 영역 칸은 짧아도 왼쪽 정렬, 숫자 칸은 가운데', await p.$eval('table tbody tr td:nth-child(11)', td => getComputedStyle(td).textAlign) === 'left'
+    && await p.$eval('table tbody tr td:nth-child(10)', td => getComputedStyle(td).textAlign) === 'left'
+    && await p.$eval('table tbody tr td:nth-child(4)', td => getComputedStyle(td).textAlign) === 'center');
+  await p.click('#schKinds .chip[data-k=""]');
   check('오류 없음', p.errors.length === 0, p.errors);
   await keep(p);
   await p.context().close();
