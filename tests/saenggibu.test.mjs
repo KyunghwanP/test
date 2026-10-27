@@ -41,9 +41,10 @@ function sheets({ dropOfficers = false, robotText = '로봇 코딩 캠프에 참
     ['<누>창의(봉사)', [
       ['창의교육부', null, null, '⊙ 활  동  명:', null, '교과학습도우미'],
       [null, null, null, '⊙ 입력 영역:', null, '봉사활동 누가기록'],
-      ['연번', '학년', '반', '번호', '성명', '시작일자', '시간', '봉사활동내용'],
-      [1, 3, 2, 5, '박나래', '2026.03.09.', 12, '교과학습도우미'],   // 원본처럼 3학년이 먼저 — 내려받아도 이 차례
-      [2, 1, 1, 1, '김가람', '2026.04.10.', 4, '헌혈'],
+      // 원본 프로젝트 봉사처럼: 머리 이름 없는 요일 칸, 한 칸에 회차가 줄바꿈으로 여러 개
+      ['연번', '학년', '반', '번호', '성명', '시작일자', null, '시간', '봉사활동내용'],
+      [1, 3, 2, 5, '박나래', '2026.03.09.\n2026.03.16.', '월\n월', '6\n6', '교과학습도우미'],   // 원본처럼 3학년이 먼저 — 내려받아도 이 차례
+      [2, 1, 1, 1, '김가람', '2026.04.10.', '금', 4, '헌혈'],
     ]],
     ['<자or진>과중(로봇공학)-2차', [
       [null, '과학중점부', null, null, '⊙ 활  동  명:', null, '진로탐색 로봇공학 캠프'],
@@ -146,7 +147,8 @@ const flex = act('수업량');
 check('수업량 유연화 — 부서 칸이 활동명과 같으면 시트 이름의 부서(연구부)', flex.dept === '연구부', flex.dept);
 check('수업량 유연화 — 차수 2·3', flex.rounds.join() === '2,3', flex.rounds);
 const vol = act('봉사');
-check('봉사 — 기재 칸이 없으면 나머지 칸을 정보로', vol.body === '' && vol.extra.join() === '시작일자,시간,봉사활동내용', vol);
+check('봉사 — 기재 칸이 없으면 나머지 칸을 정보로', vol.body === '' && vol.extra.join() === '시작일자,요일,시간,봉사활동내용', vol);
+check('머리 이름이 빈 칸이라도 요일 글자뿐이면 「요일」 로 읽는다', vol.extra[1] === '요일');
 const sch = parsed.schedules[0];
 check('창체 일정 — 1학년, 11칸, 중간 빈 줄은 자리 그대로(내려받을 때 원본 줄 자리)', sch.grade === 1 && sch.cols.length === 11 && sch.rows.length === 3
   && !sch.rows[1].v.some(Boolean)
@@ -163,7 +165,7 @@ const built = P.sgbBuildDocs(parsed);
 check('Firestore 가 못 담는 「배열 안 배열」이 어디에도 없다',
   ![...built.docs.values()].some(nested) && !nested(built.meta));
 check('학생 문서 = 학생 수', [...built.docs.keys()].filter(k => k.startsWith('saenggibuStu/')).length === parsed.students.length);
-check('명단(roster) — 반별 번호·이름', JSON.stringify(built.meta.roster['1-1']) === JSON.stringify([{ n: 1, nm: '김가람' }, { n: 2, nm: XSS }]),
+check('명단(roster) — 반별 번호·이름·자료 건수', JSON.stringify(built.meta.roster['1-1']) === JSON.stringify([{ n: 1, nm: '김가람', k: 3 }, { n: 2, nm: XSS, k: 1 }]),
   built.meta.roster['1-1']);
 const tiny = P.sgbBuildDocs(parsed, 50);
 const rp = tiny.meta.activities.find(a => a.id === robot.id).parts;
@@ -346,7 +348,9 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
 
   // 학생별
   await p.waitForSelector('#stus .stu');
-  check('학생별 — 1학년 1반이 먼저, 이름 단추', (await p.$$eval('#stus .stu', bs => bs.map(x => x.textContent))).join('|') === `1김가람|2${XSS}`);
+  check('학생별 — 1학년 1반이 먼저, 번호·이름·자료 건수', (await p.$$eval('#stus .stu', bs => bs.map(x => [...x.children].map(c => c.textContent).join('/')))).join('|') === `1/김가람/3|2/${XSS}/1`,
+    await p.$$eval('#stus .stu', bs => bs.map(x => x.textContent)));
+  check('반 목록 — 학년 머리와 반별 학생 수', (await p.textContent('#clsPane')).includes('1학년') && (await p.textContent('#clsPane .cl-item.on')).replace(/\s+/g, '') === '1반2');
   check('이름에 섞인 태그는 글자로만 — 실행되지 않는다', await p.evaluate(() => window.__xss === undefined));
   await p.click('#stus .stu[data-n="1"]');
   await p.waitForSelector('#stuOut .card');
@@ -365,10 +369,29 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   await p.press('#hakbun', 'Enter');
   await p.waitForFunction(() => document.querySelectorAll('#stuOut .card').length === 3);
   const t3 = await p.textContent('#stuOut');
-  check('학번 30205 → 3학년 2반 5번', t3.includes('3-2-5') && t3.includes('박나래'));
+  check('학번 30205 → 3학년 2반 5번', t3.includes('3학년 2반 5번') && t3.includes('30205') && t3.includes('박나래'));
+  check('반 목록도 그 반으로 옮겨 간다', (await p.textContent('#clsPane .cl-item.on')).includes('2반') && (await p.textContent('.roster-head')).includes('3학년 2반'));
   check('활동명이 겹치면 시트 이름으로 가른다 [학급 임원]', t3.includes('학생회 임원') && t3.includes('[학급 임원]'));
   check('겹치지 않으면 시트 이름을 안 붙인다', !t3.includes('[수업량유연화]'));
   check('직책 같은 덧붙은 정보', t3.includes('직책') && t3.includes('반장'));
+  const sessHead = await p.$$eval('#stuOut .sess th', ts => ts.map(t => t.textContent));
+  check('회차 표 — 한 칸에 줄바꿈으로 든 회차를 풀어 보인다(회차·시작일자·요일·시간)', sessHead.join() === '회차,시작일자,요일,시간'
+    && (await p.$$('#stuOut .sess tbody tr')).length === 2, sessHead);
+  check('회차 표에 든 칸은 아래 이름·값 목록에 다시 안 나온다', !(await p.$$eval('#stuOut .ex dt', ds => ds.map(d => d.textContent))).includes('요일'));
+
+  // 이름으로 찾기 — 목록(meta)만 쓰므로 읽기가 늘지 않는다
+  await p.fill('#hakbun', '가람');
+  await p.waitForFunction(() => document.querySelector('.roster-head').textContent.includes('찾은 학생'));
+  const found = await p.$$eval('#stus .stu', bs => bs.map(b => b.querySelector('.num').textContent + ' ' + b.querySelector('.nm').textContent));
+  check('이름 찾기 — 반이 달라도 찾고, 반-번호를 같이 보인다', found.join() === '1-1-1 김가람', found);
+  await p.click('#stus .stu');
+  await p.waitForFunction(() => document.querySelector('#stuOut .s-name')?.textContent === '김가람');
+  await p.click('#copyAll');
+  const all = await p.evaluate(() => window.__copied);
+  check('기재 문안 전체 복사 — 입력 영역·활동명을 머리에 붙여서, 문안 있는 것만', all.includes('[자율 · 진로] 진로탐색 로봇공학 캠프\n로봇 코딩')
+    && all.includes('수학 대중화 강연') && !all.includes('헌혈'), all);
+  await p.fill('#hakbun', '');
+  await p.waitForFunction(() => !document.querySelector('.roster-head').textContent.includes('찾은 학생'));
 
   // 활동별
   await p.click('#views button[data-view="act"]');
