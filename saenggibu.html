@@ -126,7 +126,8 @@
   .card-h .d{font-size:13px;font-weight:600;color:var(--ink-soft);}
   .where{font-size:12.5px;color:var(--ink-soft);margin-top:5px;line-height:1.6;}
   .body{margin-top:12px;font-size:15px;line-height:1.85;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;
-    background:var(--paper-soft);border-radius:10px;padding:13px 15px;}
+    background:var(--paper-soft);border-radius:10px;padding:13px 15px;cursor:copy;border:1px solid transparent;}
+  .body:hover{border-color:var(--mon);background:var(--today-tint);}
   .tools{display:flex;align-items:center;gap:10px;margin-top:9px;font-size:12.5px;color:var(--ink-soft);font-weight:600;}
   .tools .btn{padding:5px 12px;font-size:12.5px;}
   details{margin-top:10px;}
@@ -148,35 +149,27 @@
   .who .num{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--ink-soft);}
   .who .nm{font-size:16px;font-weight:800;}
 
-  /* 봉사활동 누가기록 — 나이스 입력창 모양(회색 머리, 테두리 상자 칸, 왼쪽 위 빨간 표시) */
-  .neis-wrap{overflow-x:auto;margin:12px 0 10px;border:1px solid #D5D9E0;border-radius:4px;background:#fff;}
-  html.dark .neis-wrap{background:var(--paper);border-color:var(--rule);}
-  /* 칸 너비는 비율로 고정 — PC 상세 폭(약 780px)에 한 번에 들어오게. 더 좁으면(폰) 가로로 밀어 본다 */
-  table.neis{border-collapse:collapse;width:100%;min-width:720px;table-layout:fixed;font-size:13px;font-family:'Noto Sans KR','Pretendard',sans-serif;}
-  table.neis th{background:#F4F5F7;color:#333;font-weight:500;font-size:12.5px;padding:9px 4px;line-height:1.35;border-bottom:1px solid #D5D9E0;border-right:1px solid #E6E8EC;word-break:keep-all;}   /* 나이스처럼 머리는 두 줄로 꺾인다 */
-  html.dark table.neis th{background:var(--paper-soft);color:var(--ink);border-color:var(--rule);}
-  table.neis td{padding:4px 3px;border-bottom:1px solid #EEF0F3;border-right:1px solid #F1F2F5;vertical-align:middle;color:#222;}
-  html.dark table.neis td{color:var(--ink);border-color:var(--rule);}
+  /* 봉사활동 누가기록 — 나이스와 같은 칸 차례의 표(모양은 앱의 다른 표와 같게) */
+  .neis-wrap{overflow-x:auto;margin:12px 0 10px;border:1px solid var(--rule);border-radius:10px;}
+  /* 칸 너비는 비율로 고정 — PC 상세 폭에 한 번에 들어오게. 더 좁으면(폰) 가로로 밀어 본다 */
+  table.neis{border-collapse:collapse;width:100%;min-width:720px;table-layout:fixed;font-size:14px;}
+  table.neis th{background:var(--paper-soft);color:var(--ink-soft);font-weight:800;font-size:12.5px;padding:9px 8px;
+    border-bottom:1px solid var(--rule);text-align:left;line-height:1.35;word-break:keep-all;}
+  table.neis td{padding:9px 8px;border-bottom:1px solid var(--rule);vertical-align:top;line-height:1.6;
+    word-break:keep-all;overflow-wrap:anywhere;}
   table.neis tr:last-child td{border-bottom:none;}
-  table.neis .f{position:relative;display:block;min-height:28px;line-height:1.45;padding:4px 6px;border:1px solid #9AA3AF;border-radius:2px;
-    background:#fff;cursor:copy;white-space:pre-wrap;word-break:keep-all;}
-  table.neis .f::before{content:'';position:absolute;left:0;top:0;border-top:6px solid #E5484D;border-right:6px solid transparent;}
-  table.neis .f:hover{border-color:var(--mon);background:#F5F9FF;}
-  html.dark table.neis .f{background:var(--bg-base);border-color:#47587A;}
-  html.dark table.neis .f:hover{background:var(--today-tint);}
-  table.neis .f.sel{padding-right:22px;}
-  table.neis .f.sel::after{content:'⌄';position:absolute;right:7px;top:2px;color:#555;font-size:13px;}
+  table.neis td[data-cp]{cursor:copy;}
+  table.neis td[data-cp]:hover{background:var(--today-tint);}
   table.neis col.c-start,table.neis col.c-end{width:12%;}
-  table.neis col.c-area{width:12%;}
-  table.neis col.c-content{width:27%;}
-  table.neis col.c-type{width:8.5%;}
+  table.neis col.c-area{width:12.5%;}
+  table.neis col.c-content{width:27.5%;}
+  table.neis col.c-type{width:8%;}
   table.neis col.c-place{width:15%;}
-  table.neis col.c-hours{width:6.5%;}
+  table.neis col.c-hours{width:6%;}
   table.neis col.c-total{width:7%;}
-  table.neis td.c-start .f,table.neis td.c-end .f{white-space:nowrap;padding:4px 4px;letter-spacing:-.2px;}
-  table.neis td.c-area .f,table.neis td.c-type .f{word-break:break-all;}
-  table.neis td.c-hours .f{text-align:right;}
-  table.neis td.c-total{text-align:right;padding-right:8px;font-variant-numeric:tabular-nums;}
+  table.neis td.c-start,table.neis td.c-end{white-space:nowrap;font-variant-numeric:tabular-nums;}
+  table.neis th.r,table.neis td.c-hours,table.neis td.c-total{text-align:right;font-variant-numeric:tabular-nums;}
+  table.neis td.c-total{color:var(--ink-soft);font-weight:700;}
   .vol-split{margin-top:12px;}
   .vol-split .card{background:var(--paper-soft);}
 
@@ -969,7 +962,7 @@ function itemCard(a, it, { who = null } = {}){
   const ex = (it.x || []).map((v, j) => v && !inSes.has(j) ? `<dt>${esc((a.extra || [])[j] || '')}</dt><dd>${esc(v)}</dd>` : '').join('');
   const sesHtml = ses ? `<div class="sess-wrap"><table class="sess"><thead><tr><th>회차</th>${ses.cols.map(j => `<th>${esc((a.extra || [])[j] || '')}</th>`).join('')}</tr></thead>
     <tbody>${ses.rows.map((r, k) => `<tr><td class="n">${k + 1}</td>${r.map(v => `<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : '';
-  const body = it.b ? `<div class="body">${esc(it.b)}</div>
+  const body = it.b ? `<div class="body" title="누르면 복사">${esc(it.b)}</div>
     <div class="tools"><button type="button" class="btn line" data-copy>📋 복사</button><span>${it.b.length.toLocaleString()}자</span></div>` : '';
   const self = it.s ? `<details><summary>${esc(a.self || '학생 글')} 보기</summary><div class="txt">${esc(it.s)}</div></details>` : '';
   const head = who
@@ -1051,10 +1044,10 @@ async function renderStuOut(){
   const vol = sgbVolunteerRows(d.items, actById);
   const volHtml = vol.length ? `<div class="card vol">
       <div class="card-h"><span class="t">봉사활동 누가기록</span><span class="d">${vol.length}건 · 총 ${vol.at(-1).total}시간 · 날짜 순</span></div>
-      <div class="where">나이스 입력창과 같은 차례입니다. 칸을 누르면 그 내용이 복사됩니다.</div>
-      <div class="neis-wrap"><table class="neis"><colgroup>${['start', 'end', 'area', 'content', 'type', 'place', 'hours', 'total'].map(k => `<col class="c-${k}">`).join('')}</colgroup><thead><tr>${SGB_VOL_COLS.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>
+      <div class="where">나이스 봉사활동 누가기록과 같은 칸 차례입니다. 칸을 누르면 그 내용이 복사됩니다.</div>
+      <div class="neis-wrap"><table class="neis"><colgroup>${['start', 'end', 'area', 'content', 'type', 'place', 'hours', 'total'].map(k => `<col class="c-${k}">`).join('')}</colgroup><thead><tr>${SGB_VOL_COLS.map((c, i) => `<th${i >= 6 ? ' class="r"' : ''}>${esc(c)}</th>`).join('')}</tr></thead><tbody>
         ${vol.map(r => `<tr title="${esc(r.src)}">${['start', 'end', 'area', 'content', 'type', 'place', 'hours'].map(k =>
-          `<td class="c-${k}"><span class="f${k === 'type' ? ' sel' : ''}" data-cp="${esc(r[k])}">${esc(r[k])}</span></td>`).join('')}<td class="c-total">${r.total}</td></tr>`).join('')}
+          `<td class="c-${k}"${r[k] ? ` data-cp="${esc(r[k])}"` : ''}>${esc(r[k])}</td>`).join('')}<td class="c-total">${r.total}</td></tr>`).join('')}
       </tbody></table></div>
       <button type="button" class="btn" id="volSplitBtn" aria-expanded="false">활동별로 나눠 보기 ▾</button>
       <div class="vol-split" id="volSplit" hidden>${d.items.filter(it => sgbIsVolunteer(actById(it.a))).map(it => itemCard(actById(it.a), it)).join('')}</div>
@@ -1206,9 +1199,10 @@ $('hakbun').addEventListener('input', e => {
   render();
 });
 document.body.addEventListener('click', e => {
-  const b = e.target.closest('[data-copy]');
-  if (b) copyText(b.closest('.card').dataset.b);
-  const f = e.target.closest('.neis .f');
+  // 기재 문안 — 복사 단추나 문안 상자를 누르면(글을 끌어 고르는 중이면 그대로 둔다)
+  const b = e.target.closest('[data-copy], .card > .body');
+  if (b && !(b.classList.contains('body') && String(getSelection())) ) copyText(b.closest('.card').dataset.b);
+  const f = e.target.closest('.neis td[data-cp]');
   if (f && f.dataset.cp) copyText(f.dataset.cp);
 });
 

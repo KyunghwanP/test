@@ -380,6 +380,9 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
     && grps[1].includes('누가기록'), grps);
   await p.click('#stuOut .card [data-copy]');
   check('복사 — 기재 문안이 그대로', await p.evaluate(() => window.__copied) === '로봇 코딩 캠프에 참여하여 센서 제어를 익힘.');
+  await p.evaluate(() => { window.__copied = ''; });
+  await p.click('#stuOut .card .body');
+  check('문안 상자를 눌러도 복사된다', await p.evaluate(() => window.__copied) === '로봇 코딩 캠프에 참여하여 센서 제어를 익힘.');
   check('학생 글(자기 평가서)은 접어 둔다', (await p.$$('#stuOut details')).length >= 1 && !(await p.isVisible('#stuOut details .txt')));
   const vcard = await p.$$eval('#stuOut .card', cs => cs.map(c => c.textContent).find(t => t.includes('헌혈')) || '');
   check('봉사처럼 기재 칸이 없으면 칸 이름과 값으로', vcard.includes('시작일자') && vcard.includes('2026.04.10.'), vcard);
@@ -399,11 +402,11 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
     && (await p.$$('#stuOut .sess tbody tr')).length === 2, sessHead);
   // 봉사활동 누가기록 — 나이스 입력창 모양, 회차를 풀어 날짜 순, 시간 누계
   const neis = await p.$$eval('#stuOut .neis tbody tr', trs => trs.map(tr => [...tr.cells].map(td => td.textContent.trim())));
-  check('봉사 — 나이스 칸 차례(시작일자…시간 누계)', (await p.$$eval('#stuOut .neis th', ts => ts.map(t => t.textContent))).join() ===
-    '시작일자,종료일자,영역구분,봉사활동내용,학교/개인 구분,장소 또는 주관 기관명,시간,시간 누계');
+  check('봉사 — 나이스와 같은 칸 차례(시작일자…시간 누계), 입력칸 모양이 아닌 표', (await p.$$eval('#stuOut .neis th', ts => ts.map(t => t.textContent))).join() ===
+    '시작일자,종료일자,영역구분,봉사활동내용,학교/개인 구분,장소 또는 주관 기관명,시간,시간 누계' && !(await p.$('#stuOut .neis .f')));
   check('봉사 — 한 칸의 회차 둘을 두 줄로, 날짜 순, 시간 누계 6 → 12', neis.length === 2 && neis[0][0] === '2026.03.09.' && neis[1][0] === '2026.03.16.'
     && neis[0][3] === '교과학습도우미' && neis[0][7] === '6' && neis[1][7] === '12', neis);
-  await p.click('#stuOut .neis tbody tr:first-child .c-content .f');
+  await p.click('#stuOut .neis tbody tr:first-child td.c-content');
   check('봉사 — 칸을 누르면 그 내용이 복사된다', await p.evaluate(() => window.__copied) === '교과학습도우미');
   check('활동별 카드는 처음엔 접혀 있다', !(await p.isVisible('#volSplit')));
   await p.click('#volSplitBtn');
