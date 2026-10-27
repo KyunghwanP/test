@@ -1777,7 +1777,11 @@ function psParseSheet(ws, sheetName) {
     const num  = String(r[at.num]  ?? '').trim();
     // 반·번호가 없으면 전출·자퇴다(그 줄은 표 맨 아래로 옮겨져 있다). 명렬에 넣지 않고,
     // 학년·이름·구분·날짜만 따로 남긴다 — 생기부 보조자료에 그 학생의 옛 학번 기록이 남아 있다.
-    if (!/^\d+$/.test(room) || !/^\d+$/.test(num)) { dropped.push({ grade, name, ...psMoveOf(moveAt >= 0 ? r[moveAt] : '') }); continue; }
+    // 떠난 학생 이름은 편성표에서 '(홍길동)' 처럼 괄호에 싸여 있다 — 괄호를 벗겨 남긴다(생기부 쪽 이름과 맞대려고)
+    if (!/^\d+$/.test(room) || !/^\d+$/.test(num)) {
+      dropped.push({ grade, name: name.replace(/^[(（]\s*(.*?)\s*[)）]$/, '$1'), ...psMoveOf(moveAt >= 0 ? r[moveAt] : '') });
+      continue;
+    }
     rows.push({
       grade: String(grade), room: String(parseInt(room, 10)), num: String(parseInt(num, 10)),
       name,

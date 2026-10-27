@@ -71,7 +71,8 @@ for (const [gi, [grade, total]] of GRADES.entries()) {
   // 떠난 학생은 표 맨 아래, 반·번호 없이. 학적사항 칸에 구분·날짜(셋째마다 비움 — 칸이 빈 경우도 있다)
   const MOVE = ['전출(2026.05.10.)', '자퇴 2026-06-01 사유 생략', ''];
   for (let i = 0; i < DROP[gi]; i++){
-    const row = ['', '', '', `전출${grade}_${i}`];
+    // 실제 편성표처럼 이름이 괄호에 싸여 있다 — 넷째마다는 괄호 없이(안 쳐진 경우도 있다)
+    const row = ['', '', '', i % 4 === 3 ? `전출${grade}_${i}` : `(전출${grade}_${i})`];
     row[head.length - 1] = MOVE[i % 3];
     aoa.push(row);
   }

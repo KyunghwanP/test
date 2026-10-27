@@ -68,8 +68,8 @@ check('시트 오류 없음', out.errors.length === 0, out.errors);
 check('세 학년을 다 읽었다', out.sheets.length === 3, out.sheets);
 check('1020명', out.rows.length === 1020, out.rows.length);
 check('전출·자퇴 55명 제외', out.dropped.length === 55, out.dropped.length);
-check('떠난 학생 — 학년·이름과 학적사항의 구분·날짜만(사유 글은 안 옮긴다)',
-  out.dropped[0].grade === 1 && /^전출1_/.test(out.dropped[0].name)
+check('떠난 학생 — 이름의 괄호는 벗기고, 학년·이름과 학적사항의 구분·날짜만(사유 글은 안 옮긴다)',
+  out.dropped[0].grade === 1 && out.dropped.every(d => /^전출\d_\d+$/.test(d.name))
   && out.dropped[0].kind === '전출' && out.dropped[0].date === '2026.05.10.'
   && out.dropped[1].kind === '자퇴' && out.dropped[1].date === '2026.06.01.' && out.dropped[2].kind === '' && !('note' in out.dropped[1]),
   out.dropped.slice(0, 3));

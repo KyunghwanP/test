@@ -582,7 +582,9 @@ function sgbSchFilter(sc, kind){
 // changed: 편성표에서 반·번호가 빈 학생(students/changed — 학년·이름·구분·날짜). 명렬에 그 학년 같은 이름이
 // 없고 떠난 학생 목록에 있으면 오류가 아니라 '학적 변동'(moved) — 떠나기 전 학번으로 남은 기록이다.
 function sgbMismatches(activities, actRows, roster, changed = []){
-  const nn = v => String(v || '').replace(/\s+/g, '');
+  // 이름 비교는 띄어쓰기·괄호를 뺀다 — 떠난 학생은 '(홍길동)' 처럼 괄호에 싸여 적힌다
+  const nn = v => String(v || '').replace(/[\s()（）]+/g, '');
+  const paren = v => /^\s*[(（].*[)）]\s*$/.test(String(v || ''));
   const gone = new Map();
   for (const x of changed || []){ const g = parseInt(x.grade, 10); if (g && x.name) gone.set(`${g}|${nn(x.name)}`, x); }
   const book = new Map(), byName = new Map();
@@ -600,8 +602,9 @@ function sgbMismatches(activities, actRows, roster, changed = []){
       const base = { sheet: a.sheet, a: a.id, g: r.g, c: r.c, n: r.n, nm: r.nm || '' };
       const left = gone.get(`${r.g}|${nn(r.nm)}`);
       const stillHere = (byName.get(nn(r.nm)) || []).some(k => k.split('-')[0] === String(r.g));
-      if ((exp == null || nn(exp) !== nn(r.nm)) && left && !stillHere){
-        out.push({ ...base, expect: exp || '', why: '학적 변동', moved: true, kind: left.kind || '', date: left.date || '' });
+      // 떠난 학생 목록에 있거나, 이름이 괄호에 싸여 있으면(떠난 학생 표시) — 그 학년 명렬에 그 이름이 더 없을 때
+      if ((exp == null || nn(exp) !== nn(r.nm)) && (left || paren(r.nm)) && !stillHere){
+        out.push({ ...base, expect: exp || '', why: '학적 변동', moved: true, kind: left?.kind || '', date: left?.date || '' });
         return;
       }
       if (exp == null) out.push({ ...base, expect: '', why: '명렬에 없는 학번', hint: (byName.get(nn(r.nm)) || []).join(', ') });

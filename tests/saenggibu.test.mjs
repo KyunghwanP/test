@@ -240,6 +240,11 @@ check('같은 학년에 그 이름이 아직 있으면 학적 변동으로 넘�
   !P.sgbMismatches(parsed.activities, parsed.actRows, ROSTER, GONE).some(m => m.moved));
 const reuse = [...ROSTER2, { grade: 2, room: 1, num: 1, name: '새학생' }];      // 떠난 자리에 다른 학생이 들어옴
 check('떠난 학생 번호를 다른 학생이 받았어도 학적 변동', P.sgbMismatches(parsed.activities, parsed.actRows, reuse, GONE).some(m => m.moved && m.nm === '이보람'));
+const parenRows = new Map([['q2', [{ g: 2, c: 1, n: 1, nm: '(이보람)' }, { g: 2, c: 1, n: 3, nm: '(정하늘)' }, { g: 1, c: 1, n: 2, nm: '(최다온)' }]]]);
+const pm = P.sgbMismatches([{ id: 'q2', sheet: 'S' }], parenRows, ROSTER2, GONE);
+check('괄호 이름 — 「(이보람)」 도 떠난 학생 이보람으로 맞춘다', pm.some(m => m.moved && m.nm === '(이보람)' && m.kind === '전출'), pm);
+check('괄호 이름 — 떠난 학생 목록에 없어도 괄호면 학적 변동(정하늘)', pm.some(m => m.moved && m.nm === '(정하늘)'), pm);
+check('괄호 이름이라도 명렬의 같은 자리 이름과 같으면 문제없음(최다온 1-1-2)', !pm.some(m => m.nm === '(최다온)'), pm);
 check('명렬이 없으면 시트끼리 — 같은 학번에 적은 쪽 이름을 짚는다', selfOnly.length === 1 && selfOnly[0].nm === '나' && selfOnly[0].why === '시트마다 이름이 다름', selfOnly);
 
 // ── 2-2. 원본 양식 뜨기 ──
