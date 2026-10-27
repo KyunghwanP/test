@@ -45,6 +45,7 @@ function sheets({ dropOfficers = false, robotText = '로봇 코딩 캠프에 참
     ['<누>창의(봉사)', [
       ['창의교육부', null, null, '⊙ 활  동  명:', null, '교과학습도우미'],
       [null, null, null, '⊙ 입력 영역:', null, '봉사활동 누가기록'],
+      [null, null, null, '⊙ 유의 사항:', null, '학교교육계획에 의해 실시한 봉사활동과 학교장이 승인한 개인 봉사활동만 입력합니다.\n반별 일괄등록 시 결시 학생이 자동으로 빠지지 않으므로 출결을 확인한 뒤 등록합니다.\n개인 봉사활동의 영역은 입력되지 않습니다.'],
       // 원본 프로젝트 봉사처럼: 머리 이름 없는 요일 칸, 한 칸에 회차가 줄바꿈으로 여러 개
       ['연번', '학년', '반', '번호', '성명', '시작일자', null, '시간', '봉사활동내용'],
       [1, 3, 2, 5, '박나래', '2026.03.09.\n2026.03.16.', '월\n월', '6\n6', '교과학습도우미'],   // 원본처럼 3학년이 먼저 — 내려받아도 이 차례
@@ -399,6 +400,12 @@ STORE = { 'students/main': { students: ROSTER } };
   await p.waitForSelector('#stus .stu');
   check('학생별 — 1학년 1반이 먼저, 번호·이름·자료 건수', (await p.$$eval('#stus .stu', bs => bs.map(x => [...x.children].map(c => c.textContent).join('/')))).join('|') === `1/김가람/3|2/${XSS}/1`,
     await p.$$eval('#stus .stu', bs => bs.map(x => x.textContent)));
+  check('반 목록 — 처음엔 보고 있는 학년(1)만 펼침', await p.isVisible('.cls-pc .cl-list[data-g="1"]') && !(await p.isVisible('.cls-pc .cl-list[data-g="3"]')));
+  await p.click('.cls-pc .cl-grade[data-g="3"]');
+  check('학년 머리를 누르면 펼친다', await p.isVisible('.cls-pc .cl-list[data-g="3"]') && (await p.textContent('.cls-pc .cl-grade[data-g="3"]')).includes('▾'));
+  await p.click('.cls-pc .cl-grade[data-g="1"]');
+  check('다시 누르면 접는다(보던 반이 있는 학년도)', !(await p.isVisible('.cls-pc .cl-list[data-g="1"]')) && (await p.textContent('.cls-pc .cl-grade[data-g="1"]')).includes('▸'));
+  await p.click('.cls-pc .cl-grade[data-g="1"]');
   check('반 목록 — 학년 머리와 반별 학생 수', (await p.textContent('#clsPane')).includes('1학년') && (await p.textContent('#clsPane .cl-item.on')).replace(/\s+/g, '') === '1반2');
   check('이름에 섞인 태그는 글자로만 — 실행되지 않는다', await p.evaluate(() => window.__xss === undefined));
   await p.click('#stus .stu[data-n="1"]');
@@ -440,6 +447,11 @@ STORE = { 'students/main': { students: ROSTER } };
   await p.click('#stuOut .neis tbody tr:first-child td.c-content');
   check('봉사 — 칸을 누르면 그 내용이 복사된다', await p.evaluate(() => window.__copied) === '교과학습도우미');
   check('활동별 카드는 처음엔 접혀 있다', !(await p.isVisible('#volSplit')));
+  const ln = await p.$eval('#stuOut .card.vol .note .nt', n => [n.clientHeight, n.scrollHeight]);
+  check('긴 유의 사항은 줄여 보이고(더보기)', ln[1] > ln[0] + 4 && await p.isVisible('#stuOut .card.vol .note-more'), ln);
+  await p.click('#stuOut .card.vol .note-more');
+  const ln2 = await p.$eval('#stuOut .card.vol .note .nt', n => [n.clientHeight, n.scrollHeight]);
+  check('「더보기」 를 누르면 다 펼쳐지고 「접기」 로 바뀐다', ln2[1] <= ln2[0] + 1 && (await p.textContent('#stuOut .card.vol .note-more')).includes('접기'), ln2);
   await p.click('#volSplitBtn');
   check('「활동별로 나눠 보기」 — 원래 활동 카드(회차 표)가 펼쳐진다', await p.isVisible('#volSplit .sess'));
   check('회차 표에 든 칸은 아래 이름·값 목록에 다시 안 나온다', !(await p.$$eval('#stuOut .ex dt', ds => ds.map(d => d.textContent))).includes('요일'));
@@ -466,8 +478,9 @@ STORE = { 'students/main': { students: ROSTER } };
   await p.waitForSelector('#actRows .card');
   check('활동별 — 어긋난 학생 카드에 ⚠ 표시(1-1-2)', await p.$$eval('#actRows .card', cs => cs.filter(c => c.querySelector('.mis')).map(c => c.querySelector('.num').textContent)).then(x => x.join() === '1-1-2'));
   check('로봇 캠프 — 참여 학생 2명, 반별 수', (await p.$$('#actRows .card')).length === 2 && (await p.textContent('#actOut .counts')).includes('1반 2'));
-  check('로봇 캠프 — 유의 사항은 늘 펼쳐 굵게', await p.isVisible('#actOut .note') && (await p.textContent('#actOut .note')).includes('담임 교사가 최종 수정')
-    && +(await p.$eval('#actOut .note', n => getComputedStyle(n).fontWeight)) >= 700 && !(await p.$('#actOut details summary:has-text("유의")')));
+  check('로봇 캠프 — 유의 사항은 상자 없이 굵은 글씨로, 짧으면 다 보인다', await p.isVisible('#actOut .note') && (await p.textContent('#actOut .note')).includes('담임 교사가 최종 수정')
+    && +(await p.$eval('#actOut .note', n => getComputedStyle(n).fontWeight)) >= 700 && await p.$eval('#actOut .note', n => getComputedStyle(n).borderLeftWidth === '0px' && getComputedStyle(n).backgroundColor === 'rgba(0, 0, 0, 0)')
+    && !(await p.$('#actOut .note .note-more')));
   check('로봇 캠프 — 시트·파일 이름', (await p.textContent('#actOut')).includes('파일: sgb-4.xlsx'));
   const rowTxt = await p.textContent('#actRows');
   check('태그 섞인 문안도 글자 그대로', rowTxt.includes('<b>태그</b>') && await p.evaluate(() => !document.querySelector('#actRows b')));
