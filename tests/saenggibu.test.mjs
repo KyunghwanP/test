@@ -578,6 +578,25 @@ STORE = { 'students/main': { students: ROSTER } };
   await p.waitForSelector('#stus .stu');
   check('다른 교사 — 자료는 보이고 올리기 단추는 없다', !(await p.isVisible('#upBtn')));
   check('폰 폭에서 가로로 넘치지 않는다', await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  // 폰 — 학년 탭 → 반 격자 → 학생 큰 단추 → 상세만, ◀ ▶ 로 넘기고 ← 로 돌아오기
+  check('폰: 반은 학년 탭 + 격자(PC 목록은 숨김)', await p.isVisible('.cls-m .g-tab') && !(await p.isVisible('.cls-pc')) && !(await p.isVisible('#stuOut')));
+  await p.click('.cls-m .g-tab[data-g="3"]');
+  await p.waitForFunction(() => document.querySelector('.roster-head').textContent.includes('3학년 2반'));
+  check('폰: 학년 탭을 누르면 그 학년 첫 반 명단', (await p.$$eval('.cls-grid .cl-item', bs => bs.map(b => b.textContent.trim()))).join() === '2반');
+  await p.click('.cls-m .g-tab[data-g="1"]');
+  await p.waitForFunction(() => document.querySelector('.roster-head').textContent.includes('1학년 1반'));
+  await p.click('#stus .stu[data-n="1"]');
+  await p.waitForSelector('#stuOut .s-name');
+  check('폰: 학생을 고르면 상세만 화면 가득(반·명단 숨김)', await p.isVisible('#stuOut') && !(await p.isVisible('#stus')) && !(await p.isVisible('.cls-m')));
+  check('폰: 위쪽 줄 — ← 1학년 1반 · 다음 학생(2번)', (await p.textContent('#mBack')).includes('1학년 1반') && (await p.$$('#mNav .m-step')).length === 1
+    && (await p.textContent('#mNav .m-step')).includes('2'));
+  await p.click('#mNav .m-step');
+  await p.waitForFunction(() => document.querySelector('#stuOut .s-id')?.textContent.includes('2번'));
+  check('폰: 다음 학생으로 넘어가고, 이제는 이전(◀ 1)만', (await p.textContent('#mNav .m-step')).includes('◀') && (await p.$$('#mNav .m-step')).length === 1);
+  await p.click('#mBack');
+  check('폰: ← 를 누르면 명단으로, 고른 학생에 표시', await p.isVisible('#stus') && !(await p.isVisible('#stuOut'))
+    && (await p.$eval('#stus .stu.on', b => b.dataset.n)) === '2');
+  check('폰: 단계마다 가로로 넘치지 않는다', await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
   check('오류 없음(다른 교사)', p.errors.length === 0, p.errors);
   await p.context().close();
 }

@@ -244,15 +244,52 @@
   @media (prefers-reduced-motion:reduce){ .toast{transition:none;} }
 
   /* 폰·좁은 창 — 세 칸을 위아래로. 반은 가로 칩, 명단은 위쪽에 짧게 */
+  .cls-m,.m-nav{display:none;}
+  /* 폰 — 단계식: ① 학년 탭 + 반 격자 ② 학생 큰 단추(2열, 안쪽 스크롤 없음) ③ 고르면 상세만 화면 가득,
+     위에 붙은 줄에서 ← 명단 · ◀ 이전 · 다음 ▶ */
   @media (max-width:900px){
     .pane3{flex-direction:column;height:auto;}
     .pane3 > *{overflow:visible;}
     .p-classes,.p-roster,.p-acts{width:auto;border-right:none;border-bottom:1px solid var(--rule);}
-    .p-classes{display:flex;gap:4px;overflow-x:auto;padding:8px;white-space:nowrap;}
-    .p-classes .cl-grade{padding:9px 6px 0 10px;}
-    .p-classes .cl-item{width:auto;margin:0;}
-    .p-roster #stus{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}
-    .p-roster{max-height:42vh;overflow-y:auto;}
+    .cls-pc{display:none;}
+    .cls-m{display:block;padding:12px 12px 10px;}
+    .cls-m .seg{width:100%;}
+    .cls-m .seg button{flex:1;font-size:15px;padding:9px 0;}
+    .cls-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:10px;}
+    .cls-grid .cl-item{justify-content:center;margin:0;padding:11px 0;border:1px solid var(--rule);background:var(--paper);font-size:15px;}
+    .cls-grid .cl-item.on{border-color:var(--mon);background:var(--mon);color:#fff;}
+    .p-roster #stus{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px 12px 16px;}
+    .p-roster .stu{border:1px solid var(--rule);border-radius:10px;padding:12px 12px;min-height:50px;}
+    .p-roster .stu .nm{font-size:16px;}
+    .p-roster .stu.on{box-shadow:none;border-color:var(--mon);}
+    .roster-head{position:static;}
+    .pane3.has-detail .p-classes,.pane3.has-detail .p-roster{display:none;}
+    .pane3:not(.has-detail) .p-detail{display:none;}
+    .m-nav{display:flex;gap:6px;align-items:center;position:sticky;top:-12px;z-index:5;margin:-12px -10px 12px;padding:10px;
+      background:var(--paper);border-bottom:1px solid var(--rule);}
+    .m-nav .btn{padding:9px 10px;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+    .m-nav #mBack{flex-shrink:0;}
+    .m-nav .m-step{flex:1;}
+    .m-nav .m-step-none{flex:1;}
+    /* 봉사 누가기록 — 폰에서는 표 대신 회차마다 한 덩어리: 날짜 · 영역 · 시간(누계) / 활동 내용 / 학교·개인 · 장소 */
+    .neis-wrap{border:none;overflow:visible;margin:8px 0;}
+    table.neis{min-width:0;table-layout:auto;}
+    table.neis colgroup,table.neis thead{display:none;}
+    table.neis tbody{display:block;}
+    table.neis tr{display:flex;flex-wrap:wrap;align-items:baseline;gap:3px 8px;padding:11px 2px;border-bottom:1px solid var(--rule);}
+    table.neis td{display:block;border:none;padding:0;}
+    table.neis td:empty{display:none;}
+    table.neis td.c-start{order:1;font-weight:800;}
+    table.neis td.c-end{order:2;font-weight:800;}
+    table.neis td.c-end::before{content:'~ ';}
+    table.neis td.c-area{order:3;color:var(--ink-soft);font-size:13.5px;}
+    table.neis td.c-hours{order:4;margin-left:auto;font-weight:800;}
+    table.neis td.c-hours::after{content:'시간';}
+    table.neis td.c-total{order:5;font-size:13px;}
+    table.neis td.c-total::before{content:'누계 ';}
+    table.neis td.c-content{order:6;width:100%;font-size:15.5px;line-height:1.6;}
+    table.neis td.c-type,table.neis td.c-place{order:7;color:var(--ink-soft);font-size:13.5px;}
+    table.neis td.c-place{order:8;}
     .p-acts{max-height:40vh;overflow-y:auto;}
     .p-detail{padding:12px 10px 32px;}
     .sheet{padding:16px 14px 18px;border-radius:12px;}
@@ -947,6 +984,10 @@ const esc = v => v == null ? '' : String(v)
   .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const LS = 'ynhs-sgb';
 let st = { view: 'stu', g: '', c: '', n: '', act: '', ag: '', ac: '', q: '', sg: '', sf: '', find: '' };
+// 폰: 학생을 고르면 상세만 화면 가득(목록은 숨김). '← 명단' 을 누르면 다시 목록. 저장하지 않는다.
+let mList = true;
+const isPhone = () => matchMedia('(max-width:900px)').matches;
+let _curList = [];          // 지금 명단(반 또는 찾은 학생) — 이전/다음 학생
 try { Object.assign(st, JSON.parse(localStorage.getItem(LS) || '{}')); } catch (e) {}
 st.find = '';                       // 이름 찾기는 다시 열면 비운다
 const save = () => { try { localStorage.setItem(LS, JSON.stringify(st)); } catch (e) {} };
@@ -1073,30 +1114,50 @@ async function renderStu(){
     list = (roster[cur] || []).map(r => ({ ...r, k: cur, cnt: r.k }));
     head = `${esc(st.g)}학년 ${esc(st.c)}반 <small>${list.length}명</small>`;
   }
+  _curList = list;
   if (!(roster[cur] || []).some(r => String(r.n) === String(st.n))) st.n = '';
+  if (!st.n) mList = true;
   save();
   const grades = [...new Set(cls.map(k => k.split('-')[0]))];
-  body.innerHTML = `<div class="pane3">
-    <nav class="p-classes" id="clsPane" aria-label="반">${grades.map(g => `<div class="cl-grade" data-g="${g}">${g}학년</div>`
-      + cls.filter(k => k.split('-')[0] === g).map(k => `<button type="button" class="cl-item${k === cur && !q ? ' on' : ''}" data-k="${k}">
-        ${k.split('-')[1]}반<span class="cl-cnt">${roster[k].length}</span></button>`).join('')).join('')}</nav>
+  const inG = cls.filter(k => k.split('-')[0] === st.g);
+  body.innerHTML = `<div class="pane3${st.n && !mList ? ' has-detail' : ''}" id="stuPanes">
+    <nav class="p-classes" id="clsPane" aria-label="반">
+      <div class="cls-pc">${grades.map(g => `<div class="cl-grade" data-g="${g}">${g}학년</div>`
+        + cls.filter(k => k.split('-')[0] === g).map(k => `<button type="button" class="cl-item${k === cur && !q ? ' on' : ''}" data-k="${k}">
+          ${k.split('-')[1]}반<span class="cl-cnt">${roster[k].length}</span></button>`).join('')).join('')}</div>
+      <div class="cls-m">
+        <div class="seg">${grades.map(g => `<button type="button" class="g-tab${g === st.g ? ' on' : ''}" data-g="${g}">${g}학년</button>`).join('')}</div>
+        <div class="cls-grid">${inG.map(k => `<button type="button" class="cl-item${k === cur && !q ? ' on' : ''}" data-k="${k}">${k.split('-')[1]}반</button>`).join('')}</div>
+      </div>
+    </nav>
     <section class="p-roster" aria-label="학생 명단"><div class="roster-head">${head}</div>
       <div id="stus">${rosterRows(list, !!q) || `<div class="empty">${q ? '맞는 학생이 없습니다.' : '이 반에는 올라온 자료가 없습니다.'}</div>`}</div></section>
     <section class="p-detail" id="stuOut">${st.n ? '<div class="empty">불러오는 중…</div>' : '<div class="empty">왼쪽에서 학생을 고르세요.</div>'}</section>
   </div>`;
-  $('clsPane').onclick = e => { const b = e.target.closest('.cl-item'); if (!b) return; [st.g, st.c] = b.dataset.k.split('-'); st.n = ''; st.find = ''; $('hakbun').value = ''; renderStu(); };
+  $('clsPane').onclick = e => {
+    const t = e.target.closest('.g-tab');
+    if (t){   // 폰: 학년을 바꾸면 그 학년 첫 반
+      const first = cls.find(k => k.split('-')[0] === t.dataset.g);
+      if (first) [st.g, st.c] = first.split('-');
+      st.n = ''; st.find = ''; $('hakbun').value = ''; renderStu(); return;
+    }
+    const b = e.target.closest('.cl-item'); if (!b) return;
+    [st.g, st.c] = b.dataset.k.split('-'); st.n = ''; st.find = ''; $('hakbun').value = ''; renderStu();
+  };
   $('stus').onclick = e => {
     const b = e.target.closest('.stu'); if (!b) return;
-    [st.g, st.c] = b.dataset.k.split('-'); st.n = b.dataset.n;
-    document.querySelectorAll('#stus .stu').forEach(x => x.classList.toggle('on', x === b));
-    if (!q) document.querySelectorAll('#clsPane .cl-item').forEach(x => x.classList.toggle('on', x.dataset.k === b.dataset.k));
-    save();
-    renderStuOut().then(() => {
-      // 폰에서는 상세가 명단 아래에 열린다 — 고르면 거기로 내려 준다
-      if (matchMedia('(max-width:900px)').matches) $('stuOut').scrollIntoView({ block: 'start' });
-    });
+    openStudent(b.dataset.k, b.dataset.n);
   };
   if (st.n) await renderStuOut();
+}
+// 학생 하나 열기 — 명단 단추·이전/다음에서 같이 쓴다
+function openStudent(k, n){
+  [st.g, st.c] = k.split('-'); st.n = String(n); mList = false;
+  save();
+  document.querySelectorAll('#stus .stu').forEach(x => x.classList.toggle('on', x.dataset.k === k && x.dataset.n === String(n)));
+  if (!(st.find || '').trim()) document.querySelectorAll('#clsPane .cl-item').forEach(x => x.classList.toggle('on', x.dataset.k === k));
+  $('stuPanes').classList.add('has-detail');
+  renderStuOut().then(() => { if (isPhone()) $('body').scrollTop = 0; });
 }
 async function renderStuOut(){
   const out = $('stuOut');
@@ -1135,7 +1196,15 @@ async function renderStuOut(){
     </div>` : '';
   const shownGroups = ordered.map(gr => ({ ...gr, cards: gr.list.filter(it => !sgbIsVolunteer(actById(it.a))) }));
   let volPlaced = false;
-  out.innerHTML = `<div class="sheet">
+  const at = _curList.findIndex(r => r.k === `${st.g}-${st.c}` && String(r.n) === String(st.n));
+  const prev = at > 0 ? _curList[at - 1] : null, next = at >= 0 && at < _curList.length - 1 ? _curList[at + 1] : null;
+  const navBtn = (r, dir) => r ? `<button type="button" class="btn m-step" data-k="${r.k}" data-n="${r.n}" aria-label="${dir === -1 ? '이전' : '다음'} 학생">
+      ${dir === -1 ? '◀ ' : ''}${esc(r.n)} ${esc(r.nm)}${dir === 1 ? ' ▶' : ''}</button>` : '<span class="m-step-none"></span>';
+  out.innerHTML = `<div class="m-nav" id="mNav">
+      <button type="button" class="btn" id="mBack">← ${(st.find || '').trim() ? '찾은 학생' : `${esc(st.g)}학년 ${esc(st.c)}반`}</button>
+      ${navBtn(prev, -1)}${navBtn(next, 1)}
+    </div>
+    <div class="sheet">
     <div class="s-head">
       <div class="s-name">${esc(d.nm)}</div>
       <div class="s-id">${esc(st.g)}학년 ${esc(st.c)}반 ${esc(st.n)}번 · ${hakbunOf(st.g, st.c, st.n)}</div>
@@ -1150,6 +1219,12 @@ async function renderStuOut(){
     }).join('')}
   </div>`;
   if ($('copyAll')) $('copyAll').onclick = () => copyText(out._all);
+  $('mBack').onclick = () => {
+    mList = true; $('stuPanes').classList.remove('has-detail');
+    const on = document.querySelector('#stus .stu.on');
+    if (on) on.scrollIntoView({ block: 'center' });
+  };
+  $('mNav').onclick = e => { const b = e.target.closest('.m-step'); if (b) openStudent(b.dataset.k, b.dataset.n); };
   if ($('volSplitBtn')) $('volSplitBtn').onclick = e => {
     const box = $('volSplit'), open = box.hidden;
     box.hidden = !open;
