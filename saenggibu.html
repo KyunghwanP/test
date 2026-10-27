@@ -148,6 +148,38 @@
   .who .num{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--ink-soft);}
   .who .nm{font-size:16px;font-weight:800;}
 
+  /* 봉사활동 누가기록 — 나이스 입력창 모양(회색 머리, 테두리 상자 칸, 왼쪽 위 빨간 표시) */
+  .neis-wrap{overflow-x:auto;margin:12px 0 10px;border:1px solid #D5D9E0;border-radius:4px;background:#fff;}
+  html.dark .neis-wrap{background:var(--paper);border-color:var(--rule);}
+  /* 칸 너비는 비율로 고정 — PC 상세 폭(약 780px)에 한 번에 들어오게. 더 좁으면(폰) 가로로 밀어 본다 */
+  table.neis{border-collapse:collapse;width:100%;min-width:720px;table-layout:fixed;font-size:13px;font-family:'Noto Sans KR','Pretendard',sans-serif;}
+  table.neis th{background:#F4F5F7;color:#333;font-weight:500;font-size:12.5px;padding:9px 4px;line-height:1.35;border-bottom:1px solid #D5D9E0;border-right:1px solid #E6E8EC;word-break:keep-all;}   /* 나이스처럼 머리는 두 줄로 꺾인다 */
+  html.dark table.neis th{background:var(--paper-soft);color:var(--ink);border-color:var(--rule);}
+  table.neis td{padding:4px 3px;border-bottom:1px solid #EEF0F3;border-right:1px solid #F1F2F5;vertical-align:middle;color:#222;}
+  html.dark table.neis td{color:var(--ink);border-color:var(--rule);}
+  table.neis tr:last-child td{border-bottom:none;}
+  table.neis .f{position:relative;display:block;min-height:28px;line-height:1.45;padding:4px 6px;border:1px solid #9AA3AF;border-radius:2px;
+    background:#fff;cursor:copy;white-space:pre-wrap;word-break:keep-all;}
+  table.neis .f::before{content:'';position:absolute;left:0;top:0;border-top:6px solid #E5484D;border-right:6px solid transparent;}
+  table.neis .f:hover{border-color:var(--mon);background:#F5F9FF;}
+  html.dark table.neis .f{background:var(--bg-base);border-color:#47587A;}
+  html.dark table.neis .f:hover{background:var(--today-tint);}
+  table.neis .f.sel{padding-right:22px;}
+  table.neis .f.sel::after{content:'⌄';position:absolute;right:7px;top:2px;color:#555;font-size:13px;}
+  table.neis col.c-start,table.neis col.c-end{width:12%;}
+  table.neis col.c-area{width:12%;}
+  table.neis col.c-content{width:27%;}
+  table.neis col.c-type{width:8.5%;}
+  table.neis col.c-place{width:15%;}
+  table.neis col.c-hours{width:6.5%;}
+  table.neis col.c-total{width:7%;}
+  table.neis td.c-start .f,table.neis td.c-end .f{white-space:nowrap;padding:4px 4px;letter-spacing:-.2px;}
+  table.neis td.c-area .f,table.neis td.c-type .f{word-break:break-all;}
+  table.neis td.c-hours .f{text-align:right;}
+  table.neis td.c-total{text-align:right;padding-right:8px;font-variant-numeric:tabular-nums;}
+  .vol-split{margin-top:12px;}
+  .vol-split .card{background:var(--paper-soft);}
+
   /* ── 활동별 ── */
   .p-acts{width:330px;flex-shrink:0;border-right:1px solid var(--rule);background:var(--paper);}
   .acts-q{position:sticky;top:0;z-index:1;background:var(--paper);padding:10px 12px;border-bottom:1px solid var(--rule);}
@@ -421,6 +453,47 @@ function sgbParseBook(sheets){
     activities.push(a);
   }
   return { activities, schedules, skipped, students: sgbStudents(activities, actRows), actRows };
+}
+
+// ── 봉사활동 누가기록 — 나이스 입력창처럼 한 표로 ──
+// 입력 영역에 '봉사' 가 든 누가기록 활동(봉사 시트·프로젝트 봉사 시트)을 칸 이름으로 맞춰 한 표에 모은다.
+// 한 칸에 회차가 줄바꿈으로 든 것(프로젝트 봉사)은 회차마다 한 줄. 시작일자 차례, 시간 누계를 붙인다.
+const SGB_VOL_COLS = ['시작일자', '종료일자', '영역구분', '봉사활동내용', '학교/개인 구분', '장소 또는 주관 기관명', '시간', '시간 누계'];
+const sgbIsVolunteer = a => !!a && (a.tags || []).includes('누') && /봉사/.test((a.area || '') + (a.title || ''));
+function sgbVolField(label){
+  const l = sgbNorm(label);
+  if (l === '시작일자') return 'start';
+  if (l === '종료일자') return 'end';
+  if (l.includes('영역')) return 'area';
+  if (l === '봉사활동내용' || l === '활동내용') return 'content';
+  if (l.includes('학교/개인') || l === '학교개인') return 'type';
+  if (l.includes('장소') || l.includes('기관')) return 'place';
+  if (l === '시간') return 'hours';
+  return '';
+}
+function sgbDateKey(v){
+  const m = String(v || '').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+  return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : '9999';
+}
+function sgbVolunteerRows(items, actOf){
+  const out = [];
+  for (const it of items || []){
+    const a = actOf(it.a);
+    if (!sgbIsVolunteer(a)) continue;
+    const f = {};
+    (a.extra || []).forEach((label, j) => { const k = sgbVolField(label); if (k && !(k in f)) f[k] = j; });
+    const val = k => f[k] == null ? '' : String((it.x || [])[f[k]] || '');
+    // 회차 수 — 시작일자·내용·시간 칸 가운데 가장 많은 줄 수
+    const n = Math.max(1, ...['start', 'content', 'hours'].map(k => val(k) ? val(k).split('\n').length : 1));
+    const pick = (k, i) => { const parts = val(k).split('\n'); return (parts.length === n ? parts[i] : (i === 0 || parts.length === 1 ? parts[0] : '')).trim(); };
+    for (let i = 0; i < n; i++)
+      out.push({ start: pick('start', i), end: pick('end', i), area: pick('area', i), content: pick('content', i),
+        type: pick('type', i), place: pick('place', i), hours: pick('hours', i), src: a.title, srcId: a.id, k: out.length });
+  }
+  out.sort((x, y) => sgbDateKey(x.start).localeCompare(sgbDateKey(y.start)) || x.k - y.k);
+  let sum = 0;
+  for (const r of out){ const h = parseFloat(r.hours); if (!isNaN(h)) sum += h; r.total = Math.round(sum * 10) / 10; }
+  return out;
 }
 
 // 활동별 줄 → 학생별 묶음. 활동 순서대로 쌓는다.
@@ -973,6 +1046,21 @@ async function renderStuOut(){
   const ordered = [...groups.values()].sort((x, y) => groupRank(x.a) - groupRank(y.a));
   // 「전체 복사」 — 기재 문안만, 입력 영역·활동명을 머리에 붙여서
   out._all = ordered.flatMap(gr => gr.list.filter(it => it.b).map(it => { const a = actById(it.a); return `[${tagTxt(a)}] ${a.title}\n${it.b}`; })).join('\n\n');
+  // 봉사활동 누가기록 — 일반 봉사·프로젝트 봉사를 나이스 입력창처럼 날짜 순 한 표로.
+  // 「활동별로 나눠 보기」를 누르면 원래 활동 카드들이 펼쳐진다.
+  const vol = sgbVolunteerRows(d.items, actById);
+  const volHtml = vol.length ? `<div class="card vol">
+      <div class="card-h"><span class="t">봉사활동 누가기록</span><span class="d">${vol.length}건 · 총 ${vol.at(-1).total}시간 · 날짜 순</span></div>
+      <div class="where">나이스 입력창과 같은 차례입니다. 칸을 누르면 그 내용이 복사됩니다.</div>
+      <div class="neis-wrap"><table class="neis"><colgroup>${['start', 'end', 'area', 'content', 'type', 'place', 'hours', 'total'].map(k => `<col class="c-${k}">`).join('')}</colgroup><thead><tr>${SGB_VOL_COLS.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>
+        ${vol.map(r => `<tr title="${esc(r.src)}">${['start', 'end', 'area', 'content', 'type', 'place', 'hours'].map(k =>
+          `<td class="c-${k}"><span class="f${k === 'type' ? ' sel' : ''}" data-cp="${esc(r[k])}">${esc(r[k])}</span></td>`).join('')}<td class="c-total">${r.total}</td></tr>`).join('')}
+      </tbody></table></div>
+      <button type="button" class="btn" id="volSplitBtn" aria-expanded="false">활동별로 나눠 보기 ▾</button>
+      <div class="vol-split" id="volSplit" hidden>${d.items.filter(it => sgbIsVolunteer(actById(it.a))).map(it => itemCard(actById(it.a), it)).join('')}</div>
+    </div>` : '';
+  const shownGroups = ordered.map(gr => ({ ...gr, cards: gr.list.filter(it => !sgbIsVolunteer(actById(it.a))) }));
+  let volPlaced = false;
   out.innerHTML = `<div class="sheet">
     <div class="s-head">
       <div class="s-name">${esc(d.nm)}</div>
@@ -980,10 +1068,20 @@ async function renderStuOut(){
       ${out._all ? '<button type="button" class="btn line" id="copyAll">📋 기재 문안 전체 복사</button>' : ''}
       <div class="s-sum">${ordered.map(gr => `<span class="tag ${SGB_TAG_CLS[(gr.a.tags || [])[0]] || ''}">${esc(tagTxt(gr.a))} ${gr.list.length}</span>`).join('')}</div>
     </div>
-    ${ordered.map(gr => `<div class="grp">${tagHtml(gr.a.tags)}<span>${gr.list.length}건</span></div>`
-      + gr.list.map(it => itemCard(actById(it.a), it)).join('')).join('')}
+    ${shownGroups.map(gr => {
+      const head = `<div class="grp">${tagHtml(gr.a.tags)}<span>${gr.list.length}건</span></div>`;
+      // 봉사 표는 누가기록 묶음 맨 앞에 한 번
+      const volPart = (gr.a.tags || []).includes('누') && !volPlaced ? (volPlaced = true, volHtml) : '';
+      return head + volPart + gr.cards.map(it => itemCard(actById(it.a), it)).join('');
+    }).join('')}
   </div>`;
   if ($('copyAll')) $('copyAll').onclick = () => copyText(out._all);
+  if ($('volSplitBtn')) $('volSplitBtn').onclick = e => {
+    const box = $('volSplit'), open = box.hidden;
+    box.hidden = !open;
+    e.target.setAttribute('aria-expanded', String(open));
+    e.target.textContent = open ? '활동별로 나눠 보기 ▴' : '활동별로 나눠 보기 ▾';
+  };
   out.scrollTop = 0;
 }
 
@@ -1110,6 +1208,8 @@ $('hakbun').addEventListener('input', e => {
 document.body.addEventListener('click', e => {
   const b = e.target.closest('[data-copy]');
   if (b) copyText(b.closest('.card').dataset.b);
+  const f = e.target.closest('.neis .f');
+  if (f && f.dataset.cp) copyText(f.dataset.cp);
 });
 
 // ── 올리기 (관리자) ──

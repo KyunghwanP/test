@@ -119,7 +119,7 @@ const FILE2 = await xlsxFile('sgb-5.xlsx', { dropOfficers: true, robotText: '로
 // ── 1. 해석 (페이지의 순수 함수 블록을 그대로) ──
 console.log('\n[해석]');
 const code = HTML.match(/<script id="sgbParser">([\s\S]*?)<\/script>/)[1];
-const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight };')();
+const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows };')();
 const wb1 = XLSX.read(fs.readFileSync(FILE1), { type: 'buffer' });
 const parsed = P.sgbParseBook(P.sgbBookToSheets(XLSX, wb1));
 const act = t => parsed.activities.find(a => a.sheet.includes(t));
@@ -194,6 +194,25 @@ check('순서는 처음 올라간 차례대로 — 남긴 시트가 맨 뒤로 �
   ordered.activities.map(a => a.id).join() === meta1.activities.map(a => a.id).join(), ordered.activities.map(a => a.sheet));
 const plusNew = P.sgbMerge(parsed, [], [], meta1.activities.filter(a => a.id !== robot.id).map(a => a.id));
 check('목록에 없던 시트(새 시트)는 뒤에', plusNew.activities.at(-1).id === robot.id);
+
+// ── 2-1b. 봉사활동 누가기록 한 표 ──
+console.log('\n[봉사 누가기록]');
+const VA = { id: 'v1', tags: ['누'], area: '봉사활동 누가기록', title: '교과학습도우미',
+  extra: ['시작일자', '종료일자', '시간', '봉사활동영역', '학교/개인', '장소/주관기관명', '봉사활동내용'] };
+const VP = { id: 'v2', tags: ['누'], area: '봉사활동 누가기록', title: '프로젝트 봉사활동 실적',
+  extra: ['정규 동아리명', '교시', '시작일자', '요일', '활동내용', '시간', '봉사활동영역', '학교/개인', '장소/기관명'] };
+const VX = { id: 'v3', tags: ['자'], area: '자율활동 특기사항', title: '다른 활동', extra: ['시작일자'] };
+const vrows = P.sgbVolunteerRows([
+  { a: 'v1', x: ['2026.04.10.', '2026.04.10.', '4', '캠페인활동', '학교', '영남고등학교', '헌혈'] },
+  { a: 'v2', x: ['창공', '6\n6', '2026.03.11.\n2026.05.20.', '수\n수', '주제 선정\n결과 정리', '1\n1', '캠페인활동', '학교', '영남고등학교'] },
+  { a: 'v3', x: ['2026.01.01.'] },
+], id => ({ v1: VA, v2: VP, v3: VX })[id]);
+check('봉사 시트 + 프로젝트 봉사(회차 둘) → 세 줄, 날짜 순', vrows.map(r => r.start).join() === '2026.03.11.,2026.04.10.,2026.05.20.', vrows.map(r => r.start));
+check('칸 맞추기 — 내용·영역·학교/개인·장소·시간(프로젝트는 회차마다 같은 값을 되풀이)',
+  vrows[0].content === '주제 선정' && vrows[2].content === '결과 정리' && vrows[0].area === '캠페인활동' && vrows[2].place === '영남고등학교'
+  && vrows[1].end === '2026.04.10.' && vrows[0].end === '', vrows);
+check('시간 누계 1 → 5 → 6', vrows.map(r => r.total).join() === '1,5,6');
+check('봉사가 아닌 활동은 안 들어간다', !vrows.some(r => r.srcId === 'v3'));
 
 // ── 2-2. 원본 양식 뜨기 ──
 console.log('\n[원본 양식]');
@@ -354,7 +373,8 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   check('이름에 섞인 태그는 글자로만 — 실행되지 않는다', await p.evaluate(() => window.__xss === undefined));
   await p.click('#stus .stu[data-n="1"]');
   await p.waitForSelector('#stuOut .card');
-  check('학생 1-1-1 — 카드 3장', (await p.$$('#stuOut .card')).length === 3);
+  const shownCards = () => p.evaluate(() => [...document.querySelectorAll('#stuOut .card')].filter(c => !c.closest('.vol-split')).length);
+  check('학생 1-1-1 — 카드 3장(로봇·수학·봉사활동 누가기록 표)', await shownCards() === 3);
   const grps = await p.$$eval('#stuOut .grp', gs => gs.map(g => g.textContent.replace(/\s+/g, ' ').trim()));
   check('입력 영역별 묶음 — 자율·진로가 앞, 누가기록이 뒤', grps.length === 2 && grps[0].includes('자율') && grps[0].includes('진로')
     && grps[1].includes('누가기록'), grps);
@@ -367,7 +387,7 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   // 학번으로
   await p.fill('#hakbun', '30205');
   await p.press('#hakbun', 'Enter');
-  await p.waitForFunction(() => document.querySelectorAll('#stuOut .card').length === 3);
+  await p.waitForFunction(() => document.querySelector('#stuOut .s-id')?.textContent.includes('30205'));
   const t3 = await p.textContent('#stuOut');
   check('학번 30205 → 3학년 2반 5번', t3.includes('3학년 2반 5번') && t3.includes('30205') && t3.includes('박나래'));
   check('반 목록도 그 반으로 옮겨 간다', (await p.textContent('#clsPane .cl-item.on')).includes('2반') && (await p.textContent('.roster-head')).includes('3학년 2반'));
@@ -377,6 +397,17 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   const sessHead = await p.$$eval('#stuOut .sess th', ts => ts.map(t => t.textContent));
   check('회차 표 — 한 칸에 줄바꿈으로 든 회차를 풀어 보인다(회차·시작일자·요일·시간)', sessHead.join() === '회차,시작일자,요일,시간'
     && (await p.$$('#stuOut .sess tbody tr')).length === 2, sessHead);
+  // 봉사활동 누가기록 — 나이스 입력창 모양, 회차를 풀어 날짜 순, 시간 누계
+  const neis = await p.$$eval('#stuOut .neis tbody tr', trs => trs.map(tr => [...tr.cells].map(td => td.textContent.trim())));
+  check('봉사 — 나이스 칸 차례(시작일자…시간 누계)', (await p.$$eval('#stuOut .neis th', ts => ts.map(t => t.textContent))).join() ===
+    '시작일자,종료일자,영역구분,봉사활동내용,학교/개인 구분,장소 또는 주관 기관명,시간,시간 누계');
+  check('봉사 — 한 칸의 회차 둘을 두 줄로, 날짜 순, 시간 누계 6 → 12', neis.length === 2 && neis[0][0] === '2026.03.09.' && neis[1][0] === '2026.03.16.'
+    && neis[0][3] === '교과학습도우미' && neis[0][7] === '6' && neis[1][7] === '12', neis);
+  await p.click('#stuOut .neis tbody tr:first-child .c-content .f');
+  check('봉사 — 칸을 누르면 그 내용이 복사된다', await p.evaluate(() => window.__copied) === '교과학습도우미');
+  check('활동별 카드는 처음엔 접혀 있다', !(await p.isVisible('#volSplit')));
+  await p.click('#volSplitBtn');
+  check('「활동별로 나눠 보기」 — 원래 활동 카드(회차 표)가 펼쳐진다', await p.isVisible('#volSplit .sess'));
   check('회차 표에 든 칸은 아래 이름·값 목록에 다시 안 나온다', !(await p.$$eval('#stuOut .ex dt', ds => ds.map(d => d.textContent))).includes('요일'));
 
   // 이름으로 찾기 — 목록(meta)만 쓰므로 읽기가 늘지 않는다
