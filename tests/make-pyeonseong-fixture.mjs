@@ -92,7 +92,7 @@ const constOf = n => new RegExp(`^const ${n}\\s*=\\s*[^\\n]*;[^\\n]*$`, 'm').exe
 globalThis.XLSX = XLSX;
 const { psParseBook } = await import('data:text/javascript,' + encodeURIComponent([
   constOf('PS_SHEETS'), constOf('PS_COLS'), grab('psBirth'), grab('psPhone'),
-  grab('psFindCols'), grab('psParseSheet'), grab('psParseBook'), 'export { psParseBook };',
+  grab('psFindCols'), constOf('PS_MOVE_KINDS'), grab('psMoveOf'), grab('psParseSheet'), grab('psParseBook'), 'export { psParseBook };',
 ].join('\n')));
 
 const { rows } = psParseBook(XLSX.read(fs.readFileSync(xlsxPath), { type: 'buffer' }));

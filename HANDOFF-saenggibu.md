@@ -163,7 +163,9 @@ CLAUDE.md: **화면 변경은 test 먼저 → 선생님 확인 → ynhs PR·병�
 ```bash
 node tests/saenggibu.test.mjs        # 199
 node tests/s360-tabs.test.mjs        # 17
-PS_FILE= node tests/upload-pyeonseong.test.mjs         # 87 (가짜 편성표: node tests/make-pyeonseong-fixture.mjs <폴더>)
+node tests/make-pyeonseong-fixture.mjs <폴더>          # 가짜 편성표 먼저 만든다(실제 파일은 개인정보라 저장소에 없음)
+PS_FILE=<폴더>/pyeonseong.xlsx node tests/upload-pyeonseong.test.mjs   # 87
+# ※ PS_FILE 을 비워 두면 예전 세션 경로로 떨어져 '건너뜁니다' 만 찍고 끝난다 — 통과가 아니다
 node tests/html-scripts.test.mjs; node tests/sw-cache.test.mjs; node tests/usage-stats.test.mjs; node tests/overtime-tab.test.mjs
 ```
 환경 주의:
