@@ -123,7 +123,7 @@ const FILE2 = await xlsxFile('sgb-5.xlsx', { dropOfficers: true, robotText: '로
 // ── 1. 해석 (페이지의 순수 함수 블록을 그대로) ──
 console.log('\n[해석]');
 const code = HTML.match(/<script id="sgbParser">([\s\S]*?)<\/script>/)[1];
-const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows };')();
+const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches };')();
 const wb1 = XLSX.read(fs.readFileSync(FILE1), { type: 'buffer' });
 const parsed = P.sgbParseBook(P.sgbBookToSheets(XLSX, wb1));
 const act = t => parsed.activities.find(a => a.sheet.includes(t));
@@ -217,6 +217,20 @@ check('칸 맞추기 — 내용·영역·학교/개인·장소·시간(프로젝
   && vrows[1].end === '2026.04.10.' && vrows[0].end === '', vrows);
 check('시간 누계 1 → 5 → 6', vrows.map(r => r.total).join() === '1,5,6');
 check('봉사가 아닌 활동은 안 들어간다', !vrows.some(r => r.srcId === 'v3'));
+
+// ── 2-1c. 반·번호·이름 맞추기 ──
+console.log('\n[반·번호·이름]');
+// 지어낸 명렬 — 1-1-2 는 다른 이름(엑셀엔 XSS 이름), 2-1-1 은 명렬에 없고 그 이름은 2-1-2 에 있다
+const ROSTER = [{ grade: '1', room: '01', num: '01', name: '김가람' }, { grade: 1, room: 1, num: 2, name: '최다온' },
+  { grade: 3, room: 2, num: 5, name: '박 나래' }, { grade: 2, room: 1, num: 2, name: '이보람' }];
+const mis = P.sgbMismatches(parsed.activities, parsed.actRows, ROSTER);
+check('명렬과 맞대 보기 — 이름 다름 1(1-1-2), 명렬에 없는 학번 1(2-1-1)', mis.length === 2
+  && mis.some(m => m.g === 1 && m.c === 1 && m.n === 2 && m.why === '이름이 명렬과 다름' && m.expect === '최다온')
+  && mis.some(m => m.g === 2 && m.n === 1 && m.why === '명렬에 없는 학번'), mis);
+check('그 이름이 명렬에서 실제로 어디 있는지 알려 준다(이보람 → 2-1-2)', mis.find(m => m.g === 2).hint === '2-1-2');
+check('띄어쓰기·앞에 0 붙은 반·번호는 같은 것으로(박 나래, 01)', !mis.some(m => m.g === 3 || (m.g === 1 && m.n === 1)));
+const selfOnly = P.sgbMismatches([{ id: 'q', sheet: 'S' }], new Map([['q', [{ g: 1, c: 1, n: 1, nm: '가' }, { g: 1, c: 1, n: 1, nm: '가' }, { g: 1, c: 1, n: 1, nm: '나' }]]]), []);
+check('명렬이 없으면 시트끼리 — 같은 학번에 적은 쪽 이름을 짚는다', selfOnly.length === 1 && selfOnly[0].nm === '나' && selfOnly[0].why === '시트마다 이름이 다름', selfOnly);
 
 // ── 2-2. 원본 양식 뜨기 ──
 console.log('\n[원본 양식]');
@@ -316,7 +330,8 @@ async function openAs(email, { width = 1100, blockExcel = false } = {}) {
 const keep = async page => { STORE = await page.evaluate(() => window.__FS__); };
 const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
 
-// 3-1 처음 — 아무것도 없을 때
+// 3-1 처음 — 아무것도 없을 때(학교 명렬은 있다)
+STORE = { 'students/main': { students: ROSTER } };
 {
   const p = await openAs(ADMIN);
   await p.waitForSelector('#body .empty');
@@ -329,6 +344,7 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   check('올리기 전 미리보기 — 활동 6 · 창체 일정 1 · 학생 수', /활동 시트 6개/.test(panel) && /창체 일정 1개/.test(panel)
     && panel.includes(`학생 ${parsed.students.length}명`), panel.slice(0, 200));
   check('미리보기에 건너뛴 시트와 까닭', panel.includes('학생 개인별 조회') && panel.includes('숨긴 시트'));
+  check('미리보기 — 반·번호·이름 확인 2건', (await p.textContent('#upMis')).includes('확인 2건') && (await p.textContent('#upMis')).includes('2-1-2'));
   check('처음 올릴 때 — 전부 「새로 추가」, 물어볼 것 없음', panel.includes('새로 추가 7') && !(await p.$('#upMissing')), panel.slice(0, 300));
   check('원본 양식도 함께 — 7/7 시트', panel.includes('원본 양식 7/7'), panel.slice(0, 300));
   await p.click('#upGo');
@@ -341,6 +357,15 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   check('활동마다 어느 파일에서 왔는지', meta.activities.every(a => a.file === path.basename(FILE1)));
   check('양식 문서 7개(saenggibu/fmt-…)', fsKeys.filter(k => k.startsWith('saenggibu/fmt-')).length === 7);
   check('관리자에게 「엑셀로 받기」', await p.isVisible('#dlBtn'));
+  check('목록에 어긋난 줄 2건이 남는다', (meta.mismatch || []).length === 2);
+  check('「⚠ 확인 필요 2」 탭이 생긴다', await p.isVisible('#chkTab') && (await p.textContent('#chkTab')).includes('2'));
+  await p.click('#chkTab');
+  await p.waitForSelector('table.chk');
+  const chk = await p.textContent('#body');
+  check('확인 필요 — 시트별로, 학번·엑셀 이름·명렬 이름·내용', chk.includes(robot.sheet) && chk.includes('최다온') && chk.includes('명렬에 없는 학번')
+    && (await p.$$('table.chk tbody tr')).length === 2);
+  check('확인 필요 표의 이름도 글자로만', await p.evaluate(() => window.__xss === undefined));
+  await p.click('#views button[data-view="stu"]');
 
   // 엑셀로 받기 — 내려받은 파일을 열어 본다
   const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#dlBtn')]);
@@ -380,6 +405,7 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   await p.waitForSelector('#stuOut .card');
   const shownCards = () => p.evaluate(() => [...document.querySelectorAll('#stuOut .card')].filter(c => !c.closest('.vol-split')).length);
   check('학생 1-1-1 — 카드 3장(로봇·수학·봉사활동 누가기록 표)', await shownCards() === 3);
+  check('학생별 카드에도 유의 사항(로봇)', await p.$$eval('#stuOut .card', cs => cs.some(c => c.textContent.includes('진로탐색 로봇공학 캠프') && c.querySelector('.note')?.textContent.includes('담임 교사가 최종 수정'))));
   const grps = await p.$$eval('#stuOut .grp', gs => gs.map(g => g.textContent.replace(/\s+/g, ' ').trim()));
   check('입력 영역별 묶음 — 자율·진로가 앞, 누가기록이 뒤', grps.length === 2 && grps[0].includes('자율') && grps[0].includes('진로')
     && grps[1].includes('누가기록'), grps);
@@ -438,8 +464,10 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   check('활동별 — 활동 6개', (await p.$$('#acts .act')).length === 6);
   await p.click(`#acts .act[data-id="${robot.id}"]`);
   await p.waitForSelector('#actRows .card');
+  check('활동별 — 어긋난 학생 카드에 ⚠ 표시(1-1-2)', await p.$$eval('#actRows .card', cs => cs.filter(c => c.querySelector('.mis')).map(c => c.querySelector('.num').textContent)).then(x => x.join() === '1-1-2'));
   check('로봇 캠프 — 참여 학생 2명, 반별 수', (await p.$$('#actRows .card')).length === 2 && (await p.textContent('#actOut .counts')).includes('1반 2'));
-  check('로봇 캠프 — 유의 사항은 접어서', (await p.textContent('#actOut')).includes('유의 사항'));
+  check('로봇 캠프 — 유의 사항은 늘 펼쳐 굵게', await p.isVisible('#actOut .note') && (await p.textContent('#actOut .note')).includes('담임 교사가 최종 수정')
+    && +(await p.$eval('#actOut .note', n => getComputedStyle(n).fontWeight)) >= 700 && !(await p.$('#actOut details summary:has-text("유의")')));
   check('로봇 캠프 — 시트·파일 이름', (await p.textContent('#actOut')).includes('파일: sgb-4.xlsx'));
   const rowTxt = await p.textContent('#actRows');
   check('태그 섞인 문안도 글자 그대로', rowTxt.includes('<b>태그</b>') && await p.evaluate(() => !document.querySelector('#actRows b')));
