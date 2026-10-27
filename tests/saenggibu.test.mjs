@@ -5,18 +5,22 @@
 //  - 머리 줄 위 '⊙ 활  동  명:' 안내 칸, 수학과처럼 A열에 '00⊙ …' 가 한 번 더 있는 시트
 //  - 활동명 칸이 다른 시트에서 복사돼 온 시트(학급 임원 시트에 '학생회 임원'), 부서 칸에 활동명이 들어간 시트
 //  - 숨김 시트(Base), 꼬리표 없는 조회 시트, 창체 일정(월·일·교시) 시트
+//  - 서식: 로봇 시트에 원본처럼 HY헤드라인M 머리, 병합, 파란 머리줄, 숨긴 A열, 가로 인쇄 — 그리고
+//    여러 사람 손을 탄 듯 본문 글꼴을 나눔고딕 14 로 섞어 둔다(내려받으면 돋움 10 으로 맞춰져야 한다)
 // Firebase 는 모듈 주소를 가로채 메모리 대역으로 바꾼다.
 //
-// 설치: npm i -D xlsx@0.18.5 playwright
+// 설치: npm i -D xlsx@0.18.5 exceljs@4.4.0 playwright
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 const ROOT = import.meta.dirname + '/..';
 const HTML = fs.readFileSync(ROOT + '/saenggibu.html', 'utf8');
 const XLSXJS = fs.readFileSync(ROOT + '/node_modules/xlsx/dist/xlsx.full.min.js', 'utf8');
+const EXCELJS = fs.readFileSync(ROOT + '/node_modules/exceljs/dist/exceljs.min.js', 'utf8');
 
 let pass = 0, fail = 0;
 const check = (n, c, x) => c ? (pass++, console.log('  ✅', n))
@@ -80,25 +84,39 @@ function sheets({ dropOfficers = false, robotText = '로봇 코딩 캠프에 참
   return dropOfficers ? list.filter(([n]) => !n.includes('학급 임원')) : list;
 }
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'sgb-'));
-function book(opts) {
-  const wb = XLSX.utils.book_new();
-  for (const [name, aoa] of sheets(opts)) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), name);
-  wb.Workbook = { Sheets: wb.SheetNames.map(n => ({ Hidden: n === 'Base' ? 2 : 0 })) };
-  return wb;
-}
-function xlsxFile(name, opts) {
+const BLUE = 'FF0066FF';
+const thin = { style: 'thin' }, box = { top: thin, left: thin, bottom: thin, right: thin };
+async function xlsxFile(name, opts) {
+  const wb = new ExcelJS.Workbook();
+  for (const [sname, aoa] of sheets(opts)) {
+    const ws = wb.addWorksheet(sname);
+    aoa.forEach((row, i) => row.forEach((v, j) => { if (v != null) ws.getRow(i + 1).getCell(j + 1).value = v; }));
+    if (sname === 'Base') ws.state = 'veryHidden';
+    if (sname.includes('로봇')) {
+      ws.getColumn(1).hidden = true;                   // 원본처럼 학번 열을 숨겨 둔다
+      ws.getColumn(7).width = 50; ws.getColumn(8).width = 81;
+      ws.mergeCells('B1:D1'); ws.mergeCells('E1:F1');
+      ws.getCell('B1').font = { name: 'HY헤드라인M', size: 16 };
+      for (let c = 2; c <= 8; c++) Object.assign(ws.getRow(5).getCell(c), {
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: BLUE } },
+        font: { name: '돋움', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }, border: box });
+      for (let r = 6; r <= 9; r++) for (let c = 2; c <= 8; c++) Object.assign(ws.getRow(r).getCell(c), {
+        font: { name: '나눔고딕', size: 14 }, border: box, alignment: { vertical: 'top', wrapText: c >= 7 } });
+      ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+    }
+  }
   const f = path.join(TMP, name);
-  XLSX.writeFile(book(opts), f, { bookType: 'xlsx' });
+  await wb.xlsx.writeFile(f);
   return f;
 }
 // 파일 이름은 영문으로 — Playwright 가 괄호·한글이 섞인 이름은 조용히 못 넘긴다(파일 0개)
-const FILE1 = xlsxFile('sgb-4.xlsx');
-const FILE2 = xlsxFile('sgb-5.xlsx', { dropOfficers: true, robotText: '로봇 코딩 캠프에서 센서 제어를 익히고 발표함.' });
+const FILE1 = await xlsxFile('sgb-4.xlsx');
+const FILE2 = await xlsxFile('sgb-5.xlsx', { dropOfficers: true, robotText: '로봇 코딩 캠프에서 센서 제어를 익히고 발표함.' });
 
 // ── 1. 해석 (페이지의 순수 함수 블록을 그대로) ──
 console.log('\n[해석]');
 const code = HTML.match(/<script id="sgbParser">([\s\S]*?)<\/script>/)[1];
-const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge };')();
+const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight };')();
 const wb1 = XLSX.read(fs.readFileSync(FILE1), { type: 'buffer' });
 const parsed = P.sgbParseBook(P.sgbBookToSheets(XLSX, wb1));
 const act = t => parsed.activities.find(a => a.sheet.includes(t));
@@ -172,6 +190,40 @@ check('순서는 처음 올라간 차례대로 — 남긴 시트가 맨 뒤로 �
 const plusNew = P.sgbMerge(parsed, [], [], meta1.activities.filter(a => a.id !== robot.id).map(a => a.id));
 check('목록에 없던 시트(새 시트)는 뒤에', plusNew.activities.at(-1).id === robot.id);
 
+// ── 2-2. 원본 양식 뜨기 ──
+console.log('\n[원본 양식]');
+const ewb = new ExcelJS.Workbook();
+await ewb.xlsx.readFile(FILE1);
+const rform = P.sgbFormOf(ewb.getWorksheet(robot.sheet), robot, 'act');
+check('머리 줄(5행)을 찾고 칸마다 쓰임을 안다 — 순번·학년·반·번호·성명·자기 평가서·기재 내용',
+  rform.h === 5 && rform.roles.join() === ',,seq,g,c,n,nm,s,b', rform.roles);
+check('위쪽 병합(B1:D1, E1:F1)을 떠 둔다', rform.merges.includes('B1:D1') && rform.merges.includes('E1:F1'), rform.merges);
+check('숨긴 A열은 숨긴 채로', rform.cols[1].hidden === true, rform.cols[1]);
+check('열 너비', rform.cols[8].w === 81 && rform.cols[7].w === 50);
+const hdrCell = rform.rows.find(r => r.r === 5).cells.find(c => c.c === 3);
+check('머리줄 서식(파랑·흰 굵은 글씨) 그대로', hdrCell.s.fill.fgColor.argb === BLUE && hdrCell.s.font.bold === true, hdrCell);
+check('위쪽 안내 칸 글자 — 병합된 나머지 칸에는 값을 안 옮긴다',
+  rform.rows[0].cells.find(c => c.c === 2).t === '과학중점부' && !rform.rows[0].cells.some(c => (c.c === 3 || c.c === 4) && c.t));
+check('본문 칸 서식에서 글꼴은 버린다(나눔고딕 14 를 안 옮긴다)', !rform.data[8].font && rform.data[8].border && rform.data[8].alignment.wrapText);
+check('인쇄 방향 가로', rform.page.orientation === 'landscape');
+const mform = P.sgbFormOf(ewb.getWorksheet(math.sheet), math, 'act');
+check('수학 — 학년반번호 칸은 key, b=k+n 은 빈 칸', mform.roles.join() === 'key,seq,g,c,n,nm,b,'.replace(/^/, ','), mform.roles);
+check('창체 일정 — 칸마다 v{j}', P.sgbFormOf(ewb.getWorksheet(sch.sheet), sch, 'sch').roles.slice(1, 4).join() === 'v0,v1,v2');
+check('Firestore 에 담을 수 있다(배열 안 배열 없음)', !nested(rform) && !nested(mform));
+const plan = P.sgbExportPlan(P.sgbBuildDocs(parsed).meta,
+  Object.fromEntries(parsed.activities.map(a => [a.id, parsed.actRows.get(a.id)])), { [robot.id]: rform, [math.id]: mform });
+check('내려받기 — 목차 + 활동 6 + 창체 일정 1', plan.length === 8 && plan[0].name === '목차');
+const rp2 = plan.find(x => x.name === robot.sheet);
+check('로봇 시트 — 원본 칸 차례대로 값(순번 1, 학년반번호 칸 없음, 기재 내용 H열)',
+  rp2.styled && rp2.rows[0][2] === 1 && rp2.rows[0][3] === 1 && rp2.rows[0][6] === '김가람' && rp2.rows[0][8].startsWith('로봇 코딩'), rp2.rows[0]);
+check('수학 시트 — 학년반번호 칸에 10101', plan.find(x => x.name === math.sheet).rows[0][1] === '10101');
+check('양식 없는 시트는 단순한 틀(파란 머리줄)', !plan.find(x => x.name === vol.sheet).styled
+  && plan.find(x => x.name === vol.sheet).form.rows.at(-1).cells[0].s.fill.fgColor.argb === BLUE);
+const lng = '가'.repeat(200);
+check('줄 높이 — 긴 문안은 여러 줄 높이, 엑셀 한도 409 를 안 넘는다',
+  P.sgbRowHeight(rform, ['', '', 1, 1, 1, 1, '김', '', lng]) > 40 && P.sgbRowHeight(rform, ['', '', 1, 1, 1, 1, '김', '', lng.repeat(20)]) === 409);
+check('줄 높이 — 숨긴 열 글자는 안 센다(한 줄 높이 그대로)', P.sgbRowHeight(rform, [lng.repeat(5), '', 1]) === P.sgbRowHeight(rform, ['', '', 1]));
+
 // ── 3. 화면 ──
 console.log('\n[화면]');
 const ORIGIN = 'https://kyunghwanp.github.io';
@@ -202,18 +254,25 @@ const STUB = {
 };
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 let STORE = {};   // 문맥이 바뀌어도(다른 사람으로 열어도) 같은 Firestore 를 보게
-async function openAs(email, { width = 1100 } = {}) {
+async function openAs(email, { width = 1100, blockExcel = false } = {}) {
   const ctx = await b.newContext({ viewport: { width, height: 900 } });
   await ctx.route(ORIGIN + '/test/saenggibu.html*', r => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HTML }));
   await ctx.route(ORIGIN + '/test/favicon-32.png', r => r.fulfill({ status: 404, body: '' }));
   await ctx.route('https://www.gstatic.com/firebasejs/**', r =>
     r.fulfill({ status: 200, contentType: 'text/javascript', body: STUB[r.request().url().split('/').pop()] || '' }));
-  await ctx.route('https://cdnjs.cloudflare.com/**', r => r.fulfill({ status: 200, contentType: 'text/javascript', body: XLSXJS }));
+  // 서식 도구(ExcelJS)는 jsDelivr 가 먼저, cdnjs 가 예비. blockExcel 이면 둘 다 막는다(못 받았을 때)
+  const ej = r => blockExcel ? r.fulfill({ status: 404, body: '' }) : r.fulfill({ status: 200, contentType: 'text/javascript', body: EXCELJS });
+  await ctx.route('https://cdn.jsdelivr.net/**', ej);
+  await ctx.route('https://cdnjs.cloudflare.com/**', r => r.request().url().includes('exceljs') ? ej(r)
+    : r.fulfill({ status: 200, contentType: 'text/javascript', body: XLSXJS }));
   await ctx.route('https://fonts.googleapis.com/**', r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   await ctx.route('https://fonts.gstatic.com/**', r => r.abort());
   await ctx.addInitScript(([e, store]) => {
     window.__TEST_EMAIL__ = e; window.__FS__ = store;
     navigator.clipboard.writeText = async t => { window.__copied = t; };
+    // 내려받을 때 붙인 파일 이름 — Playwright 의 Chromium 은 한글 이름을 'download' 로 바꿔 버려서 여기서 본다
+    const click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () { if (this.download) window.__dlName = this.download; return click.call(this); };
   }, [email, STORE]);
   const page = await ctx.newPage();
   const errors = [];
@@ -239,6 +298,7 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
     && panel.includes(`학생 ${parsed.students.length}명`), panel.slice(0, 200));
   check('미리보기에 건너뛴 시트와 까닭', panel.includes('학생 개인별 조회') && panel.includes('숨긴 시트'));
   check('처음 올릴 때 — 전부 「새로 추가」, 물어볼 것 없음', panel.includes('새로 추가 7') && !(await p.$('#upMissing')), panel.slice(0, 300));
+  check('원본 양식도 함께 — 7/7 시트', panel.includes('원본 양식 7/7'), panel.slice(0, 300));
   await p.click('#upGo');
   await p.waitForFunction(() => document.getElementById('upPanel').textContent.includes('올렸습니다'));
   const fsKeys = await p.evaluate(() => Object.keys(window.__FS__));
@@ -247,6 +307,32 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   const meta = await p.evaluate(() => window.__FS__['saenggibu/meta']);
   check('목록에 파일 이름·올린 사람·시각', meta.file === path.basename(FILE1) && meta.by === ADMIN && !!meta.at);
   check('활동마다 어느 파일에서 왔는지', meta.activities.every(a => a.file === path.basename(FILE1)));
+  check('양식 문서 7개(saenggibu/fmt-…)', fsKeys.filter(k => k.startsWith('saenggibu/fmt-')).length === 7);
+  check('관리자에게 「엑셀로 받기」', await p.isVisible('#dlBtn'));
+
+  // 엑셀로 받기 — 내려받은 파일을 열어 본다
+  const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#dlBtn')]);
+  const dlName = await p.evaluate(() => window.__dlName);
+  check('파일 이름 — 생기부 보조자료_날짜.xlsx', /^생기부 보조자료_\d{4}-\d{2}-\d{2}\.xlsx$/.test(dlName), dlName);
+  const out = new ExcelJS.Workbook();
+  await out.xlsx.readFile(await dl.path());
+  const names = out.worksheets.map(w => w.name);
+  check('시트 — 목차 + 활동 6 + 창체 일정 1, 원래 시트 이름', names.length === 8 && names[0] === '목차' && names.includes(robot.sheet), names);
+  const toc = out.getWorksheet('목차');
+  const tocTxt = []; toc.eachRow(r => tocTxt.push(r.values.join('|')));
+  check('목차 — 활동마다 건수와 시트 이름', tocTxt.some(t => t.includes('진로탐색 로봇공학 캠프') && t.includes('|2|') && t.includes(robot.sheet)), tocTxt.slice(0, 5));
+  const rw = out.getWorksheet(robot.sheet);
+  check('원본 틀 — 머리 글꼴 HY헤드라인M 16, 병합 B1:D1', rw.getCell('B1').font?.name === 'HY헤드라인M' && rw.getCell('B1').font?.size === 16
+    && (rw.model.merges || []).includes('B1:D1'), [rw.getCell('B1').font, rw.model.merges]);
+  check('원본 틀 — 파란 머리줄, 숨긴 A열, 열 너비, 가로 인쇄', rw.getCell('C5').fill?.fgColor?.argb === BLUE && rw.getColumn(1).hidden
+    && rw.getColumn(8).width === 81 && rw.pageSetup.orientation === 'landscape');
+  check('자료 — 반·번호 순, 원본 칸 자리(B 순번 · F 성명 · H 기재 내용)', rw.getCell('B6').value === 1 && rw.getCell('F6').value === '김가람'
+    && String(rw.getCell('H6').value).startsWith('로봇 코딩') && rw.getCell('F7').value === XSS, [rw.getCell('B6').value, rw.getCell('F6').value]);
+  check('본문 글꼴은 돋움 10 으로 통일(원본 나눔고딕 14 → 돋움 10)', ['B6', 'F6', 'H6', 'H7'].every(a => rw.getCell(a).font?.name === '돋움' && rw.getCell(a).font?.size === 10),
+    rw.getCell('H6').font);
+  check('본문 테두리·줄바꿈은 원본대로', rw.getCell('H6').border?.left?.style === 'thin' && rw.getCell('H6').alignment?.wrapText === true);
+  check('수학 — 학년반번호 칸에 10101', out.getWorksheet(math.sheet).getCell('A4').value === '10101');
+  check('창체 일정 시트 — 표 그대로', out.getWorksheet(sch.sheet).getCell('K4').value === '도서관 활용교육');
 
   // 학생별
   await p.waitForSelector('#stus .stu');
@@ -318,7 +404,7 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   const keys = await p.evaluate(() => Object.keys(window.__FS__));
   const msg = await p.textContent('#upPanel');
   check('남기면 — 바뀐 문서만 쓴다(로봇 활동 · 학생 1-1-1 · 목록 둘)', ops.set === 4 && ops.del === 0, ops);
-  check('남긴 시트의 활동 문서가 그대로 있다', keys.some(k => k.startsWith(`saenggibuAct/${officer.id}`)));
+  check('남긴 시트의 활동 문서·양식 문서가 그대로 있다', keys.some(k => k.startsWith(`saenggibuAct/${officer.id}`)) && keys.includes(`saenggibu/fmt-${officer.id}`));
   check('결과 안내 — 추가·바뀜·남김·지움', msg.includes('추가 0 · 바뀜 1 · 남김 1 · 지움 0'), msg);
   const s325 = await p.evaluate(() => window.__FS__['saenggibuStu/3-2-5']);
   check('남긴 시트의 문안이 학생 문서에 그대로(3-2-5 세 건)', s325.items.length === 3, s325);
@@ -363,8 +449,8 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   await p.waitForFunction(() => document.getElementById('upPanel').textContent.includes('올렸습니다'));
   const ops = await p.evaluate(() => window.__OPS__);
   const keys = await p.evaluate(() => Object.keys(window.__FS__));
-  check('지우면 — 그 활동 문서를 지우고 3-2-5 · 목록 둘만 쓴다', ops.del === 1 && ops.set === 3
-    && !keys.some(k => k.startsWith(`saenggibuAct/${officer.id}`)), ops);
+  check('지우면 — 그 활동 문서·양식 문서를 지우고 3-2-5 · 목록 둘만 쓴다', ops.del === 2 && ops.set === 3
+    && !keys.some(k => k.startsWith(`saenggibuAct/${officer.id}`)) && !keys.includes(`saenggibu/fmt-${officer.id}`), ops);
   check('결과 안내 — 지움 1', (await p.textContent('#upPanel')).includes('남김 0 · 지움 1'));
   const s325 = await p.evaluate(() => window.__FS__['saenggibuStu/3-2-5']);
   check('3-2-5 학생 문서에서도 그 활동이 빠졌다', s325.items.length === 2, s325);
@@ -391,6 +477,32 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   const q = await openAs('');
   await q.waitForSelector('#gate', { state: 'visible' });
   check('로그인 전에는 로그인 화면', await q.isVisible('#loginBtn'));
+  await q.context().close();
+}
+// 3-5 서식 도구를 못 받았을 때 — 올리기는 되고, 받을 때 단순한 틀
+{
+  STORE = {};
+  const p = await openAs(ADMIN, { blockExcel: true });
+  await p.waitForSelector('#upBtn');
+  await p.setInputFiles('#upFile', FILE1);
+  await p.waitForSelector('#upGo');
+  check('서식을 못 읽으면 그렇다고 알리고', (await p.textContent('#upPanel')).includes('서식을 못 읽었습니다'));
+  await p.click('#upGo');
+  await p.waitForFunction(() => document.getElementById('upPanel').textContent.includes('올렸습니다'));
+  check('자료는 올라간다(양식 문서만 없다)', await p.evaluate(() => Object.keys(window.__FS__).some(k => k.startsWith('saenggibuStu/'))
+    && !Object.keys(window.__FS__).some(k => k.startsWith('saenggibu/fmt-'))));
+  await keep(p);
+  await p.context().close();
+  const q = await openAs(ADMIN);
+  await q.waitForSelector('#dlBtn');
+  const [dl] = await Promise.all([q.waitForEvent('download'), q.click('#dlBtn')]);
+  const out = new ExcelJS.Workbook();
+  await out.xlsx.readFile(await dl.path());
+  const rw = out.getWorksheet(robot.sheet);
+  let hdr = 0; rw.eachRow((r, i) => { if (!hdr && r.getCell(1).value === '학년') hdr = i; });
+  check('양식이 없으면 단순한 틀 — 안내 줄 + 파란 머리줄 + 돋움 10', hdr > 0 && rw.getRow(hdr).getCell(1).fill?.fgColor?.argb === BLUE
+    && rw.getRow(hdr + 1).getCell(4).value === '김가람' && rw.getRow(hdr + 1).getCell(4).font?.name === '돋움', hdr);
+  check('오류 없음(서식 없이)', q.errors.length === 0, q.errors);
   await q.context().close();
 }
 await b.close();

@@ -158,6 +158,7 @@
     <button type="button" data-view="sch">창체 일정</button>
   </div>
   <button class="btn" id="upBtn" type="button" style="display:none;">📤 엑셀 올리기</button>
+  <button class="btn" id="dlBtn" type="button" style="display:none;" title="목차 + 활동마다 시트 하나 — 내부결재용">📥 엑셀로 받기</button>
   <input type="file" id="upFile" accept=".xlsx,.xlsm,.xls" style="display:none;">
   <span id="fileNote"></span>
 </div>
@@ -178,7 +179,7 @@ const SGB_TAG_ORDER = ['자','진','개','누'];
 const SGB_PART_BYTES = 600000;
 
 function sgbNorm(v){ return String(v ?? '').replace(/\s+/g, ''); }
-function sgbText(v){ return String(v ?? '').replace(/\r\n?/g, '\n').replace(/[ \t ]+\n/g, '\n').trim(); }
+function sgbText(v){ return String(v ?? '').replace(/\r\n?/g, '\n').replace(/[ \t\u00a0]+\n/g, '\n').trim(); }
 // 짧은 지문(FNV-1a). 시트 이름 → 활동 id, 문서 내용 → 바뀌었는지
 function sgbHash(s){
   let h = 0x811c9dc5;
@@ -377,6 +378,193 @@ function sgbMerge(parsed, keepActs, keepScheds, order = []){
   return { ...parsed, activities, schedules, actRows, students: sgbStudents(activities, actRows) };
 }
 
+// ── 원본 양식 ── 올릴 때 시트마다 위쪽 안내 칸·머리줄·병합·열 너비·인쇄 설정과 본문 칸 서식을
+// 떠 둔다(saenggibu/fmt-{id}). 내려받을 때 그 틀에 문안을 다시 채운다. 본문 글꼴만은 하나로
+// 맞춘다 — 여러 사람이 손대 시트마다 글꼴·크기가 섞여 있다(돋움 10 이 원래 양식의 기본).
+const SGB_BODY_FONT = { name: '돋움', size: 10 };
+const SGB_BLUE = 'FF0066FF';            // 원래 양식의 머리줄 파랑
+const sgbClone = o => o == null ? null : JSON.parse(JSON.stringify(o));
+function sgbCellText(v){
+  if (v == null) return '';
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (typeof v === 'object'){
+    if (Array.isArray(v.richText)) return v.richText.map(t => t.text || '').join('');
+    if ('result' in v) return sgbCellText(v.result);
+    if ('text' in v) return String(v.text ?? '');
+    return '';
+  }
+  return String(v);
+}
+// 머리 줄 칸 이름 → 그 칸에 들어갈 값의 이름. 활동: g c n nm seq key b s x{j}, 창체 일정: v{j}
+function sgbRoles(labels, a, kind){
+  const used = new Set();
+  const take = r => { if (used.has(r)) return ''; used.add(r); return r; };
+  return labels.map(l => {
+    if (!l) return '';
+    if (kind === 'sch'){ const j = (a.cols || []).findIndex((c, k) => sgbNorm(c) === l && !used.has('v' + k)); return j >= 0 ? take('v' + j) : ''; }
+    if (l === '학년') return take('g');
+    if (l === '반') return take('c');
+    if (l === '번호') return take('n');
+    if (l === '성명' || l === '이름') return take('nm');
+    if (l === '순번' || l === '연번') return take('seq');
+    if (l === '학년반번호' || l === '학번') return take('key');
+    if (a.body && l === sgbNorm(a.body) && !used.has('b')) return take('b');
+    if (a.self && l === sgbNorm(a.self) && !used.has('s')) return take('s');
+    const j = (a.extra || []).findIndex((x, k) => sgbNorm(x) === l && !used.has('x' + k));
+    return j >= 0 ? take('x' + j) : '';
+  });
+}
+// ws: ExcelJS 시트. 머리 줄을 못 찾으면 null(그 시트는 단순 표로 나간다)
+function sgbFormOf(ws, a, kind){
+  const maxCol = Math.min(Math.max(ws.columnCount || 0, 1), 40);
+  const labelsOf = r => { const out = [''];
+    for (let c = 1; c <= maxCol; c++) out.push(sgbNorm(sgbCellText(ws.getRow(r).getCell(c).value))); return out; };
+  let h = 0;
+  for (let r = 1; r <= Math.min(ws.rowCount || 0, 25) && !h; r++){
+    const s = labelsOf(r);
+    if ((s.includes('학년') && s.includes('반') && s.includes('번호'))
+      || (s.includes('월') && s.includes('일') && (s.includes('교시') || s.some(x => x.includes('활동내용'))))) h = r;
+  }
+  if (!h) return null;
+  const rows = [];
+  for (let r = 1; r <= h; r++){
+    const R = ws.getRow(r), cells = [];
+    for (let c = 1; c <= maxCol; c++){
+      const C = R.getCell(c);
+      // 병합된 칸의 나머지 칸은 값이 으뜸 칸 것으로 읽힌다 — 값은 버리고 테두리 같은 서식만
+      const slave = C.isMerged && C.master && C.master.address !== C.address;
+      const t = slave ? '' : sgbCellText(C.value);
+      const st = sgbClone(C.style) || {};
+      if (!t && !st.border && !st.fill && !st.font) continue;
+      cells.push({ c, t, s: st });
+    }
+    rows.push({ r, ht: R.height || null, cells });
+  }
+  const merges = (ws.model?.merges || []).filter(m => +(String(m).match(/^[A-Z]+(\d+)/) || [])[1] <= h);
+  const cols = [null];
+  // 너비 0 은 숨긴 열(원본의 학번 열) — 0 을 빈 값으로 보면 다시 드러난다
+  for (let c = 1; c <= maxCol; c++){ const C = ws.getColumn(c); cols.push({ w: C.width ?? null, hidden: !!C.hidden || C.width === 0 }); }
+  const roles = sgbRoles(labelsOf(h), a, kind);
+  // 본문 칸 서식은 첫 자료 줄에서 — 글꼴은 버린다(나중에 하나로)
+  const data = [null];
+  let d = 0;
+  for (let r = h + 1; r <= Math.min(ws.rowCount || 0, h + 40) && !d; r++){
+    const vals = labelsOf(r);
+    if (kind === 'sch' ? vals.some(Boolean) : /^[1-3]$/.test(vals[roles.indexOf('g')] || '')) d = r;
+  }
+  for (let c = 1; c <= maxCol; c++){
+    const st = d ? sgbClone(ws.getRow(d).getCell(c).style) || {} : {};
+    delete st.font;
+    data.push(st);
+  }
+  const page = sgbClone(ws.pageSetup) || {};
+  delete page.printArea;
+  return { v: 1, h, rows, merges, cols, roles, data, page, views: sgbClone(ws.views) || [] };
+}
+// 양식이 없을 때(못 읽었거나 옛 기록) 쓰는 단순한 틀 — 원래 양식과 같은 파랑 머리줄
+function sgbPlainForm(a, kind){
+  const thin = { style: 'thin', color: { argb: 'FF999999' } };
+  const box = { top: thin, left: thin, bottom: thin, right: thin };
+  const info = [['부서', a.dept], ['활동명', a.title], ['입력 영역', a.area], ['입력 경로', a.path], ['유의 사항', a.note]]
+    .filter(([, v]) => v);
+  const labels = kind === 'sch' ? (a.cols || [])
+    : ['학년', '반', '번호', '성명', ...(a.extra || []), ...(a.self ? [a.self] : []), ...(a.body ? [a.body] : [])];
+  const rows = info.map(([k, v], i) => ({ r: i + 1, ht: null, cells: [
+    { c: 1, t: k, s: { font: { name: '돋움', size: 10, bold: true } } },
+    { c: 2, t: v, s: { font: { name: i === 1 ? 'HY헤드라인M' : '돋움', size: i === 1 ? 14 : 10 }, alignment: { wrapText: true, vertical: 'top' } } }] }));
+  const h = info.length + 2;
+  rows.push({ r: h, ht: null, cells: labels.map((t, k) => ({ c: k + 1, t, s: {
+    font: { name: '돋움', size: 10, bold: true, color: { argb: 'FFFFFFFF' } },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: SGB_BLUE } },
+    alignment: { horizontal: 'center', vertical: 'middle', wrapText: true }, border: box } })) });
+  const merges = info.map((_, i) => `B${i + 1}:${String.fromCharCode(64 + Math.max(2, labels.length))}${i + 1}`);
+  const roles = [''].concat(sgbRoles(labels.map(sgbNorm), a, kind));
+  const cols = [null].concat(labels.map((l, k) => ({ w: kind === 'sch' ? (k >= labels.length - 2 ? 30 : 7)
+    : k < 3 ? 5 : k === 3 ? 9 : /^(b|s)$/.test(roles[k + 1]) ? 70 : 16, hidden: false })));
+  const data = [null].concat(labels.map(() => ({ border: box, alignment: { vertical: 'top', wrapText: true } })));
+  return { v: 1, h, rows, merges: labels.length > 1 ? merges : [], cols, roles, data,
+    page: { orientation: kind === 'sch' ? 'landscape' : 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 },
+    views: [{ state: 'frozen', ySplit: h }] };
+}
+// 줄바꿈 — 기재 문안·학생 글 칸은 늘, 나머지는 원본 칸이 줄바꿈이었을 때만(봉사 시트처럼 한 줄로 쓰는 표가 있다)
+function sgbWraps(form, col){
+  const role = (form.roles || [])[col] || '';
+  return role === 'b' || role === 's' || !!(((form.data || [])[col] || {}).alignment || {}).wrapText;
+}
+// 줄 높이 — 긴 문안이 잘려 보이지 않게 미리 잰다(엑셀이 열 때 늘려 준다고 믿지 않는다).
+// 한글 한 자는 숫자 1.6칸쯤, 돋움 10 한 줄은 12.75pt — 원본 시트의 높이에 맞춰 잡은 값
+function sgbRowHeight(form, vals){
+  let lines = 1;
+  vals.forEach((v, col) => {
+    if (!col || v === '' || v == null || !sgbWraps(form, col)) return;
+    const c = (form.cols || [])[col];
+    if (c && (c.hidden || c.w === 0)) return;
+    const w = Math.max(4, (c && c.w ? c.w : 9) - 1);
+    let n = 0;
+    for (const para of String(v).split('\n')){
+      let u = 0;
+      for (const ch of para) u += ch.charCodeAt(0) > 0x2e80 ? 1.6 : 1;
+      n += Math.max(1, Math.ceil(u / w));
+    }
+    lines = Math.max(lines, n);
+  });
+  return Math.min(409, Math.max(15, Math.ceil(lines * 12.75 + 3)));   // 엑셀 한 줄 높이 한도 409pt
+}
+function sgbDataStyle(form, col){
+  const base = sgbClone((form.data || [])[col]) || {};
+  const st = { ...base, font: { ...SGB_BODY_FONT } };
+  if (sgbWraps(form, col))
+    st.alignment = { ...(base.alignment || {}), wrapText: true, vertical: (base.alignment || {}).vertical || 'top' };
+  return st;
+}
+// 한 줄의 값 — 원본 칸 차례대로(roles). seq 는 차례 번호, key 는 학년반번호(30101)
+function sgbRowValues(roles, r, i){
+  const p2 = n => String(n).padStart(2, '0');
+  return roles.map(role => {
+    if (!role) return '';
+    if (role === 'g' || role === 'c' || role === 'n') return r[role];
+    if (role === 'nm') return r.nm || '';
+    if (role === 'seq') return i + 1;
+    if (role === 'key') return `${r.g}${p2(r.c)}${p2(r.n)}`;
+    if (role === 'b' || role === 's') return r[role] || '';
+    if (role[0] === 'x') return (r.x || [])[+role.slice(1)] || '';
+    if (role[0] === 'v') return (r.v || [])[+role.slice(1)] || '';
+    return '';
+  });
+}
+// 내부결재용 내려받기 — 목차 + 활동마다 시트 하나(원래 시트 이름) + 창체 일정.
+// rowsById: 활동 id → 저장된 줄들, forms: id → 양식(없으면 단순한 틀).
+// 엑셀 시트 이름 규칙(31자, : \ / ? * [ ] 금지, 겹치면 안 됨)을 맞춘다.
+function sgbExportPlan(meta, rowsById, forms = {}){
+  const used = new Set();
+  const sheetName = raw => {
+    const base = String(raw || '시트').replace(/[:\\/?*\[\]]/g, '_').trim().slice(0, 31) || '시트';
+    let name = base, k = 2;
+    while (used.has(name.toLowerCase())){ const tail = `~${k++}`; name = base.slice(0, 31 - tail.length) + tail; }
+    used.add(name.toLowerCase());
+    return name;
+  };
+  const tocName = sheetName('목차');
+  const toc = [];
+  const out = [];
+  for (const a of meta.activities || []){
+    const name = sheetName(a.sheet);
+    const form = forms[a.id] || sgbPlainForm(a, 'act');
+    const list = [...(rowsById[a.id] || [])].sort((x, y) => x.g - y.g || x.c - y.c || x.n - y.n);
+    out.push({ name, form, rows: list.map((r, i) => sgbRowValues(form.roles, r, i)), styled: !!forms[a.id] });
+    toc.push([(a.tags || []).map(t => SGB_TAGS[t] || t).join(' 또는 '), a.title, a.dept, a.area, list.length, name, a.file || '']);
+  }
+  for (const sc of meta.schedules || []){
+    const name = sheetName(sc.sheet);
+    const form = forms[sc.id] || sgbPlainForm(sc, 'sch');
+    out.push({ name, form, rows: (sc.rows || []).map((r, i) => sgbRowValues(form.roles, r, i)), styled: !!forms[sc.id] });
+    toc.push(['창체 일정', sc.title, sc.dept, sc.area, (sc.rows || []).length, name, sc.file || '']);
+  }
+  const tocForm = sgbPlainForm({ title: '생기부 보조자료 — 목차', cols: ['구분', '활동명', '부서', '입력 영역', '건수', '시트', '파일'] }, 'sch');
+  tocForm.cols = [null, ...[14, 40, 14, 30, 7, 34, 26].map(w => ({ w, hidden: false }))];
+  return [{ name: tocName, form: tocForm, rows: toc.map(v => ['', ...v]), styled: false }, ...out];
+}
+
 // 저장할 문서들. 학생 하나 = 문서 하나(학생별 보기 = 읽기 1번),
 // 활동 하나 × 학년 = 문서 하나(활동별 보기 = 학년마다 읽기 1번) — 크면 여러 조각으로.
 function sgbBuildDocs(parsed, partBytes = SGB_PART_BYTES){
@@ -426,6 +614,9 @@ const firebaseConfig = {
 };
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 const XLSX_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+// 서식(글꼴·칸 색·병합·인쇄 설정)을 읽고 쓰는 쪽. SheetJS 무료판은 서식을 못 쓴다. 앞 주소가 막히면 다음 주소.
+const EXCELJS_SRC = ['https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js',
+                     'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'];
 
 const fbApp  = initializeApp(firebaseConfig);
 const fbAuth = getAuth(fbApp);
@@ -660,6 +851,21 @@ document.body.addEventListener('click', e => {
 
 // ── 올리기 (관리자) ──
 const isAdmin = () => fbAuth.currentUser?.email === ADMIN_EMAIL;
+function loadScript(src){
+  return new Promise((ok, no) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = ok; s.onerror = () => { s.remove(); no(new Error(src)); };
+    document.head.appendChild(s);
+  });
+}
+async function loadExcelJS(){
+  for (const src of EXCELJS_SRC){
+    if (window.ExcelJS) break;
+    try { await loadScript(src); } catch (e) {}
+  }
+  if (!window.ExcelJS) throw new Error('서식 도구(ExcelJS)를 못 받았습니다');
+  return window.ExcelJS;
+}
 function loadXlsx(){
   if (window.XLSX) return Promise.resolve(window.XLSX);
   return new Promise((ok, no) => {
@@ -683,18 +889,36 @@ $('upFile').onchange = async e => {
   const p = $('upPanel'); p.style.display = 'block'; p.innerHTML = '읽는 중…';
   try {
     const XLSX = await loadXlsx();
-    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+    const buf = await f.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
     const parsed = sgbParseBook(sgbBookToSheets(XLSX, wb));
+    // 원본 양식 — 못 읽어도 올리기는 된다(내려받을 때 그 시트만 단순한 틀)
+    const forms = {};
+    let formErr = '';
+    try {
+      p.innerHTML = '서식 읽는 중…';
+      const EJ = await loadExcelJS();
+      const ewb = new EJ.Workbook();
+      await ewb.xlsx.load(buf);
+      for (const [kind, list] of [['act', parsed.activities], ['sch', parsed.schedules]]) for (const a of list){
+        const ws = ewb.getWorksheet(a.sheet);
+        const fm = ws ? sgbFormOf(ws, a, kind) : null;
+        if (fm) forms[a.id] = fm;
+      }
+    } catch (err) { formErr = err.message || String(err); }
     // 어느 파일에서 온 시트인지 남긴다(여러 파일을 더해 가며 올릴 수 있다). 지문에는 안 넣는다.
     [...parsed.activities, ...parsed.schedules].forEach(a => { a.file = f.name; });
     // 맞대 볼 기준은 지금 올라가 있는 목록 — 화면이 들고 있는 것 말고 새로 읽는다
     const oldMeta = (await getDoc(doc(fbDb, 'saenggibu', 'meta'))).data() || null;
     const cmp = sgbCompare(oldMeta, parsed);
     const tagKind = (list, side) => list.map(x => ({ ...x[side], kind: x.kind }));
-    _pending = { parsed, cmp, file: f.name };
+    _pending = { parsed, cmp, file: f.name, forms };
+    const nForms = Object.keys(forms).length, nAll = parsed.activities.length + parsed.schedules.length;
     p.innerHTML = `<h3>${esc(f.name)}</h3>
       <ul>
         <li>이 파일: 활동 시트 <b>${parsed.activities.length}</b>개 · 창체 일정 <b>${parsed.schedules.length}</b>개 · 학생 <b>${parsed.students.length}</b>명 · 기재 <b>${parsed.activities.reduce((n, a) => n + a.count, 0).toLocaleString()}</b>건</li>
+        <li>${formErr ? `<span class="err">서식을 못 읽었습니다(${esc(formErr)}) — 자료는 올라가고, 내려받을 때 단순한 표로 나옵니다.</span>`
+          : `원본 양식 ${nForms}/${nAll}개 시트 함께 저장 (내려받을 때 그 틀에 채웁니다)`}</li>
         ${parsed.skipped.length ? `<li>건너뛴 시트: ${parsed.skipped.map(x => `${esc(x.name)} <span style="color:var(--ink-soft)">(${esc(x.why)})</span>`).join(', ')}</li>` : ''}
       </ul>
       ${cmp.added.length ? `<div class="sec" id="upAdded"><b>새로 추가 ${cmp.added.length}</b>
@@ -724,6 +948,75 @@ $('upFile').onchange = async e => {
   }
 };
 
+// ── 엑셀로 받기 (관리자) ── 활동 문서를 전부 읽어(조각 수만큼) 원본 양식에 채워 한 파일로
+async function buildWorkbook(EJ, plan){
+  const wb = new EJ.Workbook();
+  wb.creator = '영남고 교사 대시보드';
+  for (const sh of plan){
+    const f = sh.form;
+    const ws = wb.addWorksheet(sh.name, { views: f.views || [], pageSetup: f.page || {} });
+    (f.cols || []).forEach((c, i) => {
+      if (!i || !c) return;
+      const col = ws.getColumn(i);
+      if (c.w) col.width = c.w;
+      if (c.hidden || c.w === 0) col.hidden = true;
+    });
+    for (const row of f.rows || []){
+      const R = ws.getRow(row.r);
+      if (row.ht) R.height = row.ht;
+      for (const cell of row.cells || []){
+        const C = R.getCell(cell.c);
+        if (cell.t !== '') C.value = cell.t;
+        if (cell.s) C.style = sgbClone(cell.s);
+      }
+    }
+    for (const m of f.merges || []) { try { ws.mergeCells(m); } catch (e) {} }
+    sh.rows.forEach((vals, i) => {
+      const R = ws.getRow(f.h + 1 + i);
+      R.height = sgbRowHeight(f, vals);
+      for (let col = 1; col < vals.length; col++){
+        if (!(f.roles || [])[col] && !(f.data || [])[col]) continue;
+        const C = R.getCell(col);
+        if (vals[col] !== '' && vals[col] != null) C.value = vals[col];
+        C.style = sgbDataStyle(f, col);
+      }
+    });
+  }
+  return wb.xlsx.writeBuffer();
+}
+$('dlBtn').onclick = async () => {
+  const btn = $('dlBtn');
+  if (!META){ toast('올라온 자료가 없습니다'); return; }
+  btn.disabled = true;
+  const label = btn.textContent;
+  try {
+    await loadMeta();
+    const EJ = await loadExcelJS();
+    const rowsById = {}, forms = {};
+    const all = [...(META.activities || []), ...(META.schedules || [])];
+    for (let i = 0; i < all.length; i++){
+      const a = all[i];
+      btn.textContent = `📥 모으는 중… ${i + 1}/${all.length}`;
+      if ((META.activities || []).includes(a)) rowsById[a.id] = await loadAllRows(a);
+      const fm = await getDoc(doc(fbDb, 'saenggibu', `fmt-${a.id}`));
+      if (fm.exists()) forms[a.id] = fm.data();
+    }
+    btn.textContent = '📥 만드는 중…';
+    const buf = await buildWorkbook(EJ, sgbExportPlan(META, rowsById, forms));
+    const d = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    const link = document.createElement('a');
+    link.href = url; link.download = `생기부 보조자료_${d}.xlsx`;
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    toast('엑셀 파일을 만들었습니다');
+  } catch (err) {
+    toast('만들지 못했습니다: ' + (err.message || err));
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+};
+
 // 남기기로 한 옛 활동의 줄을 저장된 조각에서 모은다. 하나라도 못 읽으면 멈춘다 —
 // 그대로 올리면 그 활동이 조용히 비어 버린다.
 async function loadAllRows(a){
@@ -740,7 +1033,7 @@ async function loadAllRows(a){
 // 무엇을 썼는지는 saenggibu/manifest 에 문서마다 지문으로 남긴다.
 async function doUpload(){
   if (!_pending) return;
-  const { parsed, cmp, file } = _pending;
+  const { parsed, cmp, file, forms } = _pending;
   const msg = $('upMsg'), go = $('upGo');
   go.disabled = true;
   try {
@@ -753,6 +1046,12 @@ async function doUpload(){
     const order = [...(cmp.old?.activities || []), ...(cmp.old?.schedules || [])].map(a => a.id);
     const merged = sgbMerge(parsed, keepActs, keep.filter(x => x.kind === 'sch').map(x => x.old), order);
     const built = sgbBuildDocs(merged);
+    // 양식 문서 — 이번 파일 시트는 새로 뜬 것, 남긴 시트는 저장돼 있던 것을 그대로(안 넣으면 지워진다)
+    for (const [id, fm] of Object.entries(forms || {})) built.docs.set(`saenggibu/fmt-${id}`, fm);
+    for (const x of keep){
+      const snap = await getDoc(doc(fbDb, 'saenggibu', `fmt-${x.old.id}`));
+      if (snap.exists()) built.docs.set(`saenggibu/fmt-${x.old.id}`, snap.data());
+    }
     const metaBytes = new TextEncoder().encode(JSON.stringify(built.meta)).length;
     if (metaBytes > 900000) throw new Error(`목록 문서가 너무 큽니다(${Math.round(metaBytes / 1024)}KB) — 나눠 저장하도록 고쳐야 합니다`);
     const old = (await getDoc(doc(fbDb, 'saenggibu', 'manifest'))).data()?.h || {};
@@ -808,6 +1107,8 @@ onAuthStateChanged(fbAuth, async user => {
   }
   gate.style.display = 'none';
   $('upBtn').style.display = isAdmin() ? '' : 'none';
+  // 전교생 문안이 한 파일에 담긴다 — 받기는 지금은 관리자만
+  $('dlBtn').style.display = isAdmin() ? '' : 'none';
   try { await loadMeta(); }
   catch (e) { $('body').innerHTML = `<div class="empty err">불러오지 못했습니다: ${esc(e.message || e)}</div>`; return; }
   render();
