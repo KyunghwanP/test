@@ -124,6 +124,7 @@ node tests/seat-inpage.test.mjs                    # 자리 배치 '크게 보�
 node tests/weekly-chips-live.test.mjs              # 주차 칩이 새로고침 없이 늘어나는지
 node tests/usage-stats.test.mjs                    # 사용 현황 · 전체 새로고침
 node tests/saenggibu.test.mjs                      # 생기부 보조자료 — 엑셀 해석 · 저장 문서 · 화면
+node tests/s360-tabs.test.mjs                      # 학생 종합검색 — 성적 / 생기부 보조자료 탭
 node tests/weekly-render-mode.test.mjs             # 주간교육활동을 원본대로 그리는가
 node tests/consult-weekend.test.mjs                # 상담 주말 슬롯 + 7칸 폭 측정
 node tests/task-share.test.mjs                     # 공유받은 업무에 작성자·함께 받은 사람

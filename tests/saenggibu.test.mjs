@@ -652,6 +652,34 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
   check('로그인 전에는 로그인 화면', await q.isVisible('#loginBtn'));
   await q.context().close();
 }
+// 3-4a 한 학생만 보기 — 종합검색 「생기부 보조자료」 탭이 띄우는 모양
+{
+  const ctx = await b.newContext({ viewport: { width: 900, height: 700 } });
+  await ctx.route(ORIGIN + '/test/saenggibu.html*', r => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HTML }));
+  await ctx.route('https://www.gstatic.com/firebasejs/**', r =>
+    r.fulfill({ status: 200, contentType: 'text/javascript', body: STUB[r.request().url().split('/').pop()] || '' }));
+  await ctx.route('https://teacher-api.pkh910518.workers.dev/**', r => r.fulfill({ status: 404, body: '' }));
+  await ctx.route('https://fonts.googleapis.com/**', r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+  await ctx.route('https://cdn.jsdelivr.net/**', r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+  await ctx.route('https://fonts.gstatic.com/**', r => r.abort());
+  await ctx.addInitScript(([e, store]) => {
+    window.__TEST_EMAIL__ = e; window.__FS__ = store; window.__h = [];
+    window.addEventListener('message', ev => { if (ev.data?.type === 'sgb-height') window.__h.push(ev.data.h); });
+  }, [KIM, STORE]);
+  const p = await ctx.newPage();
+  const errors = []; p.on('pageerror', e => errors.push(e.message));
+  await p.goto(ORIGIN + '/test/saenggibu.html?in=1&embed=1&k=1-1-1');
+  await p.waitForSelector('#stuOut .card');
+  check('한 학생만 보기 — 위쪽 줄·이동 줄·이름·사진은 숨기고 그 학생 카드만', !(await p.isVisible('.top')) && !(await p.isVisible('.s-name'))
+    && !(await p.isVisible('#mNav')) && (await p.textContent('#stuOut')).includes('진로탐색 로봇공학 캠프'));
+  check('한 학생만 보기 — 높이를 앱에 알린다', await p.evaluate(() => window.__h.length > 0 && window.__h.at(-1) > 100));
+  await p.goto(ORIGIN + '/test/saenggibu.html?in=1&embed=1&k=1-1-3');
+  await p.waitForSelector('#stuOut .empty');
+  check('한 학생만 보기 — 자료 없는 학생은 그렇다고', (await p.textContent('#stuOut')).includes('생기부 보조자료가 없습니다'));
+  check('오류 없음(한 학생만 보기)', errors.length === 0, errors);
+  await ctx.close();
+}
+
 // 3-4b 학적 변동 — 떠난 학생 목록(students/changed)이 있을 때
 {
   const saved = STORE;

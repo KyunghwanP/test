@@ -15,6 +15,8 @@
     if (e.key === 'ynhs-dark') document.documentElement.classList.toggle('dark', e.newValue === '1');
   });
   if (/[?&]in=1/.test(location.search)) document.documentElement.classList.add('in-app');
+  // 한 학생만 보기 — 앱의 학생 종합검색 「생기부 보조자료」 탭이 띄운다(?embed=1&k=학년-반-번호)
+  if (/[?&]embed=1/.test(location.search)) document.documentElement.classList.add('embed');
 </script>
 <style>
   /* 생기부 보조자료 — 부서·교과가 모아 낸 기재 문안 통합 엑셀을 학생별·활동별로 본다.
@@ -118,6 +120,13 @@
   .s-photo{width:96px;height:128px;object-fit:cover;border-radius:10px;border:1px solid var(--rule);background:var(--paper-soft);cursor:zoom-in;flex-shrink:0;}
   .stu .ph{display:none;width:28px;height:37px;object-fit:cover;border-radius:5px;border:1px solid var(--rule);flex-shrink:0;}
   .stu .ph.on{display:block;}
+  /* 한 학생만 보기(종합검색 안) — 위쪽 줄·이동 줄·이름·사진은 종합검색 쪽에 이미 있다 */
+  html.embed,html.embed body{height:auto;background:var(--paper);}
+  html.embed .top,html.embed .m-nav,html.embed .s-name,html.embed .s-id,html.embed .s-photo{display:none !important;}
+  html.embed #body{overflow:visible;}
+  html.embed .p-detail,html.embed .embed-out{padding:0;background:transparent;}
+  html.embed .sheet{max-width:none;border:none;box-shadow:none;padding:2px 0 8px;}
+  html.embed .s-head{padding-bottom:10px;}
   .zoom{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.6);padding:16px;cursor:zoom-out;}
   .zoom.open{display:flex;}
   .zoom-box{background:var(--paper);border-radius:16px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:8px;}
@@ -1018,6 +1027,7 @@ const esc = v => v == null ? '' : String(v)
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
   .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const LS = 'ynhs-sgb';
+const EMBED = new URLSearchParams(location.search).get('embed') === '1';   // 한 학생만 보기(종합검색 안)
 let st = { view: 'stu', g: '', c: '', n: '', act: '', ag: '', ac: '', q: '', sg: '', sf: '', find: '' };
 // 폰: 학생을 고르면 상세만 화면 가득(목록은 숨김). '← 명단' 을 누르면 다시 목록. 저장하지 않는다.
 let mList = true;
@@ -1810,8 +1820,25 @@ onAuthStateChanged(fbAuth, async user => {
   $('dlBtn').style.display = isAdmin() ? '' : 'none';
   try { await loadMeta(); }
   catch (e) { $('body').innerHTML = `<div class="empty err">불러오지 못했습니다: ${esc(e.message || e)}</div>`; return; }
+  if (EMBED) return renderEmbed();
   render();
 });
+
+// ── 한 학생만 보기(종합검색 안) — 상세만 그리고, 높이를 앱에 알려 iframe 을 늘리게 한다 ──
+function postHeight(){
+  try { parent.postMessage({ type: 'sgb-height', h: Math.ceil(document.documentElement.scrollHeight) }, location.origin); } catch (e) {}
+}
+async function renderEmbed(){
+  const m = String(new URLSearchParams(location.search).get('k') || '').match(/^(\d)-(\d+)-(\d+)$/);
+  if (!META || !m){ $('body').innerHTML = `<div class="empty">${META ? '학생을 찾지 못했습니다.' : '아직 올라온 생기부 보조자료가 없습니다.'}</div>`; postHeight(); return; }
+  [, st.g, st.c, st.n] = m;
+  _curList = [];
+  $('body').innerHTML = '<section class="embed-out" id="stuOut"></section>';
+  await renderStuOut();
+  if ($('stuOut').querySelector('.empty')) $('stuOut').innerHTML = '<div class="empty">이 학생의 생기부 보조자료가 없습니다.</div>';
+  postHeight();
+  try { new ResizeObserver(postHeight).observe(document.body); } catch (e) {}
+}
 // 앱이 탭에 다시 들어올 때 보내는 신호 — 그사이 새로 올라왔을 수 있다
 window.addEventListener('message', e => {
   if (e.origin !== location.origin || e.data?.type !== 'sgb-refresh' || !fbAuth.currentUser) return;
