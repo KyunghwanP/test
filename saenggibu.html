@@ -230,6 +230,16 @@ function sgbFindHeader(rows){
   return null;
 }
 
+const SGB_WEEKDAY = /^[월화수목금토일](\s*\n\s*[월화수목금토일])*$/;
+function sgbNameBlankCols(s, labels, sample){
+  const width = Math.max(s.length, ...sample.map(r => (r || []).length));
+  for (let j = 0; j < width; j++){
+    if (s[j]) continue;
+    const vals = sample.map(r => sgbText((r || [])[j])).filter(Boolean);
+    if (vals.length && vals.every(v => SGB_WEEKDAY.test(v))){ s[j] = '요일'; labels[j] = '요일'; }
+  }
+}
+
 // 칸의 쓰임: 기재 문안(body) · 학생이 쓴 글(self) · 나머지 정보(extra) · 버림(skip)
 function sgbRole(h){
   if (!h || /^(순번|연번|학년반번호|학번)$/.test(h) || /^[a-z]+=/i.test(h)) return 'skip';
@@ -251,7 +261,9 @@ function sgbBookToSheets(XLSX, wb){
 function sgbParseBook(sheets){
   const activities = [], schedules = [], skipped = [];
   const actRows = new Map(), ids = new Set();
+  let pos = -1;
   for (const sh of sheets){
+    pos++;                                   // 파일 안 시트 차례 — 내려받을 때 원본 순서대로
     const name = String(sh.name || '').trim();
     if (sh.hidden){ skipped.push({ name, why: '숨긴 시트' }); continue; }
     const info = sgbSheetInfo(name);
@@ -263,20 +275,21 @@ function sgbParseBook(sheets){
     let id = 'a' + sgbHash(name);
     while (ids.has(id)) id += 'x';
     ids.add(id);
-    const base = { id, sheet: name, tags: info.tags, rounds: info.rounds,
+    const base = { id, pos, sheet: name, tags: info.tags, rounds: info.rounds,
       // 부서 칸에 활동명이 그대로 들어간 시트가 있다 — 그럴 땐 시트 이름 앞쪽(예: 연구부)을 쓴다
       title: head['활동명'] || info.short, short: info.short,
       dept: head._dept && head._dept !== head['활동명'] ? head._dept : info.deptAbbr,
       area: head['입력영역'] || '', path: head['입력경로'] || '', note: head['유의사항'] || '' };
     const labels = (rows[hd.i] || []).map(v => sgbText(v).replace(/\s+/g, ' '));
+    // 머리 이름이 빈 칸 중 요일 글자(월~일)로만 찬 칸은 '요일' — 프로젝트 봉사 시트의 J열
+    if (hd.kind === 'student') sgbNameBlankCols(hd.s, labels, rows.slice(hd.i + 1, hd.i + 41));
 
     if (hd.kind === 'schedule'){
       const keep = hd.s.map((h, j) => h ? j : -1).filter(j => j >= 0);
+      // 표 중간의 빈 줄도 남긴다(월 사이 띄운 줄) — 내려받을 때 원본 줄 자리 그대로. 끝의 빈 줄만 뗀다.
       const out = [];
-      for (const r of rows.slice(hd.i + 1)){
-        const v = keep.map(j => sgbText((r || [])[j]));
-        if (v.some(Boolean)) out.push({ v });            // Firestore 는 배열 안 배열을 못 담는다
-      }
+      for (const r of rows.slice(hd.i + 1)) out.push({ v: keep.map(j => sgbText((r || [])[j])) });   // Firestore 는 배열 안 배열을 못 담는다
+      while (out.length && !out.at(-1).v.some(Boolean)) out.pop();
       const g = +(((name + ' ' + base.title).match(/([1-3])\s*학년/) || [])[1] || 0);
       const cols = keep.map(j => labels[j]);
       schedules.push({ ...base, grade: g, cols, rows: out,
@@ -309,7 +322,7 @@ function sgbParseBook(sheets){
       if (b) item.b = b;
       if (sv) item.s = sv;
       if (x.some(Boolean)) item.x = x;
-      rowsOut.push({ g, c, n, nm, ...item });
+      rowsOut.push({ g, c, n, nm, ...item, i: rowsOut.length });   // i: 시트 안 줄 차례(내려받을 때 원본 순서)
       const ck = g + '-' + c;
       byClass[ck] = (byClass[ck] || 0) + 1;
     }
@@ -375,7 +388,9 @@ function sgbMerge(parsed, keepActs, keepScheds, order = []){
     .sort((p, q) => p[1] - q[1]).map(p => p[0]);
   activities = byOrder(activities);
   const schedules = byOrder([...parsed.schedules, ...keepScheds]);
-  return { ...parsed, activities, schedules, actRows, students: sgbStudents(activities, actRows) };
+  // 활동·창체 일정을 섞은 시트 차례 — 이미 있던 것은 옛 차례, 새 시트는 파일 안 차례로 뒤에
+  const all = byOrder([...activities, ...schedules].sort((p, q) => (p.pos ?? 999) - (q.pos ?? 999)));
+  return { ...parsed, activities, schedules, actRows, order: all.map(x => x.id), students: sgbStudents(activities, actRows) };
 }
 
 // ── 원본 양식 ── 올릴 때 시트마다 위쪽 안내 칸·머리줄·병합·열 너비·인쇄 설정과 본문 칸 서식을
@@ -445,6 +460,24 @@ function sgbFormOf(ws, a, kind){
   // 너비 0 은 숨긴 열(원본의 학번 열) — 0 을 빈 값으로 보면 다시 드러난다
   for (let c = 1; c <= maxCol; c++){ const C = ws.getColumn(c); cols.push({ w: C.width ?? null, hidden: !!C.hidden || C.width === 0 }); }
   const roles = sgbRoles(labelsOf(h), a, kind);
+  // 이름 없는 머리 칸 — 값이 학번(30101)이면 key, 요일이면 그 활동의 '요일' 칸.
+  // 학생 줄만 본다(표 아래 빈 줄의 수식이 '0000' 같은 값을 내는 시트가 있다)
+  const gcol = roles.indexOf('g');
+  for (let c = 1; c <= maxCol; c++){
+    if (roles[c]) continue;
+    const vals = [];
+    for (let r = h + 1; r <= Math.min(ws.rowCount || 0, h + 40); r++){
+      if (gcol > 0 && !/^[1-3]$/.test(sgbCellText(ws.getRow(r).getCell(gcol).value).trim())) continue;
+      const t = sgbCellText(ws.getRow(r).getCell(c).value).trim();
+      if (t) vals.push(t);
+    }
+    if (!vals.length) continue;
+    if (kind !== 'sch' && !roles.includes('key') && vals.every(v => /^[1-3]\d{4}$/.test(v))) roles[c] = 'key';
+    else if (kind !== 'sch' && vals.every(v => SGB_WEEKDAY.test(v))){
+      const j = (a.extra || []).indexOf('요일');
+      if (j >= 0 && !roles.includes('x' + j)) roles[c] = 'x' + j;
+    }
+  }
   // 본문 칸 서식은 첫 자료 줄에서 — 글꼴은 버린다(나중에 하나로)
   const data = [null];
   let d = 0;
@@ -452,14 +485,50 @@ function sgbFormOf(ws, a, kind){
     const vals = labelsOf(r);
     if (kind === 'sch' ? vals.some(Boolean) : /^[1-3]$/.test(vals[roles.indexOf('g')] || '')) d = r;
   }
+  // 칸마다 원본 값의 형식 — 숫자로 적혀 있던 칸은 숫자로, 글자였던 칸은 글자로 되돌린다
+  const types = [''];
   for (let c = 1; c <= maxCol; c++){
     const st = d ? sgbClone(ws.getRow(d).getCell(c).style) || {} : {};
     delete st.font;
     data.push(st);
+    // 그 열의 값들로 정한다(첫 줄이 빈 칸이거나 한두 칸만 글자로 적힌 열이 있다): 숫자가 많으면 숫자,
+    // 앞에 0 을 붙여 적은 값(반 '01')이 하나라도 있으면 'z', 아니면 글자
+    let nNum = 0, nStr = 0, zero = false;
+    for (let r = h + 1; r <= Math.min(ws.rowCount || 0, h + 60); r++){
+      if (gcol > 0 && !/^[1-3]$/.test(sgbCellText(ws.getRow(r).getCell(gcol).value).trim())) continue;   // 학생 줄만
+      let v = ws.getRow(r).getCell(c).value;
+      if (v && typeof v === 'object' && 'result' in v) v = v.result;
+      if (typeof v === 'number') nNum++;
+      else if (typeof v === 'string' && v.trim()){ nStr++; if (/^0\d$/.test(v.trim())) zero = true; }
+    }
+    types.push(zero ? 'z' : nNum && nNum >= nStr ? 'n' : nStr ? 's' : '');
   }
   const page = sgbClone(ws.pageSetup) || {};
   delete page.printArea;
-  return { v: 1, h, rows, merges, cols, roles, data, page, views: sgbClone(ws.views) || [] };
+  // 원본 줄 높이 — 학생(같은 학생이 여러 줄이면 몇 번째인지)으로, 창체 일정은 자료 줄 차례로.
+  // 내려받을 때 원본에 있던 줄은 원본 높이를 그대로 쓴다.
+  const hts = {};
+  const gi = roles.indexOf('g'), ci = roles.indexOf('c'), ni = roles.indexOf('n');
+  const content = roles.map((r, k) => /^(b|s|x\d+|v\d+)$/.test(r) ? k : -1).filter(k => k > 0);
+  const seen = {};
+  for (let r = h + 1; r <= (ws.rowCount || 0); r++){
+    const R = ws.getRow(r);
+    const t = k => sgbCellText(R.getCell(k).value).trim();
+    if (!content.some(k => t(k))) continue;
+    let key;
+    if (kind === 'sch') key = String(r - h - 1);       // 창체 일정은 빈 줄까지 원본 줄 자리 그대로
+    else {
+      const g = parseInt(t(gi), 10), c = parseInt(t(ci), 10), n = parseInt(t(ni), 10);
+      if (!(g >= 1 && g <= 3) || !(c >= 1) || !(n >= 1)) continue;
+      const b = `${g}-${c}-${n}`;
+      key = `${b}#${seen[b] = (seen[b] ?? -1) + 1}`;
+    }
+    if (R.height) hts[key] = R.height;
+  }
+  const tab = sgbClone(ws.properties?.tabColor);
+  return { v: 1, h, rows, merges, cols, roles, data, types, page, views: sgbClone(ws.views) || [], hts,
+    tab: tab && (tab.argb || tab.theme != null) ? tab : null,
+    defH: ws.properties?.defaultRowHeight || null, hf: sgbClone(ws.headerFooter) || null };
 }
 // 양식이 없을 때(못 읽었거나 옛 기록) 쓰는 단순한 틀 — 원래 양식과 같은 파랑 머리줄
 function sgbPlainForm(a, kind){
@@ -510,6 +579,13 @@ function sgbRowHeight(form, vals){
   });
   return Math.min(409, Math.max(15, Math.ceil(lines * 12.75 + 3)));   // 엑셀 한 줄 높이 한도 409pt
 }
+function sgbTyped(form, col, v){
+  const t = (form.types || [])[col];
+  if (t === 'n' && typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v.trim())) return Number(v);
+  if (t === 's' && typeof v === 'number') return String(v);
+  if (t === 'z' && /^\d$/.test(String(v))) return '0' + v;
+  return v;
+}
 function sgbDataStyle(form, col){
   const base = sgbClone((form.data || [])[col]) || {};
   const st = { ...base, font: { ...SGB_BODY_FONT } };
@@ -544,25 +620,32 @@ function sgbExportPlan(meta, rowsById, forms = {}){
     used.add(name.toLowerCase());
     return name;
   };
-  const tocName = sheetName('목차');
   const toc = [];
   const out = [];
-  for (const a of meta.activities || []){
+  const byId = new Map([...(meta.activities || []).map(a => [a.id, ['act', a]]), ...(meta.schedules || []).map(x => [x.id, ['sch', x]])]);
+  const ids = [...(meta.order || []).filter(id => byId.has(id)), ...[...byId.keys()].filter(id => !(meta.order || []).includes(id))];
+  for (const id of ids){
+    const [kind, a] = byId.get(id);
     const name = sheetName(a.sheet);
-    const form = forms[a.id] || sgbPlainForm(a, 'act');
-    const list = [...(rowsById[a.id] || [])].sort((x, y) => x.g - y.g || x.c - y.c || x.n - y.n);
-    out.push({ name, form, rows: list.map((r, i) => sgbRowValues(form.roles, r, i)), styled: !!forms[a.id] });
-    toc.push([(a.tags || []).map(t => SGB_TAGS[t] || t).join(' 또는 '), a.title, a.dept, a.area, list.length, name, a.file || '']);
+    const form = forms[a.id] || sgbPlainForm(a, kind);
+    // 줄 차례: 원본 시트 차례(i). 옛 기록이라 i 가 없으면 반·번호 순
+    const list = kind === 'sch' ? (a.rows || []) : [...(rowsById[a.id] || [])].sort((x, y) =>
+      (x.i != null && y.i != null) ? x.i - y.i : (x.g - y.g || x.c - y.c || x.n - y.n));
+    const seen = {};
+    const heights = list.map((r, k) => {
+      if (kind === 'sch') return (form.hts || {})[String(k)] || null;
+      const b = `${r.g}-${r.c}-${r.n}`;
+      return (form.hts || {})[`${b}#${seen[b] = (seen[b] ?? -1) + 1}`] || null;
+    });
+    out.push({ name, form, rows: list.map((r, k) => sgbRowValues(form.roles, r, k)), heights, styled: !!forms[a.id] });
+    const cnt = kind === 'sch' ? list.filter(r => (r.v || []).some(Boolean)).length : list.length;
+    toc.push([kind === 'sch' ? '창체 일정' : (a.tags || []).map(t => SGB_TAGS[t] || t).join(' 또는 '), a.title, a.dept, a.area, cnt, name, a.file || '']);
   }
-  for (const sc of meta.schedules || []){
-    const name = sheetName(sc.sheet);
-    const form = forms[sc.id] || sgbPlainForm(sc, 'sch');
-    out.push({ name, form, rows: (sc.rows || []).map((r, i) => sgbRowValues(form.roles, r, i)), styled: !!forms[sc.id] });
-    toc.push(['창체 일정', sc.title, sc.dept, sc.area, (sc.rows || []).length, name, sc.file || '']);
-  }
+  const tocName = sheetName('목차');
   const tocForm = sgbPlainForm({ title: '생기부 보조자료 — 목차', cols: ['구분', '활동명', '부서', '입력 영역', '건수', '시트', '파일'] }, 'sch');
   tocForm.cols = [null, ...[14, 40, 14, 30, 7, 34, 26].map(w => ({ w, hidden: false }))];
-  return [{ name: tocName, form: tocForm, rows: toc.map(v => ['', ...v]), styled: false }, ...out];
+  // 목차는 맨 뒤 — 원본 시트 차례를 흐트러뜨리지 않게
+  return [...out, { name: tocName, form: tocForm, rows: toc.map(v => ['', ...v]), heights: [], styled: false }];
 }
 
 // 저장할 문서들. 학생 하나 = 문서 하나(학생별 보기 = 읽기 1번),
@@ -591,7 +674,10 @@ function sgbBuildDocs(parsed, partBytes = SGB_PART_BYTES){
   });
   const roster = {};
   for (const st of parsed.students) (roster[st.g + '-' + st.c] = roster[st.g + '-' + st.c] || []).push({ n: st.n, nm: st.nm });
-  return { docs, meta: { v: 1, activities, schedules: parsed.schedules, roster } };
+  // 시트 차례(활동·창체 일정 섞어서) — 합친 것이면 sgbMerge 가 정한 것, 아니면 파일 안 차례
+  const order = parsed.order || [...parsed.activities, ...parsed.schedules]
+    .map((x, i) => [x.id, (x.pos ?? 999) + i / 1e4]).sort((p, q) => p[1] - q[1]).map(p => p[0]);
+  return { docs, meta: { v: 1, activities, schedules: parsed.schedules, roster, order } };
 }
 </script>
 
@@ -829,7 +915,7 @@ function renderSch(){
       ${s.note ? `<details><summary>유의 사항</summary><div class="txt">${esc(s.note)}</div></details>` : ''}
     </div>
     <div class="tblwrap"><table><thead><tr>${(s.cols || []).map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
-      <tbody>${(s.rows || []).map(r => `<tr>${(r.v || []).map(v => `<td${v.length > 14 ? ' class="long"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+      <tbody>${(s.rows || []).filter(r => (r.v || []).some(Boolean)).map(r => `<tr>${(r.v || []).map(v => `<td${v.length > 14 ? ' class="long"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   $('schTabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; st.sg = b.dataset.id; renderSch(); };
 }
 
@@ -878,7 +964,7 @@ let _pending = null;
 $('upBtn').onclick = () => $('upFile').click();
 
 const kindTxt = k => k === 'sch' ? '창체 일정' : '';
-const cntOf = x => x ? (x.count ?? (x.rows || []).length) : 0;
+const cntOf = x => x ? (x.count ?? (x.rows || []).filter(r => (r.v || []).some(Boolean)).length) : 0;
 function upItem(x, extra = ''){
   return `<div>${tagHtml(x.tags)} ${kindTxt(x.kind) ? `<span class="d">[${kindTxt(x.kind)}]</span> ` : ''}${esc(x.title)}
     <span style="color:var(--ink-soft)">· ${esc(x.dept)} · ${extra || cntOf(x) + '건'} · ${esc(x.sheet)}</span></div>`;
@@ -954,7 +1040,11 @@ async function buildWorkbook(EJ, plan){
   wb.creator = '영남고 교사 대시보드';
   for (const sh of plan){
     const f = sh.form;
-    const ws = wb.addWorksheet(sh.name, { views: f.views || [], pageSetup: f.page || {} });
+    const props = {};
+    if (f.tab) props.tabColor = f.tab;                     // 아래 시트 탭 색
+    if (f.defH) props.defaultRowHeight = f.defH;
+    const ws = wb.addWorksheet(sh.name, { views: f.views || [], pageSetup: f.page || {}, properties: props,
+      ...(f.hf ? { headerFooter: f.hf } : {}) });
     (f.cols || []).forEach((c, i) => {
       if (!i || !c) return;
       const col = ws.getColumn(i);
@@ -973,11 +1063,11 @@ async function buildWorkbook(EJ, plan){
     for (const m of f.merges || []) { try { ws.mergeCells(m); } catch (e) {} }
     sh.rows.forEach((vals, i) => {
       const R = ws.getRow(f.h + 1 + i);
-      R.height = sgbRowHeight(f, vals);
+      R.height = (sh.heights || [])[i] || sgbRowHeight(f, vals);   // 원본에 있던 줄은 원본 높이
       for (let col = 1; col < vals.length; col++){
         if (!(f.roles || [])[col] && !(f.data || [])[col]) continue;
         const C = R.getCell(col);
-        if (vals[col] !== '' && vals[col] != null) C.value = vals[col];
+        if (vals[col] !== '' && vals[col] != null) C.value = sgbTyped(f, col, vals[col]);
         C.style = sgbDataStyle(f, col);
       }
     });
@@ -1043,7 +1133,7 @@ async function doUpload(){
     msg.textContent = keep.some(x => x.kind === 'act') ? '남길 자료 읽는 중…' : '이전 기록 확인 중…';
     const keepActs = [];
     for (const x of keep.filter(x => x.kind === 'act')) keepActs.push({ a: x.old, rows: await loadAllRows(x.old) });
-    const order = [...(cmp.old?.activities || []), ...(cmp.old?.schedules || [])].map(a => a.id);
+    const order = cmp.old?.order || [...(cmp.old?.activities || []), ...(cmp.old?.schedules || [])].map(a => a.id);
     const merged = sgbMerge(parsed, keepActs, keep.filter(x => x.kind === 'sch').map(x => x.old), order);
     const built = sgbBuildDocs(merged);
     // 양식 문서 — 이번 파일 시트는 새로 뜬 것, 남긴 시트는 저장돼 있던 것을 그대로(안 넣으면 지워진다)

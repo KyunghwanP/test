@@ -42,8 +42,8 @@ function sheets({ dropOfficers = false, robotText = '로봇 코딩 캠프에 참
       ['창의교육부', null, null, '⊙ 활  동  명:', null, '교과학습도우미'],
       [null, null, null, '⊙ 입력 영역:', null, '봉사활동 누가기록'],
       ['연번', '학년', '반', '번호', '성명', '시작일자', '시간', '봉사활동내용'],
-      [1, 1, 1, 1, '김가람', '2026.04.10.', 4, '헌혈'],
-      [2, 3, 2, 5, '박나래', '2026.03.09.', 12, '교과학습도우미'],
+      [1, 3, 2, 5, '박나래', '2026.03.09.', 12, '교과학습도우미'],   // 원본처럼 3학년이 먼저 — 내려받아도 이 차례
+      [2, 1, 1, 1, '김가람', '2026.04.10.', 4, '헌혈'],
     ]],
     ['<자or진>과중(로봇공학)-2차', [
       [null, '과학중점부', null, null, '⊙ 활  동  명:', null, '진로탐색 로봇공학 캠프'],
@@ -103,6 +103,8 @@ async function xlsxFile(name, opts) {
       for (let r = 6; r <= 9; r++) for (let c = 2; c <= 8; c++) Object.assign(ws.getRow(r).getCell(c), {
         font: { name: '나눔고딕', size: 14 }, border: box, alignment: { vertical: 'top', wrapText: c >= 7 } });
       ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+      ws.properties.tabColor = { argb: 'FFFFFF00' };   // 아래 시트 탭 색
+      ws.getRow(6).height = 120;                        // 원본 줄 높이(사람이 맞춰 둔 것)
     }
   }
   const f = path.join(TMP, name);
@@ -146,7 +148,8 @@ check('수업량 유연화 — 차수 2·3', flex.rounds.join() === '2,3', flex.
 const vol = act('봉사');
 check('봉사 — 기재 칸이 없으면 나머지 칸을 정보로', vol.body === '' && vol.extra.join() === '시작일자,시간,봉사활동내용', vol);
 const sch = parsed.schedules[0];
-check('창체 일정 — 1학년, 11칸, 빈 줄 빼고 2줄', sch.grade === 1 && sch.cols.length === 11 && sch.rows.length === 2
+check('창체 일정 — 1학년, 11칸, 중간 빈 줄은 자리 그대로(내려받을 때 원본 줄 자리)', sch.grade === 1 && sch.cols.length === 11 && sch.rows.length === 3
+  && !sch.rows[1].v.some(Boolean)
   && sch.rows[0]?.v?.[10] === '도서관 활용교육', sch);
 const s111 = parsed.students.find(s => s.g === 1 && s.c === 1 && s.n === 1);
 check('학생 1-1-1 — 봉사·로봇·수학 3건', s111 && s111.items.length === 3 && s111.nm === '김가람', s111);
@@ -195,8 +198,8 @@ console.log('\n[원본 양식]');
 const ewb = new ExcelJS.Workbook();
 await ewb.xlsx.readFile(FILE1);
 const rform = P.sgbFormOf(ewb.getWorksheet(robot.sheet), robot, 'act');
-check('머리 줄(5행)을 찾고 칸마다 쓰임을 안다 — 순번·학년·반·번호·성명·자기 평가서·기재 내용',
-  rform.h === 5 && rform.roles.join() === ',,seq,g,c,n,nm,s,b', rform.roles);
+check('머리 줄(5행)을 찾고 칸마다 쓰임을 안다 — 이름 없는 A열은 학번(값을 보고), 순번·학년·반·번호·성명·자기 평가서·기재 내용',
+  rform.h === 5 && rform.roles.join() === ',key,seq,g,c,n,nm,s,b', rform.roles);
 check('위쪽 병합(B1:D1, E1:F1)을 떠 둔다', rform.merges.includes('B1:D1') && rform.merges.includes('E1:F1'), rform.merges);
 check('숨긴 A열은 숨긴 채로', rform.cols[1].hidden === true, rform.cols[1]);
 check('열 너비', rform.cols[8].w === 81 && rform.cols[7].w === 50);
@@ -212,11 +215,15 @@ check('창체 일정 — 칸마다 v{j}', P.sgbFormOf(ewb.getWorksheet(sch.sheet
 check('Firestore 에 담을 수 있다(배열 안 배열 없음)', !nested(rform) && !nested(mform));
 const plan = P.sgbExportPlan(P.sgbBuildDocs(parsed).meta,
   Object.fromEntries(parsed.activities.map(a => [a.id, parsed.actRows.get(a.id)])), { [robot.id]: rform, [math.id]: mform });
-check('내려받기 — 목차 + 활동 6 + 창체 일정 1', plan.length === 8 && plan[0].name === '목차');
+check('내려받기 — 원본 시트 차례 그대로, 목차는 맨 뒤', plan.length === 8 && plan.at(-1).name === '목차'
+  && plan.slice(0, 7).map(x => x.name).join('|') === sheets().map(([n]) => n).filter(n => n.startsWith('<') && n !== '<자>메모').join('|'), plan.map(x => x.name));
 const rp2 = plan.find(x => x.name === robot.sheet);
 check('로봇 시트 — 원본 칸 차례대로 값(순번 1, 학년반번호 칸 없음, 기재 내용 H열)',
   rp2.styled && rp2.rows[0][2] === 1 && rp2.rows[0][3] === 1 && rp2.rows[0][6] === '김가람' && rp2.rows[0][8].startsWith('로봇 코딩'), rp2.rows[0]);
 check('수학 시트 — 학년반번호 칸에 10101', plan.find(x => x.name === math.sheet).rows[0][1] === '10101');
+check('원본 줄 높이 — 로봇 첫 줄 120, 둘째 줄은 잴 것', rp2.heights[0] === 120 && rp2.heights[1] == null, rp2.heights);
+check('탭 색을 떠 둔다', rform.tab?.argb === 'FFFFFF00', rform.tab);
+check('줄 차례는 원본 시트 차례 — 봉사는 3학년 줄이 먼저', plan.find(x => x.name === vol.sheet).rows[0].includes('박나래'));
 check('양식 없는 시트는 단순한 틀(파란 머리줄)', !plan.find(x => x.name === vol.sheet).styled
   && plan.find(x => x.name === vol.sheet).form.rows.at(-1).cells[0].s.fill.fgColor.argb === BLUE);
 const lng = '가'.repeat(200);
@@ -317,7 +324,9 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
   const out = new ExcelJS.Workbook();
   await out.xlsx.readFile(await dl.path());
   const names = out.worksheets.map(w => w.name);
-  check('시트 — 목차 + 활동 6 + 창체 일정 1, 원래 시트 이름', names.length === 8 && names[0] === '목차' && names.includes(robot.sheet), names);
+  check('시트 — 원래 이름·원래 차례, 목차는 맨 뒤', names.length === 8 && names.at(-1) === '목차' && names[0] === sch.sheet && names[2] === robot.sheet, names);
+  check('시트 탭 색 그대로(노랑)', out.getWorksheet(robot.sheet).properties.tabColor?.argb === 'FFFFFF00', out.getWorksheet(robot.sheet).properties.tabColor);
+  check('원본 줄 높이 그대로(120)', out.getWorksheet(robot.sheet).getRow(6).height === 120);
   const toc = out.getWorksheet('목차');
   const tocTxt = []; toc.eachRow(r => tocTxt.push(r.values.join('|')));
   check('목차 — 활동마다 건수와 시트 이름', tocTxt.some(t => t.includes('진로탐색 로봇공학 캠프') && t.includes('|2|') && t.includes(robot.sheet)), tocTxt.slice(0, 5));
@@ -332,6 +341,7 @@ const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
     rw.getCell('H6').font);
   check('본문 테두리·줄바꿈은 원본대로', rw.getCell('H6').border?.left?.style === 'thin' && rw.getCell('H6').alignment?.wrapText === true);
   check('수학 — 학년반번호 칸에 10101', out.getWorksheet(math.sheet).getCell('A4').value === '10101');
+  check('이름 없는 숨긴 학번 칸도 채운다(로봇 A6 = 10101)', rw.getCell('A6').value === '10101');
   check('창체 일정 시트 — 표 그대로', out.getWorksheet(sch.sheet).getCell('K4').value === '도서관 활용교육');
 
   // 학생별
