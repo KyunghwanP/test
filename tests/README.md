@@ -123,6 +123,7 @@ node tests/pass-fab.test.mjs                       # FAB 이 외출증 화면에
 node tests/seat-inpage.test.mjs                    # 자리 배치 '크게 보기' → 앱 안 화면 + 돌아가기
 node tests/weekly-chips-live.test.mjs              # 주차 칩이 새로고침 없이 늘어나는지
 node tests/usage-stats.test.mjs                    # 사용 현황 · 전체 새로고침
+node tests/saenggibu.test.mjs                      # 생기부 보조자료 — 엑셀 해석 · 저장 문서 · 화면
 node tests/weekly-render-mode.test.mjs             # 주간교육활동을 원본대로 그리는가
 node tests/consult-weekend.test.mjs                # 상담 주말 슬롯 + 7칸 폭 측정
 node tests/task-share.test.mjs                     # 공유받은 업무에 작성자·함께 받은 사람
@@ -160,6 +161,18 @@ node tests/overtime-tab.test.mjs      # 앱의 탭 배선 (Chromium)
 화면과 스크립트가 같은 말(요청 이름·인자·응답 모양)을 하는지까지 본다.
 '돌아간다'가 아니라 **시트에 무엇이 남는지**를 칸 단위로 본다 — 감사 근거로 쓰는
 문서라 틀린 기록이 남는 것이 가장 나쁘다.
+
+### 생기부 보조자료 (saenggibu.html)
+
+부서·교과가 모은 **기재 문안 통합 엑셀**(시트마다 활동 하나, 이름 앞 꼬리표 `<자>` `<진>` `<개>` `<누>`)을
+관리자가 올리면 학생 하나 = 문서 하나, 활동 하나 × 학년 = 문서 하나(크면 조각)로 나눠 저장한다.
+학생별 보기는 읽기 1번, 활동별 보기는 학년마다 1번. 자료가 계속 늘어나는 파일이라 반이나 학년을
+문서 하나에 몰면 1MiB 한도에 걸린다.
+
+다시 올리면 **바뀐 문서만** 쓴다(`saenggibu/manifest` 에 문서마다 지문). 올린 파일은 합본으로 보고,
+이번 파일에 없는 문서는 지운다. 검사는 지어낸 엑셀로 실제 모양(⊙ 안내 칸, A열의 `00⊙`, 숨김 시트,
+꼬리표 없는 조회 시트, 활동명이 복사돼 온 시트)을 흉내 낸다. 파일 이름은 영문으로 — Playwright 가
+괄호·한글 섞인 이름은 조용히 못 넘긴다.
 
 ### 사용 현황 (usage.html · 🥚 빠른 메모 제목 5연타)
 

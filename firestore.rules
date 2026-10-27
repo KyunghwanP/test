@@ -101,6 +101,21 @@ service cloud.firestore {
       allow read:  if isAppAdmin();
       allow write: if isYnhsTeacher() && request.auth.token.email == email;
     }
+    // 생기부 보조자료 — 부서·교과가 모은 기재 문안 통합 엑셀(saenggibu.html 에서 관리자가 올림).
+    // 원본 엑셀이 교원 전체에게 공유되는 자료라 읽기는 교사 전체(학생 계정은 막힌다).
+    // saenggibu/meta·manifest(목록), saenggibuStu/{학년-반-번호}(학생별), saenggibuAct/{활동-학년-조각}(활동별)
+    match /saenggibu/{docId} {
+      allow read:  if isYnhsTeacher();
+      allow write: if isAppAdmin();
+    }
+    match /saenggibuStu/{docId} {
+      allow read:  if isYnhsTeacher();
+      allow write: if isAppAdmin();
+    }
+    match /saenggibuAct/{docId} {
+      allow read:  if isYnhsTeacher();
+      allow write: if isAppAdmin();
+    }
     // 교실 자리 배치 — 문서 ID 는 '학년-반'(예: 2-3).
     // 조회는 전 교사(수업 들어갈 때 이름을 봐야 한다), 저장은 그 반 담임과 관리자만.
     // 담임 판정은 학부모 상담이 쓰는 acl/gradeRoles.homerooms 를 그대로 재사용한다.

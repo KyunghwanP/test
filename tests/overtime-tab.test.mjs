@@ -27,12 +27,12 @@ check('사이드바·탭바 단추는 처음에 숨어 있다',
       && /class="main-nav-item" data-page="duty" id="navDuty" style="display:none;"/.test(HTML)
       && /class="tab-item" data-page="duty" id="tabDuty" style="display:none;"/.test(HTML));
 const reveal = /\/\/ 초과근무 탭:[\s\S]{0,200}?if \(_IS_ADMIN\(\)\) \{([\s\S]{0,300}?)\n    \}/.exec(HTML);
-check('두 탭 모두 관리자일 때만 보인다 (_IS_ADMIN — 보기 모드 제외)', reveal && /\['navOvertime', 'tabOvertime', 'navDuty', 'tabDuty'\]\.forEach/.test(reveal[1]) && /el\.style\.display = ''/.test(reveal[1]));
+check('두 탭 모두 관리자일 때만 보인다 (_IS_ADMIN — 보기 모드 제외)', reveal && /\['navOvertime', 'tabOvertime', 'navDuty', 'tabDuty'(, '[A-Za-z]+')*\]\.forEach/.test(reveal[1]) && /el\.style\.display = ''/.test(reveal[1]));
 check('다른 곳에서 단추를 켜지 않는다', ['navOvertime', 'tabOvertime', 'navDuty', 'tabDuty'].every(id => (HTML.match(new RegExp(id, 'g')) || []).length === 2));
 check('특별실 예약 바로 아래 (공지 쓰기는 맨 끝 그대로)',
       /data-page="room"[^]*?<\/div>\s*<div class="main-nav-item" data-page="overtime"[^]*?<\/div>\s*<div class="main-nav-item" data-page="duty"/.test(HTML)
       && [...HTML.matchAll(/class="main-nav-item" data-page="([a-z]+)"/g)].map(m => m[1]).at(-1) === 'notice');
-check('화면 목록에 들어 있다', /'seat','overtime','duty','usage','notice'\]\.forEach/.test(HTML));
+check('화면 목록에 들어 있다', /'seat','overtime','duty',('[a-z]+',)*'usage','notice'\]\.forEach/.test(HTML));
 check('들어오면 프레임을 연다', /if\(page === 'overtime' \|\| page === 'duty'\) openOvertimeFrame\(page\);/.test(HTML));
 check('껍데기는 탭마다 iframe 하나', /<div class="page-view" id="overtimePage">\s*<iframe id="overtimePageFrame" title="초과근무"/.test(HTML)
       && /<div class="page-view" id="dutyPage">\s*<iframe id="dutyPageFrame" title="감독표"/.test(HTML));

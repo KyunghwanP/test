@@ -45,6 +45,7 @@
 | `consultations/{반}` | 학부모 상담 예약(개인정보 포함) | 교사 앱 · Worker |
 | `consultationsPublic/{반}` | 위 문서의 **공개 미러** | 교사 앱 · Worker |
 | `memos2/{uid}` `tasks/{uid}` | 개인 메모·업무 일정 | 본인만 |
+| `saenggibu/meta` · `saenggibuStu/{학년-반-번호}` · `saenggibuAct/{활동-학년-조각}` | 생기부 보조자료(부서별 기재 문안 통합 엑셀) — 목록 · 학생별 · 활동별 | `saenggibu.html`(관리자) |
 
 ### 교사 이메일이 다루기 까다로운 이유
 
@@ -180,6 +181,7 @@ ynhs 배포가 그대로 받는다. 양쪽에 두면 중복 실행이 된다.
   배포는 Cloudflare 대시보드라 저장소 위치와 상관없다. 그 검사들도 test 에 있다
 - 초과근무·감독표 `overtime.html` · `gas/overtime/` · `docs/duty-template.xlsx` —
   아직 시험 중(관리자 탭). 운영으로 옮길 때 이 줄을 지운다
+- 생기부 보조자료 `saenggibu.html` — 아직 시험 중(관리자 탭). 운영으로 옮길 때 이 줄을 지운다
 
 **③ 그대로 두는 것**
 
