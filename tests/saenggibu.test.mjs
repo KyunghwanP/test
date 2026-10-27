@@ -501,6 +501,8 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
   const inkUnder = () => p.evaluate(() => { const i = document.querySelector('#views > .ink'), on = document.querySelector('#views > button.on');
     return !!i && Math.abs(parseFloat(i.style.left) - on.offsetLeft) < 1 && Math.abs(parseFloat(i.style.width) - on.offsetWidth) < 1; });
   check('밑줄 탭 — 파란 줄이 고른 탭(학생별) 아래', await inkUnder());
+  await p.hover('#views button[data-view="act"]');
+  check('탭에 회색 음영 없음(마우스를 올려도 바탕은 투명)', await p.$eval('#views button[data-view="act"]', b => getComputedStyle(b).backgroundColor === 'rgba(0, 0, 0, 0)'));
   // 활동별
   await p.click('#views button[data-view="act"]');
   await p.waitForTimeout(80);
