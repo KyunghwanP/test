@@ -1581,9 +1581,15 @@
     font-family:'Pretendard','Noto Sans KR';outline:none;}
   .s360-susi-q:focus{border-color:var(--mon);}
   .s360-susi-q::placeholder{color:var(--ink-soft);font-weight:600;font-size:13px;}
-  .s360-tabs{margin:4px 0 14px;}
-  .s360-tabs .students-tab{font-size:14.5px;padding:8px 18px;}
-  .s360-tabs .students-tab:disabled{opacity:.4;cursor:not-allowed;}
+  /* 밑줄 탭 — 회색 상자 대신 고른 탭 아래 파란 줄(.s360-ink)이 미끄러져 옮겨 간다 */
+  .s360-tabs{position:relative;margin:4px 0 14px;width:auto;background:transparent;padding:0;border-radius:0;gap:2px;border-bottom:1px solid var(--rule);}
+  .s360-tabs .students-tab{font-size:15px;padding:10px 16px 11px;border-radius:6px 6px 0 0;}
+  .s360-tabs .students-tab:hover{color:var(--ink);background:var(--paper-soft);}
+  .s360-tabs .students-tab.active{background:transparent;box-shadow:none;color:var(--mon);}
+  .s360-tabs .students-tab:disabled{opacity:.4;cursor:not-allowed;background:transparent;}
+  .s360-ink{position:absolute;bottom:-1px;left:0;width:0;height:3px;border-radius:3px 3px 0 0;background:var(--mon);
+    transition:left .25s ease,width .25s ease;pointer-events:none;}
+  @media (prefers-reduced-motion:reduce){ .s360-ink{transition:none;} }
   .s360-back{display:inline-block;background:none;border:0;color:var(--ink-soft);font-weight:700;cursor:pointer;padding:0 0 10px;font-size:14px;font-family:inherit;}
   .s360-back:hover{color:var(--ink);}
   /* 차트 3개: 넓으면 3열, 좁으면 바로 1열 (2열 중간 단계 없음)
@@ -6418,7 +6424,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver7.94';
+const APP_VER = 'ver7.95';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -15163,6 +15169,7 @@ async function s360ShowDetail(s, targetEl){
       ${s360SgbOn() ? `<div class="students-tab-row s360-tabs" id="s360Tabs2" role="tablist">
           <button type="button" class="students-tab" data-tab="grade" role="tab">📈 성적</button>
           <button type="button" class="students-tab" data-tab="sgb" role="tab">📑 생기부 보조자료</button>
+          <span class="s360-ink"></span>
         </div>` : ''}
       <div class="spot-sec s360-pane-grade" style="margin-bottom:0;"><div class="spot-sec-title">성적 (내신 · 모의고사 전체 회차)</div>
         <div id="s360Grades" style="font-size:15px;color:var(--ink-soft);">불러오는 중...</div>
@@ -15257,6 +15264,7 @@ function s360ShowTab(tab, s, auto){
   const tabs = document.getElementById('s360Tabs2');
   if (!tabs) return;
   tabs.querySelectorAll('.students-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  s360MoveInk();
   const g = document.querySelector('.s360-pane-grade'), v = document.querySelector('.s360-pane-sgb');
   // 성적 탭이 흐리면(권한 없는 반) 성적 칸은 늘 숨긴다
   if (g) g.style.display = tab === 'grade' && !tabs.querySelector('[data-tab="grade"]').disabled ? '' : 'none';
@@ -15268,6 +15276,16 @@ function s360ShowTab(tab, s, auto){
   }
   if (!auto) { try { localStorage.setItem(S360_TAB_LS, tab); } catch(e){} }
 }
+// 파란 줄을 고른 탭 아래로. 처음 그릴 때는 미끄러지지 않고 바로(학생을 바꿀 때마다 왼쪽에서 날아오지 않게)
+function s360MoveInk(first){
+  const tabs = document.getElementById('s360Tabs2');
+  const ink = tabs && tabs.querySelector('.s360-ink'), on = tabs && tabs.querySelector('.students-tab.active');
+  if (!ink || !on || !on.offsetWidth) return;
+  if (first) ink.style.transition = 'none';
+  ink.style.left = on.offsetLeft + 'px'; ink.style.width = on.offsetWidth + 'px';
+  if (first) { void ink.offsetWidth; ink.style.transition = ''; }
+}
+window.addEventListener('resize', () => s360MoveInk(true));
 function s360BindTabs(s){
   const tabs = document.getElementById('s360Tabs2');
   if (!tabs) return;
@@ -15278,6 +15296,7 @@ function s360BindTabs(s){
   let last = 'grade';
   try { last = localStorage.getItem(S360_TAB_LS) || 'grade'; } catch(e){}
   s360ShowTab(last === 'sgb' ? 'sgb' : 'grade', s, true);
+  s360MoveInk(true);
 }
 window.addEventListener('message', e => {
   if (e.origin !== location.origin || e.data?.type !== 'sgb-height') return;

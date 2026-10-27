@@ -498,8 +498,13 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
   await p.fill('#hakbun', '');
   await p.waitForFunction(() => !document.querySelector('.roster-head').textContent.includes('찾은 학생'));
 
+  const inkUnder = () => p.evaluate(() => { const i = document.querySelector('#views > .ink'), on = document.querySelector('#views > button.on');
+    return !!i && Math.abs(parseFloat(i.style.left) - on.offsetLeft) < 1 && Math.abs(parseFloat(i.style.width) - on.offsetWidth) < 1; });
+  check('밑줄 탭 — 파란 줄이 고른 탭(학생별) 아래', await inkUnder());
   // 활동별
   await p.click('#views button[data-view="act"]');
+  await p.waitForTimeout(80);
+  check('탭을 옮기면 파란 줄도 옮겨 간다(활동별)', await inkUnder());
   await p.waitForSelector('#acts .act');
   check('활동별 — 활동 6개', (await p.$$('#acts .act')).length === 6);
   await p.click(`#acts .act[data-id="${robot.id}"]`);

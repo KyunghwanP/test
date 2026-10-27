@@ -21,6 +21,7 @@ const grab = name => {
 
 console.log('\n■ 원본 배선 (정적)');
 const detail = grab('s360ShowDetail');
+check('밑줄 탭 — 회색 상자 대신 파란 줄', /\.s360-tabs\{[^}]*background:transparent[^}]*border-bottom:1px solid/.test(HTML) && /\.s360-ink\{[^}]*transition:left \.25s/.test(HTML));
 check('탭 줄과 보조자료 칸은 s360SgbOn() 일 때만', /\$\{s360SgbOn\(\) \? `<div class="students-tab-row s360-tabs"/.test(detail) && /\$\{s360SgbOn\(\) \? `<div class="s360-pane-sgb"/.test(detail));
 check('지금은 관리자만(생기부 탭과 같은 조건)', /const s360SgbOn = \(\) => _IS_ADMIN\(\);/.test(HTML));
 check('권한 없는 반 — 성적 탭을 흐리게 하고 보조자료로', /gt\.disabled = true;[^\n]*\n?[^\n]*s360ShowTab\('sgb', s, true\)/.test(detail));
@@ -38,21 +39,26 @@ const mount = async (opts = {}) => page.evaluate(([fns, opts]) => {
     <div class="students-tab-row s360-tabs" id="s360Tabs2">
       <button type="button" class="students-tab" data-tab="grade">📈 성적</button>
       <button type="button" class="students-tab" data-tab="sgb">📑 생기부 보조자료</button>
+      <span class="s360-ink" style="position:absolute;bottom:0;height:3px"></span>
     </div>
     <div class="spot-sec s360-pane-grade">성적</div>
     <div class="s360-pane-sgb" style="display:none;"><iframe id="s360SgbFrame" style="height:240px"></iframe></div>`;
   window.APP_VER = 'ver9.99';
   if (!window.__bound) { (0, eval)(fns); window.__bound = true; }
   s360BindTabs({ grade: '2', room: '03', num: '7' });
-}, [grab('s360ShowTab') + grab('s360BindTabs') + "\nconst S360_TAB_LS = 'ynhs-s360-tab';\n"
+}, [grab('s360MoveInk') + grab('s360ShowTab') + grab('s360BindTabs') + "\nconst S360_TAB_LS = 'ynhs-s360-tab';\n"
      + HTML.match(/window\.addEventListener\('message', e => \{\n  if \(e\.origin !== location\.origin \|\| e\.data\?\.type !== 'sgb-height'\)[\s\S]*?\n\}\);/)[0], opts]);
 await page.evaluate(() => localStorage.clear());
 await mount();
 const shown = () => page.evaluate(() => [getComputedStyle(document.querySelector('.s360-pane-grade')).display !== 'none',
   getComputedStyle(document.querySelector('.s360-pane-sgb')).display !== 'none']);
 check('처음엔 성적 탭', JSON.stringify(await shown()) === '[true,false]' && await page.$eval('[data-tab="grade"]', x => x.classList.contains('active')));
+const inkAt = () => page.evaluate(() => { const i = document.querySelector('.s360-ink'), on = document.querySelector('.students-tab.active');
+  return Math.abs(parseFloat(i.style.left) - on.offsetLeft) < 1 && Math.abs(parseFloat(i.style.width) - on.offsetWidth) < 1; });
+check('파란 줄이 고른 탭 아래(성적)', await inkAt());
 check('보조자료는 누르기 전엔 안 띄운다(읽기 아끼기)', !(await page.$eval('#s360SgbFrame', f => f.getAttribute('src'))));
 await page.click('[data-tab="sgb"]');
+check('탭을 옮기면 파란 줄도 옮겨 간다(보조자료)', await inkAt());
 check('보조자료 탭 — 그 학생 한 명만 보기로 띄운다(앞 0 없는 학년-반-번호)',
   (await page.$eval('#s360SgbFrame', f => f.getAttribute('src'))) === 'saenggibu.html?in=1&embed=1&k=2-3-7&v=ver9.99' && JSON.stringify(await shown()) === '[false,true]');
 await page.evaluate(() => window.postMessage({ type: 'sgb-height', h: 777 }, location.origin));

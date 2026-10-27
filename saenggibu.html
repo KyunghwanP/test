@@ -58,11 +58,15 @@
     padding:12px 16px;background:var(--paper);border-bottom:1px solid var(--rule);}
   .top .ttl{font-size:17px;font-weight:900;margin-right:2px;}
   html.in-app .top .ttl{display:none;}
-  .seg{display:flex;gap:6px;background:var(--paper-soft);padding:4px;border-radius:8px;width:fit-content;}
-  .seg button{font-weight:700;font-size:14.5px;border:none;background:transparent;padding:7px 16px;border-radius:6px;
+  /* 밑줄 탭 — 고른 탭 아래 파란 줄(인디케이터)이 옆으로 미끄러져 옮겨 간다(줄은 inkify 가 그린다) */
+  .seg{position:relative;display:flex;gap:2px;width:fit-content;border-bottom:1px solid var(--rule);}
+  .seg button{font-weight:700;font-size:14.5px;border:none;background:transparent;padding:9px 14px 10px;border-radius:6px 6px 0 0;
     cursor:pointer;color:var(--ink-soft);white-space:nowrap;}
-  .seg button.on{background:var(--paper);color:var(--mon);box-shadow:0 1px 3px rgba(0,0,0,.15);}
-  html.dark .seg button.on{background:var(--bg-base);}
+  .seg button:hover{color:var(--ink);background:var(--paper-soft);}
+  .seg button.on{color:var(--mon);}
+  .seg .ink{position:absolute;bottom:-1px;left:0;width:0;height:3px;border-radius:3px 3px 0 0;background:var(--mon);
+    transition:left .25s ease,width .25s ease;pointer-events:none;}
+  @media (prefers-reduced-motion:reduce){ .seg .ink{transition:none;} }
   .search{flex:1;min-width:180px;max-width:420px;padding:10px 12px;border:1.5px solid var(--rule);border-radius:10px;
     font-size:16px;background:var(--paper);color:var(--ink);outline:none;}
   .search:focus{border-color:var(--mon);}
@@ -279,6 +283,7 @@
     .cls-pc{display:none;}
     .cls-m{display:block;padding:12px 12px 10px;}
     .cls-m .seg{width:100%;}
+    .top .seg{width:100%;}
     .cls-m .seg button{flex:1;font-size:15px;padding:9px 0;}
     .cls-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:10px;}
     .cls-grid .cl-item{justify-content:center;margin:0;padding:11px 0;border:1px solid var(--rule);background:var(--paper);font-size:15px;}
@@ -1091,6 +1096,29 @@ async function loadActGrade(a, g){
   actCache.set(key, rows);
   return rows;
 }
+
+// ── 밑줄 탭의 파란 줄 — 고른 탭(.on) 아래로. 다시 그려진 탭 줄도 이전 자리에서 미끄러져 오게 자리를 기억한다 ──
+const inkPos = {};
+function inkify(){
+  document.querySelectorAll('.seg').forEach(seg => {
+    if (!seg.offsetParent) return;                      // 숨은 탭 줄은 나중에
+    let ink = seg.querySelector(':scope > .ink');
+    const on = seg.querySelector(':scope > button.on');
+    const key = seg.id || seg.className;
+    if (!ink){
+      ink = document.createElement('span'); ink.className = 'ink'; seg.appendChild(ink);
+      const prev = inkPos[key];
+      if (prev){ ink.style.transition = 'none'; ink.style.left = prev.left + 'px'; ink.style.width = prev.width + 'px'; void ink.offsetWidth; ink.style.transition = ''; }
+    }
+    if (!on){ ink.style.width = '0'; return; }
+    const pos = { left: on.offsetLeft, width: on.offsetWidth };
+    ink.style.left = pos.left + 'px'; ink.style.width = pos.width + 'px';
+    inkPos[key] = pos;
+  });
+}
+// 탭을 다시 그리거나 고를 때마다(화면 어디서든) 다음 그림에서 줄을 맞춘다
+new MutationObserver(() => requestAnimationFrame(inkify)).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+window.addEventListener('resize', () => requestAnimationFrame(inkify));
 
 // ── 사진 ──
 const photoCache = {}, photoVer = {}, bigCache = {}, bigPending = {};
