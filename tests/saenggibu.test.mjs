@@ -153,7 +153,7 @@ const FILE2 = await xlsxFile('sgb-5.xlsx', { dropOfficers: true, robotText: '로
 // ── 1. 해석 (페이지의 순수 함수 블록을 그대로) ──
 console.log('\n[해석]');
 const code = HTML.match(/<script id="sgbParser">([\s\S]*?)<\/script>/)[1];
-const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches, sgbOddSheets, sgbActKey, sgbStamp, sgbLookalikes, sgbApplyFix, sgbFresh, sgbRosterView, sgbMisFor, sgbAreaTags };')();
+const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches, sgbOddSheets, sgbActKey, sgbStamp, sgbLookalikes, sgbApplyFix, sgbFresh, sgbRosterView, sgbMisFor, sgbAreaTags, sgbNeisBytes, sgbNeisLimit };')();
 const wb1 = XLSX.read(fs.readFileSync(FILE1), { type: 'buffer' });
 const parsed = P.sgbParseBook(P.sgbBookToSheets(XLSX, wb1));
 const act = t => parsed.activities.find(a => a.sheet.includes(t));
@@ -589,6 +589,14 @@ function newForm(ws, { dept = '○○○○부', title, area, students }){
   check('— 엑셀로 받을 때 시트 이름은 꼬리표 + 부서(활동명)', names.includes('<자>학생부(학생회 임원)') && names.includes('<동>리더십 캠프'), names);
 }
 
+console.log('\n[나이스 바이트]');
+// 나이스는 바이트로 센다 — 한글 3, 영문·숫자·공백·문장부호 1, 줄바꿈(엔터) 2(선생님 요청 2026-10-28)
+check('바이트 — 한글 3 · 영문/숫자/공백 1 · 줄바꿈 2', P.sgbNeisBytes('가a 1\n나') === 3 + 1 + 1 + 1 + 2 + 3 && P.sgbNeisBytes('') === 0
+  && P.sgbNeisBytes('가\r\n나') === 8, [P.sgbNeisBytes('가a 1\n나'), P.sgbNeisBytes('가\r\n나')]);
+check('한도 — 영역 하나일 때만(자율·동아리·개인별·행특 1500, 진로 2100), 둘 중 고름·누가기록은 없음',
+  P.sgbNeisLimit(['자']) === 1500 && P.sgbNeisLimit(['동']) === 1500 && P.sgbNeisLimit(['진']) === 2100 && P.sgbNeisLimit(['개']) === 1500
+  && P.sgbNeisLimit(['행']) === 1500 && P.sgbNeisLimit(['자', '진']) === null && P.sgbNeisLimit(['누']) === null);
+
 console.log('\n[짝짓기 — 차수 없이]');
 {
   const K = P.sgbActKey;
@@ -976,6 +984,12 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
     && grps[1].includes('누가기록'), grps);
   await p.click('#stuOut .card [data-copy]');
   check('복사 — 기재 문안이 그대로', await p.evaluate(() => window.__copied) === '로봇 코딩 캠프에 참여하여 센서 제어를 익힘.');
+  // 나이스 바이트 — 카드에 글자 수와 같이, 묶음 머리에 문안 합계(한도는 영역 하나일 때만)
+  const robotB = [...'로봇 코딩 캠프에 참여하여 센서 제어를 익힘.'].reduce((n, ch) => n + (ch === '\n' ? 2 : ch.charCodeAt(0) < 128 ? 1 : 3), 0);
+  const tools1 = await p.$$eval('#stuOut .card .tools', ts => ts.map(t => t.textContent.replace(/\s+/g, ' ')));
+  check(`카드 — 「25자 · ${robotB}바이트」`, tools1.some(t => t.includes('25자') && t.includes(`${robotB}바이트`)), tools1);
+  const g1 = await p.$$eval('#stuOut .grp', gs => gs.map(g => g.textContent.replace(/\s+/g, ' ').trim()));
+  check('묶음 머리 — 문안 합계 바이트(자율·진로 묶음, 둘 중 고름이라 한도는 안 붙임)', g1[0].includes('합계') && g1[0].includes('바이트') && !g1[0].includes('/'), g1);
   await p.evaluate(() => { window.__copied = ''; });
   await p.click('#stuOut .card .body');
   check('문안 상자를 눌러도 복사된다', await p.evaluate(() => window.__copied) === '로봇 코딩 캠프에 참여하여 센서 제어를 익힘.');
@@ -1061,6 +1075,16 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
     && (await p.textContent('#stuOut .s-name')) === '최다온');
   check('어긋남 — 원 자료의 이름은 글자로만', await p.evaluate(() => window.__xss === undefined) && (await p.textContent('#stuOut .s-warn')).includes('onerror'));
   await byHak('30205');   // 아래 검사들은 이 학생
+  const g3 = await p.$$eval('#stuOut .grp', gs => gs.map(g => g.textContent.replace(/\s+/g, ' ').trim()));
+  check('묶음 머리 — 영역이 하나면 한도까지(「/ 1,500」), 넘지 않으면 빨간 표시 없음', g3.some(t => /합계 [\d,]+바이트 \/ 1,500/.test(t)) && !(await p.$('#stuOut .grp .gb.over')), g3);
+  // 넘으면 빨갛게 — 한도를 잠깐 낮춰 다시 그려 본다
+  await p.evaluate(() => { for (const k of Object.keys(SGB_NEIS_LIMIT)) SGB_NEIS_LIMIT[k] = 10; });
+  await p.click('#stus .stu.on');
+  await p.waitForSelector('#stuOut .grp .gb.over');
+  check('묶음 머리 — 한도를 넘으면 빨갛게 「넘음」', (await p.textContent('#stuOut .grp .gb.over')).includes('넘음'));
+  await p.evaluate(() => { Object.assign(SGB_NEIS_LIMIT, { '자': 1500, '동': 1500, '진': 2100, '개': 1500, '행': 1500 }); });
+  await p.click('#stus .stu.on');
+  await p.waitForFunction(() => document.querySelector('#stuOut .grp') && !document.querySelector('#stuOut .grp .gb.over'));
   check('직책 같은 덧붙은 정보', t3.includes('직책') && t3.includes('반장'));
   const sessHead = await p.$$eval('#stuOut .sess th', ts => ts.map(t => t.textContent));
   check('회차 표 — 한 칸에 줄바꿈으로 든 회차를 풀어 보인다(회차·시작일자·요일·시간)', sessHead.join() === '회차,시작일자,요일,시간'

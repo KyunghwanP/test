@@ -54,7 +54,7 @@
 | `upload.html` | 편성표 올리기에서 반·번호가 빈 학생(전출·자퇴)을 `students/changed` 에 따로 저장(`psMoveOf`) |
 | `usage.html` | 사용 현황에 `saenggibu`·`notice` 이름 |
 | `firestore.rules` | `saenggibu`·`saenggibuStu`·`saenggibuAct` — 읽기·쓰기 `isYnhsTeacher()`(2026-10-28 쓰기를 교사 전체로) |
-| `tests/saenggibu.test.mjs` | 377개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
+| `tests/saenggibu.test.mjs` | 383개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
 | `tests/make-saenggibu-template.mjs` | **표준 양식** 엑셀 만들기(부서에 나눠 줄 빈 양식). `node tests/make-saenggibu-template.mjs <폴더>` |
 | `tests/s360-tabs.test.mjs` | 17개 검사(종합검색 탭) |
 | `tests/upload-pyeonseong*.test.mjs`, `tests/make-pyeonseong-fixture.mjs` | 편성표(학적사항 칸·괄호 이름 포함) |
@@ -108,6 +108,9 @@
   `meta.mismatch`(학적 변동 제외) — 데이터 모양은 그대로. 머리 이름은 편성표 이름.
 - 상세: 사진(작은 것 → 고화질, 누르면 크게), 이름·학년반번호·학번, 「기재 문안 전체 복사」, 입력 영역별 묶음 카드.
   문안 상자를 누르거나 복사 단추로 복사(글을 끌어 고르는 중이면 복사 안 함). 학생 글은 접힘.
+- **나이스 바이트**(2026-10-28): 카드에 「25자 · 61바이트」(`sgbNeisBytes` — 한글 3, 영문·숫자·공백 1, 줄바꿈 2, 그 밖의 비 ASCII 도 넉넉히 3).
+  학생별 영역 묶음 머리에 「문안 합계 N바이트 / 한도」 — 한도는 영역이 하나일 때만(`SGB_NEIS_LIMIT`: 자율·동아리·개인별·행특 1500, 진로 2100 —
+  기재요령 글자 수 × 3. 바뀌면 이 표만 고친다), 넘으면 빨갛게 「넘음」. <자or진>·누가기록 묶음은 합계만.
 - **참여한 활동 목록**(2026-10-28 요청): 활동명 + 입력 영역 칩(어디에 적을 수 있는지) + 추가·수정 꼬리표, 누르면 그 카드로
   (봉사는 누가기록 표로). 상세 칸이 넓으면(FHD — 카드 980 + 목록 304 가 들어갈 때, 컨테이너 쿼리 `det`) 카드 **오른쪽**에
   붙어 내려도 따라오고, 좁으면 사진 옆 이름 아래, 폰은 아래 한 줄씩. 사진은 120×160(폰 96×128).
@@ -248,7 +251,7 @@ CLAUDE.md: **화면 변경은 test 먼저 → 선생님 확인 → ynhs PR·병�
 
 ### 검사 돌리기 (이 환경 기준)
 ```bash
-node tests/saenggibu.test.mjs        # 377
+node tests/saenggibu.test.mjs        # 383
 node tests/s360-tabs.test.mjs        # 17
 node tests/make-pyeonseong-fixture.mjs <폴더>          # 가짜 편성표 먼저 만든다(실제 파일은 개인정보라 저장소에 없음)
 PS_FILE=<폴더>/pyeonseong.xlsx node tests/upload-pyeonseong.test.mjs   # 87
