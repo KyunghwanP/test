@@ -152,7 +152,7 @@ const FILE2 = await xlsxFile('sgb-5.xlsx', { dropOfficers: true, robotText: '로
 // ── 1. 해석 (페이지의 순수 함수 블록을 그대로) ──
 console.log('\n[해석]');
 const code = HTML.match(/<script id="sgbParser">([\s\S]*?)<\/script>/)[1];
-const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches, sgbOddSheets, sgbActKey, sgbStamp, sgbLookalikes, sgbApplyFix, sgbFresh, sgbRosterView };')();
+const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches, sgbOddSheets, sgbActKey, sgbStamp, sgbLookalikes, sgbApplyFix, sgbFresh, sgbRosterView, sgbMisFor };')();
 const wb1 = XLSX.read(fs.readFileSync(FILE1), { type: 'buffer' });
 const parsed = P.sgbParseBook(P.sgbBookToSheets(XLSX, wb1));
 const act = t => parsed.activities.find(a => a.sheet.includes(t));
@@ -269,6 +269,22 @@ const selfOnly = P.sgbMismatches([{ id: 'q', sheet: 'S' }], new Map([['q', [{ g:
   check('명단 — 시트에만 있는 학생(떠난 학생 등)은 그 반 맨 뒤에', row('2-1') === '2/이보람/0|1/(이보람)/1+', row('2-1'));
   check('명단 — 편성표에 없는 반도 시트에 있으면 나온다', row('4-9') === '1/한별/2+', row('4-9'));
   check('명단 — 편성표를 못 읽으면 시트에서 모은 명단 그대로', P.sgbRosterView([], sheetR) === sheetR && P.sgbRosterView(null, sheetR) === sheetR);
+}
+// 학번이 어긋난 자료도 일단 보이게 — 번호 학생에게도, 이름이 같은 학생에게도. 경고와 원 자료를 붙여서(선생님 요청 2026-10-28)
+// 신고 그대로: 편성표 1-1-1 홍길동 · 1-1-2 김철수, 엑셀에는 1-1-1 김철수
+{
+  const book = [{ grade: 1, room: 1, num: 1, name: '홍길동' }, { grade: 1, room: 1, num: 2, name: '김철수' }];
+  const mm = P.sgbMismatches([{ id: 'q', sheet: '<누>봉사' }], new Map([['q', [{ g: 1, c: 1, n: 1, nm: '김철수', a: 'q' }]]]), book);
+  const f1 = P.sgbMisFor(mm, '1-1-1'), f2 = P.sgbMisFor(mm, '1-1-2');
+  check('어긋남 — 1-1-1 홍길동에게는 자기 자료로 보이되 경고(원 자료 1-1-1 김철수)', f1.own.length === 1 && !f1.borrow.length
+    && f1.own[0].nm === '김철수' && f1.own[0].expect === '홍길동', f1);
+  check('어긋남 — 1-1-2 김철수에게도 빌려 와 보인다', f2.borrow.length === 1 && !f2.own.length && f2.borrow[0].n === 1 && f2.borrow[0].a === 'q', f2);
+  const rv = P.sgbRosterView(book, { '1-1': [{ n: 1, nm: '김철수', k: 1 }] }, mm);
+  check('어긋남 — 명단 두 학생 모두 ⚠, 1-1-2 건수에도 센다', rv['1-1'][0].warn && rv['1-1'][1].warn && rv['1-1'][0].k === 1 && rv['1-1'][1].k === 1, rv);
+  check('어긋남 — 다른 학년의 같은 이름에게는 빌려 주지 않는다', !P.sgbMisFor([{ ...mm[0], hint: '1-1-2, 2-3-4' }], '2-3-4').borrow.length);
+  check('어긋남 — 학적 변동은 경고·빌려 오기 없음', !P.sgbMisFor([{ ...mm[0], moved: true }], '1-1-2').borrow.length
+    && !P.sgbMisFor([{ ...mm[0], moved: true }], '1-1-1').own.length);
+  check('어긋남 — 같은 줄이 두 번 적혀도 한 번만 빌린다', P.sgbMisFor([mm[0], { ...mm[0] }], '1-1-2').borrow.length === 1);
 }
 const ROSTER2 = ROSTER.filter(x => x.name !== '이보람');                    // 이보람이 떠났다
 const GONE = [{ grade: '2', name: '이보람', kind: '전출', date: '2026.05.10.' }];
@@ -799,7 +815,7 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
 
   // 학생별
   await p.waitForSelector('#stus .stu');
-  check('학생별 — 1학년 1반이 먼저, 번호·이름·자료 건수', (await p.$$eval('#stus .stu', bs => bs.map(x => [...x.children].filter(c => c.tagName !== 'IMG').map(c => c.textContent).join('/')))).join('|') === '1/김가람/3|2/최다온/1|3/정하늘',
+  check('학생별 — 1학년 1반이 먼저, 번호·이름·자료 건수', (await p.$$eval('#stus .stu', bs => bs.map(x => [...x.children].filter(c => c.tagName !== 'IMG').map(c => c.textContent).join('/')))).join('|') === '1/김가람/3|2/최다온/⚠/1|3/정하늘',
     await p.$$eval('#stus .stu', bs => bs.map(x => x.textContent)));
   check('반 목록 — 처음엔 보고 있는 학년(1)만 펼침', await p.isVisible('.cls-pc .cl-list[data-g="1"]') && !(await p.isVisible('.cls-pc .cl-list[data-g="3"]')));
   await p.click('.cls-pc .cl-grade[data-g="3"]');
@@ -888,10 +904,29 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
   await p.waitForFunction(() => document.querySelector('#stuOut .s-id')?.textContent.includes('30205'));
   const t3 = await p.textContent('#stuOut');
   check('사진이 없는 학생은 사진 칸 없이', !(await p.isVisible('#sPhoto')));
-  check('학번 30205 → 3학년 2반 5번', t3.includes('3학년 2반 5번') && t3.includes('30205') && t3.includes('박나래'));
+  // 머리 이름은 편성표 것(가짜 편성표엔 '박 나래' 로 띄어 적혀 있다)
+  check('학번 30205 → 3학년 2반 5번, 이름은 편성표 것', t3.includes('3학년 2반 5번') && t3.includes('30205') && (await p.textContent('#stuOut .s-name')) === '박 나래');
   check('반 목록도 그 반으로 옮겨 간다', (await p.textContent('#clsPane .cl-item.on')).includes('2반') && (await p.textContent('.roster-head')).includes('3학년 2반'));
   check('활동명이 겹치면 시트 이름으로 가른다 [학급 임원]', t3.includes('학생회 임원') && t3.includes('[학급 임원]'));
   check('겹치지 않으면 시트 이름을 안 붙인다', !t3.includes('[수업량유연화]'));
+
+  // 학번이 어긋난 자료 — 엑셀엔 2-1-1 이보람, 편성표엔 2-1-2 이보람(2-1-1 없음). 두 곳 다 보이고 원 자료를 적어 둔다
+  const byHak = async h => { await p.fill('#hakbun', h); await p.press('#hakbun', 'Enter');
+    await p.waitForFunction(h => document.querySelector('#stuOut .s-id')?.textContent.includes(h), h); };
+  await byHak('20102');
+  check('어긋남 — 이름이 같은 편성표 학생(2-1-2 이보람)에게도 보인다', (await p.textContent('#stuOut')).includes('학생회장으로'));
+  check('어긋남 — 머리에 확인 필요 경고, 원 자료 「2-1-1 이보람」', (await p.textContent('#stuOut .s-warn')).includes('2-1-1 이보람'));
+  await shot(p, '#stuOut', '8-mis-borrow');
+  check('어긋남 — 카드에도 원 자료', await p.$$eval('#stuOut .card .mis-note', ns => ns.some(n => n.textContent.includes('2-1-1 이보람'))));
+  await byHak('20101');
+  check('어긋남 — 적힌 번호(2-1-1, 편성표에 없음)에도 보이고 「편성표에 없는 번호 · 이보람은 2-1-2」', await p.$$eval('#stuOut .card .mis-note',
+    ns => ns.some(n => n.textContent.includes('편성표에 없는 번호') && n.textContent.includes('2-1-2'))));
+  await shot(p, '#stuOut', '8-mis-own');
+  await byHak('10102');
+  check('어긋남 — 이름이 다른 줄: 「편성표의 1-1-2는 최다온」, 머리 이름은 편성표 이름', await p.$$eval('#stuOut .card .mis-note', ns => ns.some(n => n.textContent.includes('최다온')))
+    && (await p.textContent('#stuOut .s-name')) === '최다온');
+  check('어긋남 — 원 자료의 이름은 글자로만', await p.evaluate(() => window.__xss === undefined) && (await p.textContent('#stuOut .s-warn')).includes('onerror'));
+  await byHak('30205');   // 아래 검사들은 이 학생
   check('직책 같은 덧붙은 정보', t3.includes('직책') && t3.includes('반장'));
   const sessHead = await p.$$eval('#stuOut .sess th', ts => ts.map(t => t.textContent));
   check('회차 표 — 한 칸에 줄바꿈으로 든 회차를 풀어 보인다(회차·시작일자·요일·시간)', sessHead.join() === '회차,시작일자,요일,시간'

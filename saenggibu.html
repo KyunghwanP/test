@@ -169,6 +169,13 @@
   .s-acts .tag{font-size:11.5px;padding:0 7px;flex-shrink:0;}
   .s-acts .fresh{margin-left:4px;}
   .card{scroll-margin-top:12px;}
+  /* 학번·이름이 편성표와 어긋난 자료 — 누락 없게 보이되 눈에 띄게 */
+  .s-warn{font-size:14px;line-height:1.6;color:#9A3412;background:#FFF7ED;border:1px solid #FDBA74;border-radius:10px;padding:8px 12px;}
+  .s-warn ul{margin:4px 0 0;padding-left:18px;}
+  .mis-note{margin-top:8px;font-size:14px;font-weight:700;line-height:1.6;color:#9A3412;background:#FFF7ED;border:1px solid #FDBA74;border-radius:8px;padding:6px 10px;}
+  html.dark .s-warn,html.dark .mis-note{color:#FDBA74;background:#2B1A0E;border-color:#9A3412;}
+  .stu .w{font-size:13px;color:#C2410C;}
+  .mis-note .nw,.s-warn .nw{white-space:nowrap;}
   .card.hit{box-shadow:0 0 0 3px var(--sel);transition:box-shadow .2s;}
   @container det (min-width:1310px){
     html:not(.embed) .sheet{position:relative;margin-left:max(0px,calc((100% - 1300px) / 2));}
@@ -850,7 +857,21 @@ function sgbMismatches(activities, actRows, roster, changed = []){
 // 시트에서 모은 명단(meta.roster)만 쓰면 자료가 없는 학생이 빠지고 반 인원도 틀린다.
 // 자료 건수(k)는 같은 번호에서 가져온다(학생 문서가 학년-반-번호로 저장되니 이름이 달라도 그 번호의 자료다).
 // 편성표에 없는 번호·반(떠난 학생 등)은 시트 이름 그대로 그 반 맨 뒤에(extra). 명렬을 못 읽으면 시트 명단 그대로.
-function sgbRosterView(book, sheetRoster){
+// 반·번호·이름이 어긋난 줄(mismatch, 학적 변동 빼고) — 한 학생 화면에 무엇을 더 보일지.
+// own: 이 번호로 적힌 줄(자기 자료로 보이되 경고). borrow: 이 학생 이름이 적혔는데 번호가 다른 줄(그 번호 문서에서 빌려 온다).
+// 빌려 주는 것은 같은 학년의 같은 이름만 — 학년 기록이라 다른 학년의 동명이인은 아니다.
+const sgbMisKey = m => `${m.g}-${m.c}-${m.n}`;
+const sgbHintKeys = m => String(m.hint || '').split(/,\s*/).filter(k => k && k.split('-')[0] === String(m.g));
+function sgbMisFor(mismatch, key){
+  const own = [], borrow = [], seen = new Set();
+  for (const m of mismatch || []){
+    if (m.moved) continue;
+    if (sgbMisKey(m) === key) own.push(m);
+    else if (sgbHintKeys(m).includes(key) && !seen.has(sgbMisKey(m) + '|' + m.a)){ seen.add(sgbMisKey(m) + '|' + m.a); borrow.push(m); }
+  }
+  return { own, borrow };
+}
+function sgbRosterView(book, sheetRoster, mismatch = []){
   const out = {};
   for (const x of book || []){
     const g = parseInt(x.grade, 10), c = parseInt(x.room, 10), n = parseInt(x.num, 10), nm = String(x.name || '').trim();
@@ -865,6 +886,14 @@ function sgbRosterView(book, sheetRoster){
       const hit = cl.find(x => !x.extra && x.n === parseInt(r.n, 10));
       if (hit) hit.k = r.k; else cl.push({ ...r, extra: true });
     }
+  }
+  // 어긋난 줄 — 적힌 번호의 학생과 이름이 같은 학생 모두 ⚠, 이름이 같은 학생은 건수에도 센다
+  const at = key => { const [g, c, n] = key.split('-').map(Number), cl = out[`${g}-${c}`] || [];
+    return cl.find(x => !x.extra && x.n === n) || cl.find(x => parseInt(x.n, 10) === n); };
+  for (const m of mismatch || []){
+    if (m.moved) continue;
+    const me = at(sgbMisKey(m)); if (me) me.warn = true;
+    for (const k of sgbHintKeys(m)){ const o = at(k); if (o){ o.warn = true; o.k = (o.k || 0) + 1; } }
   }
   return out;
 }
@@ -1485,7 +1514,7 @@ function groupRank(a){
 }
 let _rv = null;
 function rosterView(){
-  if (!_rv || _rv.meta !== META || _rv.book !== BOOK) _rv = { meta: META, book: BOOK, v: sgbRosterView(BOOK, META?.roster) };
+  if (!_rv || _rv.meta !== META || _rv.book !== BOOK) _rv = { meta: META, book: BOOK, v: sgbRosterView(BOOK, META?.roster, META?.mismatch) };
   return _rv.v;
 }
 function classes(){
@@ -1506,6 +1535,15 @@ function sessionsOf(a, it){
   const rows = Array.from({ length: N }, (_, k) => cols.map(j => String(x[j]).split('\n')[k].trim()));
   return { cols, rows };
 }
+// 학생별 카드의 확인 필요 — 원 자료에 어떻게 적혀 있는지
+function misNote(m, borrowed){
+  const k = `<span class="nw">${esc(sgbMisKey(m))}</span>`, src = `「${k} ${esc(m.nm)}」`;
+  const hint = sgbHintKeys(m).map(h => `<span class="nw">${esc(h)}</span>`).join(', ');
+  const why = borrowed
+    ? `원 자료에는 ${src} — 이름이 같아 이 학생에게도 보입니다${m.expect ? ` · 편성표의 ${k}은 ${esc(m.expect)}` : ''}`
+    : `원 자료 ${src} · ${m.expect ? `편성표의 ${k}은 ${esc(m.expect)}` : '편성표에 없는 번호'}${hint ? ` · 「${esc(m.nm)}」은 편성표에 ${hint}` : ''}`;
+  return `<div class="mis-note">⚠ 확인 필요 — ${why}</div>`;
+}
 function itemCard(a, it, { who = null, mis = null } = {}){
   const ses = sessionsOf(a, it);
   const inSes = new Set(ses ? ses.cols : []);
@@ -1520,7 +1558,7 @@ function itemCard(a, it, { who = null, mis = null } = {}){
         ${mis && mis.moved ? `<span class="moved-tag">${esc(mis.kind || '학적 변동')}${mis.date ? ' ' + esc(mis.date) : ''}</span>` : ''}
         ${mis && !mis.moved ? `<span class="mis">⚠ ${esc(mis.why)}${mis.expect ? ` · 명렬: ${esc(mis.expect)}` : ''}${mis.hint ? ` · 이 이름은 ${esc(mis.hint)}` : ''}</span>` : ''}</div>`
     : `<div class="card-h"><span class="t">${titleHtml(a)}${freshHtml(a)}</span><span class="d">${esc(a.dept)}${roundTxt(a) ? ' · ' + roundTxt(a) : ''}</span></div>
-       ${a.area ? `<div class="where">${esc(a.area)}</div>` : ''}${noteHtml(a, 1)}`;
+       ${a.area ? `<div class="where">${esc(a.area)}</div>` : ''}${noteHtml(a, 1)}${it._mis ? misNote(it._mis, it._borrow) : ''}`;
   return `<div class="card" data-a="${esc(a.id)}" data-b="${it.b ? esc(it.b) : ''}">${head}${body}${sesHtml}${ex ? `<dl class="ex">${ex}</dl>` : ''}${self}</div>`;
 }
 
@@ -1535,7 +1573,7 @@ function rosterRows(list, withClass){
   const mv = movedSet();
   return list.map(r => { const m = mv.get(`${r.k}-${r.n}|${String(r.nm || '').replace(/\s+/g, '')}`);
     return `<button type="button" class="stu${m ? ' gone' : ''}${r.k === st.g + '-' + st.c && String(r.n) === String(st.n) ? ' on' : ''}" data-k="${r.k}" data-n="${r.n}">
-    <span class="num">${withClass ? esc(r.k) + '-' : ''}${r.n}</span><span class="nm">${esc(r.nm)}${m ? `<span class="moved-tag">${esc(m.kind || '학적 변동')}</span>` : ''}</span>${r.cnt ? `<span class="k">${r.cnt}</span>` : ''}</button>`; }).join('');
+    <span class="num">${withClass ? esc(r.k) + '-' : ''}${r.n}</span><span class="nm">${esc(r.nm)}${m ? `<span class="moved-tag">${esc(m.kind || '학적 변동')}</span>` : ''}</span>${r.warn ? '<span class="w" title="학번·이름이 편성표와 다른 자료가 있습니다">⚠</span>' : ''}${r.cnt ? `<span class="k">${r.cnt}</span>` : ''}</button>`; }).join('');
 }
 async function renderStu(){
   const body = $('body');
@@ -1622,9 +1660,23 @@ async function renderStuOut(){
   try { d = await loadStudent(key); }
   catch (e) { out.innerHTML = `<div class="empty err">불러오지 못했습니다: ${esc(e.message || e)}</div>`; return; }
   if (key !== `${st.g}-${st.c}-${st.n}`) return;   // 그사이 다른 학생을 골랐다
-  if (!d || !(d.items || []).length){ out.innerHTML = '<div class="empty">이 학생의 자료가 없습니다.</div>'; return; }
+  // 학번·이름이 편성표와 어긋난 줄 — 누락이 없게 일단 다 보인다. 이 번호로 적힌 것(own)은 경고를 붙이고,
+  // 이 학생 이름으로 다른 번호에 적힌 것(borrow)은 그 번호 문서에서 빌려 온다. 둘 다 원 자료(학번·이름)를 적어 둔다.
+  const mis = sgbMisFor(META?.mismatch, key);
+  const items = (d?.items || []).map(it => { const m = mis.own.find(m => m.a === it.a); return m ? { ...it, _mis: m } : it; });
+  for (const m of mis.borrow){
+    let src = null;
+    try { src = await loadStudent(sgbMisKey(m)); } catch (e) {}
+    for (const it of src?.items || []) if (it.a === m.a) items.push({ ...it, _mis: m, _borrow: true });
+  }
+  if (key !== `${st.g}-${st.c}-${st.n}`) return;
+  if (!items.length){ out.innerHTML = '<div class="empty">이 학생의 자료가 없습니다.</div>'; return; }
+  // 이름은 편성표 것 — 시트 첫 줄 이름이 틀렸을 수 있다
+  const me = (BOOK.length ? rosterView()[`${st.g}-${st.c}`] || [] : []).find(r => !r.extra && String(r.n) === String(st.n));
+  const nm = me?.nm || d?.nm || '';
+  const misItems = items.filter(it => it._mis);
   const groups = new Map();
-  for (const it of d.items){
+  for (const it of items){
     const a = actById(it.a);
     if (!a) continue;
     const k = groupKey(a);
@@ -1636,7 +1688,7 @@ async function renderStuOut(){
   out._all = ordered.flatMap(gr => gr.list.filter(it => it.b).map(it => { const a = actById(it.a); return `[${tagTxt(a)}] ${a.title}\n${it.b}`; })).join('\n\n');
   // 봉사활동 누가기록 — 일반 봉사·프로젝트 봉사를 나이스 입력창처럼 날짜 순 한 표로.
   // 「활동별로 나눠 보기」를 누르면 원래 활동 카드들이 펼쳐진다.
-  const vol = sgbVolunteerRows(d.items, actById);
+  const vol = sgbVolunteerRows(items, actById);
   const volHtml = vol.length ? `<div class="card vol">
       <div class="card-h"><span class="t">봉사활동 누가기록</span><span class="d">${vol.length}건 · 총 ${vol.at(-1).total}시간 · 날짜 순</span></div>
       <div class="where">나이스 봉사활동 누가기록과 같은 칸 차례입니다. 칸을 누르면 그 내용이 복사됩니다.</div>
@@ -1647,7 +1699,7 @@ async function renderStuOut(){
           `<td class="c-${k}"${r[k] ? ` data-cp="${esc(r[k])}"` : ''}>${esc(r[k])}</td>`).join('')}<td class="c-total">${r.total}</td></tr>`).join('')}
       </tbody></table></div>
       <button type="button" class="btn" id="volSplitBtn" aria-expanded="false">활동별로 나눠 보기 ▾</button>
-      <div class="vol-split" id="volSplit" hidden>${d.items.filter(it => sgbIsVolunteer(actById(it.a))).map(it => itemCard(actById(it.a), it)).join('')}</div>
+      <div class="vol-split" id="volSplit" hidden>${items.filter(it => sgbIsVolunteer(actById(it.a))).map(it => itemCard(actById(it.a), it)).join('')}</div>
     </div>` : '';
   // 참여한 활동 — 입력 영역 묶음 차례 그대로, 활동마다 한 줄
   const acts = [];
@@ -1670,11 +1722,13 @@ async function renderStuOut(){
       <img class="s-photo" id="sPhoto" alt="" hidden>
       <div class="s-main">
         <div class="s-top">
-          <div><div class="s-name">${esc(d.nm)}</div>
+          <div><div class="s-name">${esc(nm)}</div>
             <div class="s-id">${esc(st.g)}학년 ${esc(st.c)}반 ${esc(st.n)}번 · ${hakbunOf(st.g, st.c, st.n)}</div></div>
           ${out._all ? '<button type="button" class="btn line" id="copyAll">📋 기재 문안 전체 복사</button>' : ''}
         </div>
         <div class="s-sum">${ordered.map(gr => `<span class="tag ${SGB_TAG_CLS[(gr.a.tags || [])[0]] || ''}">${esc(tagTxt(gr.a))} ${gr.list.length}</span>`).join('')}</div>
+        ${misItems.length ? `<div class="s-warn"><b>⚠ 확인 필요 ${misItems.length}건</b> — 원 자료의 학번·이름이 편성표와 달라 일단 보여 줍니다. 이 학생 것이 맞는지 확인하세요.
+          <ul>${misItems.map(it => `<li>${esc(actById(it.a)?.title || '')} — 원 자료 「<span class="nw">${esc(sgbMisKey(it._mis))}</span> ${esc(it._mis.nm)}」</li>`).join('')}</ul></div>` : ''}
         <nav class="s-acts" id="sActs" aria-label="참여한 활동"><div class="s-acts-in">
           <div class="s-acts-h">참여한 활동 ${acts.length}</div>
           <ul>${acts.map(({ a, n }) => `<li><button type="button" data-go="${esc(a.id)}"><span class="an">${titleHtml(a)}${n > 1 ? ` <span class="d">${n}건</span>` : ''}${freshHtml(a)}</span>${tagHtml(a.tags)}</button></li>`).join('')}</ul>
@@ -1699,7 +1753,7 @@ async function renderStuOut(){
     card.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth' });
     card.classList.add('hit'); setTimeout(() => card.classList.remove('hit'), 1200);
   };
-  markSeen([...new Set(d.items.map(it => it.a))].map(actById));   // 꼬리표는 그린 뒤에 — 이번에는 보이고 다음부터 빠진다
+  markSeen([...new Set(items.map(it => it.a))].map(actById));   // 꼬리표는 그린 뒤에 — 이번에는 보이고 다음부터 빠진다
   // 사진 — 작은 것(반 문서)을 먼저, 고화질(워커)이 오면 바꿔 끼운다. 누르면 크게
   (async () => {
     const g = parseInt(st.g, 10), c = parseInt(st.c, 10), n = parseInt(st.n, 10);
@@ -1707,7 +1761,7 @@ async function renderStuOut(){
     const im = $('sPhoto');
     if (!small || !im || key !== `${st.g}-${st.c}-${st.n}`) return;
     im.src = small; im.hidden = false;
-    const cap = `${d.nm} · ${g}학년 ${c}반 ${n}번`;
+    const cap = `${nm} · ${g}학년 ${c}반 ${n}번`;
     im.onclick = () => openZoom(im.src, cap);
     const big = await bigPhoto(g, c, n);
     if (big && $('sPhoto') === im) im.src = big;
