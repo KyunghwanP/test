@@ -1674,8 +1674,9 @@ STORE = STORE_B;
   await q.context().close();
 }
 
-// 3-6 우리 반 작성 — 엑셀 「학생 생활기록부 입력」 도구를 웹으로(선생님 요청 2026-10-28). 담임은 자기 반만, 관리자는 모든 반.
-// 쓰는 대로 저장 · 나이스 바이트 · 빼 둔 내용 · 메모 · 되돌리기 · 보조자료 붙이기 · 행특 가리기(화면·인쇄) · 이 학생/반 전체 인쇄
+// 3-6 생기부 작성 — 학생별에서 「✏️ 작성」 으로 오른쪽에 띄워 보조자료 옆에서 쓴다(엑셀 「학생 생활기록부 입력」 도구를 웹으로,
+// 선생님 요청 2026-10-28). 담임은 자기 반만, 관리자는 모든 반. 카드의 「→ 자율」 로 붙이고, 쓰는 대로 저장 · 나이스 바이트 ·
+// 빼 둔 내용 · 메모 · 되돌리기 · 행특 가리기(화면·인쇄) · 이 학생/반 전체 인쇄
 {
   const CHOI = 'choi@yeungnam.hs.kr';
   // 담임 명단 — 김 선생님 1학년 1반, 이 선생님 3학년 2반(원본 표기 '3-02')
@@ -1690,7 +1691,7 @@ STORE = STORE_B;
     await p.waitForFunction(() => document.getElementById('upPanel').textContent.includes('올렸습니다'));
     await keep(p);
     await p.context().close();
-    // 행특 보조자료(정하늘) — 행특을 가리면 보조자료 칸에서도 빠져야 한다
+    // 행특 보조자료(정하늘) — 행특을 가리면 보조자료에서도 빠져야 한다
     const fH = await oneSheet('draft-haeng.xlsx', [['<행>담임(행특 예시)', [...readHead('행특 예시 문구', '담임'), [1, 1, 3, '정하늘', '친구를 배려하는 예시 문안.']]]]);
     const p2 = await openAs(ADMIN);
     await p2.waitForSelector('#upBtn');
@@ -1701,61 +1702,65 @@ STORE = STORE_B;
     await keep(p2);
     await p2.context().close();
   }
-  // 담임이 아닌 교사 — 탭이 없고, 작성 문서를 읽지도 않는다
+  const draftReads = pg => pg.evaluate(() => (window.__OPS__.r || []).filter(r => r.startsWith('saenggibuDraft')));
+  // 담임이 아닌 교사 — 「✏️ 작성」 이 없고, 작성 문서를 읽지도 않는다
   {
     const p = await openAs(CHOI);
     await p.waitForSelector('#stus .stu');
-    check('담임이 아닌 교사 — 「우리 반 작성」 탭이 없다', !(await p.isVisible('#draftTab')));
-    await p.evaluate(() => localStorage.setItem('ynhs-sgb', JSON.stringify({ view: 'draft' })));
-    await p.reload();
-    await p.waitForSelector('#stus .stu');
-    check('— 기억된 화면이 작성이어도 학생별로 열리고, 작성 문서는 읽지 않는다', !(await p.$('.dr'))
-      && await p.evaluate(() => !(window.__OPS__.r || []).some(r => r.startsWith('saenggibuDraft'))));
+    await p.click('#stus .stu[data-n="1"]');
+    await p.waitForSelector('#stuOut .card');
+    check('담임이 아닌 교사 — 「✏️ 작성」 단추가 없다', !(await p.$('#drOpenBtn')) && !(await p.isVisible('#drPane')));
+    check('— 작성 문서를 읽지 않는다', (await draftReads(p)).length === 0, await draftReads(p));
     await p.context().close();
   }
-  // 김 선생님(1학년 1반 담임)
-  const p = await openAs(KIM);
-  await p.waitForSelector('#draftTab', { state: 'visible' });
-  check('담임 — 「✏️ 우리 반 작성」 탭', (await p.textContent('#draftTab')).includes('우리 반 작성'));
-  await p.click('#draftTab');
-  await p.waitForSelector('#drT-ja');
-  const roster = await p.$$eval('#drStus .dr-stu', bs => bs.map(b => b.querySelector('.num').textContent + ' ' + b.querySelector('.nm').textContent));
-  check('담임 — 자기 반(1학년 1반) 명단, 편성표 학생 모두(자료 없는 학생도)', roster.join() === '1 김가람,2 최다온,3 정하늘'
-    && (await p.textContent('.dr .roster-head')).includes('1학년 1반'), roster);
-  check('담임 — 반 고르기는 없다(관리자만)', !(await p.$('.dr-pick')));
-  const reads1 = await p.evaluate(() => (window.__OPS__.r || []).filter(r => r.startsWith('saenggibuDraft')));
-  check('담임 — 자기 반 작성 문서만 읽는다', reads1.length >= 3 && reads1.every(r => /^saenggibuDraft(Hist)?\/1-1-\d+$/.test(r)), reads1);
+  // 김 선생님(1학년 1반 담임) — FHD
+  const p = await openAs(KIM, { width: 1700 });
+  await p.waitForSelector('#stus .stu');
+  check('담임 — 처음 열면 자기 반(1학년 1반), 반 목록에 ✏️', (await p.textContent('.roster-head')).includes('1학년 1반')
+    && (await p.textContent('.cls-pc .cl-item[data-k="1-1"]')).includes('✏️'));
+  await p.click('#stus .stu[data-n="1"]');
+  await p.waitForSelector('#drOpenBtn');
+  check('학생을 열면 「✏️ 작성」 단추 — 작성 칸은 처음엔 닫혀 있고 「→ 자율」 도 안 보인다', !(await p.isVisible('#drPane'))
+    && !(await p.isVisible('#stuOut .to-btns')) && (await p.$$('#stuOut .to-btns')).length >= 1);
+  check('— 열기 전에는 작성 문서를 읽지 않는다', (await draftReads(p)).length === 0);
+  await p.click('#drOpenBtn');
+  await p.waitForSelector('#drT-ja', { state: 'visible' });
+  check('「✏️ 작성」 — 오른쪽에 작성 칸(이름·학번·1 / 3), 단추는 눌린 모양', (await p.textContent('#drPane .drp-who')).includes('김가람 · 10101')
+    && (await p.textContent('#drPane .drp-pos')).trim() === '1 / 3' && await p.$eval('#drOpenBtn', b => b.classList.contains('pri') && b.getAttribute('aria-pressed') === 'true'));
+  const side = await p.evaluate(() => { const s = document.querySelector('#stuOut .sheet').getBoundingClientRect(), d = document.getElementById('drPane').getBoundingClientRect();
+    return { sheetRight: Math.round(s.right), paneLeft: Math.round(d.left), lists: !!document.querySelector('.p-roster').offsetParent }; });
+  check('— 보조자료 옆에 나란히(겹치지 않음), 넓은 화면은 명단도 그대로', side.paneLeft >= side.sheetRight && side.lists, side);
+  check('— 작성 칸을 띄우면 보조자료 카드에 「→ 자율」「→ 진로」(로봇: 자율·진로 둘 중)', (await p.$$eval('#stuOut .card:has-text("진로탐색 로봇공학 캠프") .to-btns button', bs => bs.map(b => b.textContent.trim()))).join() === '→ 자율,→ 진로');
+  const reads1 = await draftReads(p);
+  check('— 자기 반 작성 문서만 읽는다', reads1.length >= 1 && reads1.every(r => /^saenggibuDraft(Hist)?\/1-1-\d+$/.test(r)), reads1);
   // 쓰는 대로 저장 + 바이트
   const JA = '학급 회의에서 의견을 조율함.';
   const jaB = [...JA].reduce((n, ch) => n + (ch.charCodeAt(0) < 128 ? 1 : 3), 0);
   await p.fill('#drT-ja', JA);
-  check(`바이트가 바로 — 「${jaB} / 1,500바이트 · ${1500 - jaB} 남음」`, (await p.textContent('#drB-ja')).includes(`${jaB} / 1,500바이트 · ${(1500 - jaB).toLocaleString()} 남음`),
-    await p.textContent('#drB-ja'));
+  check(`바이트가 바로 — 「${jaB} / 1,500바이트」, 막대도`, (await p.textContent('#drB-ja')).trim() === `${jaB} / 1,500바이트`
+    && await p.$eval('#drM-ja i', i => parseFloat(i.style.width) > 0), await p.textContent('#drB-ja'));
   await p.waitForFunction(t => window.__FS__['saenggibuDraft/1-1-1']?.ja === t, JA);
   const doc1 = await p.evaluate(() => window.__FS__['saenggibuDraft/1-1-1']);
   check('손을 멈추면 저장 — 쓴 사람·시각·이름까지', doc1.by === KIM && !!doc1.upd && doc1.nm === '김가람', doc1);
   check('— 「저장됨」 표시', (await p.textContent('#drSaved')).includes('저장됨'));
-  check('명단 점 — 자율 자리가 초록', await p.$eval('#drStus .dr-stu[data-n="1"] .dots', el => el.children[0].classList.contains('ok')));
   // 한도 넘음(개세특 510자 = 1,530바이트)
   await p.fill('#drT-gae', '가'.repeat(510));
-  check('한도를 넘으면 빨갛게 「30 넘음」', (await p.textContent('#drB-gae')).includes('1,530 / 1,500바이트 · 30 넘음')
-    && await p.$eval('#drB-gae', e => e.classList.contains('over')) && await p.$eval('#drT-gae', e => e.classList.contains('over')));
-  check('— 명단 점도 빨강(개세특 자리)', await p.$eval('#drStus .dr-stu[data-n="1"] .dots', el => el.children[2].classList.contains('over')));
-  // 보조자료 붙이기
-  await p.waitForSelector('#drRef .rf-card');
-  const rbtn = await p.$$eval('#drRef .rf-card', cs => cs.map(c => [c.querySelector('.rf-t').textContent.trim(), [...c.querySelectorAll('[data-to]')].map(b => b.textContent.trim())]));
-  check('오른쪽 보조자료 — 로봇(자율·진로 둘 중)은 「→ 자율」「→ 진로」', rbtn.some(([t, bs]) => t.includes('진로탐색 로봇공학 캠프') && bs.join() === '→ 자율,→ 진로'), rbtn);
+  check('한도를 넘으면 빨갛게 「1,530 / 1,500 · 30 넘음」, 막대도 빨강', (await p.textContent('#drB-gae')).trim() === '1,530 / 1,500 · 30 넘음'
+    && await p.$eval('#drB-gae', e => e.classList.contains('over')) && await p.$eval('#drT-gae', e => e.classList.contains('over')) && await p.$eval('#drM-gae', e => e.classList.contains('over')));
+  // 보조자료에서 붙이기
   const ROBOT = '로봇 코딩 캠프에 참여하여 센서 제어를 익힘.';
-  await p.click('#drRef .rf-card:has-text("진로탐색 로봇공학 캠프") [data-to="jin"]');
-  check('「→ 진로」 — 진로 칸에 그 문안이 붙는다', (await p.inputValue('#drT-jin')) === ROBOT);
+  await p.click('#stuOut .card:has-text("진로탐색 로봇공학 캠프") [data-to="jin"]');
+  check('「→ 진로」 — 작성 칸의 진로에 그 문안이 붙는다', (await p.inputValue('#drT-jin')) === ROBOT);
   await p.waitForFunction(t => window.__FS__['saenggibuDraft/1-1-1']?.jin === t, ROBOT);
-  await p.click('#drRef .rf-card:has-text("진로탐색 로봇공학 캠프") [data-to="ja"]');
+  await p.click('#stuOut .card:has-text("진로탐색 로봇공학 캠프") [data-to="ja"]');
   check('— 쓴 글이 있으면 그 뒤에 한 칸 띄우고 붙는다', (await p.inputValue('#drT-ja')) === `${JA} ${ROBOT}`);
   // 빼 둔 내용·메모 — 저장되지만 바이트에는 안 든다
   const beforeB = await p.textContent('#drB-ja');
-  await p.click('#drHold-ja summary');
-  await p.fill('#drHold-ja textarea', '빼 둔 문장 하나.');
-  check('빼 둔 내용은 바이트에 안 든다', (await p.textContent('#drB-ja')) === beforeB);
+  check('빼 둔 내용 칸은 글이 없으면 접혀 있다', !(await p.isVisible('#drHT-ja')) && !(await p.isVisible('#drHT-jin')));
+  await p.click('[data-holdt="ja"]');
+  check('— 「빼 둔 내용」 을 누르면 펼쳐진다', await p.isVisible('#drHT-ja'));
+  await p.fill('#drHT-ja', '빼 둔 문장 하나.');
+  check('빼 둔 내용은 바이트에 안 든다', (await p.textContent('#drB-ja')) === beforeB && (await p.textContent('[data-holdt="ja"]')).includes('10자'));   // 「빼 둔 문장 하나.」 = 띄어쓰기 포함 10자
   await p.fill('#drMemo', '진로 희망 다시 확인');
   await p.waitForFunction(() => window.__FS__['saenggibuDraft/1-1-1']?.hold?.ja === '빼 둔 문장 하나.' && window.__FS__['saenggibuDraft/1-1-1']?.memo === '진로 희망 다시 확인');
   check('빼 둔 내용·메모가 저장된다(고친 칸만 합쳐 써서 자율 글은 그대로)', await p.evaluate(t => window.__FS__['saenggibuDraft/1-1-1'].ja === t, `${JA} ${ROBOT}`));
@@ -1768,38 +1773,38 @@ STORE = STORE_B;
   await p.click('[data-hist="ja"]');
   await p.waitForSelector('#drH-ja button[data-i]');
   const hlist = await p.$$eval('#drH-ja button[data-i]', bs => bs.map(b => b.textContent.replace(/\s+/g, ' ')));
-  check('「↶ 되돌리기」 — 기록 목록(시각·바이트·앞부분)', hlist.length >= 1 && hlist[0].includes('바이트') && hlist[0].includes('학급 회의에서'), hlist);
+  check('「되돌리기」 — 기록 목록(시각·바이트·앞부분)', hlist.length >= 1 && hlist[0].includes('바이트') && hlist[0].includes('학급 회의에서'), hlist);
   await p.click('#drH-ja button[data-i="0"]');
   await p.waitForFunction(t => window.__FS__['saenggibuDraft/1-1-1']?.ja === t, full);
   check('누르면 그 판으로 되돌아오고 저장된다', (await p.inputValue('#drT-ja')) === full && !(await p.isVisible('#drH-ja')));
   check('— 되돌리기 전 글(짧게.)도 기록에 남아 다시 되돌릴 수 있다', await p.evaluate(() => (window.__FS__['saenggibuDraftHist/1-1-1']?.ja || []).some(x => x.t === '짧게.')));
-  // 학생 넘기기 — 손을 멈추기 전에 넘겨도 쓴 것은 저장된다
+  // 학생 넘기기 — 작성 칸의 ◀ ▶. 손을 멈추기 전에 넘겨도 쓴 것은 저장, 작성 칸은 열린 채로
   await p.fill('#drT-jin', '진로 고침 — 바로 넘김');
   await p.click('#drNext');
-  await p.waitForFunction(() => document.querySelector('.dr-who b')?.textContent === '최다온');
-  check('◀ ▶ — 다음 학생(최다온), 명단에도 표시', await p.$eval('#drStus .dr-stu.on', b => b.dataset.n) === '2');
+  await p.waitForFunction(() => (document.querySelector('#drPane .drp-who')?.textContent || '').includes('최다온'));
+  check('▶ — 다음 학생(최다온): 보조자료·명단·작성 칸이 같이 넘어가고 작성 칸은 열린 채', (await p.textContent('#stuOut .s-name')) === '최다온'
+    && await p.$eval('#stus .stu.on', b => b.dataset.n) === '2' && (await p.textContent('#drPane .drp-pos')).trim() === '2 / 3');
   check('— 넘기기 전에 쓴 것도 저장', await p.evaluate(() => window.__FS__['saenggibuDraft/1-1-1']?.jin === '진로 고침 — 바로 넘김'));
-  await p.fill('#drGo', '3');
-  await p.press('#drGo', 'Enter');
-  await p.waitForFunction(() => document.querySelector('.dr-who b')?.textContent === '정하늘');
-  check('번호 바로가기 — 3 → 정하늘', true);
-  await p.waitForSelector('#drRef .rf-card');
-  check('행특 보조자료는 「→ 행특」', (await p.$$eval('#drRef .rf-card [data-to]', bs => bs.map(b => b.textContent.trim()))).join() === '→ 행특');
+  await p.click('#stus .stu[data-n="3"]');
+  await p.waitForFunction(() => (document.querySelector('#drPane .drp-who')?.textContent || '').includes('정하늘'));
+  check('명단에서 골라도 작성 칸은 그 학생으로(열린 채)', await p.isVisible('#drT-ja'));
+  check('— 행특 보조자료는 「→ 행특」', (await p.$$eval('#stuOut .card:has-text("행특 예시 문구") .to-btns button', bs => bs.map(b => b.textContent.trim()))).join() === '→ 행특');
   // 행특 — 쓰고, 가리면 화면에서 사라진다(지워지지는 않는다)
   await p.fill('#drT-haeng', '배려심이 깊음.');
   await p.waitForFunction(() => window.__FS__['saenggibuDraft/1-1-3']?.haeng === '배려심이 깊음.');
   await p.check('#drHide');
   await p.waitForSelector('#drOffH');
-  check('행특 가리기 — 행특 칸이 화면에서 빠진다(글도 화면에 없음)', !(await p.$('#drT-haeng')) && !(await p.textContent('#drPanes')).includes('배려심'));
-  check('— 명단 점도 셋(행특 점 빠짐)', (await p.$$eval('#drStus .dr-stu[data-n="3"] .dot', ds => ds.length)) === 3);
+  check('행특 가리기 — 작성 칸에서 행특이 빠진다(글도 화면에 없음)', !(await p.$('#drT-haeng')) && !(await p.textContent('#stuPanes')).includes('배려심'));
+  check('— 행특 보조자료도 화면에서 빠진다', !(await p.textContent('#stuOut')).includes('배려하는 예시'));
   check('— 가려도 지워지지는 않는다', await p.evaluate(() => window.__FS__['saenggibuDraft/1-1-3']?.haeng === '배려심이 깊음.'));
-  await p.waitForFunction(() => /보조자료가 없습니다/.test(document.getElementById('drRef')?.textContent || ''));
-  check('— 행특 보조자료도 화면에서 빠진다', !(await p.textContent('#drRef')).includes('배려하는 예시'));
-  await p.click('#views button[data-view="stu"]');
-  await p.waitForSelector('#stus .stu');
-  await p.click('#draftTab');
+  // 닫기 — ✕ 로 닫으면 작성 칸·「→ 자율」 이 사라지고, 다시 열어도 행특은 가려진 채(기억)
+  await p.click('#drClose');
+  await p.waitForFunction(() => !document.getElementById('stuPanes').classList.contains('dr-open'));
+  check('✕ — 작성 칸을 닫으면 칸째로 비우고 「→ 자율」 도 감춘다', !(await p.isVisible('#drPane')) && (await p.$eval('#drPane', el => el.innerHTML)) === ''
+    && !(await p.isVisible('#stuOut .to-btns')) && !(await p.$eval('#drOpenBtn', b => b.classList.contains('pri'))));
+  await p.click('#drOpenBtn');
   await p.waitForSelector('#drOffH');
-  check('— 화면을 옮겼다 와도 가려져 있다(기억)', !(await p.$('#drT-haeng')) && await p.evaluate(() => JSON.parse(localStorage.getItem('ynhs-sgb')).hideHaeng === true));
+  check('— 다시 열어도 행특은 가려진 채(기억)', !(await p.$('#drT-haeng')) && await p.evaluate(() => JSON.parse(localStorage.getItem('ynhs-sgb')).hideHaeng === true));
   // 인쇄 — 반 전체(학생마다 한 장)·이 학생, 행특 빼고 고를 수 있다
   await p.evaluate(() => { window.__printed = []; window.print = () => window.__printed.push(document.getElementById('printArea').innerHTML); });
   const printed = () => p.evaluate(() => { const box = document.createElement('div'); box.innerHTML = window.__printed.at(-1) || '';
@@ -1807,6 +1812,7 @@ STORE = STORE_B;
   await p.click('#drPrint summary');
   check('인쇄 메뉴 — 행특을 가려 두었으면 「행특 빼고 인쇄」 가 켜져 있다', await p.isChecked('#drPrNoH'));
   await p.click('#drPrint [data-pr="all"]');
+  await p.waitForFunction(() => (window.__printed || []).length === 1);
   const pa = await printed();
   check('우리 반 전체 인쇄 — 학생마다 한 장(3장), 행특 빼고', pa.pages === 3 && pa.names[0].includes('1번 김가람') && !pa.haeng && !pa.txt.includes('배려심'), pa);
   check('— 자율 글은 들어가고, 빼 둔 내용·메모는 안 들어간다', pa.txt.includes('학급 회의에서') && !pa.txt.includes('빼 둔 문장') && !pa.txt.includes('진로 희망 다시'), pa.txt.slice(0, 200));
@@ -1814,55 +1820,77 @@ STORE = STORE_B;
   await p.click('#drPrint summary');
   await p.uncheck('#drPrNoH');
   await p.click('#drPrint [data-pr="one"]');
+  await p.waitForFunction(() => (window.__printed || []).length === 2);
   const p1 = await printed();
   check('이 학생 인쇄 — 한 장, 「행특 빼고」 를 끄면 행특도', p1.pages === 1 && p1.names[0].includes('3번 정하늘') && p1.haeng && p1.txt.includes('배려심이 깊음.'), p1);
+  if (process.env.SGB_SHOTS){ await p.uncheck('#drHide'); await p.waitForSelector('#drT-haeng'); await p.click('#stus .stu[data-n="1"]');
+    await p.waitForFunction(() => (document.querySelector('#drPane .drp-who')?.textContent || '').includes('김가람')); await shot(p, '#stuPanes', '10-draft-1700'); }
+  // 다른 반 학생 — 김 선생님은 3학년 2반 학생에게 「✏️ 작성」 이 없고, 열어 둔 작성 칸도 감춘다
+  await p.click('.cls-pc .cl-grade[data-g="3"]').catch(() => {});
+  await p.click('.cls-pc .cl-item[data-k="3-2"]');
+  await p.waitForSelector('#stus .stu[data-n="5"]');
+  await p.click('#stus .stu[data-n="5"]');
+  await p.waitForFunction(() => (document.querySelector('#stuOut .s-name')?.textContent || '').includes('박'));
+  check('다른 반 학생 — 「✏️ 작성」 이 없고 작성 칸도 닫힌다', !(await p.$('#drOpenBtn')) && !(await p.isVisible('#drPane')));
+  check('— 그 반 작성 문서는 읽지 않는다', (await draftReads(p)).every(r => /\/1-1-\d+$/.test(r)), await draftReads(p));
   check('오류 없음(담임)', p.errors.length === 0, p.errors);
   await keep(p);
   await p.context().close();
-  // 다른 반 담임 — 자기 반(3학년 2반)만, 1학년 1반 문서는 읽지도 않는다
+  // 노트북(1100) — 작성 칸을 띄우면 반·명단 칸을 접어 보조자료와 나란히(겹치지 않게)
   {
-    const q = await openAs(LEE);
-    await q.waitForSelector('#draftTab', { state: 'visible' });
-    await q.click('#draftTab');
-    await q.waitForSelector('#drT-ja');
-    check("다른 반 담임(명단에 '3-02') — 3학년 2반만", (await q.textContent('.dr .roster-head')).includes('3학년 2반')
-      && (await q.textContent('#drStus')).includes('박 나래'));
-    check('— 1학년 1반 작성 문서는 읽지 않고 그 반 학생 이름도 안 보인다', await q.evaluate(() => (window.__OPS__.r || []).filter(r => r.startsWith('saenggibuDraft')).every(r => /\/3-2-\d+$/.test(r)))
-      && !(await q.textContent('#drPanes')).includes('김가람'));
+    const q = await openAs(KIM);
+    await q.waitForSelector('#stus .stu');
+    await q.click('#stus .stu[data-n="1"]');
+    await q.waitForSelector('#drOpenBtn');
+    await q.click('#drOpenBtn');
+    await q.waitForSelector('#drT-ja', { state: 'visible' });
+    const lay = await q.evaluate(() => { const s = document.querySelector('#stuOut .sheet').getBoundingClientRect(), d = document.getElementById('drPane').getBoundingClientRect();
+      return { cls: !!document.querySelector('.p-classes').offsetParent, roster: !!document.querySelector('.p-roster').offsetParent, sheet: [Math.round(s.left), Math.round(s.right)], pane: [Math.round(d.left), Math.round(d.right)], w: innerWidth }; });
+    check('노트북 — 반·명단 칸을 접고 보조자료 | 작성 칸 나란히(겹치지 않음)', !lay.cls && !lay.roster && lay.pane[0] >= lay.sheet[1] && lay.pane[1] <= lay.w + 1 && lay.sheet[1] - lay.sheet[0] >= 400, lay);
+    if (process.env.SGB_SHOTS) await shot(q, '#stuPanes', '10-draft-1100');
+    await q.click('#drClose');
+    await q.waitForFunction(() => !!document.querySelector('.p-roster').offsetParent);
+    check('— 닫으면 반·명단 칸이 돌아온다', await q.isVisible('#stus'));
     await q.context().close();
   }
-  // 관리자 — 반을 골라 모든 반을 본다
+  // 다른 반 담임 — 자기 반(3학년 2반)만
   {
-    const r = await openAs(ADMIN);
-    await r.waitForSelector('#draftTab', { state: 'visible' });
-    await r.click('#draftTab');
-    await r.waitForSelector('.dr-pick');
-    check('관리자 — 반 고르기(학년 탭 + 반)', (await r.$$('.dr-pick .seg button')).length >= 2 && (await r.$$('.dr-pick .dr-cls button')).length >= 1);
-    await r.click('.dr-pick .seg [data-g="3"]');
-    await r.waitForFunction(() => document.querySelector('.dr .roster-head')?.textContent.includes('3학년 2반'));
-    await r.click('.dr-pick .seg [data-g="1"]');
-    await r.waitForFunction(() => document.querySelector('.dr .roster-head')?.textContent.includes('1학년 1반'));
-    await r.click('#drStus .dr-stu[data-n="1"]');
+    const q = await openAs(LEE, { width: 1700 });
+    await q.waitForSelector('#stus .stu');
+    check("다른 반 담임(명단에 '3-02') — 처음 열면 3학년 2반", (await q.textContent('.roster-head')).includes('3학년 2반'));
+    await q.click('#stus .stu[data-n="5"]');
+    await q.waitForSelector('#drOpenBtn');
+    await q.click('#drOpenBtn');
+    await q.waitForSelector('#drT-ja', { state: 'visible' });
+    check('— 그 반 학생에게는 「✏️ 작성」', (await q.textContent('#drPane .drp-who')).includes('박 나래'));
+    await q.click('.cls-pc .cl-grade[data-g="1"]').catch(() => {});
+    await q.click('.cls-pc .cl-item[data-k="1-1"]');
+    await q.click('#stus .stu[data-n="1"]');
+    await q.waitForFunction(() => (document.querySelector('#stuOut .s-name')?.textContent || '') === '김가람');
+    check('— 1학년 1반 학생은 작성 칸 없음, 그 반 작성 문서는 읽지 않는다', !(await q.$('#drOpenBtn')) && !(await q.isVisible('#drPane'))
+      && (await draftReads(q)).every(r => /\/3-2-\d+$/.test(r)), await draftReads(q));
+    await q.context().close();
+  }
+  // 관리자 — 모든 반, 김 선생님이 쓴 글을 본다. 폰은 작성 칸이 화면 가득
+  {
+    const r = await openAs(ADMIN, { width: 1700 });
+    await r.waitForSelector('#stus .stu');
+    await r.click('#stus .stu[data-n="1"]');
+    await r.waitForSelector('#drOpenBtn');
+    await r.click('#drOpenBtn');
     await r.waitForFunction(() => (document.getElementById('drT-ja')?.value || '').startsWith('학급 회의에서'));
-    check('관리자 — 1학년 1반을 골라 김 선생님이 쓴 글을 본다(누가 썼는지도)', (await r.textContent('#drSaved')).includes('kim'));
-    // 노트북 폭(1100) — 보조자료는 작성 칸 아래에, 겹치지 않게(작성 칸이 줄어 보조자료 밑으로 들어가던 것)
-    const lay = await r.evaluate(() => { const s = document.getElementById('drSheet').getBoundingClientRect(), f = document.getElementById('drRef').getBoundingClientRect();
-      return { sheetBottom: Math.round(s.bottom), refTop: Math.round(f.top) }; });
-    check('노트북 폭 — 보조자료가 작성 칸 아래, 겹치지 않는다', lay.refTop >= lay.sheetBottom, lay);
-    if (process.env.SGB_SHOTS){
-      await shot(r, '#drPanes', '10-draft-1100');
-      await r.setViewportSize({ width: 1700, height: 950 }); await r.waitForTimeout(150);
-      await shot(r, '#drPanes', '10-draft-1700');
-    }
+    check('관리자 — 1학년 1반 학생에게도 「✏️ 작성」, 김 선생님이 쓴 글(누가 썼는지도)', (await r.textContent('#drSaved')).includes('kim'));
     await r.setViewportSize({ width: 390, height: 800 });
     await r.waitForTimeout(200);
-    check('폰 — 명단 대신 고르기 상자, 가로로 넘치지 않는다', await r.isVisible('#drSel') && !(await r.isVisible('.dr-list'))
-      && await r.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),   // 관리자 위쪽 단추 넷도 줄바꿈해서 안 넘친다
-      await r.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: window.innerWidth })));
-    await r.selectOption('#drSel', '2');
-    await r.waitForFunction(() => document.querySelector('.dr-who b')?.textContent === '최다온');
-    check('폰 — 고르기 상자로 학생을 바꾼다', true);
-    if (process.env.SGB_SHOTS) await shot(r, '#drPanes', '10-draft-phone');
+    check('폰 — 작성 칸이 화면 가득(보조자료는 감춤), 가로로 넘치지 않는다', await r.isVisible('#drT-ja') && !(await r.isVisible('#stuOut'))
+      && await r.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), await r.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: innerWidth })));
+    if (process.env.SGB_SHOTS) await r.screenshot({ path: path.join(process.env.SGB_SHOTS, '10-draft-phone.png') });
+    await r.click('#drClose');
+    await r.waitForSelector('#stuOut .card');
+    check('폰 — ✕ 로 보조자료로 돌아오고, 폰에서는 「→ 자율」 이 늘 보인다(작성 칸과 같이 못 보므로)', await r.isVisible('#stuOut .to-btns'));
+    await r.click('#stuOut .card:has-text("수학 대중화 강연") [data-to="jin"]');
+    await r.waitForFunction(() => (window.__FS__['saenggibuDraft/1-1-1']?.jin || '').endsWith('수학 대중화 강연을 청취함.'));
+    check('폰 — 작성 칸이 닫혀 있어도 「→ 진로」 는 저장된 글 뒤에 붙는다', await r.evaluate(() => window.__FS__['saenggibuDraft/1-1-1'].jin === '진로 고침 — 바로 넘김 수학 대중화 강연을 청취함.'));
     check('오류 없음(관리자)', r.errors.length === 0, r.errors);
     await r.context().close();
   }

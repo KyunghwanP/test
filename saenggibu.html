@@ -168,6 +168,8 @@
   .s-id{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;color:var(--ink-soft);margin-top:9px;}
   .s-sum{display:flex;gap:6px;flex-wrap:wrap;width:100%;}
   .s-head .btn{margin-left:auto;}
+  .s-btns{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;}
+  .s-btns .btn{margin-left:0;}
   .s-head{flex-wrap:nowrap;}
   .s-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;}
   .s-top{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;}
@@ -364,78 +366,70 @@
   .toast.on{opacity:.95;}
   @media (prefers-reduced-motion:reduce){ .toast{transition:none;} }
 
-  /* ── 우리 반 작성(담임) — 명단 | 작성 칸 | 보조자료. 칸마다 따로 스크롤 ── */
-  .dr{display:grid;grid-template-columns:210px minmax(0,1fr) minmax(320px,440px);height:100%;min-height:0;}
-  .dr > *{overflow-y:auto;min-height:0;}
-  .dr .d{font-size:13px;font-weight:600;color:var(--ink-soft);}
-  .dr-list{border-right:1px solid var(--rule);background:var(--paper);}
-  .dr-pick{padding:10px 10px 8px;border-bottom:1px solid var(--rule);}
-  .dr-pick .seg{width:100%;}
-  .dr-pick .seg button{flex:1;padding:7px 0;font-size:14px;}
-  .dr-cls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:8px;}
-  .dr-cls button{padding:6px 0;border:1px solid var(--rule);border-radius:8px;background:var(--paper);color:var(--ink);font:inherit;font-size:13.5px;font-weight:800;cursor:pointer;}
-  .dr-cls button.on{background:var(--mon);border-color:var(--mon);color:#fff;}
-  .dr-stu{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border:none;border-bottom:1px solid var(--rule);
-    background:transparent;color:var(--ink);cursor:pointer;text-align:left;font:inherit;}
-  .dr-stu:hover{background:var(--paper-soft);}
-  .dr-stu.on{background:var(--sel);box-shadow:inset 3px 0 0 var(--mon);}
-  .dr-stu .num{font-family:'IBM Plex Mono',monospace;font-size:13.5px;font-weight:700;color:var(--ink-soft);min-width:22px;}
-  .dr-stu .nm{flex:1;min-width:0;font-size:15px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  /* 영역마다 점 하나 — 빈 칸(테두리만) · 씀(초록) · 한도 넘음(빨강) */
-  .dots{display:flex;gap:3px;flex-shrink:0;}
-  .dot{display:block;width:8px;height:8px;border-radius:50%;border:1.5px solid #CBD5E1;}
-  .dot.ok{background:#10B981;border-color:#10B981;}
-  .dot.over{background:var(--warn);border-color:var(--warn);}
-  .dr-edit{background:var(--bg-base);padding:16px 18px 60px;}
-  .dr-sheet{max-width:880px;margin:0 auto;background:var(--paper);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);padding:18px 22px 26px;}
-  .dr-head{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--rule);}
-  .dr-who{display:flex;align-items:baseline;gap:10px;margin-right:auto;}
-  .dr-who b{font-size:22px;font-weight:900;}
-  .dr-who .s-id{margin-top:0;font-size:14px;}
-  .dr-nav{display:flex;align-items:center;gap:6px;}
-  .dr-nav .btn{padding:6px 10px;font-size:13.5px;max-width:150px;overflow:hidden;text-overflow:ellipsis;}
-  .dr-go{width:58px;padding:6px 8px;border:1px solid var(--rule);border-radius:8px;font:inherit;font-size:14px;text-align:center;background:var(--paper);color:var(--ink);}
-  .dr-sel{display:none;}
-  .dr-tg{display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;}
-  .dr-saved{width:100%;font-size:13px;font-weight:700;color:var(--ink-soft);min-height:18px;}
-  .dr-saved.err{color:var(--warn);cursor:pointer;text-decoration:underline;}
-  .dr-area{margin-top:18px;}
-  .dr-h{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;}
-  .dr-b{margin-left:auto;font-size:13.5px;font-weight:800;color:var(--ink-soft);font-variant-numeric:tabular-nums;}
-  .dr-b.over{color:var(--warn);}
-  .dr-hb{padding:4px 9px;font-size:12.5px;}
-  .dr-t{display:block;width:100%;min-height:104px;resize:vertical;font:inherit;font-size:15px;line-height:1.7;padding:10px 12px;
-    border:1px solid var(--rule);border-radius:10px;background:var(--paper);color:var(--ink);}
-  .dr-t:focus{outline:2px solid var(--mon);outline-offset:-1px;}
-  .dr-t.over{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn);}
-  .dr-t.hit{box-shadow:0 0 0 3px var(--sel);}
-  details.dr-hold{margin-top:6px;}
-  .dr-hold > summary{font-size:13.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;}
-  .dr-ht,.dr-mt{min-height:64px;font-size:14px;background:var(--paper-soft);}
-  .dr-hist{margin-top:6px;border:1px solid var(--rule);border-radius:10px;padding:6px;background:var(--paper-soft);}
-  .dr-hist button{display:block;width:100%;text-align:left;padding:7px 9px;border:none;border-radius:7px;background:transparent;color:var(--ink);font:inherit;font-size:13.5px;cursor:pointer;}
-  .dr-hist button:hover{background:var(--paper);}
-  .dr-hist .when{font-weight:800;margin-right:6px;}
-  .dr-hist .pv{display:block;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .dr-memo{margin-top:22px;padding-top:14px;border-top:1px dashed var(--rule);}
-  .dr-off{margin-top:18px;padding:10px 12px;border:1px dashed var(--rule);border-radius:10px;font-size:13.5px;font-weight:700;color:var(--ink-soft);}
-  .dr-print .form-dl-menu{min-width:240px;}
-  .dr-ref{border-left:1px solid var(--rule);background:var(--paper-soft);padding:14px 14px 40px;}
-  .rf-h{display:flex;flex-direction:column;gap:2px;margin-bottom:10px;}
-  .rf-h b{font-size:16px;font-weight:900;}
-  .card.rf-card{padding:12px 14px;margin-bottom:10px;}
-  .rf-t{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:15px;}
-  .rf-b{margin-top:7px;font-size:14px;line-height:1.65;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;max-height:240px;overflow-y:auto;}
-  .rf-go{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;}
-  .rf-go .btn{padding:4px 10px;font-size:13px;}
-  .rf-vol{margin-top:6px;font-size:13.5px;font-weight:700;color:var(--ink-soft);}
-  /* 노트북 — 명단 | 작성 칸, 보조자료는 작성 칸 아래. 전체가 한 번에 스크롤, 명단은 붙어 있다 */
+  /* ── 생기부 작성(담임·관리자) — 학생별 화면에서 「✏️ 작성」 으로 오른쪽에 띄우는 칸.
+     보조자료 카드의 「→ 자율」 로 붙이고 줄인다. 닫으면 칸째로 비운다(행특이 화면에 남지 않게) ── */
+  .p-draft{display:none;width:460px;flex-shrink:0;border-left:1px solid var(--rule);background:var(--paper);}
+  .pane3.dr-open .p-draft{display:block;}
+  .btn.sm{padding:5px 10px;font-size:13px;border-radius:8px;}
+  .drp{padding:14px 18px 40px;}
+  .drp .d{font-size:12.5px;font-weight:600;color:var(--ink-soft);}
+  .drp-top{display:flex;align-items:flex-start;gap:10px;}
+  .drp-who{display:flex;flex-direction:column;gap:3px;margin-right:auto;min-width:0;}
+  .drp-who b{font-size:16px;font-weight:900;}
+  .drp-who span{font-size:13.5px;font-weight:700;color:var(--ink-soft);}
+  .drp-x{width:32px;height:32px;flex-shrink:0;border:none;border-radius:8px;background:transparent;color:var(--ink-soft);font-size:17px;cursor:pointer;}
+  .drp-x:hover{background:var(--paper-soft);color:var(--ink);}
+  .drp-bar{display:flex;align-items:center;gap:8px;margin-top:12px;padding:8px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);}
+  .drp-nav{display:flex;align-items:center;gap:4px;}
+  .drp-pos{min-width:46px;text-align:center;font-size:13px;font-weight:700;color:var(--ink-soft);font-variant-numeric:tabular-nums;}
+  .drp-sw{display:inline-flex;align-items:center;gap:5px;margin-left:auto;font-size:13px;font-weight:700;color:var(--ink-soft);cursor:pointer;white-space:nowrap;}
+  .drp-saved{margin-top:8px;min-height:17px;font-size:12.5px;font-weight:600;color:var(--ink-soft);}
+  .drp-saved.err{color:var(--warn);cursor:pointer;text-decoration:underline;}
+  .drp-area{margin-top:16px;}
+  .drp-ah{display:flex;align-items:center;gap:8px;}
+  .drp-b{margin-left:auto;font-size:12.5px;font-weight:700;color:var(--ink-soft);font-variant-numeric:tabular-nums;}
+  .drp-b.over{color:var(--warn);}
+  /* 한도까지 얼마나 찼는지 — 영역 색, 넘으면 빨강 */
+  .drp-meter{height:3px;margin:7px 0 8px;border-radius:2px;background:var(--rule);overflow:hidden;}
+  .drp-meter i{display:block;height:100%;width:0;background:var(--mon);transition:width .2s;}
+  .drp-area[data-k="ja"] .drp-meter i{background:var(--t-ja);} .drp-area[data-k="jin"] .drp-meter i{background:var(--t-jin);}
+  .drp-area[data-k="gae"] .drp-meter i{background:var(--t-gae);} .drp-area[data-k="haeng"] .drp-meter i{background:var(--t-haeng);}
+  .drp-meter.over i{background:var(--warn) !important;}
+  @media (prefers-reduced-motion:reduce){ .drp-meter i{transition:none;} }
+  .drp-t{display:block;width:100%;min-height:88px;resize:none;overflow:hidden;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;
+    background:var(--paper-soft);color:var(--ink);font:inherit;font-size:14.5px;line-height:1.7;}
+  .drp-t[hidden]{display:none;}               /* display:block 이 hidden 을 이기지 않게 */
+  .drp-t:focus{outline:none;background:var(--paper);border-color:var(--mon);box-shadow:0 0 0 3px var(--sel);}
+  .drp-t.over{border-color:var(--warn);}
+  .drp-t.hit{box-shadow:0 0 0 3px var(--sel);}
+  .drp-links{display:flex;gap:14px;margin-top:6px;}
+  .drp-link{padding:0;border:none;background:none;font:inherit;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;}
+  .drp-link:hover,.drp-link[aria-expanded="true"]{color:var(--mon);}
+  .drp-hold{margin-top:6px;min-height:60px;border-style:dashed;background:transparent;font-size:13.5px;}
+  .drp-hist{margin-top:6px;padding:4px;border:1px solid var(--rule);border-radius:10px;background:var(--paper-soft);}
+  .drp-hist button{display:block;width:100%;padding:7px 9px;border:none;border-radius:7px;background:transparent;color:var(--ink);font:inherit;font-size:13px;text-align:left;cursor:pointer;}
+  .drp-hist button:hover{background:var(--paper);}
+  .drp-hist .when{font-weight:800;margin-right:6px;}
+  .drp-hist .pv{display:block;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .drp-off{margin-top:16px;padding:9px 12px;border-radius:10px;background:var(--paper-soft);font-size:13px;font-weight:700;color:var(--ink-soft);}
+  .drp-memo{margin-top:20px;padding-top:14px;border-top:1px dashed var(--rule);}
+  .drp-memo .drp-ah{margin-bottom:8px;}
+  .drp-memo .drp-ah b{font-size:14px;font-weight:800;}
+  .drp-mt{min-height:64px;font-size:14px;}
+  .drp-print .form-dl-menu{min-width:240px;}
+  /* 보조자료 카드의 「→ 자율」 — 작성 칸을 띄웠을 때만 */
+  .to-btns{display:none;}
+  .pane3.dr-open .to-btns{display:inline-flex;gap:6px;flex-wrap:wrap;}
+  .to-btns .btn{padding:4px 10px;font-size:13px;}
+  .cl-me{font-size:11px;margin-left:3px;}
+  /* 작성 칸을 띄우면 — 노트북은 반 칸, 더 좁으면 명단 칸까지 접는다(학생은 작성 칸의 ◀ ▶ 로) */
+  @media (min-width:901px) and (max-width:1499px){
+    .pane3.dr-open .p-classes{display:none;}
+    .p-draft{width:min(460px,40vw);}
+  }
   @media (min-width:901px) and (max-width:1279px){
-    .dr{grid-template-columns:200px minmax(0,1fr);grid-template-rows:auto auto;align-content:start;overflow-y:auto;height:100%;}
-    /* 칸마다 스크롤하려고 둔 min-height:0 을 풀어야 줄이 글 높이만큼 늘어난다(안 풀면 작성 칸이 보조자료 밑으로 들어간다) */
-    .dr > *{overflow:visible;min-height:auto;}
-    .dr-list{grid-row:1 / 3;position:sticky;top:0;align-self:start;max-height:100%;overflow-y:auto;}
-    .dr-ref{grid-column:2;border-left:none;border-top:1px solid var(--rule);}
+    .pane3.dr-open .p-roster{display:none;}
+    .p-draft{width:min(440px,44vw);}
   }
   /* 인쇄 — 화면은 감추고 #printArea 만. 학생마다 한 장 */
   #printArea{display:none;}
@@ -526,15 +520,10 @@
     .admin{margin-left:0;flex-wrap:wrap;}   /* 관리자는 단추가 넷 — 폰 폭을 넘지 않게 줄바꿈 */
     .seg{max-width:100%;overflow-x:auto;}
     .seg button{padding:7px 10px;}
-    /* 우리 반 작성 — 명단 대신 고르기 상자, 보조자료는 작성 칸 아래 */
-    .dr{display:block;overflow-y:auto;height:100%;}
-    .dr > *{overflow:visible;}
-    .dr-list{display:none;}
-    .dr-sel{display:block;width:100%;padding:9px 10px;border:1px solid var(--rule);border-radius:9px;font:inherit;font-size:15px;font-weight:700;background:var(--paper);color:var(--ink);}
-    .dr-edit{padding:10px 10px 24px;}
-    .dr-sheet{padding:14px 12px 18px;border-radius:12px;}
-    .dr-nav .btn{max-width:110px;}
-    .dr-ref{border-left:none;border-top:1px solid var(--rule);}
+    /* 생기부 작성 — 띄우면 화면 가득(✕ 로 보조자료에 돌아온다). 폰에서는 「→ 자율」 이 늘 보인다(작성 칸과 함께 못 보므로) */
+    .pane3.dr-open .p-detail{display:none;}
+    .p-draft{width:auto;border-left:none;}
+    .to-btns{display:inline-flex;gap:6px;flex-wrap:wrap;}
   }
 </style>
 </head>
@@ -555,7 +544,6 @@
     <button type="button" data-view="stu" class="on">학생별</button>
     <button type="button" data-view="act">활동별</button>
     <button type="button" data-view="sch">창체 일정</button>
-    <button type="button" data-view="draft" id="draftTab" style="display:none;">✏️ 우리 반 작성</button>
     <button type="button" data-view="chk" id="chkTab" style="display:none;">⚠ 확인 필요</button>
   </div>
   <input type="search" class="search" id="hakbun" placeholder="🔍 학생 이름 · 학번(30101)" autocomplete="off" aria-label="학생 이름이나 학번으로 찾기">
@@ -581,7 +569,7 @@
   <div id="body"><div class="empty">불러오는 중…</div></div>
 </div>
 <div class="toast" id="toast"></div>
-<!-- 우리 반 작성 인쇄 — 인쇄할 때만 채우고 이것만 찍는다(화면에서는 숨김) -->
+<!-- 생기부 작성 인쇄 — 인쇄할 때만 채우고 이것만 찍는다(화면에서는 숨김) -->
 <div id="printArea"></div>
 <div class="zoom" id="zoom" role="dialog" aria-label="사진 크게 보기">
   <div class="zoom-box"><img id="zoomImg" alt=""><div id="zoomCap"></div></div>
@@ -1739,14 +1727,14 @@ function rowMis(m, borrowed){
   return `<div class="row-mis">⚠ 확인 필요 · 원 자료 「<span class="nw">${esc(sgbMisKey(m))}</span> ${esc(m.nm)}」${borrowed ? ' — 이름이 같아 여기에도'
     : m.expect ? ` · 편성표의 이 번호는 ${esc(m.expect)}` : ' · 편성표에 없는 번호'}</div>`;
 }
-function itemCard(a, it, { who = null, mis = null } = {}){
+function itemCard(a, it, { who = null, mis = null, to = false } = {}){
   const ses = sessionsOf(a, it);
   const inSes = new Set(ses ? ses.cols : []);
   const ex = (it.x || []).map((v, j) => v && !inSes.has(j) ? `<dt>${esc((a.extra || [])[j] || '')}</dt><dd>${esc(v)}</dd>` : '').join('');
   const sesHtml = ses ? `<div class="sess-wrap"><table class="sess"><thead><tr><th>회차</th>${ses.cols.map(j => `<th>${esc((a.extra || [])[j] || '')}</th>`).join('')}</tr></thead>
     <tbody>${ses.rows.map((r, k) => `<tr><td class="n">${k + 1}</td>${r.map(v => `<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : '';
   const body = it.b ? `<div class="body" title="누르면 복사">${esc(it.b)}</div>
-    <div class="tools"><button type="button" class="btn line" data-copy>📋 복사</button><span>${it.b.length.toLocaleString()}자 · ${sgbNeisBytes(it.b).toLocaleString()}바이트</span></div>` : '';
+    <div class="tools"><button type="button" class="btn line" data-copy>📋 복사</button>${to ? drToHtml(a) : ''}<span>${it.b.length.toLocaleString()}자 · ${sgbNeisBytes(it.b).toLocaleString()}바이트</span></div>` : '';
   const self = it.s ? `<details><summary>${esc(a.self || '학생 글')} 보기</summary><div class="txt">${esc(it.s)}</div></details>` : '';
   const head = who
     ? `<div class="who"><span class="num">${esc(who.g)}-${esc(who.c)}-${esc(who.n)}</span><span class="nm">${esc(who.nm)}</span>
@@ -1771,10 +1759,12 @@ function rosterRows(list, withClass){
     <span class="num">${withClass ? esc(r.k) + '-' : ''}${r.n}</span><span class="nm">${esc(r.nm)}${m ? `<span class="moved-tag">${esc(m.kind || '학적 변동')}</span>` : ''}</span>${r.warn ? '<span class="w" title="학번·이름이 편성표와 다른 자료가 있습니다">⚠</span>' : ''}${r.cnt ? `<span class="k">${r.cnt}</span>` : ''}</button>`; }).join('');
 }
 async function renderStu(){
+  drFlush();
   const body = $('body');
   const cls = classes();
   const ck = st.g + '-' + st.c;
-  if (!cls.includes(ck)){ const f = cls[0] || '1-1'; [st.g, st.c] = f.split('-'); }
+  // 처음 열면(고른 반이 없으면) 담임은 자기 반
+  if (!cls.includes(ck)){ const f = (ROLE.home && cls.includes(ROLE.home) ? ROLE.home : cls[0]) || '1-1'; [st.g, st.c] = f.split('-'); }
   const roster = rosterView();
   const cur = st.g + '-' + st.c;
   const q = (st.find || '').trim();
@@ -1800,16 +1790,17 @@ async function renderStu(){
     <nav class="p-classes" id="clsPane" aria-label="반">
       <div class="cls-pc">${grades.map(g => { const open = !fold.includes(g); return `<button type="button" class="cl-grade" data-g="${g}" aria-expanded="${open}">
           ${g}학년<span class="cl-caret">${open ? '▾' : '▸'}</span></button>
-        <div class="cl-list" data-g="${g}"${open ? '' : ' hidden'}>${cls.filter(k => k.split('-')[0] === g).map(k => `<button type="button" class="cl-item${k === cur && !q ? ' on' : ''}" data-k="${k}">
-          <span>${k.split('-')[1]}반</span><span class="cl-cnt">${roster[k].length}</span></button>`).join('')}</div>`; }).join('')}</div>
+        <div class="cl-list" data-g="${g}"${open ? '' : ' hidden'}>${cls.filter(k => k.split('-')[0] === g).map(k => `<button type="button" class="cl-item${k === cur && !q ? ' on' : ''}" data-k="${k}"${k === ROLE.home ? ' title="담임 반"' : ''}>
+          <span>${k.split('-')[1]}반${k === ROLE.home ? '<span class="cl-me" aria-label="담임 반">✏️</span>' : ''}</span><span class="cl-cnt">${roster[k].length}</span></button>`).join('')}</div>`; }).join('')}</div>
       <div class="cls-m">
         <div class="seg">${grades.map(g => `<button type="button" class="g-tab${g === st.g ? ' on' : ''}" data-g="${g}">${g}학년</button>`).join('')}</div>
-        <div class="cls-grid">${inG.map(k => `<button type="button" class="cl-item${k === cur && !q ? ' on' : ''}" data-k="${k}">${k.split('-')[1]}반</button>`).join('')}</div>
+        <div class="cls-grid">${inG.map(k => `<button type="button" class="cl-item${k === cur && !q ? ' on' : ''}" data-k="${k}">${k.split('-')[1]}반${k === ROLE.home ? '<span class="cl-me" aria-label="담임 반">✏️</span>' : ''}</button>`).join('')}</div>
       </div>
     </nav>
     <section class="p-roster" aria-label="학생 명단"><div class="roster-head">${head}</div>
       <div id="stus">${rosterRows(list, !!q) || `<div class="empty">${q ? '맞는 학생이 없습니다.' : '이 반에는 올라온 자료가 없습니다.'}</div>`}</div></section>
     <section class="p-detail" id="stuOut">${st.n ? '<div class="empty">불러오는 중…</div>' : '<div class="empty">왼쪽에서 학생을 고르세요.</div>'}</section>
+    <section class="p-draft" id="drPane" aria-label="생기부 작성"></section>
   </div>`;
   $('clsPane').onclick = e => {
     const gh = e.target.closest('.cls-pc .cl-grade');
@@ -1839,6 +1830,7 @@ async function renderStu(){
 }
 // 학생 하나 열기 — 명단 단추·이전/다음에서 같이 쓴다
 function openStudent(k, n){
+  drFlush();                                   // 앞 학생의 작성 칸 고침을 먼저 쓴다
   [st.g, st.c] = k.split('-'); st.n = String(n); mList = false;
   save();
   document.querySelectorAll('#stus .stu').forEach(x => x.classList.toggle('on', x.dataset.k === k && x.dataset.n === String(n)));
@@ -1852,8 +1844,10 @@ async function renderStuOut(){
   out.innerHTML = '<div class="empty">불러오는 중…</div>';
   let d;
   try { d = await loadStudent(key); }
-  catch (e) { out.innerHTML = `<div class="empty err">불러오지 못했습니다: ${esc(e.message || e)}</div>`; return; }
+  catch (e) { out.innerHTML = `<div class="empty err">불러오지 못했습니다: ${esc(e.message || e)}</div>`; drSync(); return; }
   if (key !== `${st.g}-${st.c}-${st.n}`) return;   // 그사이 다른 학생을 골랐다
+  // 생기부 작성 — 그 반 담임·관리자만 「✏️ 작성」(보조자료가 없는 학생도 쓸 수 있게 화면은 그린다)
+  const can = drCanWrite(st.g, st.c);
   // 학번·이름이 편성표와 어긋난 줄 — 누락이 없게 일단 다 보인다. 이 번호로 적힌 것(own)은 경고를 붙이고,
   // 이 학생 이름으로 다른 번호에 적힌 것(borrow)은 그 번호 문서에서 빌려 온다. 둘 다 원 자료(학번·이름)를 적어 둔다.
   const mis = sgbMisFor(META?.mismatch, key);
@@ -1864,7 +1858,10 @@ async function renderStuOut(){
     for (const it of src?.items || []) if (it.a === m.a) items.push({ ...it, _mis: m, _borrow: true });
   }
   if (key !== `${st.g}-${st.c}-${st.n}`) return;
-  if (!items.length){ out.innerHTML = '<div class="empty">이 학생의 자료가 없습니다.</div>'; return; }
+  // 행특을 가려 두었으면(작성하는 사람만) 행특 보조자료도 화면에서 뺀다 — 학생과 상담하는 화면
+  const onlyH = a => !!a && (a.tags || []).length > 0 && a.tags.every(t => t === '행');
+  if (can && st.hideHaeng) for (let i = items.length - 1; i >= 0; i--) if (onlyH(actById(items[i].a))) items.splice(i, 1);
+  if (!items.length && !can){ out.innerHTML = '<div class="empty">이 학생의 자료가 없습니다.</div>'; drSync(); return; }
   // 이름은 편성표 것 — 시트 첫 줄 이름이 틀렸을 수 있다
   const me = (BOOK.length ? rosterView()[`${st.g}-${st.c}`] || [] : []).find(r => !r.extra && String(r.n) === String(st.n));
   const nm = me?.nm || d?.nm || '';
@@ -1918,17 +1915,19 @@ async function renderStuOut(){
         <div class="s-top">
           <div><div class="s-name">${esc(nm)}</div>
             <div class="s-id">${esc(st.g)}학년 ${esc(st.c)}반 ${esc(st.n)}번 · ${hakbunOf(st.g, st.c, st.n)}</div></div>
-          ${out._all ? '<button type="button" class="btn line" id="copyAll">📋 기재 문안 전체 복사</button>' : ''}
+          <div class="s-btns">${out._all ? '<button type="button" class="btn line" id="copyAll">📋 기재 문안 전체 복사</button>' : ''}
+            ${can ? `<button type="button" class="btn${st.drOpen ? ' pri' : ''}" id="drOpenBtn" aria-pressed="${!!st.drOpen}" title="오른쪽에 작성 칸을 띄웁니다 — 보조자료의 「→ 자율」 로 붙여 고칩니다">✏️ 작성</button>` : ''}</div>
         </div>
         <div class="s-sum">${ordered.map(gr => `<span class="tag ${SGB_TAG_CLS[(gr.a.tags || [])[0]] || ''}">${esc(tagTxt(gr.a))} ${gr.list.length}</span>`).join('')}</div>
         ${misItems.length ? `<div class="s-warn"><b>⚠ 확인 필요 ${misItems.length}건</b> — 원 자료의 학번·이름이 편성표와 달라 일단 보여 줍니다. 이 학생 것이 맞는지 확인하세요.
           <ul>${misItems.map(it => `<li>${esc(actById(it.a)?.title || '')} — 원 자료 「<span class="nw">${esc(sgbMisKey(it._mis))}</span> ${esc(it._mis.nm)}」</li>`).join('')}</ul></div>` : ''}
-        <nav class="s-acts" id="sActs" aria-label="참여한 활동"><div class="s-acts-in">
+        ${acts.length ? `<nav class="s-acts" id="sActs" aria-label="참여한 활동"><div class="s-acts-in">
           <div class="s-acts-h">참여한 활동 ${acts.length}</div>
           <ul>${acts.map(({ a, n }) => `<li><button type="button" data-go="${esc(a.id)}"><span class="an">${titleHtml(a)}${n > 1 ? ` <span class="d">${n}건</span>` : ''}${freshHtml(a)}</span>${tagHtml(a.tags)}</button></li>`).join('')}</ul>
-        </div></nav>
+        </div></nav>` : ''}
       </div>
     </div>
+    ${items.length ? '' : '<div class="empty" style="padding:30px 10px 10px;">이 학생의 보조자료가 없습니다 — 「✏️ 작성」 에서 바로 쓸 수 있습니다.</div>'}
     ${shownGroups.map(gr => {
       // 문안 합계 바이트 — 담임이 한 칸에 몰아 넣을 때 한도를 넘는지 미리(영역이 하나로 정해질 때만 한도)
       const sum = gr.list.reduce((n, it) => n + (it.b ? sgbNeisBytes(it.b) : 0), 0), lim = sgbNeisLimit(gr.a.tags);
@@ -1936,12 +1935,14 @@ async function renderStuOut(){
       const head = `<div class="grp">${tagHtml(gr.a.tags)}<span>${gr.list.length}건</span>${gb}</div>`;
       // 봉사 표는 누가기록 묶음 맨 앞에 한 번
       const volPart = (gr.a.tags || []).includes('누') && !volPlaced ? (volPlaced = true, volHtml) : '';
-      return head + volPart + gr.cards.map(it => itemCard(actById(it.a), it)).join('');
+      return head + volPart + gr.cards.map(it => itemCard(actById(it.a), it, { to: can })).join('');
     }).join('')}
   </div>`;
   if ($('copyAll')) $('copyAll').onclick = () => copyText(out._all);
+  if ($('drOpenBtn')) $('drOpenBtn').onclick = () => drToggle();
+  out.querySelector('.sheet').onclick = e => { const b = e.target.closest('[data-to]'); if (b) drAppend(b.dataset.to, b.closest('.card').dataset.b); };
   // 봉사는 접힌 활동 카드 말고 누가기록 표로
-  $('sActs').onclick = e => {
+  if ($('sActs')) $('sActs').onclick = e => {
     const b = e.target.closest('[data-go]'); if (!b) return;
     const a = actById(b.dataset.go);
     const card = (a && sgbIsVolunteer(a) && out.querySelector('.card.vol'))
@@ -1976,6 +1977,7 @@ async function renderStuOut(){
     e.target.textContent = open ? '활동별로 나눠 보기 ▴' : '활동별로 나눠 보기 ▾';
   };
   out.scrollTop = 0;
+  drSync();                                    // 작성 칸 — 열어 두었고 쓸 수 있는 학생이면 이 학생으로
 }
 
 // ── 활동별: 활동 목록 | 활동 ──
@@ -2140,11 +2142,12 @@ function renderSch(){
   markSeen([s]);
 }
 
-// ── 우리 반 작성(담임) ── 나이스에 넣을 최종안을 반 학생마다 쓴다(엑셀 「학생 생활기록부 입력」 도구를 웹으로).
-// 보조자료를 옆에 두고 가져와 줄이고 고친다. 그 반 담임과 앱 관리자만 — 규칙(saenggibuDraft·saenggibuDraftHist)이
-// 막으므로 다른 반은 조회도 안 된다. 담임 판정은 학부모 상담·자리 배치와 같은 acl/gradeRoles.homerooms.
+// ── 생기부 작성(담임) ── 나이스에 넣을 최종안을 학생마다 쓴다(엑셀 「학생 생활기록부 입력」 도구를 웹으로).
+// 학생별 화면에서 「✏️ 작성」 으로 오른쪽에 띄우고, 보조자료 카드의 「→ 자율」 로 붙여 줄이고 고친다.
+// 그 반 담임과 앱 관리자만 — 규칙(saenggibuDraft·saenggibuDraftHist)이 막으므로 다른 반은 조회도 안 된다.
+// 담임 판정은 학부모 상담·자리 배치와 같은 acl/gradeRoles.homerooms.
 // saenggibuDraft/{학년-반-번호} = { ja, jin, gae, haeng, hold: {영역: 빼 둔 내용}, memo, nm, upd, by }
-// saenggibuDraftHist/{학년-반-번호} = { 영역: [{ t, at, by }…최근 10판] } — 반 전체를 열 때 같이 받지 않게 따로 둔다
+// saenggibuDraftHist/{학년-반-번호} = { 영역: [{ t, at, by }…최근 10판] } — 학생을 열 때 같이 받지 않게 따로 둔다
 const DR_AREAS = [['ja', '자율', '자'], ['jin', '진로', '진'], ['gae', '개세특', '개'], ['haeng', '행특', '행']];
 const DR_NAME = Object.fromEntries(DR_AREAS.map(([k, nm]) => [k, nm]));
 const DR_TAG_AREA = { '자': 'ja', '진': 'jin', '개': 'gae', '행': 'haeng' };   // 보조자료 꼬리표 → 붙일 칸
@@ -2154,13 +2157,17 @@ let ROLE = { home: '', master: false };      // home: 담임 반 '학년-반', m
 const drCache = new Map(), drHist = new Map();
 const drQ = new Map();                        // 아직 안 쓴 고침: 학생 → { nm, patch, prev }
 let drTimer = 0, drSaving = Promise.resolve(), drSnap = {};
-const drKey = () => `${st.dk}-${st.dn}`;
+const drKey = () => `${+st.g}-${+st.c}-${+st.n}`;
+const drCanWrite = (g, c) => !EMBED && (ROLE.master || (!!ROLE.home && ROLE.home === `${+g}-${+c}`));
 const drStudents = ck => (rosterView()[ck] || []).filter(r => !r.extra);   // 편성표 학생(떠난 학생은 쓸 일이 없다)
 const drGet = (d, f) => f.startsWith('hold.') ? (d?.hold?.[f.slice(5)] || '') : (d?.[f] || '');
 const drSet = (d, f, v) => { if (f.startsWith('hold.')) (d.hold = d.hold || {})[f.slice(5)] = v; else d[f] = v; };
 const drBytesTxt = (v, t) => { const b = sgbNeisBytes(v), lim = SGB_NEIS_LIMIT[t];
-  return `${b.toLocaleString()} / ${lim.toLocaleString()}바이트 · ${b > lim ? (b - lim).toLocaleString() + ' 넘음' : (lim - b).toLocaleString() + ' 남음'}`; };
-const DR_HOLD_HINT = '— 바이트가 넘쳐 뺀 문장을 두는 곳';
+  return b > lim ? `${b.toLocaleString()} / ${lim.toLocaleString()} · ${(b - lim).toLocaleString()} 넘음` : `${b.toLocaleString()} / ${lim.toLocaleString()}바이트`; };
+const drPct = (v, t) => Math.min(100, sgbNeisBytes(v) / SGB_NEIS_LIMIT[t] * 100);
+// 보조자료 카드의 「→ 자율」 — 꼬리표로(<자or진> 이면 둘 다, <누>·<동> 은 없음). 행특을 가리면 「→ 행특」 도 뺀다
+const drToHtml = a => { const ks = [...new Set((a?.tags || []).map(t => DR_TAG_AREA[t]).filter(Boolean))].filter(k => k !== 'haeng' || !st.hideHaeng);
+  return ks.length ? `<span class="to-btns">${ks.map(k => `<button type="button" class="btn line" data-to="${k}">→ ${DR_NAME[k]}</button>`).join('')}</span>` : ''; };
 
 async function loadRole(){
   ROLE = { home: '', master: isAdmin() };
@@ -2170,127 +2177,80 @@ async function loadRole(){
     const m = String(h || '').match(/^(\d+)-(\d+)$/);
     if (m) ROLE.home = `${+m[1]}-${+m[2]}`;   // 명단에 '2-03' 처럼 적혀 있어도
   } catch (e) {}
-  $('draftTab').style.display = ROLE.home || ROLE.master ? '' : 'none';
 }
-// 영역마다 점 — 빈 칸 · 씀 · 한도 넘음. 행특을 가리면 점도 뺀다
-function drDots(d){
-  return DR_AREAS.filter(([k]) => k !== 'haeng' || !st.hideHaeng).map(([k, nm, t]) => {
-    const v = d?.[k] || '', b = sgbNeisBytes(v), lim = SGB_NEIS_LIMIT[t];
-    return `<i class="dot${!v.trim() ? '' : b > lim ? ' over' : ' ok'}" title="${nm} ${b.toLocaleString()} / ${lim.toLocaleString()}바이트"></i>`;
-  }).join('');
-}
-const drStuRow = (ck, r) => `<button type="button" class="dr-stu${String(r.n) === String(st.dn) ? ' on' : ''}" data-n="${r.n}">
-  <span class="num">${r.n}</span><span class="nm">${esc(r.nm)}</span><span class="dots" data-key="${ck}-${r.n}">${drDots(drCache.get(`${ck}-${r.n}`))}</span></button>`;
-const drDotsAll = () => document.querySelectorAll('#drStus .dots').forEach(el => { el.innerHTML = drDots(drCache.get(el.dataset.key)); });
-const drDotsOne = key => { const el = document.querySelector(`#drStus .dots[data-key="${key}"]`); if (el) el.innerHTML = drDots(drCache.get(key)); };
-function drPickHtml(cls, ck){
-  const grades = [...new Set(cls.map(k => k.split('-')[0]))], g = ck.split('-')[0];
-  return `<div class="dr-pick"><div class="d" style="margin-bottom:6px;">관리자 — 반 고르기</div>
-    <div class="seg">${grades.map(x => `<button type="button" data-g="${x}"${x === g ? ' class="on"' : ''}>${x}학년</button>`).join('')}</div>
-    <div class="dr-cls">${cls.filter(k => k.split('-')[0] === g).map(k => `<button type="button" data-k="${k}"${k === ck ? ' class="on"' : ''}>${k.split('-')[1]}반</button>`).join('')}</div></div>`;
+async function drLoadOne(key){
+  if (drQ.has(key) && drCache.has(key)) return drCache.get(key);   // 아직 안 쓴 고침이 있으면 그것이 최신
+  const s = await getDoc(doc(fbDb, 'saenggibuDraft', key));
+  const d = s.exists() ? s.data() : {};
+  drCache.set(key, d);
+  return d;
 }
 async function drLoadClass(ck, list){
-  const keys = list.map(r => `${ck}-${r.n}`).filter(k => !drCache.has(k));
+  const keys = list.map(r => `${ck}-${r.n}`).filter(k => !drQ.has(k));
   const snaps = await Promise.all(keys.map(k => getDoc(doc(fbDb, 'saenggibuDraft', k))));
   snaps.forEach((s, i) => drCache.set(keys[i], s.exists() ? s.data() : {}));
 }
-async function renderDraft(){
-  await drFlush();
-  const body = $('body'), cls = classes();
-  if (!ROLE.master) st.dk = ROLE.home;
-  else if (!cls.includes(st.dk)) st.dk = cls.includes(ROLE.home) ? ROLE.home : (cls[0] || '');
-  const ck = st.dk || '', list = drStudents(ck);
-  if (!list.length){
-    body.innerHTML = `<div class="empty">${ROLE.master && !ROLE.home ? '반 명단이 없습니다 — 편성표를 먼저 올려 주세요.'
-      : `담임 반(${esc(ck)})의 명단이 없습니다.<br>편성표가 올라가 있는지 확인해 주세요.`}</div>`;
-    return;
-  }
-  if (!list.some(r => String(r.n) === String(st.dn))) st.dn = String(list[0].n);
-  save();
-  const [g, c] = ck.split('-');
-  body.innerHTML = `<div class="dr" id="drPanes">
-    <aside class="dr-list" aria-label="우리 반 명단">
-      ${ROLE.master ? drPickHtml(cls, ck) : ''}
-      <div class="roster-head">${esc(g)}학년 ${esc(c)}반 <small>${list.length}명${ROLE.home === ck ? ' · 담임' : ROLE.master ? ' · 관리자' : ''}</small></div>
-      <div id="drStus">${list.map(r => drStuRow(ck, r)).join('')}</div>
-    </aside>
-    <section class="dr-edit" id="drEdit"><div class="empty">불러오는 중…</div></section>
-    <section class="dr-ref" id="drRef" aria-label="보조자료"></section>
-  </div>`;
-  $('drStus').onclick = e => { const b = e.target.closest('.dr-stu'); if (b) drOpen(b.dataset.n); };
-  const pick = $('drPanes').querySelector('.dr-pick');
-  if (pick) pick.onclick = e => {
-    const gb = e.target.closest('[data-g]'), kb = e.target.closest('[data-k]');
-    if (gb) st.dk = cls.find(k => k.split('-')[0] === gb.dataset.g) || st.dk;
-    else if (kb) st.dk = kb.dataset.k;
-    else return;
-    st.dn = ''; renderDraft();
-  };
-  const ed = $('drEdit');
-  ed.addEventListener('input', drOnInput);
-  ed.addEventListener('change', drOnChange);
-  ed.addEventListener('click', drOnClick);
-  ed.addEventListener('keydown', e => {
-    if (e.target.id !== 'drGo' || e.key !== 'Enter') return;
-    const n = parseInt(e.target.value, 10);
-    if (drStudents(st.dk).some(r => +r.n === n)) drOpen(n); else toast('그 번호 학생이 없습니다');
-  });
-  $('drRef').onclick = e => { const b = e.target.closest('[data-to]'); if (b) drAppend(b.dataset.to, b.closest('.card').dataset.b); };
-  drCache.clear(); drHist.clear();            // 들어올 때마다 새로 — 다른 기기에서 고친 것도 보이게
-  try { await drLoadClass(ck, list); }
-  catch (e) { ed.innerHTML = `<div class="empty err">이 반의 작성 내용을 불러오지 못했습니다.<br>${esc(e.message || e)}</div>`; return; }
-  if (st.view !== 'draft' || ck !== st.dk || !$('drEdit')) return;   // 그사이 다른 화면·반
-  drDotsAll();
-  await drOpen(st.dn, true);
+// 작성 칸 열고 닫기 — 열어 둔 것은 기억한다(학생을 넘겨도 그대로, 쓸 수 없는 학생에게서는 감춘다)
+function drToggle(open){ st.drOpen = open ?? !st.drOpen; save(); drSync(); }
+function drSync(){
+  const panes = $('stuPanes'); if (!panes) return;
+  const on = !!st.drOpen && !!st.n && drCanWrite(st.g, st.c);
+  panes.classList.toggle('dr-open', on);
+  const btn = $('drOpenBtn');
+  if (btn){ btn.classList.toggle('pri', on); btn.setAttribute('aria-pressed', String(on)); }
+  if (on) drRenderPanel();
+  else { drFlush(); const p = $('drPane'); if (p) p.innerHTML = ''; }   // 닫으면 칸째로 비운다(행특이 화면에 남지 않게)
 }
-// 학생 하나 열기 — 앞 학생의 고침을 먼저 쓴다
-async function drOpen(n, fresh){
-  if (!fresh) await drFlush();
-  if (!$('drEdit')) return;
-  st.dn = String(n); save();
-  const ck = st.dk, key = drKey(), list = drStudents(ck), at = list.findIndex(r => String(r.n) === st.dn);
-  if (at < 0) return;
-  document.querySelectorAll('#drStus .dr-stu').forEach(b => b.classList.toggle('on', b.dataset.n === st.dn));
+async function drRenderPanel(){
+  const pane = $('drPane'); if (!pane) return;
+  const key = drKey(), ck = `${+st.g}-${+st.c}`, list = drStudents(ck), at = list.findIndex(r => +r.n === +st.n);
+  if (at < 0){ pane.innerHTML = '<div class="drp"><div class="empty">편성표에 없는 학생이라 작성 칸을 열 수 없습니다.</div></div>'; return; }
+  if (!pane.querySelector('.drp-t')) pane.innerHTML = '<div class="drp"><div class="d">불러오는 중…</div></div>';
+  let d;
+  try { d = await drLoadOne(key); }
+  catch (e) { pane.innerHTML = `<div class="drp"><div class="empty err">작성 내용을 불러오지 못했습니다.<br>${esc(e.message || e)}</div></div>`; return; }
+  if (key !== drKey() || !$('stuPanes')?.classList.contains('dr-open')) return;   // 그사이 다른 학생·닫음
   drSnap = {};                                // 이 학생을 연 뒤 처음 고칠 때는 그 전 글을 기록에 남긴다
-  const d = drCache.get(key) || {};
-  $('drEdit').innerHTML = drEditHtml(ck, list, at, d);
+  pane.innerHTML = drPanelHtml(ck, list, at, d);
   // 글은 값으로 넣는다(태그 안에 쓰면 맨 앞 줄바꿈이 사라진다)
-  $('drEdit').querySelectorAll('textarea[data-f]').forEach(ta => { ta.value = drGet(d, ta.dataset.f); drGrow(ta); });
-  document.querySelector('#drStus .dr-stu.on')?.scrollIntoView({ block: 'nearest' });
-  if (isPhone() || matchMedia('(max-width:1279px)').matches) $('drPanes').scrollTop = 0; else $('drEdit').scrollTop = 0;
-  drRenderRef(ck, st.dn);
+  pane.querySelectorAll('textarea[data-f]').forEach(ta => { ta.value = drGet(d, ta.dataset.f); if (!ta.hidden) drGrow(ta); });
+  pane.oninput = drOnInput; pane.onchange = drOnChange; pane.onclick = drOnClick;
+  pane.scrollTop = 0;
 }
-function drEditHtml(ck, list, at, d){
+function drPanelHtml(ck, list, at, d){
   const r = list[at], prev = list[at - 1], next = list[at + 1], [g, c] = ck.split('-'), me = fbAuth.currentUser?.email || '';
-  const step = (x, id, dir) => `<button type="button" class="btn" id="${id}"${x ? ` data-n="${x.n}"` : ' disabled'} aria-label="${dir < 0 ? '이전' : '다음'} 학생">${dir < 0 ? '◀ ' : ''}${x ? esc(x.n + ' ' + x.nm) : dir < 0 ? '처음' : '끝'}${dir > 0 ? ' ▶' : ''}</button>`;
-  return `<div class="dr-sheet" id="drSheet">
-    <div class="dr-head">
-      <div class="dr-who"><b>${esc(r.nm)}</b><span class="s-id">${esc(g)}학년 ${esc(c)}반 ${esc(r.n)}번 · ${hakbunOf(g, c, r.n)}</span></div>
-      <select class="dr-sel" id="drSel" aria-label="학생 고르기">${list.map(x => `<option value="${x.n}"${x === r ? ' selected' : ''}>${x.n}. ${esc(x.nm)}</option>`).join('')}</select>
-      <div class="dr-nav">${step(prev, 'drPrev', -1)}<input class="dr-go" id="drGo" inputmode="numeric" placeholder="번호" aria-label="번호로 바로가기">${step(next, 'drNext', 1)}</div>
-      <label class="dr-tg"><input type="checkbox" id="drHide"${st.hideHaeng ? ' checked' : ''}> 행특 가리기</label>
-      <details class="form-dl dr-print" id="drPrint"><summary class="btn">🖨 인쇄</summary><div class="form-dl-menu">
+  const step = (x, id, label, ch) => `<button type="button" class="btn sm" id="${id}"${x ? ` data-n="${x.n}" title="${esc(x.n + '번 ' + x.nm)}"` : ' disabled'} aria-label="${label}">${ch}</button>`;
+  return `<div class="drp">
+    <div class="drp-top">
+      <div class="drp-who"><b>✏️ 생기부 작성</b><span>${esc(r.nm)} · ${hakbunOf(g, c, r.n)}</span></div>
+      <button type="button" class="drp-x" id="drClose" aria-label="작성 칸 닫기" title="닫기">✕</button>
+    </div>
+    <div class="drp-bar">
+      <div class="drp-nav">${step(prev, 'drPrev', '이전 학생', '◀')}<span class="drp-pos">${at + 1} / ${list.length}</span>${step(next, 'drNext', '다음 학생', '▶')}</div>
+      <label class="drp-sw"><input type="checkbox" id="drHide"${st.hideHaeng ? ' checked' : ''}> 행특 가리기</label>
+      <details class="form-dl drp-print" id="drPrint"><summary class="btn sm">🖨 인쇄</summary><div class="form-dl-menu">
         <button type="button" data-pr="one">이 학생 인쇄</button>
         <button type="button" data-pr="all">우리 반 전체 인쇄 <span class="d">— 학생마다 한 장(${list.length}장)</span></button>
         <label><input type="checkbox" id="drPrNoH"${st.hideHaeng ? ' checked' : ''}> 행특 빼고 인쇄</label></div></details>
-      <div class="dr-saved" id="drSaved">${d.upd ? `저장됨 ${fmtAt(d.upd)}${d.by && d.by !== me ? ' · ' + esc(whoTxt(d.by)) : ''}` : '쓰는 대로 저장됩니다'}</div>
     </div>
-    ${DR_AREAS.map(([k, nm, t]) => k === 'haeng' && st.hideHaeng
-      ? '<div class="dr-off" id="drOffH">행특은 가려 두었습니다 — 「행특 가리기」를 끄면 보입니다.</div>' : drAreaHtml(k, nm, t, d)).join('')}
-    <section class="dr-memo"><div class="dr-h"><b>학생 메모</b><span class="d">— 상담할 것·확인할 것. 바이트·인쇄에 들어가지 않습니다</span></div>
-      <textarea class="dr-t dr-mt" id="drMemo" data-f="memo" rows="2" aria-label="학생 메모"></textarea></section>
+    <div class="drp-saved" id="drSaved">${d.upd ? `저장됨 ${fmtAt(d.upd)}${d.by && d.by !== me ? ' · ' + esc(whoTxt(d.by)) : ''}` : '쓰는 대로 저장됩니다'}</div>
+    ${DR_AREAS.map(([k, nm, t]) => k === 'haeng' && st.hideHaeng ? '<div class="drp-off" id="drOffH">행특은 가려 두었습니다</div>' : drAreaHtml(k, nm, t, d)).join('')}
+    <section class="drp-memo"><div class="drp-ah"><b>학생 메모</b><span class="d">바이트·인쇄 제외</span></div>
+      <textarea class="drp-t drp-mt" id="drMemo" data-f="memo" aria-label="학생 메모" placeholder="상담할 것 · 확인할 것"></textarea></section>
   </div>`;
 }
 function drAreaHtml(k, nm, t, d){
   const v = d[k] || '', hv = d.hold?.[k] || '', over = sgbNeisBytes(v) > SGB_NEIS_LIMIT[t];
-  return `<section class="dr-area" data-k="${k}">
-    <div class="dr-h"><span class="tag ${SGB_TAG_CLS[t]}">${nm}</span>
-      <span class="dr-b${over ? ' over' : ''}" id="drB-${k}">${drBytesTxt(v, t)}</span>
-      <button type="button" class="btn line dr-hb" data-hist="${k}" aria-expanded="false">↶ 되돌리기</button></div>
-    <textarea class="dr-t${over ? ' over' : ''}" id="drT-${k}" data-f="${k}" rows="4" aria-label="${nm} 작성" placeholder="${nm} — 보조자료의 「→ ${nm}」로 가져오거나 직접 씁니다"></textarea>
-    <div class="dr-hist" id="drH-${k}" hidden></div>
-    <details class="dr-hold" id="drHold-${k}"${hv ? ' open' : ''}><summary>빼 둔 내용 <span class="d" id="drHoldN-${k}">${hv ? hv.length.toLocaleString() + '자' : DR_HOLD_HINT}</span></summary>
-      <textarea class="dr-t dr-ht" data-f="hold.${k}" rows="2" aria-label="${nm} 빼 둔 내용" placeholder="상담하며 다시 넣을 수 있게 — 바이트·인쇄에 들어가지 않습니다"></textarea></details>
+  return `<section class="drp-area" data-k="${k}">
+    <div class="drp-ah"><span class="tag ${SGB_TAG_CLS[t]}">${nm}</span><span class="drp-b${over ? ' over' : ''}" id="drB-${k}">${drBytesTxt(v, t)}</span></div>
+    <div class="drp-meter${over ? ' over' : ''}" id="drM-${k}"><i style="width:${drPct(v, t).toFixed(1)}%"></i></div>
+    <textarea class="drp-t${over ? ' over' : ''}" id="drT-${k}" data-f="${k}" aria-label="${nm} 작성" placeholder="직접 쓰거나, 보조자료 카드의 「→ ${nm}」 단추로 붙입니다"></textarea>
+    <div class="drp-links">
+      <button type="button" class="drp-link" data-holdt="${k}" aria-expanded="${hv ? 'true' : 'false'}">빼 둔 내용<span id="drHoldN-${k}">${hv ? ' ' + hv.length.toLocaleString() + '자' : ''}</span></button>
+      <button type="button" class="drp-link" data-hist="${k}" aria-expanded="false">되돌리기</button>
+    </div>
+    <textarea class="drp-t drp-hold" id="drHT-${k}" data-f="hold.${k}" aria-label="${nm} 빼 둔 내용" placeholder="바이트가 넘쳐 뺀 문장 — 상담하며 다시 넣을 수 있게(바이트·인쇄 제외)"${hv ? '' : ' hidden'}></textarea>
+    <div class="drp-hist" id="drH-${k}" hidden></div>
   </section>`;
 }
 function drGrow(ta){ ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 2) + 'px'; }
@@ -2298,30 +2258,36 @@ function drSaved(txt, err){ const el = $('drSaved'); if (!el) return; el.textCon
 function drOnInput(e){
   const ta = e.target.closest('textarea[data-f]'); if (!ta) return;
   drGrow(ta);
-  const f = ta.dataset.f, v = ta.value, key = drKey(), area = DR_AREAS.find(([k]) => k === f);
+  const f = ta.dataset.f, v = ta.value, area = DR_AREAS.find(([k]) => k === f);
   if (area){
-    const over = sgbNeisBytes(v) > SGB_NEIS_LIMIT[area[2]], lab = $('drB-' + f);
+    const over = sgbNeisBytes(v) > SGB_NEIS_LIMIT[area[2]], lab = $('drB-' + f), m = $('drM-' + f);
     lab.textContent = drBytesTxt(v, area[2]); lab.classList.toggle('over', over); ta.classList.toggle('over', over);
+    m.classList.toggle('over', over); m.firstElementChild.style.width = drPct(v, area[2]).toFixed(1) + '%';
   }
-  if (f.startsWith('hold.')) $('drHoldN-' + f.slice(5)).textContent = v ? v.length.toLocaleString() + '자' : DR_HOLD_HINT;
-  drQueue(key, f, v);
-  if (area) drDotsOne(key);
+  if (f.startsWith('hold.')) $('drHoldN-' + f.slice(5)).textContent = v ? ' ' + v.length.toLocaleString() + '자' : '';
+  drQueue(drKey(), f, v);
 }
 function drOnChange(e){
-  if (e.target.id === 'drHide'){ st.hideHaeng = e.target.checked; save(); drDotsAll(); drOpen(st.dn); return; }
-  if (e.target.id === 'drSel') drOpen(e.target.value);
+  // 행특 가리기 — 보조자료의 행특 카드·「→ 행특」 도 함께 빠지게 학생 화면째 다시 그린다
+  if (e.target.id === 'drHide'){ st.hideHaeng = e.target.checked; save(); drFlush(); renderStuOut(); }
 }
 function drOnClick(e){
-  const step = e.target.closest('#drPrev, #drNext'); if (step){ if (step.dataset.n) drOpen(step.dataset.n); return; }
+  if (e.target.closest('#drClose')){ drToggle(false); return; }
+  const step = e.target.closest('#drPrev, #drNext');
+  if (step){ if (step.dataset.n) openStudent(`${+st.g}-${+st.c}`, step.dataset.n); return; }
+  const ht = e.target.closest('[data-holdt]');
+  if (ht){ const box = $('drHT-' + ht.dataset.holdt), open = box.hidden; box.hidden = !open; ht.setAttribute('aria-expanded', String(open));
+    if (open){ drGrow(box); box.focus(); } return; }
   const hb = e.target.closest('[data-hist]'); if (hb){ drHistToggle(hb.dataset.hist); return; }
-  const hv = e.target.closest('.dr-hist button[data-i]'); if (hv){ drRestore(hv.dataset.k, +hv.dataset.i); return; }
+  const hv = e.target.closest('.drp-hist button[data-i]'); if (hv){ drRestore(hv.dataset.k, +hv.dataset.i); return; }
   const pr = e.target.closest('[data-pr]'); if (pr){ drPrint(pr.dataset.pr); return; }
   if (e.target.closest('#drSaved.err')) drFlush();
 }
 // 쓰는 대로 저장 — 손을 멈추고 0.9초 뒤, 학생·화면을 옮길 때, 창을 닫을 때. 고친 칸만 합쳐 쓴다(merge)
 function drQueue(key, f, v){
   let q = drQ.get(key);
-  if (!q){ const r = drStudents(st.dk).find(x => `${st.dk}-${x.n}` === key); q = { nm: r?.nm || '', patch: {}, prev: {} }; drQ.set(key, q); }
+  if (!q){ const ck = key.split('-').slice(0, 2).join('-'), r = drStudents(ck).find(x => `${ck}-${x.n}` === key);
+    q = { nm: r?.nm || '', patch: {}, prev: {} }; drQ.set(key, q); }
   const d = drCache.get(key) || {};
   if (!(f in q.prev)) q.prev[f] = drGet(d, f);       // 이번 묶음 전의 글(되돌리기 기록에 쓴다)
   q.patch[f] = v;
@@ -2380,13 +2346,13 @@ async function drHistToggle(k){
   if (!box) return;
   if (!box.hidden){ box.hidden = true; btn?.setAttribute('aria-expanded', 'false'); return; }
   box.hidden = false; btn?.setAttribute('aria-expanded', 'true');
-  box.innerHTML = '<div class="d">불러오는 중…</div>';
+  box.innerHTML = '<div class="d" style="padding:4px 6px;">불러오는 중…</div>';
   await drFlush();
   let h;
   try { h = await drHistLoad(drKey()); }
-  catch (e) { box.innerHTML = `<div class="d err">기록을 불러오지 못했습니다: ${esc(e.message || e)}</div>`; return; }
+  catch (e) { box.innerHTML = `<div class="d err" style="padding:4px 6px;">기록을 불러오지 못했습니다: ${esc(e.message || e)}</div>`; return; }
   const me = fbAuth.currentUser?.email || '', list = h[k] || [];
-  box.innerHTML = list.length ? `<div class="d" style="padding:2px 6px 4px;">눌러서 그 판으로 되돌립니다 — 지금 글은 기록에 남깁니다</div>${list.map((x, i) =>
+  box.innerHTML = list.length ? `<div class="d" style="padding:3px 6px 5px;">눌러서 그 판으로 되돌립니다 — 지금 글은 기록에 남깁니다</div>${list.map((x, i) =>
     `<button type="button" data-k="${k}" data-i="${i}"><span class="when">${fmtAt(x.at)}</span><span class="d">${sgbNeisBytes(x.t).toLocaleString()}바이트${x.by && x.by !== me ? ' · ' + esc(whoTxt(x.by)) : ''}</span>
       <span class="pv">${esc(x.t.slice(0, 90))}</span></button>`).join('')}`
     : '<div class="d" style="padding:4px 6px;">아직 기록이 없습니다 — 학생을 열고 처음 고칠 때, 5분마다, 30자 넘게 지울 때 그 전 글을 남깁니다(최근 10판).</div>';
@@ -2406,57 +2372,31 @@ async function drRestore(k, i){
   document.querySelector(`[data-hist="${k}"]`)?.setAttribute('aria-expanded', 'false');
   toast('되돌렸습니다 — 바꾸기 전 글은 기록에 남겼습니다');
 }
-// 오른쪽 — 그 학생의 보조자료(학번이 어긋난 자료도 학생별 화면과 같은 규칙으로). 「→ 자율」 로 그 칸 끝에 붙인다
-async function drRenderRef(ck, n){
-  const box = $('drRef'), key = `${ck}-${n}`;
-  if (!box) return;
-  if (!META){ box.innerHTML = '<div class="empty">올라온 보조자료가 없습니다.</div>'; return; }
-  box.innerHTML = '<div class="d">보조자료 불러오는 중…</div>';
-  let d = null;
-  try { d = await loadStudent(key); } catch (e) {}
-  const mis = sgbMisFor(META.mismatch, key);
-  const items = (d?.items || []).map(it => { const m = mis.own.find(m => m.a === it.a); return m ? { ...it, _mis: m } : it; });
-  for (const m of mis.borrow){
-    try { const src = await loadStudent(sgbMisKey(m)); for (const it of src?.items || []) if (it.a === m.a) items.push({ ...it, _mis: m, _borrow: true }); } catch (e) {}
-  }
-  if (key !== drKey() || !$('drRef')) return;           // 그사이 다른 학생
-  // 행특을 가려 두었으면 행특 보조자료도 뺀다(상담 중 화면)
-  const onlyH = a => (a.tags || []).length > 0 && (a.tags || []).every(t => t === '행');
-  const cards = items.filter(it => it.b && actById(it.a) && !sgbIsVolunteer(actById(it.a)) && !(st.hideHaeng && onlyH(actById(it.a))))
-    .map((it, i) => ({ it, i, r: groupRank(actById(it.a)) })).sort((x, y) => x.r - y.r || x.i - y.i).map(x => x.it);
-  const vol = sgbVolunteerRows(items, actById);
-  box.innerHTML = `<div class="rf-h"><b>보조자료</b><span class="d">${cards.length ? `${cards.length}건 — 「→ 자율」 처럼 누르면 그 칸 끝에 붙습니다` : '기재 문안이 있는 보조자료가 없습니다'}</span></div>
-    ${cards.map(drRefCard).join('')}
-    ${vol.length ? `<div class="rf-vol">봉사 ${vol.length}건 · 총 ${vol.at(-1).total}시간 — 학생별 화면의 누가기록 표에서 봅니다</div>` : ''}`;
-  markSeen([...new Set(items.map(it => it.a))].map(actById));
-}
-function drRefCard(it){
-  const a = actById(it.a);
-  const to = [...new Set((a.tags || []).map(t => DR_TAG_AREA[t]).filter(Boolean))].filter(k => k !== 'haeng' || !st.hideHaeng);
-  return `<div class="card rf-card" data-a="${esc(a.id)}" data-b="${esc(it.b)}">
-    <div class="rf-t">${tagHtml(a.tags)}<b>${titleHtml(a)}</b>${freshHtml(a)}</div>
-    ${a.dept ? `<div class="d">${esc(a.dept)}</div>` : ''}
-    ${it._mis ? misNote(it._mis, it._borrow) : ''}
-    <div class="rf-b">${esc(it.b)}</div>
-    <div class="rf-go">${to.map(k => `<button type="button" class="btn line" data-to="${k}">→ ${DR_NAME[k]}</button>`).join('')}
-      <button type="button" class="btn" data-copy>📋 복사</button><span class="d">${sgbNeisBytes(it.b).toLocaleString()}바이트</span></div>
-  </div>`;
-}
-function drAppend(k, text){
-  const ta = $('drT-' + k);
-  if (!ta){ toast(`${DR_NAME[k]} 칸이 가려져 있습니다`); return; }
-  const cur = ta.value.replace(/\s+$/, '');
-  ta.value = cur ? `${cur} ${text}` : text;
-  ta.dispatchEvent(new Event('input', { bubbles: true }));
-  ta.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth' });
-  ta.classList.add('hit'); setTimeout(() => ta.classList.remove('hit'), 1200);
-  toast(`${DR_NAME[k]}에 붙였습니다 — 바이트를 보며 줄여 주세요`);
+// 보조자료 카드의 「→ 자율」 — 그 칸 끝에 한 칸 띄우고 붙인다. 작성 칸이 닫혀 있어도(폰) 저장된 글 뒤에 붙인다
+async function drAppend(k, text){
+  const key = drKey();
+  let d;
+  try { d = await drLoadOne(key); }
+  catch (e) { toast('작성 내용을 불러오지 못해 붙이지 못했습니다'); return; }
+  if (key !== drKey()) return;
+  const ta = $('drT-' + k), base = (ta ? ta.value : drGet(d, k)).replace(/\s+$/, ''), v = base ? `${base} ${text}` : text;
+  if (ta){
+    ta.value = v;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    ta.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth' });
+    ta.classList.add('hit'); setTimeout(() => ta.classList.remove('hit'), 1200);
+  } else drQueue(key, k, v);
+  toast(`${DR_NAME[k]} 칸에 붙였습니다 — 바이트를 보며 줄여 주세요`);
 }
 // 인쇄 — 이 학생만 / 우리 반 전체(학생마다 한 장). 행특은 빼고 찍을 수 있다. 빼 둔 내용·메모는 안 찍는다
 async function drPrint(which){
   await drFlush();
-  const noH = !!$('drPrNoH')?.checked, ck = st.dk, [g, c] = ck.split('-');
-  const list = drStudents(ck), rows = which === 'one' ? list.filter(r => String(r.n) === st.dn) : list;
+  const noH = !!$('drPrNoH')?.checked, ck = `${+st.g}-${+st.c}`, [g, c] = ck.split('-');
+  const list = drStudents(ck), rows = which === 'one' ? list.filter(r => +r.n === +st.n) : list;
+  if (which === 'all'){
+    try { await drLoadClass(ck, list); }
+    catch (e) { toast('반 작성 내용을 불러오지 못했습니다'); return; }
+  }
   const t = new Date(), ds = `${t.getFullYear()}. ${t.getMonth() + 1}. ${t.getDate()}.`;
   $('printArea').innerHTML = rows.map(r => {
     const d = drCache.get(`${ck}-${r.n}`) || {};
@@ -2465,16 +2405,15 @@ async function drPrint(which){
         return `<div class="pr-a" data-k="${k}"><div class="pr-ah"><b>${nm}</b><span>${sgbNeisBytes(v).toLocaleString()} / ${SGB_NEIS_LIMIT[tg].toLocaleString()}바이트</span></div>
           <div class="pr-t">${v ? esc(v) : '<span class="pr-empty">(비어 있음)</span>'}</div></div>`; }).join('')}</section>`;
   }).join('');
-  $('drPrint').open = false;
+  if ($('drPrint')) $('drPrint').open = false;
   window.print();
 }
 window.addEventListener('afterprint', () => { $('printArea').innerHTML = ''; });   // 인쇄가 끝나면 비운다(행특이 화면 뒤에 남지 않게)
 
 async function render(){
-  if (st.view === 'draft' && !(ROLE.home || ROLE.master)) st.view = 'stu';
-  if (st.view !== 'draft') drFlush();          // 작성 화면을 떠날 때 남은 고침을 쓴다
+  if (st.view === 'draft') st.view = 'stu';    // 예전 판의 「우리 반 작성」 탭 — 이제 학생별의 「✏️ 작성」
+  drFlush();                                   // 화면을 바꿀 때 작성 칸에 남은 고침을 쓴다
   document.querySelectorAll('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === st.view));
-  if (st.view === 'draft') return renderDraft();
   if (!META){
     $('body').innerHTML = `<div class="empty">아직 올라온 자료가 없습니다.<br>위의 「📤 엑셀 올리기」로 엑셀을 올려 주세요.</div>`;
     return;
@@ -3037,7 +2976,7 @@ onAuthStateChanged(fbAuth, async user => {
   catch (e) { $('body').innerHTML = `<div class="empty err">불러오지 못했습니다: ${esc(e.message || e)}</div>`; return; }
   if (EMBED) return renderEmbed();
   try { const b = await getDoc(doc(fbDb, 'students', 'main')); BOOK = b.exists() ? (b.data().students || []) : []; } catch (e) { BOOK = []; }
-  await loadRole();                             // 담임·관리자면 「우리 반 작성」 탭
+  await loadRole();                             // 담임·관리자면 학생별에 「✏️ 작성」
   render();
 });
 
