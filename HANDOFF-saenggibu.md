@@ -43,7 +43,7 @@
 | `upload.html` | 편성표 올리기에서 반·번호가 빈 학생(전출·자퇴)을 `students/changed` 에 따로 저장(`psMoveOf`) |
 | `usage.html` | 사용 현황에 `saenggibu`·`notice` 이름 |
 | `firestore.rules` | `saenggibu`·`saenggibuStu`·`saenggibuAct` — 읽기·쓰기 `isYnhsTeacher()`(2026-10-28 쓰기를 교사 전체로) |
-| `tests/saenggibu.test.mjs` | 344개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
+| `tests/saenggibu.test.mjs` | 347개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
 | `tests/make-saenggibu-template.mjs` | **표준 양식** 엑셀 만들기(부서에 나눠 줄 빈 양식). `node tests/make-saenggibu-template.mjs <폴더>` |
 | `tests/s360-tabs.test.mjs` | 17개 검사(종합검색 탭) |
 | `tests/upload-pyeonseong*.test.mjs`, `tests/make-pyeonseong-fixture.mjs` | 편성표(학적사항 칸·괄호 이름 포함) |
@@ -92,7 +92,8 @@
   (`meta.roster`). 2026-10-28 이전에는 시트에 나온 학생만 보였다.
 - **학번·이름이 어긋난 자료도 일단 보인다**(누락 방지, 2026-10-28 요청 — `sgbMisFor`). 예: 편성표 1-1-1 홍길동·1-1-2 김철수, 엑셀 1-1-1 김철수
   → 1-1-1 홍길동에도(자기 번호), 1-1-2 김철수에도(같은 학년 같은 이름 — 그 번호 문서에서 빌려 옴) 보인다. 머리에 「⚠ 확인 필요 N건」 +
-  카드마다 원 자료(「1-1-1 김철수」, 편성표의 그 번호는 누구인지). 명단에 ⚠, 빌려 온 학생 건수에도 센다. 근거는 올릴 때 만든
+  카드마다 원 자료(「1-1-1 김철수」, 편성표의 그 번호는 누구인지), **봉사 누가기록 표의 그 줄**에도(주황 바탕 + 내용 칸 아래 한 줄,
+  칸 복사 값은 원래 내용만). 명단에 ⚠, 빌려 온 학생 건수에도 센다. 근거는 올릴 때 만든
   `meta.mismatch`(학적 변동 제외) — 데이터 모양은 그대로. 머리 이름은 편성표 이름.
 - 상세: 사진(작은 것 → 고화질, 누르면 크게), 이름·학년반번호·학번, 「기재 문안 전체 복사」, 입력 영역별 묶음 카드.
   문안 상자를 누르거나 복사 단추로 복사(글을 끌어 고르는 중이면 복사 안 함). 학생 글은 접힘.
@@ -233,7 +234,7 @@ CLAUDE.md: **화면 변경은 test 먼저 → 선생님 확인 → ynhs PR·병�
 
 ### 검사 돌리기 (이 환경 기준)
 ```bash
-node tests/saenggibu.test.mjs        # 344
+node tests/saenggibu.test.mjs        # 347
 node tests/s360-tabs.test.mjs        # 17
 node tests/make-pyeonseong-fixture.mjs <폴더>          # 가짜 편성표 먼저 만든다(실제 파일은 개인정보라 저장소에 없음)
 PS_FILE=<폴더>/pyeonseong.xlsx node tests/upload-pyeonseong.test.mjs   # 87

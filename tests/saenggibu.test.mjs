@@ -51,6 +51,7 @@ function sheets({ dropOfficers = false, robotText = '로봇 코딩 캠프에 참
       ['연번', '학년', '반', '번호', '성명', '시작일자', null, '시간', '봉사활동내용'],
       [1, 3, 2, 5, '박나래', '2026.03.09.\n2026.03.16.', '월\n월', '6\n6', '교과학습도우미'],   // 원본처럼 3학년이 먼저 — 내려받아도 이 차례
       [2, 1, 1, 1, '김가람', '2026.04.10.', '금', 4, '헌혈'],
+      [3, 2, 1, 1, '이보람', '2026.05.02.', '토', 2, '도서관 정리'],   // 학번 어긋남 — 편성표엔 2-1-2 이보람
     ]],
     ['<자or진>과중(로봇공학)-2차', [
       [null, '과학중점부', null, null, '⊙ 활  동  명:', null, '진로탐색 로봇공학 캠프'],
@@ -246,6 +247,11 @@ check('칸 맞추기 — 내용·영역·학교/개인·장소·시간(프로젝
   && vrows[1].end === '2026.04.10.' && vrows[0].end === '', vrows);
 check('시간 누계 1 → 5 → 6', vrows.map(r => r.total).join() === '1,5,6');
 check('봉사가 아닌 활동은 안 들어간다', !vrows.some(r => r.srcId === 'v3'));
+{
+  const m = { g: 1, c: 1, n: 1, nm: '김철수', a: 'v1' };
+  const vm = P.sgbVolunteerRows([{ a: 'v1', x: VA ? ['2026.04.10.', '', '4', '', '', '', '헌혈'] : [], _mis: m, _borrow: true }], id => ({ v1: VA })[id]);
+  check('봉사 표 줄에도 어긋남 표시를 실어 보낸다(원 자료·빌려 온 것)', vm.length === 1 && vm[0].mis === m && vm[0].borrow === true, vm);
+}
 
 // ── 2-1c. 반·번호·이름 맞추기 ──
 console.log('\n[반·번호·이름]');
@@ -253,7 +259,7 @@ console.log('\n[반·번호·이름]');
 const ROSTER = [{ grade: '1', room: '01', num: '01', name: '김가람' }, { grade: 1, room: 1, num: 2, name: '최다온' },
   { grade: 3, room: 2, num: 5, name: '박 나래' }, { grade: 2, room: 1, num: 2, name: '이보람' }];
 const mis = P.sgbMismatches(parsed.activities, parsed.actRows, ROSTER);
-check('명렬과 맞대 보기 — 이름 다름 1(1-1-2), 명렬에 없는 학번 1(2-1-1)', mis.length === 2
+check('명렬과 맞대 보기 — 이름 다름 1(1-1-2), 명렬에 없는 학번 2(2-1-1 학생회·봉사)', mis.length === 3
   && mis.some(m => m.g === 1 && m.c === 1 && m.n === 2 && m.why === '이름이 명렬과 다름' && m.expect === '최다온')
   && mis.some(m => m.g === 2 && m.n === 1 && m.why === '명렬에 없는 학번'), mis);
 check('그 이름이 명렬에서 실제로 어디 있는지 알려 준다(이보람 → 2-1-2)', mis.find(m => m.g === 2).hint === '2-1-2');
@@ -759,7 +765,7 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
   check('올리기 전 미리보기 — 활동 6 · 창체 일정 1 · 학생 수', /활동 시트 6개/.test(panel) && /창체 일정 1개/.test(panel)
     && panel.includes(`학생 ${parsed.students.length}명`), panel.slice(0, 200));
   check('미리보기에 건너뛴 시트와 까닭', panel.includes('학생 개인별 조회') && panel.includes('숨긴 시트'));
-  check('미리보기 — 반·번호·이름 확인 2건', (await p.textContent('#upMis')).includes('확인 2건') && (await p.textContent('#upMis')).includes('2-1-2'));
+  check('미리보기 — 반·번호·이름 확인 3건', (await p.textContent('#upMis')).includes('확인 3건') && (await p.textContent('#upMis')).includes('2-1-2'));
   check('처음 올릴 때 — 전부 「새로 추가」, 물어볼 것 없음', panel.includes('새로 추가 7') && !(await p.$('#upMissing')), panel.slice(0, 300));
   check('원본 양식도 함께 — 7/7 시트', panel.includes('원본 양식 7/7'), panel.slice(0, 300));
   check('칸이 다 맞으면 「확인할 시트」 경고 없음(봉사 누가기록은 문안 칸이 원래 없어 뺀다)', !(await p.$('#upOdd')));
@@ -775,13 +781,13 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
   check('활동마다 어느 파일에서 왔는지', meta.activities.every(a => a.file === path.basename(FILE1)));
   check('양식 문서 7개(saenggibu/fmt-…)', fsKeys.filter(k => k.startsWith('saenggibu/fmt-')).length === 7);
   check('관리자에게 「엑셀로 받기」', await p.isVisible('#dlBtn'));
-  check('목록에 어긋난 줄 2건이 남는다', (meta.mismatch || []).length === 2);
-  check('「⚠ 확인 필요 2」 탭이 생긴다', await p.isVisible('#chkTab') && (await p.textContent('#chkTab')).includes('2'));
+  check('목록에 어긋난 줄 3건이 남는다', (meta.mismatch || []).length === 3);
+  check('「⚠ 확인 필요 3」 탭이 생긴다', await p.isVisible('#chkTab') && (await p.textContent('#chkTab')).includes('3'));
   await p.click('#chkTab');
   await p.waitForSelector('table.chk');
   const chk = await p.textContent('#body');
   check('확인 필요 — 시트별로, 학번·엑셀 이름·명렬 이름·내용', chk.includes(robot.sheet) && chk.includes('최다온') && chk.includes('명렬에 없는 학번')
-    && (await p.$$('table.chk tbody tr')).length === 2);
+    && (await p.$$('table.chk tbody tr')).length === 3);
   check('확인 필요 표의 이름도 글자로만', await p.evaluate(() => window.__xss === undefined));
   await p.click('#views button[data-view="stu"]');
 
@@ -917,6 +923,11 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
   check('어긋남 — 이름이 같은 편성표 학생(2-1-2 이보람)에게도 보인다', (await p.textContent('#stuOut')).includes('학생회장으로'));
   check('어긋남 — 머리에 확인 필요 경고, 원 자료 「2-1-1 이보람」', (await p.textContent('#stuOut .s-warn')).includes('2-1-1 이보람'));
   await shot(p, '#stuOut', '8-mis-borrow');
+  await shot(p, '#stuOut .card.vol', '8-mis-vol');
+  const vmis = await p.$$eval('#stuOut .card.vol table.neis tbody tr', trs => trs.map(tr => ({ mis: tr.classList.contains('mis-row'),
+    note: tr.querySelector('.row-mis')?.textContent || '', cp: tr.querySelector('td.c-content')?.dataset.cp })));
+  check('어긋남 — 봉사 누가기록 표의 그 줄에도 경고와 원 자료', vmis.some(r => r.mis && r.note.includes('2-1-1 이보람')), vmis);
+  check('어긋남 — 표의 칸 복사 값은 원래 내용만(경고 글 없이)', vmis.find(r => r.mis)?.cp === '도서관 정리', vmis);
   check('어긋남 — 카드에도 원 자료', await p.$$eval('#stuOut .card .mis-note', ns => ns.some(n => n.textContent.includes('2-1-1 이보람'))));
   await byHak('20101');
   check('어긋남 — 적힌 번호(2-1-1, 편성표에 없음)에도 보이고 「편성표에 없는 번호 · 이보람은 2-1-2」', await p.$$eval('#stuOut .card .mis-note',
@@ -1007,12 +1018,12 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
   await p.click('#actRows td.c-nm');
   check('— 칸을 누르면 복사(이름)', (await p.evaluate(() => window.__copied)) === '박나래');
   // 「전체」 — 업무 담당자가 모든 학년을 한 번에(선생님 요청 2026-10-28)
-  check('학년 탭 맨 앞에 「전체」', (await p.$$eval('#selAG button', bs => bs.map(b => b.textContent.trim()))).join() === '전체,1학년,3학년');
+  check('학년 탭 맨 앞에 「전체」', (await p.$$eval('#selAG button', bs => bs.map(b => b.textContent.trim()))).join() === '전체,1학년,2학년,3학년');
   await p.click('#selAG button[data-g="all"]');
-  await p.waitForFunction(() => document.querySelectorAll('#actRows table.neis tbody tr').length === 3);
+  await p.waitForFunction(() => document.querySelectorAll('#actRows table.neis tbody tr').length === 4);
   const vAll = await vRow();
-  check('「전체」 — 모든 학년을 학년·반·번호 순으로(10101 → 30205), 칩은 「전체 학년 2」 하나',
-    vAll[0][0] === '10101' && vAll[1][0] === '30205' && (await p.textContent('#actChips')).replace(/\s+/g, ' ').trim() === '전체 학년 2'
+  check('「전체」 — 모든 학년을 학년·반·번호 순으로(10101 → 20101 → 30205), 칩은 「전체 학년 3」 하나',
+    vAll[0][0] === '10101' && vAll[1][0] === '20101' && vAll[2][0] === '30205' && (await p.textContent('#actChips')).replace(/\s+/g, ' ').trim() === '전체 학년 3'
     && (await p.$$('#actChips .chip')).length === 1, [vAll.map(r => r[0]), await p.textContent('#actChips')]);
   check('— 고른 탭을 기억한다(다시 열어도 전체)', await p.evaluate(() => JSON.parse(localStorage.getItem('ynhs-sgb') || '{}').ag) === 'all');
   await p.click(`#acts .act[data-id="${robot.id}"]`);
