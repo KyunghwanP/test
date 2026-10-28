@@ -593,8 +593,9 @@ console.log('\n[나이스 바이트]');
 // 나이스는 바이트로 센다 — 한글 3, 영문·숫자·공백·문장부호 1, 줄바꿈(엔터) 2(선생님 요청 2026-10-28)
 check('바이트 — 한글 3 · 영문/숫자/공백 1 · 줄바꿈 2', P.sgbNeisBytes('가a 1\n나') === 3 + 1 + 1 + 1 + 2 + 3 && P.sgbNeisBytes('') === 0
   && P.sgbNeisBytes('가\r\n나') === 8, [P.sgbNeisBytes('가a 1\n나'), P.sgbNeisBytes('가\r\n나')]);
-check('한도 — 영역 하나일 때만(자율·동아리·개인별·행특 1500, 진로 2100), 둘 중 고름·누가기록은 없음',
-  P.sgbNeisLimit(['자']) === 1500 && P.sgbNeisLimit(['동']) === 1500 && P.sgbNeisLimit(['진']) === 2100 && P.sgbNeisLimit(['개']) === 1500
+// 진로는 2026학년도부터 500자(1500바이트)로 줄었다(선생님 알림 2026-10-28)
+check('한도 — 영역 하나일 때만(자율·동아리·진로·개인별·행특 모두 1500), 둘 중 고름·누가기록은 없음',
+  P.sgbNeisLimit(['자']) === 1500 && P.sgbNeisLimit(['동']) === 1500 && P.sgbNeisLimit(['진']) === 1500 && P.sgbNeisLimit(['개']) === 1500
   && P.sgbNeisLimit(['행']) === 1500 && P.sgbNeisLimit(['자', '진']) === null && P.sgbNeisLimit(['누']) === null);
 
 console.log('\n[짝짓기 — 차수 없이]');
@@ -1082,7 +1083,7 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
   await p.click('#stus .stu.on');
   await p.waitForSelector('#stuOut .grp .gb.over');
   check('묶음 머리 — 한도를 넘으면 빨갛게 「넘음」', (await p.textContent('#stuOut .grp .gb.over')).includes('넘음'));
-  await p.evaluate(() => { Object.assign(SGB_NEIS_LIMIT, { '자': 1500, '동': 1500, '진': 2100, '개': 1500, '행': 1500 }); });
+  await p.evaluate(() => { Object.assign(SGB_NEIS_LIMIT, { '자': 1500, '동': 1500, '진': 1500, '개': 1500, '행': 1500 }); });
   await p.click('#stus .stu.on');
   await p.waitForFunction(() => document.querySelector('#stuOut .grp') && !document.querySelector('#stuOut .grp .gb.over'));
   check('직책 같은 덧붙은 정보', t3.includes('직책') && t3.includes('반장'));

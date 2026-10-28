@@ -520,8 +520,9 @@ function sgbNeisBytes(s){
   for (const ch of String(s ?? '').replace(/\r\n?/g, '\n')){ const c = ch.codePointAt(0); n += ch === '\n' ? 2 : c < 0x80 ? 1 : c < 0x10000 ? 3 : 4; }
   return n;
 }
-// 영역별 나이스 한도(바이트) — 기재요령의 글자 수 × 3. 영역이 하나로 정해질 때만(<자or진>·누가기록은 없음)
-const SGB_NEIS_LIMIT = { '자': 1500, '동': 1500, '진': 2100, '개': 1500, '행': 1500 };
+// 영역별 나이스 한도(바이트) — 기재요령의 글자 수 × 3. 영역이 하나로 정해질 때만(<자or진>·누가기록은 없음).
+// 진로는 2026학년도부터 700자 → 500자(1500바이트)
+const SGB_NEIS_LIMIT = { '자': 1500, '동': 1500, '진': 1500, '개': 1500, '행': 1500 };
 const sgbNeisLimit = tags => (tags || []).length === 1 ? SGB_NEIS_LIMIT[tags[0]] ?? null : null;
 // ⊙ 입력 영역 칸 → 꼬리표. 꼬리표를 빼먹은 시트를 읽을 때 쓴다. 모르면 [] (그 시트는 건너뛴다)
 function sgbAreaTags(area){
