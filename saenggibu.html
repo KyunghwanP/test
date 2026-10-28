@@ -31,8 +31,8 @@
     --ink:#0F172A; --ink-soft:#64748B; --rule:#E2E8F0;
     --mon:#3B82F6; --mon-deep:#2563EB; --warn:#EF4444; --today-tint:#EFF6FF; --sel:#EEF2FF;
     --g1:#2563EB; --g2:#0D9488; --g3:#D97706;
-    --t-ja:#2563EB; --t-jin:#059669; --t-gae:#9333EA; --t-nu:#D97706; --t-haeng:#0E7490;
-    --t-ja-bg:#EFF6FF; --t-jin-bg:#ECFDF5; --t-gae-bg:#FAF5FF; --t-nu-bg:#FFFBEB; --t-haeng-bg:#ECFEFF;
+    --t-ja:#2563EB; --t-jin:#059669; --t-gae:#9333EA; --t-nu:#D97706; --t-haeng:#0E7490; --t-dong:#BE185D;
+    --t-ja-bg:#EFF6FF; --t-jin-bg:#ECFDF5; --t-gae-bg:#FAF5FF; --t-nu-bg:#FFFBEB; --t-haeng-bg:#ECFEFF; --t-dong-bg:#FDF2F8;
     --shadow:0 4px 20px -8px rgba(0,0,0,.15);
   }
   html.dark{
@@ -40,8 +40,8 @@
     --ink:#E2E8F0; --ink-soft:#8FA3BD; --rule:#26354F;
     --mon:#60A5FA; --mon-deep:#3B82F6; --warn:#F87171; --today-tint:#16263F; --sel:#26354F;
     --g1:#60A5FA; --g2:#2DD4BF; --g3:#FBBF24;
-    --t-ja:#60A5FA; --t-jin:#34D399; --t-gae:#C084FC; --t-nu:#FBBF24; --t-haeng:#22D3EE;
-    --t-ja-bg:#16263F; --t-jin-bg:#11291F; --t-gae-bg:#241A35; --t-nu-bg:#2B2210; --t-haeng-bg:#0B2830;
+    --t-ja:#60A5FA; --t-jin:#34D399; --t-gae:#C084FC; --t-nu:#FBBF24; --t-haeng:#22D3EE; --t-dong:#F472B6;
+    --t-ja-bg:#16263F; --t-jin-bg:#11291F; --t-gae-bg:#241A35; --t-nu-bg:#2B2210; --t-haeng-bg:#0B2830; --t-dong-bg:#2D1422;
     --shadow:none;
     color-scheme:dark;
   }
@@ -191,7 +191,7 @@
   .tag{display:inline-flex;align-items:center;font-size:13px;font-weight:800;padding:2px 9px;border-radius:999px;white-space:nowrap;line-height:1.5;}
   .tag.ja{color:var(--t-ja);background:var(--t-ja-bg);} .tag.jin{color:var(--t-jin);background:var(--t-jin-bg);}
   .tag.gae{color:var(--t-gae);background:var(--t-gae-bg);} .tag.nu{color:var(--t-nu);background:var(--t-nu-bg);}
-  .tag.haeng{color:var(--t-haeng);background:var(--t-haeng-bg);}
+  .tag.haeng{color:var(--t-haeng);background:var(--t-haeng-bg);} .tag.dong{color:var(--t-dong);background:var(--t-dong-bg);}
   .grp{display:flex;align-items:center;gap:8px;margin:24px 0 10px;font-size:14px;font-weight:800;color:var(--ink-soft);}
   .grp::after{content:'';flex:1;height:1px;background:var(--rule);}
   .card{border:1px solid var(--rule);border-radius:12px;padding:16px 18px;margin-bottom:12px;background:var(--paper);}
@@ -465,10 +465,10 @@
      tests/saenggibu.test.mjs 가 이 블록을 그대로 떼어 돌린다. -->
 <script id="sgbParser">
 // 시트 이름 앞 꼬리표 — 엑셀이 쓰는 약속: <자> 자율, <진> 진로, <개> 개인별, <누> 누가기록,
-// <행> 행동특성 및 종합의견, <자or진> 둘 중 고름. 꼬리표가 없으면 ⊙ 입력 영역 칸으로 알아낸다(sgbAreaTags)
-const SGB_TAGS = { '자':'자율', '진':'진로', '개':'개인별', '누':'누가기록', '행':'행특' };
-const SGB_TAG_CLS = { '자':'ja', '진':'jin', '개':'gae', '누':'nu', '행':'haeng' };
-const SGB_TAG_ORDER = ['자','진','개','누','행'];
+// <행> 행동특성 및 종합의견, <동> 동아리, <자or진> 둘 중 고름. 꼬리표가 없으면 ⊙ 입력 영역 칸으로 알아낸다(sgbAreaTags)
+const SGB_TAGS = { '자':'자율', '동':'동아리', '진':'진로', '개':'개인별', '누':'누가기록', '행':'행특' };
+const SGB_TAG_CLS = { '자':'ja', '동':'dong', '진':'jin', '개':'gae', '누':'nu', '행':'haeng' };
+const SGB_TAG_ORDER = ['자','동','진','개','누','행'];
 // 한 문서에 담을 크기(바이트). Firestore 한도는 1MiB — 여유를 두고 자른다.
 const SGB_PART_BYTES = 600000;
 
@@ -503,6 +503,7 @@ function sgbAreaTags(area){
   if (/행동특성|행특|종합의견/.test(s)) return ['행'];
   const t = [];
   if (/자율|자치/.test(s)) t.push('자');
+  if (/동아리/.test(s)) t.push('동');
   if (/진로/.test(s)) t.push('진');
   if (/세부능력|세특|개인별/.test(s)) t.push('개');
   return t;
@@ -694,13 +695,22 @@ function sgbParseBook(sheets){
       tagGuess = true;
     }
     if (!hd){ skipped.push({ name, why: '학년·반·번호(또는 월·일) 머리 줄을 못 찾음' }); continue; }
-    let id = 'a' + sgbHash(name);
+    // 양식 그대로(○○)인 칸은 빈 칸으로 본다. 시트 이름이 양식 그대로면 여러 부서가 같은 이름으로 올려
+    // 서로 덮게 된다 — 그때는 부서(활동명)으로 활동을 알아본다(label). 시트 이름(sheet)은 서식을 찾느라 그대로 둔다
+    const dept0 = head._dept && head._dept !== head['활동명'] ? head._dept : info.deptAbbr;
+    const dept = /○/.test(dept0 || '') ? '' : dept0;
+    const ph = /○/.test(name);
+    if (ph && (!head['활동명'] || /○/.test(head['활동명']))){ skipped.push({ name, why: '시트 이름과 ⊙ 활동명이 양식 그대로(○○)라 무슨 활동인지 알 수 없음' }); continue; }
+    const label = ph ? (dept ? `${dept}(${head['활동명']})` : head['활동명']) : '';
+    const ident = ph ? (name.match(/^\s*<[^>]*>/) || [''])[0] + label : name;
+    let id = 'a' + sgbHash(ident);
     while (ids.has(id)) id += 'x';
     ids.add(id);
-    const base = { id, key: sgbActKey(name), pos, sheet: name, tags: info.tags, rounds: info.rounds, ...(tagGuess ? { tagGuess } : {}),
+    const base = { id, key: sgbActKey(ident), pos, sheet: name, tags: info.tags, rounds: ph ? [] : info.rounds,
+      ...(tagGuess ? { tagGuess } : {}), ...(label ? { label } : {}),
       // 부서 칸에 활동명이 그대로 들어간 시트가 있다 — 그럴 땐 시트 이름 앞쪽(예: 연구부)을 쓴다
-      title: head['활동명'] || info.short, short: info.short,
-      dept: head._dept && head._dept !== head['활동명'] ? head._dept : info.deptAbbr,
+      title: head['활동명'] || info.short, short: ph ? head['활동명'] : info.short,
+      dept,
       area: head['입력영역'] || '', path: head['입력경로'] || '', note: head['유의사항'] || '' };
     let labels, s = hd.s;
     if (hd.kind === 'student'){
@@ -710,6 +720,13 @@ function sgbParseBook(sheets){
       s = L.map(sgbNorm);
       // 머리 이름이 빈 칸 중 요일 글자(월~일)로만 찬 칸은 '요일' — 프로젝트 봉사 시트의 J열
       sgbNameBlankCols(s, labels, rows.slice(hd.i + 1, hd.i + 41));
+      // 학생 표 오른쪽의 딴 표(숨긴 참고 표 — 드롭다운 목록·VLOOKUP 범위) — 학년·반·번호·성명 칸 뒤에서
+      // 머리도 비고 학생 줄에도 값이 없는 열을 만나면 거기서 끊는다. 딴 표가 머리·학생 줄과 같은 줄에 걸쳐 있어도 섞이지 않게
+      const k0 = s.map(sgbColKey), g0 = k0.indexOf('g');
+      const from = Math.max(...['g', 'c', 'n', 'nm'].map(k => k0.indexOf(k))) + 1;
+      const stuRows = g0 < 0 ? [] : rows.slice(hd.i + 1).filter(r => /^[1-3]$/.test(String((r || [])[g0] ?? '').trim()));
+      for (let j = from; from > 0 && j < s.length; j++)
+        if (!s[j] && stuRows.every(r => !String((r || [])[j] ?? '').trim())){ s = s.slice(0, j); labels = labels.slice(0, j); break; }
     } else labels = (rows[hd.i] || []).map(v => sgbText(v).replace(/\s+/g, ' '));
 
     if (hd.kind === 'schedule'){
@@ -967,10 +984,11 @@ function sgbCompare(oldMeta, parsed){
       const k = a.key || sgbActKey(a.sheet); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(a.sheet); });
     for (const sheets of groups.values()) out.clash.push({ kind, sheets });
     const byKey = new Map(), byName = new Map(), used = new Set();
-    olds.forEach((o, i) => { if (!byKey.has(ok[i])) byKey.set(ok[i], o); byName.set(sgbNorm(o.sheet), o); });
+    // 시트 이름으로 잇는 것은 마지막 수단 — 양식 그대로(○○)인 이름(label)은 여러 부서가 같이 쓰니 잇지 않는다
+    olds.forEach((o, i) => { if (!byKey.has(ok[i])) byKey.set(ok[i], o); if (!o.label) byName.set(sgbNorm(o.sheet), o); });
     curs.forEach((cur, i) => {
       let old = byKey.get(ck[i]);
-      if (!old || used.has(old)) old = byName.get(sgbNorm(cur.sheet));
+      if ((!old || used.has(old)) && !cur.label) old = byName.get(sgbNorm(cur.sheet));
       if (old && used.has(old)) old = null;
       if (old) used.add(old);
       if (!old) out.added.push({ kind, cur });
@@ -1302,8 +1320,9 @@ function sgbExportPlan(meta, rowsById, forms = {}){
   for (const id of ids){
     const [kind, a] = byId.get(id);
     // 받을 때 시트 이름의 꼬리표 — 관리자가 고쳤거나(orig.tags) 꼬리표 없이 올라온 시트(tagGuess)는 지금 꼬리표로 붙인다
-    const name = sheetName((a.orig?.tags || a.tagGuess) && (a.tags || []).length
-      ? `<${a.tags.join('or')}>` + String(a.sheet).replace(/^\s*<[^>]*>\s*/, '') : a.sheet);
+    // 양식 그대로(○○)인 이름으로 올라온 시트는 부서(활동명)으로(label)
+    const name = sheetName((a.orig?.tags || a.tagGuess || a.label) && (a.tags || []).length
+      ? `<${a.tags.join('or')}>` + (a.label || String(a.sheet).replace(/^\s*<[^>]*>\s*/, '')) : a.sheet);
     const form = sgbFixForm(forms[a.id] || sgbPlainForm(a, kind), a);
     // 줄 차례: 원본 시트 차례(i). 옛 기록이라 i 가 없으면 반·번호 순
     const list = kind === 'sch' ? (a.rows || []) : [...(rowsById[a.id] || [])].sort((x, y) =>
@@ -2111,6 +2130,7 @@ async function previewFile(f){
     const nForms = Object.keys(forms).length, nAll = parsed.activities.length + parsed.schedules.length;
     const odd = sgbOddSheets(parsed.activities);
     const guessed = [...parsed.activities, ...parsed.schedules].filter(a => a.tagGuess);
+    const placeholder = [...parsed.activities, ...parsed.schedules].filter(a => a.label);
     const clash = parsed.activities.filter(a => !a.tagGuess && sgbAreaTags(a.area).length && !sgbAreaTags(a.area).some(t => (a.tags || []).includes(t)));
     const byTxt = o => o.by ? `기존: ${esc(whoTxt(o.by))}${o.upd ? ' · ' + fmtAt(o.upd) : ''}` : '';
     p.innerHTML = `<h3>${esc(f.name)}</h3>
@@ -2121,6 +2141,8 @@ async function previewFile(f){
         ${parsed.skipped.length ? `<li>건너뛴 시트: ${parsed.skipped.map(x => `${esc(x.name)} <span style="color:var(--ink-soft)">(${esc(x.why)})</span>`).join(', ')}</li>` : ''}
         ${guessed.length ? `<li id="upGuess">꼬리표 없는 시트 ${guessed.length}개 — ⊙ 입력 영역 칸으로 읽었습니다(엑셀로 받을 때 꼬리표를 붙입니다):
           ${guessed.map(a => `${esc(a.sheet)} → <b>${esc(tagTxt(a) || '창체 일정')}</b>`).join(', ')}</li>` : ''}
+        ${placeholder.length ? `<li id="upPh">시트 이름이 양식 그대로(○○)인 시트 ${placeholder.length}개 — 부서·활동명으로 구별합니다${placeholder.some(a => !a.dept) ? ' <b class="err">(부서 칸도 양식 그대로인 시트가 있습니다 — 채워 주세요)</b>' : ''}:
+          ${placeholder.map(a => `${esc(a.sheet)} → <b>${esc(a.label)}</b>`).join(', ')}</li>` : ''}
         ${clash.length ? `<li id="upClash" class="err">꼬리표와 ⊙ 입력 영역이 다른 시트 — 꼬리표대로 읽었습니다. 맞는지 보세요:
           ${clash.map(a => `${esc(a.sheet)} (입력 영역 「${esc(a.area)}」)`).join(', ')}</li>` : ''}
       </ul>

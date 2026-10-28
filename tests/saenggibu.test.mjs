@@ -523,15 +523,15 @@ console.log('\n[꼬리표 없는 시트 · <행>]');
 {
   const cases = [['자율활동 특기사항 or 진로활동 특기사항', '자,진'], ['자율·자치활동 특기사항', '자'], ['진로활동 특기사항', '진'],
     ['봉사활동 누가기록', '누'], ['개인별 세부능력 및 특기사항', '개'], ['과목별 세부능력 및 특기사항', '개'],
-    ['행동특성 및 종합의견', '행'], ['', ''], ['동아리활동', '']];
+    ['행동특성 및 종합의견', '행'], ['', ''], ['동아리활동 특기사항', '동'], ['창의적 체험활동', '']];
   const got = cases.map(([a]) => P.sgbAreaTags(a).join());
-  check('입력 영역 칸 → 꼬리표(자율·진로·누가기록·개인별·행특, 모르면 없음)', cases.every(([, t], i) => got[i] === t), got);
+  check('입력 영역 칸 → 꼬리표(자율·진로·누가기록·개인별·행특·동아리, 모르면 없음)', cases.every(([, t], i) => got[i] === t), got);
   const head = (title, area) => [['담임', null, '⊙ 활  동  명:', null, title], [null, null, '⊙ 입력 영역:', null, area], ['학년', '반', '번호', '성명', '기재 내용']];
   const { p } = await varBook('v-notag.xlsx', wb => {
     putRows(wb.addWorksheet('교무(꼬리표 없음)'), [...head('꼬리표 없는 활동', '자율활동 특기사항 or 진로활동 특기사항'), [1, 1, 1, '김가람', '꼬리표 없이 낸 문안.']]);
     putRows(wb.addWorksheet('담임(행발)'), [...head('행동발달', '행동특성 및 종합의견'), [1, 1, 2, '박나래', '행특 문안.']]);
     putRows(wb.addWorksheet('<행>담임(행특 둘)'), [...head('행특 둘', '행동특성 및 종합의견'), [1, 1, 1, '김가람', '꼬리표 있는 행특.']]);
-    putRows(wb.addWorksheet('교무(영역 모름)'), [...head('알 수 없는 영역', '동아리활동'), [1, 1, 1, '김가람', '모름.']]);
+    putRows(wb.addWorksheet('교무(영역 모름)'), [...head('알 수 없는 영역', '창의적 체험활동'), [1, 1, 1, '김가람', '모름.']]);
     putRows(wb.addWorksheet('메모'), [['그냥 메모'], ['학년', '반', '번호', '성명', '기재 내용'], [1, 1, 1, '김가람', '메모.']]);
     const big = wb.addWorksheet('개인별 조회(큰 시트)');
     for (let r = 1; r <= 3000; r++) big.getRow(r).getCell(1).value = r;
@@ -551,6 +551,42 @@ console.log('\n[꼬리표 없는 시트 · <행>]');
   const names = P.sgbExportPlan(P.sgbBuildDocs(p).meta, Object.fromEntries([a1, a2, a3].map(a => [a.id, p.actRows.get(a.id)])), {}).map(x => x.name);
   check('엑셀로 받을 때는 꼬리표를 붙여서(<자or진>·<행>), 원래 붙은 것은 그대로', names.includes('<자or진>교무(꼬리표 없음)') && names.includes('<행>담임(행발)')
     && names.includes('<행>담임(행특 둘)'), names);
+}
+
+// 선생님이 만든 새 양식(2026-10-28) — 학생 표는 B~H, 빈 열(I~Z) 너머 숨긴 AA·AB 에 입력 영역 ↔ 입력 경로 참고 표
+// (G2 드롭다운, G3 = VLOOKUP). 참고 표가 머리 줄·학생 줄과 같은 줄에 걸쳐 있어도 기타 칸에 섞이면 안 된다
+console.log('\n[새 양식 — 숨긴 참고 표 · 양식 그대로인 이름 · 동아리]');
+const AREA_LIST = [['자율활동 특기사항', '[학생생활]-[자율]'], ['진로활동 특기사항', '[학생생활]-[진로]'], ['자율활동 특기사항 or 진로활동 특기사항', '[학생생활]-[자율 or 진로]'],
+  ['개인별 세부능력 및 특기사항', '[성적]-[세특]'], ['행동특성 및 종합의견', '[학생부]-[행특]'], ['동아리활동 특기사항', '[학생생활]-[동아리]']];
+function newForm(ws, { dept = '○○○○부', title, area, students }){
+  const AA = 27;
+  putRows(ws, [[null, dept, null, null, '⊙ 활  동  명:', null, title], [null, null, null, null, '⊙ 입력 영역:', null, area],
+    [null, null, null, null, '⊙ 입력 경로:', null, AREA_LIST.find(x => x[0] === area)?.[1] || ''],
+    [null, '순번', '학년', '반', '번호', '성명', '직책', '기재 내용'],
+    ...students.map((st, i) => [null, i + 1, ...st])]);
+  AREA_LIST.forEach(([a, p], i) => { ws.getRow(i + 2).getCell(AA).value = a; ws.getRow(i + 2).getCell(AA + 1).value = p; });
+  ws.getColumn(AA).hidden = true; ws.getColumn(AA + 1).hidden = true;
+}
+{
+  const { p } = await varBook('v-newform.xlsx', wb => {
+    newForm(wb.addWorksheet('부서○○(활동명○○)'), { dept: '학생부', title: '학생회 임원', area: '자율활동 특기사항',
+      students: [[1, 1, 1, '김가람', '회장', '학생회장으로 활동함.'], [1, 1, 2, '박나래', '부회장', '부회장으로 활동함.'], [2, 1, 1, '최다온', '총무', '총무로 활동함.'], [2, 1, 2, '이보람', '서기', '서기로 활동함.']] });
+    newForm(wb.addWorksheet('부서○○(활동명○○○○)'), { title: '리더십 캠프', area: '동아리활동 특기사항', students: [[1, 1, 1, '김가람', null, '캠프에 참여함.']] });
+  });
+  const a = p.activities.find(x => x.title === '학생회 임원'), b = p.activities.find(x => x.title === '리더십 캠프');
+  check('숨긴 참고 표(빈 열 너머 AA·AB)는 학생 표가 아니다 — 기타 칸은 직책만', a?.extra.join() === '직책', a?.extra);
+  check('— 학생 줄에 참고 표 값이 섞이지 않는다', (p.actRows.get(a?.id) || []).every(r => (r.x || []).length === 1 && !(r.x || []).some(v => /특기사항|\[/.test(v))),
+    (p.actRows.get(a?.id) || []).map(r => r.x));
+  check('— 입력 영역·경로는 드롭다운 칸 값으로, 꼬리표는 입력 영역으로(자율)', a?.area === '자율활동 특기사항' && a.path === '[학생생활]-[자율]' && a.tags.join() === '자', a);
+  check('동아리활동 특기사항 → <동>', b?.tags.join() === '동', b);
+  check('시트 이름이 양식 그대로(○○)여도 활동은 부서·활동명으로 구별 — 두 시트가 다른 활동', a && b && a.id !== b.id && a.key !== b.key, [a?.key, b?.key]);
+  check('— 부서 칸을 채웠으면 부서(활동명), 부서도 양식 그대로면 활동명만', a?.label === '학생부(학생회 임원)' && b?.label === '리더십 캠프' && !b.dept, [a?.label, b?.label, b?.dept]);
+  // 다른 부서가 같은 양식 이름으로 낸 다른 활동 — 앞 것을 덮으면 안 된다
+  const { p: p2 } = await varBook('v-newform2.xlsx', wb => newForm(wb.addWorksheet('부서○○(활동명○○)'), { dept: '진로부', title: '진로 박람회', area: '진로활동 특기사항', students: [[1, 1, 1, '김가람', null, '박람회.']] }));
+  const cmp = P.sgbCompare(P.sgbBuildDocs(p).meta, p2);
+  check('— 다른 부서가 같은 양식 이름으로 올려도 「새로 추가」(앞 것을 덮지 않는다)', cmp.added.length === 1 && !cmp.changed.length, { added: cmp.added.length, changed: cmp.changed.length });
+  const names = P.sgbExportPlan(P.sgbBuildDocs(p).meta, Object.fromEntries(p.activities.map(x => [x.id, p.actRows.get(x.id)])), {}).map(x => x.name);
+  check('— 엑셀로 받을 때 시트 이름은 꼬리표 + 부서(활동명)', names.includes('<자>학생부(학생회 임원)') && names.includes('<동>리더십 캠프'), names);
 }
 
 console.log('\n[짝짓기 — 차수 없이]');

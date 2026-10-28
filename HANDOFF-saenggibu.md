@@ -26,6 +26,13 @@
   행동특성·종합의견→행, 자율·자치→자, 진로→진, 세부능력·세특·개인별→개). 활동에 `tagGuess: true`. 모르면 건너뛰고 까닭을 알린다.
   꼬리표 없는 시트는 위쪽 40줄만 보고 ⊙ 가 없으면 통째로 읽지 않는다(큰 조회 시트). 미리보기에 「꼬리표 없는 시트 → 무엇으로 읽었는지」,
   꼬리표와 입력 영역이 다르면(겹치는 영역이 없으면) 붉게 알린다(꼬리표대로 읽음). **엑셀로 받을 때는 시트 이름에 꼬리표를 붙인다.**
+- `<동>` 동아리(칩 「동아리」, 영역 차례 자율 다음 — 선생님 새 양식 드롭다운에 '동아리활동 특기사항'이 있어서, 2026-10-28).
+- **선생님 새 양식**(2026-10-28 검토): 학생 표 B~H, G2 = 입력 영역 드롭다운, G3 = `VLOOKUP(G2, AA2:AB7)` 입력 경로, 숨긴 AA·AB 에 참고 표.
+  - 학생 표 오른쪽의 딴 표는 끊는다 — 학년·반·번호·성명 칸 뒤에서 **머리도 비고 학생 줄에도 값이 없는 열**을 만나면 거기까지만 표.
+    (전에는 AA·AB 가 기타 칸이 되어 앞쪽 학생 줄에 참고 표 값이 섞였다)
+  - **시트 이름이 양식 그대로(○○)**면 여러 부서가 같은 이름으로 올려 서로 덮는다 → 부서(활동명)으로 알아본다(`label`, id·key 도 그걸로).
+    부서 칸이 `○○○○부` 그대로면 빈 칸으로 보고 활동명만. 시트 이름으로 잇는 마지막 수단(`sgbCompare` byName)도 label 이면 안 쓴다.
+    `sheet` 는 원래 이름 그대로(서식 뜰 때 시트를 찾는다). 받을 때 시트 이름 = 꼬리표 + label. 미리보기에 알림(`#upPh`).
 - 머리 줄 위에 안내 칸: `⊙ 활 동 명:` · `⊙ 입력 영역:` · `⊙ 입력 경로:` · `⊙ 유의 사항:` (값은 오른쪽 첫 칸,
   같은 줄 왼쪽의 ⊙ 없는 첫 칸이 부서). 수학과 시트는 A열에 `00⊙ …` 가 한 번 더 있다.
 - 머리 줄: `학년·반·번호·성명` + `기재 내용`(또는 `공통 문구 및 기재 예시`) + `자기 평가서`/`학생보고서` + 기타 칸.
@@ -47,7 +54,7 @@
 | `upload.html` | 편성표 올리기에서 반·번호가 빈 학생(전출·자퇴)을 `students/changed` 에 따로 저장(`psMoveOf`) |
 | `usage.html` | 사용 현황에 `saenggibu`·`notice` 이름 |
 | `firestore.rules` | `saenggibu`·`saenggibuStu`·`saenggibuAct` — 읽기·쓰기 `isYnhsTeacher()`(2026-10-28 쓰기를 교사 전체로) |
-| `tests/saenggibu.test.mjs` | 357개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
+| `tests/saenggibu.test.mjs` | 365개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
 | `tests/make-saenggibu-template.mjs` | **표준 양식** 엑셀 만들기(부서에 나눠 줄 빈 양식). `node tests/make-saenggibu-template.mjs <폴더>` |
 | `tests/s360-tabs.test.mjs` | 17개 검사(종합검색 탭) |
 | `tests/upload-pyeonseong*.test.mjs`, `tests/make-pyeonseong-fixture.mjs` | 편성표(학적사항 칸·괄호 이름 포함) |
@@ -238,7 +245,7 @@ CLAUDE.md: **화면 변경은 test 먼저 → 선생님 확인 → ynhs PR·병�
 
 ### 검사 돌리기 (이 환경 기준)
 ```bash
-node tests/saenggibu.test.mjs        # 357
+node tests/saenggibu.test.mjs        # 365
 node tests/s360-tabs.test.mjs        # 17
 node tests/make-pyeonseong-fixture.mjs <폴더>          # 가짜 편성표 먼저 만든다(실제 파일은 개인정보라 저장소에 없음)
 PS_FILE=<폴더>/pyeonseong.xlsx node tests/upload-pyeonseong.test.mjs   # 87
