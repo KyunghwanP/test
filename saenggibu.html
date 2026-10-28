@@ -79,8 +79,9 @@
   .btn.pri:hover{background:var(--mon-deep);color:#fff;}
   .btn.line{border-color:var(--mon);color:var(--mon);}
   .btn.line:hover{background:var(--mon);color:#fff;}
-  .form-dl{position:relative;display:inline-block;}
-  .form-dl > summary{list-style:none;cursor:pointer;}
+  /* 카드의 학생 글 접기(details{margin-top:10px})가 여기에도 걸려 단추가 아래로 처졌다 — 따로 0 */
+  .form-dl{position:relative;display:flex;margin:0;}
+  .form-dl > summary{list-style:none;cursor:pointer;display:block;}
   .form-dl > summary::-webkit-details-marker{display:none;}
   .form-dl-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:30;min-width:260px;background:var(--paper);border:1px solid var(--rule);
     border-radius:10px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column;}

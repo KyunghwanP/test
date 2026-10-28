@@ -867,6 +867,12 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
   check('— 누르면 두 가지: 기재 내용만 / 덧붙인 칸(직책 등)', fdl.length === 2 && fdl[0][0] === 'docs/saenggibu-form.xlsx' && fdl[1][0] === 'docs/saenggibu-form-extra.xlsx'
     && fdl.every(d => d[1].endsWith('.xlsx')) && fdl[0][2].includes('기재 내용') && fdl[1][2].includes('직책'), fdl);
   check('— 파일이 실제로 있다', fdl.every(d => fs.existsSync(path.join(ROOT, d[0]))));
+  // 오와 열 — 다른 단추와 같은 높이·같은 줄·같은 글꼴(선생님 지적 2026-10-28: 양식 받기만 아래로 처지고 얇았다)
+  const al = await p.evaluate(() => ['upBtn', 'dlBtn', 'admBtn'].map(id => document.getElementById(id)).concat(document.querySelector('#formDl summary'))
+    .filter(e => e.offsetParent).map(e => { const r = e.getBoundingClientRect(), cs = getComputedStyle(e);
+      return { top: Math.round(r.top), h: Math.round(r.height), fw: cs.fontWeight, fs: cs.fontSize, lh: cs.lineHeight, ff: cs.fontFamily.slice(0, 20) }; }));
+  check('— 양식 받기 단추가 다른 단추와 오와 열이 맞다(위치·높이·글꼴)', al.length >= 2 && al.every(x => x.top === al[0].top && x.h === al[0].h && x.fw === al[0].fw
+    && x.fs === al[0].fs && x.ff === al[0].ff), al);
   if (process.env.SGB_SHOTS) await p.screenshot({ path: path.join(process.env.SGB_SHOTS, '9-form-dl.png'), clip: { x: 0, y: 0, width: 1100, height: 260 } });
   await p.click('#body');
   check('— 바깥을 누르면 닫힌다', !(await p.$eval('#formDl', d => d.open)));
