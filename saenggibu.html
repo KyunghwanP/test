@@ -256,6 +256,7 @@
   .up .row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;}
   .up .sec{margin-top:10px;}
   .up .sec.miss{border:1px solid var(--warn);border-radius:9px;padding:8px 10px;}
+  .up .up-cols{font-size:12.5px;color:var(--ink-soft);margin:1px 0 4px 1.2em;}
   .up .miss-row{display:flex;align-items:baseline;gap:8px;padding:2px 0;}
   .up .miss-row select{font-size:13.5px;padding:2px 4px;border:1px solid var(--rule);border-radius:6px;
     background:var(--paper);color:var(--ink);flex-shrink:0;}
@@ -408,7 +409,7 @@ function sgbHead(rows, h){
     let last = -1;
     for (let j = 0; j < r.length; j++) if (String(r[j] ?? '').includes('⊙')) last = j;
     if (last < 0) continue;
-    const key = sgbNorm(r[last]).replace(/^[^⊙]*⊙/, '').replace(/[:：]$/, '');
+    const key = sgbInfoKey(sgbNorm(r[last]).replace(/^[^⊙]*⊙/, '').replace(/[:：]$/, ''));
     let val = '';
     for (let j = last + 1; j < r.length; j++){ const t = sgbText(r[j]); if (t){ val = t; break; } }
     if (key && !(key in out)) out[key] = val;
@@ -420,14 +421,87 @@ function sgbHead(rows, h){
   return out;
 }
 
+// ── 머리 칸 이름 ── 행·열 자리가 아니라 칸 이름으로 찾는다. 부서마다 양식을 조금씩 바꿔 내므로
+// (띄어쓰기·괄호·다른 낱말) 같은 뜻의 이름을 한 표에 모은다. 해석·양식 뜨기·내려받기가 모두 이 표를 쓴다 —
+// 따로 적어 두면 한쪽만 고쳐져 '읽기는 되는데 받으면 빈 칸' 같은 어긋남이 생긴다.
+const SGB_COLS = {
+  g:   ['학년'],
+  c:   ['반', '학급'],
+  n:   ['번호', '번', '출석번호'],
+  nm:  ['성명', '이름', '학생명', '학생이름', '학생성명'],
+  seq: ['순번', '연번'],
+  key: ['학년반번호', '학번'],
+};
+// 기재 문안 칸·학생 글 칸 — 이 낱말이 들어 있으면. '내용' 하나로는 안 된다(봉사활동내용·활동 내용은 기타 칸).
+// 앞에 있을수록 센 이름 — 여러 칸이 맞으면 센 쪽을 고른다('진로 특기사항 메모 | 기재 내용' 이면 기재 내용)
+const SGB_BODY_WORDS = ['기재내용', '기재문안', '기재예시', '입력내용', '특기사항', '문안', '세특'];
+const SGB_SELF_WORDS = ['평가서', '보고서', '소감문', '자기평가', '활동소감'];
+// ⊙ 안내 칸 — 같은 뜻의 다른 이름
+const SGB_INFO = {
+  활동명:   ['활동명', '활동이름', '활동제목', '활동주제', '프로그램명'],
+  입력영역: ['입력영역', '기재영역', '입력항목', '기재항목', '영역'],
+  입력경로: ['입력경로', '기재경로', '입력위치', '기재위치', '경로'],
+  유의사항: ['유의사항', '주의사항', '유의점', '참고사항', '안내사항', '기재유의사항'],
+};
+const SGB_HEAD_ROWS = 40;          // 안내 줄이 늘어도 이 안에서 머리 줄을 찾는다
+// 괄호 속은 덧붙임으로 보고 뗀다: '번호(출석)' → 번호, '유의사항(필독)' → 유의사항
+const sgbBare = h => sgbNorm(h).replace(/[(（\[［][^)）\]］]*[)）\]］]/g, '');
+// 머리 칸 → g·c·n·nm·seq·key 또는 ''
+function sgbColKey(h){
+  const k = sgbBare(h);
+  for (const [key, names] of Object.entries(SGB_COLS)) if (names.includes(k)) return key;
+  return '';
+}
+function sgbInfoKey(k){
+  const b = sgbBare(k);
+  for (const [key, names] of Object.entries(SGB_INFO)) if (names.includes(b)) return key;
+  return k;
+}
+// 칸 이름(sgbNorm) 줄이 머리 줄인가 — 'student' · 'schedule' · ''
+function sgbHeadKind(s){
+  const keys = s.map(sgbColKey);
+  if (keys.includes('g') && keys.includes('c') && keys.includes('n')) return 'student';
+  if (s.includes('월') && s.includes('일') && (s.includes('교시') || s.some(x => x.includes('활동내용')))) return 'schedule';
+  return '';
+}
 function sgbFindHeader(rows){
-  for (let i = 0; i < Math.min(rows.length, 25); i++){
+  for (let i = 0; i < Math.min(rows.length, SGB_HEAD_ROWS); i++){
     const s = (rows[i] || []).map(sgbNorm);
-    if (s.includes('학년') && s.includes('반') && s.includes('번호')) return { i, kind: 'student', s };
-    if (s.includes('월') && s.includes('일') && (s.includes('교시') || s.some(x => x.includes('활동내용'))))
-      return { i, kind: 'schedule', s };
+    const kind = sgbHeadKind(s);
+    if (kind) return { i, kind, s };
   }
   return null;
+}
+// 두 줄 머리를 한 줄로. 병합된 칸은 으뜸 칸(위·왼쪽)에만 값이 있어, 그대로 두면 이름 없는 칸으로 버려진다.
+//  - 위 줄이 묶음 이름 줄(예: '학적' 이 학년·반·번호 위에 병합)이면, 머리 줄의 빈 칸은 위 줄 이름을 빌린다
+//    (두 줄에 걸쳐 세로로 병합된 '기재 내용' 은 위 줄에만 글자가 있다)
+//  - 아래 줄이 갈래 이름 줄(예: '활동 정보' 아래 '장소'·'시간')이면 갈래 이름으로 — 학년·반·번호·성명 같은
+//    칸 이름과 기재 문안·학생 글 칸은 그대로 둔다
+// 묶음·갈래 줄로 보려면: ⊙ 안내 줄이 아니고, 글자 칸 하나라도 머리 줄의 이름 있는 칸과 겹쳐야 한다
+// (머리 바로 위 '※ 500자 이내' 같은 메모 한 칸을 칸 이름으로 착각하지 않게). 갈래 줄은 거기에 더해
+// 학생 줄이 아니고(학년·반·번호가 숫자 아님), 이름 없는 칸을 채우는 글자가 있어야 한다(머리 아래 예시 줄 거름).
+// 돌려줌: { labels, sub } — sub: 갈래 줄을 썼으면 true(그 줄까지가 머리)
+function sgbHeadLabels(up, top, dn){
+  const txt = r => (r || []).map(v => sgbText(v));
+  const T = txt(top), U = txt(up), D = txt(dn);
+  const labels = Array.from({ length: Math.max(T.length, U.length, D.length) }, (_, j) => T[j] || '');
+  const sun = r => (r || []).some(v => String(v ?? '').includes('⊙'));
+  const overlaps = X => X.some((t, j) => t && labels[j]);
+  if (up && !sun(up) && overlaps(U)) U.forEach((t, j) => { if (t && !labels[j]) labels[j] = t; });
+  let sub = false;
+  if (dn && !sun(dn)){
+    const keys = labels.map(sgbColKey);
+    const num = k => { const j = keys.indexOf(k); return j >= 0 && parseInt(D[j], 10) >= 1; };   // 해석과 같은 잣대
+    if (!num('g') && !num('c') && !num('n') && overlaps(D) && D.some((t, j) => t && !labels[j])){
+      sub = true;
+      D.forEach((t, j) => {
+        if (!t) return;
+        const l = labels[j];
+        if (!l || (!sgbColKey(l) && sgbRole(sgbNorm(l)) === 'extra')) labels[j] = t;
+      });
+    }
+  }
+  return { labels, sub };
 }
 
 const SGB_WEEKDAY = /^[월화수목금토일](\s*\n\s*[월화수목금토일])*$/;
@@ -442,9 +516,11 @@ function sgbNameBlankCols(s, labels, sample){
 
 // 칸의 쓰임: 기재 문안(body) · 학생이 쓴 글(self) · 나머지 정보(extra) · 버림(skip)
 function sgbRole(h){
-  if (!h || /^(순번|연번|학년반번호|학번)$/.test(h) || /^[a-z]+=/i.test(h)) return 'skip';
-  if (h.includes('기재내용') || h.includes('기재예시') || h === '특기사항') return 'body';
-  if (h.includes('평가서') || h.includes('보고서')) return 'self';
+  if (!h || /^[a-z]+=/i.test(h)) return 'skip';
+  const k = sgbColKey(h);
+  if (k === 'seq' || k === 'key') return 'skip';
+  if (SGB_BODY_WORDS.some(w => h.includes(w))) return 'body';
+  if (SGB_SELF_WORDS.some(w => h.includes(w))) return 'self';
   return 'extra';
 }
 
@@ -480,9 +556,15 @@ function sgbParseBook(sheets){
       title: head['활동명'] || info.short, short: info.short,
       dept: head._dept && head._dept !== head['활동명'] ? head._dept : info.deptAbbr,
       area: head['입력영역'] || '', path: head['입력경로'] || '', note: head['유의사항'] || '' };
-    const labels = (rows[hd.i] || []).map(v => sgbText(v).replace(/\s+/g, ' '));
-    // 머리 이름이 빈 칸 중 요일 글자(월~일)로만 찬 칸은 '요일' — 프로젝트 봉사 시트의 J열
-    if (hd.kind === 'student') sgbNameBlankCols(hd.s, labels, rows.slice(hd.i + 1, hd.i + 41));
+    let labels, s = hd.s;
+    if (hd.kind === 'student'){
+      // 두 줄 머리(병합)는 한 줄로 — 자료 줄은 학년·반·번호가 숫자인 줄만 읽으니 갈래 줄은 저절로 빠진다
+      const L = sgbHeadLabels(rows[hd.i - 1], rows[hd.i], rows[hd.i + 1]).labels;
+      labels = L.map(v => v.replace(/\s+/g, ' '));
+      s = L.map(sgbNorm);
+      // 머리 이름이 빈 칸 중 요일 글자(월~일)로만 찬 칸은 '요일' — 프로젝트 봉사 시트의 J열
+      sgbNameBlankCols(s, labels, rows.slice(hd.i + 1, hd.i + 41));
+    } else labels = (rows[hd.i] || []).map(v => sgbText(v).replace(/\s+/g, ' '));
 
     if (hd.kind === 'schedule'){
       const keep = hd.s.map((h, j) => h ? j : -1).filter(j => j >= 0);
@@ -497,17 +579,18 @@ function sgbParseBook(sheets){
       continue;
     }
 
-    const s = hd.s, gi = s.indexOf('학년'), ci = s.indexOf('반'), ni = s.indexOf('번호');
-    const nmi = s.findIndex(h => h === '성명' || h === '이름');
+    const keys = s.map(sgbColKey);
+    const gi = keys.indexOf('g'), ci = keys.indexOf('c'), ni = keys.indexOf('n'), nmi = keys.indexOf('nm');
+    // 기재 문안·학생 글 칸은 센 낱말 차례로 고른다(같으면 왼쪽). 못 고른 후보는 기타 칸.
+    const rank = (h, words) => { const k = words.findIndex(w => h.includes(w)); return k < 0 ? 99 : k; };
     let bi = -1, si = -1;
-    const xi = [];
     s.forEach((h, j) => {
       if ([gi, ci, ni, nmi].includes(j)) return;
       const role = sgbRole(h);
-      if (role === 'body' && bi < 0) bi = j;
-      else if (role === 'self' && si < 0) si = j;
-      else if (role !== 'skip') xi.push(j);
+      if (role === 'body' && (bi < 0 || rank(h, SGB_BODY_WORDS) < rank(s[bi], SGB_BODY_WORDS))) bi = j;
+      if (role === 'self' && (si < 0 || rank(h, SGB_SELF_WORDS) < rank(s[si], SGB_SELF_WORDS))) si = j;
     });
+    const xi = s.map((h, j) => j).filter(j => ![gi, ci, ni, nmi, bi, si].includes(j) && sgbRole(s[j]) !== 'skip');
     const rowsOut = [], byClass = {};
     for (const r0 of rows.slice(hd.i + 1)){
       const r = r0 || [];
@@ -534,6 +617,15 @@ function sgbParseBook(sheets){
     activities.push(a);
   }
   return { activities, schedules, skipped, students: sgbStudents(activities, actRows), actRows };
+}
+
+// 올리기 전에 눈으로 볼 시트 — 칸을 못 읽었거나(칸 이름이 뜻밖), 표준 양식의 「예)」 예시 글이 남은 시트.
+// 봉사 누가기록은 기재 문안 칸이 원래 없다.
+function sgbOddSheets(activities){
+  const left = a => ['dept', 'title', 'area', 'path', 'note'].some(k => /^\s*예\s*\)/.test(a[k] || ''));
+  return activities.map(a => ({ a, why: !a.count ? '학생 줄을 못 읽음'
+      : !a.body && !sgbIsVolunteer(a) ? '기재 문안 칸 없음'
+      : left(a) ? '위쪽 안내 칸에 「예)」 예시 글이 남아 있음' : '' })).filter(x => x.why);
 }
 
 // ── 봉사활동 누가기록 — 나이스 입력창처럼 한 표로 ──
@@ -731,12 +823,8 @@ function sgbRoles(labels, a, kind){
   return labels.map(l => {
     if (!l) return '';
     if (kind === 'sch'){ const j = (a.cols || []).findIndex((c, k) => sgbNorm(c) === l && !used.has('v' + k)); return j >= 0 ? take('v' + j) : ''; }
-    if (l === '학년') return take('g');
-    if (l === '반') return take('c');
-    if (l === '번호') return take('n');
-    if (l === '성명' || l === '이름') return take('nm');
-    if (l === '순번' || l === '연번') return take('seq');
-    if (l === '학년반번호' || l === '학번') return take('key');
+    const k = sgbColKey(l);
+    if (k) return take(k);
     if (a.body && l === sgbNorm(a.body) && !used.has('b')) return take('b');
     if (a.self && l === sgbNorm(a.self) && !used.has('s')) return take('s');
     const j = (a.extra || []).findIndex((x, k) => sgbNorm(x) === l && !used.has('x' + k));
@@ -748,13 +836,20 @@ function sgbFormOf(ws, a, kind){
   const maxCol = Math.min(Math.max(ws.columnCount || 0, 1), 40);
   const labelsOf = r => { const out = [''];
     for (let c = 1; c <= maxCol; c++) out.push(sgbNorm(sgbCellText(ws.getRow(r).getCell(c).value))); return out; };
-  let h = 0;
-  for (let r = 1; r <= Math.min(ws.rowCount || 0, 25) && !h; r++){
-    const s = labelsOf(r);
-    if ((s.includes('학년') && s.includes('반') && s.includes('번호'))
-      || (s.includes('월') && s.includes('일') && (s.includes('교시') || s.some(x => x.includes('활동내용'))))) h = r;
-  }
+  let h = 0, hk = '';
+  for (let r = 1; r <= Math.min(ws.rowCount || 0, SGB_HEAD_ROWS) && !h; r++){ hk = sgbHeadKind(labelsOf(r)); if (hk) h = r; }
   if (!h) return null;
+  // 두 줄 머리 — 해석과 똑같이 합친다. 그러려면 SheetJS 가 읽는 모양(병합 나머지 칸은 빈 칸)으로 봐야 한다
+  let headLabels = labelsOf(h);
+  if (hk === 'student'){
+    const plainOf = r => { const out = [];
+      for (let c = 1; c <= maxCol; c++){ const C = ws.getRow(r).getCell(c);
+        out.push(C.isMerged && C.master && C.master.address !== C.address ? '' : sgbCellText(C.value)); }
+      return out; };
+    const { labels, sub } = sgbHeadLabels(h > 1 ? plainOf(h - 1) : null, plainOf(h), plainOf(h + 1));
+    if (sub) h++;                          // 갈래 줄까지가 머리 — 자료는 그 다음 줄부터
+    headLabels = [''].concat(labels.map(sgbNorm));
+  }
   const rows = [];
   for (let r = 1; r <= h; r++){
     const R = ws.getRow(r), cells = [];
@@ -773,7 +868,7 @@ function sgbFormOf(ws, a, kind){
   const cols = [null];
   // 너비 0 은 숨긴 열(원본의 학번 열) — 0 을 빈 값으로 보면 다시 드러난다
   for (let c = 1; c <= maxCol; c++){ const C = ws.getColumn(c); cols.push({ w: C.width ?? null, hidden: !!C.hidden || C.width === 0 }); }
-  const roles = sgbRoles(labelsOf(h), a, kind);
+  const roles = sgbRoles(headLabels, a, kind);
   // 이름 없는 머리 칸 — 값이 학번(30101)이면 key, 요일이면 그 활동의 '요일' 칸.
   // 학생 줄만 본다(표 아래 빈 줄의 수식이 '0000' 같은 값을 내는 시트가 있다)
   const gcol = roles.indexOf('g');
@@ -1600,9 +1695,16 @@ $('upBtn').onclick = () => $('upFile').click();
 
 const kindTxt = k => k === 'sch' ? '창체 일정' : '';
 const cntOf = x => x ? (x.count ?? (x.rows || []).filter(r => (r.v || []).some(Boolean)).length) : 0;
-function upItem(x, extra = ''){
+// 어느 칸을 무엇으로 읽었는지 — 칸 이름으로 찾으니, 이름이 뜻밖이면 여기서 눈으로 잡는다
+const colsTxt = a => {
+  const ex = (a.extra || []).filter(Boolean);
+  return [a.body ? `기재 문안 「${a.body}」` : '기재 문안 칸 없음', a.self ? `학생 글 「${a.self}」` : '',
+    ex.length ? `기타 ${ex.join(' · ')}` : ''].filter(Boolean).join(' / ');
+};
+function upItem(x, extra = '', cols = false){
   return `<div>${tagHtml(x.tags)} ${kindTxt(x.kind) ? `<span class="d">[${kindTxt(x.kind)}]</span> ` : ''}${esc(x.title)}
-    <span style="color:var(--ink-soft)">· ${esc(x.dept)} · ${extra || cntOf(x) + '건'} · ${esc(x.sheet)}</span></div>`;
+    <span style="color:var(--ink-soft)">· ${esc(x.dept)} · ${extra || cntOf(x) + '건'} · ${esc(x.sheet)}</span>${
+    cols && x.kind !== 'sch' ? `<div class="up-cols">${esc(colsTxt(x))}</div>` : ''}</div>`;
 }
 $('upFile').onchange = async e => {
   const f = e.target.files[0]; e.target.value = '';
@@ -1641,6 +1743,7 @@ $('upFile').onchange = async e => {
     const tagKind = (list, side) => list.map(x => ({ ...x[side], kind: x.kind }));
     _pending = { parsed, cmp, file: f.name, forms, roster, changed };
     const nForms = Object.keys(forms).length, nAll = parsed.activities.length + parsed.schedules.length;
+    const odd = sgbOddSheets(parsed.activities);
     p.innerHTML = `<h3>${esc(f.name)}</h3>
       <ul>
         <li>이 파일: 활동 시트 <b>${parsed.activities.length}</b>개 · 창체 일정 <b>${parsed.schedules.length}</b>개 · 학생 <b>${parsed.students.length}</b>명 · 기재 <b>${parsed.activities.reduce((n, a) => n + a.count, 0).toLocaleString()}</b>건</li>
@@ -1648,6 +1751,11 @@ $('upFile').onchange = async e => {
           : `원본 양식 ${nForms}/${nAll}개 시트 함께 저장 (내려받을 때 그 틀에 채웁니다)`}</li>
         ${parsed.skipped.length ? `<li>건너뛴 시트: ${parsed.skipped.map(x => `${esc(x.name)} <span style="color:var(--ink-soft)">(${esc(x.why)})</span>`).join(', ')}</li>` : ''}
       </ul>
+      ${odd.length ? `<div class="sec miss" id="upOdd"><b>⚠ 확인할 시트 ${odd.length}개</b>
+          <span class="d">— 엑셀을 고쳐 다시 올리세요. 칸은 자리가 아니라 이름으로 찾습니다
+          (기재 문안 칸은 이름에 '기재 내용'·'특기사항' 같은 말이 들어가야 합니다).</span>
+          <div class="acts-sum">${odd.map(({ a, why }) => `<div>${esc(a.sheet)} — <b>${esc(why)}</b>
+            <div class="up-cols">읽은 칸: ${esc(colsTxt(a))}</div></div>`).join('')}</div></div>` : ''}
       ${mis.length ? `<div class="sec miss" id="upMis"><b>⚠ 반·번호·이름 확인 ${mis.length}건</b>
           <span class="d">— ${roster.length ? '학교 명렬과 다릅니다' : '명렬을 못 읽어 시트끼리 맞대 봤습니다'}. 올린 뒤 「확인 필요」 탭에서 시트별로 볼 수 있습니다.</span>
           <div class="acts-sum">${mis.slice(0, 50).map(m => `<div>${esc(m.sheet)} · <b>${m.g}-${m.c}-${m.n}</b> ${esc(m.nm)}
@@ -1655,9 +1763,9 @@ $('upFile').onchange = async e => {
             ${mis.length > 50 ? `<div class="d">… ${mis.length - 50}건 더</div>` : ''}</div></div>` : ''}
       ${moved.length ? `<div class="sec d" id="upMoved">학적 변동(전출·자퇴) 학생의 기록 ${moved.length}건 — 떠나기 전 학번이라 확인할 필요는 없습니다.</div>` : ''}
       ${cmp.added.length ? `<div class="sec" id="upAdded"><b>새로 추가 ${cmp.added.length}</b>
-        <div class="acts-sum">${tagKind(cmp.added, 'cur').map(x => upItem(x)).join('')}</div></div>` : ''}
+        <div class="acts-sum">${tagKind(cmp.added, 'cur').map(x => upItem(x, '', true)).join('')}</div></div>` : ''}
       ${cmp.changed.length ? `<div class="sec" id="upChanged"><b>내용이 바뀜 ${cmp.changed.length}</b> <span style="color:var(--ink-soft)">— 이 파일 것으로 바꿉니다</span>
-        <div class="acts-sum">${cmp.changed.map(x => upItem({ ...x.cur, kind: x.kind }, `${cntOf(x.old)}건 → ${cntOf(x.cur)}건`)).join('')}</div></div>` : ''}
+        <div class="acts-sum">${cmp.changed.map(x => upItem({ ...x.cur, kind: x.kind }, `${cntOf(x.old)}건 → ${cntOf(x.cur)}건`, true)).join('')}</div></div>` : ''}
       ${cmp.same.length ? `<div class="sec" style="color:var(--ink-soft)">그대로 ${cmp.same.length}</div>` : ''}
       ${cmp.missing.length ? `<div class="sec miss" id="upMissing"><b>이 파일에 없는 기존 자료 ${cmp.missing.length}</b>
           <span style="color:var(--ink-soft)">— 하나씩 남길지 지울지 고르세요</span>

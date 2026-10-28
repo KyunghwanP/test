@@ -118,6 +118,17 @@ async function xlsxFile(name, opts) {
   await wb.xlsx.writeFile(f);
   return f;
 }
+// 칸 이름이 맞지 않는 시트 — 올리기 미리보기에서 경고해야 한다(그대로 올리면 문안 복사가 안 된다)
+const FILE_ODD = path.join(TMP, 'sgb-odd.xlsx');
+{
+  const wb = new ExcelJS.Workbook();
+  const put = (ws, aoa) => aoa.forEach((row, i) => row.forEach((v, j) => { if (v != null) ws.getRow(i + 1).getCell(j + 1).value = v; }));
+  put(wb.addWorksheet('<개>국어(이름 다른 칸)'), [[null, '⊙ 활  동  명:', null, '이름 다른 칸'],
+    ['학년', '반', '번호', '성명', '작성할 글'], [1, 1, 1, '김가람', '문안인데 칸 이름이 낯설다.']]);
+  put(wb.addWorksheet('<자>교무(정상)'), [[null, '⊙ 활  동  명:', null, '정상'],
+    ['학년', '반', '번호', '성명', '자기 평가서', '기재 내용'], [1, 1, 2, '박나래', '평가', '문안.']]);
+  await wb.xlsx.writeFile(FILE_ODD);
+}
 // 파일 이름은 영문으로 — Playwright 가 괄호·한글이 섞인 이름은 조용히 못 넘긴다(파일 0개)
 const FILE1 = await xlsxFile('sgb-4.xlsx');
 const FILE2 = await xlsxFile('sgb-5.xlsx', { dropOfficers: true, robotText: '로봇 코딩 캠프에서 센서 제어를 익히고 발표함.' });
@@ -125,7 +136,7 @@ const FILE2 = await xlsxFile('sgb-5.xlsx', { dropOfficers: true, robotText: '로
 // ── 1. 해석 (페이지의 순수 함수 블록을 그대로) ──
 console.log('\n[해석]');
 const code = HTML.match(/<script id="sgbParser">([\s\S]*?)<\/script>/)[1];
-const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches };')();
+const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches, sgbOddSheets };')();
 const wb1 = XLSX.read(fs.readFileSync(FILE1), { type: 'buffer' });
 const parsed = P.sgbParseBook(P.sgbBookToSheets(XLSX, wb1));
 const act = t => parsed.activities.find(a => a.sheet.includes(t));
@@ -286,6 +297,214 @@ check('줄 높이 — 긴 문안은 여러 줄 높이, 엑셀 한도 409 를 안
   P.sgbRowHeight(rform, ['', '', 1, 1, 1, 1, '김', '', lng]) > 40 && P.sgbRowHeight(rform, ['', '', 1, 1, 1, 1, '김', '', lng.repeat(20)]) === 409);
 check('줄 높이 — 숨긴 열 글자는 안 센다(한 줄 높이 그대로)', P.sgbRowHeight(rform, [lng.repeat(5), '', 1]) === P.sgbRowHeight(rform, ['', '', 1]));
 
+// ── 2-3. 양식이 조금 달라도 머리 칸을 알아본다 ──
+// 부서마다 안내 줄을 더 넣거나, 칸 이름을 다르게 쓰거나, 머리를 두 줄로 병합해 낸다. 행·열 자리가 아니라
+// 칸 이름으로 찾으니 자리는 상관없다. 그런데 이름이 다르면 조용히 '기타 칸' 이 되고(기재 문안 복사가 안 됨),
+// 두 줄 머리는 병합된 칸 이름이 위 줄에만 있어 아래 줄에서 이름 없는 칸으로 버려졌다(문안이 통째로 사라짐).
+// 엑셀은 ExcelJS 로 병합까지 만들어 앱과 똑같이 SheetJS 로 읽는다 — 병합 칸이 실제로 어떻게 읽히는지 그대로.
+console.log('\n[양식 변형 — 머리 칸 자동 인식]');
+const putRows = (ws, aoa) => aoa.forEach((row, i) => row.forEach((v, j) => { if (v != null) ws.getRow(i + 1).getCell(j + 1).value = v; }));
+async function varBook(fname, build) {
+  const wb = new ExcelJS.Workbook();
+  build(wb);
+  const f = path.join(TMP, fname);
+  await wb.xlsx.writeFile(f);
+  const ew = new ExcelJS.Workbook();
+  await ew.xlsx.readFile(f);
+  return { p: P.sgbParseBook(P.sgbBookToSheets(XLSX, XLSX.read(fs.readFileSync(f), { type: 'buffer' }))), ew };
+}
+const itemOf = (p, g, c, n) => p.students.find(s => s.g === g && s.c === c && s.n === n)?.items?.[0];
+{
+  const { p, ew } = await varBook('v-long.xlsx', wb => {
+    const aoa = [['교무부', null, '⊙ 활  동  명:', null, '긴 안내 활동']];
+    for (let k = 0; k < 28; k++) aoa.push([null, null, null, null, `안내 ${k + 1}번째 줄`]);
+    aoa.push(['학년', '반', '번호', '성명', '기재 내용']);               // 30번째 줄
+    aoa.push([1, 2, 3, '김가람', '긴 안내 아래의 문안.']);
+    putRows(wb.addWorksheet('<자>교무(긴 안내)'), aoa);
+  });
+  const a = p.activities[0];
+  check('안내 줄이 늘어 머리가 30번째 줄이어도 찾는다', a?.body === '기재 내용' && a.count === 1 && !p.skipped.length, [a, p.skipped]);
+  check('— 양식 뜨기도 30번째 줄을 머리로', a && P.sgbFormOf(ew.getWorksheet(a.sheet), a, 'act')?.h === 30);
+}
+{
+  const { p } = await varBook('v-order.xlsx', wb => putRows(wb.addWorksheet('<자>교무(칸 차례)'), [
+    [null, '⊙ 활  동  명:', null, '칸 차례를 바꾼 활동'],
+    ['기재 내용', '성명', '번호', '반', '학년'],
+    ['뒤섞인 칸의 문안.', '박나래', 5, 2, 3],
+  ]));
+  const it = itemOf(p, 3, 2, 5);
+  check('칸 차례가 바뀌어도 이름으로 찾는다(학년·반·번호·성명·기재 내용)',
+    p.activities[0]?.body === '기재 내용' && it?.b === '뒤섞인 칸의 문안.' && p.students[0]?.nm === '박나래', [p.activities[0], it]);
+}
+{
+  const { p, ew } = await varBook('v-words.xlsx', wb => {
+    putRows(wb.addWorksheet('<자>교무(다른 낱말)'), [
+      [null, '⊙ 활  동  명:', null, '낱말이 다른 머리'],
+      ['학년', '학급', '출석번호', '학생명', '기재 내용'],
+      [2, 1, 4, '최다온', '다른 낱말 머리의 문안.'],
+    ]);
+    putRows(wb.addWorksheet('<자>교무(괄호 머리)'), [
+      [null, '⊙ 활  동  명:', null, '괄호가 붙은 머리'],
+      ['학년', '반(학급)', '번호 (출석)', '성명(한글)', '기재 내용(500자 이내)'],
+      [1, 3, 7, '이보람', '괄호 붙은 머리의 문안.'],
+    ]);
+  });
+  const [w, b] = p.activities;
+  check('반 = 학급, 번호 = 출석번호, 성명 = 학생명', w?.count === 1 && !w.extra.length && itemOf(p, 2, 1, 4)?.b === '다른 낱말 머리의 문안.'
+    && p.students.find(s => s.g === 2)?.nm === '최다온', [w, p.students]);
+  check('머리 이름의 괄호 속은 덧붙임으로 본다(반(학급)·번호 (출석)·성명(한글)·기재 내용(500자 이내))',
+    b?.count === 1 && !b.extra.length && b.body === '기재 내용(500자 이내)' && p.students.find(s => s.g === 1)?.nm === '이보람', b);
+  const wf = w && P.sgbFormOf(ew.getWorksheet(w.sheet), w, 'act');
+  check('— 양식 뜨기·내려받기도 같은 칸으로(학급 → 반, 학생명 → 성명)', wf?.roles.join() === ',g,c,n,nm,b', wf?.roles);
+}
+{
+  const { p } = await varBook('v-body.xlsx', wb => {
+    putRows(wb.addWorksheet('<개>국어(세부능력)'), [
+      [null, '⊙ 활  동  명:', null, '세특'],
+      ['학년', '반', '번호', '성명', '활동 소감문', '세부능력 및 특기사항'],
+      [1, 1, 5, '김가람', '소감을 적음.', '세특 문안.'],
+    ]);
+    putRows(wb.addWorksheet('<자>교무(기재 문안)'), [
+      [null, '⊙ 활  동  명:', null, '문안'],
+      ['학년', '반', '번호', '성명', '자기평가', '기재 문안'],
+      [1, 1, 6, '박나래', '스스로 평가함.', '기재 문안 칸의 글.'],
+    ]);
+    putRows(wb.addWorksheet('<누>봉사(내용 칸)'), [
+      [null, '⊙ 활  동  명:', null, '봉사'],
+      ['학년', '반', '번호', '성명', '봉사활동내용', '활동 내용'],
+      [1, 1, 7, '최다온', '헌혈', '헌혈에 참여'],
+    ]);
+  });
+  const [se, mu, bo] = p.activities;
+  check("기재 문안 = '세부능력 및 특기사항', 학생 글 = '활동 소감문'", se?.body === '세부능력 및 특기사항' && se.self === '활동 소감문', se);
+  check("기재 문안 = '기재 문안', 학생 글 = '자기평가'", mu?.body === '기재 문안' && mu.self === '자기평가', mu);
+  check("'내용' 만으로는 기재 문안이 아니다(봉사활동내용·활동 내용은 기타 칸 그대로)", bo?.body === '' && bo.extra.join() === '봉사활동내용,활동 내용', bo);
+}
+{
+  const { p } = await varBook('v-info.xlsx', wb => putRows(wb.addWorksheet('<진>과학(안내 낱말)'), [
+    ['과학부', null, '⊙ 활동 이름:', null, '안내 낱말이 다른 활동'],
+    [null, null, '⊙ 기재 영역:', null, '진로활동 특기사항'],
+    [null, null, '⊙ 입력 위치:', null, '[학생생활]-[창의적체험활동]'],
+    [null, null, '⊙ 주의 사항(필독):', null, '최종 확인은 담임'],
+    ['학년', '반', '번호', '성명', '기재 내용'],
+    [1, 1, 1, '김가람', '안내 낱말이 다른 시트.'],
+  ]));
+  const a = p.activities[0];
+  check('⊙ 안내 칸 — 활동 이름 → 활동명, 기재 영역 → 입력 영역, 입력 위치 → 입력 경로, 주의 사항(필독) → 유의 사항',
+    a?.title === '안내 낱말이 다른 활동' && a.area === '진로활동 특기사항' && a.path.includes('창의적체험활동')
+    && a.note === '최종 확인은 담임' && a.dept === '과학부', a);
+}
+{
+  // 묶음 머리: '학적' 이 학년·반·번호·성명 위에 병합, '기재 내용' 은 두 줄에 걸쳐 세로 병합(값은 위 줄에만)
+  const { p, ew } = await varBook('v-group.xlsx', wb => {
+    const ws = wb.addWorksheet('<자>교무(묶음 머리)');
+    putRows(ws, [
+      ['교무부', null, '⊙ 활  동  명:', null, '두 줄 머리'],
+      ['학적', null, null, null, '기재 내용'],
+      ['학년', '반', '번호', '성명', null],
+      [1, 1, 2, '박나래', '세로로 병합된 기재 내용 칸의 문안.'],
+    ]);
+    ws.mergeCells('A2:D2'); ws.mergeCells('E2:E3');
+  });
+  const a = p.activities[0];
+  check('두 줄 머리(위에 묶음 이름, 세로 병합) — 기재 내용 칸을 잃지 않는다',
+    a?.body === '기재 내용' && itemOf(p, 1, 1, 2)?.b === '세로로 병합된 기재 내용 칸의 문안.', [a, p.students]);
+  const f = a && P.sgbFormOf(ew.getWorksheet(a.sheet), a, 'act');
+  check('— 양식 뜨기: 머리는 3번째 줄, 병합된 E열은 기재 문안', f?.h === 3 && f.roles[5] === 'b', f && [f.h, f.roles]);
+  const pl = f && P.sgbExportPlan(P.sgbBuildDocs(p).meta, { [a.id]: p.actRows.get(a.id) }, { [a.id]: f }).find(x => x.name === a.sheet);
+  check('— 내려받기: 문안이 원래 칸(E열)에', pl?.rows?.[0]?.[5] === '세로로 병합된 기재 내용 칸의 문안.', pl?.rows?.[0]);
+}
+{
+  // 갈래 머리: '활동 정보' 가 두 칸에 병합되고 그 아래 줄에 '장소'·'시간'(학년·반·번호는 세로 병합)
+  const { p, ew } = await varBook('v-sub.xlsx', wb => {
+    const ws = wb.addWorksheet('<누>봉사(갈래 머리)');
+    putRows(ws, [
+      ['봉사부', null, '⊙ 활  동  명:', null, '갈래 머리'],
+      ['학년', '반', '번호', '성명', '기재 내용', '활동 정보', null],
+      [null, null, null, null, null, '장소', '시간'],
+      [2, 3, 4, '이보람', '갈래 머리 아래 문안.', '시민회관', 3],
+    ]);
+    for (const c of 'ABCDE') ws.mergeCells(`${c}2:${c}3`);
+    ws.mergeCells('F2:G2');
+  });
+  const a = p.activities[0];
+  check("두 줄 머리(아래에 갈래 이름) — '장소'·'시간' 칸을 잃지 않는다",
+    a?.extra.join() === '장소,시간' && itemOf(p, 2, 3, 4)?.x?.join() === '시민회관,3', [a, itemOf(p, 2, 3, 4)]);
+  const f = a && P.sgbFormOf(ew.getWorksheet(a.sheet), a, 'act');
+  check('— 양식 뜨기: 머리는 갈래 줄(3번째), 장소·시간은 기타 칸', f?.h === 3 && f.roles[6] === 'x0' && f.roles[7] === 'x1', f && [f.h, f.roles]);
+}
+{
+  // 기재 문안 낱말이 넓어진 만큼, 여러 칸이 맞으면 센 이름을 고른다(왼쪽부터 고르면 메모 칸을 문안으로 집는다)
+  const { p } = await varBook('v-rank.xlsx', wb => putRows(wb.addWorksheet('<진>진로(두 후보)'), [
+    [null, '⊙ 활  동  명:', null, '후보가 둘'],
+    ['학년', '반', '번호', '성명', '진로 특기사항 메모', '기재 내용'],
+    [1, 2, 1, '박나래', '메모일 뿐', '진짜 문안.'],
+  ]));
+  const a = p.activities[0];
+  check("기재 문안 후보가 둘이면 센 이름(기재 내용) — '진로 특기사항 메모' 는 기타 칸",
+    a?.body === '기재 내용' && a.extra.join() === '진로 특기사항 메모' && itemOf(p, 1, 2, 1)?.b === '진짜 문안.', a);
+}
+{
+  // 잘못 알아보지 않는가 — 머리 바로 위·아래의 메모·예시 줄은 칸 이름이 아니다
+  const { p } = await varBook('v-memo.xlsx', wb => {
+    putRows(wb.addWorksheet('<자>교무(위 메모)'), [
+      ['교무부', null, '⊙ 활  동  명:', null, '메모 위 머리'],
+      [null, null, null, null, null, '※ 500자 이내'],          // 이름 없는 칸 위에만 메모 한 칸
+      ['학년', '반', '번호', '성명', '기재 내용', null],
+      [1, 1, 3, '최다온', '메모가 있어도 칸 이름은 그대로.', null],
+    ]);
+    putRows(wb.addWorksheet('<자>교무(예시 줄)'), [
+      ['교무부', null, '⊙ 활  동  명:', null, '예시 줄'],
+      ['학년', '반', '번호', '성명', '직책', '기재 내용'],
+      ['예시', null, null, '홍길동', '반장', '이렇게 씁니다.'],    // 머리 아래 예시 줄 — 갈래 이름 줄이 아니다
+      [1, 1, 4, '김가람', '부반장', '예시 아래의 진짜 문안.'],
+    ]);
+  });
+  const [m, e] = p.activities;
+  check('머리 바로 위 메모 한 칸을 칸 이름으로 착각하지 않는다', m?.body === '기재 내용' && !m.extra.length, m);
+  check("머리 바로 아래 예시 줄을 갈래 이름으로 착각하지 않는다('직책' 이 예시의 '반장' 으로 안 바뀜, 예시 줄은 학생이 아니라 빠짐)",
+    e?.body === '기재 내용' && e.extra.join() === '직책' && e.count === 1 && itemOf(p, 1, 1, 4)?.b === '예시 아래의 진짜 문안.', e);
+}
+
+// ── 2-4. 표준 양식 ── 부서에 나눠 줄 빈 양식(tests/make-saenggibu-template.mjs). 앱이 그대로 읽어야 하고,
+// 모양은 원래 쓰던 통합 엑셀을 따른다. 파서가 바뀌어 양식과 어긋나면 여기서 잡힌다.
+console.log('\n[표준 양식]');
+{
+  const { makeTemplate, TEMPLATE_NAME } = await import('./make-saenggibu-template.mjs');
+  const tf = await makeTemplate(ExcelJS, TMP);
+  const tp = P.sgbParseBook(P.sgbBookToSheets(XLSX, XLSX.read(fs.readFileSync(tf), { type: 'buffer' })));
+  const [ta, tb] = tp.activities;
+  check('활동 시트 2개를 읽고, 건너뛰는 건 「작성 안내」 하나(꼬리표 없음)', path.basename(tf) === TEMPLATE_NAME
+    && tp.activities.length === 2 && tp.skipped.length === 1 && tp.skipped[0].name === '작성 안내', [tp.activities.map(a => a.sheet), tp.skipped]);
+  check('기본형 — 꼬리표 자, 부서·활동명·입력 영역·입력 경로·유의 사항을 다 읽는다',
+    ta?.tags.join() === '자' && ta.dept && ta.title && ta.area && ta.path && ta.note, ta);
+  check('기본형 — 기재 문안 「기재 내용」, 학생 글 「자기 평가서」, 기타 칸 없음, 예시 3줄',
+    ta?.body === '기재 내용' && ta.self === '자기 평가서' && !ta.extra.length && ta.count === 3, ta);
+  check('칸을 더한 형 — 꼬리표 개, 주제는 기타 칸, 학생 글 없음, 예시 2줄',
+    tb?.tags.join() === '개' && tb.body === '기재 내용' && !tb.self && tb.extra.join() === '주제' && tb.count === 2, tb);
+  const odd0 = P.sgbOddSheets(tp.activities);
+  check('양식을 그대로 올리면 「예)」 예시 글이 남았다고 알린다(칸은 맞다)', odd0.length === 2
+    && odd0.every(x => x.why.includes('예)')), odd0.map(x => x.why));
+  const filled = tp.activities.map(a => Object.fromEntries(Object.entries(a).map(([k, v]) => [k, typeof v === 'string' ? v.replace(/^예\) /, '') : v])));
+  check('— 예시 글을 지우고 채우면 경고 없음', !P.sgbOddSheets(filled).length, P.sgbOddSheets(filled).map(x => x.why));
+  check('예시 이름은 지어낸 것만', tp.students.every(x => ['김가람', '박나래', '최다온', '이보람'].includes(x.nm)), tp.students.map(x => x.nm));
+  const tw = new ExcelJS.Workbook();
+  await tw.xlsx.readFile(tf);
+  const tws = tw.getWorksheet(ta.sheet);
+  const tfm = P.sgbFormOf(tws, ta, 'act');
+  check('양식 뜨기 — 머리 5행, 숨긴 A열은 학번(수식 값으로), 순번·학년·반·번호·성명·자기 평가서·기재 내용',
+    tfm?.h === 5 && tfm.roles.join() === ',key,seq,g,c,n,nm,s,b', tfm?.roles);
+  const hc = tws.getCell('C5');
+  check('원래 양식 모양 — 파란 머리줄에 흰 굵은 돋움 10', hc.fill?.fgColor?.argb === BLUE && hc.font?.bold === true
+    && hc.font?.name === '돋움' && hc.font?.size === 10 && hc.font?.color?.argb === 'FFFFFFFF', hc.style);
+  check('원래 양식 모양 — 부서 이름 HY헤드라인M(B1:D1 병합), 안내 칸 이름 E:F 병합',
+    tws.getCell('B1').font?.name === 'HY헤드라인M' && tfm.merges.includes('B1:D1') && tfm.merges.includes('E1:F1'), tfm.merges);
+  check('원래 양식 모양 — A열 숨김, 자기 평가서 50 · 기재 내용 81, 가로 인쇄',
+    tws.getColumn(1).hidden === true && tws.getColumn(7).width === 50 && tws.getColumn(8).width === 81 && tws.pageSetup.orientation === 'landscape');
+  const bc = tws.getCell('H6');
+  check('본문 글꼴 돋움 10, 글 칸은 줄바꿈', bc.font?.name === '돋움' && bc.font?.size === 10 && bc.alignment?.wrapText === true, bc.style);
+}
+
 // ── 3. 화면 ──
 console.log('\n[화면]');
 const ORIGIN = 'https://kyunghwanp.github.io';
@@ -350,6 +569,20 @@ async function openAs(email, { width = 1100, blockExcel = false } = {}) {
 const keep = async page => { STORE = await page.evaluate(() => window.__FS__); };
 const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
 
+// 3-0 칸 이름이 안 맞는 시트 — 올리기 전에 알린다(쓰지 않고 닫는다)
+STORE = { 'students/main': { students: ROSTER } };
+{
+  const p = await openAs(ADMIN);
+  await p.waitForSelector('#body .empty');
+  await p.setInputFiles('#upFile', FILE_ODD);
+  await p.waitForSelector('#upGo');
+  const odd = (await p.$('#upOdd')) ? await p.textContent('#upOdd') : '';
+  check('미리보기 — 기재 문안 칸을 못 찾은 시트를 알리고, 어떤 칸으로 읽었는지까지',
+    odd.includes('확인할 시트 1개') && odd.includes('국어(이름 다른 칸)') && odd.includes('기재 문안 칸 없음') && odd.includes('작성할 글'), odd);
+  check('— 칸이 맞는 시트는 경고에 안 든다', odd && !odd.includes('교무(정상)'), odd);
+  await p.close();
+}
+
 // 3-1 처음 — 아무것도 없을 때(학교 명렬은 있다)
 STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: { 1: PNG }, updatedAt: 'v1' } };
 {
@@ -367,6 +600,9 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
   check('미리보기 — 반·번호·이름 확인 2건', (await p.textContent('#upMis')).includes('확인 2건') && (await p.textContent('#upMis')).includes('2-1-2'));
   check('처음 올릴 때 — 전부 「새로 추가」, 물어볼 것 없음', panel.includes('새로 추가 7') && !(await p.$('#upMissing')), panel.slice(0, 300));
   check('원본 양식도 함께 — 7/7 시트', panel.includes('원본 양식 7/7'), panel.slice(0, 300));
+  check('칸이 다 맞으면 「확인할 시트」 경고 없음(봉사 누가기록은 문안 칸이 원래 없어 뺀다)', !(await p.$('#upOdd')));
+  check('미리보기 — 새 시트마다 어느 칸을 무엇으로 읽었는지', (await p.textContent('#upAdded')).includes('기재 문안 「기재 내용」 / 학생 글 「자기 평가서」'),
+    (await p.textContent('#upAdded')).slice(0, 300));
   await p.click('#upGo');
   await p.waitForFunction(() => document.getElementById('upPanel').textContent.includes('올렸습니다'));
   const fsKeys = await p.evaluate(() => Object.keys(window.__FS__));

@@ -12,7 +12,7 @@
 
 - 현재 **test 저장소에만** 있다(`KyunghwanP/test`). 운영(ynhs)으로는 아직 안 옮겼다.
 - 탭은 **관리자(선생님 본인) 계정에만** 보인다. 자료 읽기 규칙은 이미 교사 전체.
-- 마지막 버전: `APP_VER = 'ver7.97'`(index.html·usage.html), `CACHE_VER = 'v641'`(sw.js).
+- 마지막 버전: `APP_VER = 'ver7.98'`(index.html·usage.html), `CACHE_VER = 'v642'`(sw.js).
 
 ### 원본 엑셀의 모양(이걸 알아야 코드가 읽힌다)
 - 시트 하나 = 활동 하나. 시트 이름 앞 꼬리표가 입력 영역: `<자>` 자율, `<진>` 진로, `<개>` 개인별 세특,
@@ -38,14 +38,16 @@
 | `upload.html` | 편성표 올리기에서 반·번호가 빈 학생(전출·자퇴)을 `students/changed` 에 따로 저장(`psMoveOf`) |
 | `usage.html` | 사용 현황에 `saenggibu`·`notice` 이름 |
 | `firestore.rules` | `saenggibu`·`saenggibuStu`·`saenggibuAct` — 읽기 `isYnhsTeacher()`, 쓰기 `isAppAdmin()` |
-| `tests/saenggibu.test.mjs` | 199개 검사(해석·저장·맞대보기·양식·내려받기·화면·폰·학적 변동·사진·한 학생 보기) |
+| `tests/saenggibu.test.mjs` | 233개 검사(해석·양식 변형·표준 양식·저장·맞대보기·양식·내려받기·화면·폰·학적 변동·사진·한 학생 보기) |
+| `tests/make-saenggibu-template.mjs` | **표준 양식** 엑셀 만들기(부서에 나눠 줄 빈 양식). `node tests/make-saenggibu-template.mjs <폴더>` |
 | `tests/s360-tabs.test.mjs` | 17개 검사(종합검색 탭) |
 | `tests/upload-pyeonseong*.test.mjs`, `tests/make-pyeonseong-fixture.mjs` | 편성표(학적사항 칸·괄호 이름 포함) |
 | `BACKLOG.md` | 「학생 종합검색에 성적/보조자료 탭」 항목(지금은 시험 중으로 바꿔 둠) |
 
 `saenggibu.html` 구조:
 - `<script id="sgbParser">` — **순수 함수만**(XLSX·Firebase 없이). 검사가 이 블록을 그대로 떼어 돌린다.
-  `sgbParseBook` · `sgbBuildDocs` · `sgbCompare` · `sgbMerge` · `sgbStudents` · `sgbMismatches` · `sgbVolunteerRows` ·
+  머리 칸 이름 표 `SGB_COLS`·`SGB_BODY_WORDS`·`SGB_SELF_WORDS`·`SGB_INFO`와 `sgbColKey`·`sgbHeadKind`·`sgbHeadLabels`(두 줄 머리)·
+  `sgbOddSheets`(미리보기 경고) · `sgbParseBook` · `sgbBuildDocs` · `sgbCompare` · `sgbMerge` · `sgbStudents` · `sgbMismatches` · `sgbVolunteerRows` ·
   `sgbSchFilter`/`sgbSchKind` · `sgbFormOf` · `sgbPlainForm` · `sgbExportPlan` · `sgbRowValues` · `sgbRowHeight` · `sgbTyped` 등
 - `<script type="module">` — Firebase, 화면 그리기(`renderStu`/`renderStuOut`/`renderAct`/`renderActOut`/`renderSch`/`renderChk`),
   올리기(`doUpload`), 내려받기(`buildWorkbook`, `dlBtn`), 사진, 밑줄 탭(`inkify`), 한 학생 보기(`renderEmbed`)
@@ -112,6 +114,22 @@
 3. 올리기: 남긴 시트의 줄은 저장된 활동 문서에서 다시 읽어 합친다(**하나라도 못 읽으면 아무것도 안 쓰고 멈춤**), 양식 문서도 함께 유지.
    활동 순서는 처음 올라간 차례를 지키고 새 시트는 뒤에. 바뀐 문서만 쓰고 이제 없는 문서는 지운다. 마지막에 meta·manifest.
 
+### 머리 칸 인식 (2026-10-28)
+- **자리가 아니라 이름으로** 찾는다. 머리 줄은 위에서 **40줄** 안(전엔 25). 칸 차례는 상관없다.
+- 같은 뜻의 이름은 **한 표**에 — 해석(`sgbParseBook`)·양식 뜨기(`sgbFormOf`)·내려받기(`sgbRoles`)가 같이 쓴다. 이름을 더할 땐 표만 고친다.
+  반=학급 · 번호=번·출석번호 · 성명=이름·학생명 · 괄호 속은 뗀다 · 기재 문안 낱말(앞일수록 셈): 기재내용 > 기재문안 > 기재예시 > 입력내용 > 특기사항 > 문안 > 세특 ·
+  학생 글: 평가서·보고서·소감문·자기평가·활동소감 · ⊙ 안내: 활동 이름/기재 영역/입력 위치/주의 사항 등. **'내용' 하나로는 문안이 아니다**(봉사활동내용).
+- **두 줄 머리**: 위 줄이 묶음 이름(학적 등 병합)이면 머리 줄의 빈 칸은 위 줄 이름을 빌리고, 아래 줄이 갈래 이름(장소·시간)이면 그 이름으로.
+  고치기 전엔 세로 병합된 '기재 내용' 이 이름 없는 칸으로 버려져 **시트의 문안이 통째로 사라졌다**(경고 없음).
+- 미리보기: 새로·바뀐 시트마다 「기재 문안 「…」 / 학생 글 「…」 / 기타 …」 한 줄, 「⚠ 확인할 시트」(문안 칸 없음·학생 줄 0·「예)」 남음).
+
+### 표준 양식 (2026-10-28)
+- `tests/make-saenggibu-template.mjs` → `생기부 보조자료 표준 양식.xlsx`. 작성 안내 시트(꼬리표 없어 앱은 건너뜀) + `<자>부서(활동명)`(자기 평가서 + 기재 내용) + `<개>교과(활동명)`(주제 + 기재 내용).
+- 모양은 원래 통합 엑셀(검사 픽스처가 따른 모양): B1:D1 부서 이름 HY헤드라인M 16(길면 칸에 맞춰 줄임), E:F `⊙` 안내 칸 이름 + G:끝 값, 5행 파란 머리줄(흰 굵은 돋움 10),
+  숨긴 A열 = 학번 수식(학년&반2자리&번호2자리), 자기 평가서 50 · 기재 내용 81, 가로 A4·머리줄 반복 인쇄·머리줄 아래 틀 고정. 예시는 「예)」 와 지어낸 이름.
+- 원본을 실제로 대조하진 못했다(원본은 개인정보라 이 환경에 없음) — **선생님이 엑셀에서 열어 보고 다른 점을 알려 주기로 함**.
+- 아직 배포 방식 미정 — 파일을 직접 나눠 줄지, 앱에 「빈 양식 받기」 단추를 둘지.
+
 ## 6. 엑셀로 받기 (관리자, 내부결재용)
 
 `생기부 보조자료_날짜.xlsx` — **원본 시트 차례 그대로 + 맨 뒤 목차**.
@@ -134,6 +152,9 @@
 - [ ] 창체 일정 「입력 경로·안내」 펼칠지(400자 넘음) — 선생님께 물어보기
 - [ ] 1학년 진로 시간은 학급별 1·2학기 차시표가 들어 있어 2학기 계획분까지 합쳐진다(원본 누계와 다름 — 버그 아님, 설명함)
 - [ ] 실제 파일에서 시트끼리 이름이 어긋난 줄 13건(봉사 8, 프로젝트 봉사 2, 학생회 임원·사회적경제·멘토멘티 각 1)
+- [ ] **시트 하나만 더 올리기**는 된다(빠진 시트는 기본 「남기기」). 단 활동 id 가 시트 이름 전체의 해시라, 고친 판의 이름이 바뀌면(`-1차` → `-2차`)
+      새 활동으로 들어가고 옛 것이 「남기기」 로 겹친다 — 올릴 때 옛 시트를 「지우기」 로 골라야 한다. 차수를 떼고 맞대 볼지는 선생님께 물어보기
+- [ ] 표준 양식을 실제 엑셀에서 열어 원본과 모양 대조(선생님)
 
 ## 8. 운영(ynhs)으로 옮길 때 / 교사 전체에 열 때
 
@@ -161,7 +182,7 @@ CLAUDE.md: **화면 변경은 test 먼저 → 선생님 확인 → ynhs PR·병�
 
 ### 검사 돌리기 (이 환경 기준)
 ```bash
-node tests/saenggibu.test.mjs        # 199
+node tests/saenggibu.test.mjs        # 233
 node tests/s360-tabs.test.mjs        # 17
 node tests/make-pyeonseong-fixture.mjs <폴더>          # 가짜 편성표 먼저 만든다(실제 파일은 개인정보라 저장소에 없음)
 PS_FILE=<폴더>/pyeonseong.xlsx node tests/upload-pyeonseong.test.mjs   # 87
