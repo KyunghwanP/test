@@ -2022,6 +2022,19 @@ STORE = STORE_B;
     check('오류 없음(반별 생기부)', r.errors.length === 0, r.errors);
     await r.context().close();
   }
+  // 관리자가 담임이기도 하면 — 그래도 「반별 생기부」(고르는 칸이 있으니), 처음은 자기 반
+  {
+    const roles = STORE['acl/gradeRoles'];
+    STORE['acl/gradeRoles'] = { ...roles, homerooms: { ...roles.homerooms, [ADMIN]: '3-02' } };
+    const r = await openAs(ADMIN, { width: 1700 });
+    await r.waitForSelector('#stus .stu');
+    check('관리자이면서 담임 — 탭은 「📘 반별 생기부」', (await r.textContent('#clsTab')).trim() === '📘 반별 생기부');
+    await r.click('#clsTab');
+    await r.waitForSelector('#clsPage .cls-all tbody tr');
+    check('— 처음은 자기 반(3학년 2반), 고르는 칸도 있다', (await r.textContent('.cls-ttl b')) === '3학년 2반 생기부' && await r.isVisible('#clsG'));
+    await r.context().close();
+    STORE['acl/gradeRoles'] = roles;
+  }
 }
 // 3-7 반·명단 숨기기 · 작성 칸 넓이 끌기 · 단독 개인별 조회(새 창) — 창 두 개를 띄워 놓고 작업할 때(선생님 요청 2026-10-28)
 {

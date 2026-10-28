@@ -2389,7 +2389,7 @@ async function loadRole(){
   } catch (e) {}
   const t = $('clsTab');
   t.style.display = (ROLE.home || ROLE.master) && !SOLO ? '' : 'none';
-  t.textContent = ROLE.home ? '📘 우리 반 생기부' : '📘 반별 생기부';
+  t.textContent = ROLE.master ? '📘 반별 생기부' : '📘 우리 반 생기부';   // 관리자는 담임이어도 학년·반을 골라 보므로 「반별」
 }
 async function drLoadOne(key){
   if (drQ.has(key) && drCache.has(key)) return drCache.get(key);   // 아직 안 쓴 고침이 있으면 그것이 최신
