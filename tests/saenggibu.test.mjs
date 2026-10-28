@@ -1119,16 +1119,16 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
   await p.waitForSelector('#actRows table.neis');
   const vHeads = await p.$$eval('#actRows table.neis thead th', ths => ths.map(t => t.textContent.trim()));
   check('봉사 활동별 — 카드 대신 나이스 칸 차례 표, 맨 앞에 학번·이름', vHeads.slice(0, 4).join() === '학번,이름,시작일자,종료일자'
-    && vHeads.at(-1) === '시간 누계' && !(await p.$('#actRows .card')), vHeads);
+    && vHeads.at(-1) === '시간' && !(await p.$('#actRows .card, #actRows .c-total')), vHeads);   // 누계는 뺐다(선생님 요청 2026-10-28 — 학생별 누가기록 표에만)
   const vRow = async () => p.$$eval('#actRows table.neis tbody tr', trs => trs.map(tr => [...tr.cells].map(td => td.textContent.trim())));
   const v1 = await vRow();
-  check('— 1학년: 10101 김가람 · 2026.04.10. · 헌혈 · 4시간 · 누계 4', v1.length === 1 && v1[0][0] === '10101' && v1[0][1] === '김가람'
-    && v1[0][2] === '2026.04.10.' && v1[0].includes('헌혈') && v1[0].at(-2) === '4' && v1[0].at(-1) === '4', v1);
+  check('— 1학년: 10101 김가람 · 2026.04.10. · 헌혈 · 4시간(누계 칸 없음)', v1.length === 1 && v1[0][0] === '10101' && v1[0][1] === '김가람'
+    && v1[0][2] === '2026.04.10.' && v1[0].includes('헌혈') && v1[0].at(-1) === '4' && v1[0].length === 9, v1);
   await p.click('#selAG button[data-g="3"]');
   await p.waitForFunction(() => document.querySelectorAll('#actRows table.neis tbody tr').length === 2);
   const v3 = await vRow();
-  check('— 한 칸에 든 회차는 한 줄씩, 학번·이름은 그 학생 첫 줄에만(두 줄에 걸침), 누계는 학생마다(6 → 12)',
-    v3[0][0] === '30205' && v3[0][1].includes('박나래') && v3[1][0] === '2026.03.16.' && v3[0].at(-1) === '6' && v3[1].at(-1) === '12'
+  check('— 한 칸에 든 회차는 한 줄씩, 학번·이름은 그 학생 첫 줄에만(두 줄에 걸침), 시간은 회차마다(6 · 6)',
+    v3[0][0] === '30205' && v3[0][1].includes('박나래') && v3[1][0] === '2026.03.16.' && v3[0].at(-1) === '6' && v3[1].at(-1) === '6'
     && (await p.$eval('#actRows td.c-nm', td => td.rowSpan)) === 2, v3);
   check('— PC: 학번·이름이 한 줄(꺾이지 않음)', await p.evaluate(() => ['.c-hak', '.c-nm'].every(sel => {
     const td = document.querySelector('#actRows ' + sel), lh = parseFloat(getComputedStyle(td).lineHeight) || 24;
@@ -1307,10 +1307,10 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
   await p.waitForTimeout(200);
   check('폰: 봉사 표 — 학번·이름이 덩어리 머리에, 가로로 넘치지 않는다', (await txt(p, '#actRows tr.who-first')).includes('30205')
     && await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
-  check('폰: 날짜·시간·누계가 화면 안에(학번·이름 아래 줄)', await p.evaluate(() => {
+  check('폰: 날짜·시간이 화면 안에(학번·이름 아래 줄)', await p.evaluate(() => {
     const tr = document.querySelector('#actRows tr.who-first'), box = document.getElementById('actRows').getBoundingClientRect();
     const nm = tr.querySelector('.c-nm').getBoundingClientRect();
-    return ['.c-start', '.c-hours', '.c-total'].every(sel => { const r = tr.querySelector(sel).getBoundingClientRect();
+    return ['.c-start', '.c-hours'].every(sel => { const r = tr.querySelector(sel).getBoundingClientRect();
       return r.width > 0 && r.right <= box.right + 1 && r.top >= nm.bottom - 1; }); }));
   await shot(p, '#actRows', '7-vol-act-phone');
   await p.click('#views button[data-view="stu"]');

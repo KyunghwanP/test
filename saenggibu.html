@@ -281,9 +281,9 @@
   table.neis.with-who{min-width:860px;}
   table.neis.with-who col.c-hak{width:8%;} table.neis.with-who col.c-nm{width:9.5%;}
   table.neis.with-who col.c-start,table.neis.with-who col.c-end{width:9.5%;}
-  table.neis.with-who col.c-area{width:10%;} table.neis.with-who col.c-content{width:22%;}
+  table.neis.with-who col.c-area{width:10%;} table.neis.with-who col.c-content{width:28.5%;}
   table.neis.with-who col.c-type{width:7%;} table.neis.with-who col.c-place{width:12.5%;}
-  table.neis.with-who col.c-hours{width:5.5%;} table.neis.with-who col.c-total{width:6.5%;}
+  table.neis.with-who col.c-hours{width:5.5%;}
   table.neis td.c-hak,table.neis td.c-nm{white-space:nowrap;}   /* 학번·이름은 꺾이지 않게 */
   table.neis td.c-hak{font-variant-numeric:tabular-nums;color:var(--ink-soft);font-weight:700;}
   table.neis td.c-nm{font-weight:800;}
@@ -1898,7 +1898,7 @@ async function renderAct(){
   await renderActOut();
 }
 // 봉사 활동은 활동별에서도 학생별처럼 나이스 칸 차례 표로 — 맨 앞에 학번·이름. 학생마다 회차를 한 줄씩 풀고
-// (프로젝트 봉사는 한 칸에 회차가 줄바꿈으로 든다) 학번·이름은 그 학생 첫 줄에만 걸친다. 시간 누계는 학생마다 이 활동 안에서.
+// (프로젝트 봉사는 한 칸에 회차가 줄바꿈으로 든다) 학번·이름은 그 학생 첫 줄에만 걸친다. 시간 누계는 없다(학생별 표에만).
 function volActTable(a, list, mm){
   const keys = ['start', 'end', 'area', 'content', 'type', 'place', 'hours'];
   const body = list.map(r => {
@@ -1910,11 +1910,12 @@ function volActTable(a, list, mm){
       : ` <span class="mis" title="${esc(mis.why)}${mis.expect ? ' · 명렬: ' + esc(mis.expect) : ''}">⚠</span>`) : '';
     return vr.map((v, i) => `<tr${i === 0 ? ' class="who-first"' : ''}>${i === 0 ? `<td class="c-hak" rowspan="${vr.length}" data-cp="${hak}">${hak}</td>
         <td class="c-nm" rowspan="${vr.length}"${r.nm ? ` data-cp="${esc(r.nm)}"` : ''}>${esc(r.nm)}${tag}</td>` : ''}${keys.map(k =>
-        `<td class="c-${k}"${v[k] ? ` data-cp="${esc(v[k])}"` : ''}>${esc(v[k])}</td>`).join('')}<td class="c-total">${v.total}</td></tr>`).join('');
+        `<td class="c-${k}"${v[k] ? ` data-cp="${esc(v[k])}"` : ''}>${esc(v[k])}</td>`).join('')}</tr>`).join('');
   }).join('');
-  return `<div class="where">나이스 봉사활동 누가기록과 같은 칸 차례입니다. 칸을 누르면 그 내용이 복사됩니다. 시간 누계는 학생마다 이 활동 안에서 셉니다.</div>
-    <div class="neis-wrap"><table class="neis with-who"><colgroup>${['hak', 'nm', ...keys, 'total'].map(k => `<col class="c-${k}">`).join('')}</colgroup>
-    <thead><tr><th>학번</th><th>이름</th>${SGB_VOL_COLS.map((c, i) => `<th${i >= 6 ? ' class="r"' : ''}>${esc(c)}</th>`).join('')}</tr></thead>
+  // 시간 누계는 뺀다 — 한 활동 안의 누계라 학생의 실제 누계가 아니다(선생님 요청 2026-10-28). 누계는 학생별 표에만
+  return `<div class="where">나이스 봉사활동 누가기록과 같은 칸 차례입니다. 칸을 누르면 그 내용이 복사됩니다.</div>
+    <div class="neis-wrap"><table class="neis with-who"><colgroup>${['hak', 'nm', ...keys].map(k => `<col class="c-${k}">`).join('')}</colgroup>
+    <thead><tr><th>학번</th><th>이름</th>${SGB_VOL_COLS.slice(0, keys.length).map((c, i) => `<th${i >= 6 ? ' class="r"' : ''}>${esc(c)}</th>`).join('')}</tr></thead>
     <tbody>${body}</tbody></table></div>`;
 }
 async function renderActOut(){
