@@ -465,6 +465,8 @@
   .drp-spell-diff .ws{text-decoration:none;font-weight:900;}
   html.dark .drp-spell-diff del{color:#FCA5A5;background:#3B1414;} html.dark .drp-spell-diff ins{color:#86EFAC;background:#0F2E1B;}
   .drp-spell-btns{display:flex;gap:6px;}
+  .drp-spell-steps{font-size:13.5px;line-height:1.6;color:var(--ink);}
+  .drp-spell-in[hidden]{display:none;}
   .drp-hold{margin-top:6px;min-height:60px;border-style:dashed;background:transparent;font-size:13.5px;}
   .drp-hist{margin-top:6px;padding:4px;border:1px solid var(--rule);border-radius:10px;background:var(--paper-soft);}
   .drp-hist button{display:block;width:100%;padding:7px 9px;border:none;border-radius:7px;background:transparent;color:var(--ink);font:inherit;font-size:13px;text-align:left;cursor:pointer;}
@@ -2184,7 +2186,7 @@ async function renderStuOut(){
     const on = document.querySelector('#stus .stu.on');
     if (on) on.scrollIntoView({ block: 'center' });
   };
-  if ($('soloBtn')) $('soloBtn').onclick = () => window.open(`saenggibu.html?solo=1&k=${encodeURIComponent(key)}`, '_blank', 'noopener');
+  if ($('soloBtn')) $('soloBtn').onclick = () => popWin(`saenggibu.html?solo=1&k=${encodeURIComponent(key)}`, 'sgbSolo', 1000);   // 팝업 창(선생님 요청) — 다시 누르면 같은 창에 그 학생
   $('mNav').onclick = e => { const b = e.target.closest('.m-step'); if (b) openStudent(b.dataset.k, b.dataset.n); };
   if ($('volSplitBtn')) $('volSplitBtn').onclick = e => {
     const box = $('volSplit'), open = box.hidden;
@@ -2518,7 +2520,7 @@ function drAreaHtml(k, nm, t, d){
     <div class="drp-links">
       <button type="button" class="drp-link" data-holdt="${k}" aria-expanded="${hv ? 'true' : 'false'}">빼 둔 내용<span id="drHoldN-${k}">${hv ? ' ' + hv.length.toLocaleString() + '자' : ''}</span></button>
       <button type="button" class="drp-link" data-hist="${k}" aria-expanded="false">되돌리기</button>
-      <button type="button" class="drp-link" data-spell="${k}" title="글을 복사해 부산대 맞춤법 검사기를 새 탭으로 엽니다 — 고친 글을 붙여 넣으면 바뀐 곳을 보여 주고 반영">🔤 맞춤법</button>
+      <button type="button" class="drp-link" data-spell="${k}" title="글을 복사해 두고 부산대 맞춤법 검사기를 팝업으로 띄웁니다 — 고친 글을 복사해 「📋 복사한 글 반영」">🔤 맞춤법</button>
     </div>
     <div class="drp-spell" id="drS-${k}" hidden></div>
     <textarea class="drp-t drp-hold" id="drHT-${k}" data-f="hold.${k}" aria-label="${nm} 빼 둔 내용" placeholder="바이트가 넘쳐 뺀 문장 — 상담하며 다시 넣을 수 있게(바이트·인쇄 제외)"${hv ? '' : ' hidden'}></textarea>
@@ -2554,7 +2556,9 @@ function drOnClick(e){
   const hb = e.target.closest('[data-hist]'); if (hb){ drHistToggle(hb.dataset.hist); return; }
   const sp = e.target.closest('[data-spell]'); if (sp){ drSpellOpen(sp.dataset.spell); return; }
   const sa = e.target.closest('[data-spell-apply]'); if (sa){ drSpellApply(sa.dataset.spellApply); return; }
+  const sk = e.target.closest('[data-spell-clip]'); if (sk){ drSpellClip(sk.dataset.spellClip); return; }
   const sc = e.target.closest('[data-spell-close]'); if (sc){ drSpellClose(sc.dataset.spellClose); return; }
+  const su = e.target.closest('[data-spell-undo]'); if (su){ drSpellUndo(su.dataset.spellUndo); return; }
   const hv = e.target.closest('.drp-hist button[data-i]'); if (hv){ drRestore(hv.dataset.k, +hv.dataset.i); return; }
   const pr = e.target.closest('[data-pr]'); if (pr){ drPrint(pr.dataset.pr, { ck: `${+st.g}-${+st.c}`, noH: !!$('drPrNoH')?.checked }); return; }
   if (e.target.closest('#drClassBtn')){ drFlush(); st.clsK = `${+st.g}-${+st.c}`; st.view = 'cls'; save(); render(); return; }
@@ -2649,35 +2653,68 @@ async function drRestore(k, i){
   document.querySelector(`[data-hist="${k}"]`)?.setAttribute('aria-expanded', 'false');
   toast('되돌렸습니다 — 바꾸기 전 글은 기록에 남겼습니다');
 }
-// 맞춤법 — 부산대 맞춤법 검사기(개인 무료)를 선생님이 직접 쓴다. 앱은 글을 복사해 검사기를 새 탭으로 열고,
-// 고친 글을 붙여 넣으면 바뀐 곳·바이트 변화를 보여 주고 「반영」(되돌리기 기록을 남긴다).
-// 앱이 검사기에 글을 직접 보내 결과를 받아오지는 않는다 — 자동 연결은 기관 계약이 필요하다(2026-10-28 선생님과 정함)
+// 맞춤법 — 부산대 맞춤법 검사기(개인 무료)를 선생님이 직접 쓴다. 「🔤 맞춤법」 → 글을 복사해 두고 검사기를 팝업 창으로 띄운다(선생님 요청 — 새 탭 말고 팝업).
+// 팝업에 붙여 넣어 검사하고 고친 글을 복사한 뒤 작성 칸의 「📋 복사한 글 반영」 을 누르면 앱이 클립보드를 읽어 바로 반영(고치기 전 글은 되돌리기 기록에)하고
+// 바뀐 곳을 보여 준다. 검사기 화면 안은 다른 사이트라 앱이 읽지 못한다(브라우저 보안) — 그래서 고친 글 복사는 선생님이 한 번.
+// 앱이 검사기에 글을 직접 보내 결과를 받아오지는 않는다 — 자동 연결은 기관 계약이 필요하다(2026-10-28 선생님과 정함).
+// (앱 위에 iframe 으로 띄우는 것도 해 봤지만, 그 사이트가 다른 사이트 안에 뜨는 것을 막아 두면 빈 화면이라 팝업으로)
 const SPELLER_URL = 'https://nara-speller.co.kr/speller/';
+// 팝업 창 — 화면 오른쪽에. 이름이 같으면 열린 창을 다시 쓴다(새 창이 쌓이지 않게)
+function popWin(url, name, w){
+  const sw = screen.availWidth || 1280, sh = screen.availHeight || 900, sl = screen.availLeft || 0, stp = screen.availTop || 0;
+  w = Math.min(w, sw);
+  const win = window.open(url, name, `popup=yes,width=${w},height=${sh - 40},left=${sl + sw - w},top=${stp}`);
+  try { win?.focus(); } catch (e) {}
+  return win;
+}
 async function drSpellOpen(k){
-  const ta = $('drT-' + k), box = $('drS-' + k); if (!ta || !box) return;
+  const ta = $('drT-' + k); if (!ta) return;
   if (!ta.value.trim()){ toast('검사할 글이 없습니다'); return; }
   await copyText(ta.value);
-  const w = window.open(SPELLER_URL, 'sgbSpeller');       // 같은 탭을 다시 쓴다
-  try { if (w) w.opener = null; } catch (e) {}
+  const win = popWin(SPELLER_URL, 'sgbSpeller', 860);
+  drSpellBox(k);
+  toast(win ? '글을 복사했습니다 — 팝업 검사기에 붙여 넣으세요(Ctrl+V)' : '팝업이 막혀 있습니다 — 주소창 오른쪽에서 이 사이트의 팝업을 허용해 주세요');
+}
+// 작성 칸 안의 상자 — 단계 안내와 「📋 복사한 글 반영」. 클립보드를 못 읽었거나 엉뚱한 글이면 붙여 넣는 칸, 반영한 뒤에는 바뀐 곳과 「되돌리기」
+function drSpellBox(k){
+  const box = $('drS-' + k); if (!box) return;
   box.hidden = false;
-  box.innerHTML = `<div class="d">글을 복사했습니다 — ① 새 탭의 부산대 검사기에 붙여 넣고(Ctrl+V) 검사 → ② 고친 글을 복사해 아래에 붙여 넣으면 바뀐 곳을 보여 줍니다</div>
-    <textarea class="drp-spell-in" id="drSI-${k}" data-k="${k}" aria-label="${DR_NAME[k]} 고친 글 붙여 넣기" placeholder="여기에 고친 글 붙여 넣기(Ctrl+V)"></textarea>
+  box.innerHTML = `<div class="drp-spell-steps" id="drSG-${k}"><b>글을 복사해 두었습니다.</b> ① 팝업 검사기에 붙여 넣기(Ctrl+V) → ② 검사 → ③ 고친 글 복사(Ctrl+C) → ④ 아래 「📋 복사한 글 반영」</div>
+    <textarea class="drp-spell-in" id="drSI-${k}" data-k="${k}" aria-label="${DR_NAME[k]} 고친 글 붙여 넣기" placeholder="검사기에서 고친 글을 복사해 여기에 붙여 넣기(Ctrl+V)" hidden></textarea>
     <div class="drp-spell-sum" id="drSS-${k}"></div>
     <div class="drp-spell-diff" id="drSD-${k}"></div>
-    <div class="drp-spell-btns"><button type="button" class="btn sm pri" data-spell-apply="${k}" disabled>반영</button><button type="button" class="btn sm" data-spell-close="${k}">닫기</button></div>`;
-  toast('글을 복사했습니다 — 새 탭의 검사기에 붙여 넣으세요');
+    <div class="drp-spell-btns" id="drSB-${k}"><button type="button" class="btn sm pri" data-spell-clip="${k}">📋 복사한 글 반영</button>
+      <button type="button" class="btn sm" data-spell="${k}" title="글을 다시 복사하고 검사기 팝업을 앞으로">검사기 다시 띄우기</button>
+      <button type="button" class="btn sm" data-spell-close="${k}">닫기</button></div>`;
+}
+// 붙여 넣는 칸을 꺼내고 「반영」 단추로(클립보드를 못 읽었을 때 · 엉뚱한 글일 때)
+function drSpellManual(k){
+  $('drSI-' + k).hidden = false;
+  $('drSB-' + k).innerHTML = `<button type="button" class="btn sm pri" data-spell-apply="${k}" disabled>반영</button><button type="button" class="btn sm" data-spell-close="${k}">닫기</button>`;
+}
+async function drSpellClip(k){
+  let txt = '';
+  try { txt = await navigator.clipboard.readText(); } catch (e) {}    // 처음 한 번은 브라우저가 「클립보드 보기 허용」 을 묻는다
+  drSpellManual(k);
+  if (!txt.trim()){ toast('복사한 글을 읽지 못했습니다 — 칸에 붙여 넣어 주세요(Ctrl+V)'); $('drSI-' + k).focus(); return; }
+  $('drSI-' + k).value = txt;
+  const r = drSpellDiff(k);
+  if (!r.changes){ toast('바뀐 곳이 없습니다'); return; }
+  if (r.sim < .5){ toast('복사한 글이 이 칸 글과 많이 다릅니다 — 확인하고 「반영」 을 눌러 주세요'); return; }
+  await drSpellApply(k);
 }
 const drSpellText = k => ($('drSI-' + k)?.value || '').replace(/\r\n?/g, '\n').replace(/\s+$/, '');
 function drSpellDiff(k){
   const cur = ($('drT-' + k)?.value || '').replace(/\s+$/, ''), fix = drSpellText(k), btn = document.querySelector(`[data-spell-apply="${k}"]`);
-  if (!fix.trim()){ $('drSS-' + k).textContent = ''; $('drSD-' + k).innerHTML = ''; btn.disabled = true; return; }
+  if (!fix.trim()){ $('drSS-' + k).textContent = ''; $('drSD-' + k).innerHTML = ''; if (btn) btn.disabled = true; return { changes: 0, sim: 0 }; }
   const ops = sgbDiff(cur, fix), changes = ops.filter((o, i) => o[0] && (i === 0 || !ops[i - 1][0])).length;
   const same = ops.reduce((n, [op, t]) => n + (op ? 0 : [...t].length), 0), sim = same / Math.max([...cur].length, [...fix].length, 1);
   const lim = SGB_NEIS_LIMIT[DR_AREAS.find(([x]) => x === k)[2]], b0 = sgbNeisBytes(cur), b1 = sgbNeisBytes(fix);
   const mark = (t, sp) => esc(t).replace(/ /g, `<span class="ws">${sp}</span>`).replace(/\n/g, '↵\n');
   $('drSS-' + k).innerHTML = `${changes ? `바뀐 곳 ${changes}군데` : '바뀐 곳이 없습니다'} · ${b0.toLocaleString()} → ${b1.toLocaleString()}바이트${b1 > lim ? ` <span class="err">· 한도 ${(b1 - lim).toLocaleString()} 넘음</span>` : ''}${sim < .5 ? ' <span class="err">· 다른 글 같습니다 — 맞는지 확인하세요</span>' : ''}`;
   $('drSD-' + k).innerHTML = changes ? ops.map(([op, t]) => !op ? esc(t) : op < 0 ? `<del>${mark(t, '⌒')}</del>` : `<ins>${mark(t, '∨')}</ins>`).join('') : '';
-  btn.disabled = !changes;
+  if (btn) btn.disabled = !changes;
+  return { changes, sim };
 }
 async function drSpellApply(k){
   const ta = $('drT-' + k), fix = drSpellText(k), key = drKey();
@@ -2689,9 +2726,13 @@ async function drSpellApply(k){
   ta.value = fix;
   ta.dispatchEvent(new Event('input', { bubbles: true }));
   await drFlush();
-  drSpellClose(k);
-  toast('고친 글을 반영했습니다 — 「되돌리기」 로 고치기 전 글로 돌아갈 수 있습니다');
+  // 반영한 뒤 — 안내·붙여 넣는 칸은 감추고, 바뀐 곳은 남겨 두고 「되돌리기」
+  $('drSI-' + k).hidden = true; if ($('drSG-' + k)) $('drSG-' + k).hidden = true;
+  $('drSS-' + k).innerHTML = '✅ 반영했습니다 · ' + $('drSS-' + k).innerHTML;
+  $('drSB-' + k).innerHTML = `<button type="button" class="btn sm" data-spell-undo="${k}">되돌리기</button><button type="button" class="btn sm" data-spell-close="${k}">닫기</button>`;
+  toast('고친 글을 반영했습니다');
 }
+async function drSpellUndo(k){ drSpellClose(k); await drRestore(k, 0); }   // 기록 맨 앞이 고치기 전 글
 function drSpellClose(k){ const box = $('drS-' + k); if (box){ box.hidden = true; box.innerHTML = ''; } }
 // 보조자료 카드의 「→ 자율」 — 그 칸 끝에 한 칸 띄우고 붙인다. 작성 칸이 닫혀 있어도(폰) 저장된 글 뒤에 붙인다
 async function drAppend(k, text){
