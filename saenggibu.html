@@ -187,6 +187,34 @@
   .s-acts .tag{font-size:11.5px;padding:0 7px;flex-shrink:0;}
   .s-acts .fresh{margin-left:4px;}
   .card{scroll-margin-top:12px;}
+  /* 좁은 칸(태블릿·노트북에서 작성 칸을 띄웠을 때 등) — 사진·이름·활동 목록이 위로 지나가면 이름·반 번호·참여한 활동을 위쪽 한 줄로.
+     한 줄만(활동이 많으면 옆으로 밀어 본다). 폰·넓은 화면(오른쪽 목차)에는 없다. 높이 0 의 틀에 얹어 글이 밀리지 않게 */
+  .s-mini{display:none;}
+  .s-mini-in{position:absolute;left:-16px;right:-16px;top:0;display:flex;align-items:center;gap:12px;padding:7px 16px;
+    background:var(--paper);border-bottom:1px solid var(--rule);box-shadow:0 6px 12px -10px rgba(15,23,42,.35);
+    opacity:0;transform:translateY(-6px);pointer-events:none;transition:opacity .15s,transform .15s;}
+  .s-mini.on .s-mini-in{opacity:1;transform:none;pointer-events:auto;}
+  .s-mini-who{display:flex;align-items:baseline;gap:6px;flex-shrink:0;white-space:nowrap;}
+  .s-mini-who b{font-size:16px;font-weight:900;}
+  .s-mini-who span{font-size:12.5px;font-weight:700;color:var(--ink-soft);}
+  .s-mini-acts{display:flex;gap:6px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none;
+    -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);}
+  .s-mini-acts.end{-webkit-mask-image:none;mask-image:none;}
+  .s-mini-acts::-webkit-scrollbar{display:none;}
+  .s-mini-acts button{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;max-width:230px;padding:4px 10px;border:1px solid var(--rule);border-radius:999px;
+    background:var(--paper);color:var(--ink);font:inherit;font-size:13px;font-weight:700;line-height:1.4;cursor:pointer;white-space:nowrap;}
+  .s-mini-acts button:hover{border-color:var(--mon);color:var(--mon);}
+  .s-mini-acts .an{overflow:hidden;text-overflow:ellipsis;}
+  .s-mini-acts .d{font-weight:600;color:var(--ink-soft);}
+  .s-mini-acts .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--ink-soft);}
+  .s-mini-acts .dot.ja{background:var(--t-ja);} .s-mini-acts .dot.jin{background:var(--t-jin);} .s-mini-acts .dot.gae{background:var(--t-gae);}
+  .s-mini-acts .dot.nu{background:var(--t-nu);} .s-mini-acts .dot.haeng{background:var(--t-haeng);} .s-mini-acts .dot.dong{background:var(--t-dong);}
+  @media (min-width:901px){
+    @container det (max-width:1309px){
+      html:not(.embed) .s-mini{display:block;position:sticky;top:calc(var(--navH, 0px) - 16px);z-index:4;height:0;}
+      html:not(.embed) .card{scroll-margin-top:calc(var(--navH, 0px) + 58px);}
+    }
+  }
   /* 학번·이름이 편성표와 어긋난 자료 — 누락 없게 보이되 눈에 띄게 */
   .s-warn{font-size:14px;line-height:1.6;color:#9A3412;background:#FFF7ED;border:1px solid #FDBA74;border-radius:10px;padding:8px 12px;}
   .s-warn ul{margin:4px 0 0;padding-left:18px;}
@@ -375,10 +403,16 @@
   .pane3.dr-open .p-detail{flex:var(--drL,1) 1 0;min-width:0;}
   .pane3.dr-open .p-draft{flex:var(--drR,1) 1 0;min-width:0;}
   /* 사이 막대 — 끌어서 작성 칸 넓이를(30%~70%), 두 번 누르면 반반 */
-  .dr-split{display:none;flex:none;width:9px;margin:0 -5px 0 -4px;position:relative;z-index:3;overflow:hidden;cursor:col-resize;touch-action:none;}
+  .dr-split{display:none;flex:none;width:9px;margin:0 -5px 0 -4px;position:relative;z-index:3;overflow:visible;cursor:col-resize;touch-action:none;}
   .dr-split::after{content:'';position:absolute;top:0;bottom:0;left:4px;width:1px;background:transparent;transition:background .15s,width .15s,left .15s;}
   .dr-split:hover::after,.dr-split:focus-visible::after,.dr-split.drag::after{left:3px;width:3px;background:var(--mon);}
   .dr-split:focus-visible{outline:none;}
+  /* 손잡이 — 끌어서 넓이를 바꿀 수 있다는 표시(선생님 요청). 높이 가운데에 작게 ‹ › */
+  .dr-grip{position:absolute;top:50%;left:calc(50% + 1px);transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;
+    width:18px;height:38px;border:1px solid var(--rule);border-radius:9px;background:var(--paper);color:var(--ink-soft);
+    box-shadow:0 1px 4px rgba(15,23,42,.12);transition:border-color .15s,color .15s;}
+  .dr-grip svg{width:12px;height:12px;}
+  .dr-split:hover .dr-grip,.dr-split:focus-visible .dr-grip,.dr-split.drag .dr-grip{border-color:var(--mon);color:var(--mon);}
   .pane3.dr-open .dr-split{display:block;}
   .pane3.dr-open .p-draft{display:block;}
   .btn.sm{padding:5px 10px;font-size:13px;border-radius:8px;}
@@ -452,60 +486,88 @@
   /* 작성 칸을 띄우면 — 노트북은 반 칸, 더 좁으면 명단 칸까지 접는다(학생은 작성 칸의 ◀ ▶ 로) */
   @media (min-width:901px) and (max-width:1439px){ .pane3.dr-open .p-classes{display:none;} }
   @media (min-width:901px) and (max-width:1179px){ .pane3.dr-open .p-roster{display:none;} }
-  /* 인쇄 — 화면은 감추고 #printArea 만. 학생마다 한 장, 컬러.
-     쪽 여백을 0 으로 둬야 브라우저 머리말·꼬리말(주소·날짜·쪽 번호)이 안 찍힌다 — 여백은 쪽 안쪽 여백으로 준다 */
+  /* 인쇄 — 화면은 감추고 #printArea 만. 학생마다 한 장.
+     쪽 여백을 0 으로 둬야 브라우저 머리말·꼬리말(주소·날짜·쪽 번호)이 안 찍힌다 — 위아래 여백은 표의 머리·꼬리 칸으로 준다 */
   #printArea{display:none;}
   @page{size:A4;margin:0;}
   @media print{
     html,body{height:auto;background:#fff;}
     body > *:not(#printArea){display:none !important;}
-    #printArea{display:block;color:#111827;font-size:10.5pt;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    .pr-page{box-sizing:border-box;padding:18mm 17mm 14mm;break-after:page;page-break-after:always;
-      -webkit-box-decoration-break:clone;box-decoration-break:clone;}   /* 한 장을 넘겨도 다음 장에 여백 */
+    #printArea{display:block;--ac:#1E3A5F;--hair:#D5DAE1;--mute:#858B95;color:#1F2328;font-family:'Noto Sans KR',sans-serif;font-size:10pt;
+      -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    /* 문서처럼 — 색은 남색 하나, 가는 줄, 본문은 명조(칩·막대·카드 없이). 학생 하나가 표 하나:
+       두 장을 넘기면 표 머리(이름·학번)가 다음 장에도 찍히고, 영역은 쪽 사이에서 갈라지지 않는다 */
+    .pr-page{padding:0 17mm;break-after:page;page-break-after:always;}
     .pr-page:last-child{break-after:auto;page-break-after:auto;}
-    /* 생기부 양식처럼 — 표·가는 선, 색은 머리 칸의 옅은 남색 하나(꾸밈 없이) */
-    .pr-title{margin:0 0 6mm;padding-bottom:3mm;border-bottom:2.4pt double #1F2A44;text-align:center;font-size:17pt;font-weight:800;letter-spacing:.4em;color:#1F2A44;}
-    table.pr-id,table.pr-body{width:100%;border-collapse:collapse;table-layout:fixed;}
-    .pr-id{margin-bottom:5mm;}
-    .pr-id th,.pr-id td,.pr-body th,.pr-body td{border:.6pt solid #5B6475;}
-    .pr-id th{width:15mm;padding:2mm 0;background:#EEF1F6;color:#1F2A44;font-size:9.5pt;font-weight:700;text-align:center;}
-    .pr-id td{padding:2mm 1mm;text-align:center;font-size:10.5pt;}
-    .pr-id td.pr-name{width:30mm;font-weight:700;letter-spacing:.1em;}
-    .pr-body th{width:30mm;padding:2mm 2.5mm;background:#EEF1F6;color:#1F2A44;font-size:9.5pt;font-weight:700;line-height:1.5;
-      text-align:center;vertical-align:middle;word-break:keep-all;}
-    .pr-body td{padding:3mm 3.5mm 2.2mm;vertical-align:top;}
-    .pr-body tr{break-inside:avoid;}
-    .pr-t{min-height:24mm;font-size:10.5pt;line-height:1.8;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;}
-    .pr-bytes{margin-top:1.5mm;text-align:right;font-size:8pt;color:#6B7280;font-variant-numeric:tabular-nums;}
-    .pr-a.over .pr-bytes{color:#B91C1C;font-weight:700;}
-    .pr-empty{color:#9CA3AF;}
-    .pr-foot{display:flex;justify-content:space-between;margin-top:3mm;font-size:8pt;color:#6B7280;}
+    table.pr-frame{width:100%;border-collapse:collapse;}
+    .pr-frame td,.pr-frame th{padding:0;vertical-align:top;}
+    .pr-frame > thead > tr:first-child > td{padding-top:15mm;}
+    .pr-frame > tfoot > tr > td{padding-bottom:11mm;}
+    .pr-head{display:flex;align-items:flex-end;justify-content:space-between;gap:8mm;padding-bottom:3.2mm;border-bottom:1.4pt solid var(--ac);}
+    .pr-nm{font-family:'Noto Serif KR','Nanum Myeongjo','Batang',serif;font-size:19pt;font-weight:700;color:#111;letter-spacing:.03em;}
+    .pr-id{margin-left:3mm;font-size:10.5pt;font-weight:500;color:#555;}
+    .pr-doc{text-align:right;line-height:1.35;}
+    .pr-doc b{display:block;font-size:9.5pt;font-weight:700;color:var(--ac);letter-spacing:.04em;}
+    .pr-doc span{display:block;margin-top:.6mm;font-size:8pt;color:var(--mute);}
+    tr.pr-sec{break-inside:avoid;}
+    tr.pr-sec > td{padding:3.8mm 0 4.2mm;border-bottom:.5pt solid var(--hair);}
+    .pr-sh{display:flex;align-items:baseline;justify-content:space-between;gap:6mm;margin-bottom:1.5mm;}
+    .pr-sh b{font-size:10.2pt;font-weight:700;color:var(--ac);}
+    .pr-bytes{font-size:7.8pt;color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap;}
+    .pr-sec.over .pr-bytes,.pr-row.over .c-b{color:#B42318;font-weight:700;}
+    .pr-t{font-family:'Noto Serif KR','Nanum Myeongjo','Batang',serif;font-size:9.8pt;line-height:1.72;color:#202428;
+      white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;}
+    .pr-empty{font-family:'Noto Sans KR',sans-serif;color:#A0A6AF;}
+    .pr-foot{display:flex;justify-content:space-between;padding-top:2.6mm;font-size:7.8pt;color:var(--mute);}
+    /* 영역 인쇄 — 반 전체를 한 표로(자율만, 진로만 …). 쪽마다 제목·머리줄을 다시 */
+    table.pr-list{table-layout:fixed;}
+    .pr-list col.c-n{width:11mm;} .pr-list col.c-nm{width:19mm;} .pr-list col.c-b{width:16mm;}
+    .pr-list .pr-head{margin-bottom:1.5mm;}
+    .pr-list .pr-nm{font-size:16pt;}
+    .pr-cols th{padding:2.2mm 2mm 1.8mm;border-bottom:.9pt solid var(--ac);font-size:8.3pt;font-weight:700;color:var(--ac);text-align:left;white-space:nowrap;}
+    .pr-list tbody td{padding:2.6mm 2mm 2.8mm;border-bottom:.5pt solid var(--hair);}
+    .pr-list .c-n{text-align:center;} .pr-list .c-b{text-align:right;}
+    .pr-list td.c-n{color:#555;font-variant-numeric:tabular-nums;}
+    .pr-list td.c-nm{font-weight:700;white-space:nowrap;}
+    .pr-list td.c-b{font-size:7.8pt;color:var(--mute);font-variant-numeric:tabular-nums;}
+    .pr-list td.pr-t{font-size:9.5pt;line-height:1.66;}
+    .pr-list tbody tr{break-inside:avoid;}
   }
-  /* 우리 반 전체 보기 — 영역 하나를 반 전체로(엑셀의 자율·진로·개세특·행특 시트처럼). 이름을 누르면 그 학생 작성 칸으로 */
-  .drc{position:fixed;inset:0;z-index:65;display:flex;align-items:flex-start;justify-content:center;padding:4vh 16px;background:rgba(15,23,42,.45);overflow-y:auto;}
-  .drc[hidden]{display:none;}
-  .drc-box{width:min(1120px,100%);background:var(--paper);border-radius:16px;box-shadow:0 20px 50px -20px rgba(0,0,0,.45);padding:18px 22px 22px;}
-  .drc-box > .d{font-size:14px;font-weight:700;color:var(--ink-soft);}
-  .drc-top{display:flex;align-items:center;gap:10px;}
-  .drc-top b{margin-right:auto;font-size:18px;font-weight:900;}
-  .drc .seg{margin-top:10px;}
-  .drc-sum{margin:12px 0 6px;font-size:13.5px;font-weight:700;color:var(--ink-soft);}
-  .drc-sum .err{color:var(--warn);}
-  table.drc-t{width:100%;border-collapse:collapse;font-size:14px;}
-  .drc-t th{padding:8px;border-bottom:1px solid var(--rule);background:var(--paper-soft);text-align:left;font-size:12.5px;font-weight:800;color:var(--ink-soft);}
-  .drc-t th.r{text-align:right;}
-  .drc-t td{padding:10px 8px;border-bottom:1px solid var(--rule);vertical-align:top;}
-  .drc-t td.n{width:44px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;font-weight:700;}
-  .drc-t td.nm{width:92px;white-space:nowrap;}
-  .drc-t td.nm button{padding:0;border:none;background:none;font:inherit;font-weight:800;color:var(--ink);cursor:pointer;
+  /* ── 우리 반 생기부(담임) — 반 전체를 한 페이지에. 한눈에(학생 × 영역) · 영역별 표. 이름을 누르면 그 학생 작성 칸으로 ── */
+  .cls-wrap{height:100%;overflow-y:auto;padding:16px 16px 48px;}
+  .cls-sheet{max-width:1180px;}
+  .cls-head{display:flex;align-items:flex-start;gap:10px 14px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--rule);}
+  .cls-ttl{display:flex;flex-direction:column;gap:3px;margin-right:auto;}
+  .cls-ttl b{font-size:22px;font-weight:900;}
+  .cls-ttl .d{font-size:13px;font-weight:600;color:var(--ink-soft);}
+  .cls-pick{display:flex;gap:6px;align-items:center;}
+  .cls-pick select{padding:6px 8px;border:1px solid var(--rule);border-radius:8px;background:var(--paper);color:var(--ink);font:inherit;font-size:14px;font-weight:700;}
+  .cls-act{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .cls-sheet .seg{margin-top:12px;}
+  .cls-sum{margin:12px 0 6px;font-size:13.5px;font-weight:700;color:var(--ink-soft);}
+  .cls-sum .err{color:var(--warn);}
+  table.cls-t{width:100%;border-collapse:collapse;font-size:14px;}
+  .cls-t th{padding:8px;border-bottom:1px solid var(--rule);background:var(--paper-soft);text-align:left;font-size:12.5px;font-weight:800;color:var(--ink-soft);}
+  .cls-t th.r,.cls-t td.r{text-align:right;}
+  .cls-t td{padding:10px 8px;border-bottom:1px solid var(--rule);vertical-align:top;}
+  .cls-t td.n{width:44px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;font-weight:700;}
+  .cls-t td.nm{width:92px;white-space:nowrap;}
+  .cls-t td.nm button{padding:0;border:none;background:none;font:inherit;font-weight:800;color:var(--ink);cursor:pointer;
     text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:3px;}
-  .drc-t td.nm button:hover{color:var(--mon);text-decoration-color:var(--mon);}
-  .drc-t td.tx{line-height:1.65;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;}
-  .drc-t td.tx.none{color:var(--ink-soft);}
-  .drc-t td.b{width:118px;text-align:right;white-space:nowrap;font-size:13px;font-weight:700;color:var(--ink-soft);font-variant-numeric:tabular-nums;}
-  .drc-t tr.over td.b{color:var(--warn);}
-  .drc-t tr.over td.tx{box-shadow:inset 3px 0 0 var(--warn);padding-left:11px;}
-  .drc-t td.cp{width:64px;text-align:right;}
+  .cls-t td.nm button:hover{color:var(--mon);text-decoration-color:var(--mon);}
+  .cls-t td.tx{line-height:1.65;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;}
+  .cls-t td.tx.none{color:var(--ink-soft);}
+  .cls-t td.b{width:118px;text-align:right;white-space:nowrap;font-size:13px;font-weight:700;color:var(--ink-soft);font-variant-numeric:tabular-nums;}
+  .cls-t tr.over td.b{color:var(--warn);}
+  .cls-t tr.over td.tx{box-shadow:inset 3px 0 0 var(--warn);padding-left:11px;}
+  .cls-t td.cp{width:64px;text-align:right;}
+  /* 한눈에 — 영역마다 바이트(빈 칸 · 씀 · 넘음) */
+  .cls-all td.bx{text-align:right;font-size:13.5px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .cls-all td.bx.none{color:var(--ink-soft);font-weight:600;}
+  .cls-all td.bx.ok{color:var(--ink);}
+  .cls-all td.bx.over{color:var(--warn);}
+  .cls-all .c-up{width:110px;font-size:12.5px;color:var(--ink-soft);white-space:nowrap;}
+  .cls-all tfoot td{padding:9px 8px;font-size:12.5px;font-weight:800;color:var(--ink-soft);background:var(--paper-soft);border-bottom:none;}
 
   /* 폰·좁은 창 — 세 칸을 위아래로. 반은 가로 칩, 명단은 위쪽에 짧게 */
   .cls-m,.m-nav{display:none;}
@@ -584,15 +646,15 @@
     .pane3.dr-open .p-draft{flex:none;width:auto;border-left:none;}
     .ic-ph{display:inline;} .ic-pc{display:none;}
     .new-win,.list-off-btn,.dr-split{display:none !important;}
-    .drc{padding:0;}
-    .drc-box{border-radius:0;min-height:100%;padding:14px 12px 20px;}
-    table.drc-t,.drc-t tbody{display:block;}
-    .drc-t thead{display:none;}
-    .drc-t tr{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding:10px 2px;border-bottom:1px solid var(--rule);}
-    .drc-t td{display:block;padding:0;border:none;}
-    .drc-t td.tx{order:5;width:100%;}
-    .drc-t td.b{order:3;margin-left:auto;width:auto;}
-    .drc-t td.cp{order:4;width:auto;}
+    .cls-wrap{padding:10px 10px 32px;}
+    .cls-area table.cls-t,.cls-area .cls-t tbody{display:block;}
+    .cls-area .cls-t thead{display:none;}
+    .cls-area .cls-t tr{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding:10px 2px;border-bottom:1px solid var(--rule);}
+    .cls-area .cls-t td{display:block;padding:0;border:none;}
+    .cls-area .cls-t td.tx{order:5;width:100%;}
+    .cls-area .cls-t td.b{order:3;margin-left:auto;width:auto;}
+    .cls-area .cls-t td.cp{order:4;width:auto;}
+    .cls-all{font-size:13px;} .cls-all .c-up{display:none;}
     .to-btns{display:inline-flex;gap:6px;flex-wrap:wrap;}
   }
 </style>
@@ -614,6 +676,7 @@
     <button type="button" data-view="stu" class="on">학생별</button>
     <button type="button" data-view="act">활동별</button>
     <button type="button" data-view="sch">창체 일정</button>
+    <button type="button" data-view="cls" id="clsTab" style="display:none;">📘 우리 반 생기부</button>
     <button type="button" data-view="chk" id="chkTab" style="display:none;">⚠ 확인 필요</button>
   </div>
   <input type="search" class="search" id="hakbun" placeholder="🔍 학생 이름 · 학번(30101)" autocomplete="off" aria-label="학생 이름이나 학번으로 찾기">
@@ -641,8 +704,6 @@
 <div class="toast" id="toast"></div>
 <!-- 생기부 작성 인쇄 — 인쇄할 때만 채우고 이것만 찍는다(화면에서는 숨김) -->
 <div id="printArea"></div>
-<!-- 생기부 작성 — 우리 반 전체 보기(영역 하나를 반 전체로) -->
-<div class="drc" id="drClass" role="dialog" aria-modal="true" aria-label="우리 반 전체 보기" hidden></div>
 <div class="zoom" id="zoom" role="dialog" aria-label="사진 크게 보기">
   <div class="zoom-box"><img id="zoomImg" alt=""><div id="zoomCap"></div></div>
 </div>
@@ -1881,7 +1942,8 @@ async function renderStu(){
     <section class="p-roster" aria-label="학생 명단"><div class="roster-head">${head}<button type="button" class="list-off-btn" id="listOffBtn" title="반·명단을 숨기고 넓게 봅니다 — 위쪽 ☰ 로 다시">« 숨기기</button></div>
       <div id="stus">${rosterRows(list, !!q) || `<div class="empty">${q ? '맞는 학생이 없습니다.' : '이 반에는 올라온 자료가 없습니다.'}</div>`}</div></section>
     <section class="p-detail" id="stuOut">${st.n ? '<div class="empty">불러오는 중…</div>' : '<div class="empty">왼쪽에서 학생을 고르세요.</div>'}</section>
-    <div class="dr-split" id="drSplit" role="separator" aria-orientation="vertical" aria-label="작성 칸 넓이 — 끌거나 ← → 키, 두 번 누르면 반반" tabindex="0"></div>
+    <div class="dr-split" id="drSplit" role="separator" aria-orientation="vertical" aria-label="작성 칸 넓이 — 끌거나 ← → 키, 두 번 누르면 반반" title="끌어서 넓이 조절 · 두 번 누르면 반반" tabindex="0">
+      <span class="dr-grip" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M4.5 2.5 1.5 6l3 3.5M7.5 2.5l3 3.5-3 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
     <section class="p-draft" id="drPane" aria-label="생기부 작성"></section>
   </div>`;
   $('clsPane').onclick = e => {
@@ -1992,6 +2054,10 @@ async function renderStuOut(){
       <button type="button" class="btn" id="mBack"><span class="ic-ph">←</span><span class="ic-pc">☰</span> ${(st.find || '').trim() ? '찾은 학생' : `${esc(st.g)}학년 ${esc(st.c)}반`}</button>
       ${navBtn(prev, -1)}${navBtn(next, 1)}
     </div>
+    <div class="s-mini" id="sMini" aria-hidden="true"><div class="s-mini-in">
+      <span class="s-mini-who"><b>${esc(nm)}</b> <span>${esc(st.g)}학년 ${esc(st.c)}반 ${esc(st.n)}번</span></span>
+      ${acts.length ? `<div class="s-mini-acts">${acts.map(({ a, n }) => `<button type="button" tabindex="-1" data-go="${esc(a.id)}" title="${esc(a.title)}"><i class="dot ${SGB_TAG_CLS[(a.tags || [])[0]] || ''}"></i><span class="an">${esc(a.title)}</span>${n > 1 ? `<span class="d">${n}</span>` : ''}</button>`).join('')}</div>` : ''}
+    </div></div>
     <div class="sheet">
     <div class="s-head">
       <img class="s-photo" id="sPhoto" alt="" hidden>
@@ -2000,7 +2066,7 @@ async function renderStuOut(){
           <div><div class="s-name">${esc(nm)}</div>
             <div class="s-id">${esc(st.g)}학년 ${esc(st.c)}반 ${esc(st.n)}번 · ${hakbunOf(st.g, st.c, st.n)}</div></div>
           <div class="s-btns">${out._all ? '<button type="button" class="btn line" id="copyAll">📋 기재 문안 전체 복사</button>' : ''}
-            ${SOLO || EMBED ? '' : '<button type="button" class="btn line new-win" id="soloBtn" title="이 학생만 새 창으로 — 창 두 개를 띄워 놓고 작업할 때">↗ 새 창</button>'}
+            ${SOLO || EMBED || !can ? '' : '<button type="button" class="btn line new-win" id="soloBtn" title="이 학생만 새 창으로 — 창 두 개를 띄워 놓고 작업할 때">↗ 새 창</button>'}
             ${can ? `<button type="button" class="btn${st.drOpen ? ' pri' : ''}" id="drOpenBtn" aria-pressed="${!!st.drOpen}" title="오른쪽에 작성 칸을 띄웁니다 — 보조자료의 「→ 자율」 로 붙여 고칩니다">✏️ 작성</button>` : ''}</div>
         </div>
         <div class="s-sum">${ordered.map(gr => `<span class="tag ${SGB_TAG_CLS[(gr.a.tags || [])[0]] || ''}">${esc(tagTxt(gr.a))} ${gr.list.length}</span>`).join('')}</div>
@@ -2027,7 +2093,7 @@ async function renderStuOut(){
   if ($('drOpenBtn')) $('drOpenBtn').onclick = () => drToggle();
   out.querySelector('.sheet').onclick = e => { const b = e.target.closest('[data-to]'); if (b) drAppend(b.dataset.to, b.closest('.card').dataset.b); };
   // 봉사는 접힌 활동 카드 말고 누가기록 표로
-  if ($('sActs')) $('sActs').onclick = e => {
+  const goAct = e => {
     const b = e.target.closest('[data-go]'); if (!b) return;
     const a = actById(b.dataset.go);
     const card = (a && sgbIsVolunteer(a) && out.querySelector('.card.vol'))
@@ -2036,6 +2102,8 @@ async function renderStuOut(){
     card.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth' });
     card.classList.add('hit'); setTimeout(() => card.classList.remove('hit'), 1200);
   };
+  if ($('sActs')) $('sActs').onclick = goAct;
+  miniWire(out, goAct);
   markSeen([...new Set(items.map(it => it.a))].map(actById));   // 꼬리표는 그린 뒤에 — 이번에는 보이고 다음부터 빠진다
   // 사진 — 작은 것(반 문서)을 먼저, 고화질(워커)이 오면 바꿔 끼운다. 누르면 크게
   (async () => {
@@ -2071,6 +2139,29 @@ async function renderStuOut(){
   out.scrollTop = 0;
   listApply();
   drSync();                                    // 작성 칸 — 열어 두었고 쓸 수 있는 학생이면 이 학생으로
+}
+// 좁은 칸 위쪽 줄 — 학생 머리(사진·이름·활동 목록)가 위로 지나가면 나타난다. 위쪽 이동 줄(☰ · ◀ ▶)이 있으면 그 아래에.
+// 활동은 한 줄로 옆으로 밀어 본다(마우스 휠도 옆으로)
+function miniWire(out, goAct){
+  const mini = $('sMini'), head = out.querySelector('.s-head'), nav = $('mNav'), acts = mini?.querySelector('.s-mini-acts');
+  if (!mini || !head) return;
+  const navH = () => nav && nav.offsetParent ? nav.offsetHeight : 0;
+  const sync = () => {
+    out.style.setProperty('--navH', navH() + 'px');
+    mini.classList.toggle('on', getComputedStyle(mini).display !== 'none'
+      && head.getBoundingClientRect().bottom < out.getBoundingClientRect().top + navH() + 6);
+  };
+  out.onscroll = sync;
+  out._miniRO?.disconnect();
+  if (window.ResizeObserver){ out._miniRO = new ResizeObserver(sync); out._miniRO.observe(out); if (nav) out._miniRO.observe(nav); }
+  mini.onclick = goAct;
+  if (acts){
+    const edge = () => acts.classList.toggle('end', acts.scrollLeft + acts.clientWidth >= acts.scrollWidth - 2);
+    acts.onscroll = edge;
+    acts.onwheel = e => { if (acts.scrollWidth > acts.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)){ acts.scrollLeft += e.deltaY; e.preventDefault(); } };
+    requestAnimationFrame(edge);
+  }
+  sync();
 }
 // 반·명단 숨기기(「« 숨기기」, 기억) — 학생을 연 동안만. 숨기면 위쪽 줄(☰ 반 · ◀ 이전 · 다음 ▶)로 넘긴다
 function listApply(){ const panes = $('stuPanes'); if (panes) panes.classList.toggle('list-off', !!st.listOff && !!st.n && !SOLO); }
@@ -2296,6 +2387,9 @@ async function loadRole(){
     const m = String(h || '').match(/^(\d+)-(\d+)$/);
     if (m) ROLE.home = `${+m[1]}-${+m[2]}`;   // 명단에 '2-03' 처럼 적혀 있어도
   } catch (e) {}
+  const t = $('clsTab');
+  t.style.display = (ROLE.home || ROLE.master) && !SOLO ? '' : 'none';
+  t.textContent = ROLE.home ? '📘 우리 반 생기부' : '📘 반별 생기부';
 }
 async function drLoadOne(key){
   if (drQ.has(key) && drCache.has(key)) return drCache.get(key);   // 아직 안 쓴 고침이 있으면 그것이 최신
@@ -2347,7 +2441,7 @@ function drPanelHtml(ck, list, at, d){
     <div class="drp-bar">
       <div class="drp-nav">${step(prev, 'drPrev', '이전 학생', '◀')}<span class="drp-pos">${at + 1} / ${list.length}</span>${step(next, 'drNext', '다음 학생', '▶')}</div>
       <label class="drp-sw"><input type="checkbox" id="drHide"${st.hideHaeng ? ' checked' : ''}> 행특 가리기</label>
-      <button type="button" class="btn sm" id="drClassBtn" title="영역 하나를 반 전체로 — 자율 전체, 진로 전체 …">📋 반 전체</button>
+      <button type="button" class="btn sm" id="drClassBtn" title="우리 반 생기부 — 반 전체를 한 페이지에(자율 전체, 진로 전체 …)">📘 반 전체</button>
       <details class="form-dl drp-print" id="drPrint"><summary class="btn sm">🖨 인쇄</summary><div class="form-dl-menu">
         <button type="button" data-pr="one">이 학생 인쇄</button>
         <button type="button" data-pr="all">우리 반 전체 인쇄 <span class="d">— 학생마다 한 장(${list.length}장)</span></button>
@@ -2400,8 +2494,8 @@ function drOnClick(e){
     if (open){ drGrow(box); box.focus(); } return; }
   const hb = e.target.closest('[data-hist]'); if (hb){ drHistToggle(hb.dataset.hist); return; }
   const hv = e.target.closest('.drp-hist button[data-i]'); if (hv){ drRestore(hv.dataset.k, +hv.dataset.i); return; }
-  const pr = e.target.closest('[data-pr]'); if (pr){ drPrint(pr.dataset.pr); return; }
-  if (e.target.closest('#drClassBtn')){ drClassOpen(st.drcK || 'ja'); return; }
+  const pr = e.target.closest('[data-pr]'); if (pr){ drPrint(pr.dataset.pr, { ck: `${+st.g}-${+st.c}`, noH: !!$('drPrNoH')?.checked }); return; }
+  if (e.target.closest('#drClassBtn')){ drFlush(); st.clsK = `${+st.g}-${+st.c}`; st.view = 'cls'; save(); render(); return; }
   if (e.target.closest('#drSaved.err')) drFlush();
 }
 // 쓰는 대로 저장 — 손을 멈추고 0.9초 뒤, 학생·화면을 옮길 때, 창을 닫을 때. 고친 칸만 합쳐 쓴다(merge)
@@ -2510,78 +2604,192 @@ async function drAppend(k, text){
   toast(`${DR_NAME[k]} 칸에 붙였습니다 — 바이트를 보며 줄여 주세요`);
 }
 // 인쇄 — 이 학생만 / 우리 반 전체(학생마다 한 장). 행특은 빼고 찍을 수 있다. 빼 둔 내용·메모는 안 찍는다
-async function drPrint(which){
+const prDate = () => { const t = new Date(); return `${t.getFullYear()}. ${t.getMonth() + 1}. ${t.getDate()}.`; };
+const prHead = (big, small, ds) => `<header class="pr-head"><div class="pr-who"><b class="pr-nm">${big}</b> <span class="pr-id">${small}</span></div>
+  <div class="pr-doc"><b>학교생활기록부 기재안</b> <span>${ds}</span></div></header>`;
+// 인쇄 글꼴(본문 명조) — 인쇄할 때만 불러온다. 못 불러오면(학교 망 등) 2초만 기다리고 바탕체로 찍는다
+let prFontCss = null;
+async function prFonts(){
+  prFontCss ||= new Promise(res => {
+    const l = document.createElement('link');
+    l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&display=swap';
+    l.onload = l.onerror = () => res(); document.head.appendChild(l);
+  });
+  const txt = $('printArea').textContent;
+  await Promise.race([
+    prFontCss.then(() => Promise.all(['400 10pt', '700 19pt'].map(f => document.fonts.load(`${f} "Noto Serif KR"`, txt)))),
+    new Promise(r => setTimeout(r, 2000)),
+  ]).catch(() => {});
+}
+async function drPrint(which, { ck, noH }){
   await drFlush();
-  const noH = !!$('drPrNoH')?.checked, ck = `${+st.g}-${+st.c}`, [g, c] = ck.split('-');
+  const [g, c] = ck.split('-');
   const list = drStudents(ck), rows = which === 'one' ? list.filter(r => +r.n === +st.n) : list;
   if (which === 'all'){
     try { await drLoadClass(ck, list); }
     catch (e) { toast('반 작성 내용을 불러오지 못했습니다'); return; }
   }
-  const t = new Date(), ds = `${t.getFullYear()}. ${t.getMonth() + 1}. ${t.getDate()}.`;
+  const ds = prDate();
   $('printArea').innerHTML = rows.map((r, i) => {
     const d = drCache.get(`${ck}-${r.n}`) || {};
-    return `<section class="pr-page">
-      <h1 class="pr-title">학교생활기록부 기재안</h1>
-      <table class="pr-id"><tr><th>학년</th><td>${esc(g)}</td><th>반</th><td>${esc(c)}</td><th>번호</th><td>${esc(r.n)}</td><th>성명</th><td class="pr-name">${esc(r.nm)}</td></tr></table>
-      <table class="pr-body">${DR_AREAS.filter(([k]) => !(noH && k === 'haeng')).map(([k, nm, tg]) => {
+    return `<section class="pr-page"><table class="pr-frame">
+      <thead><tr><td>${prHead(esc(r.nm), `${esc(g)}학년 ${esc(c)}반 ${esc(r.n)}번`, ds)}</td></tr></thead>
+      <tbody>${DR_AREAS.filter(([k]) => !(noH && k === 'haeng')).map(([k, , tg]) => {
         const v = d[k] || '', b = sgbNeisBytes(v), lim = SGB_NEIS_LIMIT[tg], over = b > lim;
-        return `<tr class="pr-a${over ? ' over' : ''}" data-k="${k}"><th>${DR_FULL[k]}</th>
-          <td><div class="pr-t">${v.trim() ? esc(v) : '<span class="pr-empty">(작성 전)</span>'}</div>
-            <div class="pr-bytes">${b.toLocaleString()} / ${lim.toLocaleString()}바이트${over ? ` · ${(b - lim).toLocaleString()}바이트 초과` : ''}</div></td></tr>`;
-      }).join('')}</table>
-      <footer class="pr-foot"><span>출력 ${ds}${noH ? ' · 행동특성 및 종합의견 제외' : ''}</span><span>${i + 1} / ${rows.length}</span></footer>
-    </section>`;
+        return `<tr class="pr-sec${over ? ' over' : ''}" data-k="${k}"><td>
+          <div class="pr-sh"><b>${DR_FULL[k]}</b><span class="pr-bytes">${b.toLocaleString()} / ${lim.toLocaleString()}바이트${over ? ` · ${(b - lim).toLocaleString()} 초과` : ''}</span></div>
+          <div class="pr-t">${v.trim() ? esc(v) : '<span class="pr-empty">작성 전</span>'}</div></td></tr>`;
+      }).join('')}</tbody>
+      <tfoot><tr><td><footer class="pr-foot"><span>${noH ? '행동특성 및 종합의견 제외' : ''}</span><span>${i + 1} / ${rows.length}</span></footer></td></tr></tfoot>
+    </table></section>`;
   }).join('');
   if ($('drPrint')) $('drPrint').open = false;
+  await prFonts();
   window.print();
 }
 window.addEventListener('afterprint', () => { $('printArea').innerHTML = ''; });   // 인쇄가 끝나면 비운다(행특이 화면 뒤에 남지 않게)
-// 우리 반 전체 보기 — 영역 하나를 반 전체로(엑셀의 자율·진로·개세특·행특 시트처럼). 학생마다 글·바이트·복사, 이름을 누르면 그 학생 작성 칸으로
-async function drClassOpen(k){
-  await drFlush();
-  const ck = `${+st.g}-${+st.c}`, list = drStudents(ck), box = $('drClass');
-  box.hidden = false;
-  box.innerHTML = '<div class="drc-box"><div class="d">불러오는 중…</div></div>';
+// ── 우리 반 생기부(담임) ── 반 전체를 한 페이지에. 한눈에(학생 × 영역 바이트) · 자율 · 진로 · 개세특 · 행특,
+// 영역 인쇄(자율만 반 전체 한 표로 …) · 학생마다 인쇄 · 엑셀로 저장. 그 반 담임과 앱 관리자만(규칙이 막는다)
+async function renderCls(){
+  drFlush();
+  const body = $('body'), cls = classes();
+  if (!ROLE.master) st.clsK = ROLE.home;
+  else if (!cls.includes(st.clsK)) st.clsK = (ROLE.home && cls.includes(ROLE.home) ? ROLE.home : cls[0]) || '';
+  const ck = st.clsK || '', list = drStudents(ck);
+  if (!list.length){ body.innerHTML = `<div class="empty">${ck ? `${esc(ck)} 반 명단이 없습니다 — 편성표가 올라가 있는지 확인해 주세요.` : '반 명단이 없습니다 — 편성표를 먼저 올려 주세요.'}</div>`; return; }
+  save();
+  body.innerHTML = '<div class="cls-wrap"><div class="sheet cls-sheet"><div class="empty">불러오는 중…</div></div></div>';
   try { await drLoadClass(ck, list); }
-  catch (e) { box.innerHTML = `<div class="drc-box"><div class="empty err">반 작성 내용을 불러오지 못했습니다.<br>${esc(e.message || e)}</div></div>`; return; }
-  if (!box.hidden) drClassRender(ck, k);
+  catch (e) { body.innerHTML = `<div class="empty err">반 작성 내용을 불러오지 못했습니다.<br>${esc(e.message || e)}</div>`; return; }
+  if (st.view !== 'cls' || st.clsK !== ck) return;   // 그사이 다른 화면·반
+  clsDraw(ck, list, new Date().toISOString());
 }
-function drClassRender(ck, k){
-  const box = $('drClass'), list = drStudents(ck), [g, c] = ck.split('-');
-  const areas = DR_AREAS.filter(([x]) => x !== 'haeng' || !st.hideHaeng);   // 행특을 가리면 탭도 없다
-  if (!areas.some(([x]) => x === k)) k = areas[0][0];
-  st.drcK = k; save();
-  const [, nm, t] = DR_AREAS.find(([x]) => x === k), lim = SGB_NEIS_LIMIT[t];
-  const rows = list.map(r => { const v = drCache.get(`${ck}-${r.n}`)?.[k] || ''; return { r, v, b: sgbNeisBytes(v) }; });
-  const filled = rows.filter(x => x.v.trim()).length, over = rows.filter(x => x.b > lim).length;
-  box.innerHTML = `<div class="drc-box">
-    <div class="drc-top"><b>${esc(g)}학년 ${esc(c)}반 전체</b><button type="button" class="drp-x" id="drcClose" aria-label="닫기" title="닫기">✕</button></div>
-    <div class="seg" id="drcTabs">${areas.map(([x, n]) => `<button type="button" data-k="${x}"${x === k ? ' class="on"' : ''}>${n}</button>`).join('')}</div>
-    <div class="drc-sum">${DR_FULL[k]} · 쓴 학생 ${filled} / ${list.length}명${over ? ` · <span class="err">한도 넘음 ${over}명</span>` : ''}</div>
-    <table class="drc-t"><thead><tr><th>번호</th><th>이름</th><th>${nm}</th><th class="r">바이트</th><th></th></tr></thead><tbody>
+function clsDraw(ck, list, at){
+  const [g, c] = ck.split('-'), cls = classes();
+  const areas = DR_AREAS.filter(([k]) => k !== 'haeng' || !st.hideHaeng);   // 행특을 가리면 탭·칸도 없다
+  const tab = areas.some(([k]) => k === st.clsTab) ? st.clsTab : 'all';
+  const grades = [...new Set(cls.map(k => k.split('-')[0]))];
+  const pick = ROLE.master ? `<div class="cls-pick"><select id="clsG" aria-label="학년">${grades.map(x => `<option value="${x}"${x === g ? ' selected' : ''}>${x}학년</option>`).join('')}</select>
+      <select id="clsC" aria-label="반">${cls.filter(k => k.split('-')[0] === g).map(k => `<option value="${k}"${k === ck ? ' selected' : ''}>${k.split('-')[1]}반</option>`).join('')}</select></div>` : '';
+  const area = DR_AREAS.find(([k]) => k === tab);
+  let main;
+  if (tab === 'all'){
+    const cnt = areas.map(([k, , t]) => { const lim = SGB_NEIS_LIMIT[t]; let f = 0, o = 0;
+      for (const r of list){ const v = drCache.get(`${ck}-${r.n}`)?.[k] || ''; if (v.trim()) f++; if (sgbNeisBytes(v) > lim) o++; } return { f, o }; });
+    main = `<div class="cls-sum">한눈에 — 영역마다 바이트(한도 1,500). 빨강은 넘음, 「—」 는 아직 쓰지 않음. 이름을 누르면 그 학생 작성 칸으로</div>
+      <table class="cls-t cls-all"><thead><tr><th>번호</th><th>이름</th>${areas.map(([, nm]) => `<th class="r">${nm}</th>`).join('')}<th class="r c-up">마지막 저장</th></tr></thead><tbody>
+      ${list.map(r => { const d = drCache.get(`${ck}-${r.n}`) || {};
+        return `<tr><td class="n">${esc(r.n)}</td><td class="nm"><button type="button" data-n="${r.n}" title="이 학생 작성 칸으로">${esc(r.nm)}</button></td>
+          ${areas.map(([k, nm, t]) => { const v = d[k] || '', b = sgbNeisBytes(v), lim = SGB_NEIS_LIMIT[t];
+            return `<td class="bx ${!v.trim() ? 'none' : b > lim ? 'over' : 'ok'}" data-k="${k}" title="${nm} ${b.toLocaleString()} / ${lim.toLocaleString()}바이트">${v.trim() ? b.toLocaleString() : '—'}</td>`; }).join('')}
+          <td class="r c-up">${d.upd ? fmtAt(d.upd) : ''}</td></tr>`; }).join('')}
+      </tbody><tfoot><tr><td></td><td>쓴 학생</td>${cnt.map(x => `<td class="r">${x.f} / ${list.length}${x.o ? ` <span class="err">· 넘음 ${x.o}</span>` : ''}</td>`).join('')}<td class="c-up"></td></tr></tfoot></table>`;
+  } else {
+    const [k, nm, t] = area, lim = SGB_NEIS_LIMIT[t];
+    const rows = list.map(r => { const v = drCache.get(`${ck}-${r.n}`)?.[k] || ''; return { r, v, b: sgbNeisBytes(v) }; });
+    const filled = rows.filter(x => x.v.trim()).length, over = rows.filter(x => x.b > lim).length;
+    main = `<div class="cls-sum">${DR_FULL[k]} · 쓴 학생 ${filled} / ${list.length}명${over ? ` · <span class="err">한도 넘음 ${over}명</span>` : ''}</div>
+      <div class="cls-area"><table class="cls-t"><thead><tr><th>번호</th><th>이름</th><th>${nm}</th><th class="r">바이트</th><th></th></tr></thead><tbody>
       ${rows.map(({ r, v, b }) => `<tr${b > lim ? ' class="over"' : ''}><td class="n">${esc(r.n)}</td>
         <td class="nm"><button type="button" data-n="${r.n}" title="이 학생 작성 칸으로">${esc(r.nm)}</button></td>
         <td class="tx${v.trim() ? '' : ' none'}">${v.trim() ? esc(v) : '아직 쓰지 않았습니다'}</td>
         <td class="b">${b.toLocaleString()} / ${lim.toLocaleString()}</td>
         <td class="cp">${v.trim() ? `<button type="button" class="btn sm" data-cpk="${r.n}">복사</button>` : ''}</td></tr>`).join('')}
-    </tbody></table></div>`;
-  box.onclick = e => {
-    if (e.target === box || e.target.closest('#drcClose')){ drClassClose(); return; }
-    const tb = e.target.closest('#drcTabs [data-k]'); if (tb){ drClassRender(ck, tb.dataset.k); return; }
-    const cp = e.target.closest('[data-cpk]'); if (cp){ copyText(drCache.get(`${ck}-${cp.dataset.cpk}`)?.[st.drcK] || ''); return; }
-    const nb = e.target.closest('.nm [data-n]'); if (nb){ drClassClose(); if (!st.drOpen) drToggle(true); openStudent(ck, nb.dataset.n); }
+      </tbody></table></div>`;
+  }
+  const wrap = $('body').querySelector('.cls-wrap') || (() => { $('body').innerHTML = '<div class="cls-wrap"></div>'; return $('body').querySelector('.cls-wrap'); })();
+  wrap.innerHTML = `<div class="sheet cls-sheet" id="clsPage">
+    <div class="cls-head">
+      <div class="cls-ttl"><b>${esc(g)}학년 ${esc(c)}반 생기부</b><span class="d">${list.length}명 · 담임 작성 칸 기준 · ${fmtAt(at)} 불러옴</span></div>
+      ${pick}
+      <div class="cls-act">
+        <label class="drp-sw"><input type="checkbox" id="clsHide"${st.hideHaeng ? ' checked' : ''}> 행특 가리기</label>
+        ${tab === 'all' ? '' : `<button type="button" class="btn sm" id="clsPrArea" title="${DR_FULL[tab]}만 반 전체를 한 표로">🖨 ${area[1]} 인쇄</button>`}
+        <button type="button" class="btn sm" id="clsPrAll" title="학생마다 한 장(${list.length}장)">🖨 학생마다 인쇄</button>
+        <button type="button" class="btn sm" id="clsXlsx" title="영역마다 시트 — 번호·이름·내용·바이트">📥 엑셀로 저장</button>
+      </div>
+    </div>
+    <div class="seg" id="clsTabs"><button type="button" data-t="all"${tab === 'all' ? ' class="on"' : ''}>한눈에</button>${areas.map(([k, nm]) => `<button type="button" data-t="${k}"${tab === k ? ' class="on"' : ''}>${nm}</button>`).join('')}</div>
+    ${main}
+  </div>`;
+  const page = $('clsPage');
+  page.onclick = e => {
+    const tb = e.target.closest('#clsTabs [data-t]'); if (tb){ st.clsTab = tb.dataset.t; save(); clsDraw(ck, list, at); return; }
+    const nb = e.target.closest('.nm [data-n]');
+    if (nb){ [st.g, st.c] = ck.split('-'); st.n = String(nb.dataset.n); st.view = 'stu'; st.find = ''; st.drOpen = true; mList = false; save(); render(); return; }
+    const cp = e.target.closest('[data-cpk]'); if (cp){ copyText(drCache.get(`${ck}-${cp.dataset.cpk}`)?.[st.clsTab] || ''); return; }
+    if (e.target.closest('#clsPrArea')){ drPrintArea(ck, st.clsTab); return; }
+    if (e.target.closest('#clsPrAll')){ drPrint('all', { ck, noH: !!st.hideHaeng }); return; }
+    if (e.target.closest('#clsXlsx')) drXlsx(ck);
+  };
+  page.onchange = e => {
+    if (e.target.id === 'clsHide'){ st.hideHaeng = e.target.checked; save(); clsDraw(ck, list, at); return; }
+    if (e.target.id === 'clsG'){ st.clsK = cls.find(k => k.split('-')[0] === e.target.value) || st.clsK; save(); renderCls(); return; }
+    if (e.target.id === 'clsC'){ st.clsK = e.target.value; save(); renderCls(); }
   };
 }
-function drClassClose(){ const box = $('drClass'); box.hidden = true; box.innerHTML = ''; }
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('drClass').hidden) drClassClose(); });
+// 영역 인쇄 — 반 전체를 한 표로(자율만, 진로만 …). 쪽이 넘어가면 제목·머리줄을 다시
+async function drPrintArea(ck, k){
+  const [g, c] = ck.split('-'), list = drStudents(ck), [, , tg] = DR_AREAS.find(([x]) => x === k), lim = SGB_NEIS_LIMIT[tg];
+  $('printArea').innerHTML = `<section class="pr-page"><table class="pr-frame pr-list">
+    <colgroup><col class="c-n"><col class="c-nm"><col><col class="c-b"></colgroup>
+    <thead><tr><td colspan="4">${prHead(DR_FULL[k], `${esc(g)}학년 ${esc(c)}반 · ${list.length}명`, prDate())}</td></tr>
+      <tr class="pr-cols"><th class="c-n">번호</th><th>성명</th><th>내용</th><th class="c-b">바이트</th></tr></thead>
+    <tbody>${list.map(r => { const v = drCache.get(`${ck}-${r.n}`)?.[k] || '', b = sgbNeisBytes(v), over = b > lim;
+      return `<tr class="pr-row${over ? ' over' : ''}"><td class="c-n">${esc(r.n)}</td><td class="c-nm">${esc(r.nm)}</td>
+        <td class="pr-t">${v.trim() ? esc(v) : '<span class="pr-empty">작성 전</span>'}</td>
+        <td class="c-b">${b.toLocaleString()}${over ? `<br>${(b - lim).toLocaleString()} 초과` : ''}</td></tr>`; }).join('')}</tbody>
+    <tfoot><tr><td colspan="4"><footer class="pr-foot"><span>한도 ${lim.toLocaleString()}바이트 · 빨간 숫자는 넘음</span><span></span></footer></td></tr></tfoot>
+  </table></section>`;
+  await prFonts();
+  window.print();
+}
+// 우리 반 엑셀로 저장 — 영역마다 시트(반·번호·이름·내용·바이트), 엑셀 「학생 생활기록부 입력」 도구의 영역 시트처럼
+async function drXlsx(ck){
+  const btn = $('clsXlsx'), label = btn?.textContent;
+  if (btn){ btn.disabled = true; btn.textContent = '📥 만드는 중…'; }
+  try {
+    const EJ = await loadExcelJS();
+    const wb = new EJ.Workbook();
+    const [g, c] = ck.split('-'), list = drStudents(ck);
+    const line = { style: 'thin', color: { argb: 'FF9AA3B2' } }, box = { top: line, left: line, bottom: line, right: line };
+    for (const [k, nm, t] of DR_AREAS.filter(([x]) => x !== 'haeng' || !st.hideHaeng)){
+      const lim = SGB_NEIS_LIMIT[t];
+      const ws = wb.addWorksheet(nm, { views: [{ state: 'frozen', ySplit: 1 }], pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
+      ws.columns = [{ header: '반', key: 'c', width: 6 }, { header: '번호', key: 'n', width: 6 }, { header: '이름', key: 'nm', width: 11 },
+        { header: DR_FULL[k], key: 'v', width: 100 }, { header: '바이트', key: 'b', width: 9 }];
+      for (const r of list){ const v = drCache.get(`${ck}-${r.n}`)?.[k] || ''; ws.addRow({ c: +c, n: +r.n, nm: r.nm, v, b: sgbNeisBytes(v) }); }
+      ws.eachRow((row, i) => row.eachCell(cell => {
+        cell.border = box;
+        cell.alignment = { vertical: i === 1 ? 'middle' : 'top', horizontal: cell.col === 4 && i > 1 ? 'left' : 'center', wrapText: cell.col === 4 };
+        if (i === 1){ cell.font = { bold: true, color: { argb: 'FF1F2A44' } }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF1F6' } }; }
+        else if (cell.col === 5 && +cell.value > lim) cell.font = { bold: true, color: { argb: 'FFB91C1C' } };
+      }));
+    }
+    const buf = await wb.xlsx.writeBuffer();
+    const d = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    const link = document.createElement('a');
+    link.href = url; link.download = `${g}학년 ${c}반 생기부 기재안_${d}.xlsx`;
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    toast('엑셀 파일을 만들었습니다');
+  } catch (e) { toast('만들지 못했습니다: ' + (e.message || e)); }
+  finally { if (btn){ btn.disabled = false; btn.textContent = label; } }
+}
 
 async function render(){
   if (st.view === 'draft' || SOLO) st.view = 'stu';    // 예전 판의 「우리 반 작성」 탭 — 이제 학생별의 「✏️ 작성」. 단독 창은 학생별만
+  if (st.view === 'cls' && !(ROLE.home || ROLE.master)) st.view = 'stu';   // 우리 반 생기부 — 담임·관리자만
   drFlush();                                   // 화면을 바꿀 때 작성 칸에 남은 고침을 쓴다
   document.querySelectorAll('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === st.view));
+  if (st.view === 'cls') return renderCls();   // 보조자료가 없어도 열린다(담임 작성 칸만 본다)
   if (!META){
     $('body').innerHTML = `<div class="empty">아직 올라온 자료가 없습니다.<br>위의 「📤 엑셀 올리기」로 엑셀을 올려 주세요.</div>`;
+    return;
+  }
+  if (SOLO && !drCanWrite(st.g, st.c)){       // 단독 창은 작성하는 창 — 주소를 바꿔도 다른 반 학생은 안 연다
+    $('body').innerHTML = `<div class="empty">${SOLO_ONLY}.<br>다른 반 학생의 보조자료는 본 창의 「학생별」 에서 봅니다.</div>`;
     return;
   }
   const nMis = (META.mismatch || []).filter(m => !m.moved).length;
@@ -2601,6 +2809,7 @@ $('hakbun').addEventListener('keydown', e => {
   if (e.key !== 'Enter' || !META) return;
   const m = e.target.value.trim().match(/^([1-3])(\d{2})(\d{2})$/);
   if (!m){ if (SOLO && e.target.value.trim()) soloFind(e.target.value.trim()); return; }
+  if (SOLO && !drCanWrite(m[1], m[2])){ toast(SOLO_ONLY); return; }
   st.view = 'stu'; st.g = m[1]; st.c = String(+m[2]); st.n = String(+m[3]); st.find = '';
   e.target.value = '';
   render();
@@ -2612,11 +2821,12 @@ $('hakbun').addEventListener('input', e => {
   st.find = v; st.view = 'stu';
   render();
 });
-// 단독 창 — 이름으로 찾기(명단이 없으니 맞는 첫 학생을 바로 연다)
+// 단독 창 — 이름으로 찾기(명단이 없으니 맞는 첫 학생을 바로 연다). 담임 반 학생만(관리자는 모두)
+const SOLO_ONLY = '새 창에서는 담임 반 학생만 찾고 열 수 있습니다';
 function soloFind(q){
   const rv = rosterView(), hits = [];
-  for (const k of classes()) for (const r of rv[k] || []) if (!r.extra && (r.nm || '').includes(q)) hits.push([k, r]);
-  if (!hits.length){ toast('맞는 학생이 없습니다'); return; }
+  for (const k of classes()) if (drCanWrite(...k.split('-'))) for (const r of rv[k] || []) if (!r.extra && (r.nm || '').includes(q)) hits.push([k, r]);
+  if (!hits.length){ toast(classes().some(k => (rv[k] || []).some(r => (r.nm || '').includes(q))) ? SOLO_ONLY : '맞는 학생이 없습니다'); return; }
   const [k, r] = hits[0];
   $('hakbun').value = ''; [st.g, st.c] = k.split('-'); st.n = String(r.n); save(); render();
   if (hits.length > 1) toast(`${hits.length}명 가운데 첫 학생입니다 — 학번으로 찾으면 정확합니다`);
