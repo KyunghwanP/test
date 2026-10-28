@@ -55,7 +55,7 @@
 | `usage.html` | 사용 현황에 `saenggibu`·`notice` 이름 |
 | `firestore.rules` | `saenggibu`·`saenggibuStu`·`saenggibuAct` — 읽기·쓰기 `isYnhsTeacher()`(2026-10-28 쓰기를 교사 전체로) |
 | `tests/saenggibu-draft-rules.test.mjs` | 생기부 작성 규칙(에뮬레이터) 22개 — 담임은 자기 반만, 다른 반·다른 교사·전체열람 권한자·학생은 못 봄, 관리자는 모든 반 |
-| `tests/saenggibu.test.mjs` | 465개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
+| `tests/saenggibu.test.mjs` | 466개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
 | `tests/make-saenggibu-template.mjs` | **표준 양식** 엑셀 만들기(부서에 나눠 줄 빈 양식). `node tests/make-saenggibu-template.mjs <폴더>` |
 | `tests/s360-tabs.test.mjs` | 17개 검사(종합검색 탭) |
 | `tests/upload-pyeonseong*.test.mjs`, `tests/make-pyeonseong-fixture.mjs` | 편성표(학적사항 칸·괄호 이름 포함) |
@@ -144,7 +144,9 @@
   (엑셀은 매크로가 실행 취소 기록을 지워 실수로 지우면 못 살렸다)
 - **행특 가리기**(기억): 행특 칸을 화면에서 아예 빼고(글도 DOM 에 안 넣는다), 행특 보조자료·「→ 행특」 도 뺀다(작성하는 사람 화면에서만). 지우지는 않는다.
 - **인쇄**(작성 칸 머리): 이 학생 / 우리 반 전체(학생마다 한 장 — 그때 반 문서를 새로 읽는다), 「행특 빼고 인쇄」(가려 두었으면 처음부터 켜짐).
-  빼 둔 내용·메모는 안 찍는다. `#printArea` 만 찍고, 끝나면 비운다. **컬러**(영역 색 띠·칩·채운 막대, 넘으면 빨강, 이름 머리·쪽 번호 꼬리, `print-color-adjust:exact`).
+  빼 둔 내용·메모는 안 찍는다. `#printArea` 만 찍고, 끝나면 비운다. **생기부 양식처럼 표로** — 「학교생활기록부 기재안」 제목(두 줄 선), 학년·반·번호·성명 칸,
+  왼쪽 영역 이름 칸(옅은 남색) | 오른쪽 내용·바이트(넘으면 빨간 「N바이트 초과」), 아래 출력일·쪽 번호. 칩·색 띠·막대 같은 꾸밈은 뺐다
+  (처음엔 컬러 카드로 했다가 선생님이 「너무 AI스러워」 — 2026-10-28). `print-color-adjust:exact` 로 머리 칸 색은 찍힌다.
   **`@page{size:A4;margin:0}`** — 쪽 여백이 0 이어야 브라우저 머리말·꼬리말(주소·날짜·쪽 번호)이 안 찍힌다. 여백은 `.pr-page` 안쪽 여백(넘치면 `box-decoration-break:clone`).
 - **작성 칸 넓이 끌기**: 보조자료와 작성 칸 사이 막대(`#drSplit`)를 끌어서 30%~70%(← → 키도), 두 번 누르면 반반. `st.drFrac` 로 기억,
   `--drL`·`--drR` 을 flex-grow 로(바탕 0 · 안쪽 여백이 같아야 비율대로).
@@ -288,7 +290,7 @@ CLAUDE.md: **화면 변경은 test 먼저 → 선생님 확인 → ynhs PR·병�
 
 ### 검사 돌리기 (이 환경 기준)
 ```bash
-node tests/saenggibu.test.mjs        # 465
+node tests/saenggibu.test.mjs        # 466
 # 규칙(생기부 작성) — 에뮬레이터: tests/README.md 「보안 규칙」. 이 환경에선 패키지를 임시 폴더에 깔고 거기서 돌렸다:
 #   npm i firebase-tools@13 @firebase/rules-unit-testing@3 firebase@10 (임시 폴더) → firebase emulators:start --only firestore (8099)
 #   cp tests/saenggibu-draft-rules.test.mjs <임시 폴더>/ && node <임시 폴더>/saenggibu-draft-rules.test.mjs   (저장소 폴더에서) # 22

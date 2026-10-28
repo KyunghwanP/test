@@ -459,30 +459,27 @@
   @media print{
     html,body{height:auto;background:#fff;}
     body > *:not(#printArea){display:none !important;}
-    #printArea{display:block;color:#0F172A;font-size:10.5pt;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    .pr-page{box-sizing:border-box;padding:15mm 16mm 12mm;break-after:page;page-break-after:always;
+    #printArea{display:block;color:#111827;font-size:10.5pt;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .pr-page{box-sizing:border-box;padding:18mm 17mm 14mm;break-after:page;page-break-after:always;
       -webkit-box-decoration-break:clone;box-decoration-break:clone;}   /* 한 장을 넘겨도 다음 장에 여백 */
     .pr-page:last-child{break-after:auto;page-break-after:auto;}
-    .pr-top{display:flex;align-items:flex-end;justify-content:space-between;gap:8mm;padding-bottom:4.5mm;margin-bottom:6mm;border-bottom:2.2pt solid #3B82F6;}
-    .pr-title{font-size:8.5pt;font-weight:800;letter-spacing:.12em;color:#3B82F6;}
-    .pr-name{margin-top:1.5mm;font-size:21pt;font-weight:900;letter-spacing:-.01em;}
-    .pr-name small{margin-left:3mm;font-size:10.5pt;font-weight:700;color:#64748B;letter-spacing:0;}
-    .pr-meta{text-align:right;font-size:8.5pt;font-weight:600;color:#64748B;line-height:1.6;}
-    .pr-a{--c:#3B82F6;--bg:#EFF6FF;margin-bottom:4.5mm;padding:3.5mm 4.5mm 4mm;border:.6pt solid #E2E8F0;border-left:3.5pt solid var(--c);border-radius:2.5mm;break-inside:avoid;}
-    .pr-a[data-k="ja"]{--c:#2563EB;--bg:#EFF6FF;} .pr-a[data-k="jin"]{--c:#059669;--bg:#ECFDF5;}
-    .pr-a[data-k="gae"]{--c:#9333EA;--bg:#FAF5FF;} .pr-a[data-k="haeng"]{--c:#0E7490;--bg:#ECFEFF;}
-    .pr-ah{display:flex;align-items:center;gap:2.5mm;margin-bottom:2.5mm;}
-    .pr-chip{padding:.5mm 2.8mm;border-radius:99px;background:var(--bg);color:var(--c);font-size:9.5pt;font-weight:800;}
-    .pr-full{font-size:8.5pt;font-weight:700;color:#64748B;}
-    .pr-gauge{flex:1;height:1.4mm;margin:0 1mm;border-radius:1mm;background:#E2E8F0;overflow:hidden;}
-    .pr-gauge i{display:block;height:100%;background:var(--c);}
-    .pr-bytes{font-size:8.5pt;font-weight:700;color:#64748B;white-space:nowrap;font-variant-numeric:tabular-nums;}
-    .pr-a.over{border-left-color:#EF4444;}
-    .pr-a.over .pr-gauge i{background:#EF4444;}
-    .pr-a.over .pr-bytes{color:#EF4444;}
-    .pr-t{font-size:10.5pt;line-height:1.75;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;}
-    .pr-empty{color:#94A3B8;}
-    .pr-foot{display:flex;justify-content:space-between;margin-top:5mm;padding-top:2.5mm;border-top:.6pt solid #E2E8F0;font-size:8pt;font-weight:600;color:#94A3B8;}
+    /* 생기부 양식처럼 — 표·가는 선, 색은 머리 칸의 옅은 남색 하나(꾸밈 없이) */
+    .pr-title{margin:0 0 6mm;padding-bottom:3mm;border-bottom:2.4pt double #1F2A44;text-align:center;font-size:17pt;font-weight:800;letter-spacing:.4em;color:#1F2A44;}
+    table.pr-id,table.pr-body{width:100%;border-collapse:collapse;table-layout:fixed;}
+    .pr-id{margin-bottom:5mm;}
+    .pr-id th,.pr-id td,.pr-body th,.pr-body td{border:.6pt solid #5B6475;}
+    .pr-id th{width:15mm;padding:2mm 0;background:#EEF1F6;color:#1F2A44;font-size:9.5pt;font-weight:700;text-align:center;}
+    .pr-id td{padding:2mm 1mm;text-align:center;font-size:10.5pt;}
+    .pr-id td.pr-name{width:30mm;font-weight:700;letter-spacing:.1em;}
+    .pr-body th{width:30mm;padding:2mm 2.5mm;background:#EEF1F6;color:#1F2A44;font-size:9.5pt;font-weight:700;line-height:1.5;
+      text-align:center;vertical-align:middle;word-break:keep-all;}
+    .pr-body td{padding:3mm 3.5mm 2.2mm;vertical-align:top;}
+    .pr-body tr{break-inside:avoid;}
+    .pr-t{min-height:24mm;font-size:10.5pt;line-height:1.8;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;}
+    .pr-bytes{margin-top:1.5mm;text-align:right;font-size:8pt;color:#6B7280;font-variant-numeric:tabular-nums;}
+    .pr-a.over .pr-bytes{color:#B91C1C;font-weight:700;}
+    .pr-empty{color:#9CA3AF;}
+    .pr-foot{display:flex;justify-content:space-between;margin-top:3mm;font-size:8pt;color:#6B7280;}
   }
   /* 우리 반 전체 보기 — 영역 하나를 반 전체로(엑셀의 자율·진로·개세특·행특 시트처럼). 이름을 누르면 그 학생 작성 칸으로 */
   .drc{position:fixed;inset:0;z-index:65;display:flex;align-items:flex-start;justify-content:center;padding:4vh 16px;background:rgba(15,23,42,.45);overflow-y:auto;}
@@ -2525,18 +2522,15 @@ async function drPrint(which){
   $('printArea').innerHTML = rows.map((r, i) => {
     const d = drCache.get(`${ck}-${r.n}`) || {};
     return `<section class="pr-page">
-      <header class="pr-top">
-        <div><div class="pr-title">학교생활기록부 작성안</div><div class="pr-name">${esc(r.nm)}<small>${esc(g)}학년 ${esc(c)}반 ${esc(r.n)}번 · ${hakbunOf(g, c, r.n)}</small></div></div>
-        <div class="pr-meta">${ds} 인쇄${noH ? '<br>행특 제외' : ''}</div>
-      </header>
-      ${DR_AREAS.filter(([k]) => !(noH && k === 'haeng')).map(([k, nm, tg]) => {
+      <h1 class="pr-title">학교생활기록부 기재안</h1>
+      <table class="pr-id"><tr><th>학년</th><td>${esc(g)}</td><th>반</th><td>${esc(c)}</td><th>번호</th><td>${esc(r.n)}</td><th>성명</th><td class="pr-name">${esc(r.nm)}</td></tr></table>
+      <table class="pr-body">${DR_AREAS.filter(([k]) => !(noH && k === 'haeng')).map(([k, nm, tg]) => {
         const v = d[k] || '', b = sgbNeisBytes(v), lim = SGB_NEIS_LIMIT[tg], over = b > lim;
-        return `<div class="pr-a${over ? ' over' : ''}" data-k="${k}"><div class="pr-ah"><span class="pr-chip">${nm}</span><span class="pr-full">${DR_FULL[k]}</span>
-            <span class="pr-gauge"><i style="width:${Math.min(100, b / lim * 100).toFixed(1)}%"></i></span>
-            <span class="pr-bytes">${b.toLocaleString()} / ${lim.toLocaleString()}바이트${over ? ' · ' + (b - lim).toLocaleString() + ' 넘음' : ''}</span></div>
-          <div class="pr-t">${v.trim() ? esc(v) : '<span class="pr-empty">아직 쓰지 않았습니다</span>'}</div></div>`;
-      }).join('')}
-      <footer class="pr-foot"><span>나이스 입력 전 확인용 · 생기부 보조자료</span><span>${i + 1} / ${rows.length}</span></footer>
+        return `<tr class="pr-a${over ? ' over' : ''}" data-k="${k}"><th>${DR_FULL[k]}</th>
+          <td><div class="pr-t">${v.trim() ? esc(v) : '<span class="pr-empty">(작성 전)</span>'}</div>
+            <div class="pr-bytes">${b.toLocaleString()} / ${lim.toLocaleString()}바이트${over ? ` · ${(b - lim).toLocaleString()}바이트 초과` : ''}</div></td></tr>`;
+      }).join('')}</table>
+      <footer class="pr-foot"><span>출력 ${ds}${noH ? ' · 행동특성 및 종합의견 제외' : ''}</span><span>${i + 1} / ${rows.length}</span></footer>
     </section>`;
   }).join('');
   if ($('drPrint')) $('drPrint').open = false;

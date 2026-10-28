@@ -1838,15 +1838,19 @@ STORE = STORE_B;
   await p.evaluate(() => { window.__printed = []; window.print = () => window.__printed.push(document.getElementById('printArea').innerHTML); });
   const printed = () => p.evaluate(() => { const box = document.createElement('div'); box.innerHTML = window.__printed.at(-1) || '';
     return { pages: box.querySelectorAll('.pr-page').length, names: [...box.querySelectorAll('.pr-name')].map(b => b.textContent), haeng: !!box.querySelector('.pr-a[data-k="haeng"]'),
+      ids: [...box.querySelectorAll('table.pr-id')].map(t => t.textContent.replace(/\s+/g, '')), heads: [...box.querySelectorAll('.pr-a th')].map(th => th.textContent.trim()),
+      deco: box.querySelectorAll('.pr-chip, .pr-gauge').length,
       over: [...box.querySelectorAll('.pr-a.over')].map(a => a.dataset.k), foot: [...box.querySelectorAll('.pr-foot')].map(f => f.textContent.replace(/\s+/g, ' ')), txt: box.textContent }; });
   await p.click('#drPrint summary');
   check('인쇄 메뉴 — 행특을 가려 두었으면 「행특 빼고 인쇄」 가 켜져 있다', await p.isChecked('#drPrNoH'));
   await p.click('#drPrint [data-pr="all"]');
   await p.waitForFunction(() => (window.__printed || []).length === 1);
   const pa = await printed();
-  check('우리 반 전체 인쇄 — 학생마다 한 장(3장), 행특 빼고', pa.pages === 3 && pa.names[0].includes('김가람') && pa.names[0].includes('1학년 1반 1번') && !pa.haeng && !pa.txt.includes('배려심'), pa);
-  check('— 영역 이름을 다 적고(자율·자치활동 특기사항 …), 한도를 넘은 칸은 빨갛게(개세특), 아래에 쪽 번호', pa.txt.includes('자율·자치활동 특기사항') && pa.txt.includes('개인별 세부능력 및 특기사항')
-    && pa.over.join() === 'gae' && pa.foot[0].includes('1 / 3') && pa.foot[2].includes('3 / 3'), pa);
+  check('우리 반 전체 인쇄 — 학생마다 한 장(3장), 행특 빼고', pa.pages === 3 && pa.names[0] === '김가람' && !pa.haeng && !pa.txt.includes('배려심'), pa);
+  // 생기부 양식처럼 표로(선생님: 「너무 AI스러워」 2026-10-28) — 칩·막대 같은 꾸밈 없이, 학년·반·번호·성명 칸 + 왼쪽 영역 이름 칸
+  check('— 생기부 양식처럼: 학년·반·번호·성명 칸, 왼쪽에 영역 이름(자율·자치활동 특기사항 …), 칩·막대 꾸밈 없음', pa.ids[0] === '학년1반1번호1성명김가람'
+    && pa.heads.slice(0, 3).join('|') === '자율·자치활동 특기사항|진로활동 특기사항|개인별 세부능력 및 특기사항' && pa.deco === 0, pa);
+  check('— 한도를 넘은 칸은 표시(개세특), 아래에 출력일·쪽 번호', pa.over.join() === 'gae' && pa.foot[0].includes('1 / 3') && pa.foot[2].includes('3 / 3') && pa.foot[0].includes('출력'), pa);
   check('— 자율 글은 들어가고, 빼 둔 내용·메모는 안 들어간다', pa.txt.includes('학급 회의에서') && !pa.txt.includes('빼 둔 문장') && !pa.txt.includes('진로 희망 다시'), pa.txt.slice(0, 200));
   check('— 고르면 메뉴가 닫힌다', !(await p.$eval('#drPrint', d => d.open)));
   await p.click('#drPrint summary');
@@ -1854,7 +1858,8 @@ STORE = STORE_B;
   await p.click('#drPrint [data-pr="one"]');
   await p.waitForFunction(() => (window.__printed || []).length === 2);
   const p1 = await printed();
-  check('이 학생 인쇄 — 한 장, 「행특 빼고」 를 끄면 행특도', p1.pages === 1 && p1.names[0].includes('정하늘') && p1.names[0].includes('3번') && p1.haeng && p1.txt.includes('배려심이 깊음.'), p1);
+  check('이 학생 인쇄 — 한 장, 「행특 빼고」 를 끄면 행특도', p1.pages === 1 && p1.names[0] === '정하늘' && p1.ids[0].includes('번호3') && p1.haeng
+    && p1.heads.includes('행동특성 및 종합의견') && p1.txt.includes('배려심이 깊음.'), p1);
   if (process.env.SGB_SHOTS){ await p.evaluate(h => { document.getElementById('printArea').innerHTML = h; }, (await p.evaluate(() => window.__printed[0])));
     await p.pdf({ path: path.join(process.env.SGB_SHOTS, '11-print-class.pdf'), format: 'A4', printBackground: true, preferCSSPageSize: true }); }
   if (process.env.SGB_SHOTS){ await p.uncheck('#drHide'); await p.waitForSelector('#drT-haeng'); await p.click('#stus .stu[data-n="1"]');
