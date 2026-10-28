@@ -2071,7 +2071,7 @@ STORE = STORE_B;
   await p.mouse.move(grip.cx + 7, grip.cy); await p.mouse.down(); await p.mouse.move(grip.cx - 100, grip.cy, { steps: 5 }); await p.mouse.up();
   const pw5 = await p.$eval('#drPane', el => el.getBoundingClientRect().width);
   check('— 손잡이 가장자리(막대 밖)를 잡고 끌어도 넓이가 바뀐다', Math.abs((pw5 - pw4) - 107) <= 12, { pw4, pw5 });
-  if (process.env.SGB_SHOTS){ await p.dblclick('#drSplit'); await shot(p, '#stuPanes', '12-list-off-1700'); }
+  if (process.env.SGB_SHOTS){ await p.dblclick('#drSplit'); await p.mouse.move(5, 300); await p.waitForTimeout(200); await shot(p, '#stuPanes', '12-list-off-1700'); }
   // ☰ — 반·명단을 다시
   await p.click('#mBack');
   await p.waitForFunction(() => !document.getElementById('stuPanes').classList.contains('list-off'));

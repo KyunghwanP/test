@@ -408,10 +408,10 @@
   .dr-split:hover::after,.dr-split:focus-visible::after,.dr-split.drag::after{left:3px;width:3px;background:var(--mon);}
   .dr-split:focus-visible{outline:none;}
   /* 손잡이 — 끌어서 넓이를 바꿀 수 있다는 표시(선생님 요청). 높이 가운데에 작게 ‹ › */
-  .dr-grip{position:absolute;top:50%;left:calc(50% + 1px);transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;
-    width:18px;height:38px;border:1px solid var(--rule);border-radius:9px;background:var(--paper);color:var(--ink-soft);
+  .dr-grip{position:absolute;z-index:1;top:50%;left:calc(50% + 1px);transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;   /* 막대 위 파란 줄(::after)보다 위에 */
+    width:20px;height:40px;border:1px solid var(--rule);border-radius:10px;background:var(--paper);color:var(--ink-soft);
     box-shadow:0 1px 4px rgba(15,23,42,.12);transition:border-color .15s,color .15s;}
-  .dr-grip svg{width:12px;height:12px;}
+  .dr-grip svg{width:14px;height:11px;}
   .dr-split:hover .dr-grip,.dr-split:focus-visible .dr-grip,.dr-split.drag .dr-grip{border-color:var(--mon);color:var(--mon);}
   .pane3.dr-open .dr-split{display:block;}
   .pane3.dr-open .p-draft{display:block;}
@@ -1943,7 +1943,7 @@ async function renderStu(){
       <div id="stus">${rosterRows(list, !!q) || `<div class="empty">${q ? '맞는 학생이 없습니다.' : '이 반에는 올라온 자료가 없습니다.'}</div>`}</div></section>
     <section class="p-detail" id="stuOut">${st.n ? '<div class="empty">불러오는 중…</div>' : '<div class="empty">왼쪽에서 학생을 고르세요.</div>'}</section>
     <div class="dr-split" id="drSplit" role="separator" aria-orientation="vertical" aria-label="작성 칸 넓이 — 끌거나 ← → 키, 두 번 누르면 반반" title="끌어서 넓이 조절 · 두 번 누르면 반반" tabindex="0">
-      <span class="dr-grip" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M4.5 2.5 1.5 6l3 3.5M7.5 2.5l3 3.5-3 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+      <span class="dr-grip" aria-hidden="true"><svg viewBox="0 0 16 12"><path d="M5.5 2 2 6l3.5 4M10.5 2 14 6l-3.5 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
     <section class="p-draft" id="drPane" aria-label="생기부 작성"></section>
   </div>`;
   $('clsPane').onclick = e => {
