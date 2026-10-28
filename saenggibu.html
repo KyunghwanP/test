@@ -1724,24 +1724,26 @@ async function renderActOut(){
   const a = actById(st.act);
   if (!a){ out.innerHTML = '<div class="empty">왼쪽에서 활동을 고르세요.</div>'; return; }
   const grades = Object.keys(a.parts || {}).sort();
-  if (!grades.includes(st.ag)) st.ag = grades[0] || '';
-  const counts = Object.entries(a.byClass || {}).filter(([k]) => k.split('-')[0] === st.ag)
+  // 「전체」 — 업무 담당자가 모든 학년을 한 번에 본다(학년이 둘 이상일 때만 탭이 있다)
+  const all = st.ag === 'all' && grades.length > 1;
+  if (!all && !grades.includes(st.ag)) st.ag = grades[0] || '';
+  const counts = all ? [] : Object.entries(a.byClass || {}).filter(([k]) => k.split('-')[0] === st.ag)
     .sort((x, y) => +x[0].split('-')[1] - +y[0].split('-')[1]);
-  const total = counts.reduce((s, [, n]) => s + n, 0);
+  const total = all ? Object.values(a.byClass || {}).reduce((s, n) => s + n, 0) : counts.reduce((s, [, n]) => s + n, 0);
   out.innerHTML = `<div class="sheet">
     <div class="card-h">${tagHtml(a.tags)}<span class="t" style="font-size:21px;">${titleHtml(a)}${freshHtml(a)}</span><span class="d">${esc(a.dept)}${roundTxt(a) ? ' · ' + roundTxt(a) : ''}</span></div>
     ${a.area || a.path ? `<div class="where">${esc(a.area)}${a.path ? '<br>' + esc(a.path) : ''}</div>` : ''}
     ${noteHtml(a)}
     <div class="where">시트: ${esc(a.sheet)}${a.file ? ' · 파일: ' + esc(a.file) : ''}</div>
-    <div class="bar">${grades.length > 1 ? `<div class="seg" id="selAG">${grades.map(g => `<button type="button" data-g="${g}" class="${g === st.ag ? 'on' : ''}">${g}학년</button>`).join('')}</div>` : ''}</div>
-    <div class="counts" id="actChips"><button type="button" class="chip${!st.ac ? ' on' : ''}" data-c="">${esc(st.ag)}학년 전체 <b>${total}</b></button>${counts.map(([k, n]) =>
+    <div class="bar">${grades.length > 1 ? `<div class="seg" id="selAG"><button type="button" data-g="all" class="${all ? 'on' : ''}">전체</button>${grades.map(g => `<button type="button" data-g="${g}" class="${g === st.ag ? 'on' : ''}">${g}학년</button>`).join('')}</div>` : ''}</div>
+    <div class="counts" id="actChips"><button type="button" class="chip${!st.ac || all ? ' on' : ''}" data-c="">${all ? '전체 학년' : esc(st.ag) + '학년 전체'} <b>${total}</b></button>${counts.map(([k, n]) =>
       `<button type="button" class="chip${k.split('-')[1] === st.ac ? ' on' : ''}" data-c="${esc(k.split('-')[1])}">${esc(k.split('-')[1])}반 <b>${n}</b></button>`).join('')}</div>
     <div id="actRows"><div class="empty">불러오는 중…</div></div>
   </div>`;
   if ($('selAG')) $('selAG').onclick = e => { const b = e.target.closest('button'); if (!b) return; st.ag = b.dataset.g; st.ac = ''; save(); renderActOut(); };
   let rows;
   const drawRows = () => {
-    const list = rows.filter(r => !st.ac || String(r.c) === st.ac).sort((x, y) => x.c - y.c || x.n - y.n);
+    const list = rows.filter(r => all || !st.ac || String(r.c) === st.ac).sort((x, y) => x.g - y.g || x.c - y.c || x.n - y.n);
     const mm = misMap();
     if (!list.length){ $('actRows').innerHTML = '<div class="empty">이 반에는 없습니다.</div>'; return; }
     $('actRows').innerHTML = sgbIsVolunteer(a) ? volActTable(a, list, mm)
@@ -1753,7 +1755,7 @@ async function renderActOut(){
     document.querySelectorAll('#actChips .chip').forEach(x => x.classList.toggle('on', x === b));
     if (rows) drawRows();
   };
-  try { rows = await loadActGrade(a, st.ag); }
+  try { rows = all ? (await Promise.all(grades.map(g => loadActGrade(a, g)))).flat() : await loadActGrade(a, st.ag); }
   catch (e) { $('actRows').innerHTML = `<div class="empty err">불러오지 못했습니다: ${esc(e.message || e)}</div>`; return; }
   drawRows();
 }

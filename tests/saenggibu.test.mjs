@@ -912,6 +912,15 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
   if (process.env.SGB_SHOTS){ await p.setViewportSize({ width: 1440, height: 900 }); await shot(p, '#actOut', '6-vol-act-pc'); await p.setViewportSize({ width: 1100, height: 900 }); }
   await p.click('#actRows td.c-nm');
   check('— 칸을 누르면 복사(이름)', (await p.evaluate(() => window.__copied)) === '박나래');
+  // 「전체」 — 업무 담당자가 모든 학년을 한 번에(선생님 요청 2026-10-28)
+  check('학년 탭 맨 앞에 「전체」', (await p.$$eval('#selAG button', bs => bs.map(b => b.textContent.trim()))).join() === '전체,1학년,3학년');
+  await p.click('#selAG button[data-g="all"]');
+  await p.waitForFunction(() => document.querySelectorAll('#actRows table.neis tbody tr').length === 3);
+  const vAll = await vRow();
+  check('「전체」 — 모든 학년을 학년·반·번호 순으로(10101 → 30205), 칩은 「전체 학년 2」 하나',
+    vAll[0][0] === '10101' && vAll[1][0] === '30205' && (await p.textContent('#actChips')).replace(/\s+/g, ' ').trim() === '전체 학년 2'
+    && (await p.$$('#actChips .chip')).length === 1, [vAll.map(r => r[0]), await p.textContent('#actChips')]);
+  check('— 고른 탭을 기억한다(다시 열어도 전체)', await p.evaluate(() => JSON.parse(localStorage.getItem('ynhs-sgb') || '{}').ag) === 'all');
   await p.click(`#acts .act[data-id="${robot.id}"]`);
   await p.waitForSelector('#actRows .card');
   check('— 봉사가 아닌 활동은 그대로 카드', !(await p.$('#actRows table.neis')));
