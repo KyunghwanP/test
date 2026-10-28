@@ -6,6 +6,9 @@ _grades_src/
 *.xls
 # 예외: 빈 감독표 양식(이름 없음 — 학년부가 받아 채운다). 이름을 채운 판은 올리지 않는다
 !docs/duty-template.xlsx
+# 예외: 빈 생기부 보조자료 양식(학생 줄 비움 — tests/saenggibu.test.mjs 가 비었는지 본다)
+!docs/saenggibu-form.xlsx
+!docs/saenggibu-form-extra.xlsx
 
 # 위젯 빌드 산출물 (CI가 릴리스로 배포 — 저장소엔 커밋하지 않음)
 widget/*.exe
