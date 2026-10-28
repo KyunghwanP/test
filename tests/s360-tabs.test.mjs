@@ -24,7 +24,7 @@ const detail = grab('s360ShowDetail');
 check('밑줄 탭 — 회색 상자 대신 파란 줄', /\.s360-tabs\{[^}]*background:transparent[^}]*border-bottom:1px solid/.test(HTML) && /\.s360-ink\{[^}]*transition:left \.25s/.test(HTML));
 check('탭에 회색 음영 없음(마우스를 올려도 글자색만)', !/\.s360-tabs \.students-tab:hover\{[^}]*background/.test(HTML));
 check('탭 줄과 보조자료 칸은 s360SgbOn() 일 때만', /\$\{s360SgbOn\(\) \? `<div class="students-tab-row s360-tabs"/.test(detail) && /\$\{s360SgbOn\(\) \? `<div class="s360-pane-sgb"/.test(detail));
-check('지금은 관리자만(생기부 탭과 같은 조건)', /const s360SgbOn = \(\) => _IS_ADMIN\(\);/.test(HTML));
+check('모든 교사(생기부 탭과 같은 조건)', /const s360SgbOn = \(\) => true;/.test(HTML));
 check('권한 없는 반 — 성적 탭을 흐리게 하고 보조자료로', /gt\.disabled = true;[^\n]*\n?[^\n]*s360ShowTab\('sgb', s, true\)/.test(detail));
 check('상세를 그린 뒤 탭을 붙인다', /s360BindTabs\(s\);/.test(detail));
 

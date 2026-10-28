@@ -101,20 +101,22 @@ service cloud.firestore {
       allow read:  if isAppAdmin();
       allow write: if isYnhsTeacher() && request.auth.token.email == email;
     }
-    // 생기부 보조자료 — 부서·교과가 모은 기재 문안 통합 엑셀(saenggibu.html 에서 관리자가 올림).
-    // 원본 엑셀이 교원 전체에게 공유되는 자료라 읽기는 교사 전체(학생 계정은 막힌다).
-    // saenggibu/meta·manifest(목록), saenggibuStu/{학년-반-번호}(학생별), saenggibuAct/{활동-학년-조각}(활동별)
+    // 생기부 보조자료 — 부서·교과가 기재 문안 시트를 올리면 바로 반영(saenggibu.html). 읽기·쓰기 모두 교사 전체
+    // (학생 계정은 막힌다). 학생 문서 하나에 여러 부서 문안이 함께 들어 있어 부서별로 쓰기를 가를 수 없다 —
+    // 누가 올렸는지는 활동마다(meta)와 올린 기록(log)에 남고, 잘못 올린 것은 관리자가 관리 화면에서 지운다.
+    // saenggibu/meta·manifest(목록)·lock(올리는 동안 잠금)·log(올린 기록)·fmt-{활동}(원본 양식),
+    // saenggibuStu/{학년-반-번호}(학생별), saenggibuAct/{활동-학년-조각}(활동별)
     match /saenggibu/{docId} {
       allow read:  if isYnhsTeacher();
-      allow write: if isAppAdmin();
+      allow write: if isYnhsTeacher();
     }
     match /saenggibuStu/{docId} {
       allow read:  if isYnhsTeacher();
-      allow write: if isAppAdmin();
+      allow write: if isYnhsTeacher();
     }
     match /saenggibuAct/{docId} {
       allow read:  if isYnhsTeacher();
-      allow write: if isAppAdmin();
+      allow write: if isYnhsTeacher();
     }
     // 교실 자리 배치 — 문서 ID 는 '학년-반'(예: 2-3).
     // 조회는 전 교사(수업 들어갈 때 이름을 봐야 한다), 저장은 그 반 담임과 관리자만.

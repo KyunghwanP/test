@@ -129,6 +129,22 @@ const FILE_ODD = path.join(TMP, 'sgb-odd.xlsx');
     ['학년', '반', '번호', '성명', '자기 평가서', '기재 내용'], [1, 1, 2, '박나래', '평가', '문안.']]);
   await wb.xlsx.writeFile(FILE_ODD);
 }
+// 부서가 시트를 하나씩 바로 올린다 — 김 선생님이 처음 올리고, 이 선생님이 고쳐 올리고, 이름을 바꿔 다시 낸다
+async function oneSheet(fname, sheets) {
+  const wb = new ExcelJS.Workbook();
+  for (const [name, aoa] of sheets) aoa.forEach((row, i) => row.forEach((v, j) => {
+    if (v != null) (wb.getWorksheet(name) || wb.addWorksheet(name)).getRow(i + 1).getCell(j + 1).value = v; }));
+  const f = path.join(TMP, fname); await wb.xlsx.writeFile(f); return f;
+}
+const readHead = (title, dept = '교무부') => [[dept, null, '⊙ 활  동  명:', null, title], ['학년', '반', '번호', '성명', '기재 내용']];
+const FILE_K1 = await oneSheet('dept-k1.xlsx', [['<자>교무(독서 토론)', [...readHead('독서 토론'), [1, 1, 1, '김가람', '독서 토론에 참여함.'], [1, 1, 2, '박나래', '토론 사회를 봄.']]]]);
+const FILE_K2 = await oneSheet('dept-k2.xlsx', [['<자>교무(독서 토론)', [...readHead('독서 토론'), [1, 1, 1, '김가람', '다른 선생님이 고친 문안.']]]]);
+const FILE_K3 = await oneSheet('dept-k3.xlsx', [['<자>교무(독서토론 활동)', [...readHead('독서 토론'), [1, 1, 1, '김가람', '이름을 바꿔 낸 새 판.']]]]);
+const FILE_K4 = await oneSheet('dept-k4.xlsx', [['<자>생활(학생회 임원)', [[null, '생활교육부', null, null, '⊙ 활  동  명:', null, '학생회 임원'],
+  [null, '순번', '학년', '반', '번호', '성명', '직책', '기재 내용'], ['20101', 1, 2, 1, 1, '이보람', '회장', '학생회장으로 행사를 이끎.']]]]);
+const FILE_CL = await oneSheet('dept-cl.xlsx', [
+  ['<자>교무(강연)-1차', [...readHead('강연 1'), [1, 1, 1, '김가람', '첫 강연.']]],
+  ['<자>교무(강연)-2차', [...readHead('강연 2'), [1, 1, 1, '김가람', '둘째 강연.']]]]);
 // 파일 이름은 영문으로 — Playwright 가 괄호·한글이 섞인 이름은 조용히 못 넘긴다(파일 0개)
 const FILE1 = await xlsxFile('sgb-4.xlsx');
 const FILE2 = await xlsxFile('sgb-5.xlsx', { dropOfficers: true, robotText: '로봇 코딩 캠프에서 센서 제어를 익히고 발표함.' });
@@ -136,7 +152,7 @@ const FILE2 = await xlsxFile('sgb-5.xlsx', { dropOfficers: true, robotText: '로
 // ── 1. 해석 (페이지의 순수 함수 블록을 그대로) ──
 console.log('\n[해석]');
 const code = HTML.match(/<script id="sgbParser">([\s\S]*?)<\/script>/)[1];
-const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches, sgbOddSheets };')();
+const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches, sgbOddSheets, sgbActKey, sgbStamp, sgbLookalikes, sgbApplyFix, sgbFresh };')();
 const wb1 = XLSX.read(fs.readFileSync(FILE1), { type: 'buffer' });
 const parsed = P.sgbParseBook(P.sgbBookToSheets(XLSX, wb1));
 const act = t => parsed.activities.find(a => a.sheet.includes(t));
@@ -466,6 +482,105 @@ const itemOf = (p, g, c, n) => p.students.find(s => s.g === g && s.c === c && s.
     e?.body === '기재 내용' && e.extra.join() === '직책' && e.count === 1 && itemOf(p, 1, 1, 4)?.b === '예시 아래의 진짜 문안.', e);
 }
 
+// ── 2-3b. 다시 올릴 때 짝짓기 — 차수 없이 ──
+// 부서가 시트를 하나씩 바로 올린다. 예전 합본은 시트 이름 끝에 배포 차수(-2차-3차(수정))를 붙였고 앞으로는
+// 안 붙인다 — 붙든 안 붙든, 꼬리표를 고쳐 냈든 같은 활동이어야 겹치지 않는다. 괄호 안 차수는 활동 회차라 다르다.
+console.log('\n[짝짓기 — 차수 없이]');
+{
+  const K = P.sgbActKey;
+  const pairs = [
+    ['<자>생활(학급 임원)-2차', '생활(학급임원)'],
+    ['<자or진>생활(학급 임원)-2차-3차(수정)', '생활(학급임원)'],
+    ['<자>생활(학급 임원)', '생활(학급임원)'],
+    ['<자>생활(학급 임원)_3차', '생활(학급임원)'],
+    ['<자>수학과(강연(1차))-3차', '수학과(강연(1차))'],
+    ['<자>수학과(강연(2차))-3차', '수학과(강연(2차))'],
+    ['<자or진>수학과(수학대중화강연 1,2차)-1차', '수학과(수학대중화강연1,2차)'],
+    ['<개>연구부(수업량유연화)-2차-3차(수정)', '연구부(수업량유연화)'],
+  ];
+  const bad = pairs.filter(([n, k]) => K(n) !== k).map(([n, k]) => [n, K(n), k]);
+  check('활동 열쇠 — 꼬리표·끝의 배포 차수·(수정)은 떼고, 괄호 안 회차는 남긴다', !bad.length, bad);
+
+  const A = (sheet, title, hash, extra = {}) => ({ id: 'a' + sheet, sheet, title, hash, ...extra });
+  const meta = { activities: [
+    A('<자>생활(학급 임원)-2차', '학급 임원', 'h1', { by: 'old@x', since: 'S0', upd: 'U0' }),
+    A('<자>수학과(강연(1차))-2차', '강연 1차', 'h2'),
+    A('<자>수학과(강연(2차))-2차', '강연 2차', 'h3', { by: 'b@x', since: 'S3', upd: 'U3' }),
+  ], schedules: [] };
+  const cur = { activities: [
+    A('<자or진>생활(학급 임원)', '학급 임원', 'h1b'),       // 차수 없이 + 꼬리표 고쳐 냄 + 내용 바뀜
+    A('<자>수학과(강연(1차))', '강연 1차', 'h2b'),
+    A('<자>수학과(강연(2차))-3차', '강연 2차', 'h3'),          // 내용 그대로, 이름만 차수 바뀜
+  ], schedules: [] };
+  const c = P.sgbCompare(meta, cur);
+  check('차수 없이 내도·꼬리표를 고쳐 내도 같은 활동 — 「바뀜」 으로 짝(새로 추가·빠짐 없음)',
+    c.changed.length === 2 && c.same.length === 1 && !c.added.length && !c.missing.length
+    && c.changed.find(x => x.cur.sheet.includes('학급 임원'))?.old.sheet === '<자>생활(학급 임원)-2차', c);
+  check('괄호 안 회차가 다르면 다른 활동 — 강연(1차)·강연(2차) 각자 짝',
+    c.changed.find(x => x.cur.sheet.includes('강연(1차)'))?.old.title === '강연 1차' && c.same[0]?.old.title === '강연 2차');
+
+  const now = '2026-10-28T09:00:00.000Z';
+  P.sgbStamp(c, 'me@x', now);
+  const off = c.changed.find(x => x.cur.sheet.includes('학급 임원')).cur;
+  const lec = c.changed.find(x => x.cur.sheet.includes('강연(1차)')).cur;
+  check('올린 사람·날짜 — 바뀐 것은 처음 날짜를 두고 바뀐 날짜·올린 사람만 새로', off.since === 'S0' && off.upd === now && off.by === 'me@x', off);
+  check('— 예전 기록에 날짜가 없으면 칸을 아예 안 만든다(Firestore 는 undefined 를 못 담는다)', !('since' in lec) && lec.upd === now, lec);
+  check('— 그대로인 것은 옛 기록 그대로', c.same[0].cur.by === 'b@x' && c.same[0].cur.since === 'S3' && c.same[0].cur.upd === 'U3', c.same[0].cur);
+  const c2 = P.sgbCompare({ activities: [], schedules: [] }, { activities: [A('<자>새 활동', '새 활동', 'n')], schedules: [] });
+  P.sgbStamp(c2, 'me@x', now);
+  check('— 새로 들어온 것은 처음 날짜 = 바뀐 날짜 = 지금(「추가」)', c2.added[0].cur.since === now && c2.added[0].cur.upd === now);
+
+  const c3 = P.sgbCompare({ activities: [A('<자>교무(강연)-1차', '강연', 'k1')], schedules: [] },
+    { activities: [A('<자>교무(강연)-1차', '강연', 'k1'), A('<자>교무(강연)-2차', '강연', 'k2')], schedules: [] });
+  check('이 파일 안에서 차수를 떼면 같아지는 시트 — 하나로 묶지 않고 알린다(clash)',
+    c3.clash.length === 1 && c3.clash[0].sheets.length === 2, c3.clash);
+  check('— 시트 이름이 같은 예전 것과는 짝, 다른 하나는 새로 추가', c3.same.length === 1 && c3.same[0].cur.sheet === '<자>교무(강연)-1차'
+    && c3.added.length === 1 && c3.added[0].cur.sheet === '<자>교무(강연)-2차' && !c3.missing.length, c3);
+
+  const c4 = P.sgbCompare({ activities: [A('<자>생활(학급 임원)-2차', '학급 임원', 'h1'), A('<자>교무(독서)', '독서', 'r')], schedules: [] },
+    { activities: [A('<자>생활(반 임원)', '학급 임원', 'x'), A('<자>교무(토론)', '토론', 'y')], schedules: [] });
+  const look = P.sgbLookalikes(c4);
+  check('이름을 바꿔 낸 새 판 짐작 — ⊙ 활동명이 짝 없는 기존 활동과 같으면(학급 임원), 아니면 짐작 안 함(토론)',
+    look.length === 1 && look[0].cur.sheet === '<자>생활(반 임원)' && look[0].old.sheet === '<자>생활(학급 임원)-2차', look);
+}
+
+// ── 2-3c. 관리자가 앱에서 고친 값 ── 원본은 그대로 두고 fix 에. 다시 올려도 남고, 받기에도 들어간다.
+console.log('\n[관리자가 고친 값]');
+{
+  const meta0 = P.sgbBuildDocs(parsed).meta;
+  const rb0 = meta0.activities.find(a => a.id === robot.id);
+  rb0.fix = { title: '고친 활동명', dept: '진로진학부', tags: ['진'] };
+  const eff = P.sgbApplyFix(meta0);
+  const rb = eff.activities.find(a => a.id === robot.id);
+  check('읽을 때 고친 값으로 덮어 보이고, 원래 값은 orig 에', rb.title === '고친 활동명' && rb.dept === '진로진학부' && rb.tags.join() === '진'
+    && rb.orig.title === '진로탐색 로봇공학 캠프' && rb.orig.dept === '과학중점부' && rb.orig.tags.join() === '자,진', rb);
+  check('— 원본 칸은 그대로(다시 올릴 때 원본끼리 맞대 본다)', rb0.title === '진로탐색 로봇공학 캠프' && rb0.dept === '과학중점부');
+  check('— 고친 게 없는 활동은 그대로(orig 없음)', !eff.activities.find(a => a.id === math.id).orig);
+  const plan = P.sgbExportPlan(eff, { [robot.id]: parsed.actRows.get(robot.id) }, { [robot.id]: rform });
+  const rp = plan.find(x => x.name.includes('과중(로봇공학)'));
+  const top = rp.form.rows.filter(r => r.r <= rp.form.h).flatMap(r => r.cells.map(c => c.t));
+  check('엑셀로 받기 — 원본 양식의 위쪽 안내 칸이 고친 값(부서·활동명)', top.includes('고친 활동명') && top.includes('진로진학부') && !top.includes('과학중점부'), top);
+  check('— 고친 꼬리표는 시트 이름에', rp.name === '<진>과중(로봇공학)-2차', rp.name);
+  check('— 목차에도 고친 활동명·부서', plan.at(-1).rows.some(r => r.includes('고친 활동명') && r.includes('진로진학부')));
+  check('— 저장된 양식 자체는 안 건드린다(받을 때 복사본만)', rform.rows[0].cells.find(c => c.c === 2).t === '과학중점부');
+  const c = P.sgbCompare(meta0, parsed);
+  P.sgbStamp(c, 'kim@x', 'now');
+  const again = [...c.same, ...c.changed].find(x => x.cur.id === robot.id)?.cur;
+  check('부서가 틀린 이름 그대로 같은 파일을 다시 올려도 고친 값이 남는다', again?.fix?.title === '고친 활동명' && again.title === '진로탐색 로봇공학 캠프', again);
+}
+
+// ── 2-3d. 추가·수정 꼬리표 ── 7일은 모두에게, 그 뒤에는 안 본 선생님에게 볼 때까지
+console.log('\n[추가·수정 꼬리표]');
+{
+  const F = P.sgbFresh, now = Date.parse('2026-10-28T09:00:00Z'), d = n => new Date(now - n * 864e5).toISOString();
+  check('올린 지 7일 안 — 추가(처음 날짜 = 바뀐 날짜) · 수정', F({ id: 'a', since: d(1), upd: d(1) }, {}, now) === 'new' && F({ id: 'a', since: d(30), upd: d(2) }, {}, now) === 'mod');
+  check('— 7일 안이면 이미 봤어도 보인다', F({ id: 'a', since: d(2), upd: d(2) }, { a: d(2) }, now) === 'new');
+  check('7일이 지나도 안 본 선생님에게는 보인다', F({ id: 'a', since: d(10), upd: d(10) }, {}, now) === 'new');
+  check('— 7일이 지나고 이미 봤으면 안 보인다', F({ id: 'a', since: d(10), upd: d(10) }, { a: d(10) }, now) === '');
+  check('— 본 뒤에 다시 바뀌었으면 다시 보인다(수정)', F({ id: 'a', since: d(30), upd: d(9) }, { a: d(20) }, now) === 'mod');
+  check('날짜가 없는 옛 기록은 꼬리표 없음', F({ id: 'a' }, {}, now) === '');
+}
+
 // ── 2-4. 표준 양식 ── 부서에 나눠 줄 빈 양식(tests/make-saenggibu-template.mjs). 앱이 그대로 읽어야 하고,
 // 모양은 원래 쓰던 통합 엑셀을 따른다. 파서가 바뀌어 양식과 어긋나면 여기서 잡힌다.
 console.log('\n[표준 양식]');
@@ -503,6 +618,11 @@ console.log('\n[표준 양식]');
     tws.getColumn(1).hidden === true && tws.getColumn(7).width === 50 && tws.getColumn(8).width === 81 && tws.pageSetup.orientation === 'landscape');
   const bc = tws.getCell('H6');
   check('본문 글꼴 돋움 10, 글 칸은 줄바꿈', bc.font?.name === '돋움' && bc.font?.size === 10 && bc.alignment?.wrapText === true, bc.style);
+  const guide = [];
+  tw.getWorksheet('작성 안내').eachRow(r => guide.push(String(r.getCell(1).value || '')));
+  const g = guide.join('\n');
+  check('작성 안내 — 차수를 붙이지 않음 · 회차는 괄호 안 · 앱에서 바로 올리는 법', g.includes('차수(-1차 · -2차)를 붙이지 않습니다')
+    && g.includes('강연(1차)') && g.includes('📤 엑셀 올리기') && g.includes('확인할 시트'), g.slice(0, 200));
 }
 
 // ── 3. 화면 ──
@@ -521,16 +641,22 @@ const STUB = {
     export const indexedDBLocalPersistence = {}, browserLocalPersistence = {};`,
   'firebase-firestore.js': `
     const fs = () => (window.__FS__ = window.__FS__ || {});
-    const ops = () => (window.__OPS__ = window.__OPS__ || { get: 0, set: 0, del: 0 });
+    const ops = () => (window.__OPS__ = window.__OPS__ || { get: 0, set: 0, del: 0, w: [] });
+    const rec = (k, ref) => { const o = ops(); if (k === 's') o.set++; else o.del++; (o.w = o.w || []).push([k, ref]); };
     const clone = v => JSON.parse(JSON.stringify(v));
     export function getFirestore(){ return {}; }
     export function doc(db, c, id){ return c + '/' + id; }
     export async function getDoc(ref){ ops().get++; const d = fs()[ref]; return { exists: () => !!d, data: () => d && clone(d) }; }
-    export async function setDoc(ref, data){ ops().set++; fs()[ref] = clone(data); }
+    export async function setDoc(ref, data){ rec('s', ref); fs()[ref] = clone(data); }
+    export async function deleteDoc(ref){ rec('d', ref); delete fs()[ref]; }
+    // 트랜잭션 — 한 탭 안에서는 차례로 도니 읽고 쓰기만 흉내 낸다
+    export async function runTransaction(db, fn){
+      return fn({ get: async ref => getDoc(ref), set(ref, d){ rec('s', ref); fs()[ref] = clone(d); }, delete(ref){ rec('d', ref); delete fs()[ref]; } });
+    }
     export function writeBatch(){
       const q = [];
       return { set(ref, d){ q.push(['s', ref, clone(d)]); }, delete(ref){ q.push(['d', ref]); },
-        async commit(){ for (const [k, ref, d] of q){ if (k === 's'){ ops().set++; fs()[ref] = d; } else { ops().del++; delete fs()[ref]; } } } };
+        async commit(){ for (const [k, ref, d] of q){ rec(k, ref); if (k === 's') fs()[ref] = d; else delete fs()[ref]; } } };
     }`,
 };
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
@@ -567,7 +693,14 @@ async function openAs(email, { width = 1100, blockExcel = false } = {}) {
   return page;
 }
 const keep = async page => { STORE = await page.evaluate(() => window.__FS__); };
-const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr';
+// 자료 문서 쓰기만 — 잠금(saenggibu/lock)·올린 기록(saenggibu/log)은 빼고 센다
+const dataOps = o => { const w = (o.w || []).filter(([, r]) => !/^saenggibu\/(lock|log)$/.test(r));
+  return { set: w.filter(([k]) => k === 's').length, del: w.filter(([k]) => k === 'd').length }; };
+// 눈 확인용 캡처 — SGB_SHOTS=<폴더> 를 주면 그때만 찍는다(검사 결과에는 영향 없음)
+const shot = async (p, sel, name) => { if (!process.env.SGB_SHOTS) return;
+  const el = await p.$(sel); if (el) await el.screenshot({ path: path.join(process.env.SGB_SHOTS, name + '.png') }); };
+const ADMIN = 'pkh910518@yeungnam.hs.kr', KIM = 'kim@yeungnam.hs.kr', LEE = 'lee@yeungnam.hs.kr';
+const ADMIN_E = ADMIN;
 
 // 3-0 칸 이름이 안 맞는 시트 — 올리기 전에 알린다(쓰지 않고 닫는다)
 STORE = { 'students/main': { students: ROSTER } };
@@ -782,25 +915,34 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
   await p.context().close();
 }
 
-// 3-2 다시 올리기(로봇 문안이 바뀌고 학급 임원 시트가 빠진 파일) — 빠진 것은 묻고, 기본은 남기기
+// 3-2 다시 올리기(로봇 문안이 바뀌고 학급 임원 시트가 빠진 파일) — 관리자도 기본은 「추가·수정」: 빠진 것은 그대로
 {
   const p = await openAs(ADMIN);
   await p.waitForSelector('#upBtn');
-  await p.evaluate(() => { window.__OPS__ = { get: 0, set: 0, del: 0 }; });
+  await p.evaluate(() => { window.__OPS__ = { get: 0, set: 0, del: 0, w: [] }; });
   await p.setInputFiles('#upFile', FILE2);
   await p.waitForSelector('#upGo');
   const panel = await p.textContent('#upPanel');
   check('미리보기 — 바뀐 시트와 건수(2건 → 2건)', panel.includes('내용이 바뀜 1') && (await p.textContent('#upChanged')).includes('2건 → 2건'), panel.slice(0, 400));
   check('미리보기 — 그대로 5', panel.includes('그대로 5'));
   const miss = await p.textContent('#upMissing');
-  check('미리보기 — 이 파일에 없는 기존 시트를 묻는다(학급 임원)', miss.includes('기존 자료 1') && miss.includes('학급 임원'), miss);
-  check('물어보는 칸의 기본값은 「남기기」', await p.$eval('#upMissing select', s => s.value) === 'keep');
+  check('미리보기 — 이 파일에 없는 기존 시트는 「그대로 둡니다」(기본 추가·수정, 묻지 않음)',
+    miss.includes('기존 자료 1개') && miss.includes('그대로 둡니다') && !(await p.isVisible('#upMissing select')), miss);
+  check('관리자에게만 「올리는 방식」 — 추가·수정이 기본', await p.isVisible('#upMode')
+    && await p.$eval('input[name="upMode"]:checked', r => r.value) === 'add');
+  check('「내용이 바뀜」 에 기존 것을 누가 언제 올렸는지(관리자)', (await p.textContent('#upChanged')).includes('기존: 관리자'),
+    await p.textContent('#upChanged'));
   await p.click('#upGo');
   await p.waitForFunction(() => document.getElementById('upPanel').textContent.includes('올렸습니다'));
   const ops = await p.evaluate(() => window.__OPS__);
   const keys = await p.evaluate(() => Object.keys(window.__FS__));
   const msg = await p.textContent('#upPanel');
-  check('남기면 — 바뀐 문서만 쓴다(로봇 활동 · 학생 1-1-1 · 목록 둘)', ops.set === 4 && ops.del === 0, ops);
+  check('남기면 — 바뀐 문서만 쓴다(로봇 활동 · 학생 1-1-1 · 목록 둘)', dataOps(ops).set === 4 && dataOps(ops).del === 0, dataOps(ops));
+  check('쓰는 동안 잠그고, 다 쓰면 푼다', ops.w[0]?.[1] === 'saenggibu/lock' && ops.w.at(-1)?.[0] === 'd' && ops.w.at(-1)?.[1] === 'saenggibu/lock'
+    && !keys.includes('saenggibu/lock'), ops.w.map(x => x.join(':')));
+  const lg = await p.evaluate(() => window.__FS__['saenggibu/log']);
+  check('올린 기록 — 누가 · 어느 파일 · 바뀐 활동', lg?.items?.[0]?.by === ADMIN_E && lg.items[0].file === 'sgb-5.xlsx'
+    && lg.items[0].changed.length === 1, lg?.items?.[0]);
   check('남긴 시트의 활동 문서·양식 문서가 그대로 있다', keys.some(k => k.startsWith(`saenggibuAct/${officer.id}`)) && keys.includes(`saenggibu/fmt-${officer.id}`));
   check('결과 안내 — 추가·바뀜·남김·지움', msg.includes('추가 0 · 바뀜 1 · 남김 1 · 지움 0'), msg);
   const s325 = await p.evaluate(() => window.__FS__['saenggibuStu/3-2-5']);
@@ -809,6 +951,8 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
   check('남긴 활동은 처음 파일 이름, 바뀐 활동은 새 파일 이름', meta.activities.find(a => a.id === officer.id).file === 'sgb-4.xlsx'
     && meta.activities.find(a => a.id === robot.id).file === 'sgb-5.xlsx');
   check('바뀐 문안이 화면에 — 로봇', (await p.evaluate(() => window.__FS__['saenggibuStu/1-1-1'].items.map(i => i.b || '').join('|'))).includes('발표함'));
+  const rb = meta.activities.find(a => a.id === robot.id);
+  check('바뀐 활동에 올린 사람·바뀐 날짜(처음 날짜는 첫 올리기 것)', rb.by === ADMIN_E && rb.upd && rb.since && rb.since < rb.upd, rb);
   await keep(p);
   await p.context().close();
 }
@@ -819,34 +963,40 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
   STORE = Object.fromEntries(Object.entries(saved).filter(([k]) => !k.startsWith(`saenggibuAct/${officer.id}`)));
   const p = await openAs(ADMIN);
   await p.waitForSelector('#upBtn');
-  await p.evaluate(() => { window.__OPS__ = { get: 0, set: 0, del: 0 }; });
+  await p.evaluate(() => { window.__OPS__ = { get: 0, set: 0, del: 0, w: [] }; });
   await p.setInputFiles('#upFile', FILE2);
   await p.waitForSelector('#upGo');
   await p.click('#upGo');
   await p.waitForFunction(() => /실패|올렸습니다/.test(document.getElementById('upPanel').textContent));
   const ops = await p.evaluate(() => window.__OPS__);
-  check('남길 자료를 못 읽으면 실패로 멈추고 아무것도 안 쓴다', ops.set === 0 && ops.del === 0
+  check('남길 자료를 못 읽으면 실패로 멈추고 아무것도 안 쓴다(잠금도 푼다)', dataOps(ops).set === 0 && dataOps(ops).del === 0
+    && !(await p.evaluate(() => 'saenggibu/lock' in window.__FS__))
     && (await p.textContent('#upPanel')).includes('못 읽었습니다'), ops);
   check('실패하면 다시 누를 수 있다', !!(await p.$('#upGo')) && await p.isEnabled('#upGo'));
   await p.context().close();
   STORE = saved;
 }
 
-// 3-2b 같은 파일을 한 번 더 — 이번엔 「모두 지우기」(합본으로 바꾸기)
+// 3-2b 같은 파일을 한 번 더 — 이번엔 관리자가 「전체 바꾸기」(합본): 빠진 시트는 기본 지우기, 확인 창
 {
   const p = await openAs(ADMIN);
   await p.waitForSelector('#upBtn');
-  await p.evaluate(() => { window.__OPS__ = { get: 0, set: 0, del: 0 }; });
+  await p.evaluate(() => { window.__OPS__ = { get: 0, set: 0, del: 0, w: [] }; });
   await p.setInputFiles('#upFile', FILE2);
-  await p.waitForSelector('#missDelAll');
-  check('같은 파일이면 바뀐 것 없음 — 남겨 둔 시트만 다시 묻는다', !(await p.$('#upChanged')) && (await p.textContent('#upPanel')).includes('그대로 6'));
-  await p.click('#missDelAll');
-  check('「모두 지우기」 를 누르면 칸이 전부 「지우기」', await p.$$eval('#upMissing select', ss => ss.every(s => s.value === 'del')));
+  await p.waitForSelector('#upMode');
+  check('같은 파일이면 바뀐 것 없음 — 남겨 둔 시트만 「그대로 둡니다」', !(await p.$('#upChanged')) && (await p.textContent('#upPanel')).includes('그대로 6'));
+  await p.check('input[name="upMode"][value="replace"]');
+  check('「전체 바꾸기」 를 고르면 빠진 시트 목록이 열리고 기본은 「지우기」', await p.isVisible('#upMissing select')
+    && await p.$$eval('#upMissing select', ss => ss.every(s => s.value === 'del')) && (await p.textContent('#upMissHow')).includes('지웁니다'));
+  await shot(p, '#upPanel', '3-preview-replace');
+  let asked = '';
+  p.once('dialog', d => { asked = d.message(); d.accept(); });
   await p.click('#upGo');
   await p.waitForFunction(() => document.getElementById('upPanel').textContent.includes('올렸습니다'));
   const ops = await p.evaluate(() => window.__OPS__);
   const keys = await p.evaluate(() => Object.keys(window.__FS__));
-  check('지우면 — 그 활동 문서·양식 문서를 지우고 3-2-5 · 목록 둘만 쓴다', ops.del === 2 && ops.set === 3
+  check('지우기 전에 확인 창 — 몇 개 · 무엇', asked.includes('1개를 지웁니다') && asked.includes('학생회 임원'), asked);
+  check('지우면 — 그 활동 문서·양식 문서를 지우고 3-2-5 · 목록 둘만 쓴다', dataOps(ops).del === 2 && dataOps(ops).set === 3
     && !keys.some(k => k.startsWith(`saenggibuAct/${officer.id}`)) && !keys.includes(`saenggibu/fmt-${officer.id}`), ops);
   check('결과 안내 — 지움 1', (await p.textContent('#upPanel')).includes('남김 0 · 지움 1'));
   const s325 = await p.evaluate(() => window.__FS__['saenggibuStu/3-2-5']);
@@ -856,11 +1006,12 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
   await p.context().close();
 }
 
-// 3-3 다른 선생님 — 보기만
+// 3-3 다른 선생님 — 보고, 올릴 수도 있다(받기·관리는 관리자만)
 {
   const p = await openAs(KIM, { width: 390 });
   await p.waitForSelector('#stus .stu');
-  check('다른 교사 — 자료는 보이고 올리기 단추는 없다', !(await p.isVisible('#upBtn')));
+  check('다른 교사 — 자료가 보이고 올리기 단추도 있다(부서가 바로 올린다), 엑셀로 받기는 없다',
+    await p.isVisible('#upBtn') && !(await p.isVisible('#dlBtn')));
   check('폰 폭에서 가로로 넘치지 않는다', await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
   // 폰 — 학년 탭 → 반 격자 → 학생 큰 단추 → 상세만, ◀ ▶ 로 넘기고 ← 로 돌아오기
   check('폰: 명단은 한 줄에 한 명(번호 차례대로 위에서 아래로)', await p.evaluate(() => { const b = [...document.querySelectorAll('#stus .stu')];
@@ -886,6 +1037,237 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
   check('오류 없음(다른 교사)', p.errors.length === 0, p.errors);
   await p.context().close();
 }
+// 3-3a 부서가 바로 올리기 — 김 선생님이 시트 하나를 올린다(나머지는 그대로), 교사에겐 「전체 바꾸기」 가 없다
+const STORE_B = JSON.parse(JSON.stringify(STORE));          // 뒤 검사를 위해 이 묶음이 끝나면 되돌린다
+const upload = async (p, file) => { await p.setInputFiles('#upFile', file); await p.waitForSelector('#upGo'); };
+const done = p => p.waitForFunction(() => /올렸습니다|실패/.test(document.getElementById('upPanel').textContent));
+const txt = async (p, sel) => (await p.$(sel)) ? p.textContent(sel) : '';
+// 관리 화면 — 결과(admMsg)가 뜨거나 실패(admEdMsg·admMsg)가 뜰 때까지
+const adminDone = (p, word) => p.waitForFunction(w => { const a = document.getElementById('admMsg')?.textContent || '', e = document.getElementById('admEdMsg')?.textContent || '';
+  return a.includes(w) || /실패/.test(a + e); }, word, { timeout: 15000 }).catch(() => {});
+{
+  const p = await openAs(KIM);
+  await p.waitForSelector('#upBtn');
+  await upload(p, FILE_K1);
+  check('교사 미리보기 — 「올리는 방식」 이 없다(전체 바꾸기는 관리자만), 빠진 시트는 그대로',
+    !(await p.$('#upMode')) && (await p.textContent('#upMissing')).includes('그대로 둡니다') && !(await p.$('#upMissing select')));
+  const n0 = STORE['saenggibu/meta'].activities.length;
+  await p.click('#upGo'); await done(p);
+  const meta = await p.evaluate(() => window.__FS__['saenggibu/meta']);
+  const rd = meta.activities.find(a => a.sheet === '<자>교무(독서 토론)');
+  check(`김 선생님 시트가 더해지고 나머지는 그대로(${n0} → ${n0 + 1})`, rd && meta.activities.length === n0 + 1
+    && (await p.textContent('#upPanel')).includes('추가 1'), meta.activities.map(a => a.sheet));
+  check('올린 사람·날짜 — 새로 들어온 활동(처음 날짜 = 바뀐 날짜)', rd?.by === KIM && rd.since && rd.since === rd.upd, rd);
+  await keep(p);
+  await p.context().close();
+}
+// 3-3b 다른 선생님이 남의 활동을 고쳐 올리면 — 묻고, 기본은 건너뛰기
+{
+  const p = await openAs(LEE);
+  await p.waitForSelector('#upBtn');
+  await upload(p, FILE_K2);
+  await shot(p, '#upPanel', '1-preview-foreign');
+  const chg = await p.textContent('#upChanged');
+  check('남이 올린 활동 — ⚠ 누가 올렸는지, 기본은 「건너뛰기」', chg.includes('kim 선생님이 올린 활동') && await p.$eval('#upChanged select', s => s.value) === 'skip', chg);
+  await p.click('#upGo'); await done(p);
+  let s111 = await p.evaluate(() => window.__FS__['saenggibuStu/1-1-1']);
+  check('건너뛰면 김 선생님 문안 그대로, 결과에 「건너뜀 1」', s111.items.some(i => i.b === '독서 토론에 참여함.') && !s111.items.some(i => i.b === '다른 선생님이 고친 문안.')
+    && (await p.textContent('#upPanel')).includes('건너뜀 1'), await p.textContent('#upPanel'));
+  await keep(p);
+  await upload(p, FILE_K2);
+  await p.selectOption('#upChanged select', 'put');
+  await p.click('#upGo'); await done(p);
+  s111 = await p.evaluate(() => window.__FS__['saenggibuStu/1-1-1']);
+  const rd = (await p.evaluate(() => window.__FS__['saenggibu/meta'])).activities.find(a => a.sheet === '<자>교무(독서 토론)');
+  check('「바꾸기」 를 고르면 바뀌고, 올린 사람이 이 선생님으로(처음 날짜는 그대로)', s111.items.some(i => i.b === '다른 선생님이 고친 문안.')
+    && rd.by === LEE && rd.since < rd.upd
+    && !((await p.evaluate(() => window.__FS__['saenggibuStu/1-1-2']))?.items || []).some(i => i.b === '토론 사회를 봄.'), rd);
+  await keep(p);
+  await p.context().close();
+}
+// 3-3c 이름을 바꿔 낸 새 판 — ⊙ 활동명이 같으면 묻는다(기본 따로 추가), 바꾸면 옛것이 빠지고 자리를 잇는다
+{
+  const p = await openAs(LEE);
+  await p.waitForSelector('#upBtn');
+  await upload(p, FILE_K3);
+  await shot(p, '#upPanel', '2-preview-lookalike');
+  const add = await p.textContent('#upAdded');
+  check('새 판 짐작 — 「기존 「독서 토론」… 의 새 판인가요?」, 기본은 따로 추가', add.includes('의 새 판인가요?') && add.includes('교무(독서 토론)')
+    && await p.$eval('#upAdded select', s => s.value) === 'new', add);
+  const before = (await p.evaluate(() => window.__FS__['saenggibu/meta'])).order;
+  const nBefore = (await p.evaluate(() => window.__FS__['saenggibu/meta'])).activities.length;
+  const oldId = (await p.evaluate(() => window.__FS__['saenggibu/meta'])).activities.find(a => a.sheet === '<자>교무(독서 토론)').id;
+  await p.selectOption('#upAdded select', 'swap');
+  await p.click('#upGo'); await done(p);
+  const meta = await p.evaluate(() => window.__FS__['saenggibu/meta']);
+  const nw = meta.activities.find(a => a.sheet === '<자>교무(독서토론 활동)');
+  check('바꾸면 — 옛 시트는 빠지고 새 시트가 옛 자리에(활동 수 그대로)', nw && !meta.activities.some(a => a.id === oldId) && meta.activities.length === nBefore
+    && meta.order.indexOf(nw.id) === before.indexOf(oldId), [meta.order, before]);
+  check('— 처음 날짜는 옛것에서(「수정」 으로 보이게)', nw.since && nw.since < nw.upd, nw);
+  await keep(p);
+  await p.context().close();
+}
+// 3-3c2 예전 합본의 시트(차수 붙음)를 부서가 차수 없이 다시 낸다 — 같은 활동으로 바뀌고 목록 자리도 그대로
+{
+  const p = await openAs(LEE);
+  await p.waitForSelector('#upBtn');
+  const m0 = await p.evaluate(() => window.__FS__['saenggibu/meta']);
+  const old = m0.activities.find(a => a.sheet === '<자>생활(학생회 임원)-2차');
+  const at0 = m0.order.indexOf(old.id);
+  await upload(p, FILE_K4);
+  check('차수를 뗀 이름으로 짝 — 「내용이 바뀜」(새로 추가 아님)', (await txt(p, '#upChanged')).includes('학생회 임원') && !(await p.$('#upAdded')));
+  await p.click('#upGo'); await done(p);
+  const m1 = await p.evaluate(() => window.__FS__['saenggibu/meta']);
+  const nw = m1.activities.find(a => a.sheet === '<자>생활(학생회 임원)');
+  check('— 옛 시트는 빠지고, 목록 가운데 자리 그대로(끝으로 밀리지 않음)', nw && !m1.activities.some(a => a.id === old.id)
+    && m1.order.indexOf(nw.id) === at0 && at0 < m1.order.length - 1, [at0, nw && m1.order.indexOf(nw.id), m1.order.length]);
+  await keep(p);
+  await p.context().close();
+}
+// 3-3d 같이 올리는 때 — 다른 사람이 올리는 중이면 막고, 미리보기 뒤에 누가 먼저 올렸으면 다시 미리보기
+{
+  STORE['saenggibu/lock'] = { by: KIM, at: new Date().toISOString() };
+  const p = await openAs(LEE);
+  await p.waitForSelector('#upBtn');
+  await upload(p, FILE_K1);
+  await p.evaluate(() => { window.__OPS__ = { get: 0, set: 0, del: 0, w: [] }; });
+  await p.click('#upGo'); await done(p);
+  const ops = await p.evaluate(() => window.__OPS__);
+  check('다른 선생님이 올리는 중이면 — 막고 아무것도 안 쓴다(그 잠금은 그대로)', (await txt(p, '#upMsg')).includes('kim 선생님이 올리는 중')
+    && dataOps(ops).set === 0 && dataOps(ops).del === 0 && (await p.evaluate(() => window.__FS__['saenggibu/lock']?.by)) === KIM, await txt(p, '#upPanel'));
+  await p.evaluate(k => { window.__FS__['saenggibu/lock'] = { by: k, at: new Date(Date.now() - 10 * 60 * 1000).toISOString() }; }, KIM);
+  if (!(await p.$('#upGo'))) await upload(p, FILE_K1);
+  await p.click('#upGo'); await done(p);
+  check('잠금이 5분 넘게 묵었으면(창을 닫았거나 끊김) — 버려진 것으로 보고 올린다', (await p.textContent('#upPanel')).includes('올렸습니다')
+    && !(await p.evaluate(() => 'saenggibu/lock' in window.__FS__)));
+  await upload(p, FILE_K2);
+  await p.evaluate(() => { window.__FS__['saenggibu/meta'].at = 'someone-else'; });     // 미리보기 뒤에 누가 먼저 올림
+  await p.click('#upGo'); await done(p);
+  check('미리보기 뒤에 누가 먼저 올렸으면 — 쓰지 않고 「다시 미리보기」', (await txt(p, '#upMsg')).includes('다시 미리보기') && !!(await p.$('#upRetry')));
+  if (await p.$('#upRetry')) await p.click('#upRetry'); else await upload(p, FILE_K2);
+  await p.waitForSelector('#upGo');
+  await p.click('#upGo'); await done(p);
+  check('— 다시 미리보기 하면 올라간다', (await p.textContent('#upPanel')).includes('올렸습니다'));
+  check('오류 없음(부서 올리기)', p.errors.length === 0, p.errors);
+  await p.context().close();
+  delete STORE['saenggibu/lock'];                // 이 묶음에서 심어 둔 잠금 — 뒤 검사로 넘기지 않는다
+}
+// 3-3e 차수를 떼면 이름이 같은 시트 둘 — 알려 주고 따로 올린다
+{
+  const p = await openAs(LEE);
+  await p.waitForSelector('#upBtn');
+  await upload(p, FILE_CL);
+  const cl = (await p.$('#upClash')) ? await p.textContent('#upClash') : '';
+  check('「차수를 떼면 이름이 같은 시트」 경고 — 두 시트 이름과 괄호 안에 쓰라는 안내', cl.includes('교무(강연)-1차') && cl.includes('교무(강연)-2차') && cl.includes('괄호 안에'), cl);
+  check('— 하나로 묶지 않고 둘 다 「새로 추가」', (await p.textContent('#upAdded')).includes('새로 추가 2'));
+  await p.context().close();
+}
+// 3-3f 관리(선생님만) — 바로 고치기 · 원래대로 · 통째로 지우기 · 기록
+{
+  const p = await openAs(ADMIN);
+  await p.waitForSelector('#admBtn');
+  check('관리자에게만 「⚙ 관리」', await p.isVisible('#admBtn'));
+  await p.click('#admBtn');
+  await p.waitForSelector('.adm-tb');
+  const tb = await p.textContent('.adm-tb');
+  check('관리 목록 — 활동·창체 일정과 올린 사람(lee · 관리자)', tb.includes('독서 토론') && tb.includes('창체 일정') && tb.includes('lee') && tb.includes('관리자'), tb.slice(0, 300));
+  check('최근 올린 기록 — 누가 · 어느 파일', (await txt(p, '#admLog')).includes('dept-k'), (await txt(p, '#admLog')).slice(0, 200));
+  const meta0 = await p.evaluate(() => window.__FS__['saenggibu/meta']);
+  const target = meta0.activities.find(a => a.sheet === '<자>생활(학생회 임원)');
+  await p.click(`.adm-ed[data-id="${target.id}"]`);
+  await p.fill('.adm-edit [data-f="title"]', '학생자치회 임원');
+  await p.fill('.adm-edit [data-f="dept"]', '학생자치부');
+  await shot(p, '#admPanel', '4-admin-edit');
+  await p.click('#admSave');
+  await adminDone(p, '고쳤습니다');
+  let raw = (await p.evaluate(() => window.__FS__['saenggibu/meta'])).activities.find(a => a.id === target.id);
+  check('고치기 — 원본 칸은 그대로, 고친 칸만 따로(활동명·부서)', raw.title === '학생회 임원' && raw.fix?.title === '학생자치회 임원'
+    && raw.fix?.dept === '학생자치부' && Object.keys(raw.fix).length === 2, [raw, await txt(p, '#admEdMsg'), await txt(p, '#admMsg'), p.errors]);
+  check('— 관리 목록에 고친 값과 ✏ 표시', (await p.textContent(`tr[data-id="${target.id}"]`)).includes('학생자치회 임원') && !!(await p.$(`tr[data-id="${target.id}"] .fixed`)));
+  await p.click('#views [data-view="act"]');
+  await p.waitForFunction(() => document.getElementById('body').textContent.includes('학생자치회 임원'), null, { timeout: 5000 }).catch(() => {});
+  check('— 화면(활동별)에 고친 활동명', (await p.textContent('#body')).includes('학생자치회 임원'));
+  await p.click(`.adm-ed[data-id="${target.id}"]`);
+  check('다시 열면 「원래: 학생회 임원」', (await p.textContent('.adm-edit')).includes('원래: 학생회 임원'));
+  await p.click('#admReset');
+  await adminDone(p, '원래대로');
+  raw = (await p.evaluate(() => window.__FS__['saenggibu/meta'])).activities.find(a => a.id === target.id);
+  check('「원래대로」 — 고침이 지워진다', !raw.fix, raw);
+  await p.click(`.adm-ed[data-id="${target.id}"]`);                // 다시 고쳐 둔다(아래 다시 올리기에서 남는지 본다)
+  await p.fill('.adm-edit [data-f="title"]', '학생자치회 임원');
+  await p.click('#admSave');
+  await adminDone(p, '고쳤습니다');
+  const m1 = await p.evaluate(() => window.__FS__['saenggibu/meta']);
+  const rd = m1.activities.find(a => a.sheet === '<자>교무(독서토론 활동)');
+  await p.check(`.adm-ck[data-id="${rd.id}"]`);
+  let asked = '';
+  p.once('dialog', d => { asked = d.message(); d.accept(); });
+  await p.click('#admDel');
+  await p.waitForFunction(() => /지웠습니다|실패/.test(document.getElementById('admMsg')?.textContent || ''));
+  const m2 = await p.evaluate(() => window.__FS__['saenggibu/meta']);
+  const keys = await p.evaluate(() => Object.keys(window.__FS__));
+  check('통째로 지우기 — 확인 창, 목록·활동 문서·양식에서 빠진다', asked.includes('1개를 지웁니다') && asked.includes('독서 토론')
+    && !m2.activities.some(a => a.id === rd.id) && !keys.some(k => k.startsWith(`saenggibuAct/${rd.id}`)) && !keys.includes(`saenggibu/fmt-${rd.id}`), [asked, await txt(p, '#admMsg')]);
+  check('— 학생 문서에서도 빠진다(1-1-1)', !((await p.evaluate(() => window.__FS__['saenggibuStu/1-1-1']))?.items || []).some(i => i.a === rd.id));
+  check('— 나머지는 그대로(활동 하나만 줄고, 고친 값도 남는다)', m2.activities.length === m1.activities.length - 1
+    && m2.activities.find(a => a.id === target.id)?.fix?.title === '학생자치회 임원');
+  check('— 기록에 「지움 독서 토론」', (await txt(p, '#admLog')).includes('지움 독서 토론'), (await txt(p, '#admLog')).slice(0, 300));
+  check('오류 없음(관리)', p.errors.length === 0, p.errors);
+  await keep(p);
+  await p.context().close();
+}
+// 3-3g 부서가 틀린 이름 그대로 같은 파일을 다시 올려도 — 선생님이 고친 값이 남는다
+{
+  const p = await openAs(LEE);
+  await p.waitForSelector('#upBtn');
+  check('다른 교사에게는 「⚙ 관리」 가 없다', !(await p.isVisible('#admBtn')));
+  await upload(p, FILE_K4);
+  await p.click('#upGo'); await done(p);
+  const a = (await p.evaluate(() => window.__FS__['saenggibu/meta'])).activities.find(x => x.sheet === '<자>생활(학생회 임원)');
+  check('다시 올려도 고친 활동명이 남는다(원본 칸은 파일 그대로)', a?.fix?.title === '학생자치회 임원' && a.title === '학생회 임원', a);
+  await keep(p);
+  await p.context().close();
+}
+// 3-3h 추가·수정 꼬리표 — 화면에서. 본 것은 선생님마다 브라우저에 기억한다
+{
+  const m = STORE['saenggibu/meta'];
+  const off = m.activities.find(a => a.sheet === '<자>생활(학생회 임원)');                 // 8일 전에 바뀜 — 안 본 사람에겐 보여야
+  off.since = new Date(Date.now() - 20 * 864e5).toISOString(); off.upd = new Date(Date.now() - 8 * 864e5).toISOString();
+  const flex = m.activities.find(a => a.sheet.includes('수업량'));
+  delete flex.since; delete flex.upd; delete flex.by;                                      // 날짜 없는 옛 기록
+  const rbId = m.activities.find(a => a.sheet.includes('로봇')).id, mathId = m.activities.find(a => a.sheet.includes('수학')).id;
+  const p = await openAs(KIM);
+  await p.waitForSelector('.cls-pc .cl-item');
+  check('반 목록 — 추가·수정된 자료가 있는 반에 점(1-1)', !!(await p.$('.cls-pc .cl-item[data-k="1-1"] .fresh-dot')));
+  await p.click('#views [data-view="act"]');
+  await p.waitForSelector('#acts .act');
+  const tagOf = async id => txt(p, `#acts .act[data-id="${id}"] .fresh`);
+  check('활동 목록 — 처음 올라온 것 「추가」, 바뀐 것 「수정」, 날짜 없는 옛 기록은 꼬리표 없음',
+    (await tagOf(mathId)) === '추가' && (await tagOf(rbId)) === '수정' && (await tagOf(flex.id)) === '', [await tagOf(mathId), await tagOf(rbId), await tagOf(flex.id)]);
+  check('— 8일 전에 바뀌었어도 아직 안 봤으면 「수정」', (await tagOf(off.id)) === '수정');
+  await shot(p, '.p-acts', '5-fresh-tags');
+  await p.click('#freshTg');
+  const ids = await p.$$eval('#acts .act', bs => bs.map(b => b.dataset.id));
+  check('「추가·수정만」 — 꼬리표 있는 활동만 남는다', !ids.includes(flex.id) && ids.includes(off.id) && ids.includes(mathId), ids);
+  await p.click('#freshTg');
+  await p.click(`#acts .act[data-id="${off.id}"]`);
+  await p.waitForFunction(() => (document.querySelector('#actOut .card-h')?.textContent || '').includes('학생자치회'), null, { timeout: 8000 }).catch(() => {});
+  check('활동을 열면 그때는 꼬리표가 보인다', (await txt(p, '#actOut .card-h')).includes('수정'), await txt(p, '#actOut .card-h'));
+  await p.click('#views [data-view="stu"]');
+  await p.click('#views [data-view="act"]');
+  await p.waitForSelector('#acts .act');
+  check('— 다시 그리면 8일 지난 그 활동은 꼬리표가 빠진다(본 것으로)', (await tagOf(off.id)) === '');
+  check('— 7일 안의 것은 봤어도 그대로', (await tagOf(rbId)) === '수정');
+  await p.click('#views [data-view="stu"]');
+  await p.click('.cls-pc .cl-item[data-k="1-1"]');
+  await p.click('#stus .stu[data-n="1"]');
+  await p.waitForSelector('#stuOut .card');
+  check('학생 카드에도 꼬리표(1-1-1)', (await p.$$('#stuOut .card .fresh')).length > 0);
+  check('오류 없음(꼬리표)', p.errors.length === 0, p.errors);
+  await p.context().close();
+}
+STORE = STORE_B;
+
 // 3-4 학생 계정·로그인 전
 {
   const p = await openAs('1030101@yeungnam.hs.kr');
@@ -988,14 +1370,15 @@ const USG = fs.readFileSync(ROOT + '/usage.html', 'utf8');
 const RULES = fs.readFileSync(ROOT + '/firestore.rules', 'utf8');
 check('탭·메뉴는 처음엔 숨김', /id="tabSaenggibu" style="display:none;"/.test(IDX) && /id="navSaenggibu" style="display:none;"/.test(IDX));
 const reveal = IDX.match(/if \(_IS_ADMIN\(\)\) \{\s*\[([^\]]*)\]\.forEach/);
-check('관리자일 때만 드러낸다', reveal && reveal[1].includes("'navSaenggibu'") && reveal[1].includes("'tabSaenggibu'"));
+check('로그인한 교사 모두에게 드러낸다(관리자 조건 목록에서 빠짐 · 따로 연다)', reveal && !reveal[1].includes('Saenggibu')
+  && /\[\s*'navSaenggibu',\s*'tabSaenggibu'\s*\]\.forEach/.test(IDX));
 check('탭 전환 목록에 들어 있다', /'duty','saenggibu','usage'/.test(IDX) && IDX.includes("if(page === 'saenggibu') openSaenggibuFrame();"));
 check('프레임 주소에 버전', IDX.includes('saenggibu.html?in=1&v=${encodeURIComponent(APP_VER)}'));
 check('사용 현황에 이름이 있다', USG.includes("saenggibu:'📑 생기부 보조자료'"));
 check('앱·사용 현황 버전이 같다', IDX.match(/const APP_VER = '([^']+)'/)[1] === USG.match(/const APP_VER = '([^']+)'/)[1]);
 for (const c of ['saenggibu', 'saenggibuStu', 'saenggibuAct']) {
   const m = RULES.match(new RegExp(`match /${c}/\\{docId\\} \\{([^}]*)\\}`));
-  check(`규칙 ${c} — 읽기 교사 전체, 쓰기 관리자`, m && /allow read:\s*if isYnhsTeacher\(\);/.test(m[1]) && /allow write: if isAppAdmin\(\);/.test(m[1]), m && m[1]);
+  check(`규칙 ${c} — 읽기·쓰기 교사 전체(부서가 바로 올린다)`, m && /allow read:\s*if isYnhsTeacher\(\);/.test(m[1]) && /allow write: if isYnhsTeacher\(\);/.test(m[1]), m && m[1]);
 }
 
 fs.rmSync(TMP, { recursive: true, force: true });

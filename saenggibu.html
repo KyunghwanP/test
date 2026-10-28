@@ -84,6 +84,22 @@
 
   #main{flex:1;min-height:0;display:flex;flex-direction:column;}
   #upPanel{display:none;margin:12px 16px 0;}
+  #admPanel{display:none;margin:12px 16px 0;}
+  .adm-wrap{overflow-x:auto;margin-top:8px;border:1px solid var(--rule);border-radius:9px;}
+  .adm-tb{border-collapse:collapse;width:100%;font-size:13.5px;}
+  .adm-tb th,.adm-tb td{padding:6px 8px;border-bottom:1px solid var(--rule);text-align:left;vertical-align:middle;white-space:nowrap;}
+  .adm-tb th{background:var(--paper-soft);font-weight:700;font-size:12.5px;color:var(--ink-soft);}
+  .adm-tb td.n{text-align:right;}
+  .adm-tb .btn{padding:3px 9px;font-size:12.5px;}
+  .adm-tb .fixed{color:var(--mon);}
+  .adm-form{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;padding:8px 2px;white-space:normal;}
+  .adm-form label{display:flex;flex-direction:column;gap:2px;font-size:12.5px;color:var(--ink-soft);}
+  .adm-form input,.adm-form textarea{font:inherit;font-size:14px;color:var(--ink);padding:5px 8px;border:1px solid var(--rule);border-radius:7px;}
+  .adm-form em{font-style:normal;font-size:12px;}
+  .adm-form .adm-tags{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-size:13px;}
+  .adm-form .adm-tags label{flex-direction:row;align-items:center;gap:4px;color:var(--ink);font-size:13px;}
+  .adm-form .row{grid-column:1/-1;}
+  @media (max-width:640px){ .adm-form{grid-template-columns:1fr;} }
   #body{flex:1;min-height:0;overflow:auto;}
   .empty{padding:44px 20px;text-align:center;color:var(--ink-soft);font-size:15.5px;font-weight:700;line-height:1.7;}
   .err{color:var(--warn);}
@@ -147,6 +163,16 @@
   .grp::after{content:'';flex:1;height:1px;background:var(--rule);}
   .card{border:1px solid var(--rule);border-radius:12px;padding:16px 18px;margin-bottom:12px;background:var(--paper);}
   .card-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+  /* 추가·수정 꼬리표 — '상태' 라 '분류'(영역 칩: 연한 바탕 + 색 글씨, 파랑·초록·보라·주황)와 한눈에 달라야 한다.
+     꽉 찬 색 + 흰 글씨, 영역 칩에 없는 색(빨강 · 남색), 덜 둥근 모서리. */
+  .fresh{display:inline-block;font-size:11px;font-weight:800;padding:1px 5px;border-radius:4px;margin-left:6px;
+    vertical-align:2px;line-height:1.45;color:#fff;letter-spacing:.02em;}
+  .fresh.new{background:#E11D48;}
+  .fresh.mod{background:#4338CA;}
+  .fresh-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#E11D48;margin-left:5px;vertical-align:middle;}
+  .cl-item.on .fresh-dot{background:#fff;}
+  .fresh-tg{margin-top:6px;border:1px solid var(--rule);background:var(--paper);border-radius:8px;padding:3px 10px;font:inherit;font-size:13px;font-weight:700;color:#E11D48;cursor:pointer;}
+  .fresh-tg.on{background:#E11D48;border-color:#E11D48;color:#fff;}
   .card-h .t{font-size:17px;font-weight:800;}
   .card-h .d{font-size:14px;font-weight:600;color:var(--ink-soft);}
   .where{font-size:13.5px;color:var(--ink-soft);margin-top:5px;line-height:1.6;}
@@ -257,6 +283,11 @@
   .up .sec{margin-top:10px;}
   .up .sec.miss{border:1px solid var(--warn);border-radius:9px;padding:8px 10px;}
   .up .up-cols{font-size:12.5px;color:var(--ink-soft);margin:1px 0 4px 1.2em;}
+  .up .pick{display:block;margin:2px 0 8px 1.2em;font-size:13px;}
+  .up .pick.warn{color:var(--warn);font-weight:700;}
+  .up .pick select{font-size:13px;padding:2px 4px;margin-left:6px;border:1px solid var(--rule);border-radius:6px;font-weight:400;}
+  .up .up-mode{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;}
+  .up .up-mode label{font-size:13.5px;}
   .up .miss-row{display:flex;align-items:baseline;gap:8px;padding:2px 0;}
   .up .miss-row select{font-size:13.5px;padding:2px 4px;border:1px solid var(--rule);border-radius:6px;
     background:var(--paper);color:var(--ink);flex-shrink:0;}
@@ -356,12 +387,14 @@
   <div class="admin">
     <button class="btn" id="upBtn" type="button" style="display:none;">📤 엑셀 올리기</button>
     <button class="btn" id="dlBtn" type="button" style="display:none;" title="원본 양식 그대로 — 내부결재용">📥 엑셀로 받기</button>
+    <button class="btn" id="admBtn" type="button" style="display:none;" title="관리자에게만 보입니다">⚙ 관리</button>
   </div>
   <input type="file" id="upFile" accept=".xlsx,.xlsm,.xls" style="display:none;">
   <span id="fileNote"></span>
 </div>
 <div id="main">
   <div id="upPanel" class="up"></div>
+  <div id="admPanel" class="up"></div>
   <div id="body"><div class="empty">불러오는 중…</div></div>
 </div>
 <div class="toast" id="toast"></div>
@@ -398,6 +431,28 @@ function sgbSheetInfo(name){
   const rounds = [...rest.replace(/\([^)]*\)/g, '').matchAll(/(\d+)\s*차/g)].map(x => +x[1]);
   const paren = rest.match(/\(([^)]*)\)/);
   return { tags, rest, rounds, short: paren ? paren[1].trim() : rest, deptAbbr: rest.split('(')[0].replace(/-\d+차.*$/, '').trim() };
+}
+
+// ── 활동을 알아보는 이름 ── 시트 이름에서 꼬리표와 맨 끝의 배포 차수·(수정)을 뗀다. 다시 올릴 때
+// 같은 활동인지 이걸로 맞대 본다(id 는 시트 이름 그대로 — 저장된 문서 이름이 바뀌지 않게).
+// 배포 차수는 합본을 나눠 줄 때 '뭐가 새로 들어왔나' 를 알아보려고 붙이던 것이라, 붙든 안 붙든 같은 활동이다.
+// 꼬리표를 고쳐 낸 판(<자> → <자or진>)도 같은 활동. 괄호 안의 차수는 활동 회차라 남긴다:
+// '<자>수학과(강연(1차))-3차' → 수학과(강연(1차)).
+function sgbActKey(name){
+  let s = String(name ?? '').replace(/^\s*<[^>]*>\s*/, '');
+  for (let prev = null; prev !== s; ){
+    prev = s;
+    s = s.replace(/\s*[-_]\s*\d+\s*차\s*$/, '').replace(/\s*[(（]\s*(?:수정|최종|추가|보완|재배포)\s*[)）]\s*$/, '');
+  }
+  return sgbNorm(s);
+}
+// 맞대 볼 열쇠 — 같은 목록 안에서 열쇠가 겹치면(괄호 없이 회차를 쓴 '강연-1차'·'강연-2차', 꼬리표만 다른 두 시트)
+// 하나로 묶을 수 없으니 그 시트들은 시트 이름 그대로 쓴다('=' 를 붙여 차수 뗀 열쇠와 섞이지 않게).
+function sgbMatchKeys(list){
+  const keyOf = a => a.key || sgbActKey(a.sheet);
+  const n = new Map();
+  for (const a of list || []) n.set(keyOf(a), (n.get(keyOf(a)) || 0) + 1);
+  return (list || []).map(a => n.get(keyOf(a)) > 1 ? '=' + sgbNorm(a.sheet) : keyOf(a));
 }
 
 // 머리 줄 위의 안내: '⊙ 활  동  명:' 칸의 오른쪽 첫 값. 같은 줄 왼쪽의 '⊙' 없는 첫 칸은 부서.
@@ -551,7 +606,7 @@ function sgbParseBook(sheets){
     let id = 'a' + sgbHash(name);
     while (ids.has(id)) id += 'x';
     ids.add(id);
-    const base = { id, pos, sheet: name, tags: info.tags, rounds: info.rounds,
+    const base = { id, key: sgbActKey(name), pos, sheet: name, tags: info.tags, rounds: info.rounds,
       // 부서 칸에 활동명이 그대로 들어간 시트가 있다 — 그럴 땐 시트 이름 앞쪽(예: 연구부)을 쓴다
       title: head['활동명'] || info.short, short: info.short,
       dept: head._dept && head._dept !== head['활동명'] ? head._dept : info.deptAbbr,
@@ -761,19 +816,92 @@ function sgbStudents(activities, actRows){
 
 // 이번 파일과 이미 올라가 있는 것(saenggibu/meta)을 시트 단위로 맞대 본다.
 // 같은 시트 = 같은 시트 이름(id). 지문이 없는 옛 기록은 '바뀜' 으로 본다.
+// 올라가 있는 것과 이 파일을 활동마다 짝지어 본다 — 차수 뗀 이름(sgbActKey)으로, 안 되면 시트 이름 그대로.
+// clash: 이 파일 안에서 차수를 떼면 이름이 같아지는 시트들(하나로 묶지 않고 따로 올리되 알려 준다)
 function sgbCompare(oldMeta, parsed){
-  const out = { added: [], changed: [], same: [], missing: [], old: oldMeta };
+  const out = { added: [], changed: [], same: [], missing: [], clash: [], old: oldMeta };
   const sides = [['act', oldMeta?.activities, parsed.activities], ['sch', oldMeta?.schedules, parsed.schedules]];
-  for (const [kind, olds, curs] of sides){
-    const left = new Map((olds || []).map(o => [o.id, o]));
-    for (const cur of curs || []){
-      const old = left.get(cur.id);
-      left.delete(cur.id);
+  for (const [kind, olds0, curs0] of sides){
+    const olds = olds0 || [], curs = curs0 || [];
+    const ok = sgbMatchKeys(olds), ck = sgbMatchKeys(curs);
+    const groups = new Map();
+    curs.forEach((a, i) => { if (!ck[i].startsWith('=')) return;
+      const k = a.key || sgbActKey(a.sheet); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(a.sheet); });
+    for (const sheets of groups.values()) out.clash.push({ kind, sheets });
+    const byKey = new Map(), byName = new Map(), used = new Set();
+    olds.forEach((o, i) => { if (!byKey.has(ok[i])) byKey.set(ok[i], o); byName.set(sgbNorm(o.sheet), o); });
+    curs.forEach((cur, i) => {
+      let old = byKey.get(ck[i]);
+      if (!old || used.has(old)) old = byName.get(sgbNorm(cur.sheet));
+      if (old && used.has(old)) old = null;
+      if (old) used.add(old);
       if (!old) out.added.push({ kind, cur });
       else if (old.hash && old.hash === cur.hash) out.same.push({ kind, cur, old });
       else out.changed.push({ kind, cur, old });
+    });
+    for (const o of olds) if (!used.has(o)) out.missing.push({ kind, old: o });
+  }
+  return out;
+}
+
+// 올린 사람·날짜 — 새로 들어온 것은 지금, 바뀐 것은 처음 날짜는 두고 바뀐 날짜만 지금, 그대로인 것은 옛 기록.
+// 「추가」「수정」 꼬리표가 이걸 본다(since === upd 면 추가). Firestore 는 undefined 를 못 담아 있는 값만 옮긴다.
+function sgbStamp(cmp, who, now){
+  const copy = (to, from, keys) => { for (const k of keys) if (from?.[k] != null) to[k] = from[k]; };
+  for (const x of cmp.added) Object.assign(x.cur, { by: who, since: now, upd: now });
+  for (const x of cmp.changed){ copy(x.cur, x.old, ['since', 'fix']); Object.assign(x.cur, { by: who, upd: now }); }
+  for (const x of cmp.same) copy(x.cur, x.old, ['by', 'since', 'upd', 'fix']);
+}
+
+// ── 추가·수정 꼬리표 ── 부서가 바로 올리니 '뭐가 새로 들어왔나' 를 앱이 알려 준다(예전엔 시트 이름의 차수로).
+// 올린 지 7일은 모두에게, 그 뒤에는 아직 안 본 선생님에게 볼 때까지. seen: 이 선생님이 본 활동 { id: 그때의 upd }.
+// 처음 날짜 = 바뀐 날짜면 추가, 아니면 수정. 날짜가 없는 옛 기록은 꼬리표 없음.
+const SGB_FRESH_DAYS = 7;
+function sgbFresh(a, seen = {}, now = Date.now()){
+  if (!a?.upd) return '';
+  const recent = now - Date.parse(a.upd) < SGB_FRESH_DAYS * 864e5;
+  if (!recent && seen[a.id] === a.upd) return '';
+  return a.since && a.since === a.upd ? 'new' : 'mod';
+}
+
+// ── 관리자가 앱에서 고친 값 ── 활동의 fix 에 따로 둔다(원본 칸은 그대로). 그래야 부서가 틀린 이름 그대로
+// 같은 파일을 다시 올려도 고친 값이 유지된다(sgbStamp 가 fix 를 옮긴다). 읽을 때 덮어 보이고, 원래 값은 orig 에.
+const SGB_FIX_KEYS = ['dept', 'title', 'area', 'path', 'note', 'tags'];
+function sgbApplyFix(meta){
+  if (!meta) return meta;
+  const ap = a => {
+    if (!a?.fix || !Object.keys(a.fix).length) return a;
+    const orig = {};
+    for (const k of SGB_FIX_KEYS) if (k in a.fix) orig[k] = a[k];
+    return { ...a, ...a.fix, orig };
+  };
+  return { ...meta, activities: (meta.activities || []).map(ap), schedules: (meta.schedules || []).map(ap) };
+}
+// 내려받기 — 원본 양식의 위쪽 안내 칸은 올릴 때 떠 둔 글자 그대로라, 원래 값과 같은 칸을 고친 값으로 바꾼다
+function sgbFixForm(form, a){
+  if (!a?.orig || !form) return form;
+  const f = sgbClone(form);
+  const swaps = Object.entries(a.orig).filter(([k, v]) => k !== 'tags' && v && String(a[k] ?? '') !== String(v));
+  for (const row of f.rows || []){
+    if (row.r > (f.h || 0)) continue;
+    for (const c of row.cells || []){
+      const hit = swaps.find(([, v]) => sgbText(c.t) === sgbText(v));
+      if (hit) c.t = a[hit[0]] ?? '';
     }
-    for (const old of left.values()) out.missing.push({ kind, old });
+  }
+  return f;
+}
+
+// 새로 들어온 시트 가운데 ⊙ 활동명이 짝 없는 기존 활동과 같은 것 — 이름을 바꿔 낸 새 판일 수 있다.
+// 학급 임원 시트에 '학생회 임원' 이 복사돼 온 실제 사례가 있어, 짐작만 하고 바꿀지는 묻는다(기본은 따로 추가).
+function sgbLookalikes(cmp){
+  const free = cmp.missing.filter(x => x.kind === 'act');
+  const out = [], taken = new Set();
+  for (const x of cmp.added){
+    if (x.kind !== 'act') continue;
+    const t = sgbNorm(x.cur.title);
+    const m = t && free.find(y => !taken.has(y.old) && sgbNorm(y.old.title) === t);
+    if (m){ taken.add(m.old); out.push({ cur: x.cur, old: m.old }); }
   }
   return out;
 }
@@ -1035,8 +1163,8 @@ function sgbExportPlan(meta, rowsById, forms = {}){
   const ids = [...(meta.order || []).filter(id => byId.has(id)), ...[...byId.keys()].filter(id => !(meta.order || []).includes(id))];
   for (const id of ids){
     const [kind, a] = byId.get(id);
-    const name = sheetName(a.sheet);
-    const form = forms[a.id] || sgbPlainForm(a, kind);
+    const name = sheetName(a.orig?.tags ? String(a.sheet).replace(/^\s*<[^>]*>/, `<${(a.tags || []).join('or')}>`) : a.sheet);
+    const form = sgbFixForm(forms[a.id] || sgbPlainForm(a, kind), a);
     // 줄 차례: 원본 시트 차례(i). 옛 기록이라 i 가 없으면 반·번호 순
     const list = kind === 'sch' ? (a.rows || []) : [...(rowsById[a.id] || [])].sort((x, y) =>
       (x.i != null && y.i != null) ? x.i - y.i : (x.g - y.g || x.c - y.c || x.n - y.n));
@@ -1096,7 +1224,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebas
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged,
          setPersistence, browserLocalPersistence, indexedDBLocalPersistence }
   from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, writeBatch }
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, writeBatch, runTransaction }
   from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -1162,6 +1290,23 @@ const titleHtml = a => {
   return esc(a.title) + (dup && a.short ? ` <span class="d">[${esc(a.short)}]</span>` : '');
 };
 const roundTxt = a => (a.rounds || []).length ? a.rounds.join('·') + '차' : '';
+// 이 선생님이 본 활동 — 브라우저에 기억한다(기기마다 따로). 지금 목록에 없는 것은 덜어 낸다.
+const SEEN_KEY = 'sgbSeen';
+let SEEN = (() => { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '{}') || {}; } catch (e) { return {}; } })();
+function markSeen(list){
+  let dirty = false;
+  for (const a of list) if (a?.upd && SEEN[a.id] !== a.upd){ SEEN[a.id] = a.upd; dirty = true; }
+  if (!dirty) return;
+  const ids = new Set([...(META?.activities || []), ...(META?.schedules || [])].map(x => x.id));
+  for (const k of Object.keys(SEEN)) if (!ids.has(k)) delete SEEN[k];
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify(SEEN)); } catch (e) {}
+}
+const freshHtml = a => { const f = sgbFresh(a, SEEN);
+  return f ? `<span class="fresh ${f}" title="${f === 'new' ? '새로 추가됨' : '내용이 바뀜'} · ${fmtAt(a.upd)}">${f === 'new' ? '추가' : '수정'}</span>` : ''; };
+// 추가·수정된 활동이 있는 반(반 목록의 점) — 학생마다 하려면 목록 문서가 1MiB 를 넘을 수 있어 반 단위로
+const freshClasses = () => { const out = new Set();
+  for (const a of META?.activities || []) if (sgbFresh(a, SEEN)) for (const k of Object.keys(a.byClass || {})) out.add(k);
+  return out; };
 const fmtAt = iso => { try { const d = new Date(iso); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; } catch (e) { return ''; } };
 
 // ── 읽기 ──
@@ -1169,7 +1314,7 @@ async function loadMeta(){
   const s = await getDoc(doc(fbDb, 'saenggibu', 'meta'));
   const next = s.exists() ? s.data() : null;
   const changed = !META || !next || META.at !== next.at;
-  META = next;
+  META = sgbApplyFix(next);                // 관리자가 앱에서 고친 값으로 덮어 보인다(원본은 그대로)
   if (changed){ stuCache.clear(); actCache.clear(); }
   $('fileNote').textContent = META ? `최근 올린 파일: ${META.file || ''}${META.at ? ' · ' + fmtAt(META.at) : ''}` : '';
   return changed;
@@ -1307,7 +1452,7 @@ function itemCard(a, it, { who = null, mis = null } = {}){
     ? `<div class="who"><span class="num">${esc(who.g)}-${esc(who.c)}-${esc(who.n)}</span><span class="nm">${esc(who.nm)}</span>
         ${mis && mis.moved ? `<span class="moved-tag">${esc(mis.kind || '학적 변동')}${mis.date ? ' ' + esc(mis.date) : ''}</span>` : ''}
         ${mis && !mis.moved ? `<span class="mis">⚠ ${esc(mis.why)}${mis.expect ? ` · 명렬: ${esc(mis.expect)}` : ''}${mis.hint ? ` · 이 이름은 ${esc(mis.hint)}` : ''}</span>` : ''}</div>`
-    : `<div class="card-h"><span class="t">${titleHtml(a)}</span><span class="d">${esc(a.dept)}${roundTxt(a) ? ' · ' + roundTxt(a) : ''}</span></div>
+    : `<div class="card-h"><span class="t">${titleHtml(a)}${freshHtml(a)}</span><span class="d">${esc(a.dept)}${roundTxt(a) ? ' · ' + roundTxt(a) : ''}</span></div>
        ${a.area ? `<div class="where">${esc(a.area)}</div>` : ''}${noteHtml(a, 1)}`;
   return `<div class="card" data-b="${it.b ? esc(it.b) : ''}">${head}${body}${sesHtml}${ex ? `<dl class="ex">${ex}</dl>` : ''}${self}</div>`;
 }
@@ -1351,15 +1496,16 @@ async function renderStu(){
   // 학년 접기 — 처음엔 지금 보는 학년만 펼친다. 접은 학년은 기억한다(st.fold)
   if (!Array.isArray(st.fold)) st.fold = grades.filter(g => g !== st.g);
   const fold = st.fold.filter(g => g !== st.g || q);
+  const fc = freshClasses();
   body.innerHTML = `<div class="pane3${st.n && !mList ? ' has-detail' : ''}" id="stuPanes">
     <nav class="p-classes" id="clsPane" aria-label="반">
       <div class="cls-pc">${grades.map(g => { const open = !fold.includes(g); return `<button type="button" class="cl-grade" data-g="${g}" aria-expanded="${open}">
           ${g}학년<span class="cl-caret">${open ? '▾' : '▸'}</span></button>
         <div class="cl-list" data-g="${g}"${open ? '' : ' hidden'}>${cls.filter(k => k.split('-')[0] === g).map(k => `<button type="button" class="cl-item${k === cur && !q ? ' on' : ''}" data-k="${k}">
-          ${k.split('-')[1]}반<span class="cl-cnt">${roster[k].length}</span></button>`).join('')}</div>`; }).join('')}</div>
+          <span>${k.split('-')[1]}반${fc.has(k) ? '<span class="fresh-dot" title="추가·수정된 자료가 있는 반"></span>' : ''}</span><span class="cl-cnt">${roster[k].length}</span></button>`).join('')}</div>`; }).join('')}</div>
       <div class="cls-m">
         <div class="seg">${grades.map(g => `<button type="button" class="g-tab${g === st.g ? ' on' : ''}" data-g="${g}">${g}학년</button>`).join('')}</div>
-        <div class="cls-grid">${inG.map(k => `<button type="button" class="cl-item${k === cur && !q ? ' on' : ''}" data-k="${k}">${k.split('-')[1]}반</button>`).join('')}</div>
+        <div class="cls-grid">${inG.map(k => `<button type="button" class="cl-item${k === cur && !q ? ' on' : ''}" data-k="${k}">${k.split('-')[1]}반${fc.has(k) ? '<span class="fresh-dot"></span>' : ''}</button>`).join('')}</div>
       </div>
     </nav>
     <section class="p-roster" aria-label="학생 명단"><div class="roster-head">${head}</div>
@@ -1464,6 +1610,7 @@ async function renderStuOut(){
     }).join('')}
   </div>`;
   if ($('copyAll')) $('copyAll').onclick = () => copyText(out._all);
+  markSeen([...new Set(d.items.map(it => it.a))].map(actById));   // 꼬리표는 그린 뒤에 — 이번에는 보이고 다음부터 빠진다
   // 사진 — 작은 것(반 문서)을 먼저, 고화질(워커)이 오면 바꿔 끼운다. 누르면 크게
   (async () => {
     const g = parseInt(st.g, 10), c = parseInt(st.c, 10), n = parseInt(st.n, 10);
@@ -1495,33 +1642,39 @@ async function renderStuOut(){
 function actListHtml(){
   const acts = [...(META.activities || [])].sort((x, y) => groupRank(x) - groupRank(y) || (x.pos ?? 0) - (y.pos ?? 0));
   const q = (st.q || '').trim();
-  const shown = acts.filter(a => !q || (a.title + a.dept + a.sheet).includes(q));
+  const shown = acts.filter(a => (!q || (a.title + a.dept + a.sheet).includes(q)) && (!st.fresh || sgbFresh(a, SEEN)));
   let last = null, html = '';
   for (const x of shown){
     const k = groupKey(x);
     if (k !== last){ html += `<div class="acts-grp">${tagHtml(x.tags)}</div>`; last = k; }
     html += `<button type="button" class="act${x.id === st.act ? ' on' : ''}" data-id="${x.id}">
-      <span class="t">${titleHtml(x)}<small>${esc(x.dept)}${roundTxt(x) ? ' · ' + roundTxt(x) : ''}</small></span><span class="n">${x.count}</span></button>`;
+      <span class="t">${titleHtml(x)}${freshHtml(x)}<small>${esc(x.dept)}${roundTxt(x) ? ' · ' + roundTxt(x) : ''}</small></span><span class="n">${x.count}</span></button>`;
   }
-  return html || '<div class="empty">맞는 활동이 없습니다.</div>';
+  return html || `<div class="empty">${st.fresh ? '추가되거나 바뀐 활동이 없습니다.' : '맞는 활동이 없습니다.'}</div>`;
 }
 async function renderAct(){
   const body = $('body');
   const acts = META.activities || [];
   if (!acts.some(a => a.id === st.act)) st.act = [...acts].sort((x, y) => groupRank(x) - groupRank(y))[0]?.id || '';
+  const nFresh = acts.filter(a => sgbFresh(a, SEEN)).length;
+  if (!nFresh) st.fresh = false;
   save();
   body.innerHTML = `<div class="pane3">
     <section class="p-acts" aria-label="활동 목록">
-      <div class="acts-q"><input type="search" id="actQ" placeholder="활동·부서 찾기" value="${esc(st.q || '')}" aria-label="활동 찾기"></div>
+      <div class="acts-q"><input type="search" id="actQ" placeholder="활동·부서 찾기" value="${esc(st.q || '')}" aria-label="활동 찾기">
+        ${nFresh ? `<button type="button" class="fresh-tg${st.fresh ? ' on' : ''}" id="freshTg" aria-pressed="${!!st.fresh}">추가·수정만 ${nFresh}</button>` : ''}</div>
       <div id="acts">${actListHtml()}</div></section>
     <section class="p-detail" id="actOut"></section>
   </div>`;
   $('actQ').oninput = e => { st.q = e.target.value; save(); $('acts').innerHTML = actListHtml(); };
+  if ($('freshTg')) $('freshTg').onclick = () => { st.fresh = !st.fresh; save(); $('freshTg').classList.toggle('on', st.fresh);
+    $('freshTg').setAttribute('aria-pressed', String(st.fresh)); $('acts').innerHTML = actListHtml(); };
   $('acts').onclick = e => {
     const b = e.target.closest('.act'); if (!b) return;
     st.act = b.dataset.id; st.ac = ''; st.ag = ''; save();
     document.querySelectorAll('#acts .act').forEach(x => x.classList.toggle('on', x === b));
-    renderActOut();
+    // 본 것으로 치는 건 목록에서 직접 눌러 열었을 때만 — 탭에 들어올 때 저절로 열리는 첫 활동은 아직 안 읽은 것
+    renderActOut().then(() => markSeen([actById(b.dataset.id)]));
     if (matchMedia('(max-width:900px)').matches) $('actOut').scrollIntoView({ block: 'start' });
   };
   await renderActOut();
@@ -1536,7 +1689,7 @@ async function renderActOut(){
     .sort((x, y) => +x[0].split('-')[1] - +y[0].split('-')[1]);
   const total = counts.reduce((s, [, n]) => s + n, 0);
   out.innerHTML = `<div class="sheet">
-    <div class="card-h">${tagHtml(a.tags)}<span class="t" style="font-size:21px;">${titleHtml(a)}</span><span class="d">${esc(a.dept)}${roundTxt(a) ? ' · ' + roundTxt(a) : ''}</span></div>
+    <div class="card-h">${tagHtml(a.tags)}<span class="t" style="font-size:21px;">${titleHtml(a)}${freshHtml(a)}</span><span class="d">${esc(a.dept)}${roundTxt(a) ? ' · ' + roundTxt(a) : ''}</span></div>
     ${a.area || a.path ? `<div class="where">${esc(a.area)}${a.path ? '<br>' + esc(a.path) : ''}</div>` : ''}
     ${noteHtml(a)}
     <div class="where">시트: ${esc(a.sheet)}${a.file ? ' · 파일: ' + esc(a.file) : ''}</div>
@@ -1610,7 +1763,7 @@ function renderSch(){
       ${st.sf ? `<span class="sch-sum">${rows.length}건${hours != null ? ` · 이수 ${Math.round(hours * 10) / 10}시간` : ''}</span>` : ''}
     </div>
     <div class="sheet" style="margin-top:14px;">
-      <div class="card-h">${tagHtml(s.tags)}<span class="t" style="font-size:20px;">${esc(s.title)}</span><span class="d">${esc(s.dept)}</span></div>
+      <div class="card-h">${tagHtml(s.tags)}<span class="t" style="font-size:20px;">${esc(s.title)}${freshHtml(s)}</span><span class="d">${esc(s.dept)}</span></div>
       ${s.area ? `<div class="where">${esc(s.area)}</div>` : ''}
       ${s.path ? `<details><summary>입력 경로·안내 보기</summary><div class="txt">${esc(s.path)}</div></details>` : ''}
       ${noteHtml(s)}
@@ -1619,12 +1772,13 @@ function renderSch(){
     </div></div>`;
   $('schTabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; st.sg = b.dataset.id; renderSch(); };
   $('schKinds').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; st.sf = b.dataset.k; renderSch(); };
+  markSeen([s]);
 }
 
 async function render(){
   document.querySelectorAll('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === st.view));
   if (!META){
-    $('body').innerHTML = `<div class="empty">아직 올라온 자료가 없습니다.${isAdmin() ? '<br>위의 「📤 엑셀 올리기」로 통합 엑셀을 올려 주세요.' : ''}</div>`;
+    $('body').innerHTML = `<div class="empty">아직 올라온 자료가 없습니다.<br>위의 「📤 엑셀 올리기」로 엑셀을 올려 주세요.</div>`;
     return;
   }
   const nMis = (META.mismatch || []).filter(m => !m.moved).length;
@@ -1706,9 +1860,11 @@ function upItem(x, extra = '', cols = false){
     <span style="color:var(--ink-soft)">· ${esc(x.dept)} · ${extra || cntOf(x) + '건'} · ${esc(x.sheet)}</span>${
     cols && x.kind !== 'sch' ? `<div class="up-cols">${esc(colsTxt(x))}</div>` : ''}</div>`;
 }
-$('upFile').onchange = async e => {
-  const f = e.target.files[0]; e.target.value = '';
-  if (!f) return;
+$('upFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) previewFile(f); };
+const me = () => fbAuth.currentUser?.email || '';
+const whoTxt = email => !email ? '' : email === ADMIN_EMAIL ? '관리자' : email.split('@')[0];
+// 미리보기 — 무엇이 어떻게 바뀌는지 보여 주고, 사람이 고를 것만 묻는다(고른 값은 select[data-pick] 에)
+async function previewFile(f){
   const p = $('upPanel'); p.style.display = 'block'; p.innerHTML = '읽는 중…';
   try {
     const XLSX = await loadXlsx();
@@ -1734,16 +1890,21 @@ $('upFile').onchange = async e => {
     // 맞대 볼 기준은 지금 올라가 있는 목록 — 화면이 들고 있는 것 말고 새로 읽는다
     const oldMeta = (await getDoc(doc(fbDb, 'saenggibu', 'meta'))).data() || null;
     const cmp = sgbCompare(oldMeta, parsed);
+    const look = sgbLookalikes(cmp);
     // 반·번호·이름 맞추기 — 학교 명렬(교사 읽기 가능)과. 못 읽으면 시트끼리.
     let roster = [], changed = [];
     try { const rs = await getDoc(doc(fbDb, 'students', 'main')); roster = rs.exists() ? (rs.data().students || []) : []; } catch (e) {}
     try { const rc = await getDoc(doc(fbDb, 'students', 'changed')); changed = rc.exists() ? (rc.data().students || []) : []; } catch (e) {}
     const misAll = sgbMismatches(parsed.activities, parsed.actRows, roster, changed);
     const mis = misAll.filter(m => !m.moved), moved = misAll.filter(m => m.moved);
-    const tagKind = (list, side) => list.map(x => ({ ...x[side], kind: x.kind }));
-    _pending = { parsed, cmp, file: f.name, forms, roster, changed };
+    const admin = isAdmin(), mine = me();
+    // 남(관리자 아닌 다른 교사)이 올린 활동을 바꾸려 할 때 — 관리자가 아니면 묻고, 기본은 건너뛰기.
+    // 관리자가 올려 둔 것(지금까지의 합본)은 부서가 고쳐 내는 게 맞으니 묻지 않는다.
+    const foreign = x => !admin && x.old.by && x.old.by !== mine && x.old.by !== ADMIN_EMAIL;
+    _pending = { parsed, cmp, look, file: f.name, f, forms, roster, changed, metaAt: oldMeta?.at || null };
     const nForms = Object.keys(forms).length, nAll = parsed.activities.length + parsed.schedules.length;
     const odd = sgbOddSheets(parsed.activities);
+    const byTxt = o => o.by ? `기존: ${esc(whoTxt(o.by))}${o.upd ? ' · ' + fmtAt(o.upd) : ''}` : '';
     p.innerHTML = `<h3>${esc(f.name)}</h3>
       <ul>
         <li>이 파일: 활동 시트 <b>${parsed.activities.length}</b>개 · 창체 일정 <b>${parsed.schedules.length}</b>개 · 학생 <b>${parsed.students.length}</b>명 · 기재 <b>${parsed.activities.reduce((n, a) => n + a.count, 0).toLocaleString()}</b>건</li>
@@ -1751,11 +1912,17 @@ $('upFile').onchange = async e => {
           : `원본 양식 ${nForms}/${nAll}개 시트 함께 저장 (내려받을 때 그 틀에 채웁니다)`}</li>
         ${parsed.skipped.length ? `<li>건너뛴 시트: ${parsed.skipped.map(x => `${esc(x.name)} <span style="color:var(--ink-soft)">(${esc(x.why)})</span>`).join(', ')}</li>` : ''}
       </ul>
+      ${admin && cmp.missing.length ? `<div class="sec up-mode" id="upMode"><b>올리는 방식</b>
+          <label><input type="radio" name="upMode" value="add" checked> 추가·수정 <span class="d">— 이 파일에 없는 기존 시트는 그대로</span></label>
+          <label><input type="radio" name="upMode" value="replace"> 전체 바꾸기 <span class="d">— 이 파일에 없는 기존 시트는 지움(합본)</span></label></div>` : ''}
       ${odd.length ? `<div class="sec miss" id="upOdd"><b>⚠ 확인할 시트 ${odd.length}개</b>
           <span class="d">— 엑셀을 고쳐 다시 올리세요. 칸은 자리가 아니라 이름으로 찾습니다
           (기재 문안 칸은 이름에 '기재 내용'·'특기사항' 같은 말이 들어가야 합니다).</span>
           <div class="acts-sum">${odd.map(({ a, why }) => `<div>${esc(a.sheet)} — <b>${esc(why)}</b>
             <div class="up-cols">읽은 칸: ${esc(colsTxt(a))}</div></div>`).join('')}</div></div>` : ''}
+      ${cmp.clash.length ? `<div class="sec miss" id="upClash"><b>⚠ 차수를 떼면 이름이 같은 시트 ${cmp.clash.length}묶음</b>
+          <span class="d">— 활동 회차는 괄호 안에 써 주세요(예: 강연(1차)). 지금은 시트 이름 그대로 따로 올립니다.</span>
+          <div class="acts-sum">${cmp.clash.map(g => `<div>${g.sheets.map(esc).join(' · ')}</div>`).join('')}</div></div>` : ''}
       ${mis.length ? `<div class="sec miss" id="upMis"><b>⚠ 반·번호·이름 확인 ${mis.length}건</b>
           <span class="d">— ${roster.length ? '학교 명렬과 다릅니다' : '명렬을 못 읽어 시트끼리 맞대 봤습니다'}. 올린 뒤 「확인 필요」 탭에서 시트별로 볼 수 있습니다.</span>
           <div class="acts-sum">${mis.slice(0, 50).map(m => `<div>${esc(m.sheet)} · <b>${m.g}-${m.c}-${m.n}</b> ${esc(m.nm)}
@@ -1763,31 +1930,39 @@ $('upFile').onchange = async e => {
             ${mis.length > 50 ? `<div class="d">… ${mis.length - 50}건 더</div>` : ''}</div></div>` : ''}
       ${moved.length ? `<div class="sec d" id="upMoved">학적 변동(전출·자퇴) 학생의 기록 ${moved.length}건 — 떠나기 전 학번이라 확인할 필요는 없습니다.</div>` : ''}
       ${cmp.added.length ? `<div class="sec" id="upAdded"><b>새로 추가 ${cmp.added.length}</b>
-        <div class="acts-sum">${tagKind(cmp.added, 'cur').map(x => upItem(x, '', true)).join('')}</div></div>` : ''}
+        <div class="acts-sum">${cmp.added.map(x => { const l = look.find(l => l.cur === x.cur);
+          return upItem({ ...x.cur, kind: x.kind }, '', true) + (l ? `<label class="pick warn">⚠ 기존 「${esc(l.old.title)}」(${esc(l.old.sheet)})의 새 판인가요?
+            <select data-pick="like:${esc(x.cur.id)}"><option value="new">따로 추가</option><option value="swap">기존 것을 이걸로 바꾸기</option></select></label>` : ''); }).join('')}</div></div>` : ''}
       ${cmp.changed.length ? `<div class="sec" id="upChanged"><b>내용이 바뀜 ${cmp.changed.length}</b> <span style="color:var(--ink-soft)">— 이 파일 것으로 바꿉니다</span>
-        <div class="acts-sum">${cmp.changed.map(x => upItem({ ...x.cur, kind: x.kind }, `${cntOf(x.old)}건 → ${cntOf(x.cur)}건`, true)).join('')}</div></div>` : ''}
+        <div class="acts-sum">${cmp.changed.map(x => upItem({ ...x.cur, kind: x.kind }, `${cntOf(x.old)}건 → ${cntOf(x.cur)}건`, true)
+          + (foreign(x) ? `<label class="pick warn">⚠ ${esc(whoTxt(x.old.by))} 선생님이 올린 활동입니다${x.old.upd ? '(' + fmtAt(x.old.upd) + ')' : ''}
+              <select data-pick="chg:${x.kind}:${esc(x.cur.id)}"><option value="skip">건너뛰기(그대로 둠)</option><option value="put">이 파일 것으로 바꾸기</option></select></label>`
+            : byTxt(x.old) ? `<div class="up-cols">${byTxt(x.old)}</div>` : '')).join('')}</div></div>` : ''}
       ${cmp.same.length ? `<div class="sec" style="color:var(--ink-soft)">그대로 ${cmp.same.length}</div>` : ''}
-      ${cmp.missing.length ? `<div class="sec miss" id="upMissing"><b>이 파일에 없는 기존 자료 ${cmp.missing.length}</b>
-          <span style="color:var(--ink-soft)">— 하나씩 남길지 지울지 고르세요</span>
-          <div class="row"><button type="button" class="btn" id="missKeepAll">모두 남기기 (더하기)</button>
-            <button type="button" class="btn" id="missDelAll">모두 지우기 (합본으로 바꾸기)</button></div>
-          <div class="acts-sum">${cmp.missing.map(x => `<label class="miss-row">
-              <select data-miss="${x.kind}:${esc(x.old.id)}" aria-label="${esc(x.old.title)} 남길지 지울지">
-                <option value="keep">남기기</option><option value="del">지우기</option></select>
-              ${upItem({ ...x.old, kind: x.kind })}</label>`).join('')}</div>
+      ${cmp.missing.length ? `<div class="sec" id="upMissing">이 파일에 없는 기존 자료 ${cmp.missing.length}개 — <span id="upMissHow">그대로 둡니다</span>
+          ${admin ? `<div id="upMissList" style="display:none;"><div class="row"><button type="button" class="btn" id="missKeepAll">모두 남기기</button></div>
+            <div class="acts-sum">${cmp.missing.map(x => `<label class="miss-row">
+              <select data-pick="miss:${x.kind}:${esc(x.old.id)}" aria-label="${esc(x.old.title)} 지울지 남길지">
+                <option value="del">지우기</option><option value="keep">남기기</option></select>
+              ${upItem({ ...x.old, kind: x.kind })}</label>`).join('')}</div></div>` : ''}
         </div>` : ''}
       ${!cmp.added.length && !cmp.changed.length && !cmp.missing.length ? '<div class="sec">올라가 있는 것과 같습니다 — 바뀌는 것이 없습니다.</div>' : ''}
       <div class="row"><button type="button" class="btn pri" id="upGo">올리기</button>
         <button type="button" class="btn" id="upCancel">취소</button><span id="upMsg"></span></div>`;
-    const setAll = v => p.querySelectorAll('select[data-miss]').forEach(sel => { sel.value = v; });
-    if ($('missKeepAll')) $('missKeepAll').onclick = () => setAll('keep');
-    if ($('missDelAll')) $('missDelAll').onclick = () => setAll('del');
+    // 전체 바꾸기(관리자)를 고르면 빠진 시트 목록이 열리고, 기본은 지우기
+    const modeSync = () => {
+      const rep = p.querySelector('input[name="upMode"]:checked')?.value === 'replace';
+      if ($('upMissList')) $('upMissList').style.display = rep ? '' : 'none';
+      if ($('upMissHow')) $('upMissHow').textContent = rep ? '아래에서 고른 대로 지웁니다' : '그대로 둡니다';
+    };
+    p.querySelectorAll('input[name="upMode"]').forEach(r => { r.onchange = modeSync; });
+    if ($('missKeepAll')) $('missKeepAll').onclick = () => p.querySelectorAll('select[data-pick^="miss:"]').forEach(sel => { sel.value = 'keep'; });
     $('upCancel').onclick = () => { _pending = null; p.style.display = 'none'; };
     $('upGo').onclick = doUpload;
   } catch (err) {
     p.innerHTML = `<span class="err">읽지 못했습니다: ${esc(err.message || err)}</span> <button type="button" class="btn" onclick="this.parentNode.style.display='none'">닫기</button>`;
   }
-};
+}
 
 // ── 엑셀로 받기 (관리자) ── 활동 문서를 전부 읽어(조각 수만큼) 원본 양식에 채워 한 파일로
 async function buildWorkbook(EJ, plan){
@@ -1874,26 +2049,40 @@ async function loadAllRows(a){
   return rows;
 }
 
-// 이 파일 + 남기기로 한 옛 자료를 합쳐 다시 짠 뒤, 바뀐 문서만 쓰고 이제 없는 문서는 지운다.
-// 무엇을 썼는지는 saenggibu/manifest 에 문서마다 지문으로 남긴다.
-async function doUpload(){
-  if (!_pending) return;
-  const { parsed, cmp, file, forms, roster, changed } = _pending;
-  const msg = $('upMsg'), go = $('upGo');
-  go.disabled = true;
+// ── 바로 반영 ── 모든 교사가 올린다. 학생 문서 하나에 여러 부서 문안이 함께 들어 있어, 두 사람이 동시에 쓰면
+// 나중 사람이 앞사람 것을 지운다. 그래서 쓰는 동안 잠그고(saenggibu/lock), 잠근 뒤에는 미리보기 때 본 목록이
+// 그대로인지 다시 본다(그 사이 누가 올렸으면 다시 미리보기).
+const LOCK_MS = 5 * 60 * 1000;              // 이보다 오래된 잠금은 버려진 것(창을 닫았거나 끊겼다)
+const lockRef = () => doc(fbDb, 'saenggibu', 'lock');
+async function lockTake(){
+  const mine = me();
+  await runTransaction(fbDb, async tx => {
+    const s = await tx.get(lockRef());
+    const d = s.exists() ? s.data() : null;
+    if (d && d.by !== mine && Date.now() - Date.parse(d.at || 0) < LOCK_MS)
+      throw new Error(`${whoTxt(d.by)} 선생님이 올리는 중입니다 — 잠시 뒤 다시 눌러 주세요`);
+    tx.set(lockRef(), { by: mine, at: new Date().toISOString() });
+  });
+}
+async function lockDrop(){ try { await deleteDoc(lockRef()); } catch (e) {} }
+
+// 이 파일 + 남길 기존 자료를 합쳐 다시 짠 뒤, 바뀐 문서만 쓰고 이제 없는 문서는 지운다(올리기·지우기가 같이 쓴다).
+// 무엇을 썼는지는 saenggibu/manifest 에 문서마다 지문으로, 누가 무엇을 했는지는 saenggibu/log 에(최근 200).
+// plan: { parsed, keep: [{ kind, old }], forms, order, metaAt, file?, roster?, changed?, log }
+async function sgbCommit(plan, say = () => {}){
+  await lockTake();
   try {
-    const pick = {};
-    $('upPanel').querySelectorAll('select[data-miss]').forEach(sel => { pick[sel.dataset.miss] = sel.value; });
-    const keep = cmp.missing.filter(x => pick[x.kind + ':' + x.old.id] !== 'del');
-    msg.textContent = keep.some(x => x.kind === 'act') ? '남길 자료 읽는 중…' : '이전 기록 확인 중…';
+    const metaNow = (await getDoc(doc(fbDb, 'saenggibu', 'meta'))).data() || null;
+    if ((metaNow?.at || null) !== (plan.metaAt || null))
+      throw Object.assign(new Error('그 사이 다른 선생님이 올렸습니다 — 다시 미리보기를 하세요'), { stale: true });
+    say(plan.keep.some(x => x.kind === 'act') ? '남길 자료 읽는 중…' : '이전 기록 확인 중…');
     const keepActs = [];
-    for (const x of keep.filter(x => x.kind === 'act')) keepActs.push({ a: x.old, rows: await loadAllRows(x.old) });
-    const order = cmp.old?.order || [...(cmp.old?.activities || []), ...(cmp.old?.schedules || [])].map(a => a.id);
-    const merged = sgbMerge(parsed, keepActs, keep.filter(x => x.kind === 'sch').map(x => x.old), order);
+    for (const x of plan.keep.filter(x => x.kind === 'act')) keepActs.push({ a: x.old, rows: await loadAllRows(x.old) });
+    const merged = sgbMerge(plan.parsed, keepActs, plan.keep.filter(x => x.kind === 'sch').map(x => x.old), plan.order || []);
     const built = sgbBuildDocs(merged);
     // 양식 문서 — 이번 파일 시트는 새로 뜬 것, 남긴 시트는 저장돼 있던 것을 그대로(안 넣으면 지워진다)
-    for (const [id, fm] of Object.entries(forms || {})) built.docs.set(`saenggibu/fmt-${id}`, fm);
-    for (const x of keep){
+    for (const [id, fm] of Object.entries(plan.forms || {})) built.docs.set(`saenggibu/fmt-${id}`, fm);
+    for (const x of plan.keep){
       const snap = await getDoc(doc(fbDb, 'saenggibu', `fmt-${x.old.id}`));
       if (snap.exists()) built.docs.set(`saenggibu/fmt-${x.old.id}`, snap.data());
     }
@@ -1915,7 +2104,7 @@ async function doUpload(){
       if (ops >= 200 || bytes + len > 3000000) await flush();
       const [c, id] = path.split('/');
       batch.set(doc(fbDb, c, id), data); ops++; bytes += len; done++;
-      if (done % 50 === 0) msg.textContent = `쓰는 중… ${done}/${writes.length}`;
+      if (done % 50 === 0) say(`쓰는 중… ${done}/${writes.length}`);
     }
     for (const k of dels){
       if (ops >= 200) await flush();
@@ -1923,21 +2112,198 @@ async function doUpload(){
       batch.delete(doc(fbDb, c, id)); ops++;
     }
     await flush();
-    msg.textContent = '목록 저장 중…';
+    say('목록 저장 중…');
+    let { roster, changed } = plan;
+    if (!roster){ roster = []; try { const rs = await getDoc(doc(fbDb, 'students', 'main')); roster = rs.exists() ? (rs.data().students || []) : []; } catch (e) {} }
+    if (!changed){ changed = []; try { const rc = await getDoc(doc(fbDb, 'students', 'changed')); changed = rc.exists() ? (rc.data().students || []) : []; } catch (e) {} }
     const mismatch = sgbMismatches(merged.activities, merged.actRows, roster, changed);
-    await setDoc(doc(fbDb, 'saenggibu', 'meta'), { ...built.meta, mismatch, file, at: new Date().toISOString(), by: fbAuth.currentUser.email });
+    const at = new Date().toISOString(), by = me();
+    await setDoc(doc(fbDb, 'saenggibu', 'meta'), { ...built.meta, mismatch, file: plan.file || metaNow?.file || '', at, by });
     await setDoc(doc(fbDb, 'saenggibu', 'manifest'), { h: now });
+    try {
+      const lg = (await getDoc(doc(fbDb, 'saenggibu', 'log'))).data()?.items || [];
+      await setDoc(doc(fbDb, 'saenggibu', 'log'), { items: [{ at, by, ...plan.log }, ...lg].slice(0, 200) });
+    } catch (e) {}
+    return { writes: writes.length, dels: dels.length };
+  } finally { await lockDrop(); }
+}
+
+async function doUpload(){
+  if (!_pending) return;
+  const { parsed, cmp, look, file, forms, roster, changed, metaAt } = _pending;
+  const msg = $('upMsg'), go = $('upGo'), panel = $('upPanel');
+  const pick = {};
+  panel.querySelectorAll('select[data-pick]').forEach(sel => { pick[sel.dataset.pick] = sel.value; });
+  const rep = isAdmin() && panel.querySelector('input[name="upMode"]:checked')?.value === 'replace';
+  const skip = cmp.changed.filter(x => pick[`chg:${x.kind}:${x.cur.id}`] === 'skip');          // 남의 활동 — 그대로 둠
+  const swap = look.filter(l => pick[`like:${l.cur.id}`] === 'swap');                          // 이름 바꿔 낸 새 판
+  const gone = rep ? cmp.missing.filter(x => pick[`miss:${x.kind}:${x.old.id}`] !== 'keep') : [];   // 전체 바꾸기에서 지울 것
+  if (gone.length && !confirm(`이 파일에 없는 기존 시트 ${gone.length}개를 지웁니다.\n(${gone.slice(0, 5).map(x => x.old.title).join(', ')}${gone.length > 5 ? ' …' : ''})\n계속할까요?`)) return;
+  go.disabled = true;
+  try {
+    const skipCur = new Set(skip.map(x => x.cur)), swapCur = new Set(swap.map(l => l.cur));
+    const swapOld = new Set(swap.map(l => l.old)), goneOld = new Set(gone.map(x => x.old));
+    const p2 = { ...parsed, activities: parsed.activities.filter(a => !skipCur.has(a)), schedules: parsed.schedules.filter(a => !skipCur.has(a)) };
+    const keep = [...skip.map(x => ({ kind: x.kind, old: x.old })), ...cmp.missing.filter(x => !swapOld.has(x.old) && !goneOld.has(x.old))];
+    // 올린 사람·날짜 — 새 판으로 바꾼 것은 '바뀜'(처음 날짜는 옛것)
+    const c2 = { added: cmp.added.filter(x => !swapCur.has(x.cur)), same: cmp.same,
+      changed: [...cmp.changed.filter(x => !skipCur.has(x.cur)), ...swap.map(l => ({ kind: 'act', cur: l.cur, old: l.old }))] };
+    sgbStamp(c2, me(), new Date().toISOString());
+    // 차례 — 이름이 바뀐 짝은 옛 자리에(목록 끝으로 밀리지 않게)
+    const ren = new Map([...c2.changed, ...c2.same].filter(x => x.old.id !== x.cur.id).map(x => [x.old.id, x.cur.id]));
+    const order = (cmp.old?.order || [...(cmp.old?.activities || []), ...(cmp.old?.schedules || [])].map(a => a.id)).map(id => ren.get(id) || id);
+    const skipIds = new Set(skip.map(x => x.cur.id));
+    const forms2 = Object.fromEntries(Object.entries(forms || {}).filter(([id]) => !skipIds.has(id)));
+    const t = a => a.title || a.sheet;
+    const res = await sgbCommit({ parsed: p2, keep, forms: forms2, order, file, roster, changed, metaAt,
+      log: { file, added: c2.added.map(x => t(x.cur)), changed: c2.changed.map(x => t(x.cur)), removed: gone.map(x => t(x.old)), skipped: skip.map(x => t(x.cur)) } },
+      txt => { msg.textContent = txt; });
     _pending = null;
-    const removed = cmp.missing.length - keep.length;
-    $('upPanel').innerHTML = `✅ 올렸습니다 — 추가 ${cmp.added.length} · 바뀜 ${cmp.changed.length} · 남김 ${keep.length} · 지움 ${removed}
-      <span style="color:var(--ink-soft)">(문서 ${writes.length}개 쓰고 ${dels.length}개 지움)</span>
+    panel.innerHTML = `✅ 올렸습니다 — 추가 ${c2.added.length} · 바뀜 ${c2.changed.length} · 남김 ${keep.length - skip.length} · 지움 ${gone.length}${skip.length ? ` · 건너뜀 ${skip.length}` : ''}
+      <span style="color:var(--ink-soft)">(문서 ${res.writes}개 쓰고 ${res.dels}개 지움)</span>
       <button type="button" class="btn" onclick="this.parentNode.style.display='none'">닫기</button>`;
     await loadMeta();
     render();
   } catch (err) {
-    msg.innerHTML = `<span class="err">실패: ${esc(err.message || err)}</span>`;
+    const stale = !!err.stale;
+    msg.innerHTML = `<span class="err">실패: ${esc(err.message || err)}</span>${stale ? ' <button type="button" class="btn" id="upRetry">다시 미리보기</button>' : ''}`;
+    if (stale) $('upRetry').onclick = () => previewFile(_pending.f);
     go.disabled = false;
   }
+}
+
+// ── 관리(관리자만) ── 잘못 올라간 활동·창체 일정을 통째로 지우고, 부서·활동명 같은 안내를 앱에서 바로 고친다.
+// 화면만 관리자에게 보인다(쓰기 규칙은 교사 전체 — 학생 문서를 부서별로 가를 수 없어서). 누가 했는지는 log 에.
+$('admBtn').onclick = () => { if ($('admPanel').style.display === 'block'){ $('admPanel').style.display = 'none'; return; } renderAdmin(); };
+const logLine = x => {
+  const parts = [x.added?.length && `추가 ${x.added.join(', ')}`, x.changed?.length && `바뀜 ${x.changed.join(', ')}`,
+    x.removed?.length && `지움 ${x.removed.join(', ')}`, x.skipped?.length && `건너뜀 ${x.skipped.join(', ')}`, x.fixed && `고침 ${x.fixed}`].filter(Boolean);
+  return `<div>${fmtAt(x.at)} · <b>${esc(whoTxt(x.by))}</b>${x.file ? ' · ' + esc(x.file) : ''} — ${esc(parts.join(' / ') || '바뀐 것 없음')}</div>`;
+};
+async function renderAdmin(){
+  const p = $('admPanel'); p.style.display = 'block'; p.innerHTML = '불러오는 중…';
+  try {
+    const raw = (await getDoc(doc(fbDb, 'saenggibu', 'meta'))).data() || null;
+    const lg = (await getDoc(doc(fbDb, 'saenggibu', 'log'))).data()?.items || [];
+    if (!raw){ p.innerHTML = '아직 올라온 자료가 없습니다. <button type="button" class="btn" id="admClose">닫기</button>'; $('admClose').onclick = () => { p.style.display = 'none'; }; return; }
+    const eff = sgbApplyFix(raw);
+    const rank = new Map((eff.order || []).map((id, i) => [id, i]));
+    const items = [...eff.activities.map(a => ['act', a]), ...eff.schedules.map(x => ['sch', x])]
+      .sort((x, y) => (rank.get(x[1].id) ?? 1e9) - (rank.get(y[1].id) ?? 1e9));
+    const row = ([kind, a]) => `<tr data-id="${esc(a.id)}">
+      <td><input type="checkbox" class="adm-ck" data-id="${esc(a.id)}" aria-label="${esc(a.title)} 고르기"></td>
+      <td>${kind === 'sch' ? '<span class="d">창체 일정</span>' : tagHtml(a.tags)}</td>
+      <td>${esc(a.title)}${a.orig ? ' <span class="fixed" title="앱에서 고침">✏</span>' : ''}</td>
+      <td>${esc(a.dept || '')}</td><td class="d">${esc(a.sheet)}</td>
+      <td>${esc(whoTxt(a.by) || '-')}</td><td class="d">${a.upd ? fmtAt(a.upd) : ''}</td><td class="n">${cntOf(a)}</td>
+      <td><button type="button" class="btn adm-ed" data-id="${esc(a.id)}">✏ 고치기</button></td></tr>`;
+    p.innerHTML = `<h3>⚙ 관리 <span class="d">— 선생님에게만 보입니다</span></h3>
+      <div class="sec">잘못 올라간 것은 골라서 지우고, 부서·활동명 같은 안내는 바로 고칩니다(엑셀을 다시 올리지 않아도 됩니다).
+        고친 값은 부서가 같은 파일을 다시 올려도 남습니다.</div>
+      <div class="adm-wrap"><table class="adm-tb"><thead><tr><th><input type="checkbox" id="admAll" aria-label="모두 고르기"></th>
+        <th>구분</th><th>활동명</th><th>부서</th><th>시트</th><th>올린 사람</th><th>날짜</th><th>건수</th><th></th></tr></thead>
+        <tbody>${items.map(row).join('')}</tbody></table></div>
+      <div class="row"><button type="button" class="btn" id="admDel" disabled>🗑 고른 것 지우기</button>
+        <button type="button" class="btn" id="admClose">닫기</button><span id="admMsg"></span></div>
+      <div class="sec"><b>최근 올린 기록</b>${lg.length ? `<div class="acts-sum" id="admLog">${lg.slice(0, 50).map(logLine).join('')}</div>` : ' <span class="d">아직 없습니다</span>'}</div>`;
+    const cks = () => [...p.querySelectorAll('.adm-ck')];
+    const sync = () => { $('admDel').disabled = !cks().some(c => c.checked); };
+    cks().forEach(c => { c.onchange = sync; });
+    $('admAll').onchange = e => { cks().forEach(c => { c.checked = e.target.checked; }); sync(); };
+    $('admClose').onclick = () => { p.style.display = 'none'; };
+    $('admDel').onclick = () => adminDelete(cks().filter(c => c.checked).map(c => c.dataset.id), raw);
+    p.querySelectorAll('.adm-ed').forEach(b => { b.onclick = () => adminEditOpen(b.dataset.id, eff); });
+  } catch (err) { p.innerHTML = `<span class="err">불러오지 못했습니다: ${esc(err.message || err)}</span>`; }
+}
+// 통째로 지우기 — 나머지를 남기고 다시 짜서 쓴다(올리기와 같은 길, 같은 잠금)
+async function adminDelete(ids, raw){
+  const del = new Set(ids);
+  const all = [...(raw.activities || []).map(a => ['act', a]), ...(raw.schedules || []).map(x => ['sch', x])];
+  const eff = sgbApplyFix(raw);
+  const titleOf = id => [...eff.activities, ...eff.schedules].find(a => a.id === id)?.title || id;
+  const names = all.filter(([, a]) => del.has(a.id)).map(([, a]) => titleOf(a.id));
+  if (!names.length || !confirm(`고른 ${names.length}개를 지웁니다 — 학생별 화면에서도 빠집니다.\n(${names.slice(0, 5).join(', ')}${names.length > 5 ? ' …' : ''})\n계속할까요?`)) return;
+  $('admDel').disabled = true;
+  try {
+    const keep = all.filter(([, a]) => !del.has(a.id)).map(([kind, old]) => ({ kind, old }));
+    const res = await sgbCommit({ parsed: { activities: [], schedules: [], actRows: new Map(), students: [], skipped: [] },
+      keep, forms: {}, order: raw.order || [], metaAt: raw.at || null, log: { removed: names } }, t => { $('admMsg').textContent = t; });
+    await loadMeta(); render();
+    await renderAdmin();
+    $('admMsg').textContent = `✅ ${names.length}개를 지웠습니다(문서 ${res.writes}개 쓰고 ${res.dels}개 지움)`;
+  } catch (err) {
+    if (err.stale){ await renderAdmin(); $('admMsg').textContent = '그 사이 다른 선생님이 올려 목록을 다시 불러왔습니다 — 다시 골라 주세요'; return; }
+    $('admMsg').innerHTML = `<span class="err">실패: ${esc(err.message || err)}</span>`; $('admDel').disabled = false;
+  }
+}
+// 바로 고치기 — 목록 문서(meta)의 그 활동에 fix 만 쓴다(학생·활동 문서는 그대로)
+function adminEditOpen(id, eff){
+  const p = $('admPanel');
+  p.querySelectorAll('tr.adm-edit').forEach(r => r.remove());
+  const a = [...eff.activities, ...eff.schedules].find(x => x.id === id);
+  const tr = p.querySelector(`tr[data-id="${CSS.escape(id)}"]`);
+  if (!a || !tr) return;
+  const o = a.orig || {};
+  const field = (k, label, long) => `<label><span>${label}</span>${long
+      ? `<textarea data-f="${k}" rows="2">${esc(a[k] || '')}</textarea>` : `<input data-f="${k}" value="${esc(a[k] || '')}">`}
+    ${k in o ? `<em class="d">원래: ${esc(o[k] || '(비어 있음)')}</em>` : ''}</label>`;
+  const isAct = eff.activities.includes(a);
+  const ed = document.createElement('tr');
+  ed.className = 'adm-edit';
+  ed.innerHTML = `<td colspan="9"><div class="adm-form">
+    ${field('dept', '부서')}${field('title', '활동명')}${field('area', '입력 영역')}${field('path', '입력 경로')}${field('note', '유의 사항', true)}
+    ${isAct ? `<div class="adm-tags"><span>꼬리표</span>${Object.entries(SGB_TAGS).map(([t, nm]) =>
+      `<label><input type="checkbox" data-tag="${t}"${(a.tags || []).includes(t) ? ' checked' : ''}> ${esc(nm)}</label>`).join('')}
+      ${'tags' in o ? `<em class="d">원래: ${esc((o.tags || []).map(t => SGB_TAGS[t] || t).join(' 또는 '))}</em>` : ''}</div>` : ''}
+    <div class="row"><button type="button" class="btn pri" id="admSave">저장</button>
+      ${a.orig ? '<button type="button" class="btn" id="admReset">원래대로</button>' : ''}
+      <button type="button" class="btn" id="admEdCancel">취소</button><span id="admEdMsg"></span></div></div></td>`;
+  tr.after(ed);
+  $('admEdCancel').onclick = () => ed.remove();
+  $('admSave').onclick = () => adminEditSave(a, ed, false);
+  if ($('admReset')) $('admReset').onclick = () => adminEditSave(a, ed, true);
+}
+async function adminEditSave(a, ed, reset){
+  const msg = $('admEdMsg');
+  const val = {};
+  ed.querySelectorAll('[data-f]').forEach(el => { val[el.dataset.f] = el.value.trim(); });
+  const tagEls = [...ed.querySelectorAll('[data-tag]')];
+  if (tagEls.length) val.tags = tagEls.filter(c => c.checked).map(c => c.dataset.tag);
+  if (!reset && tagEls.length && !val.tags.length){ msg.innerHTML = '<span class="err">꼬리표를 하나 이상 고르세요</span>'; return; }
+  if (!reset && !val.title){ msg.innerHTML = '<span class="err">활동명은 비울 수 없습니다</span>'; return; }
+  try {
+    msg.textContent = '저장 중…';
+    await metaPatch(m => {
+      const t = [...(m.activities || []), ...(m.schedules || [])].find(x => x.id === a.id);
+      if (!t) throw new Error('그 사이 지워진 활동입니다');
+      if (reset){ delete t.fix; return; }
+      const fix = {};
+      for (const [k, v] of Object.entries(val)){
+        const same = k === 'tags' ? (t.tags || []).join() === v.join() : String(t[k] ?? '') === v;
+        if (!same) fix[k] = v;                 // 원본과 다른 칸만 — 원본과 같게 되돌린 칸은 고침에서 빠진다
+      }
+      if (Object.keys(fix).length) t.fix = fix; else delete t.fix;
+    }, { fixed: `${a.orig?.title || a.title}${reset ? ' (원래대로)' : ''}` });
+    await loadMeta(); render();
+    await renderAdmin();
+    $('admMsg').textContent = reset ? '✅ 원래대로 돌렸습니다' : '✅ 고쳤습니다';
+  } catch (err) { msg.innerHTML = `<span class="err">실패: ${esc(err.message || err)}</span>`; }
+}
+// 목록 문서만 고친다 — 올리기와 같은 잠금 안에서 새로 읽어 고쳐 쓴다(그 사이 올린 것을 덮지 않게)
+async function metaPatch(fn, log){
+  await lockTake();
+  try {
+    const ref = doc(fbDb, 'saenggibu', 'meta');
+    const m = (await getDoc(ref)).data();
+    if (!m) throw new Error('목록이 없습니다');
+    fn(m);
+    const at = new Date().toISOString(), by = me();
+    await setDoc(ref, { ...m, at });
+    try {
+      const lg = (await getDoc(doc(fbDb, 'saenggibu', 'log'))).data()?.items || [];
+      await setDoc(doc(fbDb, 'saenggibu', 'log'), { items: [{ at, by, ...log }, ...lg].slice(0, 200) });
+    } catch (e) {}
+  } finally { await lockDrop(); }
 }
 
 // ── 시작 ──
@@ -1952,9 +2318,10 @@ onAuthStateChanged(fbAuth, async user => {
     return;
   }
   gate.style.display = 'none';
-  $('upBtn').style.display = isAdmin() ? '' : 'none';
+  $('upBtn').style.display = '';                 // 부서·교과가 바로 올린다(모든 교사)
   // 전교생 문안이 한 파일에 담긴다 — 받기는 지금은 관리자만
   $('dlBtn').style.display = isAdmin() ? '' : 'none';
+  $('admBtn').style.display = isAdmin() ? '' : 'none';
   try { await loadMeta(); }
   catch (e) { $('body').innerHTML = `<div class="empty err">불러오지 못했습니다: ${esc(e.message || e)}</div>`; return; }
   if (EMBED) return renderEmbed();
