@@ -688,6 +688,21 @@ console.log('\n[추가·수정 꼬리표]');
 // ── 2-4. 표준 양식 ── 부서에 나눠 줄 빈 양식(tests/make-saenggibu-template.mjs). 앱이 그대로 읽어야 하고,
 // 모양은 원래 쓰던 통합 엑셀을 따른다. 파서가 바뀌어 양식과 어긋나면 여기서 잡힌다.
 console.log('\n[표준 양식]');
+// 지금 나눠 주는 양식 — 선생님이 만든 파일 그대로(학생 줄 값만 비움). 앱의 「양식 받기」 가 이 두 파일을 준다(2026-10-28)
+for (const [fname, hr, extra] of [['saenggibu-form.xlsx', 5, ''], ['saenggibu-form-extra.xlsx', 4, '직책']]){
+  const fp = path.join(ROOT, 'docs', fname);
+  const wb = XLSX.read(fs.readFileSync(fp), { type: 'buffer', cellFormula: true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const left = Object.keys(ws).filter(k => k[0] !== '!' && (c => c.r >= hr && c.c >= 1 && c.c <= 7)(XLSX.utils.decode_cell(k)) && String(ws[k].v ?? '').trim());
+  check(`${fname} — 학생 줄에 값이 없다(공개 저장소)`, left.length === 0, left.slice(0, 5));
+  const tp = P.sgbParseBook(P.sgbBookToSheets(XLSX, wb));
+  const ta = tp.activities[0];
+  check(`${fname} — 앱이 읽는다: 기재 내용 칸, 입력 영역(드롭다운 G2)·경로(VLOOKUP G3), 숨긴 참고 표는 안 섞임`, tp.activities.length === 1 && ta.body === '기재 내용'
+    && ta.area === String(ws.G2?.v) && /VLOOKUP/.test(ws.G3?.f || '') && !!ta.path && ta.extra.filter(x => !/^0+$/.test(x)).join() === extra, ta);
+  const ew = new ExcelJS.Workbook(); await ew.xlsx.readFile(fp);
+  check(`${fname} — 드롭다운·숨긴 참고 표(AA·AB)·학번 수식(A열) 그대로`, ew.worksheets[0].getCell('G2').dataValidation?.type === 'list'
+    && ew.worksheets[0].getColumn(27).hidden && /TEXT/.test(String(ws['A' + (hr + 1)]?.f || '')));
+}
 {
   const { makeTemplate, TEMPLATE_NAME } = await import('./make-saenggibu-template.mjs');
   const tf = await makeTemplate(ExcelJS, TMP);
@@ -845,6 +860,16 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
   const p = await openAs(ADMIN);
   await p.waitForSelector('#body .empty');
   check('자료가 없으면 관리자에게 올리라고 안내', (await p.textContent('#body')).includes('엑셀 올리기'));
+  // 양식 받기 — 엑셀 올리기 옆, 두 가지(기재 내용만 · 덧붙인 칸)
+  check('「📄 양식 받기」 가 엑셀 올리기 옆에', await p.isVisible('#formDl') && await p.evaluate(() => document.getElementById('upBtn').nextElementSibling?.id === 'formDl'));
+  await p.click('#formDl summary');
+  const fdl = await p.$$eval('#formDl a', as => as.map(a => [a.getAttribute('href'), a.getAttribute('download'), a.textContent.trim()]));
+  check('— 누르면 두 가지: 기재 내용만 / 덧붙인 칸(직책 등)', fdl.length === 2 && fdl[0][0] === 'docs/saenggibu-form.xlsx' && fdl[1][0] === 'docs/saenggibu-form-extra.xlsx'
+    && fdl.every(d => d[1].endsWith('.xlsx')) && fdl[0][2].includes('기재 내용') && fdl[1][2].includes('직책'), fdl);
+  check('— 파일이 실제로 있다', fdl.every(d => fs.existsSync(path.join(ROOT, d[0]))));
+  if (process.env.SGB_SHOTS) await p.screenshot({ path: path.join(process.env.SGB_SHOTS, '9-form-dl.png'), clip: { x: 0, y: 0, width: 1100, height: 260 } });
+  await p.click('#body');
+  check('— 바깥을 누르면 닫힌다', !(await p.$eval('#formDl', d => d.open)));
   check('관리자에게만 올리기 단추', await p.isVisible('#upBtn'));
 
   await p.setInputFiles('#upFile', FILE1);

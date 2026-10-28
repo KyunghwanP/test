@@ -79,6 +79,14 @@
   .btn.pri:hover{background:var(--mon-deep);color:#fff;}
   .btn.line{border-color:var(--mon);color:var(--mon);}
   .btn.line:hover{background:var(--mon);color:#fff;}
+  .form-dl{position:relative;display:inline-block;}
+  .form-dl > summary{list-style:none;cursor:pointer;}
+  .form-dl > summary::-webkit-details-marker{display:none;}
+  .form-dl-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:30;min-width:260px;background:var(--paper);border:1px solid var(--rule);
+    border-radius:10px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column;}
+  .form-dl-menu a{display:block;padding:9px 10px;border-radius:8px;color:var(--ink);text-decoration:none;font-size:14.5px;font-weight:700;line-height:1.45;}
+  .form-dl-menu a:hover{background:var(--paper-soft);}
+  .form-dl-menu .d{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);}
   #fileNote{width:100%;font-size:13px;color:var(--ink-soft);font-weight:600;}
   #fileNote:empty{display:none;}
 
@@ -445,6 +453,14 @@
   <input type="search" class="search" id="hakbun" placeholder="🔍 학생 이름 · 학번(30101)" autocomplete="off" aria-label="학생 이름이나 학번으로 찾기">
   <div class="admin">
     <button class="btn" id="upBtn" type="button" style="display:none;">📤 엑셀 올리기</button>
+    <!-- 양식 받기 — 선생님이 만든 파일 그대로(학생 줄만 비움). 부서가 이걸 받아 채워서 올린다 -->
+    <details class="form-dl" id="formDl" style="display:none;">
+      <summary class="btn">📄 양식 받기</summary>
+      <div class="form-dl-menu">
+        <a href="docs/saenggibu-form.xlsx" download="생기부 보조자료 양식(기재 내용만).xlsx">기재 내용만 <span class="d">— 기본</span></a>
+        <a href="docs/saenggibu-form-extra.xlsx" download="생기부 보조자료 양식(직책 칸).xlsx">직책 칸 있는 것 <span class="d">— 칸 이름은 바꾸거나 더 넣어도 됩니다(자기 평가서 등)</span></a>
+      </div>
+    </details>
     <button class="btn" id="dlBtn" type="button" style="display:none;" title="원본 양식 그대로 — 내부결재용">📥 엑셀로 받기</button>
     <button class="btn" id="admBtn" type="button" style="display:none;" title="관리자에게만 보입니다">⚙ 관리</button>
   </div>
@@ -2071,6 +2087,8 @@ function loadXlsx(){
 }
 let _pending = null;
 $('upBtn').onclick = () => $('upFile').click();
+// 양식 받기 메뉴 — 바깥을 누르거나 하나를 고르면 닫는다
+document.addEventListener('click', e => { const d = $('formDl'); if (d.open && (!d.contains(e.target) || e.target.closest('a'))) d.open = false; });
 
 const kindTxt = k => k === 'sch' ? '창체 일정' : '';
 const cntOf = x => x ? (x.count ?? (x.rows || []).filter(r => (r.v || []).some(Boolean)).length) : 0;
@@ -2553,6 +2571,7 @@ onAuthStateChanged(fbAuth, async user => {
   }
   gate.style.display = 'none';
   $('upBtn').style.display = '';                 // 부서·교과가 바로 올린다(모든 교사)
+  $('formDl').style.display = '';
   // 전교생 문안이 한 파일에 담긴다 — 받기는 지금은 관리자만
   $('dlBtn').style.display = isAdmin() ? '' : 'none';
   $('admBtn').style.display = isAdmin() ? '' : 'none';
