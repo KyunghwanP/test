@@ -1618,8 +1618,9 @@ STORE = STORE_B;
   await ctx.route('https://cdn.jsdelivr.net/**', r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   await ctx.route('https://fonts.gstatic.com/**', r => r.abort());
   await ctx.addInitScript(([e, store]) => {
-    window.__TEST_EMAIL__ = e; window.__FS__ = store; window.__h = [];
-    window.addEventListener('message', ev => { if (ev.data?.type === 'sgb-height') window.__h.push(ev.data.h); });
+    window.__TEST_EMAIL__ = e; window.__FS__ = store; window.__h = []; window.__acts = []; window.__goAt = [];
+    window.addEventListener('message', ev => { if (ev.data?.type === 'sgb-height') window.__h.push(ev.data.h); if (ev.data?.type === 'sgb-acts') window.__acts.push(ev.data);
+      if (ev.data?.type === 'sgb-go-at') window.__goAt.push(ev.data.y); });
   }, [KIM, STORE]);
   const p = await ctx.newPage();
   const errors = []; p.on('pageerror', e => errors.push(e.message));
@@ -1628,6 +1629,14 @@ STORE = STORE_B;
   check('한 학생만 보기 — 위쪽 줄·이동 줄·이름·사진은 숨기고 그 학생 카드만', !(await p.isVisible('.top')) && !(await p.isVisible('.s-name'))
     && !(await p.isVisible('#mNav')) && (await p.textContent('#stuOut')).includes('진로탐색 로봇공학 캠프'));
   check('한 학생만 보기 — 높이를 앱에 알린다', await p.evaluate(() => window.__h.length > 0 && window.__h.at(-1) > 100));
+  // 종합검색 위쪽 줄 — 이 창은 스크롤이 없어 바깥 앱이 줄을 붙인다. 활동 목록을 알려 주고, 칩을 누르면 그 카드 위치를 알려 준다
+  const sa = await p.evaluate(() => window.__acts.at(-1));
+  check('한 학생만 보기 — 종합검색 위쪽 줄에 쓸 활동 목록을 알린다(학생 1-1-1, 활동 3)', sa?.k === '1-1-1' && sa.acts.length === 3 && sa.acts[0].title === '진로탐색 로봇공학 캠프'
+    && sa.acts.every(x => x.id && 'tag' in x && x.n >= 1), sa);
+  await p.evaluate(id => window.postMessage({ type: 'sgb-go', id }, location.origin), sa.acts[1].id);
+  await p.waitForFunction(() => window.__goAt.length === 1);
+  check('— 칩을 누르면(sgb-go) 그 카드가 창 어디에 있는지 알린다(sgb-go-at)·카드 강조', await p.evaluate(id => { const c = [...document.querySelectorAll('#stuOut .card[data-a]')].find(x => x.dataset.a === id);
+    return Math.abs(window.__goAt[0] - (c.getBoundingClientRect().top + scrollY)) <= 1 && c.classList.contains('hit'); }, sa.acts[1].id));
   await p.goto(ORIGIN + '/test/saenggibu.html?in=1&embed=1&k=1-1-3');
   await p.waitForSelector('#stuOut .empty');
   check('한 학생만 보기 — 자료 없는 학생은 그렇다고', (await p.textContent('#stuOut')).includes('생기부 보조자료가 없습니다'));

@@ -1588,6 +1588,25 @@
   .s360-write{margin-left:auto;align-self:center;border:none;background:none;padding:6px 4px;font:inherit;font-size:14px;font-weight:800;color:var(--mon);cursor:pointer;
     text-decoration:underline;text-decoration-color:transparent;text-underline-offset:3px;transition:text-decoration-color .15s;white-space:nowrap;}
   .s360-write:hover{text-decoration-color:var(--mon);}
+  /* 보조자료 탭을 보며 내리면 — 탭 줄이 지나간 뒤 위쪽에 이름·학년 반 번호·참여한 활동(잘리지 않게, 많으면 줄바꿈). 칩을 누르면 그 카드로.
+     활동은 안쪽 보조자료 창이 알려 준다(sgb-acts). 높이 0 의 틀에 얹어 글이 밀리지 않게. 폰은 없음(생기부 탭과 같게) */
+  .s360-mini{display:none;}
+  .s360-mini-in{position:absolute;left:-28px;right:-28px;top:0;display:flex;align-items:baseline;gap:12px;padding:8px 28px;
+    background:var(--paper);border-bottom:1px solid var(--rule);box-shadow:0 6px 12px -10px rgba(15,23,42,.35);
+    opacity:0;transform:translateY(-6px);pointer-events:none;transition:opacity .15s,transform .15s;}
+  .s360-mini.on .s360-mini-in{opacity:1;transform:none;pointer-events:auto;}
+  .s360-mini-who{display:flex;align-items:baseline;gap:6px;flex-shrink:0;white-space:nowrap;}
+  .s360-mini-who b{font-size:16px;font-weight:900;color:var(--ink);}
+  .s360-mini-who span{font-family:'IBM Plex Mono';font-size:13px;font-weight:700;color:var(--ink-soft);}
+  .s360-mini-acts{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0;}
+  .s360-mini-acts button{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:4px 10px;border:1px solid var(--rule);border-radius:14px;
+    background:var(--paper);color:var(--ink);font:inherit;font-size:13px;font-weight:700;line-height:1.4;cursor:pointer;text-align:left;}
+  .s360-mini-acts button:hover{border-color:var(--mon);color:var(--mon);}
+  .s360-mini-acts .d{font-weight:600;color:var(--ink-soft);}
+  .s360-mini-acts .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--ink-soft);}
+  .s360-mini-acts .dot.ja{background:#2563EB;} .s360-mini-acts .dot.jin{background:#059669;} .s360-mini-acts .dot.gae{background:#9333EA;}
+  .s360-mini-acts .dot.nu{background:#D97706;} .s360-mini-acts .dot.haeng{background:#0E7490;} .s360-mini-acts .dot.dong{background:#BE185D;}
+  @media (min-width:901px){ .s360-mini{display:block;position:sticky;top:-16px;z-index:5;height:0;} }   /* 스크롤 칸의 안쪽 여백(16px)만큼 올려 맨 위에 붙인다 */
   .s360-tabs .students-tab{font-size:15px;padding:10px 16px 11px;border-radius:6px 6px 0 0;}
   .s360-tabs .students-tab:hover{color:var(--ink);}   /* 회색 음영 없이 글자색만 */
   .s360-tabs .students-tab.active{background:transparent;box-shadow:none;color:var(--mon);}
@@ -6429,7 +6448,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver8.31';
+const APP_VER = 'ver8.32';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -15181,7 +15200,10 @@ async function s360ShowDetail(s, targetEl){
           <button type="button" class="students-tab" data-tab="sgb" role="tab">📑 생기부 보조자료</button>
           ${s360CanWrite(s) ? '<button type="button" class="s360-write" id="s360WriteBtn" title="생기부 보조자료 탭으로 옮겨 이 학생의 작성 칸을 엽니다">✏️ 작성하러 가기</button>' : ''}
           <span class="s360-ink"></span>
-        </div>` : ''}
+        </div>
+        <div class="s360-mini" id="s360Mini" aria-hidden="true"><div class="s360-mini-in">
+          <span class="s360-mini-who"><b>${escapeHtml(s.name||'')}</b> <span>${s.grade}학년 ${s.room}반 ${s.num}번</span></span>
+          <div class="s360-mini-acts" id="s360MiniActs"></div></div></div>` : ''}
       <div class="spot-sec s360-pane-grade" style="margin-bottom:0;"><div class="spot-sec-title">성적 (내신 · 모의고사 전체 회차)</div>
         <div id="s360Grades" style="font-size:15px;color:var(--ink-soft);">불러오는 중...</div>
       </div>
@@ -15190,6 +15212,7 @@ async function s360ShowDetail(s, targetEl){
         </div>` : ''}
     </div>`;
   s360BindTabs(s);
+  s360MiniBind(main);
   if (!paneMode) document.getElementById('s360BackBtn').addEventListener('click', () => s360Back());
   document.getElementById('s360ContactBtn').addEventListener('click', () => showStudentDetail(s));
   s360LoadPhoto(s);      // 사진명렬(studentPhotos) — 있으면 헤더에 표시
@@ -15285,7 +15308,42 @@ function s360ShowTab(tab, s, auto){
     if (f && f.dataset.k !== k){ f.dataset.k = k; f.src = `saenggibu.html?in=1&embed=1&k=${k}&v=${encodeURIComponent(APP_VER)}`; }
   }
   if (!auto) { try { localStorage.setItem(S360_TAB_LS, tab); } catch(e){} }
+  s360MiniSync();
 }
+// ── 보조자료 탭 위쪽 줄 ── 탭 줄이 스크롤 칸 위로 지나가면 나타난다(보조자료 탭일 때만)
+let _s360Main = null;
+function s360MiniBind(main){
+  _s360Main = main;
+  if (!main._s360Mini){ main.addEventListener('scroll', s360MiniSync, { passive: true }); main._s360Mini = true; }   // 같은 칸에 학생마다 또 걸지 않게
+  s360MiniSync();
+}
+function s360MiniSync(){
+  const mini = document.getElementById('s360Mini'), tabs = document.getElementById('s360Tabs2'), main = _s360Main;
+  if (!mini || !tabs || !main) return;
+  const sgb = !!tabs.querySelector('[data-tab="sgb"].active') && !!document.getElementById('s360MiniActs')?.children.length;
+  mini.classList.toggle('on', sgb && getComputedStyle(mini).display !== 'none' && tabs.getBoundingClientRect().bottom < main.getBoundingClientRect().top + 4);
+}
+function s360MiniRender(acts){
+  const box = document.getElementById('s360MiniActs');
+  if (!box) return;
+  box.innerHTML = acts.map(a => `<button type="button" tabindex="-1" data-go="${escapeHtml(a.id)}" title="${escapeHtml(a.title)}"><i class="dot ${escapeHtml(a.tag || '')}"></i><span class="an">${escapeHtml(a.title)}</span>${a.n > 1 ? `<span class="d">${a.n}</span>` : ''}</button>`).join('');
+  box.onclick = e => {
+    const b = e.target.closest('[data-go]'), f = document.getElementById('s360SgbFrame');
+    if (b && f) try { f.contentWindow.postMessage({ type: 'sgb-go', id: b.dataset.go }, location.origin); } catch (err) {}
+  };
+  s360MiniSync();
+}
+window.addEventListener('message', e => {
+  const f = document.getElementById('s360SgbFrame');
+  if (e.origin !== location.origin || !f || e.source !== f.contentWindow) return;
+  if (e.data?.type === 'sgb-acts' && e.data.k === f.dataset.k) s360MiniRender(Array.isArray(e.data.acts) ? e.data.acts : []);
+  if (e.data?.type === 'sgb-go-at' && _s360Main){
+    // 그 카드가 위쪽 줄 바로 아래에 오게 — 안쪽 창의 위치 + 카드의 창 안 위치 - 위쪽 줄 높이
+    const main = _s360Main, bar = document.querySelector('#s360Mini .s360-mini-in');
+    const top = main.scrollTop + f.getBoundingClientRect().top - main.getBoundingClientRect().top + (+e.data.y || 0) - (bar ? bar.offsetHeight : 0) - 10;
+    main.scrollTo({ top: Math.max(0, top), behavior: matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth' });
+  }
+});
 // 파란 줄을 고른 탭 아래로. 처음 그릴 때는 미끄러지지 않고 바로(학생을 바꿀 때마다 왼쪽에서 날아오지 않게)
 function s360MoveInk(first){
   const tabs = document.getElementById('s360Tabs2');

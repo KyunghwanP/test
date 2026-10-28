@@ -2147,12 +2147,10 @@ async function renderStuOut(){
   if ($('copyAll')) $('copyAll').onclick = () => copyText(out._all);
   if ($('drOpenBtn')) $('drOpenBtn').onclick = () => drToggle();
   out.querySelector('.sheet').onclick = e => { const b = e.target.closest('[data-to]'); if (b) drAppend(b.dataset.to, b.closest('.card').dataset.b); };
-  // 봉사는 접힌 활동 카드 말고 누가기록 표로
+  out._acts = acts.map(({ a, n }) => ({ id: a.id, title: a.title, n, tag: SGB_TAG_CLS[(a.tags || [])[0]] || '' }));   // 종합검색 위쪽 줄에 알려 줄 활동
   const goAct = e => {
     const b = e.target.closest('[data-go]'); if (!b) return;
-    const a = actById(b.dataset.go);
-    const card = (a && sgbIsVolunteer(a) && out.querySelector('.card.vol'))
-      || [...out.querySelectorAll('.card[data-a]')].find(c => c.dataset.a === b.dataset.go && !c.closest('.vol-split'));
+    const card = actCard(out, b.dataset.go);
     if (!card) return;
     card.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth' });
     card.classList.add('hit'); setTimeout(() => card.classList.remove('hit'), 1200);
@@ -2194,6 +2192,12 @@ async function renderStuOut(){
   out.scrollTop = 0;
   listApply();
   drSync();                                    // 작성 칸 — 열어 두었고 쓸 수 있는 학생이면 이 학생으로
+}
+// 활동 → 그 카드. 봉사는 접힌 활동 카드 말고 누가기록 표로
+function actCard(out, id){
+  const a = actById(id);
+  return (a && sgbIsVolunteer(a) && out.querySelector('.card.vol'))
+    || [...out.querySelectorAll('.card[data-a]')].find(c => c.dataset.a === id && !c.closest('.vol-split'));
 }
 // 좁은 칸 위쪽 줄 — 학생 머리(사진·이름·활동 목록)가 위로 지나가면 나타난다. 위쪽 이동 줄(☰ · ◀ ▶)이 있으면 그 아래에.
 // 활동은 잘리지 않게 다 보인다(많으면 줄바꿈) — 카드로 건너뛸 때 그 높이만큼 아래로(--miniH)
@@ -3572,8 +3576,18 @@ async function renderEmbed(){
   await renderStuOut();
   if ($('stuOut').querySelector('.empty')) $('stuOut').innerHTML = '<div class="empty">이 학생의 생기부 보조자료가 없습니다.</div>';
   postHeight();
+  // 종합검색 위쪽 줄(이름·학년 반 번호·활동 칩)에 쓸 활동 목록 — 이 창은 스크롤이 없어(높이를 다 늘린다) 바깥 앱이 줄을 붙인다
+  try { parent.postMessage({ type: 'sgb-acts', k: `${+st.g}-${+st.c}-${+st.n}`, acts: $('stuOut')._acts || [] }, location.origin); } catch (e) {}
   try { new ResizeObserver(postHeight).observe(document.body); } catch (e) {}
 }
+// 종합검색 위쪽 줄의 활동 칩 — 그 카드가 이 창의 어디에 있는지 알려 주면 바깥 앱이 스크롤한다(이 창은 스크롤이 없다)
+window.addEventListener('message', e => {
+  if (e.origin !== location.origin || e.source !== window.parent || e.data?.type !== 'sgb-go' || !EMBED) return;
+  const card = actCard($('stuOut'), String(e.data.id || ''));
+  if (!card) return;
+  card.classList.add('hit'); setTimeout(() => card.classList.remove('hit'), 1200);
+  try { parent.postMessage({ type: 'sgb-go-at', y: Math.round(card.getBoundingClientRect().top + scrollY) }, location.origin); } catch (e2) {}
+});
 // 종합검색의 「✏️ 작성하러 가기」 — 그 학생을 학생별로 열고 작성 칸을 띄운다(쓸 수 있는 학생일 때만 — drCanWrite)
 window.addEventListener('message', e => {
   if (e.origin !== location.origin || e.source !== window.parent || e.data?.type !== 'sgb-open' || EMBED || SOLO) return;
