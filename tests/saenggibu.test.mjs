@@ -822,8 +822,12 @@ async function openAs(email, { width = 1100, blockExcel = false } = {}) {
   await ctx.route('https://fonts.googleapis.com/**', r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   await ctx.route('https://fonts.gstatic.com/**', r => r.abort());
   // 맞춤법 검사기 — 가짜 화면(앱은 띄우기만 하고 그 안을 읽거나 보내지 않는다)
-  await ctx.route('https://nara-speller.co.kr/**', r => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8',
-    body: '<!doctype html><meta charset="utf-8"><title>검사기</title><textarea id="in"></textarea><button>검사하기</button>' }));
+  await ctx.route('https://nara-speller.co.kr/**', r => {
+    const q = r.request(), got = q.method() === 'POST' ? new URLSearchParams(q.postData() || '').get('text1') || '' : null;
+    return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: got === null
+      ? '<!doctype html><meta charset="utf-8"><title>검사기</title><textarea id="text1"></textarea><button>검사하기</button>'
+      : `<!doctype html><meta charset="utf-8"><title>검사 결과</title><div id="tdCorrection1stBox"></div><button id="btnOrgCopy">결과 복사하기</button><script>document.getElementById('tdCorrection1stBox').textContent = ${JSON.stringify(got).replace(/</g, '\\u003c')};</script>` });
+  });
   await ctx.addInitScript(([e, store]) => {
     window.__TEST_EMAIL__ = e; window.__FS__ = store;
     navigator.clipboard.writeText = async t => { window.__copied = t; };
@@ -1798,21 +1802,25 @@ STORE = STORE_B;
   await p.waitForFunction(t => window.__FS__['saenggibuDraft/1-1-1']?.ja === t, full);
   check('누르면 그 판으로 되돌아오고 저장된다', (await p.inputValue('#drT-ja')) === full && !(await p.isVisible('#drH-ja')));
   check('— 되돌리기 전 글(짧게.)도 기록에 남아 다시 되돌릴 수 있다', await p.evaluate(() => (window.__FS__['saenggibuDraftHist/1-1-1']?.ja || []).some(x => x.t === '짧게.')));
-  // 맞춤법 — 「🔤 맞춤법」 이면 글을 복사해 두고 부산대 검사기를 팝업 창으로(선생님 요청 2026-10-28 — 새 탭 말고 팝업). 고친 글을 복사해
-  // 작성 칸의 「📋 복사한 글 반영」 → 바로 반영·바뀐 곳. 앱은 검사기 안을 읽거나 글을 보내지 않는다 — 클립보드만
+  // 맞춤법 — 「🔤 맞춤법」 이면 선생님 브라우저가 부산대 검사기(이전 버전) 팝업에 그 칸 글을 바로 보내 결과가 뜬다(나라인포테크: 이전 버전은
+  // 대량 수집·학습이 아니고 글자 수 한도 안이면 써도 된다 — 2026-10-28 선생님이 받은 답변). 결과의 「결과 복사하기」 → 작성 칸의 「📋 복사한 글 반영」.
+  // 보내는 건 팝업 창의 화면 이동뿐 — 앱 화면이 검사기와 몰래 주고받지 않는다(검사기는 사람 확인 뒤에 있고, 결과는 클립보드로만)
   await p.evaluate(() => { const o = window.open; window.__wo = []; window.open = function (...a){ window.__wo.push(a); return o.apply(this, a); }; });
   const spellReq = [];
-  p.context().on('request', r => { const u = r.url(); if (u.includes('nara-speller') && (r.method() !== 'GET' || u.includes('%ED%95%99%EA%B8%89'))) spellReq.push(r.method() + ' ' + u); });
+  p.context().on('request', r => { if (!r.url().includes('nara-speller')) return; const f = r.method() === 'POST' ? new URLSearchParams(r.postData() || '') : null;
+    spellReq.push({ m: r.method(), u: r.url(), nav: r.isNavigationRequest(), app: r.frame().page() === p, text1: f?.get('text1') ?? null, weak: f?.get('bWeakOpt') ?? null }); });
   const [spop] = await Promise.all([p.context().waitForEvent('page'), p.click('[data-spell="ja"]')]);
-  await p.waitForSelector('#drS-ja [data-spell-clip="ja"]');
+  await spop.waitForURL('https://nara-speller.co.kr/old_speller/results');
+  await spop.waitForSelector('#btnOrgCopy');
   const wo = await p.evaluate(() => window.__wo.at(-1));
-  check('「🔤 맞춤법」 — 그 칸 글을 복사해 두고 검사기를 팝업 창으로(이름 sgbSpeller — 다시 누르면 같은 창), 작성 칸에 단계 안내·「📋 복사한 글 반영」',
-    (await p.evaluate(() => window.__copied)) === full && wo[0] === 'https://nara-speller.co.kr/speller/' && wo[1] === 'sgbSpeller' && /popup=yes/.test(wo[2]) && /width=860/.test(wo[2])
-    && (await p.textContent('#drSG-ja')).includes('Ctrl+V'), wo);
-  await spop.waitForLoadState();
-  check('— 팝업에 검사기가 뜬다(가짜 화면)', !!(await spop.$('#in')));
+  const post = spellReq.find(x => x.m === 'POST');
+  check('「🔤 맞춤법」 — 검사기 팝업 창(이름 sgbSpeller)에 그 칸 글을 바로 보내 결과 화면이 뜬다(이전 버전 · 순화어 교정 켬)', wo[1] === 'sgbSpeller' && /popup=yes/.test(wo[2])
+    && post?.u === 'https://nara-speller.co.kr/old_speller/results' && post.text1 === full && post.weak === 'true' && (await spop.textContent('#tdCorrection1stBox')) === full, { wo, post });
+  check('— 보내는 건 팝업의 화면 이동뿐(앱 화면이 검사기와 몰래 주고받지 않는다)', spellReq.length >= 1 && spellReq.every(x => x.nav && !x.app), spellReq);
+  check('— 작성 칸에 안내(「결과 복사하기」 → 「📋 복사한 글 반영」), 결과가 안 뜰 때를 위해 글도 복사해 둔다', (await p.textContent('#drSG-ja')).includes('결과 복사하기')
+    && (await p.evaluate(() => window.__copied)) === full && await p.isVisible('[data-spell-clip="ja"]'));
   const FIXED = full.replace('로봇 코딩', '로봇코딩').replace('익힘.', '익혔음.');
-  await p.evaluate(t => { navigator.clipboard.readText = async () => t; }, FIXED + '\n');   // 선생님이 검사기에서 고친 글을 복사했다
+  await p.evaluate(t => { navigator.clipboard.readText = async () => t; }, FIXED + '\n');   // 선생님이 결과 화면의 「결과 복사하기」 를 눌렀다
   await p.click('[data-spell-clip="ja"]');
   await p.waitForFunction(t => window.__FS__['saenggibuDraft/1-1-1']?.ja === t, FIXED);
   const sv = await p.evaluate(() => ({ sum: document.getElementById('drSS-ja').textContent, dels: [...document.querySelectorAll('#drSD-ja del')].map(d => d.textContent),
@@ -1827,14 +1835,14 @@ STORE = STORE_B;
   await p.click('[data-spell-undo="ja"]');
   await p.waitForFunction(t => window.__FS__['saenggibuDraft/1-1-1']?.ja === t, full);
   check('「되돌리기」 — 고치기 전 글로 돌아온다', (await p.inputValue('#drT-ja')) === full && !(await p.isVisible('#drS-ja')));
-  check('— 앱은 검사기에 글을 보내지 않는다(팝업을 띄우는 것만)', spellReq.length === 0, spellReq);
   const nOpen = await p.evaluate(() => window.__wo.length);
   await p.click('[data-spell="haeng"]');
-  check('— 빈 칸은 검사기를 띄우지 않는다', (await p.evaluate(() => window.__wo.length)) === nOpen && !(await p.isVisible('#drS-haeng')));
-  // 엉뚱한 글을 복사해 왔으면 바로 반영하지 않는다
+  check('— 빈 칸은 검사기에 보내지 않는다', (await p.evaluate(() => window.__wo.length)) === nOpen && !(await p.isVisible('#drS-haeng')));
+  // 다른 칸 — 같은 팝업 창에 그 글을 보낸다. 엉뚱한 글을 복사해 왔으면 바로 반영하지 않는다
   await p.click('[data-spell="jin"]');
-  await p.waitForSelector('[data-spell-clip="jin"]');
-  check('— 다시 누르면 같은 팝업 창을 쓴다(이름 sgbSpeller)', (await p.evaluate(() => window.__wo.at(-1)[1])) === 'sgbSpeller' && p.context().pages().length === 2);
+  await spop.waitForFunction(t => document.getElementById('tdCorrection1stBox')?.textContent === t, ROBOT);
+  check('— 다른 칸도 같은 팝업 창에(진로 글이 검사기로)', (await p.evaluate(() => window.__wo.at(-1)[1])) === 'sgbSpeller' && p.context().pages().length === 2
+    && spellReq.filter(x => x.m === 'POST').at(-1)?.text1 === ROBOT);
   await p.evaluate(() => { navigator.clipboard.readText = async () => '전혀 다른 글을 잘못 복사해 왔다.'; });
   await p.click('[data-spell-clip="jin"]');
   await p.waitForSelector('[data-spell-apply="jin"]');

@@ -2520,7 +2520,7 @@ function drAreaHtml(k, nm, t, d){
     <div class="drp-links">
       <button type="button" class="drp-link" data-holdt="${k}" aria-expanded="${hv ? 'true' : 'false'}">빼 둔 내용<span id="drHoldN-${k}">${hv ? ' ' + hv.length.toLocaleString() + '자' : ''}</span></button>
       <button type="button" class="drp-link" data-hist="${k}" aria-expanded="false">되돌리기</button>
-      <button type="button" class="drp-link" data-spell="${k}" title="글을 복사해 두고 부산대 맞춤법 검사기를 팝업으로 띄웁니다 — 고친 글을 복사해 「📋 복사한 글 반영」">🔤 맞춤법</button>
+      <button type="button" class="drp-link" data-spell="${k}" title="부산대 맞춤법 검사기(이전 버전) 팝업에 이 칸 글을 보내 검사합니다 — 결과의 「결과 복사하기」 → 「📋 복사한 글 반영」">🔤 맞춤법</button>
     </div>
     <div class="drp-spell" id="drS-${k}" hidden></div>
     <textarea class="drp-t drp-hold" id="drHT-${k}" data-f="hold.${k}" aria-label="${nm} 빼 둔 내용" placeholder="바이트가 넘쳐 뺀 문장 — 상담하며 다시 넣을 수 있게(바이트·인쇄 제외)"${hv ? '' : ' hidden'}></textarea>
@@ -2653,12 +2653,15 @@ async function drRestore(k, i){
   document.querySelector(`[data-hist="${k}"]`)?.setAttribute('aria-expanded', 'false');
   toast('되돌렸습니다 — 바꾸기 전 글은 기록에 남겼습니다');
 }
-// 맞춤법 — 부산대 맞춤법 검사기(개인 무료)를 선생님이 직접 쓴다. 「🔤 맞춤법」 → 글을 복사해 두고 검사기를 팝업 창으로 띄운다(선생님 요청 — 새 탭 말고 팝업).
-// 팝업에 붙여 넣어 검사하고 고친 글을 복사한 뒤 작성 칸의 「📋 복사한 글 반영」 을 누르면 앱이 클립보드를 읽어 바로 반영(고치기 전 글은 되돌리기 기록에)하고
-// 바뀐 곳을 보여 준다. 검사기 화면 안은 다른 사이트라 앱이 읽지 못한다(브라우저 보안) — 그래서 고친 글 복사는 선생님이 한 번.
-// 앱이 검사기에 글을 직접 보내 결과를 받아오지는 않는다 — 자동 연결은 기관 계약이 필요하다(2026-10-28 선생님과 정함).
-// (앱 위에 iframe 으로 띄우는 것도 해 봤지만, 그 사이트가 다른 사이트 안에 뜨는 것을 막아 두면 빈 화면이라 팝업으로)
-const SPELLER_URL = 'https://nara-speller.co.kr/speller/';
+// 맞춤법 — 부산대(나라인포테크) 맞춤법 검사기 **이전 버전**. 「🔤 맞춤법」 이면 선생님 브라우저가 검사기 팝업 창에 그 칸 글을 바로 보내
+// 검사 결과가 뜬다(검사기의 입력 양식 그대로: text1 · 순화어 교정 켬). 선생님이 결과 화면의 「결과 복사하기」 → 작성 칸의 「📋 복사한 글 반영」 을 누르면
+// 앱이 클립보드를 읽어 바로 반영(고치기 전 글은 되돌리기 기록에)하고 바뀐 곳을 보여 준다.
+// - 나라인포테크 답변(2026-10-28, 선생님이 받음): 이전 버전은 대량 수집·학습이 아니고 한 번에 넣는 글자 수 한도를 넘지 않으면 써도 된다.
+//   우리는 교사가 누를 때 한 칸(최대 1,500바이트)씩만 보낸다.
+// - 앱(서버)이 검사기와 직접 주고받지는 않는다 — 검사기는 사람 확인(Cloudflare·reCAPTCHA) 뒤에 있고, 다른 사이트 화면은 브라우저가 앱에게 못 읽게 한다.
+//   그래서 보내기는 선생님 브라우저의 팝업이, 결과 가져오기는 「결과 복사하기」 → 클립보드가 한다.
+// - 앱 위 iframe 판은 그 사이트가 다른 사이트 안에 뜨는 것을 막아(X-Frame-Options) 걷었다
+const SPELLER_URL = 'https://nara-speller.co.kr/old_speller/', SPELLER_POST = 'https://nara-speller.co.kr/old_speller/results';
 // 팝업 창 — 화면 오른쪽에. 이름이 같으면 열린 창을 다시 쓴다(새 창이 쌓이지 않게)
 function popWin(url, name, w){
   const sw = screen.availWidth || 1280, sh = screen.availHeight || 900, sl = screen.availLeft || 0, stp = screen.availTop || 0;
@@ -2667,24 +2670,38 @@ function popWin(url, name, w){
   try { win?.focus(); } catch (e) {}
   return win;
 }
-async function drSpellOpen(k){
+// 검사기 팝업에 글을 보낸다 — 누른 그 자리에서 창부터 열어야 팝업 차단에 안 걸린다.
+// 주소를 비워 열면 이미 떠 있는 창은 그대로 잡기만 한다(about:blank 로 보내면 그 이동이 양식 보내기를 덮어 빈 창이 된다)
+function spellSubmit(text){
+  const win = popWin('', 'sgbSpeller', 900);
+  if (!win) return null;
+  const f = document.createElement('form');
+  f.method = 'post'; f.action = SPELLER_POST; f.target = 'sgbSpeller'; f.acceptCharset = 'UTF-8'; f.hidden = true;
+  for (const [n, v] of [['text1', text], ['btnModeChange', 'on'], ['bWeakOpt', 'true']]){
+    const i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = v; f.appendChild(i);
+  }
+  document.body.appendChild(f); f.submit(); f.remove();
+  return win;
+}
+function drSpellOpen(k){
   const ta = $('drT-' + k); if (!ta) return;
   if (!ta.value.trim()){ toast('검사할 글이 없습니다'); return; }
-  await copyText(ta.value);
-  const win = popWin(SPELLER_URL, 'sgbSpeller', 860);
+  const win = spellSubmit(ta.value);
+  copyText(ta.value);                          // 결과가 안 뜨면 검사기에 붙여 넣을 수 있게
   drSpellBox(k);
-  toast(win ? '글을 복사했습니다 — 팝업 검사기에 붙여 넣으세요(Ctrl+V)' : '팝업이 막혀 있습니다 — 주소창 오른쪽에서 이 사이트의 팝업을 허용해 주세요');
+  toast(win ? '검사기 팝업에 보냈습니다 — 결과가 뜨면 「결과 복사하기」' : '팝업이 막혀 있습니다 — 주소창 오른쪽에서 이 사이트의 팝업을 허용해 주세요');
 }
 // 작성 칸 안의 상자 — 단계 안내와 「📋 복사한 글 반영」. 클립보드를 못 읽었거나 엉뚱한 글이면 붙여 넣는 칸, 반영한 뒤에는 바뀐 곳과 「되돌리기」
 function drSpellBox(k){
   const box = $('drS-' + k); if (!box) return;
   box.hidden = false;
-  box.innerHTML = `<div class="drp-spell-steps" id="drSG-${k}"><b>글을 복사해 두었습니다.</b> ① 팝업 검사기에 붙여 넣기(Ctrl+V) → ② 검사 → ③ 고친 글 복사(Ctrl+C) → ④ 아래 「📋 복사한 글 반영」</div>
+  box.innerHTML = `<div class="drp-spell-steps" id="drSG-${k}"><b>검사기 팝업에 글을 보냈습니다.</b> 결과가 뜨면 ① 팝업의 「결과 복사하기」 → ② 아래 「📋 복사한 글 반영」
+      <span class="d">(결과가 안 뜨면 <a href="${SPELLER_URL}" target="sgbSpeller">검사기 첫 화면</a>에 붙여 넣기(Ctrl+V) → 검사하기 — 글은 복사해 두었습니다)</span></div>
     <textarea class="drp-spell-in" id="drSI-${k}" data-k="${k}" aria-label="${DR_NAME[k]} 고친 글 붙여 넣기" placeholder="검사기에서 고친 글을 복사해 여기에 붙여 넣기(Ctrl+V)" hidden></textarea>
     <div class="drp-spell-sum" id="drSS-${k}"></div>
     <div class="drp-spell-diff" id="drSD-${k}"></div>
     <div class="drp-spell-btns" id="drSB-${k}"><button type="button" class="btn sm pri" data-spell-clip="${k}">📋 복사한 글 반영</button>
-      <button type="button" class="btn sm" data-spell="${k}" title="글을 다시 복사하고 검사기 팝업을 앞으로">검사기 다시 띄우기</button>
+      <button type="button" class="btn sm" data-spell="${k}" title="지금 글로 다시 검사">다시 검사</button>
       <button type="button" class="btn sm" data-spell-close="${k}">닫기</button></div>`;
 }
 // 붙여 넣는 칸을 꺼내고 「반영」 단추로(클립보드를 못 읽었을 때 · 엉뚱한 글일 때)
