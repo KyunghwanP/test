@@ -118,6 +118,16 @@ service cloud.firestore {
       allow read:  if isYnhsTeacher();
       allow write: if isYnhsTeacher();
     }
+    // 생기부 담임 작성(saenggibu.html 「우리 반 작성」) — 나이스에 넣을 최종안(자율·진로·개세특·행특)과
+    // 빼 둔 내용·학생 메모(saenggibuDraft), 영역별 되돌리기 기록(saenggibuDraftHist). 문서 ID 는 '학년-반-번호'.
+    // 그 반 담임과 앱 관리자만 읽고 쓴다 — 다른 반은 조회도 안 된다. 행특은 담임 고유 권한이라
+    // '교사면 전부'로 열면 안 된다. 담임 판정은 학부모 상담·자리 배치와 같은 acl/gradeRoles.homerooms.
+    match /saenggibuDraft/{key} {
+      allow read, write: if isDraftKey(key) && (isAppAdmin() || isHomeroomOf(draftClass(key)));
+    }
+    match /saenggibuDraftHist/{key} {
+      allow read, write: if isDraftKey(key) && (isAppAdmin() || isHomeroomOf(draftClass(key)));
+    }
     // 교실 자리 배치 — 문서 ID 는 '학년-반'(예: 2-3).
     // 조회는 전 교사(수업 들어갈 때 이름을 봐야 한다), 저장은 그 반 담임과 관리자만.
     // 담임 판정은 학부모 상담이 쓰는 acl/gradeRoles.homerooms 를 그대로 재사용한다.
@@ -298,6 +308,13 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/acl/gradeRoles)
         && request.auth.token.email in gradeAcl().homerooms
         && sameClass(gradeAcl().homerooms[request.auth.token.email], classKey);
+    }
+    // 담임 작성 문서 ID('학년-반-번호') — 모양이 맞을 때만, 앞 두 마디가 그 학생의 반
+    function isDraftKey(key) {
+      return key.matches('^[1-3]-[0-9]{1,2}-[0-9]{1,2}$');
+    }
+    function draftClass(key) {
+      return key.split('-')[0] + '-' + key.split('-')[1];
     }
     function sameClass(a, b) {
       return a == b

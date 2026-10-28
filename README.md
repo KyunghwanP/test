@@ -47,6 +47,7 @@
 | `consultationsPublic/{반}` | 위 문서의 **공개 미러** | 교사 앱 · Worker |
 | `memos2/{uid}` `tasks/{uid}` | 개인 메모·업무 일정 | 본인만 |
 | `saenggibu/meta`·`manifest`·`lock`·`log`·`fmt-*` · `saenggibuStu/{학년-반-번호}` · `saenggibuAct/{활동-학년-조각}` | 생기부 보조자료(부서별 기재 문안 시트) — 목록 · 올리는 동안 잠금 · 올린 기록 · 원본 양식 · 학생별 · 활동별 | `saenggibu.html`(교사 전체가 올림, 관리는 관리자) |
+| `saenggibuDraft/{학년-반-번호}` · `saenggibuDraftHist/{학년-반-번호}` | 생기부 담임 작성(우리 반 작성) — 자율·진로·개세특·행특 최종안·빼 둔 내용·메모 · 되돌리기 기록. **그 반 담임과 앱 관리자만**(다른 반은 조회도 안 됨) | `saenggibu.html` 「✏️ 우리 반 작성」 |
 
 ### 교사 이메일이 다루기 까다로운 이유
 
