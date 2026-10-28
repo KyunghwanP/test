@@ -3555,6 +3555,8 @@ onAuthStateChanged(fbAuth, async user => {
   try { const b = await getDoc(doc(fbDb, 'students', 'main')); BOOK = b.exists() ? (b.data().students || []) : []; } catch (e) { BOOK = []; }
   await loadRole();                             // 담임·관리자면 학생별에 「✏️ 작성」
   render();
+  // 앱 안의 생기부 탭 — 다 떴다고 앱에 알린다(종합검색의 「✏️ 작성하러 가기」 가 그다음에 학생을 보낸다)
+  if (!SOLO && window.parent !== window) try { window.parent.postMessage({ type: 'sgb-ready' }, location.origin); } catch (e) {}
 });
 
 // ── 한 학생만 보기(종합검색 안) — 상세만 그리고, 높이를 앱에 알려 iframe 을 늘리게 한다 ──
@@ -3572,6 +3574,16 @@ async function renderEmbed(){
   postHeight();
   try { new ResizeObserver(postHeight).observe(document.body); } catch (e) {}
 }
+// 종합검색의 「✏️ 작성하러 가기」 — 그 학생을 학생별로 열고 작성 칸을 띄운다(쓸 수 있는 학생일 때만 — drCanWrite)
+window.addEventListener('message', e => {
+  if (e.origin !== location.origin || e.source !== window.parent || e.data?.type !== 'sgb-open' || EMBED || SOLO) return;
+  const m = String(e.data.k || '').match(/^(\d)-(\d+)-(\d+)$/);
+  if (!m) return;
+  drFlush();
+  [, st.g, st.c, st.n] = m; st.view = 'stu'; st.find = ''; mList = false;
+  if (e.data.dr && drCanWrite(st.g, st.c)) st.drOpen = true;
+  save(); render();
+});
 // 앱이 탭에 다시 들어올 때 보내는 신호 — 그사이 새로 올라왔을 수 있다
 window.addEventListener('message', e => {
   if (e.origin !== location.origin || e.data?.type !== 'sgb-refresh' || !fbAuth.currentUser) return;

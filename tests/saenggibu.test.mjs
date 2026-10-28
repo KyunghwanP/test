@@ -2194,6 +2194,15 @@ STORE = STORE_B;
   const pw5 = await p.$eval('#drPane', el => el.getBoundingClientRect().width);
   check('— 손잡이 가장자리(막대 밖)를 잡고 끌어도 넓이가 바뀐다', Math.abs((pw5 - pw4) - 107) <= 12, { pw4, pw5 });
   if (process.env.SGB_SHOTS){ await p.dblclick('#drSplit'); await p.mouse.move(5, 300); await p.waitForTimeout(200); await shot(p, '#stuPanes', '12-list-off-1700'); }
+  // 종합검색의 「✏️ 작성하러 가기」 — 앱이 보낸 학생을 학생별로 열고 작성 칸을 띄운다(쓸 수 있는 학생만). 앱 대신 이 창이 자기에게 보낸다(맨 위 창이라 parent = 자기)
+  await p.evaluate(() => window.postMessage({ type: 'sgb-open', k: '1-1-3', dr: 1 }, location.origin));
+  await p.waitForFunction(() => document.querySelector('#stuOut .s-name')?.textContent === '정하늘' && (document.querySelector('#drPane .drp-who')?.textContent || '').includes('정하늘'));
+  check('「✏️ 작성하러 가기」 로 오면 — 그 학생(1-1-3)을 학생별로 열고 작성 칸까지', await p.isVisible('#drT-ja'));
+  await p.evaluate(() => window.postMessage({ type: 'sgb-open', k: '3-2-5', dr: 1 }, location.origin));
+  await p.waitForFunction(() => (document.querySelector('#stuOut .s-name')?.textContent || '').includes('나래'));
+  check('— 쓸 수 없는 학생(다른 반)이면 학생만 열고 작성 칸은 없다', !(await p.isVisible('#drPane')) && !(await p.$('#drOpenBtn')));
+  await p.evaluate(() => window.postMessage({ type: 'sgb-open', k: '1-1-2', dr: 1 }, 'https://kyunghwanp.github.io'));
+  await p.waitForFunction(() => document.querySelector('#stuOut .s-name')?.textContent === '최다온');
   // ☰ — 반·명단을 다시
   await p.click('#mBack');
   await p.waitForFunction(() => !document.getElementById('stuPanes').classList.contains('list-off'));

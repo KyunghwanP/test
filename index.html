@@ -1581,8 +1581,13 @@
     font-family:'Pretendard','Noto Sans KR';outline:none;}
   .s360-susi-q:focus{border-color:var(--mon);}
   .s360-susi-q::placeholder{color:var(--ink-soft);font-weight:600;font-size:13px;}
-  /* 밑줄 탭 — 회색 상자 대신 고른 탭 아래 파란 줄(.s360-ink)이 미끄러져 옮겨 간다 */
-  .s360-tabs{position:relative;margin:4px 0 14px;width:auto;background:transparent;padding:0;border-radius:0;gap:2px;border-bottom:1px solid var(--rule);}
+  /* 밑줄 탭 — 회색 상자 대신 고른 탭 아래 파란 줄(.s360-ink)이 미끄러져 옮겨 간다.
+     .students-tab-row(학생 비상연락망의 회색 상자 탭)가 뒤에서 같은 무게로 덮어 회색 상자가 남았었다 → 두 클래스로 무게를 올린다(2026-10-28) */
+  .students-tab-row.s360-tabs{position:relative;margin:4px 0 14px;width:auto;background:transparent;padding:0;border-radius:0;gap:2px;border-bottom:1px solid var(--rule);}
+  /* 그 반 담임·관리자 — 탭 줄 오른쪽 끝에 「✏️ 작성하러 가기」(생기부 보조자료 탭의 그 학생 작성 칸으로) */
+  .s360-write{margin-left:auto;align-self:center;border:none;background:none;padding:6px 4px;font:inherit;font-size:14px;font-weight:800;color:var(--mon);cursor:pointer;
+    text-decoration:underline;text-decoration-color:transparent;text-underline-offset:3px;transition:text-decoration-color .15s;white-space:nowrap;}
+  .s360-write:hover{text-decoration-color:var(--mon);}
   .s360-tabs .students-tab{font-size:15px;padding:10px 16px 11px;border-radius:6px 6px 0 0;}
   .s360-tabs .students-tab:hover{color:var(--ink);}   /* 회색 음영 없이 글자색만 */
   .s360-tabs .students-tab.active{background:transparent;box-shadow:none;color:var(--mon);}
@@ -6424,7 +6429,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver8.30';
+const APP_VER = 'ver8.31';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -10715,7 +10720,7 @@ function openOvertimeFrame(page){
 function openSaenggibuFrame(){
   const f = document.getElementById('saenggibuPageFrame');
   if (!f) return;
-  if (!f.src || f.src === 'about:blank') { f.src = `saenggibu.html?in=1&v=${encodeURIComponent(APP_VER)}`; return; }
+  if (!f.src || f.src === 'about:blank') { f.dataset.ready = ''; f.src = `saenggibu.html?in=1&v=${encodeURIComponent(APP_VER)}`; return; }
   try { f.contentWindow.postMessage({ type: 'sgb-refresh' }, location.origin); } catch (e) {}
 }
 
@@ -15174,6 +15179,7 @@ async function s360ShowDetail(s, targetEl){
       ${s360SgbOn() ? `<div class="students-tab-row s360-tabs" id="s360Tabs2" role="tablist">
           <button type="button" class="students-tab" data-tab="grade" role="tab">📈 성적</button>
           <button type="button" class="students-tab" data-tab="sgb" role="tab">📑 생기부 보조자료</button>
+          ${s360CanWrite(s) ? '<button type="button" class="s360-write" id="s360WriteBtn" title="생기부 보조자료 탭으로 옮겨 이 학생의 작성 칸을 엽니다">✏️ 작성하러 가기</button>' : ''}
           <span class="s360-ink"></span>
         </div>` : ''}
       <div class="spot-sec s360-pane-grade" style="margin-bottom:0;"><div class="spot-sec-title">성적 (내신 · 모의고사 전체 회차)</div>
@@ -15290,9 +15296,35 @@ function s360MoveInk(first){
   if (first) { void ink.offsetWidth; ink.style.transition = ''; }
 }
 window.addEventListener('resize', () => s360MoveInk(true));
+// 종합검색 「✏️ 작성하러 가기」 — 그 반 담임과 관리자만(가장 모드는 아님). 화면 편의일 뿐이고, 저장은 firestore.rules 가 다시 막는다
+function s360CanWrite(s){
+  if (isViewAs()) return false;
+  if (fbAuth.currentUser?.email === ADMIN_EMAIL) return true;
+  const hr = getMyHomeroom();
+  return !!hr && sameClassKey(hr, `${s.grade}-${s.room}`);
+}
+// 생기부 보조자료 탭으로 옮겨 그 학생의 작성 칸을 연다. 탭이 처음이면 다 뜬 뒤(sgb-ready)에, 떠 있으면 바로 알린다
+let _sgbGo = null;
+function openSaenggibuWrite(k){
+  _sgbGo = { type: 'sgb-open', k, dr: 1 };
+  navigateTo('saenggibu');
+  sgbFlushGo();
+}
+function sgbFlushGo(){
+  const f = document.getElementById('saenggibuPageFrame');
+  if (!_sgbGo || !f || f.dataset.ready !== '1') return;
+  try { f.contentWindow.postMessage(_sgbGo, location.origin); _sgbGo = null; } catch (e) {}
+}
+window.addEventListener('message', e => {
+  if (e.origin !== location.origin || e.data?.type !== 'sgb-ready') return;
+  const f = document.getElementById('saenggibuPageFrame');
+  if (f && e.source === f.contentWindow){ f.dataset.ready = '1'; sgbFlushGo(); }
+});
 function s360BindTabs(s){
   const tabs = document.getElementById('s360Tabs2');
   if (!tabs) return;
+  const wb = document.getElementById('s360WriteBtn');
+  if (wb) wb.addEventListener('click', () => openSaenggibuWrite(`${parseInt(s.grade)}-${parseInt(s.room)}-${parseInt(s.num)}`));
   tabs.addEventListener('click', e => {
     const b = e.target.closest('.students-tab');
     if (b && !b.disabled) s360ShowTab(b.dataset.tab, s);

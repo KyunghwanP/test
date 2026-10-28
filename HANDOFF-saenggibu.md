@@ -17,7 +17,7 @@
 
 - 현재 **test 저장소에만** 있다(`KyunghwanP/test`). 운영(ynhs)으로는 아직 안 옮겼다. 선생님이 test 에서 더 다듬은 뒤 옮긴다.
 - 탭·종합검색 「생기부 보조자료」 탭은 **test 에서 교사 전체에 열었다**. 엑셀로 받기·관리는 관리자만.
-- 마지막 버전: `APP_VER = 'ver8.30'`(index.html·usage.html), `CACHE_VER = 'v674'`(sw.js) — 2026-10-28 우리 반 생기부 페이지·인쇄 다시·새 창은 담임 반만.
+- 마지막 버전: `APP_VER = 'ver8.31'`(index.html·usage.html), `CACHE_VER = 'v675'`(sw.js) — 2026-10-28 우리 반 생기부 페이지·인쇄 다시·새 창은 담임 반만.
 
 ### 원본 엑셀의 모양(이걸 알아야 코드가 읽힌다)
 - 시트 하나 = 활동 하나. 시트 이름 앞 꼬리표가 입력 영역: `<자>` 자율, `<진>` 진로, `<개>` 개인별 세특,
@@ -50,14 +50,14 @@
 | 파일 | 내용 |
 |---|---|
 | `saenggibu.html` (약 1,900줄) | 화면 전부 + 올리기 + 내려받기. 앱 안에서 iframe 으로 뜬다 |
-| `index.html` | 탭·메뉴(`tabSaenggibu`·`navSaenggibu`, **교사 전체**), iframe 껍데기, `openSaenggibuFrame`, 학생 종합검색의 「성적 / 생기부 보조자료」 탭(`s360ShowTab`·`s360BindTabs`·`s360MoveInk`, `s360SgbOn`) |
+| `index.html` | 탭·메뉴(`tabSaenggibu`·`navSaenggibu`, **교사 전체**), iframe 껍데기, `openSaenggibuFrame`, 학생 종합검색의 「성적 / 생기부 보조자료」 탭(`s360ShowTab`·`s360BindTabs`·`s360MoveInk`, `s360SgbOn`), 그 반 담임·관리자의 「✏️ 작성하러 가기」(`s360CanWrite`·`openSaenggibuWrite` — 생기부 탭이 `sgb-ready` 를 보내면 `sgb-open` 으로 학생을 보낸다) |
 | `upload.html` | 편성표 올리기에서 반·번호가 빈 학생(전출·자퇴)을 `students/changed` 에 따로 저장(`psMoveOf`) |
 | `usage.html` | 사용 현황에 `saenggibu`·`notice` 이름 |
 | `firestore.rules` | `saenggibu`·`saenggibuStu`·`saenggibuAct` — 읽기·쓰기 `isYnhsTeacher()`(2026-10-28 쓰기를 교사 전체로) |
 | `tests/saenggibu-draft-rules.test.mjs` | 생기부 작성 규칙(에뮬레이터) 22개 — 담임은 자기 반만, 다른 반·다른 교사·전체열람 권한자·학생은 못 봄, 관리자는 모든 반 |
 | `tests/saenggibu.test.mjs` | 466개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
 | `tests/make-saenggibu-template.mjs` | **표준 양식** 엑셀 만들기(부서에 나눠 줄 빈 양식). `node tests/make-saenggibu-template.mjs <폴더>` |
-| `tests/s360-tabs.test.mjs` | 17개 검사(종합검색 탭) |
+| `tests/s360-tabs.test.mjs` | 23개 검사(종합검색 탭 — 앱 스타일을 그대로 얹어 회색 상자가 안 덮이는지, 「✏️ 작성하러 가기」 판정·이동) |
 | `tests/upload-pyeonseong*.test.mjs`, `tests/make-pyeonseong-fixture.mjs` | 편성표(학적사항 칸·괄호 이름 포함) |
 | `BACKLOG.md` | 「학생 종합검색에 성적/보조자료 탭」 항목(지금은 시험 중으로 바꿔 둠) |
 
@@ -193,6 +193,13 @@
   - **🖨 (영역) 인쇄**(`drPrintArea`): 그 영역만 반 전체를 한 표로(번호·성명·내용·바이트) — 쪽이 넘어가면 제목·머리줄이 다음 쪽에도. **🖨 학생마다 인쇄**: 작성 칸의 「우리 반 전체 인쇄」 와 같음.
   - **📥 엑셀로 저장**(`drXlsx`, ExcelJS): 「1학년 1반 생기부 기재안_날짜.xlsx」, 영역마다 시트(반·번호·이름·영역 이름·바이트, 넘은 바이트 빨강, 머리줄 틀 고정, 가로 A4).
   - 행특을 가리면 탭·한눈에 칸·인쇄·엑셀 시트에서 모두 빠진다. 열 때 반 문서를 새로 읽는다. 보조자료가 아직 없어도 열린다.
+
+**학생 종합검색(index.html)과 이어지는 곳**(2026-10-28 선생님 요청):
+- 「📈 성적 / 📑 생기부 보조자료」 탭 뒤 회색 상자를 없앴다 — 밑줄 탭(`.s360-tabs`)으로 만들어 두었는데, 학생 비상연락망의 `.students-tab-row`(회색 상자 탭)가
+  뒤에서 같은 무게로 덮어 회색 상자가 남아 있었다. `.students-tab-row.s360-tabs` 로 무게를 올렸다(검사는 앱 스타일을 통째로 얹어 계산된 모양을 본다).
+- 그 반 담임과 관리자에게 탭 줄 오른쪽 끝 **「✏️ 작성하러 가기」**(가장 모드에서는 없음): 누르면 앱이 생기부 보조자료 탭으로 옮기고, 그 탭의 saenggibu.html 이
+  다 뜨면(`sgb-ready`) `sgb-open` 으로 학생을 보내 학생별로 열고 작성 칸을 띄운다(쓸 수 없는 학생이면 작성 칸은 열지 않는다 — `drCanWrite`). 탭이 이미 떠 있으면
+  바로 보낸다. 받는 쪽은 같은 출처·부모 창이 보낸 것만 받는다.
 
 **활동별** — 입력 영역별 활동 목록 | 활동 설명(유의 사항·입력 경로·시트·파일) + 학년 탭 + 반별 인원 칩(누르면 그 반만) + 학생 카드.
 학년 탭 맨 앞에 **「전체」**(학년이 둘 이상일 때) — 업무 담당자가 모든 학년을 학년·반·번호 순으로, 칩은 「전체 학년 N」 하나(2026-10-28 요청).

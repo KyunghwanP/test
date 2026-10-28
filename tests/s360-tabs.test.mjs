@@ -27,6 +27,7 @@ check('탭 줄과 보조자료 칸은 s360SgbOn() 일 때만', /\$\{s360SgbOn\(\
 check('모든 교사(생기부 탭과 같은 조건)', /const s360SgbOn = \(\) => true;/.test(HTML));
 check('권한 없는 반 — 성적 탭을 흐리게 하고 보조자료로', /gt\.disabled = true;[^\n]*\n?[^\n]*s360ShowTab\('sgb', s, true\)/.test(detail));
 check('상세를 그린 뒤 탭을 붙인다', /s360BindTabs\(s\);/.test(detail));
+check('그 반 담임·관리자에게만 탭 줄 오른쪽 「✏️ 작성하러 가기」', /\$\{s360CanWrite\(s\) \? '<button type="button" class="s360-write" id="s360WriteBtn"/.test(detail));
 
 console.log('\n■ 눌러 보기');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
@@ -50,7 +51,13 @@ const mount = async (opts = {}) => page.evaluate(([fns, opts]) => {
 }, [grab('s360MoveInk') + grab('s360ShowTab') + grab('s360BindTabs') + "\nconst S360_TAB_LS = 'ynhs-s360-tab';\n"
      + HTML.match(/window\.addEventListener\('message', e => \{\n  if \(e\.origin !== location\.origin \|\| e\.data\?\.type !== 'sgb-height'\)[\s\S]*?\n\}\);/)[0], opts]);
 await page.evaluate(() => localStorage.clear());
+// 앱의 스타일을 그대로 얹는다 — 같은 이름 규칙이 뒤에서 덮는지까지 보려고(학생 비상연락망의 .students-tab-row 가 회색 상자를 덮어씌웠었다)
+await page.addStyleTag({ content: [...HTML.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n') });
 await mount();
+const box = await page.$eval('#s360Tabs2', el => { const c = getComputedStyle(el); return { bg: c.backgroundColor, pad: c.paddingTop, r: c.borderTopLeftRadius,
+  w: Math.round(el.getBoundingClientRect().width), pw: Math.round(el.parentElement.getBoundingClientRect().width), line: c.borderBottomStyle }; });
+check('탭 뒤 회색 상자 없음 — 배경 투명·안쪽 여백 0·둥근 모서리 없음, 아래 회색 줄은 칸 너비 가득(선생님 요청 2026-10-28)',
+  box.bg === 'rgba(0, 0, 0, 0)' && box.pad === '0px' && box.r === '0px' && box.line === 'solid' && box.w === box.pw, box);
 const shown = () => page.evaluate(() => [getComputedStyle(document.querySelector('.s360-pane-grade')).display !== 'none',
   getComputedStyle(document.querySelector('.s360-pane-sgb')).display !== 'none']);
 check('처음엔 성적 탭', JSON.stringify(await shown()) === '[true,false]' && await page.$eval('[data-tab="grade"]', x => x.classList.contains('active')));
@@ -80,6 +87,34 @@ check('권한 없는 반 — 성적 탭은 흐리고 보조자료가 열린다',
 await page.click('[data-tab="grade"]', { force: true });
 check('흐린 성적 탭은 눌러도 안 바뀐다', JSON.stringify(await shown()) === '[false,true]');
 check('자동 전환은 기억하지 않는다(다른 반 학생은 다시 성적부터)', (await page.evaluate(() => localStorage.getItem('ynhs-s360-tab'))) === 'grade');
+
+console.log('\n■ 「✏️ 작성하러 가기」');
+const cw = await page.evaluate(([fn, same]) => {
+  (0, eval)(same + fn + "\nvar ADMIN_EMAIL = 'admin@x';");
+  const r = (email, hr, va, g, c) => { window.fbAuth = { currentUser: { email } }; window.getMyHomeroom = () => hr; window.isViewAs = () => va; return s360CanWrite({ grade: g, room: c }); };
+  return [r('kim@x', '1-1', false, '1', '01'), r('kim@x', '1-1', false, '1', '2'), r('admin@x', null, false, '3', '2'), r('kim@x', '1-1', true, '1', '1'), r('lee@x', null, false, '1', '1')];
+}, [grab('s360CanWrite'), grab('sameClassKey')]);
+check('그 반 담임(\'01\' 표기도)·관리자만 — 다른 반 담임·가장 모드·담임 아님은 단추 없음', JSON.stringify(cw) === '[true,false,true,false,false]', cw);
+const go = await page.evaluate(src => {
+  document.body.insertAdjacentHTML('beforeend', '<iframe id="saenggibuPageFrame"></iframe>');
+  (0, eval)(src);
+  window.__nav = []; window.navigateTo = p => window.__nav.push(p);
+  const f = document.getElementById('saenggibuPageFrame'), sent = [];
+  f.contentWindow.postMessage = (m, o) => sent.push([m, o]);
+  openSaenggibuWrite('1-1-3');
+  const before = sent.length;
+  window.dispatchEvent(new MessageEvent('message', { data: { type: 'sgb-ready' }, origin: location.origin, source: window }));   // 다른 곳에서 온 「다 떴음」 은 무시
+  const stranger = sent.length;
+  window.dispatchEvent(new MessageEvent('message', { data: { type: 'sgb-ready' }, origin: location.origin, source: f.contentWindow }));
+  const afterReady = sent.length;
+  openSaenggibuWrite('2-1-1');                                   // 이미 떠 있으면 바로
+  return { nav: window.__nav, before, stranger, afterReady, sent };
+}, 'var _sgbGo = null;\n' + grab('openSaenggibuWrite') + grab('sgbFlushGo')
+   + HTML.match(/window\.addEventListener\('message', e => \{\n  if \(e\.origin !== location\.origin \|\| e\.data\?\.type !== 'sgb-ready'\)[\s\S]*?\n\}\);/)[0]);
+check('누르면 생기부 탭으로 옮기고, 탭이 다 뜨면(그 프레임의 sgb-ready) 그 학생을 작성 칸 열기로 보낸다', go.nav.join() === 'saenggibu,saenggibu' && go.before === 0 && go.stranger === 0
+  && go.afterReady === 1 && JSON.stringify(go.sent[0]) === JSON.stringify([{ type: 'sgb-open', k: '1-1-3', dr: 1 }, 'https://kyunghwanp.github.io']), go);
+check('— 탭이 이미 떠 있으면 바로 보낸다', go.sent.length === 2 && go.sent[1][0].k === '2-1-1', go.sent);
+check('탭을 새로 띄우면 「다 떴음」 표시를 지운다(다시 뜰 때까지 기다리게)', /f\.dataset\.ready = ''; f\.src = `saenggibu\.html\?in=1/.test(grab('openSaenggibuFrame')));
 await b.close();
 console.log(`\n${fail ? '❌' : '✅'} 통과 ${pass} / 실패 ${fail}`);
 process.exit(fail ? 1 : 0);
