@@ -153,7 +153,7 @@ const FILE2 = await xlsxFile('sgb-5.xlsx', { dropOfficers: true, robotText: '로
 // ── 1. 해석 (페이지의 순수 함수 블록을 그대로) ──
 console.log('\n[해석]');
 const code = HTML.match(/<script id="sgbParser">([\s\S]*?)<\/script>/)[1];
-const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches, sgbOddSheets, sgbActKey, sgbStamp, sgbLookalikes, sgbApplyFix, sgbFresh, sgbRosterView, sgbMisFor };')();
+const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches, sgbOddSheets, sgbActKey, sgbStamp, sgbLookalikes, sgbApplyFix, sgbFresh, sgbRosterView, sgbMisFor, sgbAreaTags };')();
 const wb1 = XLSX.read(fs.readFileSync(FILE1), { type: 'buffer' });
 const parsed = P.sgbParseBook(P.sgbBookToSheets(XLSX, wb1));
 const act = t => parsed.activities.find(a => a.sheet.includes(t));
@@ -518,6 +518,41 @@ const itemOf = (p, g, c, n) => p.students.find(s => s.g === g && s.c === c && s.
 // ── 2-3b. 다시 올릴 때 짝짓기 — 차수 없이 ──
 // 부서가 시트를 하나씩 바로 올린다. 예전 합본은 시트 이름 끝에 배포 차수(-2차-3차(수정))를 붙였고 앞으로는
 // 안 붙인다 — 붙든 안 붙든, 꼬리표를 고쳐 냈든 같은 활동이어야 겹치지 않는다. 괄호 안 차수는 활동 회차라 다르다.
+console.log('\n[꼬리표 없는 시트 · <행>]');
+// 부서가 직접 올리니 꼬리표를 빼먹을 수 있다 — ⊙ 입력 영역 칸으로 영역을 알아낸다. 받을 때는 꼬리표를 붙여서(선생님 요청 2026-10-28)
+{
+  const cases = [['자율활동 특기사항 or 진로활동 특기사항', '자,진'], ['자율·자치활동 특기사항', '자'], ['진로활동 특기사항', '진'],
+    ['봉사활동 누가기록', '누'], ['개인별 세부능력 및 특기사항', '개'], ['과목별 세부능력 및 특기사항', '개'],
+    ['행동특성 및 종합의견', '행'], ['', ''], ['동아리활동', '']];
+  const got = cases.map(([a]) => P.sgbAreaTags(a).join());
+  check('입력 영역 칸 → 꼬리표(자율·진로·누가기록·개인별·행특, 모르면 없음)', cases.every(([, t], i) => got[i] === t), got);
+  const head = (title, area) => [['담임', null, '⊙ 활  동  명:', null, title], [null, null, '⊙ 입력 영역:', null, area], ['학년', '반', '번호', '성명', '기재 내용']];
+  const { p } = await varBook('v-notag.xlsx', wb => {
+    putRows(wb.addWorksheet('교무(꼬리표 없음)'), [...head('꼬리표 없는 활동', '자율활동 특기사항 or 진로활동 특기사항'), [1, 1, 1, '김가람', '꼬리표 없이 낸 문안.']]);
+    putRows(wb.addWorksheet('담임(행발)'), [...head('행동발달', '행동특성 및 종합의견'), [1, 1, 2, '박나래', '행특 문안.']]);
+    putRows(wb.addWorksheet('<행>담임(행특 둘)'), [...head('행특 둘', '행동특성 및 종합의견'), [1, 1, 1, '김가람', '꼬리표 있는 행특.']]);
+    putRows(wb.addWorksheet('교무(영역 모름)'), [...head('알 수 없는 영역', '동아리활동'), [1, 1, 1, '김가람', '모름.']]);
+    putRows(wb.addWorksheet('메모'), [['그냥 메모'], ['학년', '반', '번호', '성명', '기재 내용'], [1, 1, 1, '김가람', '메모.']]);
+    const big = wb.addWorksheet('개인별 조회(큰 시트)');
+    for (let r = 1; r <= 3000; r++) big.getRow(r).getCell(1).value = r;
+  });
+  const by = s => p.activities.find(a => a.sheet === s);
+  const why = s => p.skipped.find(x => x.name === s)?.why || '';
+  const a1 = by('교무(꼬리표 없음)'), a2 = by('담임(행발)'), a3 = by('<행>담임(행특 둘)');
+  check('꼬리표 없어도 ⊙ 입력 영역으로 읽는다 — 자율·진로, 문안까지', a1?.tags.join() === '자,진' && a1.tagGuess === true
+    && p.actRows.get(a1.id)?.[0]?.b === '꼬리표 없이 낸 문안.', a1);
+  check('꼬리표 없는 행특 시트 → <행>', a2?.tags.join() === '행' && a2.tagGuess === true, a2);
+  check('<행> 꼬리표도 알아본다(짐작 아님)', a3?.tags.join() === '행' && !a3.tagGuess, a3);
+  check('입력 영역으로도 모르면 건너뛰고 까닭을 알린다', !by('교무(영역 모름)') && why('교무(영역 모름)').includes('입력 영역'), p.skipped);
+  check('⊙ 안내 칸도 꼬리표도 없는 시트는 전처럼 건너뜀', !by('메모') && why('메모').includes('꼬리표'), p.skipped);
+  const sh = P.sgbBookToSheets(XLSX, XLSX.read(fs.readFileSync(path.join(TMP, 'v-notag.xlsx')), { type: 'buffer' }));
+  check('꼬리표 없는 큰 시트는 위쪽만 보고 ⊙ 가 없으면 통째로 읽지 않는다', sh.find(x => x.name === '개인별 조회(큰 시트)').rows.length === 0
+    && sh.find(x => x.name === '교무(꼬리표 없음)').rows.length >= 4);
+  const names = P.sgbExportPlan(P.sgbBuildDocs(p).meta, Object.fromEntries([a1, a2, a3].map(a => [a.id, p.actRows.get(a.id)])), {}).map(x => x.name);
+  check('엑셀로 받을 때는 꼬리표를 붙여서(<자or진>·<행>), 원래 붙은 것은 그대로', names.includes('<자or진>교무(꼬리표 없음)') && names.includes('<행>담임(행발)')
+    && names.includes('<행>담임(행특 둘)'), names);
+}
+
 console.log('\n[짝짓기 — 차수 없이]');
 {
   const K = P.sgbActKey;
@@ -748,6 +783,23 @@ STORE = { 'students/main': { students: ROSTER } };
   check('미리보기 — 기재 문안 칸을 못 찾은 시트를 알리고, 어떤 칸으로 읽었는지까지',
     odd.includes('확인할 시트 1개') && odd.includes('국어(이름 다른 칸)') && odd.includes('기재 문안 칸 없음') && odd.includes('작성할 글'), odd);
   check('— 칸이 맞는 시트는 경고에 안 든다', odd && !odd.includes('교무(정상)'), odd);
+  await p.close();
+}
+
+// 3-0b 꼬리표 없는 시트·꼬리표와 입력 영역이 다른 시트 — 미리보기에서 알린다(쓰지 않고 닫는다)
+{
+  const hd = (title, area) => [['담임', null, '⊙ 활  동  명:', null, title], [null, null, '⊙ 입력 영역:', null, area], ['학년', '반', '번호', '성명', '기재 내용']];
+  const fNo = await oneSheet('notag.xlsx', [['담임(행발)', [...hd('행동발달', '행동특성 및 종합의견'), [1, 1, 1, '김가람', '행특 문안.']]],
+    ['<자>교무(어긋남)', [...hd('어긋난 꼬리표', '진로활동 특기사항'), [1, 1, 1, '김가람', '문안.']]]]);
+  STORE = { 'students/main': { students: ROSTER } };
+  const p = await openAs(ADMIN);
+  await p.waitForSelector('#body .empty');
+  await p.setInputFiles('#upFile', fNo);
+  await p.waitForSelector('#upGo');
+  const g = (await p.$('#upGuess')) ? await p.textContent('#upGuess') : '';
+  check('미리보기 — 꼬리표 없는 시트를 입력 영역으로 읽었다고(담임(행발) → 행특)', g.includes('담임(행발)') && g.includes('행특'), g);
+  const c = (await p.$('#upClash')) ? await p.textContent('#upClash') : '';
+  check('미리보기 — 꼬리표와 입력 영역이 다른 시트를 알린다', c.includes('교무(어긋남)') && c.includes('진로활동'), c);
   await p.close();
 }
 

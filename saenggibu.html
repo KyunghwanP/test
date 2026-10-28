@@ -31,8 +31,8 @@
     --ink:#0F172A; --ink-soft:#64748B; --rule:#E2E8F0;
     --mon:#3B82F6; --mon-deep:#2563EB; --warn:#EF4444; --today-tint:#EFF6FF; --sel:#EEF2FF;
     --g1:#2563EB; --g2:#0D9488; --g3:#D97706;
-    --t-ja:#2563EB; --t-jin:#059669; --t-gae:#9333EA; --t-nu:#D97706;
-    --t-ja-bg:#EFF6FF; --t-jin-bg:#ECFDF5; --t-gae-bg:#FAF5FF; --t-nu-bg:#FFFBEB;
+    --t-ja:#2563EB; --t-jin:#059669; --t-gae:#9333EA; --t-nu:#D97706; --t-haeng:#0E7490;
+    --t-ja-bg:#EFF6FF; --t-jin-bg:#ECFDF5; --t-gae-bg:#FAF5FF; --t-nu-bg:#FFFBEB; --t-haeng-bg:#ECFEFF;
     --shadow:0 4px 20px -8px rgba(0,0,0,.15);
   }
   html.dark{
@@ -40,8 +40,8 @@
     --ink:#E2E8F0; --ink-soft:#8FA3BD; --rule:#26354F;
     --mon:#60A5FA; --mon-deep:#3B82F6; --warn:#F87171; --today-tint:#16263F; --sel:#26354F;
     --g1:#60A5FA; --g2:#2DD4BF; --g3:#FBBF24;
-    --t-ja:#60A5FA; --t-jin:#34D399; --t-gae:#C084FC; --t-nu:#FBBF24;
-    --t-ja-bg:#16263F; --t-jin-bg:#11291F; --t-gae-bg:#241A35; --t-nu-bg:#2B2210;
+    --t-ja:#60A5FA; --t-jin:#34D399; --t-gae:#C084FC; --t-nu:#FBBF24; --t-haeng:#22D3EE;
+    --t-ja-bg:#16263F; --t-jin-bg:#11291F; --t-gae-bg:#241A35; --t-nu-bg:#2B2210; --t-haeng-bg:#0B2830;
     --shadow:none;
     color-scheme:dark;
   }
@@ -191,6 +191,7 @@
   .tag{display:inline-flex;align-items:center;font-size:13px;font-weight:800;padding:2px 9px;border-radius:999px;white-space:nowrap;line-height:1.5;}
   .tag.ja{color:var(--t-ja);background:var(--t-ja-bg);} .tag.jin{color:var(--t-jin);background:var(--t-jin-bg);}
   .tag.gae{color:var(--t-gae);background:var(--t-gae-bg);} .tag.nu{color:var(--t-nu);background:var(--t-nu-bg);}
+  .tag.haeng{color:var(--t-haeng);background:var(--t-haeng-bg);}
   .grp{display:flex;align-items:center;gap:8px;margin:24px 0 10px;font-size:14px;font-weight:800;color:var(--ink-soft);}
   .grp::after{content:'';flex:1;height:1px;background:var(--rule);}
   .card{border:1px solid var(--rule);border-radius:12px;padding:16px 18px;margin-bottom:12px;background:var(--paper);}
@@ -463,10 +464,11 @@
 <!-- 엑셀 → 자료. 순수 함수만 둔다(XLSX·Firebase 없이 시트 이름·숨김 여부·행 배열만 받는다).
      tests/saenggibu.test.mjs 가 이 블록을 그대로 떼어 돌린다. -->
 <script id="sgbParser">
-// 시트 이름 앞 꼬리표 — 엑셀이 쓰는 약속: <자> 자율, <진> 진로, <개> 개인별, <누> 누가기록, <자or진> 둘 중 고름
-const SGB_TAGS = { '자':'자율', '진':'진로', '개':'개인별', '누':'누가기록' };
-const SGB_TAG_CLS = { '자':'ja', '진':'jin', '개':'gae', '누':'nu' };
-const SGB_TAG_ORDER = ['자','진','개','누'];
+// 시트 이름 앞 꼬리표 — 엑셀이 쓰는 약속: <자> 자율, <진> 진로, <개> 개인별, <누> 누가기록,
+// <행> 행동특성 및 종합의견, <자or진> 둘 중 고름. 꼬리표가 없으면 ⊙ 입력 영역 칸으로 알아낸다(sgbAreaTags)
+const SGB_TAGS = { '자':'자율', '진':'진로', '개':'개인별', '누':'누가기록', '행':'행특' };
+const SGB_TAG_CLS = { '자':'ja', '진':'jin', '개':'gae', '누':'nu', '행':'haeng' };
+const SGB_TAG_ORDER = ['자','진','개','누','행'];
 // 한 문서에 담을 크기(바이트). Firestore 한도는 1MiB — 여유를 두고 자른다.
 const SGB_PART_BYTES = 600000;
 
@@ -483,12 +485,27 @@ function sgbHash(s){
 function sgbSheetInfo(name){
   const m = String(name).match(/^\s*<([^>]+)>\s*(.*)$/);
   if (!m) return null;
-  const tags = m[1].split(/or/i).map(s => s.trim()).filter(Boolean);
-  const rest = m[2].trim();
+  return { tags: m[1].split(/or/i).map(s => s.trim()).filter(Boolean), ...sgbNameInfo(m[2]) };
+}
+// 꼬리표 뒤 이름 — 차수·괄호 속 짧은 이름·부서 약칭
+function sgbNameInfo(rest0){
+  const rest = String(rest0 ?? '').trim();
   // 괄호 안의 숫자(예: '수학대중화강연 1,2차')는 차수가 아니다
   const rounds = [...rest.replace(/\([^)]*\)/g, '').matchAll(/(\d+)\s*차/g)].map(x => +x[1]);
   const paren = rest.match(/\(([^)]*)\)/);
-  return { tags, rest, rounds, short: paren ? paren[1].trim() : rest, deptAbbr: rest.split('(')[0].replace(/-\d+차.*$/, '').trim() };
+  return { rest, rounds, short: paren ? paren[1].trim() : rest, deptAbbr: rest.split('(')[0].replace(/-\d+차.*$/, '').trim() };
+}
+// ⊙ 입력 영역 칸 → 꼬리표. 꼬리표를 빼먹은 시트를 읽을 때 쓴다. 모르면 [] (그 시트는 건너뛴다)
+function sgbAreaTags(area){
+  const s = sgbNorm(area);
+  if (!s) return [];
+  if (/누가|봉사/.test(s)) return ['누'];
+  if (/행동특성|행특|종합의견/.test(s)) return ['행'];
+  const t = [];
+  if (/자율|자치/.test(s)) t.push('자');
+  if (/진로/.test(s)) t.push('진');
+  if (/세부능력|세특|개인별/.test(s)) t.push('개');
+  return t;
 }
 
 // ── 활동을 알아보는 이름 ── 시트 이름에서 꼬리표와 맨 끝의 배포 차수·(수정)을 뗀다. 다시 올릴 때
@@ -637,12 +654,21 @@ function sgbRole(h){
   return 'extra';
 }
 
-// 엑셀 → sgbParseBook 이 받는 모양. 꼬리표(<…>) 없는 시트는 읽지도 않는다(개인별 조회 시트가 6천 줄이다).
+// 엑셀 → sgbParseBook 이 받는 모양. 꼬리표(<…>) 없는 시트는 위쪽(SGB_HEAD_ROWS 줄)만 보고 ⊙ 안내 칸이 없으면
+// 통째로 읽지 않는다(개인별 조회 시트가 6천 줄이다). ⊙ 가 있으면 꼬리표를 빼먹은 활동 시트일 수 있어 다 읽는다.
 function sgbBookToSheets(XLSX, wb){
   return wb.SheetNames.map((name, i) => {
     const hidden = !!(wb.Workbook?.Sheets?.[i]?.Hidden);
-    if (hidden || !/^\s*</.test(name)) return { name, hidden, rows: [] };
-    return { name, hidden, rows: XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, defval: '' }) };
+    const ws = wb.Sheets[name];
+    if (hidden || !ws) return { name, hidden, rows: [] };
+    if (!/^\s*</.test(name)){
+      if (!ws['!ref']) return { name, hidden, rows: [] };
+      const r = XLSX.utils.decode_range(ws['!ref']);
+      const top = XLSX.utils.encode_range({ s: r.s, e: { r: Math.min(r.e.r, r.s.r + SGB_HEAD_ROWS), c: r.e.c } });
+      const peek = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '', range: top });
+      if (!peek.some(row => (row || []).some(v => String(v).includes('⊙')))) return { name, hidden, rows: [] };
+    }
+    return { name, hidden, rows: XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' }) };
   });
 }
 
@@ -655,16 +681,23 @@ function sgbParseBook(sheets){
     pos++;                                   // 파일 안 시트 차례 — 내려받을 때 원본 순서대로
     const name = String(sh.name || '').trim();
     if (sh.hidden){ skipped.push({ name, why: '숨긴 시트' }); continue; }
-    const info = sgbSheetInfo(name);
-    if (!info){ skipped.push({ name, why: '이름이 <자>·<진>·<누> 같은 꼬리표로 시작하지 않음' }); continue; }
+    let info = sgbSheetInfo(name), tagGuess = false;
     const rows = sh.rows || [];
     const hd = sgbFindHeader(rows);
+    const head = hd ? sgbHead(rows, hd.i) : {};
+    if (!info){
+      // 꼬리표를 빼먹은 활동 시트 — ⊙ 활동명이 있고 ⊙ 입력 영역으로 영역을 알 수 있으면 읽는다(창체 일정은 영역 없이도)
+      const tags = sgbAreaTags(head['입력영역']);
+      if (!hd || !head['활동명']){ skipped.push({ name, why: '이름이 <자>·<진>·<개>·<누>·<행> 같은 꼬리표로 시작하지 않고 ⊙ 활동명 칸도 없음' }); continue; }
+      if (!tags.length && hd.kind !== 'schedule'){ skipped.push({ name, why: `꼬리표가 없고 ⊙ 입력 영역 칸(${head['입력영역'] || '비어 있음'})으로도 영역을 알 수 없음` }); continue; }
+      info = { tags, ...sgbNameInfo(name) };
+      tagGuess = true;
+    }
     if (!hd){ skipped.push({ name, why: '학년·반·번호(또는 월·일) 머리 줄을 못 찾음' }); continue; }
-    const head = sgbHead(rows, hd.i);
     let id = 'a' + sgbHash(name);
     while (ids.has(id)) id += 'x';
     ids.add(id);
-    const base = { id, key: sgbActKey(name), pos, sheet: name, tags: info.tags, rounds: info.rounds,
+    const base = { id, key: sgbActKey(name), pos, sheet: name, tags: info.tags, rounds: info.rounds, ...(tagGuess ? { tagGuess } : {}),
       // 부서 칸에 활동명이 그대로 들어간 시트가 있다 — 그럴 땐 시트 이름 앞쪽(예: 연구부)을 쓴다
       title: head['활동명'] || info.short, short: info.short,
       dept: head._dept && head._dept !== head['활동명'] ? head._dept : info.deptAbbr,
@@ -1268,7 +1301,9 @@ function sgbExportPlan(meta, rowsById, forms = {}){
   const ids = [...(meta.order || []).filter(id => byId.has(id)), ...[...byId.keys()].filter(id => !(meta.order || []).includes(id))];
   for (const id of ids){
     const [kind, a] = byId.get(id);
-    const name = sheetName(a.orig?.tags ? String(a.sheet).replace(/^\s*<[^>]*>/, `<${(a.tags || []).join('or')}>`) : a.sheet);
+    // 받을 때 시트 이름의 꼬리표 — 관리자가 고쳤거나(orig.tags) 꼬리표 없이 올라온 시트(tagGuess)는 지금 꼬리표로 붙인다
+    const name = sheetName((a.orig?.tags || a.tagGuess) && (a.tags || []).length
+      ? `<${a.tags.join('or')}>` + String(a.sheet).replace(/^\s*<[^>]*>\s*/, '') : a.sheet);
     const form = sgbFixForm(forms[a.id] || sgbPlainForm(a, kind), a);
     // 줄 차례: 원본 시트 차례(i). 옛 기록이라 i 가 없으면 반·번호 순
     const list = kind === 'sch' ? (a.rows || []) : [...(rowsById[a.id] || [])].sort((x, y) =>
@@ -2075,6 +2110,8 @@ async function previewFile(f){
     _pending = { parsed, cmp, look, file: f.name, f, forms, roster, changed, metaAt: oldMeta?.at || null };
     const nForms = Object.keys(forms).length, nAll = parsed.activities.length + parsed.schedules.length;
     const odd = sgbOddSheets(parsed.activities);
+    const guessed = [...parsed.activities, ...parsed.schedules].filter(a => a.tagGuess);
+    const clash = parsed.activities.filter(a => !a.tagGuess && sgbAreaTags(a.area).length && !sgbAreaTags(a.area).some(t => (a.tags || []).includes(t)));
     const byTxt = o => o.by ? `기존: ${esc(whoTxt(o.by))}${o.upd ? ' · ' + fmtAt(o.upd) : ''}` : '';
     p.innerHTML = `<h3>${esc(f.name)}</h3>
       <ul>
@@ -2082,6 +2119,10 @@ async function previewFile(f){
         <li>${formErr ? `<span class="err">서식을 못 읽었습니다(${esc(formErr)}) — 자료는 올라가고, 내려받을 때 단순한 표로 나옵니다.</span>`
           : `원본 양식 ${nForms}/${nAll}개 시트 함께 저장 (내려받을 때 그 틀에 채웁니다)`}</li>
         ${parsed.skipped.length ? `<li>건너뛴 시트: ${parsed.skipped.map(x => `${esc(x.name)} <span style="color:var(--ink-soft)">(${esc(x.why)})</span>`).join(', ')}</li>` : ''}
+        ${guessed.length ? `<li id="upGuess">꼬리표 없는 시트 ${guessed.length}개 — ⊙ 입력 영역 칸으로 읽었습니다(엑셀로 받을 때 꼬리표를 붙입니다):
+          ${guessed.map(a => `${esc(a.sheet)} → <b>${esc(tagTxt(a) || '창체 일정')}</b>`).join(', ')}</li>` : ''}
+        ${clash.length ? `<li id="upClash" class="err">꼬리표와 ⊙ 입력 영역이 다른 시트 — 꼬리표대로 읽었습니다. 맞는지 보세요:
+          ${clash.map(a => `${esc(a.sheet)} (입력 영역 「${esc(a.area)}」)`).join(', ')}</li>` : ''}
       </ul>
       ${admin && cmp.missing.length ? `<div class="sec up-mode" id="upMode"><b>올리는 방식</b>
           <label><input type="radio" name="upMode" value="add" checked> 추가·수정 <span class="d">— 이 파일에 없는 기존 시트는 그대로</span></label>
