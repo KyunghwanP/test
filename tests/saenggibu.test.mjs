@@ -689,7 +689,8 @@ console.log('\n[추가·수정 꼬리표]');
 // 모양은 원래 쓰던 통합 엑셀을 따른다. 파서가 바뀌어 양식과 어긋나면 여기서 잡힌다.
 console.log('\n[표준 양식]');
 // 지금 나눠 주는 양식 — 선생님이 만든 파일 그대로(학생 줄 값만 비움). 앱의 「양식 받기」 가 이 두 파일을 준다(2026-10-28)
-for (const [fname, hr, extra] of [['saenggibu-form.xlsx', 5, ''], ['saenggibu-form-extra.xlsx', 4, '직책']]){
+// 추가 기재 칸 판(2026-10-28 교체) — 자기평가서 칸 + 기재 내용, 시트 보호는 열 너비·서식·열/행 넣고 빼기를 허용
+for (const [fname, hr, extra, self] of [['saenggibu-form.xlsx', 5, '', ''], ['saenggibu-form-extra.xlsx', 4, '', '자기평가서']]){
   const fp = path.join(ROOT, 'docs', fname);
   const wb = XLSX.read(fs.readFileSync(fp), { type: 'buffer', cellFormula: true });
   const ws = wb.Sheets[wb.SheetNames[0]];
@@ -698,10 +699,13 @@ for (const [fname, hr, extra] of [['saenggibu-form.xlsx', 5, ''], ['saenggibu-fo
   const tp = P.sgbParseBook(P.sgbBookToSheets(XLSX, wb));
   const ta = tp.activities[0];
   check(`${fname} — 앱이 읽는다: 기재 내용 칸, 입력 영역(드롭다운 G2)·경로(VLOOKUP G3), 숨긴 참고 표는 안 섞임`, tp.activities.length === 1 && ta.body === '기재 내용'
-    && ta.area === String(ws.G2?.v) && /VLOOKUP/.test(ws.G3?.f || '') && !!ta.path && ta.extra.filter(x => !/^0+$/.test(x)).join() === extra, ta);
+    && ta.area === String(ws.G2?.v) && /VLOOKUP/.test(ws.G3?.f || '') && !!ta.path && ta.extra.filter(x => !/^0+$/.test(x)).join() === extra && ta.self === self, ta);
   const ew = new ExcelJS.Workbook(); await ew.xlsx.readFile(fp);
   check(`${fname} — 드롭다운·숨긴 참고 표(AA·AB)·학번 수식(A열) 그대로`, ew.worksheets[0].getCell('G2').dataValidation?.type === 'list'
     && ew.worksheets[0].getColumn(27).hidden && /TEXT/.test(String(ws['A' + (hr + 1)]?.f || '')));
+  if (fname.includes('extra')){ const sp = ew.worksheets[0].sheetProtection || {};
+    check(`${fname} — 시트 보호 중에도 열 너비·서식·열/행 넣고 빼기는 된다`, sp.sheet && sp.formatColumns && sp.formatRows && sp.formatCells
+      && sp.insertColumns && sp.deleteColumns && sp.insertRows && sp.deleteRows, sp); }
 }
 {
   const { makeTemplate, TEMPLATE_NAME } = await import('./make-saenggibu-template.mjs');
@@ -864,8 +868,8 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
   check('「📄 양식 받기」 가 엑셀 올리기 옆에', await p.isVisible('#formDl') && await p.evaluate(() => document.getElementById('upBtn').nextElementSibling?.id === 'formDl'));
   await p.click('#formDl summary');
   const fdl = await p.$$eval('#formDl a', as => as.map(a => [a.getAttribute('href'), a.getAttribute('download'), a.textContent.trim()]));
-  check('— 누르면 두 가지: 기재 내용만 / 덧붙인 칸(직책 등)', fdl.length === 2 && fdl[0][0] === 'docs/saenggibu-form.xlsx' && fdl[1][0] === 'docs/saenggibu-form-extra.xlsx'
-    && fdl.every(d => d[1].endsWith('.xlsx')) && fdl[0][2].includes('기재 내용') && fdl[1][2].includes('직책'), fdl);
+  check('— 누르면 두 가지: 기재 내용만 / 추가 기재 칸 있는 것', fdl.length === 2 && fdl[0][0] === 'docs/saenggibu-form.xlsx' && fdl[1][0] === 'docs/saenggibu-form-extra.xlsx'
+    && fdl.every(d => d[1].endsWith('.xlsx')) && fdl[0][2].includes('기재 내용') && fdl[1][2].includes('추가 기재 칸') && fdl[1][1].includes('추가 기재 칸'), fdl);
   check('— 파일이 실제로 있다', fdl.every(d => fs.existsSync(path.join(ROOT, d[0]))));
   // 오와 열 — 다른 단추와 같은 높이·같은 줄·같은 글꼴(선생님 지적 2026-10-28: 양식 받기만 아래로 처지고 얇았다)
   const al = await p.evaluate(() => ['upBtn', 'dlBtn', 'admBtn'].map(id => document.getElementById(id)).concat(document.querySelector('#formDl summary'))

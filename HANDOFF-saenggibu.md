@@ -54,7 +54,7 @@
 | `upload.html` | 편성표 올리기에서 반·번호가 빈 학생(전출·자퇴)을 `students/changed` 에 따로 저장(`psMoveOf`) |
 | `usage.html` | 사용 현황에 `saenggibu`·`notice` 이름 |
 | `firestore.rules` | `saenggibu`·`saenggibuStu`·`saenggibuAct` — 읽기·쓰기 `isYnhsTeacher()`(2026-10-28 쓰기를 교사 전체로) |
-| `tests/saenggibu.test.mjs` | 376개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
+| `tests/saenggibu.test.mjs` | 377개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
 | `tests/make-saenggibu-template.mjs` | **표준 양식** 엑셀 만들기(부서에 나눠 줄 빈 양식). `node tests/make-saenggibu-template.mjs <폴더>` |
 | `tests/s360-tabs.test.mjs` | 17개 검사(종합검색 탭) |
 | `tests/upload-pyeonseong*.test.mjs`, `tests/make-pyeonseong-fixture.mjs` | 편성표(학적사항 칸·괄호 이름 포함) |
@@ -184,7 +184,7 @@
 - 미리보기: 새로·바뀐 시트마다 「기재 문안 「…」 / 학생 글 「…」 / 기타 …」 한 줄, 「⚠ 확인할 시트」(문안 칸 없음·학생 줄 0·「예)」 남음).
 
 ### 표준 양식 (2026-10-28)
-- **지금 나눠 주는 양식은 `docs/saenggibu-form.xlsx`(기재 내용만, ⊙ 네 줄) · `docs/saenggibu-form-extra.xlsx`(직책 칸)** — 선생님이 만든 파일
+- **지금 나눠 주는 양식은 `docs/saenggibu-form.xlsx`(기재 내용만, ⊙ 네 줄) · `docs/saenggibu-form-extra.xlsx`(추가 기재 칸 — 자기평가서 칸, 시트 보호 중에도 열 너비·서식·열/행 넣고 빼기 허용)** — 선생님이 만든 파일
   그대로, 학생 줄 값만 비웠다(공개 저장소. 공유 문자열에서도 지움). 앱 위쪽 「📄 양식 받기」(엑셀 올리기 옆, 모든 교사)가 이 둘을 준다.
   바꿀 때는 새 파일로 통째로 교체하되 **학생 줄이 비었는지 꼭 확인**(검사가 본다).
 - (예전) `tests/make-saenggibu-template.mjs` → `생기부 보조자료 표준 양식.xlsx`. 해석 검사용으로 남겨 둔다. 작성 안내 시트(활동명 칸·머리 줄이 없어 앱은 건너뜀) + `<자>부서(활동명)`(자기 평가서 + 기재 내용) + `<개>교과(활동명)`(주제 + 기재 내용).
@@ -248,7 +248,7 @@ CLAUDE.md: **화면 변경은 test 먼저 → 선생님 확인 → ynhs PR·병�
 
 ### 검사 돌리기 (이 환경 기준)
 ```bash
-node tests/saenggibu.test.mjs        # 376
+node tests/saenggibu.test.mjs        # 377
 node tests/s360-tabs.test.mjs        # 17
 node tests/make-pyeonseong-fixture.mjs <폴더>          # 가짜 편성표 먼저 만든다(실제 파일은 개인정보라 저장소에 없음)
 PS_FILE=<폴더>/pyeonseong.xlsx node tests/upload-pyeonseong.test.mjs   # 87
