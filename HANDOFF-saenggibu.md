@@ -17,7 +17,7 @@
 
 - 현재 **test 저장소에만** 있다(`KyunghwanP/test`). 운영(ynhs)으로는 아직 안 옮겼다. 선생님이 test 에서 더 다듬은 뒤 옮긴다.
 - 탭·종합검색 「생기부 보조자료」 탭은 **test 에서 교사 전체에 열었다**. 엑셀로 받기·관리는 관리자만.
-- 마지막 버전: `APP_VER = 'ver7.99'`(index.html·usage.html), `CACHE_VER = 'v643'`(sw.js).
+- 마지막 버전: `APP_VER = 'ver8.00'`(index.html·usage.html), `CACHE_VER = 'v644'`(sw.js).
 
 ### 원본 엑셀의 모양(이걸 알아야 코드가 읽힌다)
 - 시트 하나 = 활동 하나. 시트 이름 앞 꼬리표가 입력 영역: `<자>` 자율, `<진>` 진로, `<개>` 개인별 세특,
@@ -43,7 +43,7 @@
 | `upload.html` | 편성표 올리기에서 반·번호가 빈 학생(전출·자퇴)을 `students/changed` 에 따로 저장(`psMoveOf`) |
 | `usage.html` | 사용 현황에 `saenggibu`·`notice` 이름 |
 | `firestore.rules` | `saenggibu`·`saenggibuStu`·`saenggibuAct` — 읽기·쓰기 `isYnhsTeacher()`(2026-10-28 쓰기를 교사 전체로) |
-| `tests/saenggibu.test.mjs` | 305개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
+| `tests/saenggibu.test.mjs` | 314개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
 | `tests/make-saenggibu-template.mjs` | **표준 양식** 엑셀 만들기(부서에 나눠 줄 빈 양식). `node tests/make-saenggibu-template.mjs <폴더>` |
 | `tests/s360-tabs.test.mjs` | 17개 검사(종합검색 탭) |
 | `tests/upload-pyeonseong*.test.mjs`, `tests/make-pyeonseong-fixture.mjs` | 편성표(학적사항 칸·괄호 이름 포함) |
@@ -98,6 +98,9 @@
   폰의 봉사 표는 회차마다 한 덩어리(날짜·영역·시간·누계 / 내용 / 학교·장소).
 
 **활동별** — 입력 영역별 활동 목록 | 활동 설명(유의 사항·입력 경로·시트·파일) + 학년 탭 + 반별 인원 칩(누르면 그 반만) + 학생 카드.
+**봉사 활동은 카드 대신 학생별과 같은 나이스 칸 차례 표**(`volActTable`) — 맨 앞에 학번(다섯 자리)·이름, 회차는 한 줄씩, 학번·이름은 그 학생 첫 줄에만 걸침,
+시간 누계는 학생마다 이 활동 안에서, 칸 누르면 복사. 폰에서는 학번·이름이 덩어리 머리줄(2026-10-28 선생님 요청).
+※ 같은 날 고친 버그: 학생별 폰 단계식 규칙(`.pane3:not(.has-detail) .p-detail` 숨김)이 활동별에도 걸려 **폰에서 활동 상세가 아예 안 보였다** — `#stuPanes` 로 좁힘.
 어긋난 학생 카드에 ⚠, 학적 변동 학생은 회색 꼬리표.
 
 **창체 일정** — 학년 탭 + 「전체 · 자율·자치 · 진로 · 동아리」 칩(건수), 거르면 건수·이수시간 합.
@@ -219,7 +222,7 @@ CLAUDE.md: **화면 변경은 test 먼저 → 선생님 확인 → ynhs PR·병�
 
 ### 검사 돌리기 (이 환경 기준)
 ```bash
-node tests/saenggibu.test.mjs        # 305
+node tests/saenggibu.test.mjs        # 314
 node tests/s360-tabs.test.mjs        # 17
 node tests/make-pyeonseong-fixture.mjs <폴더>          # 가짜 편성표 먼저 만든다(실제 파일은 개인정보라 저장소에 없음)
 PS_FILE=<폴더>/pyeonseong.xlsx node tests/upload-pyeonseong.test.mjs   # 87

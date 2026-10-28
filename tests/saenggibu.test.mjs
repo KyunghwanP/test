@@ -696,6 +696,8 @@ const keep = async page => { STORE = await page.evaluate(() => window.__FS__); }
 // 자료 문서 쓰기만 — 잠금(saenggibu/lock)·올린 기록(saenggibu/log)은 빼고 센다
 const dataOps = o => { const w = (o.w || []).filter(([, r]) => !/^saenggibu\/(lock|log)$/.test(r));
   return { set: w.filter(([k]) => k === 's').length, del: w.filter(([k]) => k === 'd').length }; };
+// 요소가 없으면 빈 글자(흐름이 틀어져도 멈추지 말고 ❌ 로)
+const txt = async (p, sel) => (await p.$(sel)) ? p.textContent(sel) : '';
 // 눈 확인용 캡처 — SGB_SHOTS=<폴더> 를 주면 그때만 찍는다(검사 결과에는 영향 없음)
 const shot = async (p, sel, name) => { if (!process.env.SGB_SHOTS) return;
   const el = await p.$(sel); if (el) await el.screenshot({ path: path.join(process.env.SGB_SHOTS, name + '.png') }); };
@@ -888,6 +890,31 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
   check('로봇 캠프 — 시트·파일 이름', (await p.textContent('#actOut')).includes('파일: sgb-4.xlsx'));
   const rowTxt = await p.textContent('#actRows');
   check('태그 섞인 문안도 글자 그대로', rowTxt.includes('<b>태그</b>') && await p.evaluate(() => !document.querySelector('#actRows b')));
+  // 봉사 — 활동별에서도 학생별처럼 나이스 칸 차례 표, 맨 앞에 학번·이름(선생님 요청 2026-10-28)
+  await p.click(`#acts .act[data-id="${vol.id}"]`);
+  await p.waitForSelector('#actRows table.neis');
+  const vHeads = await p.$$eval('#actRows table.neis thead th', ths => ths.map(t => t.textContent.trim()));
+  check('봉사 활동별 — 카드 대신 나이스 칸 차례 표, 맨 앞에 학번·이름', vHeads.slice(0, 4).join() === '학번,이름,시작일자,종료일자'
+    && vHeads.at(-1) === '시간 누계' && !(await p.$('#actRows .card')), vHeads);
+  const vRow = async () => p.$$eval('#actRows table.neis tbody tr', trs => trs.map(tr => [...tr.cells].map(td => td.textContent.trim())));
+  const v1 = await vRow();
+  check('— 1학년: 10101 김가람 · 2026.04.10. · 헌혈 · 4시간 · 누계 4', v1.length === 1 && v1[0][0] === '10101' && v1[0][1] === '김가람'
+    && v1[0][2] === '2026.04.10.' && v1[0].includes('헌혈') && v1[0].at(-2) === '4' && v1[0].at(-1) === '4', v1);
+  await p.click('#selAG button[data-g="3"]');
+  await p.waitForFunction(() => document.querySelectorAll('#actRows table.neis tbody tr').length === 2);
+  const v3 = await vRow();
+  check('— 한 칸에 든 회차는 한 줄씩, 학번·이름은 그 학생 첫 줄에만(두 줄에 걸침), 누계는 학생마다(6 → 12)',
+    v3[0][0] === '30205' && v3[0][1].includes('박나래') && v3[1][0] === '2026.03.16.' && v3[0].at(-1) === '6' && v3[1].at(-1) === '12'
+    && (await p.$eval('#actRows td.c-nm', td => td.rowSpan)) === 2, v3);
+  check('— PC: 학번·이름이 한 줄(꺾이지 않음)', await p.evaluate(() => ['.c-hak', '.c-nm'].every(sel => {
+    const td = document.querySelector('#actRows ' + sel), lh = parseFloat(getComputedStyle(td).lineHeight) || 24;
+    const r = document.createRange(); r.selectNodeContents(td); return r.getClientRects().length === 1 || r.getBoundingClientRect().height < lh * 1.5; })));
+  if (process.env.SGB_SHOTS){ await p.setViewportSize({ width: 1440, height: 900 }); await shot(p, '#actOut', '6-vol-act-pc'); await p.setViewportSize({ width: 1100, height: 900 }); }
+  await p.click('#actRows td.c-nm');
+  check('— 칸을 누르면 복사(이름)', (await p.evaluate(() => window.__copied)) === '박나래');
+  await p.click(`#acts .act[data-id="${robot.id}"]`);
+  await p.waitForSelector('#actRows .card');
+  check('— 봉사가 아닌 활동은 그대로 카드', !(await p.$('#actRows table.neis')));
   await p.fill('#actQ', '없는활동');
   await p.waitForFunction(() => document.querySelector('#acts').textContent.includes('맞는 활동이 없습니다'));
   check('활동 찾기 — 없으면 안내', true);
@@ -1034,6 +1061,25 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
   check('폰: ← 를 누르면 명단으로, 고른 학생에 표시', await p.isVisible('#stus') && !(await p.isVisible('#stuOut'))
     && (await p.$eval('#stus .stu.on', b => b.dataset.n)) === '2');
   check('폰: 단계마다 가로로 넘치지 않는다', await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  // 폰 — 활동별에서 활동을 누르면 상세가 보여야 한다. 학생별 단계식 규칙(.pane3:not(.has-detail) .p-detail 숨김)이
+  // 활동별 칸에도 걸려 폰에서는 활동 상세가 아예 안 보였다(2026-10-28 봉사 표를 보다 찾음)
+  await p.click('#views button[data-view="act"]');
+  await p.waitForSelector('#acts .act');
+  await p.click(`#acts .act[data-id="${vol.id}"]`);
+  await p.waitForSelector('#actRows table.neis', { state: 'attached' });
+  check('폰: 활동별에서 활동을 누르면 상세가 보인다', await p.isVisible('#actOut') && await p.isVisible('#actRows table.neis'));
+  await p.click('#selAG button[data-g="3"]').catch(() => {});
+  await p.waitForTimeout(200);
+  check('폰: 봉사 표 — 학번·이름이 덩어리 머리에, 가로로 넘치지 않는다', (await txt(p, '#actRows tr.who-first')).includes('30205')
+    && await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  check('폰: 날짜·시간·누계가 화면 안에(학번·이름 아래 줄)', await p.evaluate(() => {
+    const tr = document.querySelector('#actRows tr.who-first'), box = document.getElementById('actRows').getBoundingClientRect();
+    const nm = tr.querySelector('.c-nm').getBoundingClientRect();
+    return ['.c-start', '.c-hours', '.c-total'].every(sel => { const r = tr.querySelector(sel).getBoundingClientRect();
+      return r.width > 0 && r.right <= box.right + 1 && r.top >= nm.bottom - 1; }); }));
+  await shot(p, '#actRows', '7-vol-act-phone');
+  await p.click('#views button[data-view="stu"]');
+  await p.waitForSelector('.cls-m .g-tab');
   check('오류 없음(다른 교사)', p.errors.length === 0, p.errors);
   await p.context().close();
 }
@@ -1041,7 +1087,6 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
 const STORE_B = JSON.parse(JSON.stringify(STORE));          // 뒤 검사를 위해 이 묶음이 끝나면 되돌린다
 const upload = async (p, file) => { await p.setInputFiles('#upFile', file); await p.waitForSelector('#upGo'); };
 const done = p => p.waitForFunction(() => /올렸습니다|실패/.test(document.getElementById('upPanel').textContent));
-const txt = async (p, sel) => (await p.$(sel)) ? p.textContent(sel) : '';
 // 관리 화면 — 결과(admMsg)가 뜨거나 실패(admEdMsg·admMsg)가 뜰 때까지
 const adminDone = (p, word) => p.waitForFunction(w => { const a = document.getElementById('admMsg')?.textContent || '', e = document.getElementById('admEdMsg')?.textContent || '';
   return a.includes(w) || /실패/.test(a + e); }, word, { timeout: 15000 }).catch(() => {});

@@ -237,6 +237,19 @@
   table.neis td.c-start,table.neis td.c-end{white-space:nowrap;font-variant-numeric:tabular-nums;}
   table.neis th.r,table.neis td.c-hours,table.neis td.c-total{text-align:right;font-variant-numeric:tabular-nums;}
   table.neis td.c-total{color:var(--ink-soft);font-weight:700;}
+  /* 활동별 봉사 표 — 앞에 학번·이름 */
+  table.neis.with-who{min-width:860px;}
+  table.neis.with-who col.c-hak{width:8%;} table.neis.with-who col.c-nm{width:9.5%;}
+  table.neis.with-who col.c-start,table.neis.with-who col.c-end{width:9.5%;}
+  table.neis.with-who col.c-area{width:10%;} table.neis.with-who col.c-content{width:22%;}
+  table.neis.with-who col.c-type{width:7%;} table.neis.with-who col.c-place{width:12.5%;}
+  table.neis.with-who col.c-hours{width:5.5%;} table.neis.with-who col.c-total{width:6.5%;}
+  table.neis td.c-hak,table.neis td.c-nm{white-space:nowrap;}   /* 학번·이름은 꺾이지 않게 */
+  table.neis td.c-hak{font-variant-numeric:tabular-nums;color:var(--ink-soft);font-weight:700;}
+  table.neis td.c-nm{font-weight:800;}
+  table.neis td.c-hak,table.neis td.c-nm{border-right:1px solid var(--rule);background:var(--paper);}
+  table.neis.with-who tr.who-first:not(:first-child) td{border-top:2px solid var(--rule);}
+  table.neis td.c-nm .mis{color:var(--warn);}
   .vol-split{margin-top:12px;}
   .vol-split .card{background:var(--paper-soft);}
 
@@ -327,7 +340,8 @@
     .p-roster .stu.on{box-shadow:none;border-color:var(--mon);}
     .roster-head{position:static;}
     .pane3.has-detail .p-classes,.pane3.has-detail .p-roster{display:none;}
-    .pane3:not(.has-detail) .p-detail{display:none;}
+    /* 학생별 단계식만 — 활동별(.pane3 를 같이 쓴다)에 걸리면 폰에서 활동 상세가 아예 안 보인다 */
+    #stuPanes:not(.has-detail) .p-detail{display:none;}
     .m-nav{display:flex;gap:6px;align-items:center;position:sticky;top:-12px;z-index:5;margin:-12px -10px 12px;padding:10px;
       background:var(--paper);border-bottom:1px solid var(--rule);}
     .m-nav .btn{padding:9px 10px;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;}
@@ -353,6 +367,12 @@
     table.neis td.c-content{order:6;width:100%;font-size:15.5px;line-height:1.6;}
     table.neis td.c-type,table.neis td.c-place{order:7;color:var(--ink-soft);font-size:13.5px;}
     table.neis td.c-place{order:8;}
+    /* 폰 — 학번·이름은 그 학생 첫 덩어리의 머리줄 */
+    table.neis.with-who{min-width:0;}             /* 넓은 화면용 최소 폭을 풀어야 날짜·시간이 화면 안에 */
+    table.neis td.c-hak,table.neis td.c-nm{order:0;border:none;background:none;}
+    table.neis td.c-nm{flex:1 0 calc(100% - 72px);font-size:16px;}   /* 학번·이름이 한 줄을 차지 — 날짜·시간은 다음 줄 */
+    table.neis.with-who tr.who-first:not(:first-child){border-top:2px solid var(--rule);}
+    table.neis.with-who tr.who-first:not(:first-child) td{border-top:none;}
     .p-acts{max-height:40vh;overflow-y:auto;}
     .p-detail{padding:12px 10px 32px;}
     .sheet{padding:16px 14px 18px;border-radius:12px;}
@@ -1679,6 +1699,26 @@ async function renderAct(){
   };
   await renderActOut();
 }
+// 봉사 활동은 활동별에서도 학생별처럼 나이스 칸 차례 표로 — 맨 앞에 학번·이름. 학생마다 회차를 한 줄씩 풀고
+// (프로젝트 봉사는 한 칸에 회차가 줄바꿈으로 든다) 학번·이름은 그 학생 첫 줄에만 걸친다. 시간 누계는 학생마다 이 활동 안에서.
+function volActTable(a, list, mm){
+  const keys = ['start', 'end', 'area', 'content', 'type', 'place', 'hours'];
+  const body = list.map(r => {
+    const vr = sgbVolunteerRows([r], () => a);
+    if (!vr.length) return '';
+    const mis = mm.get(misKey(a.id, r));
+    const hak = `${r.g}${String(r.c).padStart(2, '0')}${String(r.n).padStart(2, '0')}`;
+    const tag = mis ? (mis.moved ? ` <span class="moved-tag">${esc(mis.kind || '학적 변동')}</span>`
+      : ` <span class="mis" title="${esc(mis.why)}${mis.expect ? ' · 명렬: ' + esc(mis.expect) : ''}">⚠</span>`) : '';
+    return vr.map((v, i) => `<tr${i === 0 ? ' class="who-first"' : ''}>${i === 0 ? `<td class="c-hak" rowspan="${vr.length}" data-cp="${hak}">${hak}</td>
+        <td class="c-nm" rowspan="${vr.length}"${r.nm ? ` data-cp="${esc(r.nm)}"` : ''}>${esc(r.nm)}${tag}</td>` : ''}${keys.map(k =>
+        `<td class="c-${k}"${v[k] ? ` data-cp="${esc(v[k])}"` : ''}>${esc(v[k])}</td>`).join('')}<td class="c-total">${v.total}</td></tr>`).join('');
+  }).join('');
+  return `<div class="where">나이스 봉사활동 누가기록과 같은 칸 차례입니다. 칸을 누르면 그 내용이 복사됩니다. 시간 누계는 학생마다 이 활동 안에서 셉니다.</div>
+    <div class="neis-wrap"><table class="neis with-who"><colgroup>${['hak', 'nm', ...keys, 'total'].map(k => `<col class="c-${k}">`).join('')}</colgroup>
+    <thead><tr><th>학번</th><th>이름</th>${SGB_VOL_COLS.map((c, i) => `<th${i >= 6 ? ' class="r"' : ''}>${esc(c)}</th>`).join('')}</tr></thead>
+    <tbody>${body}</tbody></table></div>`;
+}
 async function renderActOut(){
   const out = $('actOut');
   const a = actById(st.act);
@@ -1703,7 +1743,9 @@ async function renderActOut(){
   const drawRows = () => {
     const list = rows.filter(r => !st.ac || String(r.c) === st.ac).sort((x, y) => x.c - y.c || x.n - y.n);
     const mm = misMap();
-    $('actRows').innerHTML = list.map(r => itemCard(a, r, { who: r, mis: mm.get(misKey(a.id, r)) })).join('') || '<div class="empty">이 반에는 없습니다.</div>';
+    if (!list.length){ $('actRows').innerHTML = '<div class="empty">이 반에는 없습니다.</div>'; return; }
+    $('actRows').innerHTML = sgbIsVolunteer(a) ? volActTable(a, list, mm)
+      : list.map(r => itemCard(a, r, { who: r, mis: mm.get(misKey(a.id, r)) })).join('');
   };
   $('actChips').onclick = e => {
     const b = e.target.closest('.chip'); if (!b) return;
