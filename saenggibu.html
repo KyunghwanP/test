@@ -187,24 +187,21 @@
   .s-acts .tag{font-size:11.5px;padding:0 7px;flex-shrink:0;}
   .s-acts .fresh{margin-left:4px;}
   .card{scroll-margin-top:12px;}
-  /* 좁은 칸(태블릿·노트북에서 작성 칸을 띄웠을 때 등) — 사진·이름·활동 목록이 위로 지나가면 이름·반 번호·참여한 활동을 위쪽 한 줄로.
-     한 줄만(활동이 많으면 옆으로 밀어 본다). 폰·넓은 화면(오른쪽 목차)에는 없다. 높이 0 의 틀에 얹어 글이 밀리지 않게 */
+  /* 좁은 칸(태블릿·노트북에서 작성 칸을 띄웠을 때 등) — 사진·이름·활동 목록이 위로 지나가면 이름·반 번호·참여한 활동을 위쪽에.
+     활동은 잘리지 않게 다 보인다 — 많으면 줄을 바꾼다(선생님 요청 2026-10-28, 처음엔 한 줄로 옆으로 밀었다).
+     폰·넓은 화면(오른쪽 목차)에는 없다. 높이 0 의 틀에 얹어 글이 밀리지 않게 */
   .s-mini{display:none;}
-  .s-mini-in{position:absolute;left:-16px;right:-16px;top:0;display:flex;align-items:center;gap:12px;padding:7px 16px;
+  .s-mini-in{position:absolute;left:-16px;right:-16px;top:0;display:flex;align-items:baseline;gap:12px;padding:7px 16px;
     background:var(--paper);border-bottom:1px solid var(--rule);box-shadow:0 6px 12px -10px rgba(15,23,42,.35);
     opacity:0;transform:translateY(-6px);pointer-events:none;transition:opacity .15s,transform .15s;}
   .s-mini.on .s-mini-in{opacity:1;transform:none;pointer-events:auto;}
   .s-mini-who{display:flex;align-items:baseline;gap:6px;flex-shrink:0;white-space:nowrap;}
   .s-mini-who b{font-size:16px;font-weight:900;}
   .s-mini-who span{font-size:12.5px;font-weight:700;color:var(--ink-soft);}
-  .s-mini-acts{display:flex;gap:6px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none;
-    -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);}
-  .s-mini-acts.end{-webkit-mask-image:none;mask-image:none;}
-  .s-mini-acts::-webkit-scrollbar{display:none;}
-  .s-mini-acts button{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;max-width:230px;padding:4px 10px;border:1px solid var(--rule);border-radius:999px;
-    background:var(--paper);color:var(--ink);font:inherit;font-size:13px;font-weight:700;line-height:1.4;cursor:pointer;white-space:nowrap;}
+  .s-mini-acts{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0;}
+  .s-mini-acts button{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:4px 10px;border:1px solid var(--rule);border-radius:14px;
+    background:var(--paper);color:var(--ink);font:inherit;font-size:13px;font-weight:700;line-height:1.4;cursor:pointer;text-align:left;}
   .s-mini-acts button:hover{border-color:var(--mon);color:var(--mon);}
-  .s-mini-acts .an{overflow:hidden;text-overflow:ellipsis;}
   .s-mini-acts .d{font-weight:600;color:var(--ink-soft);}
   .s-mini-acts .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--ink-soft);}
   .s-mini-acts .dot.ja{background:var(--t-ja);} .s-mini-acts .dot.jin{background:var(--t-jin);} .s-mini-acts .dot.gae{background:var(--t-gae);}
@@ -212,7 +209,7 @@
   @media (min-width:901px){
     @container det (max-width:1309px){
       html:not(.embed) .s-mini{display:block;position:sticky;top:calc(var(--navH, 0px) - 16px);z-index:4;height:0;}
-      html:not(.embed) .card{scroll-margin-top:calc(var(--navH, 0px) + 58px);}
+      html:not(.embed) .card{scroll-margin-top:calc(var(--navH, 0px) + var(--miniH, 44px) + 14px);}   /* 위쪽 줄이 몇 줄이든 그 아래로 */
     }
   }
   /* 학번·이름이 편성표와 어긋난 자료 — 누락 없게 보이되 눈에 띄게 */
@@ -2199,26 +2196,21 @@ async function renderStuOut(){
   drSync();                                    // 작성 칸 — 열어 두었고 쓸 수 있는 학생이면 이 학생으로
 }
 // 좁은 칸 위쪽 줄 — 학생 머리(사진·이름·활동 목록)가 위로 지나가면 나타난다. 위쪽 이동 줄(☰ · ◀ ▶)이 있으면 그 아래에.
-// 활동은 한 줄로 옆으로 밀어 본다(마우스 휠도 옆으로)
+// 활동은 잘리지 않게 다 보인다(많으면 줄바꿈) — 카드로 건너뛸 때 그 높이만큼 아래로(--miniH)
 function miniWire(out, goAct){
-  const mini = $('sMini'), head = out.querySelector('.s-head'), nav = $('mNav'), acts = mini?.querySelector('.s-mini-acts');
+  const mini = $('sMini'), head = out.querySelector('.s-head'), nav = $('mNav'), bar = mini?.firstElementChild;
   if (!mini || !head) return;
   const navH = () => nav && nav.offsetParent ? nav.offsetHeight : 0;
   const sync = () => {
     out.style.setProperty('--navH', navH() + 'px');
+    out.style.setProperty('--miniH', (bar?.offsetHeight || 44) + 'px');
     mini.classList.toggle('on', getComputedStyle(mini).display !== 'none'
       && head.getBoundingClientRect().bottom < out.getBoundingClientRect().top + navH() + 6);
   };
   out.onscroll = sync;
   out._miniRO?.disconnect();
-  if (window.ResizeObserver){ out._miniRO = new ResizeObserver(sync); out._miniRO.observe(out); if (nav) out._miniRO.observe(nav); }
+  if (window.ResizeObserver){ out._miniRO = new ResizeObserver(sync); out._miniRO.observe(out); if (nav) out._miniRO.observe(nav); if (bar) out._miniRO.observe(bar); }
   mini.onclick = goAct;
-  if (acts){
-    const edge = () => acts.classList.toggle('end', acts.scrollLeft + acts.clientWidth >= acts.scrollWidth - 2);
-    acts.onscroll = edge;
-    acts.onwheel = e => { if (acts.scrollWidth > acts.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)){ acts.scrollLeft += e.deltaY; e.preventDefault(); } };
-    requestAnimationFrame(edge);
-  }
   sync();
 }
 // 반·명단 숨기기(「« 숨기기」, 기억) — 학생을 연 동안만. 숨기면 위쪽 줄(☰ 반 · ◀ 이전 · 다음 ▶)로 넘긴다

@@ -2213,7 +2213,13 @@ STORE = STORE_B;
     return { top: Math.round(m.top), navBottom: Math.round(nav.bottom), h: Math.round(m.height), left: Math.round(m.left), right: Math.round(m.right), outL: Math.round(out.left), outR: Math.round(out.right),
       who: document.querySelector('#sMini .s-mini-who').textContent.replace(/\s+/g, ' ').trim(), acts: [...document.querySelectorAll('#sMini .s-mini-acts button')].map(b => b.textContent.trim()),
       photo: !!document.querySelector('#sMini img'), op: getComputedStyle(document.querySelector('#sMini .s-mini-in')).opacity }; });
-  check('내려가면 위쪽 줄 — 이동 줄(☰ · ▶) 바로 아래, 칸 너비 가득, 한 줄(48px 이하)', Math.abs(mb.top - mb.navBottom) <= 1 && mb.left <= mb.outL + 1 && mb.right >= mb.outR - 1 && mb.h <= 48, mb);
+  check('내려가면 위쪽 줄 — 이동 줄(☰ · ▶) 바로 아래, 칸 너비 가득', Math.abs(mb.top - mb.navBottom) <= 1 && mb.left <= mb.outL + 1 && mb.right >= mb.outR - 1, mb);
+  // 활동은 잘리지 않게 다 보인다 — 칸이 좁으면 줄을 바꾼다(선생님 요청 2026-10-28: 「짤리지 않고 다 볼 수 있게」)
+  const full3 = await q.evaluate(() => { const bar = document.querySelector('#sMini .s-mini-in').getBoundingClientRect(), acts = document.querySelector('#sMini .s-mini-acts');
+    const bs = [...acts.querySelectorAll('button')].map(b => b.getBoundingClientRect());
+    return { inside: bs.every(r => r.left >= bar.left - 1 && r.right <= bar.right + 1 && r.bottom <= bar.bottom + 1), rows: new Set(bs.map(r => Math.round(r.top))).size,
+      noScroll: acts.scrollWidth <= acts.clientWidth + 1, clipped: [...acts.querySelectorAll('button')].some(b => b.scrollWidth > b.clientWidth + 1) }; });
+  check('— 활동 칩이 모두 위쪽 줄 안에 다 보인다(옆으로 숨는 것·말줄임 없이), 좁으면 줄바꿈', full3.inside && full3.noScroll && !full3.clipped && full3.rows >= 2, full3);
   check('— 사진 없이 이름·반 번호·참여한 활동 3', mb.who === '김가람 1학년 1반 1번' && mb.acts.length === 3 && mb.acts[0].includes('진로탐색 로봇공학 캠프') && !mb.photo, mb);
   check('— 나타나면 또렷하게(투명 아님)', mb.op === '1', mb.op);
   if (process.env.SGB_SHOTS) await q.screenshot({ path: path.join(process.env.SGB_SHOTS, '15-mini-1100.png'), clip: { x: 0, y: 0, width: 1100, height: 330 } });
