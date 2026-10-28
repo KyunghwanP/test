@@ -1930,6 +1930,83 @@ STORE = STORE_B;
     await r.context().close();
   }
 }
+// 3-7 반·명단 숨기기 · 작성 칸 넓이 끌기 · 단독 개인별 조회(새 창) — 창 두 개를 띄워 놓고 작업할 때(선생님 요청 2026-10-28)
+{
+  const p = await openAs(KIM, { width: 1700 });
+  await p.waitForSelector('#stus .stu');
+  await p.click('#stus .stu[data-n="1"]');
+  await p.waitForSelector('#listOffBtn');
+  const w0 = await p.$eval('#stuOut', el => el.getBoundingClientRect().width);
+  await p.click('#listOffBtn');
+  await p.waitForFunction(() => document.getElementById('stuPanes').classList.contains('list-off'));
+  const w1 = await p.$eval('#stuOut', el => el.getBoundingClientRect().width);
+  check('「« 숨기기」 — 반·명단을 숨기고 보조자료가 넓어진다, 위쪽 줄(☰ 1학년 1반 · 다음 ▶)', !(await p.isVisible('.p-classes')) && !(await p.isVisible('.p-roster'))
+    && w1 > w0 + 300 && await p.isVisible('#mNav') && (await p.textContent('#mBack')).includes('☰') && (await p.textContent('#mBack')).includes('1학년 1반'), { w0, w1 });
+  await p.click('#mNav .m-step[data-n="2"]');
+  await p.waitForFunction(() => document.querySelector('#stuOut .s-name')?.textContent === '최다온');
+  check('— 위쪽 줄 ▶ 로 다음 학생, 숨긴 채로', await p.$eval('#stuPanes', el => el.classList.contains('list-off')));
+  check('— 숨긴 것을 기억한다', await p.evaluate(() => JSON.parse(localStorage.getItem('ynhs-sgb')).listOff === true));
+  // 작성 칸 넓이 — 사이 막대를 끈다
+  await p.click('#drOpenBtn');
+  await p.waitForSelector('#drT-ja', { state: 'visible' });
+  const sp = await p.$eval('#drSplit', el => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 240 }; });
+  const pw0 = await p.$eval('#drPane', el => el.getBoundingClientRect().width);
+  await p.mouse.move(sp.x, sp.y); await p.mouse.down(); await p.mouse.move(sp.x - 200, sp.y, { steps: 6 }); await p.mouse.up();
+  const pw1 = await p.$eval('#drPane', el => el.getBoundingClientRect().width);
+  check('사이 막대를 끌면 작성 칸 넓이가 바뀐다(왼쪽으로 200 → 200 넓게)', Math.abs((pw1 - pw0) - 200) <= 12, { pw0, pw1 });
+  check('— 넓이를 기억한다', await p.evaluate(() => JSON.parse(localStorage.getItem('ynhs-sgb')).drFrac > 0.5));
+  const sp2 = await p.$eval('#drSplit', el => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 240 }; });
+  await p.mouse.move(sp2.x, sp2.y); await p.mouse.down(); await p.mouse.move(sp2.x - 2000, sp2.y, { steps: 6 }); await p.mouse.up();
+  const lim = await p.evaluate(() => { const d = document.getElementById('stuOut').getBoundingClientRect().width, w = document.getElementById('drPane').getBoundingClientRect().width; return w / (d + w); });
+  check('— 끝까지 끌어도 70% 까지', lim <= 0.71 && lim >= 0.68, lim);
+  await p.dblclick('#drSplit');
+  const half = await p.evaluate(() => [document.getElementById('stuOut').getBoundingClientRect().width, document.getElementById('drPane').getBoundingClientRect().width].map(Math.round));
+  check('— 두 번 누르면 반반', Math.abs(half[0] - half[1]) <= 4, half);
+  await p.focus('#drSplit');
+  await p.keyboard.press('ArrowRight');
+  const pw2 = await p.$eval('#drPane', el => el.getBoundingClientRect().width);
+  check('— ← → 키로도(→ 는 작성 칸을 좁게)', pw2 < half[1] - 10, { pw2, half });
+  if (process.env.SGB_SHOTS){ await p.dblclick('#drSplit'); await shot(p, '#stuPanes', '12-list-off-1700'); }
+  // ☰ — 반·명단을 다시
+  await p.click('#mBack');
+  await p.waitForFunction(() => !document.getElementById('stuPanes').classList.contains('list-off'));
+  check('☰ — 반·명단이 돌아온다', await p.isVisible('.p-roster') && await p.isVisible('.p-classes'));
+  // 「↗ 새 창」 — 이 학생만 따로
+  const [pop] = await Promise.all([p.context().waitForEvent('page'), p.click('#soloBtn')]);
+  await pop.waitForLoadState();
+  check('「↗ 새 창」 — 이 학생만 따로 띄운다(?solo=1&k=1-1-2)', /saenggibu\.html\?solo=1&k=1-1-2/.test(pop.url()), pop.url());
+  await pop.close();
+  check('오류 없음(목록 숨기기·넓이)', p.errors.length === 0, p.errors);
+  await p.context().close();
+}
+{
+  const q = await openAs(KIM, { width: 960 });
+  await q.waitForSelector('#stus .stu');
+  const mainSt = await q.evaluate(() => localStorage.getItem('ynhs-sgb'));
+  await q.goto(ORIGIN + '/test/saenggibu.html?solo=1&k=1-1-2');
+  await q.waitForFunction(() => document.querySelector('#stuOut .s-name')?.textContent === '최다온');
+  check('단독 개인별 조회 — 그 학생만(반·명단·화면 탭 없음), 제목 「개인별 조회」', await q.evaluate(() => document.documentElement.classList.contains('solo'))
+    && !(await q.isVisible('.p-classes')) && !(await q.isVisible('.p-roster')) && !(await q.isVisible('#views')) && (await q.textContent('.top .ttl')).includes('개인별 조회'));
+  check('— 위쪽 줄 ◀ 1 · 3 ▶ (☰ 단추·새 창 단추는 없다)', await q.isVisible('#mNav') && !(await q.isVisible('#mBack')) && (await q.$$('#mNav .m-step')).length === 2 && !(await q.$('#soloBtn')));
+  await q.click('#mNav .m-step[data-n="3"]');
+  await q.waitForFunction(() => document.querySelector('#stuOut .s-name')?.textContent === '정하늘');
+  check('— ▶ 로 다음 학생', true);
+  await q.fill('#hakbun', '10101');
+  await q.press('#hakbun', 'Enter');
+  await q.waitForFunction(() => document.querySelector('#stuOut .s-name')?.textContent === '김가람');
+  check('— 학번 + Enter 로 그 학생', true);
+  await q.fill('#hakbun', '최다');
+  await q.press('#hakbun', 'Enter');
+  await q.waitForFunction(() => document.querySelector('#stuOut .s-name')?.textContent === '최다온');
+  check('— 이름 + Enter 로도(명단이 없으니 바로 그 학생)', true);
+  await q.click('#drOpenBtn');
+  await q.waitForSelector('#drT-ja', { state: 'visible' });
+  check('— 「✏️ 작성」 도 된다(담임)', (await q.textContent('#drPane .drp-who')).includes('최다온'));
+  if (process.env.SGB_SHOTS) await q.screenshot({ path: path.join(process.env.SGB_SHOTS, '13-solo-960.png') });
+  check('— 본 창의 고른 반·학생은 덮지 않는다(따로 기억)', (await q.evaluate(() => localStorage.getItem('ynhs-sgb'))) === mainSt);
+  check('오류 없음(단독 개인별 조회)', q.errors.length === 0, q.errors);
+  await q.context().close();
+}
 await b.close();
 
 // ── 4. 앱에 붙인 곳 ──

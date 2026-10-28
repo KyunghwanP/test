@@ -17,6 +17,8 @@
   if (/[?&]in=1/.test(location.search)) document.documentElement.classList.add('in-app');
   // 한 학생만 보기 — 앱의 학생 종합검색 「생기부 보조자료」 탭이 띄운다(?embed=1&k=학년-반-번호)
   if (/[?&]embed=1/.test(location.search)) document.documentElement.classList.add('embed');
+  // 단독 개인별 조회 — 한 학생만 따로 띄운 창(?solo=1&k=학년-반-번호). 창 두 개를 띄워 놓고 작업할 때
+  if (/[?&]solo=1/.test(location.search)) document.documentElement.classList.add('solo');
 </script>
 <style>
   /* 생기부 보조자료 — 부서·교과가 모아 낸 기재 문안 통합 엑셀을 학생별·활동별로 본다.
@@ -370,7 +372,14 @@
      보조자료 카드의 「→ 자율」 로 붙이고 줄인다. 닫으면 칸째로 비운다(행특이 화면에 남지 않게) ── */
   .p-draft{display:none;padding:0 16px;border-left:1px solid var(--rule);background:var(--paper);}   /* 옆 칸(보조자료)과 같은 안쪽 여백 — 그래야 정말 반반 */
   /* 반반 — 띄우면 보조자료 칸과 남은 폭을 똑같이 나눈다(선생님: 반반 느낌). 「참여한 활동」 은 좁아진 보조자료 칸에서 사진 옆 이름 아래로 */
-  .pane3.dr-open .p-detail,.pane3.dr-open .p-draft{flex:1 1 0;min-width:0;}
+  .pane3.dr-open .p-detail{flex:var(--drL,1) 1 0;min-width:0;}
+  .pane3.dr-open .p-draft{flex:var(--drR,1) 1 0;min-width:0;}
+  /* 사이 막대 — 끌어서 작성 칸 넓이를(30%~70%), 두 번 누르면 반반 */
+  .dr-split{display:none;flex:none;width:9px;margin:0 -5px 0 -4px;position:relative;z-index:3;overflow:hidden;cursor:col-resize;touch-action:none;}
+  .dr-split::after{content:'';position:absolute;top:0;bottom:0;left:4px;width:1px;background:transparent;transition:background .15s,width .15s,left .15s;}
+  .dr-split:hover::after,.dr-split:focus-visible::after,.dr-split.drag::after{left:3px;width:3px;background:var(--mon);}
+  .dr-split:focus-visible{outline:none;}
+  .pane3.dr-open .dr-split{display:block;}
   .pane3.dr-open .p-draft{display:block;}
   .btn.sm{padding:5px 10px;font-size:13px;border-radius:8px;}
   .drp{padding:14px 2px 40px;}
@@ -424,6 +433,22 @@
   .pane3.dr-open .to-btns{display:inline-flex;gap:6px;flex-wrap:wrap;}
   .to-btns .btn{padding:4px 10px;font-size:13px;}
   .cl-me{font-size:11px;margin-left:3px;}
+  /* 반·명단 숨기기(「« 숨기기」) · 단독 개인별 조회 — 목록 대신 위쪽 줄(☰ 반 · ◀ 이전 · 다음 ▶) */
+  .list-off-btn{margin-left:auto;padding:2px 8px;border:1px solid var(--rule);border-radius:7px;background:var(--paper);color:var(--ink-soft);
+    font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;}
+  .list-off-btn:hover{color:var(--mon);border-color:var(--mon);}
+  .pane3.list-off .p-classes,.pane3.list-off .p-roster,html.solo .p-classes,html.solo .p-roster{display:none;}
+  .pane3.list-off .m-nav,html.solo .m-nav{display:flex;gap:6px;align-items:center;position:sticky;top:-16px;z-index:5;margin:-16px -16px 14px;
+    padding:9px 16px;background:var(--paper);border-bottom:1px solid var(--rule);}
+  .pane3.list-off .m-nav .btn,html.solo .m-nav .btn{padding:6px 12px;font-size:13.5px;max-width:220px;overflow:hidden;text-overflow:ellipsis;}
+  html.solo #mBack{display:none;}
+  html.solo .top #views,html.solo .top .admin,html.solo #fileNote{display:none !important;}
+  .ic-ph{display:none;}
+  @media (min-width:901px) and (max-width:1179px){
+    .pane3.dr-open .m-nav{display:flex;gap:6px;align-items:center;position:sticky;top:-16px;z-index:5;margin:-16px -16px 14px;
+      padding:9px 16px;background:var(--paper);border-bottom:1px solid var(--rule);}
+    .pane3.dr-open .m-nav .btn{padding:6px 12px;font-size:13.5px;max-width:200px;overflow:hidden;text-overflow:ellipsis;}
+  }
   /* 작성 칸을 띄우면 — 노트북은 반 칸, 더 좁으면 명단 칸까지 접는다(학생은 작성 칸의 ◀ ▶ 로) */
   @media (min-width:901px) and (max-width:1439px){ .pane3.dr-open .p-classes{display:none;} }
   @media (min-width:901px) and (max-width:1179px){ .pane3.dr-open .p-roster{display:none;} }
@@ -560,6 +585,8 @@
     /* 생기부 작성 — 띄우면 화면 가득(✕ 로 보조자료에 돌아온다). 폰에서는 「→ 자율」 이 늘 보인다(작성 칸과 함께 못 보므로) */
     .pane3.dr-open .p-detail{display:none;}
     .pane3.dr-open .p-draft{flex:none;width:auto;border-left:none;}
+    .ic-ph{display:inline;} .ic-pc{display:none;}
+    .new-win,.list-off-btn,.dr-split{display:none !important;}
     .drc{padding:0;}
     .drc-box{border-radius:0;min-height:100%;padding:14px 12px 20px;}
     table.drc-t,.drc-t tbody{display:block;}
@@ -1586,15 +1613,24 @@ const $ = id => document.getElementById(id);
 const esc = v => v == null ? '' : String(v)
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
   .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-const LS = 'ynhs-sgb';
 const EMBED = new URLSearchParams(location.search).get('embed') === '1';   // 한 학생만 보기(종합검색 안)
+const SOLO = new URLSearchParams(location.search).get('solo') === '1';     // 단독 개인별 조회(새 창)
+const LS = SOLO ? 'ynhs-sgb-solo' : 'ynhs-sgb';
 let st = { view: 'stu', g: '', c: '', n: '', act: '', ag: '', ac: '', q: '', sg: '', sf: '', find: '' };
 // 폰: 학생을 고르면 상세만 화면 가득(목록은 숨김). '← 명단' 을 누르면 다시 목록. 저장하지 않는다.
 let mList = true;
 const isPhone = () => matchMedia('(max-width:900px)').matches;
 let _curList = [];          // 지금 명단(반 또는 찾은 학생) — 이전/다음 학생
-try { Object.assign(st, JSON.parse(localStorage.getItem(LS) || '{}')); } catch (e) {}
+try {
+  Object.assign(st, JSON.parse(localStorage.getItem('ynhs-sgb') || '{}'));
+  if (SOLO) Object.assign(st, JSON.parse(localStorage.getItem(LS) || '{}'));   // 단독 창 — 본 창 설정 위에 단독 창 것
+} catch (e) {}
 st.find = '';                       // 이름 찾기는 다시 열면 비운다
+if (SOLO){                          // 주소의 학생으로, 학생별만
+  const m = String(new URLSearchParams(location.search).get('k') || '').match(/^(\d)-(\d+)-(\d+)$/);
+  if (m) [, st.g, st.c, st.n] = m;
+  st.view = 'stu'; mList = false;
+}
 const save = () => { try { localStorage.setItem(LS, JSON.stringify(st)); } catch (e) {} };
 
 let META = null;
@@ -1845,9 +1881,10 @@ async function renderStu(){
         <div class="cls-grid">${inG.map(k => `<button type="button" class="cl-item${k === cur && !q ? ' on' : ''}" data-k="${k}">${k.split('-')[1]}반${k === ROLE.home ? '<span class="cl-me" aria-label="담임 반">✏️</span>' : ''}</button>`).join('')}</div>
       </div>
     </nav>
-    <section class="p-roster" aria-label="학생 명단"><div class="roster-head">${head}</div>
+    <section class="p-roster" aria-label="학생 명단"><div class="roster-head">${head}<button type="button" class="list-off-btn" id="listOffBtn" title="반·명단을 숨기고 넓게 봅니다 — 위쪽 ☰ 로 다시">« 숨기기</button></div>
       <div id="stus">${rosterRows(list, !!q) || `<div class="empty">${q ? '맞는 학생이 없습니다.' : '이 반에는 올라온 자료가 없습니다.'}</div>`}</div></section>
     <section class="p-detail" id="stuOut">${st.n ? '<div class="empty">불러오는 중…</div>' : '<div class="empty">왼쪽에서 학생을 고르세요.</div>'}</section>
+    <div class="dr-split" id="drSplit" role="separator" aria-orientation="vertical" aria-label="작성 칸 넓이 — 끌거나 ← → 키, 두 번 누르면 반반" tabindex="0"></div>
     <section class="p-draft" id="drPane" aria-label="생기부 작성"></section>
   </div>`;
   $('clsPane').onclick = e => {
@@ -1874,6 +1911,8 @@ async function renderStu(){
     const b = e.target.closest('.stu'); if (!b) return;
     openStudent(b.dataset.k, b.dataset.n);
   };
+  $('listOffBtn').onclick = () => { st.listOff = true; save(); listApply(); };
+  drFracApply(); drSplitWire(); listApply();
   if (st.n) await renderStuOut();
 }
 // 학생 하나 열기 — 명단 단추·이전/다음에서 같이 쓴다
@@ -1953,7 +1992,7 @@ async function renderStuOut(){
   const navBtn = (r, dir) => r ? `<button type="button" class="btn m-step" data-k="${r.k}" data-n="${r.n}" aria-label="${dir === -1 ? '이전' : '다음'} 학생">
       ${dir === -1 ? '◀ ' : ''}${esc(r.n)} ${esc(r.nm)}${dir === 1 ? ' ▶' : ''}</button>` : '<span class="m-step-none"></span>';
   out.innerHTML = `<div class="m-nav" id="mNav">
-      <button type="button" class="btn" id="mBack">← ${(st.find || '').trim() ? '찾은 학생' : `${esc(st.g)}학년 ${esc(st.c)}반`}</button>
+      <button type="button" class="btn" id="mBack"><span class="ic-ph">←</span><span class="ic-pc">☰</span> ${(st.find || '').trim() ? '찾은 학생' : `${esc(st.g)}학년 ${esc(st.c)}반`}</button>
       ${navBtn(prev, -1)}${navBtn(next, 1)}
     </div>
     <div class="sheet">
@@ -1964,6 +2003,7 @@ async function renderStuOut(){
           <div><div class="s-name">${esc(nm)}</div>
             <div class="s-id">${esc(st.g)}학년 ${esc(st.c)}반 ${esc(st.n)}번 · ${hakbunOf(st.g, st.c, st.n)}</div></div>
           <div class="s-btns">${out._all ? '<button type="button" class="btn line" id="copyAll">📋 기재 문안 전체 복사</button>' : ''}
+            ${SOLO || EMBED ? '' : '<button type="button" class="btn line new-win" id="soloBtn" title="이 학생만 새 창으로 — 창 두 개를 띄워 놓고 작업할 때">↗ 새 창</button>'}
             ${can ? `<button type="button" class="btn${st.drOpen ? ' pri' : ''}" id="drOpenBtn" aria-pressed="${!!st.drOpen}" title="오른쪽에 작성 칸을 띄웁니다 — 보조자료의 「→ 자율」 로 붙여 고칩니다">✏️ 작성</button>` : ''}</div>
         </div>
         <div class="s-sum">${ordered.map(gr => `<span class="tag ${SGB_TAG_CLS[(gr.a.tags || [])[0]] || ''}">${esc(tagTxt(gr.a))} ${gr.list.length}</span>`).join('')}</div>
@@ -2013,10 +2053,17 @@ async function renderStuOut(){
     if (big && $('sPhoto') === im) im.src = big;
   })();
   $('mBack').onclick = () => {
+    if (!isPhone()){
+      // 넓은 화면 — 숨긴 반·명단을 다시(작성 칸 때문에 접혔으면 작성 칸을 닫는다)
+      if (st.listOff){ st.listOff = false; save(); listApply(); }
+      else if ($('stuPanes').classList.contains('dr-open')) drToggle(false);
+      return;
+    }
     mList = true; $('stuPanes').classList.remove('has-detail');
     const on = document.querySelector('#stus .stu.on');
     if (on) on.scrollIntoView({ block: 'center' });
   };
+  if ($('soloBtn')) $('soloBtn').onclick = () => window.open(`saenggibu.html?solo=1&k=${encodeURIComponent(key)}`, '_blank', 'noopener');
   $('mNav').onclick = e => { const b = e.target.closest('.m-step'); if (b) openStudent(b.dataset.k, b.dataset.n); };
   if ($('volSplitBtn')) $('volSplitBtn').onclick = e => {
     const box = $('volSplit'), open = box.hidden;
@@ -2025,7 +2072,33 @@ async function renderStuOut(){
     e.target.textContent = open ? '활동별로 나눠 보기 ▴' : '활동별로 나눠 보기 ▾';
   };
   out.scrollTop = 0;
+  listApply();
   drSync();                                    // 작성 칸 — 열어 두었고 쓸 수 있는 학생이면 이 학생으로
+}
+// 반·명단 숨기기(「« 숨기기」, 기억) — 학생을 연 동안만. 숨기면 위쪽 줄(☰ 반 · ◀ 이전 · 다음 ▶)로 넘긴다
+function listApply(){ const panes = $('stuPanes'); if (panes) panes.classList.toggle('list-off', !!st.listOff && !!st.n && !SOLO); }
+// 작성 칸 넓이 — 사이 막대를 끌어서(30%~70%), ← → 키로, 두 번 누르면 반반. 기억한다
+const drFracOf = v => Math.min(.7, Math.max(.3, +v || .5));
+function drFracApply(){
+  const panes = $('stuPanes'); if (!panes) return;
+  const f = drFracOf(st.drFrac);
+  panes.style.setProperty('--drL', String(1 - f)); panes.style.setProperty('--drR', String(f));
+}
+function drSplitWire(){
+  const sp = $('drSplit'); if (!sp) return;
+  sp.onpointerdown = e => {
+    e.preventDefault(); sp.setPointerCapture?.(e.pointerId); sp.classList.add('drag');
+    const move = ev => { const d = $('stuOut').getBoundingClientRect(), p = $('drPane').getBoundingClientRect();
+      st.drFrac = drFracOf((p.right - ev.clientX) / (p.right - d.left)); drFracApply(); };
+    const up = () => { sp.classList.remove('drag'); sp.removeEventListener('pointermove', move); sp.removeEventListener('pointerup', up); save(); };
+    sp.addEventListener('pointermove', move); sp.addEventListener('pointerup', up);
+  };
+  sp.ondblclick = () => { st.drFrac = .5; drFracApply(); save(); };
+  sp.onkeydown = e => {
+    const d = e.key === 'ArrowLeft' ? .02 : e.key === 'ArrowRight' ? -.02 : 0;
+    if (!d) return;
+    e.preventDefault(); st.drFrac = drFracOf(drFracOf(st.drFrac) + d); drFracApply(); save();
+  };
 }
 
 // ── 활동별: 활동 목록 | 활동 ──
@@ -2510,7 +2583,7 @@ function drClassClose(){ const box = $('drClass'); box.hidden = true; box.innerH
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('drClass').hidden) drClassClose(); });
 
 async function render(){
-  if (st.view === 'draft') st.view = 'stu';    // 예전 판의 「우리 반 작성」 탭 — 이제 학생별의 「✏️ 작성」
+  if (st.view === 'draft' || SOLO) st.view = 'stu';    // 예전 판의 「우리 반 작성」 탭 — 이제 학생별의 「✏️ 작성」. 단독 창은 학생별만
   drFlush();                                   // 화면을 바꿀 때 작성 칸에 남은 고침을 쓴다
   document.querySelectorAll('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === st.view));
   if (!META){
@@ -2533,18 +2606,27 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') $('zoom').cl
 $('hakbun').addEventListener('keydown', e => {
   if (e.key !== 'Enter' || !META) return;
   const m = e.target.value.trim().match(/^([1-3])(\d{2})(\d{2})$/);
-  if (!m) return;
+  if (!m){ if (SOLO && e.target.value.trim()) soloFind(e.target.value.trim()); return; }
   st.view = 'stu'; st.g = m[1]; st.c = String(+m[2]); st.n = String(+m[3]); st.find = '';
   e.target.value = '';
   render();
 });
 $('hakbun').addEventListener('input', e => {
-  if (!META) return;
+  if (!META || SOLO) return;
   const v = e.target.value.trim();
   if (/^\d+$/.test(v)) return;           // 학번을 치는 중
   st.find = v; st.view = 'stu';
   render();
 });
+// 단독 창 — 이름으로 찾기(명단이 없으니 맞는 첫 학생을 바로 연다)
+function soloFind(q){
+  const rv = rosterView(), hits = [];
+  for (const k of classes()) for (const r of rv[k] || []) if (!r.extra && (r.nm || '').includes(q)) hits.push([k, r]);
+  if (!hits.length){ toast('맞는 학생이 없습니다'); return; }
+  const [k, r] = hits[0];
+  $('hakbun').value = ''; [st.g, st.c] = k.split('-'); st.n = String(r.n); save(); render();
+  if (hits.length > 1) toast(`${hits.length}명 가운데 첫 학생입니다 — 학번으로 찾으면 정확합니다`);
+}
 document.body.addEventListener('click', e => {
   // 기재 문안 — 복사 단추나 문안 상자를 누르면(글을 끌어 고르는 중이면 그대로 둔다)
   const b = e.target.closest('[data-copy], .card > .body');
@@ -3055,6 +3137,11 @@ async function metaPatch(fn, log){
 }
 
 // ── 시작 ──
+if (SOLO){
+  document.querySelector('.top .ttl').textContent = '📑 개인별 조회';
+  document.title = '개인별 조회 — 생기부 보조자료';
+  $('hakbun').placeholder = '🔍 학번(30101) 또는 이름 + Enter';
+}
 $('loginBtn').onclick = () => signInWithPopup(fbAuth, new GoogleAuthProvider())
   .catch(e => { $('gateErr').textContent = e.message || String(e); });
 onAuthStateChanged(fbAuth, async user => {

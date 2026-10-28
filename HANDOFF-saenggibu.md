@@ -55,7 +55,7 @@
 | `usage.html` | 사용 현황에 `saenggibu`·`notice` 이름 |
 | `firestore.rules` | `saenggibu`·`saenggibuStu`·`saenggibuAct` — 읽기·쓰기 `isYnhsTeacher()`(2026-10-28 쓰기를 교사 전체로) |
 | `tests/saenggibu-draft-rules.test.mjs` | 생기부 작성 규칙(에뮬레이터) 22개 — 담임은 자기 반만, 다른 반·다른 교사·전체열람 권한자·학생은 못 봄, 관리자는 모든 반 |
-| `tests/saenggibu.test.mjs` | 446개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
+| `tests/saenggibu.test.mjs` | 465개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
 | `tests/make-saenggibu-template.mjs` | **표준 양식** 엑셀 만들기(부서에 나눠 줄 빈 양식). `node tests/make-saenggibu-template.mjs <폴더>` |
 | `tests/s360-tabs.test.mjs` | 17개 검사(종합검색 탭) |
 | `tests/upload-pyeonseong*.test.mjs`, `tests/make-pyeonseong-fixture.mjs` | 편성표(학적사항 칸·괄호 이름 포함) |
@@ -146,6 +146,12 @@
 - **인쇄**(작성 칸 머리): 이 학생 / 우리 반 전체(학생마다 한 장 — 그때 반 문서를 새로 읽는다), 「행특 빼고 인쇄」(가려 두었으면 처음부터 켜짐).
   빼 둔 내용·메모는 안 찍는다. `#printArea` 만 찍고, 끝나면 비운다. **컬러**(영역 색 띠·칩·채운 막대, 넘으면 빨강, 이름 머리·쪽 번호 꼬리, `print-color-adjust:exact`).
   **`@page{size:A4;margin:0}`** — 쪽 여백이 0 이어야 브라우저 머리말·꼬리말(주소·날짜·쪽 번호)이 안 찍힌다. 여백은 `.pr-page` 안쪽 여백(넘치면 `box-decoration-break:clone`).
+- **작성 칸 넓이 끌기**: 보조자료와 작성 칸 사이 막대(`#drSplit`)를 끌어서 30%~70%(← → 키도), 두 번 누르면 반반. `st.drFrac` 로 기억,
+  `--drL`·`--drR` 을 flex-grow 로(바탕 0 · 안쪽 여백이 같아야 비율대로).
+- **반·명단 숨기기**(명단 머리 「« 숨기기」, `st.listOff` 기억): 학생을 연 동안 반·명단 칸을 숨기고 위쪽 줄(☰ 반 · ◀ 이전 · 다음 ▶)로 넘긴다.
+  ☰ 로 다시(넓은 화면). 폰은 원래 단계식이라 단추 없음. 작성 칸 때문에 접힌 노트북 폭에서도 위쪽 줄이 보이고 ☰ 는 작성 칸을 닫는다.
+- **단독 개인별 조회**(「↗ 새 창」 → `saenggibu.html?solo=1&k=학년-반-번호`): 창 두 개를 띄워 놓고(예: 나이스 옆) 쓸 때. 한 학생만 — 반·명단·화면 탭·올리기 단추 없음,
+  위쪽 줄 ◀ ▶, 학번 또는 이름 + Enter(이름은 맞는 첫 학생), 「✏️ 작성」 도 그대로. 기억은 `ynhs-sgb-solo` 에 따로(본 창의 고른 반·학생을 덮지 않게, 처음엔 본 창 설정을 따름).
 - **📋 반 전체**(작성 칸 머리): 영역 하나를 반 전체로 — 엑셀의 자율·진로·개세특·행특 시트처럼. 학생마다 글·바이트(넘으면 빨강)·복사, 「쓴 학생 N / M명 · 한도 넘음 K명」,
   이름을 누르면 닫고 그 학생 작성 칸으로. 행특을 가리면 행특 탭도 없다. 그때 반 문서를 새로 읽는다.
 
@@ -282,7 +288,7 @@ CLAUDE.md: **화면 변경은 test 먼저 → 선생님 확인 → ynhs PR·병�
 
 ### 검사 돌리기 (이 환경 기준)
 ```bash
-node tests/saenggibu.test.mjs        # 446
+node tests/saenggibu.test.mjs        # 465
 # 규칙(생기부 작성) — 에뮬레이터: tests/README.md 「보안 규칙」. 이 환경에선 패키지를 임시 폴더에 깔고 거기서 돌렸다:
 #   npm i firebase-tools@13 @firebase/rules-unit-testing@3 firebase@10 (임시 폴더) → firebase emulators:start --only firestore (8099)
 #   cp tests/saenggibu-draft-rules.test.mjs <임시 폴더>/ && node <임시 폴더>/saenggibu-draft-rules.test.mjs   (저장소 폴더에서) # 22
