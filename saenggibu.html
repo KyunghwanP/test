@@ -2683,24 +2683,50 @@ function spellSubmit(text){
   document.body.appendChild(f); f.submit(); f.remove();
   return win;
 }
+// 검사 중인 칸 — 선생님이 팝업에서 「결과 복사하기」 를 누르고 앱 창으로 돌아오면(창을 누르거나 다시 보면) 클립보드를 읽어 바로 반영하고 팝업을 닫는다.
+// 검사기 단추를 앱이 가로챌 수는 없다(다른 사이트 화면 — 브라우저가 막는다). 그래서 「돌아옴」 을 신호로 쓴다
+let spellPend = null;
 function drSpellOpen(k){
   const ta = $('drT-' + k); if (!ta) return;
   if (!ta.value.trim()){ toast('검사할 글이 없습니다'); return; }
   const win = spellSubmit(ta.value);
-  copyText(ta.value);                          // 결과가 안 뜨면 검사기에 붙여 넣을 수 있게
+  copyText(ta.value);                          // 결과가 안 뜨면 검사기에 붙여 넣을 수 있게(돌아왔는데 이 글 그대로면 아직 복사 전)
   drSpellBox(k);
-  toast(win ? '검사기 팝업에 보냈습니다 — 결과가 뜨면 「결과 복사하기」' : '팝업이 막혀 있습니다 — 주소창 오른쪽에서 이 사이트의 팝업을 허용해 주세요');
+  spellPend = { k, key: drKey(), win };
+  toast(win ? '검사기 팝업에 보냈습니다 — 결과가 뜨면 「결과 복사하기」 를 누르고 이 창으로 돌아오세요' : '팝업이 막혀 있습니다 — 주소창 오른쪽에서 이 사이트의 팝업을 허용해 주세요');
 }
+async function spellReturn(){
+  const sp = spellPend;
+  if (!sp || sp.busy) return;
+  if (sp.key !== drKey() || !$('drT-' + sp.k) || !$('drSI-' + sp.k) || $('drS-' + sp.k).hidden){ spellPend = null; return; }   // 학생·칸이 바뀌었으면 그만
+  if (!document.hasFocus()) return;
+  sp.busy = true;
+  let txt = '';
+  try { txt = await navigator.clipboard.readText(); } catch (e) {}    // 처음 한 번은 브라우저가 「클립보드 보기 허용」 을 묻는다
+  sp.busy = false;
+  if (spellPend !== sp) return;
+  const fix = txt.replace(/\r\n?/g, '\n').replace(/\s+$/, ''), cur = $('drT-' + sp.k).value.replace(/\s+$/, '');
+  if (!fix.trim() || fix === cur) return;     // 아직 「결과 복사하기」 전 — 기다린다
+  $('drSI-' + sp.k).value = fix;
+  const r = drSpellDiff(sp.k);
+  if (!r.changes) return;
+  spellPend = null;
+  if (r.sim < .5){ drSpellManual(sp.k); drSpellDiff(sp.k); toast('복사한 글이 이 칸 글과 많이 다릅니다 — 확인하고 「반영」 을 눌러 주세요'); return; }
+  try { sp.win?.close(); } catch (e) {}         // 검사기 팝업은 닫는다
+  await drSpellApply(sp.k);
+}
+window.addEventListener('focus', () => setTimeout(spellReturn, 0));
+document.addEventListener('pointerdown', e => { if (spellPend && !e.target.closest('[data-spell-clip], [data-spell], [data-spell-close]')) setTimeout(spellReturn, 0); }, true);
 // 작성 칸 안의 상자 — 단계 안내와 「📋 복사한 글 반영」. 클립보드를 못 읽었거나 엉뚱한 글이면 붙여 넣는 칸, 반영한 뒤에는 바뀐 곳과 「되돌리기」
 function drSpellBox(k){
   const box = $('drS-' + k); if (!box) return;
   box.hidden = false;
-  box.innerHTML = `<div class="drp-spell-steps" id="drSG-${k}"><b>검사기 팝업에 글을 보냈습니다.</b> 결과가 뜨면 ① 팝업의 「결과 복사하기」 → ② 아래 「📋 복사한 글 반영」
+  box.innerHTML = `<div class="drp-spell-steps" id="drSG-${k}"><b>검사기 팝업에 글을 보냈습니다.</b> 결과가 뜨면 팝업의 「결과 복사하기」 를 누르고 이 창으로 돌아오세요 — 팝업이 닫히고 바로 반영됩니다
       <span class="d">(결과가 안 뜨면 <a href="${SPELLER_URL}" target="sgbSpeller">검사기 첫 화면</a>에 붙여 넣기(Ctrl+V) → 검사하기 — 글은 복사해 두었습니다)</span></div>
     <textarea class="drp-spell-in" id="drSI-${k}" data-k="${k}" aria-label="${DR_NAME[k]} 고친 글 붙여 넣기" placeholder="검사기에서 고친 글을 복사해 여기에 붙여 넣기(Ctrl+V)" hidden></textarea>
     <div class="drp-spell-sum" id="drSS-${k}"></div>
     <div class="drp-spell-diff" id="drSD-${k}"></div>
-    <div class="drp-spell-btns" id="drSB-${k}"><button type="button" class="btn sm pri" data-spell-clip="${k}">📋 복사한 글 반영</button>
+    <div class="drp-spell-btns" id="drSB-${k}"><button type="button" class="btn sm" data-spell-clip="${k}" title="돌아와도 반영되지 않으면 눌러 주세요">📋 복사한 글 반영</button>
       <button type="button" class="btn sm" data-spell="${k}" title="지금 글로 다시 검사">다시 검사</button>
       <button type="button" class="btn sm" data-spell-close="${k}">닫기</button></div>`;
 }
@@ -2710,6 +2736,7 @@ function drSpellManual(k){
   $('drSB-' + k).innerHTML = `<button type="button" class="btn sm pri" data-spell-apply="${k}" disabled>반영</button><button type="button" class="btn sm" data-spell-close="${k}">닫기</button>`;
 }
 async function drSpellClip(k){
+  spellPend = null;
   let txt = '';
   try { txt = await navigator.clipboard.readText(); } catch (e) {}    // 처음 한 번은 브라우저가 「클립보드 보기 허용」 을 묻는다
   drSpellManual(k);
@@ -2747,10 +2774,10 @@ async function drSpellApply(k){
   $('drSI-' + k).hidden = true; if ($('drSG-' + k)) $('drSG-' + k).hidden = true;
   $('drSS-' + k).innerHTML = '✅ 반영했습니다 · ' + $('drSS-' + k).innerHTML;
   $('drSB-' + k).innerHTML = `<button type="button" class="btn sm" data-spell-undo="${k}">되돌리기</button><button type="button" class="btn sm" data-spell-close="${k}">닫기</button>`;
-  toast('고친 글을 반영했습니다');
+  toast('반영되었습니다 — 바뀐 곳은 칸 아래에서 보고, 「되돌리기」 로 돌아갈 수 있습니다');
 }
 async function drSpellUndo(k){ drSpellClose(k); await drRestore(k, 0); }   // 기록 맨 앞이 고치기 전 글
-function drSpellClose(k){ const box = $('drS-' + k); if (box){ box.hidden = true; box.innerHTML = ''; } }
+function drSpellClose(k){ const box = $('drS-' + k); if (box){ box.hidden = true; box.innerHTML = ''; } if (spellPend?.k === k) spellPend = null; }
 // 보조자료 카드의 「→ 자율」 — 그 칸 끝에 한 칸 띄우고 붙인다. 작성 칸이 닫혀 있어도(폰) 저장된 글 뒤에 붙인다
 async function drAppend(k, text){
   const key = drKey();

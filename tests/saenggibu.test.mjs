@@ -1817,17 +1817,23 @@ STORE = STORE_B;
   check('「🔤 맞춤법」 — 검사기 팝업 창(이름 sgbSpeller)에 그 칸 글을 바로 보내 결과 화면이 뜬다(이전 버전 · 순화어 교정 켬)', wo[1] === 'sgbSpeller' && /popup=yes/.test(wo[2])
     && post?.u === 'https://nara-speller.co.kr/old_speller/results' && post.text1 === full && post.weak === 'true' && (await spop.textContent('#tdCorrection1stBox')) === full, { wo, post });
   check('— 보내는 건 팝업의 화면 이동뿐(앱 화면이 검사기와 몰래 주고받지 않는다)', spellReq.length >= 1 && spellReq.every(x => x.nav && !x.app), spellReq);
-  check('— 작성 칸에 안내(「결과 복사하기」 → 「📋 복사한 글 반영」), 결과가 안 뜰 때를 위해 글도 복사해 둔다', (await p.textContent('#drSG-ja')).includes('결과 복사하기')
+  check('— 작성 칸에 안내(「결과 복사하기」 누르고 돌아오면 반영), 결과가 안 뜰 때를 위해 글도 복사해 둔다', (await p.textContent('#drSG-ja')).includes('결과 복사하기')
     && (await p.evaluate(() => window.__copied)) === full && await p.isVisible('[data-spell-clip="ja"]'));
+  // 「결과 복사하기」 를 누르고 앱 창으로 돌아오면(창을 누르면) — 클립보드를 읽어 바로 반영, 팝업은 닫힌다(선생님 요청: 복사하면 꺼지고 반영 누를 필요 없게)
+  await p.evaluate(t => { navigator.clipboard.readText = async () => t; }, full);       // 아직 복사 전(앱이 복사해 둔 원래 글 그대로)
+  await p.click('#drPane .drp-who');
+  await p.waitForTimeout(300);
+  check('— 아직 「결과 복사하기」 전이면 돌아와도 그대로(팝업도 그대로)', (await p.inputValue('#drT-ja')) === full && !spop.isClosed() && await p.isVisible('#drSG-ja'));
   const FIXED = full.replace('로봇 코딩', '로봇코딩').replace('익힘.', '익혔음.');
   await p.evaluate(t => { navigator.clipboard.readText = async () => t; }, FIXED + '\n');   // 선생님이 결과 화면의 「결과 복사하기」 를 눌렀다
-  await p.click('[data-spell-clip="ja"]');
+  await p.click('#drPane .drp-who');
   await p.waitForFunction(t => window.__FS__['saenggibuDraft/1-1-1']?.ja === t, FIXED);
+  await p.waitForTimeout(100);
   const sv = await p.evaluate(() => ({ sum: document.getElementById('drSS-ja').textContent, dels: [...document.querySelectorAll('#drSD-ja del')].map(d => d.textContent),
     ins: [...document.querySelectorAll('#drSD-ja ins')].map(d => d.textContent), paste: !document.getElementById('drSI-ja').hidden, steps: !document.getElementById('drSG-ja').hidden,
-    undo: !!document.querySelector('[data-spell-undo="ja"]') }));
+    undo: !!document.querySelector('[data-spell-undo="ja"]'), toast: document.getElementById('toast').textContent }));
   const fb = s => [...s].reduce((n, ch) => n + (ch.charCodeAt(0) < 128 ? 1 : 3), 0);
-  check('「📋 복사한 글 반영」 — 클립보드의 고친 글이 바로 칸에 들어가 저장', (await p.inputValue('#drT-ja')) === FIXED, sv);
+  check('「결과 복사하기」 → 앱 창으로 돌아오면 바로 반영·저장, 검사기 팝업은 닫히고 「반영되었습니다」', (await p.inputValue('#drT-ja')) === FIXED && spop.isClosed() && sv.toast.startsWith('반영되었습니다'), sv);
   check('— 바뀐 곳 2군데(붙임 ⌒ · 빨강 → 초록)와 바이트 변화, 「되돌리기」', sv.sum.startsWith('✅ 반영했습니다 · 바뀐 곳 2군데') && sv.sum.includes(`${fb(full).toLocaleString()} → ${fb(FIXED).toLocaleString()}바이트`)
     && sv.dels.join('|') === '⌒|힘' && sv.ins.join('|') === '혔음' && !sv.paste && !sv.steps && sv.undo, sv);
   if (process.env.SGB_SHOTS) await shot(p, '#drPane .drp-area[data-k="ja"]', '16-spell');
@@ -1838,29 +1844,29 @@ STORE = STORE_B;
   const nOpen = await p.evaluate(() => window.__wo.length);
   await p.click('[data-spell="haeng"]');
   check('— 빈 칸은 검사기에 보내지 않는다', (await p.evaluate(() => window.__wo.length)) === nOpen && !(await p.isVisible('#drS-haeng')));
-  // 다른 칸 — 같은 팝업 창에 그 글을 보낸다. 엉뚱한 글을 복사해 왔으면 바로 반영하지 않는다
-  await p.click('[data-spell="jin"]');
-  await spop.waitForFunction(t => document.getElementById('tdCorrection1stBox')?.textContent === t, ROBOT);
-  check('— 다른 칸도 같은 팝업 창에(진로 글이 검사기로)', (await p.evaluate(() => window.__wo.at(-1)[1])) === 'sgbSpeller' && p.context().pages().length === 2
-    && spellReq.filter(x => x.m === 'POST').at(-1)?.text1 === ROBOT);
+  // 다른 칸 — 새 팝업에 그 글을 보낸다. 엉뚱한 글을 복사해 왔으면 돌아와도 반영하지 않고 확인을 받는다(창으로 돌아옴 = focus)
+  const [spop2] = await Promise.all([p.context().waitForEvent('page'), p.click('[data-spell="jin"]')]);
+  await spop2.waitForSelector('#btnOrgCopy');
+  check('— 다른 칸도 검사기 팝업에(진로 글이 검사기로)', (await spop2.textContent('#tdCorrection1stBox')) === ROBOT && spellReq.filter(x => x.m === 'POST').at(-1)?.text1 === ROBOT);
   await p.evaluate(() => { navigator.clipboard.readText = async () => '전혀 다른 글을 잘못 복사해 왔다.'; });
-  await p.click('[data-spell-clip="jin"]');
+  await p.bringToFront();
+  await p.evaluate(() => window.dispatchEvent(new Event('focus')));
   await p.waitForSelector('[data-spell-apply="jin"]');
-  check('— 엉뚱한 글이면 반영하지 않고 「다른 글 같습니다」(확인 후 「반영」)', (await p.inputValue('#drT-jin')) === ROBOT && (await p.textContent('#drSS-jin')).includes('다른 글 같습니다')
-    && !(await p.$eval('[data-spell-apply="jin"]', b => b.disabled)));
+  check('— 엉뚱한 글이면 돌아와도 반영하지 않고 「다른 글 같습니다」(확인 후 「반영」), 팝업도 그대로', (await p.inputValue('#drT-jin')) === ROBOT
+    && (await p.textContent('#drSS-jin')).includes('다른 글 같습니다') && !(await p.$eval('[data-spell-apply="jin"]', b => b.disabled)) && !spop2.isClosed());
   await p.click('[data-spell-close="jin"]');
-  // 클립보드를 못 읽으면(허용 안 함) 붙여 넣는 칸으로
+  // 클립보드를 못 읽으면(허용 안 함) — 「📋 복사한 글 반영」 → 붙여 넣는 칸으로
   await p.click('[data-spell="jin"]');
   await p.waitForSelector('[data-spell-clip="jin"]');
   await p.evaluate(() => { navigator.clipboard.readText = async () => { throw new Error('denied'); }; });
   await p.click('[data-spell-clip="jin"]');
   await p.waitForSelector('#drSI-jin:not([hidden])');
-  check('— 클립보드를 못 읽으면 붙여 넣는 칸으로 안내', await p.isVisible('#drSI-jin') && (await p.textContent('#toast')).includes('붙여 넣어'));
+  check('— 클립보드를 못 읽으면 「📋 복사한 글 반영」 이 붙여 넣는 칸으로 안내', await p.isVisible('#drSI-jin') && (await p.textContent('#toast')).includes('붙여 넣어'));
   await p.fill('#drSI-jin', ROBOT.replace('익힘.', '익혔음.'));
   await p.click('[data-spell-apply="jin"]');
   await p.waitForFunction(t => window.__FS__['saenggibuDraft/1-1-1']?.jin === t, ROBOT.replace('익힘.', '익혔음.'));
   check('— 붙여 넣고 「반영」 해도 된다', (await p.inputValue('#drT-jin')) === ROBOT.replace('익힘.', '익혔음.'));
-  await spop.close();
+  if (!spop2.isClosed()) await spop2.close();
   // 우리 반 생기부 — 반 전체를 한 페이지에(선생님 요청 2026-10-28: 모달 말고 페이지로, 담임에게만 단추).
   // 한눈에(학생 × 영역 바이트) · 영역 탭(자율 전체 …) · 영역 인쇄 · 학생마다 인쇄 · 엑셀로 저장. 작성 칸의 「📘 반 전체」 로도 간다
   check('담임 — 위쪽 화면 탭에 「📘 우리 반 생기부」', await p.isVisible('#clsTab') && (await p.textContent('#clsTab')).trim() === '📘 우리 반 생기부');
