@@ -1399,7 +1399,8 @@ const adminDone = (p, word) => p.waitForFunction(w => { const a = document.getEl
   const rbId = m.activities.find(a => a.sheet.includes('로봇')).id, mathId = m.activities.find(a => a.sheet.includes('수학')).id;
   const p = await openAs(KIM);
   await p.waitForSelector('.cls-pc .cl-item');
-  check('반 목록 — 추가·수정된 자료가 있는 반에 점(1-1)', !!(await p.$('.cls-pc .cl-item[data-k="1-1"] .fresh-dot')));
+  // 반 목록의 빨간 점은 뺐다 — 거의 모든 반에 떠서 뜻이 없었다(선생님 요청 2026-10-28). 꼬리표는 활동·카드에만
+  check('반 목록 — 추가·수정 빨간 점 없음', !(await p.$('.cl-item .fresh-dot')));
   await p.click('#views [data-view="act"]');
   await p.waitForSelector('#acts .act');
   const tagOf = async id => txt(p, `#acts .act[data-id="${id}"] .fresh`);

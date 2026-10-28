@@ -201,8 +201,6 @@
     vertical-align:2px;line-height:1.45;color:#fff;letter-spacing:.02em;}
   .fresh.new{background:#E11D48;}
   .fresh.mod{background:#4338CA;}
-  .fresh-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#E11D48;margin-left:5px;vertical-align:middle;}
-  .cl-item.on .fresh-dot{background:#fff;}
   .fresh-tg{margin-top:6px;border:1px solid var(--rule);background:var(--paper);border-radius:8px;padding:3px 10px;font:inherit;font-size:13px;font-weight:700;color:#E11D48;cursor:pointer;}
   .fresh-tg.on{background:#E11D48;border-color:#E11D48;color:#fff;}
   .card-h .t{font-size:17px;font-weight:800;}
@@ -1411,10 +1409,6 @@ function markSeen(list){
 }
 const freshHtml = a => { const f = sgbFresh(a, SEEN);
   return f ? `<span class="fresh ${f}" title="${f === 'new' ? '새로 추가됨' : '내용이 바뀜'} · ${fmtAt(a.upd)}">${f === 'new' ? '추가' : '수정'}</span>` : ''; };
-// 추가·수정된 활동이 있는 반(반 목록의 점) — 학생마다 하려면 목록 문서가 1MiB 를 넘을 수 있어 반 단위로
-const freshClasses = () => { const out = new Set();
-  for (const a of META?.activities || []) if (sgbFresh(a, SEEN)) for (const k of Object.keys(a.byClass || {})) out.add(k);
-  return out; };
 const fmtAt = iso => { try { const d = new Date(iso); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; } catch (e) { return ''; } };
 
 // ── 읽기 ──
@@ -1612,16 +1606,15 @@ async function renderStu(){
   // 학년 접기 — 처음엔 지금 보는 학년만 펼친다. 접은 학년은 기억한다(st.fold)
   if (!Array.isArray(st.fold)) st.fold = grades.filter(g => g !== st.g);
   const fold = st.fold.filter(g => g !== st.g || q);
-  const fc = freshClasses();
   body.innerHTML = `<div class="pane3${st.n && !mList ? ' has-detail' : ''}" id="stuPanes">
     <nav class="p-classes" id="clsPane" aria-label="반">
       <div class="cls-pc">${grades.map(g => { const open = !fold.includes(g); return `<button type="button" class="cl-grade" data-g="${g}" aria-expanded="${open}">
           ${g}학년<span class="cl-caret">${open ? '▾' : '▸'}</span></button>
         <div class="cl-list" data-g="${g}"${open ? '' : ' hidden'}>${cls.filter(k => k.split('-')[0] === g).map(k => `<button type="button" class="cl-item${k === cur && !q ? ' on' : ''}" data-k="${k}">
-          <span>${k.split('-')[1]}반${fc.has(k) ? '<span class="fresh-dot" title="추가·수정된 자료가 있는 반"></span>' : ''}</span><span class="cl-cnt">${roster[k].length}</span></button>`).join('')}</div>`; }).join('')}</div>
+          <span>${k.split('-')[1]}반</span><span class="cl-cnt">${roster[k].length}</span></button>`).join('')}</div>`; }).join('')}</div>
       <div class="cls-m">
         <div class="seg">${grades.map(g => `<button type="button" class="g-tab${g === st.g ? ' on' : ''}" data-g="${g}">${g}학년</button>`).join('')}</div>
-        <div class="cls-grid">${inG.map(k => `<button type="button" class="cl-item${k === cur && !q ? ' on' : ''}" data-k="${k}">${k.split('-')[1]}반${fc.has(k) ? '<span class="fresh-dot"></span>' : ''}</button>`).join('')}</div>
+        <div class="cls-grid">${inG.map(k => `<button type="button" class="cl-item${k === cur && !q ? ' on' : ''}" data-k="${k}">${k.split('-')[1]}반</button>`).join('')}</div>
       </div>
     </nav>
     <section class="p-roster" aria-label="학생 명단"><div class="roster-head">${head}</div>
