@@ -2700,6 +2700,7 @@ function clsDraw(ck, list, at){
   const wrap = $('body').querySelector('.cls-wrap') || (() => { $('body').innerHTML = '<div class="cls-wrap"></div>'; return $('body').querySelector('.cls-wrap'); })();
   wrap.innerHTML = `<div class="sheet cls-sheet" id="clsPage">
     <div class="cls-head">
+      ${SOLO ? '<button type="button" class="btn sm" id="clsBack" title="보던 학생으로 — 새 창에는 화면 탭이 없다">← 학생으로</button>' : ''}
       <div class="cls-ttl"><b>${esc(g)}학년 ${esc(c)}반 생기부</b><span class="d">${list.length}명 · 담임 작성 칸 기준 · ${fmtAt(at)} 불러옴</span></div>
       ${pick}
       <div class="cls-act">
@@ -2715,6 +2716,7 @@ function clsDraw(ck, list, at){
   const page = $('clsPage');
   page.onclick = e => {
     const tb = e.target.closest('#clsTabs [data-t]'); if (tb){ st.clsTab = tb.dataset.t; save(); clsDraw(ck, list, at); return; }
+    if (e.target.closest('#clsBack')){ st.view = 'stu'; save(); render(); return; }
     const nb = e.target.closest('.nm [data-n]');
     if (nb){ [st.g, st.c] = ck.split('-'); st.n = String(nb.dataset.n); st.view = 'stu'; st.find = ''; st.drOpen = true; mList = false; save(); render(); return; }
     const cp = e.target.closest('[data-cpk]'); if (cp){ copyText(drCache.get(`${ck}-${cp.dataset.cpk}`)?.[st.clsTab] || ''); return; }
@@ -2779,7 +2781,7 @@ async function drXlsx(ck){
 }
 
 async function render(){
-  if (st.view === 'draft' || SOLO) st.view = 'stu';    // 예전 판의 「우리 반 작성」 탭 — 이제 학생별의 「✏️ 작성」. 단독 창은 학생별만
+  if (st.view === 'draft' || (SOLO && st.view !== 'cls')) st.view = 'stu';   // 예전 「우리 반 작성」 탭 — 이제 「✏️ 작성」. 단독 창은 학생별과 작성 칸의 「📘 반 전체」 만
   if (st.view === 'cls' && !(ROLE.home || ROLE.master)) st.view = 'stu';   // 우리 반 생기부 — 담임·관리자만
   drFlush();                                   // 화면을 바꿀 때 작성 칸에 남은 고침을 쓴다
   document.querySelectorAll('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === st.view));

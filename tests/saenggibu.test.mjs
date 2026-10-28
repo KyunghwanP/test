@@ -2022,6 +2022,21 @@ STORE = STORE_B;
     check('오류 없음(반별 생기부)', r.errors.length === 0, r.errors);
     await r.context().close();
   }
+  // 관리자 — 본 창 작성 칸의 「📘 반 전체」 로도(신고 2026-10-28 — 본 창에서도 되는지)
+  {
+    const r = await openAs(ADMIN, { width: 1700 });
+    await r.waitForSelector('#stus .stu');
+    await r.click('#stus .stu[data-n="1"]');
+    await r.waitForSelector('#drOpenBtn');
+    await r.click('#drOpenBtn');
+    await r.waitForSelector('#drClassBtn');
+    await r.click('#drClassBtn');
+    await r.waitForSelector('#clsPage .cls-all tbody tr', { timeout: 3000 }).catch(() => {});
+    check('관리자 본 창 — 작성 칸 「📘 반 전체」 → 그 학생 반(1학년 1반) 생기부, 고르는 칸', (await txt(r, '.cls-ttl b')) === '1학년 1반 생기부' && await r.isVisible('#clsG')
+      && !(await r.$('#clsBack')));
+    check('오류 없음(관리자 반 전체)', r.errors.length === 0, r.errors);
+    await r.context().close();
+  }
   // 관리자가 담임이기도 하면 — 그래도 「반별 생기부」(고르는 칸이 있으니), 처음은 자기 반
   {
     const roles = STORE['acl/gradeRoles'];
@@ -2165,6 +2180,14 @@ STORE = STORE_B;
   await q.waitForSelector('#drT-ja', { state: 'visible' });
   check('— 「✏️ 작성」 도 된다(담임)', (await q.textContent('#drPane .drp-who')).includes('최다온'));
   if (process.env.SGB_SHOTS) await q.screenshot({ path: path.join(process.env.SGB_SHOTS, '13-solo-960.png') });
+  // 새 창의 작성 칸 「📘 반 전체」 — 같은 창에서 우리 반 생기부로, 「← 학생으로」 로 돌아온다
+  // (선생님 신고 2026-10-28: 「작성 화면에서 반 전체를 눌러도 모달도 안 뜨네」 — 새 창은 학생별만 그리게 막혀 있어 아무 일도 없었다)
+  await q.click('#drClassBtn');
+  await q.waitForSelector('#clsPage .cls-all tbody tr', { timeout: 3000 }).catch(() => {});
+  check('새 창 — 작성 칸 「📘 반 전체」 를 누르면 우리 반 생기부(1학년 1반)가 열린다', (await txt(q, '.cls-ttl b')) === '1학년 1반 생기부');
+  await q.click('#clsBack', { timeout: 3000 }).catch(() => {});
+  await q.waitForFunction(() => document.querySelector('#stuOut .s-name')?.textContent === '최다온', null, { timeout: 3000 }).catch(() => {});
+  check('— 「← 학생으로」 로 그 학생에게 돌아온다(작성 칸 열린 채)', (await txt(q, '#stuOut .s-name')) === '최다온' && await q.isVisible('#drT-ja'));
   check('— 본 창의 고른 반·학생은 덮지 않는다(따로 기억)', (await q.evaluate(() => localStorage.getItem('ynhs-sgb'))) === mainSt);
   // 다른 반 학생은 새 창에서 찾지도 열지도 못한다(선생님 확인 2026-10-28) — 보조자료 보기는 본 창 학생별에서
   await q.fill('#hakbun', '30205');
