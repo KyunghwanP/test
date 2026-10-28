@@ -152,7 +152,7 @@ const FILE2 = await xlsxFile('sgb-5.xlsx', { dropOfficers: true, robotText: '로
 // ── 1. 해석 (페이지의 순수 함수 블록을 그대로) ──
 console.log('\n[해석]');
 const code = HTML.match(/<script id="sgbParser">([\s\S]*?)<\/script>/)[1];
-const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches, sgbOddSheets, sgbActKey, sgbStamp, sgbLookalikes, sgbApplyFix, sgbFresh };')();
+const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches, sgbOddSheets, sgbActKey, sgbStamp, sgbLookalikes, sgbApplyFix, sgbFresh, sgbRosterView };')();
 const wb1 = XLSX.read(fs.readFileSync(FILE1), { type: 'buffer' });
 const parsed = P.sgbParseBook(P.sgbBookToSheets(XLSX, wb1));
 const act = t => parsed.activities.find(a => a.sheet.includes(t));
@@ -259,6 +259,17 @@ check('명렬과 맞대 보기 — 이름 다름 1(1-1-2), 명렬에 없는 학�
 check('그 이름이 명렬에서 실제로 어디 있는지 알려 준다(이보람 → 2-1-2)', mis.find(m => m.g === 2).hint === '2-1-2');
 check('띄어쓰기·앞에 0 붙은 반·번호는 같은 것으로(박 나래, 01)', !mis.some(m => m.g === 3 || (m.g === 1 && m.n === 1)));
 const selfOnly = P.sgbMismatches([{ id: 'q', sheet: 'S' }], new Map([['q', [{ g: 1, c: 1, n: 1, nm: '가' }, { g: 1, c: 1, n: 1, nm: '가' }, { g: 1, c: 1, n: 1, nm: '나' }]]]), []);
+// 학생별 명단은 편성표(students/main)가 기준 — 시트에 이름이 없는 학생도 나오고, 반 인원도 편성표대로(선생님 지적 2026-10-28)
+{
+  const sheetR = { '1-1': [{ n: 1, nm: '김가람', k: 3 }, { n: 2, nm: '엉뚱이', k: 1 }], '2-1': [{ n: 1, nm: '(이보람)', k: 1 }], '4-9': [{ n: 1, nm: '한별', k: 2 }] };
+  const rv = P.sgbRosterView(ROSTER, sheetR);
+  const row = k => (rv[k] || []).map(r => `${r.n}/${r.nm}/${r.k}${r.extra ? '+' : ''}`).join('|');
+  check('명단 — 편성표 이름·번호 차례, 자료 건수는 같은 번호에서', row('1-1') === '1/김가람/3|2/최다온/1', row('1-1'));
+  check('명단 — 자료가 없는 학생·반도 편성표에 있으면 나온다(건수 0)', row('3-2') === '5/박 나래/0', row('3-2'));
+  check('명단 — 시트에만 있는 학생(떠난 학생 등)은 그 반 맨 뒤에', row('2-1') === '2/이보람/0|1/(이보람)/1+', row('2-1'));
+  check('명단 — 편성표에 없는 반도 시트에 있으면 나온다', row('4-9') === '1/한별/2+', row('4-9'));
+  check('명단 — 편성표를 못 읽으면 시트에서 모은 명단 그대로', P.sgbRosterView([], sheetR) === sheetR && P.sgbRosterView(null, sheetR) === sheetR);
+}
 const ROSTER2 = ROSTER.filter(x => x.name !== '이보람');                    // 이보람이 떠났다
 const GONE = [{ grade: '2', name: '이보람', kind: '전출', date: '2026.05.10.' }];
 const mv = P.sgbMismatches(parsed.activities, parsed.actRows, ROSTER2, GONE);
@@ -718,8 +729,8 @@ STORE = { 'students/main': { students: ROSTER } };
   await p.close();
 }
 
-// 3-1 처음 — 아무것도 없을 때(학교 명렬은 있다)
-STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: { 1: PNG }, updatedAt: 'v1' } };
+// 3-1 처음 — 아무것도 없을 때(학교 명렬은 있다). 정하늘(1-1-3)은 편성표에만 있고 시트에는 없다
+STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, name: '정하늘' }] }, 'studentPhotos/1-1': { photos: { 1: PNG }, updatedAt: 'v1' } };
 {
   const p = await openAs(ADMIN);
   await p.waitForSelector('#body .empty');
@@ -788,7 +799,7 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
 
   // 학생별
   await p.waitForSelector('#stus .stu');
-  check('학생별 — 1학년 1반이 먼저, 번호·이름·자료 건수', (await p.$$eval('#stus .stu', bs => bs.map(x => [...x.children].filter(c => c.tagName !== 'IMG').map(c => c.textContent).join('/')))).join('|') === `1/김가람/3|2/${XSS}/1`,
+  check('학생별 — 1학년 1반이 먼저, 번호·이름·자료 건수', (await p.$$eval('#stus .stu', bs => bs.map(x => [...x.children].filter(c => c.tagName !== 'IMG').map(c => c.textContent).join('/')))).join('|') === '1/김가람/3|2/최다온/1|3/정하늘',
     await p.$$eval('#stus .stu', bs => bs.map(x => x.textContent)));
   check('반 목록 — 처음엔 보고 있는 학년(1)만 펼침', await p.isVisible('.cls-pc .cl-list[data-g="1"]') && !(await p.isVisible('.cls-pc .cl-list[data-g="3"]')));
   await p.click('.cls-pc .cl-grade[data-g="3"]');
@@ -796,8 +807,11 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
   await p.click('.cls-pc .cl-grade[data-g="1"]');
   check('다시 누르면 접는다(보던 반이 있는 학년도)', !(await p.isVisible('.cls-pc .cl-list[data-g="1"]')) && (await p.textContent('.cls-pc .cl-grade[data-g="1"]')).includes('▸'));
   await p.click('.cls-pc .cl-grade[data-g="1"]');
-  check('반 목록 — 학년 머리와 반별 학생 수', (await p.textContent('#clsPane')).includes('1학년') && (await p.textContent('#clsPane .cl-item.on')).replace(/\s+/g, '') === '1반2');
+  check('반 목록 — 학년 머리와 반별 학생 수', (await p.textContent('#clsPane')).includes('1학년') && (await p.textContent('#clsPane .cl-item.on')).replace(/\s+/g, '') === '1반3');
   check('이름에 섞인 태그는 글자로만 — 실행되지 않는다', await p.evaluate(() => window.__xss === undefined));
+  await p.click('#stus .stu[data-n="3"]');
+  await p.waitForFunction(() => document.getElementById('stuOut').textContent.includes('자료가 없습니다'));
+  check('편성표에만 있는 학생도 고를 수 있다 — 「자료가 없습니다」', true);
   await p.click('#stus .stu[data-n="1"]');
   await p.waitForSelector('#stuOut .card');
   const shownCards = () => p.evaluate(() => [...document.querySelectorAll('#stuOut .card')].filter(c => !c.closest('.vol-split')).length);
@@ -1110,7 +1124,9 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
     && (await p.textContent('#mNav .m-step')).includes('2'));
   await p.click('#mNav .m-step');
   await p.waitForFunction(() => document.querySelector('#stuOut .s-id')?.textContent.includes('2번'));
-  check('폰: 다음 학생으로 넘어가고, 이제는 이전(◀ 1)만', (await p.textContent('#mNav .m-step')).includes('◀') && (await p.$$('#mNav .m-step')).length === 1);
+  // 2번 다음에 편성표에만 있는 3번(정하늘)이 있다 — 이전·다음 둘 다
+  const steps = await p.$$eval('#mNav .m-step', bs => bs.map(b => b.textContent.trim()));
+  check('폰: 다음 학생으로 넘어가고, 이전(◀ 1)·다음(3 ▶)', steps.length === 2 && steps[0].startsWith('◀ 1') && steps[1].startsWith('3') && steps[1].endsWith('▶'), steps);
   await p.click('#mBack');
   check('폰: ← 를 누르면 명단으로, 고른 학생에 표시', await p.isVisible('#stus') && !(await p.isVisible('#stuOut'))
     && (await p.$eval('#stus .stu.on', b => b.dataset.n)) === '2');

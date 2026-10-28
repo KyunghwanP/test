@@ -43,7 +43,7 @@
 | `upload.html` | 편성표 올리기에서 반·번호가 빈 학생(전출·자퇴)을 `students/changed` 에 따로 저장(`psMoveOf`) |
 | `usage.html` | 사용 현황에 `saenggibu`·`notice` 이름 |
 | `firestore.rules` | `saenggibu`·`saenggibuStu`·`saenggibuAct` — 읽기·쓰기 `isYnhsTeacher()`(2026-10-28 쓰기를 교사 전체로) |
-| `tests/saenggibu.test.mjs` | 326개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
+| `tests/saenggibu.test.mjs` | 332개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
 | `tests/make-saenggibu-template.mjs` | **표준 양식** 엑셀 만들기(부서에 나눠 줄 빈 양식). `node tests/make-saenggibu-template.mjs <폴더>` |
 | `tests/s360-tabs.test.mjs` | 17개 검사(종합검색 탭) |
 | `tests/upload-pyeonseong*.test.mjs`, `tests/make-pyeonseong-fixture.mjs` | 편성표(학적사항 칸·괄호 이름 포함) |
@@ -87,6 +87,9 @@
 
 **학생별** — 앱의 학생 종합검색 모양(반 목록 | 명단 | 상세).
 - PC: 반 목록은 학년 단위로 접기(▾/▸, 처음엔 보는 학년만, 접은 상태 기억). 명단은 번호·이름·자료 건수만(사진은 상세에만 — 반 전체가 한눈에 보이게, 2026-10-28).
+- **명단의 기준은 편성표**(`students/main`, 페이지 열 때 한 번 읽음 — `sgbRosterView`). 자료가 없는 학생도 나오고 반 인원도 편성표대로,
+  건수는 같은 번호의 자료. 편성표에 없는 번호(떠난 학생 등)는 시트 이름으로 그 반 맨 뒤. 명렬을 못 읽으면 예전처럼 시트에서 모은 명단
+  (`meta.roster`). 2026-10-28 이전에는 시트에 나온 학생만 보였다.
 - 상세: 사진(작은 것 → 고화질, 누르면 크게), 이름·학년반번호·학번, 「기재 문안 전체 복사」, 입력 영역별 묶음 카드.
   문안 상자를 누르거나 복사 단추로 복사(글을 끌어 고르는 중이면 복사 안 함). 학생 글은 접힘.
 - **참여한 활동 목록**(2026-10-28 요청): 활동명 + 입력 영역 칩(어디에 적을 수 있는지) + 추가·수정 꼬리표, 누르면 그 카드로
@@ -226,7 +229,7 @@ CLAUDE.md: **화면 변경은 test 먼저 → 선생님 확인 → ynhs PR·병�
 
 ### 검사 돌리기 (이 환경 기준)
 ```bash
-node tests/saenggibu.test.mjs        # 326
+node tests/saenggibu.test.mjs        # 332
 node tests/s360-tabs.test.mjs        # 17
 node tests/make-pyeonseong-fixture.mjs <폴더>          # 가짜 편성표 먼저 만든다(실제 파일은 개인정보라 저장소에 없음)
 PS_FILE=<폴더>/pyeonseong.xlsx node tests/upload-pyeonseong.test.mjs   # 87

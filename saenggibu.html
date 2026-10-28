@@ -846,6 +846,29 @@ function sgbMismatches(activities, actRows, roster, changed = []){
   return out.slice(0, 1000);
 }
 
+// 학생별 명단 — 학교 명렬(편성표를 올리면 students/main: grade·room·num·name)이 기준.
+// 시트에서 모은 명단(meta.roster)만 쓰면 자료가 없는 학생이 빠지고 반 인원도 틀린다.
+// 자료 건수(k)는 같은 번호에서 가져온다(학생 문서가 학년-반-번호로 저장되니 이름이 달라도 그 번호의 자료다).
+// 편성표에 없는 번호·반(떠난 학생 등)은 시트 이름 그대로 그 반 맨 뒤에(extra). 명렬을 못 읽으면 시트 명단 그대로.
+function sgbRosterView(book, sheetRoster){
+  const out = {};
+  for (const x of book || []){
+    const g = parseInt(x.grade, 10), c = parseInt(x.room, 10), n = parseInt(x.num, 10), nm = String(x.name || '').trim();
+    if (!(g && c && n) || !nm) continue;
+    (out[`${g}-${c}`] = out[`${g}-${c}`] || []).push({ n, nm, k: 0 });
+  }
+  if (!Object.keys(out).length) return sheetRoster || {};
+  for (const list of Object.values(out)) list.sort((p, q) => p.n - q.n);
+  for (const [key, list] of Object.entries(sheetRoster || {})){
+    const cl = out[key] = out[key] || [];
+    for (const r of list){
+      const hit = cl.find(x => !x.extra && x.n === parseInt(r.n, 10));
+      if (hit) hit.k = r.k; else cl.push({ ...r, extra: true });
+    }
+  }
+  return out;
+}
+
 // 활동별 줄 → 학생별 묶음. 활동 순서대로 쌓는다.
 function sgbStudents(activities, actRows){
   const stu = new Map();
@@ -1316,6 +1339,7 @@ st.find = '';                       // 이름 찾기는 다시 열면 비운다
 const save = () => { try { localStorage.setItem(LS, JSON.stringify(st)); } catch (e) {} };
 
 let META = null;
+let BOOK = [];          // 학교 명렬(편성표 → students/main) — 학생별 명단의 기준. 페이지를 열 때 한 번 읽는다
 const stuCache = new Map(), actCache = new Map();
 const actById = id => (META?.activities || []).find(a => a.id === id);
 
@@ -1459,8 +1483,13 @@ function groupRank(a){
   const t = a.tags || [];
   return (t.length ? SGB_TAG_ORDER.indexOf(t[0]) : 9) * 10 + t.length;
 }
+let _rv = null;
+function rosterView(){
+  if (!_rv || _rv.meta !== META || _rv.book !== BOOK) _rv = { meta: META, book: BOOK, v: sgbRosterView(BOOK, META?.roster) };
+  return _rv.v;
+}
 function classes(){
-  return Object.keys(META?.roster || {}).sort((x, y) => { const [a1, b1] = x.split('-').map(Number), [a2, b2] = y.split('-').map(Number); return a1 - a2 || b1 - b2; });
+  return Object.keys(rosterView()).sort((x, y) => { const [a1, b1] = x.split('-').map(Number), [a2, b2] = y.split('-').map(Number); return a1 - a2 || b1 - b2; });
 }
 
 // 한 칸에 여러 회차가 줄바꿈으로 들어 있는 활동(프로젝트 봉사: 교시·시작일자·요일·활동내용·시간 7줄씩) —
@@ -1513,7 +1542,7 @@ async function renderStu(){
   const cls = classes();
   const ck = st.g + '-' + st.c;
   if (!cls.includes(ck)){ const f = cls[0] || '1-1'; [st.g, st.c] = f.split('-'); }
-  const roster = META.roster || {};
+  const roster = rosterView();
   const cur = st.g + '-' + st.c;
   const q = (st.find || '').trim();
   let list, head;
@@ -2409,6 +2438,7 @@ onAuthStateChanged(fbAuth, async user => {
   try { await loadMeta(); }
   catch (e) { $('body').innerHTML = `<div class="empty err">불러오지 못했습니다: ${esc(e.message || e)}</div>`; return; }
   if (EMBED) return renderEmbed();
+  try { const b = await getDoc(doc(fbDb, 'students', 'main')); BOOK = b.exists() ? (b.data().students || []) : []; } catch (e) { BOOK = []; }
   render();
 });
 
