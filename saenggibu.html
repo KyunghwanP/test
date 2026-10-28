@@ -136,10 +136,8 @@
   .sheet{max-width:980px;margin:0 auto;background:var(--paper);border-radius:14px;box-shadow:var(--shadow);
     border:1px solid var(--rule);padding:22px 26px 26px;}
   .s-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--rule);}
-  /* 사진 — 종합검색처럼 3:4. 명단에는 작은 얼굴 */
+  /* 사진 — 종합검색처럼 3:4. 상세에만(명단에 넣으면 줄이 높아져 반 전체가 한눈에 안 보인다) */
   .s-photo{width:120px;height:160px;object-fit:cover;border-radius:10px;border:1px solid var(--rule);background:var(--paper-soft);cursor:zoom-in;flex-shrink:0;}
-  .stu .ph{display:none;width:28px;height:37px;object-fit:cover;border-radius:5px;border:1px solid var(--rule);flex-shrink:0;}
-  .stu .ph.on{display:block;}
   /* 한 학생만 보기(종합검색 안) — 위쪽 줄·이동 줄·이름·사진은 종합검색 쪽에 이미 있다 */
   html.embed,html.embed body{height:auto;background:var(--paper);}
   html.embed .top,html.embed .m-nav,html.embed .s-name,html.embed .s-id,html.embed .s-photo{display:none !important;}
@@ -1439,17 +1437,6 @@ function bigPhoto(g, c, n){
   })().then(u => { bigCache[key] = u; delete bigPending[key]; return u; });
   return bigPending[key];
 }
-// 명단의 작은 사진 — 명단을 그린 뒤 반 사진 문서를 받아 채운다
-async function fillRosterPhotos(){
-  const btns = [...document.querySelectorAll('#stus .stu')];
-  for (const ck of new Set(btns.map(b => b.dataset.k))){
-    const ph = await classPhotos(ck);
-    btns.filter(b => b.dataset.k === ck).forEach(b => {
-      const url = ph[String(parseInt(b.dataset.n, 10))], im = b.querySelector('.ph');
-      if (url && im){ im.src = url; im.classList.add('on'); }
-    });
-  }
-}
 function openZoom(src, cap){
   const z = $('zoom');
   $('zoomImg').src = src; $('zoomCap').textContent = cap;
@@ -1519,7 +1506,7 @@ function rosterRows(list, withClass){
   const mv = movedSet();
   return list.map(r => { const m = mv.get(`${r.k}-${r.n}|${String(r.nm || '').replace(/\s+/g, '')}`);
     return `<button type="button" class="stu${m ? ' gone' : ''}${r.k === st.g + '-' + st.c && String(r.n) === String(st.n) ? ' on' : ''}" data-k="${r.k}" data-n="${r.n}">
-    <img class="ph" alt="" loading="lazy"><span class="num">${withClass ? esc(r.k) + '-' : ''}${r.n}</span><span class="nm">${esc(r.nm)}${m ? `<span class="moved-tag">${esc(m.kind || '학적 변동')}</span>` : ''}</span>${r.cnt ? `<span class="k">${r.cnt}</span>` : ''}</button>`; }).join('');
+    <span class="num">${withClass ? esc(r.k) + '-' : ''}${r.n}</span><span class="nm">${esc(r.nm)}${m ? `<span class="moved-tag">${esc(m.kind || '학적 변동')}</span>` : ''}</span>${r.cnt ? `<span class="k">${r.cnt}</span>` : ''}</button>`; }).join('');
 }
 async function renderStu(){
   const body = $('body');
@@ -1587,8 +1574,6 @@ async function renderStu(){
     const b = e.target.closest('.stu'); if (!b) return;
     openStudent(b.dataset.k, b.dataset.n);
   };
-  fillRosterPhotos();
-  fillRosterPhotos();
   if (st.n) await renderStuOut();
 }
 // 학생 하나 열기 — 명단 단추·이전/다음에서 같이 쓴다

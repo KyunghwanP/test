@@ -802,8 +802,9 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
   await p.waitForSelector('#stuOut .card');
   const shownCards = () => p.evaluate(() => [...document.querySelectorAll('#stuOut .card')].filter(c => !c.closest('.vol-split')).length);
   check('학생 1-1-1 — 카드 3장(로봇·수학·봉사활동 누가기록 표)', await shownCards() === 3);
-  check('명단에 작은 사진(사진 있는 학생만)', await p.$eval('#stus .stu[data-n="1"] .ph', i => i.classList.contains('on') && i.src.startsWith('data:image'))
-    && !(await p.$eval('#stus .stu[data-n="2"] .ph', i => i.classList.contains('on'))));
+  // 명단에는 사진 없이 — 사진 때문에 줄이 높아져 반 전체가 한눈에 안 보였다(선생님 요청 2026-10-28). 사진은 상세에만
+  const rows = await p.$$eval('#stus .stu', bs => ({ img: bs.some(b => b.querySelector('img')), h: Math.max(...bs.map(b => b.getBoundingClientRect().height)) }));
+  check('명단에는 사진 없이, 줄 높이 낮게', !rows.img && rows.h <= 46, rows);
   await p.waitForFunction(() => document.getElementById('sPhoto')?.src.startsWith('blob:'));
   check('상세 사진 — 작은 사진 뒤 고화질(워커)로 바꿔 끼운다', await p.isVisible('#sPhoto'));
   await p.click('#sPhoto');
