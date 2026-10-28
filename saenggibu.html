@@ -450,6 +450,21 @@
   .drp-links{display:flex;gap:14px;margin-top:6px;}
   .drp-link{padding:0;border:none;background:none;font:inherit;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;}
   .drp-link:hover,.drp-link[aria-expanded="true"]{color:var(--mon);}
+  /* 맞춤법 — 부산대 검사기에서 고친 글을 붙여 넣으면 바뀐 곳(∨ 띄움 · ⌒ 붙임)과 바이트 변화를 보여 주고 반영 */
+  .drp-spell{display:flex;flex-direction:column;gap:8px;margin:8px 0 4px;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--paper-soft);}
+  .drp-spell[hidden]{display:none;}
+  .drp-spell-in{width:100%;min-height:60px;padding:8px 10px;border:1px dashed var(--rule);border-radius:8px;background:var(--paper);color:var(--ink);
+    font:inherit;font-size:14px;line-height:1.6;resize:vertical;}
+  .drp-spell-sum{font-size:13px;font-weight:700;color:var(--ink-soft);}
+  .drp-spell-sum .err{color:var(--warn);}
+  .drp-spell-diff{padding:8px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--paper);font-size:14.5px;line-height:1.8;
+    white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;}
+  .drp-spell-diff:empty{display:none;}
+  .drp-spell-diff del{color:#B42318;background:#FDECEA;text-decoration:line-through;}
+  .drp-spell-diff ins{color:#067647;background:#E3F6EA;text-decoration:none;font-weight:800;}
+  .drp-spell-diff .ws{text-decoration:none;font-weight:900;}
+  html.dark .drp-spell-diff del{color:#FCA5A5;background:#3B1414;} html.dark .drp-spell-diff ins{color:#86EFAC;background:#0F2E1B;}
+  .drp-spell-btns{display:flex;gap:6px;}
   .drp-hold{margin-top:6px;min-height:60px;border-style:dashed;background:transparent;font-size:13.5px;}
   .drp-hist{margin-top:6px;padding:4px;border:1px solid var(--rule);border-radius:10px;background:var(--paper-soft);}
   .drp-hist button{display:block;width:100%;padding:7px 9px;border:none;border-radius:7px;background:transparent;color:var(--ink);font:inherit;font-size:13px;text-align:left;cursor:pointer;}
@@ -747,6 +762,47 @@ function sgbNeisBytes(s){
   let n = 0;
   for (const ch of String(s ?? '').replace(/\r\n?/g, '\n')){ const c = ch.codePointAt(0); n += ch === '\n' ? 2 : c < 0x80 ? 1 : c < 0x10000 ? 3 : 4; }
   return n;
+}
+// 두 글의 차이 — 글자 단위(공통 앞뒤를 떼고 가운데만 LCS). [[0 같음 | -1 지움 | 1 넣음, 글], …].
+// 맞춤법 검사기에서 고친 글을 붙여 넣을 때 바뀐 곳을 보여 준다. 띄어쓰기만 바뀐 곳은 그대로 두고(할∨수∨있다),
+// 글자가 바뀐 곳 사이에 낀 한두 글자는 한 덩어리로 묶어 읽기 쉽게(되서 → 돼서)
+function sgbDiff(a, b){
+  a = [...String(a ?? '')]; b = [...String(b ?? '')];
+  let s = 0; while (s < a.length && s < b.length && a[s] === b[s]) s++;
+  let e = 0; while (e < a.length - s && e < b.length - s && a[a.length - 1 - e] === b[b.length - 1 - e]) e++;
+  const A = a.slice(s, a.length - e), B = b.slice(s, b.length - e), n = A.length, m = B.length;
+  let ops = [];
+  const push = (op, t) => { if (!t) return; const l = ops[ops.length - 1]; if (l && l[0] === op) l[1] += t; else ops.push([op, t]); };
+  push(0, a.slice(0, s).join(''));
+  if (n * m > 4e6){ push(-1, A.join('')); push(1, B.join('')); }      // 통째로 다른 글 — 비교하지 않는다
+  else {
+    const L = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    let i = 0, j = 0;
+    while (i < n && j < m){
+      if (A[i] === B[j]){ push(0, A[i]); i++; j++; }
+      else if (L[i + 1][j] >= L[i][j + 1]) push(-1, A[i++]);
+      else push(1, B[j++]);
+    }
+    push(-1, A.slice(i).join('')); push(1, B.slice(j).join(''));
+  }
+  push(0, a.slice(a.length - e).join(''));
+  // 묶기 — 글자가 바뀐 덩어리 사이에 낀 한두 글자(공백 아닌)는 지움+넣음으로 합친다
+  const word = t => /\S/.test(t);
+  for (let k = 1; k < ops.length - 1; k++){
+    const [op, t] = ops[k], l = ops[k - 1], r = ops[k + 1];
+    if (op !== 0 || [...t].length > 2 || /\s/.test(t) || !l[0] || !r[0] || !word(l[1]) || !word(r[1])) continue;
+    ops[k] = [-1, t]; ops.splice(k + 1, 0, [1, t]);
+  }
+  // 같은 종류끼리 잇고, 한 덩어리 안에서는 지움을 넣음보다 앞에
+  const out = [];
+  for (let k = 0; k < ops.length;){
+    if (ops[k][0] === 0){ out.push(ops[k]); k++; continue; }
+    let del = '', ins = '';
+    while (k < ops.length && ops[k][0] !== 0){ if (ops[k][0] < 0) del += ops[k][1]; else ins += ops[k][1]; k++; }
+    if (del) out.push([-1, del]); if (ins) out.push([1, ins]);
+  }
+  return out;
 }
 // 영역별 나이스 한도(바이트) — 기재요령의 글자 수 × 3. 영역이 하나로 정해질 때만(<자or진>·누가기록은 없음).
 // 진로는 2026학년도부터 700자 → 500자(1500바이트)
@@ -2462,7 +2518,9 @@ function drAreaHtml(k, nm, t, d){
     <div class="drp-links">
       <button type="button" class="drp-link" data-holdt="${k}" aria-expanded="${hv ? 'true' : 'false'}">빼 둔 내용<span id="drHoldN-${k}">${hv ? ' ' + hv.length.toLocaleString() + '자' : ''}</span></button>
       <button type="button" class="drp-link" data-hist="${k}" aria-expanded="false">되돌리기</button>
+      <button type="button" class="drp-link" data-spell="${k}" title="글을 복사해 부산대 맞춤법 검사기를 새 탭으로 엽니다 — 고친 글을 붙여 넣으면 바뀐 곳을 보여 주고 반영">🔤 맞춤법</button>
     </div>
+    <div class="drp-spell" id="drS-${k}" hidden></div>
     <textarea class="drp-t drp-hold" id="drHT-${k}" data-f="hold.${k}" aria-label="${nm} 빼 둔 내용" placeholder="바이트가 넘쳐 뺀 문장 — 상담하며 다시 넣을 수 있게(바이트·인쇄 제외)"${hv ? '' : ' hidden'}></textarea>
     <div class="drp-hist" id="drH-${k}" hidden></div>
   </section>`;
@@ -2470,6 +2528,7 @@ function drAreaHtml(k, nm, t, d){
 function drGrow(ta){ ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 2) + 'px'; }
 function drSaved(txt, err){ const el = $('drSaved'); if (!el) return; el.textContent = txt; el.classList.toggle('err', !!err); }
 function drOnInput(e){
+  const si = e.target.closest('.drp-spell-in'); if (si){ drSpellDiff(si.dataset.k); return; }
   const ta = e.target.closest('textarea[data-f]'); if (!ta) return;
   drGrow(ta);
   const f = ta.dataset.f, v = ta.value, area = DR_AREAS.find(([k]) => k === f);
@@ -2493,6 +2552,9 @@ function drOnClick(e){
   if (ht){ const box = $('drHT-' + ht.dataset.holdt), open = box.hidden; box.hidden = !open; ht.setAttribute('aria-expanded', String(open));
     if (open){ drGrow(box); box.focus(); } return; }
   const hb = e.target.closest('[data-hist]'); if (hb){ drHistToggle(hb.dataset.hist); return; }
+  const sp = e.target.closest('[data-spell]'); if (sp){ drSpellOpen(sp.dataset.spell); return; }
+  const sa = e.target.closest('[data-spell-apply]'); if (sa){ drSpellApply(sa.dataset.spellApply); return; }
+  const sc = e.target.closest('[data-spell-close]'); if (sc){ drSpellClose(sc.dataset.spellClose); return; }
   const hv = e.target.closest('.drp-hist button[data-i]'); if (hv){ drRestore(hv.dataset.k, +hv.dataset.i); return; }
   const pr = e.target.closest('[data-pr]'); if (pr){ drPrint(pr.dataset.pr, { ck: `${+st.g}-${+st.c}`, noH: !!$('drPrNoH')?.checked }); return; }
   if (e.target.closest('#drClassBtn')){ drFlush(); st.clsK = `${+st.g}-${+st.c}`; st.view = 'cls'; save(); render(); return; }
@@ -2587,6 +2649,50 @@ async function drRestore(k, i){
   document.querySelector(`[data-hist="${k}"]`)?.setAttribute('aria-expanded', 'false');
   toast('되돌렸습니다 — 바꾸기 전 글은 기록에 남겼습니다');
 }
+// 맞춤법 — 부산대 맞춤법 검사기(개인 무료)를 선생님이 직접 쓴다. 앱은 글을 복사해 검사기를 새 탭으로 열고,
+// 고친 글을 붙여 넣으면 바뀐 곳·바이트 변화를 보여 주고 「반영」(되돌리기 기록을 남긴다).
+// 앱이 검사기에 글을 직접 보내 결과를 받아오지는 않는다 — 자동 연결은 기관 계약이 필요하다(2026-10-28 선생님과 정함)
+const SPELLER_URL = 'https://nara-speller.co.kr/speller/';
+async function drSpellOpen(k){
+  const ta = $('drT-' + k), box = $('drS-' + k); if (!ta || !box) return;
+  if (!ta.value.trim()){ toast('검사할 글이 없습니다'); return; }
+  await copyText(ta.value);
+  const w = window.open(SPELLER_URL, 'sgbSpeller');       // 같은 탭을 다시 쓴다
+  try { if (w) w.opener = null; } catch (e) {}
+  box.hidden = false;
+  box.innerHTML = `<div class="d">글을 복사했습니다 — ① 새 탭의 부산대 검사기에 붙여 넣고(Ctrl+V) 검사 → ② 고친 글을 복사해 아래에 붙여 넣으면 바뀐 곳을 보여 줍니다</div>
+    <textarea class="drp-spell-in" id="drSI-${k}" data-k="${k}" aria-label="${DR_NAME[k]} 고친 글 붙여 넣기" placeholder="여기에 고친 글 붙여 넣기(Ctrl+V)"></textarea>
+    <div class="drp-spell-sum" id="drSS-${k}"></div>
+    <div class="drp-spell-diff" id="drSD-${k}"></div>
+    <div class="drp-spell-btns"><button type="button" class="btn sm pri" data-spell-apply="${k}" disabled>반영</button><button type="button" class="btn sm" data-spell-close="${k}">닫기</button></div>`;
+  toast('글을 복사했습니다 — 새 탭의 검사기에 붙여 넣으세요');
+}
+const drSpellText = k => ($('drSI-' + k)?.value || '').replace(/\r\n?/g, '\n').replace(/\s+$/, '');
+function drSpellDiff(k){
+  const cur = ($('drT-' + k)?.value || '').replace(/\s+$/, ''), fix = drSpellText(k), btn = document.querySelector(`[data-spell-apply="${k}"]`);
+  if (!fix.trim()){ $('drSS-' + k).textContent = ''; $('drSD-' + k).innerHTML = ''; btn.disabled = true; return; }
+  const ops = sgbDiff(cur, fix), changes = ops.filter((o, i) => o[0] && (i === 0 || !ops[i - 1][0])).length;
+  const same = ops.reduce((n, [op, t]) => n + (op ? 0 : [...t].length), 0), sim = same / Math.max([...cur].length, [...fix].length, 1);
+  const lim = SGB_NEIS_LIMIT[DR_AREAS.find(([x]) => x === k)[2]], b0 = sgbNeisBytes(cur), b1 = sgbNeisBytes(fix);
+  const mark = (t, sp) => esc(t).replace(/ /g, `<span class="ws">${sp}</span>`).replace(/\n/g, '↵\n');
+  $('drSS-' + k).innerHTML = `${changes ? `바뀐 곳 ${changes}군데` : '바뀐 곳이 없습니다'} · ${b0.toLocaleString()} → ${b1.toLocaleString()}바이트${b1 > lim ? ` <span class="err">· 한도 ${(b1 - lim).toLocaleString()} 넘음</span>` : ''}${sim < .5 ? ' <span class="err">· 다른 글 같습니다 — 맞는지 확인하세요</span>' : ''}`;
+  $('drSD-' + k).innerHTML = changes ? ops.map(([op, t]) => !op ? esc(t) : op < 0 ? `<del>${mark(t, '⌒')}</del>` : `<ins>${mark(t, '∨')}</ins>`).join('') : '';
+  btn.disabled = !changes;
+}
+async function drSpellApply(k){
+  const ta = $('drT-' + k), fix = drSpellText(k), key = drKey();
+  if (!ta || !fix.trim()) return;
+  await drFlush();
+  const cur = ta.value;
+  try { await drHistPush(key, { [k]: fix }, { [k]: cur }, true); }      // 고치기 전 글은 되돌리기 기록에
+  catch (e) { toast('기록을 남기지 못해 반영하지 않았습니다'); return; }
+  ta.value = fix;
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
+  await drFlush();
+  drSpellClose(k);
+  toast('고친 글을 반영했습니다 — 「되돌리기」 로 고치기 전 글로 돌아갈 수 있습니다');
+}
+function drSpellClose(k){ const box = $('drS-' + k); if (box){ box.hidden = true; box.innerHTML = ''; } }
 // 보조자료 카드의 「→ 자율」 — 그 칸 끝에 한 칸 띄우고 붙인다. 작성 칸이 닫혀 있어도(폰) 저장된 글 뒤에 붙인다
 async function drAppend(k, text){
   const key = drKey();

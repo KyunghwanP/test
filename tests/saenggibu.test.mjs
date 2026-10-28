@@ -153,7 +153,7 @@ const FILE2 = await xlsxFile('sgb-5.xlsx', { dropOfficers: true, robotText: '로
 // ── 1. 해석 (페이지의 순수 함수 블록을 그대로) ──
 console.log('\n[해석]');
 const code = HTML.match(/<script id="sgbParser">([\s\S]*?)<\/script>/)[1];
-const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches, sgbOddSheets, sgbActKey, sgbStamp, sgbLookalikes, sgbApplyFix, sgbFresh, sgbRosterView, sgbMisFor, sgbAreaTags, sgbNeisBytes, sgbNeisLimit };')();
+const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches, sgbOddSheets, sgbActKey, sgbStamp, sgbLookalikes, sgbApplyFix, sgbFresh, sgbRosterView, sgbMisFor, sgbAreaTags, sgbNeisBytes, sgbNeisLimit, sgbDiff };')();
 const wb1 = XLSX.read(fs.readFileSync(FILE1), { type: 'buffer' });
 const parsed = P.sgbParseBook(P.sgbBookToSheets(XLSX, wb1));
 const act = t => parsed.activities.find(a => a.sheet.includes(t));
@@ -593,6 +593,15 @@ console.log('\n[나이스 바이트]');
 // 나이스는 바이트로 센다 — 한글 3, 영문·숫자·공백·문장부호 1, 줄바꿈(엔터) 2(선생님 요청 2026-10-28)
 check('바이트 — 한글 3 · 영문/숫자/공백 1 · 줄바꿈 2', P.sgbNeisBytes('가a 1\n나') === 3 + 1 + 1 + 1 + 2 + 3 && P.sgbNeisBytes('') === 0
   && P.sgbNeisBytes('가\r\n나') === 8, [P.sgbNeisBytes('가a 1\n나'), P.sgbNeisBytes('가\r\n나')]);
+// 맞춤법 — 검사기에서 고친 글을 붙여 넣으면 바뀐 곳을 글자 단위로(선생님 요청 2026-10-28). 지어낸 문장
+{
+  const D = (a, b) => P.sgbDiff(a, b).map(([op, s]) => op === 0 ? s : op < 0 ? `[-${s}]` : `[+${s}]`).join('');
+  check('비교 — 띄어쓰기만 바뀐 곳은 그 자리만(할∨수∨있다)', D('할수있다', '할 수 있다') === '할[+ ]수[+ ]있다', D('할수있다', '할 수 있다'));
+  check('— 글자가 바뀐 곳(되서 → 돼서), 붙여 쓴 곳(로봇 코딩 → 로봇코딩)', D('되서 좋았다', '돼서 좋았다') === '[-되][+돼]서 좋았다'
+    && D('로봇 코딩 캠프에서 익힘.', '로봇코딩 캠프에서 익혔음.') === '로봇[- ]코딩 캠프에서 익[-힘][+혔음].', [D('되서 좋았다', '돼서 좋았다'), D('로봇 코딩 캠프에서 익힘.', '로봇코딩 캠프에서 익혔음.')]);
+  check('— 바뀐 덩어리 사이에 낀 한 글자는 묶는다, 같으면 그대로, 빈 글에서', D('가나다', '마나바') === '[-가나다][+마나바]' && D('같음', '같음') === '같음'
+    && D('', '새 글') === '[+새 글]', [D('가나다', '마나바'), D('같음', '같음'), D('', '새 글')]);
+}
 // 진로는 2026학년도부터 500자(1500바이트)로 줄었다(선생님 알림 2026-10-28)
 check('한도 — 영역 하나일 때만(자율·동아리·진로·개인별·행특 모두 1500), 둘 중 고름·누가기록은 없음',
   P.sgbNeisLimit(['자']) === 1500 && P.sgbNeisLimit(['동']) === 1500 && P.sgbNeisLimit(['진']) === 1500 && P.sgbNeisLimit(['개']) === 1500
@@ -1786,6 +1795,34 @@ STORE = STORE_B;
   await p.waitForFunction(t => window.__FS__['saenggibuDraft/1-1-1']?.ja === t, full);
   check('누르면 그 판으로 되돌아오고 저장된다', (await p.inputValue('#drT-ja')) === full && !(await p.isVisible('#drH-ja')));
   check('— 되돌리기 전 글(짧게.)도 기록에 남아 다시 되돌릴 수 있다', await p.evaluate(() => (window.__FS__['saenggibuDraftHist/1-1-1']?.ja || []).some(x => x.t === '짧게.')));
+  // 맞춤법 — 글을 복사해 부산대 검사기를 새 탭으로 열고, 고친 글을 붙여 넣으면 바뀐 곳·바이트를 보여 주고 반영(선생님 요청 2026-10-28)
+  // 앱이 검사기에 글을 직접 보내지는 않는다(자동 연결은 기관 계약이 필요) — 새 탭을 여는 것까지만
+  await p.evaluate(() => { window.__opened = []; window.open = (u, n) => { window.__opened.push([u, n]); return null; }; });
+  await p.click('[data-spell="ja"]');
+  await p.waitForSelector('#drSI-ja');
+  check('「🔤 맞춤법」 — 그 칸 글을 복사하고 부산대 검사기를 새 탭으로(같은 탭을 다시 씀)', (await p.evaluate(() => window.__copied)) === full
+    && JSON.stringify(await p.evaluate(() => window.__opened)) === JSON.stringify([['https://nara-speller.co.kr/speller/', 'sgbSpeller']]) && await p.isVisible('#drS-ja'));
+  check('— 고친 글을 붙여 넣기 전에는 「반영」 이 꺼져 있다', await p.$eval('[data-spell-apply="ja"]', b => b.disabled));
+  const FIXED = full.replace('로봇 코딩', '로봇코딩').replace('익힘.', '익혔음.');
+  await p.fill('#drSI-ja', FIXED + '\n');
+  const sv = await p.evaluate(() => ({ sum: document.getElementById('drSS-ja').textContent, dels: [...document.querySelectorAll('#drSD-ja del')].map(d => d.textContent),
+    ins: [...document.querySelectorAll('#drSD-ja ins')].map(d => d.textContent), on: !document.querySelector('[data-spell-apply="ja"]').disabled }));
+  const fb = s => [...s].reduce((n, ch) => n + (ch.charCodeAt(0) < 128 ? 1 : 3), 0);
+  check('붙여 넣으면 바뀐 곳 2군데 — 붙임은 ⌒, 바뀐 글자는 빨강 → 초록, 바이트 변화', sv.sum.startsWith('바뀐 곳 2군데') && sv.sum.includes(`${fb(full).toLocaleString()} → ${fb(FIXED).toLocaleString()}바이트`)
+    && sv.dels.join('|') === '⌒|힘' && sv.ins.join('|') === '혔음' && sv.on, sv);
+  if (process.env.SGB_SHOTS) await shot(p, '#drPane .drp-area[data-k="ja"]', '16-spell');
+  await p.click('[data-spell-apply="ja"]');
+  await p.waitForFunction(t => window.__FS__['saenggibuDraft/1-1-1']?.ja === t, FIXED);
+  check('「반영」 — 고친 글이 칸에 들어가고 저장, 상자는 닫힌다', (await p.inputValue('#drT-ja')) === FIXED && !(await p.isVisible('#drS-ja')));
+  check('— 고치기 전 글은 되돌리기 기록에(되돌릴 수 있게)', await p.evaluate(t => (window.__FS__['saenggibuDraftHist/1-1-1']?.ja || [])[0]?.t === t, full));
+  await p.click('[data-spell="haeng"]');
+  check('— 빈 칸은 검사하지 않는다(새 탭도 안 연다)', (await p.evaluate(() => window.__opened.length)) === 1 && !(await p.isVisible('#drS-haeng')));
+  await p.click('[data-spell="jin"]');
+  await p.waitForSelector('#drSI-jin');
+  await p.fill('#drSI-jin', '전혀 다른 글을 잘못 붙여 넣었다.');
+  check('— 엉뚱한 글을 붙이면 「다른 글 같습니다」', (await p.textContent('#drSS-jin')).includes('다른 글 같습니다'));
+  await p.click('[data-spell-close="jin"]');
+  check('— 닫기로 그냥 닫는다(진로 글은 그대로)', !(await p.isVisible('#drS-jin')) && (await p.inputValue('#drT-jin')) === ROBOT);
   // 우리 반 생기부 — 반 전체를 한 페이지에(선생님 요청 2026-10-28: 모달 말고 페이지로, 담임에게만 단추).
   // 한눈에(학생 × 영역 바이트) · 영역 탭(자율 전체 …) · 영역 인쇄 · 학생마다 인쇄 · 엑셀로 저장. 작성 칸의 「📘 반 전체」 로도 간다
   check('담임 — 위쪽 화면 탭에 「📘 우리 반 생기부」', await p.isVisible('#clsTab') && (await p.textContent('#clsTab')).trim() === '📘 우리 반 생기부');
