@@ -823,6 +823,50 @@ STORE = { 'students/main': { students: ROSTER }, 'studentPhotos/1-1': { photos: 
   const vcard = await p.$$eval('#stuOut .card', cs => cs.map(c => c.textContent).find(t => t.includes('헌혈')) || '');
   check('봉사처럼 기재 칸이 없으면 칸 이름과 값으로', vcard.includes('시작일자') && vcard.includes('2026.04.10.'), vcard);
 
+  // 참여한 활동 목록 — 활동명 + 입력 영역(어디에 적을 수 있는지). 누르면 그 카드로(선생님 요청 2026-10-28)
+  const actList = await p.evaluate(() => {
+    const ids = [...new Set([...document.querySelectorAll('#stuOut .card[data-a]')].map(c => c.dataset.a))];
+    const lis = [...document.querySelectorAll('#stuOut .s-acts li')];
+    return { ids, got: lis.map(li => li.querySelector('[data-go]')?.dataset.go), tagged: lis.every(li => li.querySelector('.tag')),
+      txt: lis.map(li => li.textContent.replace(/\s+/g, ' ').trim()) };
+  });
+  check('참여한 활동 — 카드의 활동이 하나씩 빠짐없이(봉사도)', actList.ids.length >= 3 && actList.got.length === actList.ids.length
+    && actList.ids.every(id => actList.got.includes(id)), actList);
+  check('참여한 활동 — 줄마다 입력 영역 칩', actList.tagged, actList.txt);
+  check('참여한 활동 — 머리에 몇 개인지', (await p.textContent('#stuOut .s-acts-h')).includes(String(actList.ids.length)));
+  const ph = await p.evaluate(() => { const r = document.getElementById('sPhoto').getBoundingClientRect(); return [r.width, r.height]; });
+  check('상세 사진 — 조금 크게(120×160)', ph[0] === 120 && ph[1] === 160, ph);
+  const narrow = await p.evaluate(() => { const s = document.querySelector('#stuOut .sheet').getBoundingClientRect(), l = document.querySelector('#stuOut .s-acts').getBoundingClientRect(),
+    ph = document.getElementById('sPhoto').getBoundingClientRect(); return { inSheet: l.right <= s.right + 1 && l.left >= ph.right, top: l.top < ph.bottom + 200 }; });
+  check('좁은 화면 — 목록은 이름 아래, 사진 옆 빈자리', narrow.inSheet && narrow.top, narrow);
+  const goTo = async sel => {
+    await p.evaluate(() => { document.getElementById('stuOut').scrollTop = 0; });
+    await p.click(sel);
+    await p.waitForTimeout(700);
+  };
+  // 맨 끝 일반 카드(봉사 표 아래) — 내려가야 보이는 것
+  const mathId = await p.$$eval('#stuOut .card[data-a]', cs => cs.filter(c => !c.closest('.vol-split')).at(-1)?.dataset.a);
+  await goTo(`#stuOut .s-acts [data-go="${mathId}"]`);
+  check('목록에서 누르면 그 카드가 위로', await p.evaluate(id => { const c = document.querySelector(`#stuOut .card[data-a="${id}"]`).getBoundingClientRect(),
+    o = document.getElementById('stuOut').getBoundingClientRect(); return document.getElementById('stuOut').scrollTop > 0 && c.top >= o.top - 2 && c.top < o.top + 120; }, mathId));
+  const volId = await p.$eval('#stuOut .vol-split .card[data-a]', c => c.dataset.a);
+  await goTo(`#stuOut .s-acts [data-go="${volId}"]`);
+  // 표가 맨 아래라 끝까지 내려가도 위에 닿지 않을 수 있다 — 끝까지 내려갔거나 위에 닿았으면 된다
+  check('봉사 활동을 누르면 누가기록 표로(접힌 카드 말고)', await p.evaluate(() => { const e = document.getElementById('stuOut'), c = document.querySelector('#stuOut .card.vol').getBoundingClientRect(),
+    o = e.getBoundingClientRect(); return e.scrollTop > 0 && c.top >= o.top - 2 && (c.top < o.top + 120 || e.scrollTop >= e.scrollHeight - e.clientHeight - 1); }));
+  // FHD — 오른쪽 빈자리에 목록, 내려도 따라온다
+  await p.setViewportSize({ width: 1920, height: 1000 });
+  await p.evaluate(() => { document.getElementById('stuOut').scrollTop = 0; });
+  const wide = await p.evaluate(() => { const s = document.querySelector('#stuOut .sheet').getBoundingClientRect(), l = document.querySelector('#stuOut .s-acts-in').getBoundingClientRect(),
+    o = document.getElementById('stuOut').getBoundingClientRect(); return { right: l.left >= s.right, fits: l.right <= o.right, top: Math.abs(l.top - s.top) < 4 }; });
+  check('FHD — 목록은 카드 오른쪽 빈자리, 화면 안에', wide.right && wide.fits && wide.top, wide);
+  if (process.env.SGB_SHOTS) await shot(p, '#stuOut', '7-stu-acts-fhd');
+  await p.evaluate(() => { const o = document.getElementById('stuOut'); o.scrollTop = o.scrollHeight; });
+  check('FHD — 끝까지 내려도 목록이 보인다', await p.evaluate(() => { const l = document.querySelector('#stuOut .s-acts-in').getBoundingClientRect(),
+    o = document.getElementById('stuOut').getBoundingClientRect(); return l.top >= o.top - 1 && l.top < o.top + 40; }));
+  await p.setViewportSize({ width: 1100, height: 900 });
+  if (process.env.SGB_SHOTS){ await p.evaluate(() => { document.getElementById('stuOut').scrollTop = 0; }); await shot(p, '#stuOut', '7-stu-acts-narrow'); }
+
   // 학번으로
   await p.fill('#hakbun', '30205');
   await p.press('#hakbun', 'Enter');

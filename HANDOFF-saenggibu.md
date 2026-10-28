@@ -43,7 +43,7 @@
 | `upload.html` | 편성표 올리기에서 반·번호가 빈 학생(전출·자퇴)을 `students/changed` 에 따로 저장(`psMoveOf`) |
 | `usage.html` | 사용 현황에 `saenggibu`·`notice` 이름 |
 | `firestore.rules` | `saenggibu`·`saenggibuStu`·`saenggibuAct` — 읽기·쓰기 `isYnhsTeacher()`(2026-10-28 쓰기를 교사 전체로) |
-| `tests/saenggibu.test.mjs` | 317개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
+| `tests/saenggibu.test.mjs` | 326개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기) |
 | `tests/make-saenggibu-template.mjs` | **표준 양식** 엑셀 만들기(부서에 나눠 줄 빈 양식). `node tests/make-saenggibu-template.mjs <폴더>` |
 | `tests/s360-tabs.test.mjs` | 17개 검사(종합검색 탭) |
 | `tests/upload-pyeonseong*.test.mjs`, `tests/make-pyeonseong-fixture.mjs` | 편성표(학적사항 칸·괄호 이름 포함) |
@@ -89,6 +89,9 @@
 - PC: 반 목록은 학년 단위로 접기(▾/▸, 처음엔 보는 학년만, 접은 상태 기억). 명단에 사진·번호·이름·자료 건수.
 - 상세: 사진(작은 것 → 고화질, 누르면 크게), 이름·학년반번호·학번, 「기재 문안 전체 복사」, 입력 영역별 묶음 카드.
   문안 상자를 누르거나 복사 단추로 복사(글을 끌어 고르는 중이면 복사 안 함). 학생 글은 접힘.
+- **참여한 활동 목록**(2026-10-28 요청): 활동명 + 입력 영역 칩(어디에 적을 수 있는지) + 추가·수정 꼬리표, 누르면 그 카드로
+  (봉사는 누가기록 표로). 상세 칸이 넓으면(FHD — 카드 980 + 목록 304 가 들어갈 때, 컨테이너 쿼리 `det`) 카드 **오른쪽**에
+  붙어 내려도 따라오고, 좁으면 사진 옆 이름 아래, 폰은 아래 한 줄씩. 사진은 120×160(폰 96×128).
 - **봉사활동 누가기록**: 일반 봉사 + 프로젝트 봉사를 **나이스와 같은 칸 차례**(시작일자·종료일자·영역구분·봉사활동내용·
   학교/개인 구분·장소 또는 주관 기관명·시간·시간 누계)의 **일반 표**로, 날짜 순, 회차는 한 줄씩, 칸 누르면 복사.
   「활동별로 나눠 보기」로 원래 카드(프로젝트 봉사는 회차 표). ※ 입력칸 모양으로 꾸미지 말 것(선생님이 거부함).
@@ -223,7 +226,7 @@ CLAUDE.md: **화면 변경은 test 먼저 → 선생님 확인 → ynhs PR·병�
 
 ### 검사 돌리기 (이 환경 기준)
 ```bash
-node tests/saenggibu.test.mjs        # 317
+node tests/saenggibu.test.mjs        # 326
 node tests/s360-tabs.test.mjs        # 17
 node tests/make-pyeonseong-fixture.mjs <폴더>          # 가짜 편성표 먼저 만든다(실제 파일은 개인정보라 저장소에 없음)
 PS_FILE=<폴더>/pyeonseong.xlsx node tests/upload-pyeonseong.test.mjs   # 87
