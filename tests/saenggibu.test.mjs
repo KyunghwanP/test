@@ -1978,6 +1978,7 @@ STORE = STORE_B;
   await p.evaluate(() => { window.__printed = []; window.print = () => window.__printed.push(document.getElementById('printArea').innerHTML); });
   const printed = () => p.evaluate(() => { const box = document.createElement('div'); box.innerHTML = window.__printed.at(-1) || '';
     return { pages: box.querySelectorAll('.pr-page').length, names: [...box.querySelectorAll('.pr-nm')].map(b => b.textContent), haeng: !!box.querySelector('.pr-sec[data-k="haeng"]'),
+      pageHeads: [...box.querySelectorAll('.pr-page')].map(pg => [...pg.querySelectorAll('.pr-sec .pr-sh b')].map(b => b.textContent.trim()).join('|')),
       ids: [...box.querySelectorAll('.pr-id')].map(t => t.textContent.trim()), heads: [...box.querySelectorAll('.pr-sec .pr-sh b')].map(b => b.textContent.trim()),
       doc: box.querySelector('.pr-doc')?.textContent.replace(/\s+/g, ' ').trim(), deco: box.querySelectorAll('.pr-chip, .pr-gauge, table.pr-id').length,
       repeat: [...box.querySelectorAll('.pr-page')].every(s => !!s.querySelector('table.pr-frame > thead .pr-head')),
@@ -2003,6 +2004,18 @@ STORE = STORE_B;
   const p1 = await printed();
   check('이 학생 인쇄 — 한 장, 「행특 빼고」 를 끄면 행특도', p1.pages === 1 && p1.names[0] === '정하늘' && p1.ids[0] === '1학년 1반 3번' && p1.haeng
     && p1.heads.includes('행동특성 및 종합의견') && p1.txt.includes('배려심이 깊음.'), p1);
+  // 개세특·행특은 비어 있으면 그 칸을 찍지 않는다(선생님 요청 2026-10-28). 자율·진로는 비어도 「작성 전」 으로 찍는다
+  const AJ = '자율·자치활동 특기사항', JN = '진로활동 특기사항', GS = '개인별 세부능력 및 특기사항', HT = '행동특성 및 종합의견';
+  check('— 개세특이 비어 있으면 그 칸이 없다(정하늘: 자율·진로·행특만)', p1.pageHeads[0] === [AJ, JN, HT].join('|'), p1.pageHeads);
+  check('— 반 전체 인쇄도 학생마다 — 개세특을 쓴 김가람만 개세특, 빈 학생은 자율·진로만', pa.pageHeads.join(' / ') === [[AJ, JN, GS], [AJ, JN], [AJ, JN]].map(x => x.join('|')).join(' / '), pa.pageHeads);
+  await p.click('#stus .stu[data-n="1"]');
+  await p.waitForFunction(() => (document.querySelector('#drPane .drp-who')?.textContent || '').includes('김가람'));
+  await p.click('#drPrint summary');
+  await p.uncheck('#drPrNoH');
+  await p.click('#drPrint [data-pr="one"]');
+  await p.waitForFunction(() => (window.__printed || []).length === 3);
+  const p0 = await printed();
+  check('— 행특도 비어 있으면 찍지 않는다(김가람 — 「행특 빼고」 를 꺼도)', p0.names[0] === '김가람' && !p0.haeng && p0.pageHeads[0] === [AJ, JN, GS].join('|'), p0.pageHeads);
   if (process.env.SGB_SHOTS){ await p.evaluate(h => { document.getElementById('printArea').innerHTML = h; }, (await p.evaluate(() => window.__printed[0])));
     await p.pdf({ path: path.join(process.env.SGB_SHOTS, '11-print-class.pdf'), format: 'A4', printBackground: true, preferCSSPageSize: true }); }
   if (process.env.SGB_SHOTS){ await p.uncheck('#drHide'); await p.waitForSelector('#drT-haeng'); await p.click('#stus .stu[data-n="1"]');

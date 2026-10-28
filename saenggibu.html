@@ -2787,6 +2787,8 @@ async function drAppend(k, text){
   toast(`${DR_NAME[k]} 칸에 붙였습니다 — 바이트를 보며 줄여 주세요`);
 }
 // 인쇄 — 이 학생만 / 우리 반 전체(학생마다 한 장). 행특은 빼고 찍을 수 있다. 빼 둔 내용·메모는 안 찍는다
+// 개세특·행특은 비어 있으면 그 칸을 찍지 않는다(선생님 요청 2026-10-28 — 개세특은 없는 학생이 많다). 자율·진로는 비어도 「작성 전」 으로
+const DR_PR_SKIP = new Set(['gae', 'haeng']);
 const prDate = () => { const t = new Date(); return `${t.getFullYear()}. ${t.getMonth() + 1}. ${t.getDate()}.`; };
 const prHead = (big, small, ds) => `<header class="pr-head"><div class="pr-who"><b class="pr-nm">${big}</b> <span class="pr-id">${small}</span></div>
   <div class="pr-doc"><b>학교생활기록부 기재안</b> <span>${ds}</span></div></header>`;
@@ -2817,7 +2819,7 @@ async function drPrint(which, { ck, noH }){
     const d = drCache.get(`${ck}-${r.n}`) || {};
     return `<section class="pr-page"><table class="pr-frame">
       <thead><tr><td>${prHead(esc(r.nm), `${esc(g)}학년 ${esc(c)}반 ${esc(r.n)}번`, ds)}</td></tr></thead>
-      <tbody>${DR_AREAS.filter(([k]) => !(noH && k === 'haeng')).map(([k, , tg]) => {
+      <tbody>${DR_AREAS.filter(([k]) => !(noH && k === 'haeng') && !(DR_PR_SKIP.has(k) && !(d[k] || '').trim())).map(([k, , tg]) => {
         const v = d[k] || '', b = sgbNeisBytes(v), lim = SGB_NEIS_LIMIT[tg], over = b > lim;
         return `<tr class="pr-sec${over ? ' over' : ''}" data-k="${k}"><td>
           <div class="pr-sh"><b>${DR_FULL[k]}</b><span class="pr-bytes">${b.toLocaleString()} / ${lim.toLocaleString()}바이트${over ? ` · ${(b - lim).toLocaleString()} 초과` : ''}</span></div>
