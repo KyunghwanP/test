@@ -2570,28 +2570,73 @@ for (const c of ['saenggibu', 'saenggibuStu', 'saenggibuAct']) {
   check(`규칙 ${c} — 읽기·쓰기 교사 전체(부서가 바로 올린다)`, m && /allow read:\s*if isYnhsTeacher\(\);/.test(m[1]) && /allow write: if isYnhsTeacher\(\);/.test(m[1]), m && m[1]);
 }
 // 사용설명서 — 통합앱 설명서(manual.html)와 같은 형식으로 따로 한 장, 핵심 먼저(선생님 요청 2026-10-29).
+// 담임 / 부서·교과 두 탭으로 나눔(선생님 요청 2026-10-29) — 스크립트 없이 주소 끝(#write · #upload · 절 #w1 · #u1 …)으로 고른다.
 // 앱의 단추·알림 이름을 바꾸면 설명서도 고치라고 여기서 걸린다
 {
   const SMAN = fs.readFileSync(ROOT + '/saenggibu-manual.html', 'utf8');
   const MAN = fs.readFileSync(ROOT + '/manual.html', 'utf8');
   const style = s => (s.match(/<body>\s*<style>([\s\S]*?)<\/style>/) || [])[1] || '';
-  check('생기부 사용설명서 — 통합앱 설명서와 같은 형식(같은 스타일에 덧붙임 · 왼쪽 목차), 맨 위가 「이것만 알면 됩니다」', style(MAN).length > 1000 && style(SMAN).startsWith(style(MAN))
-    && SMAN.includes('<aside>') && /<main>\s*<div class="page" id="top">[\s\S]*?<h1>이것만 알면 됩니다<\/h1>/.test(SMAN));
+  check('생기부 사용설명서 — 통합앱 설명서와 같은 형식(같은 스타일에 덧붙임 · 왼쪽 목차), 맨 위에 탭 둘(담임 선생님 / 부서·교과 선생님)', style(MAN).length > 1000 && style(SMAN).startsWith(style(MAN))
+    && SMAN.includes('<aside>') && /<main>\s*<nav class="tabs"[^>]*>\s*<a class="tab w" href="#write">[\s\S]*?담임 선생님[\s\S]*?<a class="tab u" href="#upload">[\s\S]*?부서·교과 선생님/.test(SMAN));
+  check('— 탭마다 맨 위가 「이것만 알면 됩니다」(담임 네 단계 · 부서·교과 세 단계)',
+    /<div class="panel" id="write">\s*<div class="page">[\s\S]*?<h1>이것만 알면 됩니다<\/h1>[\s\S]*?<h2>네 단계<\/h2>/.test(SMAN)
+    && /<div class="panel" id="upload">\s*<div class="page">[\s\S]*?<h1>이것만 알면 됩니다<\/h1>[\s\S]*?<h2>세 단계<\/h2>/.test(SMAN));
+  const wPart = SMAN.slice(SMAN.indexOf('<div class="panel" id="write">'), SMAN.indexOf('<div class="panel" id="upload">')), uPart = SMAN.slice(SMAN.indexOf('<div class="panel" id="upload">'));
+  check('— 담임 절(1~10)은 담임 탭에, 부서·교과 절(1~6)은 그 탭에', wPart.length > 1000 && [...Array(10)].every((_, i) => wPart.includes(`<section id="w${i + 1}">`))
+    && [...Array(6)].every((_, i) => uPart.includes(`<section id="u${i + 1}">`)) && !/<section id="u/.test(wPart) && !/<section id="w/.test(uPart));
   const ids = [...SMAN.matchAll(/<a href="#([a-z0-9]+)">/g)].map(m => m[1]);
-  check('— 목차가 가리키는 절이 다 있다(1~13 + 핵심)', ids.length >= 14 && ids.every(id => SMAN.includes(`id="${id}"`)), ids.filter(id => !SMAN.includes(`id="${id}"`)));
+  check('— 목차가 가리키는 절이 다 있다(담임 1~10 · 부서·교과 1~6 + 핵심 둘)', ids.length >= 18 && ids.every(id => SMAN.includes(`id="${id}"`)), ids.filter(id => !SMAN.includes(`id="${id}"`)));
   const imgs = [...SMAN.matchAll(/<img [^>]*src="([^"]*)"/g)].map(m => m[1]);
-  check('— 그림은 모두 파일 안에(data:image/png), 바깥 주소·스크립트 없음, 예시 자료라고 밝힌다', imgs.length >= 15 && imgs.every(u => u.startsWith('data:image/png;base64,'))
+  check('— 그림은 모두 파일 안에(data:image/png), 바깥 주소·스크립트 없음, 예시 자료라고 밝힌다', imgs.length >= 18 && imgs.every(u => u.startsWith('data:image/png;base64,'))
     && !/<script/i.test(SMAN) && !/(src|href)="https?:/i.test(SMAN) && SMAN.includes('예시 자료로 재현했습니다'), imgs.length);
   const labels = ['✏️ 작성', '🔤 맞춤법', '📋 복사한 글 반영', '📘 반 전체', '📘 우리 반 생기부', '📘 반별 생기부', '🖨 인쇄', '행특 빼고 인쇄', '학생마다 인쇄', '엑셀로 저장',
     '📄 양식 받기', '📤 엑셀 올리기', '↗ 새 창', '행특 가리기', '다른 창에서 이 칸이 수정되었습니다.', '다른 창에서 수정된 내용을 불러왔습니다', '그 글로 바꾸기', '이 창 글로 저장',
-    '저장하지 못했습니다', '이미 ', '에 들어간 문장입니다 — 한 번 더 누르면 붙입니다'];
+    '저장하지 못했습니다', '이미 ', '에 들어간 문장입니다 — 한 번 더 누르면 붙입니다', '📋 기재 문안 전체 복사', '✏️ 작성하러 가기', '⚠ 확인 필요', '⚠ 유의 사항',
+    // 부서·교과 탭 — 양식·미리보기·활동별
+    '기재 내용만', '추가 기재 칸', '⚠ 확인할 시트', '반·번호·이름 확인', '새 판인가요?', '따로 추가', '건너뛰기(그대로 둠)', '선생님이 올리는 중입니다',
+    '새로 추가', '내용이 바뀜', '올렸습니다', '활동별', '활동·부서 찾기', '추가·수정만', '⚙ 관리'];
   const gone = labels.filter(l => !SMAN.includes(l) || !HTML.includes(l));
   check('— 설명서가 부르는 단추·알림 이름이 앱에 그대로 있다(앱에서 이름을 바꾸면 여기서 걸린다)', !gone.length && HTML.includes('→ ${DR_NAME[k]}') && HTML.includes('에 들어감`')
     && SMAN.includes('→ 자율') && SMAN.includes('✓ 진로에 들어감'), gone);
-  check('통합앱 사용설명서 — 14번 절 「생기부 보조자료」(따로 만든 설명서로 가는 단추), Q&A 는 15번', MAN.includes('<a href="#s14"><i>14</i>생기부 보조자료</a><a href="#s15"><i>15</i>Q&A</a>')
-    && /<section id="s14"><h2 class="sh"><span class="n">14<\/span>생기부 보조자료<\/h2>[\s\S]*?href="saenggibu-manual\.html"[\s\S]*?<section id="s15"><h2 class="sh"><span class="n">15<\/span>Q&A<\/h2>/.test(MAN));
+  check('통합앱 사용설명서 — 14번 절 「생기부 보조자료」(탭마다 가는 단추 둘), Q&A 는 15번', MAN.includes('<a href="#s14"><i>14</i>생기부 보조자료</a><a href="#s15"><i>15</i>Q&A</a>')
+    && /<section id="s14"><h2 class="sh"><span class="n">14<\/span>생기부 보조자료<\/h2>[\s\S]*?href="saenggibu-manual\.html#write"[\s\S]*?href="saenggibu-manual\.html#upload"[\s\S]*?<section id="s15"><h2 class="sh"><span class="n">15<\/span>Q&A<\/h2>/.test(MAN));
   const mids = [...MAN.matchAll(/<a href="#([a-z0-9]+)">/g)].map(m => m[1]);
   check('— 통합앱 설명서 목차도 절이 다 있다', mids.length >= 16 && mids.every(id => MAN.includes(`id="${id}"`)), mids.filter(id => !MAN.includes(`id="${id}"`)));
+  // 탭 동작 — 브라우저로 연다: 처음엔 담임, 탭·목차·주소 끝으로 바뀌고, 폰 폭에서 가로로 넘치지 않는다
+  const mb = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+  const url = 'file://' + ROOT + '/saenggibu-manual.html';
+  const st = p => p.evaluate(async () => {
+    await Promise.all(document.getAnimations().map(a => a.finished));   // 탭 테두리 색이 바뀌는 0.1초를 기다린다
+    const vis = s => { const e = document.querySelector(s); return !!e && getComputedStyle(e).display !== 'none'; };
+    return { w: vis('#write'), u: vis('#upload'), tw: vis('aside .tw'), tu: vis('aside .tu'),
+      on: [...document.querySelectorAll('.tab')].filter(t => getComputedStyle(t).borderTopColor === 'rgb(0, 107, 255)').map(t => t.classList[1]).join(),
+      sx: document.documentElement.scrollWidth, vw: innerWidth };
+  });
+  const pc = await (await mb.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+  await pc.goto(url);
+  const t0 = await st(pc);
+  check('설명서 탭 — 처음 열면 담임 쪽만(왼쪽 목차도 담임), 「담임 선생님」 탭이 켜짐', t0.w && !t0.u && t0.tw && !t0.tu && t0.on === 'w', t0);
+  await pc.click('.tab.u');
+  const t1 = await st(pc);
+  check('— 「부서·교과 선생님」 탭을 누르면 그쪽만(목차도 바뀜)', !t1.w && t1.u && !t1.tw && t1.tu && t1.on === 'u', t1);
+  await pc.click('aside .tu a[href="#u4"]');
+  const t2 = await st(pc);
+  check('— 그 탭 목차에서 절로 가도(#u4) 탭은 그대로', !t2.w && t2.u && t2.on === 'u', t2);
+  await pc.goto(url + '#w9');
+  const t3 = await st(pc);
+  check('— 주소 끝이 담임 절(#w9)이면 담임 쪽', t3.w && !t3.u && t3.on === 'w', t3);
+  await pc.goto(url + '#upload');
+  const t4 = await st(pc);
+  check('— 통합앱 설명서의 「📤 부서·교과 선생님 설명서」(#upload)로 들어오면 그 탭', !t4.w && t4.u && t4.on === 'u', t4);
+  const ph = await (await mb.newContext({ viewport: { width: 390, height: 844 }, isMobile: true })).newPage();
+  await ph.goto(url);
+  const t5 = await st(ph);
+  check('— 폰 폭: 왼쪽 목차 대신 「자세히 보기」 위 바로가기, 가로로 넘치지 않음', !t5.tw && !t5.tu && t5.sx <= t5.vw
+    && await ph.evaluate(() => getComputedStyle(document.querySelector('#write .toc-m')).display === 'flex'), t5);
+  await ph.click('.tab.u');
+  const t6 = await st(ph);
+  check('— 폰에서도 탭이 바뀌고 넘치지 않음', !t6.w && t6.u && t6.on === 'u' && t6.sx <= t6.vw, t6);
+  await mb.close();
 }
 
 fs.rmSync(TMP, { recursive: true, force: true });
