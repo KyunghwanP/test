@@ -590,9 +590,9 @@ function newForm(ws, { dept = '○○○○부', title, area, students }){
 }
 
 console.log('\n[나이스 바이트]');
-// 나이스는 바이트로 센다 — 한글 3, 영문·숫자·공백·문장부호 1, 줄바꿈(엔터) 2(선생님 요청 2026-10-28)
-check('바이트 — 한글 3 · 영문/숫자/공백 1 · 줄바꿈 2', P.sgbNeisBytes('가a 1\n나') === 3 + 1 + 1 + 1 + 2 + 3 && P.sgbNeisBytes('') === 0
-  && P.sgbNeisBytes('가\r\n나') === 8, [P.sgbNeisBytes('가a 1\n나'), P.sgbNeisBytes('가\r\n나')]);
+// 나이스는 바이트로 센다 — 한글 3, 영문·숫자·공백·문장부호 1, 줄바꿈(엔터) 1(선생님이 나이스에서 확인 2026-10-29 — 처음엔 2 로 셌다)
+check('바이트 — 한글 3 · 영문/숫자/공백 1 · 줄바꿈(엔터) 1', P.sgbNeisBytes('가a 1\n나') === 3 + 1 + 1 + 1 + 1 + 3 && P.sgbNeisBytes('') === 0
+  && P.sgbNeisBytes('가\r\n나') === 7 && P.sgbNeisBytes('가\r나') === 7 && P.sgbNeisBytes('\n\n') === 2, [P.sgbNeisBytes('가a 1\n나'), P.sgbNeisBytes('가\r\n나')]);
 // 맞춤법 — 검사기에서 고친 글을 붙여 넣으면 바뀐 곳을 글자 단위로(선생님 요청 2026-10-28). 지어낸 문장
 {
   const D = (a, b) => P.sgbDiff(a, b).map(([op, s]) => op === 0 ? s : op < 0 ? `[-${s}]` : `[+${s}]`).join('');
@@ -1004,7 +1004,7 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
   await p.click('#stuOut .card [data-copy]');
   check('복사 — 기재 문안이 그대로', await p.evaluate(() => window.__copied) === '로봇 코딩 캠프에 참여하여 센서 제어를 익힘.');
   // 나이스 바이트 — 카드에 글자 수와 같이, 묶음 머리에 문안 합계(한도는 영역 하나일 때만)
-  const robotB = [...'로봇 코딩 캠프에 참여하여 센서 제어를 익힘.'].reduce((n, ch) => n + (ch === '\n' ? 2 : ch.charCodeAt(0) < 128 ? 1 : 3), 0);
+  const robotB = [...'로봇 코딩 캠프에 참여하여 센서 제어를 익힘.'].reduce((n, ch) => n + (ch.charCodeAt(0) < 128 ? 1 : 3), 0);
   const tools1 = await p.$$eval('#stuOut .card .tools', ts => ts.map(t => t.textContent.replace(/\s+/g, ' ')));
   check(`카드 — 「25자 · ${robotB}바이트」`, tools1.some(t => t.includes('25자') && t.includes(`${robotB}바이트`)), tools1);
   const g1 = await p.$$eval('#stuOut .grp', gs => gs.map(g => g.textContent.replace(/\s+/g, ' ').trim()));

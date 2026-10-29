@@ -756,10 +756,11 @@ function sgbNameInfo(rest0){
   const paren = rest.match(/\(([^)]*)\)/);
   return { rest, rounds, short: paren ? paren[1].trim() : rest, deptAbbr: rest.split('(')[0].replace(/-\d+차.*$/, '').trim() };
 }
-// 나이스 바이트 — 한글 3, 영문·숫자·공백·문장부호 1, 줄바꿈(엔터) 2. 그 밖의 비 ASCII(·, ○ 등)도 넉넉히 3
+// 나이스 바이트 — 한글 3, 영문·숫자·공백·문장부호 1, 줄바꿈(엔터) 1(선생님이 나이스에서 확인 2026-10-29 — 처음엔 2 로 셌다).
+// 그 밖의 비 ASCII(·, ○ 등)도 넉넉히 3. 윈도에서 붙여 넣은 줄바꿈(\r\n)도 엔터 하나
 function sgbNeisBytes(s){
   let n = 0;
-  for (const ch of String(s ?? '').replace(/\r\n?/g, '\n')){ const c = ch.codePointAt(0); n += ch === '\n' ? 2 : c < 0x80 ? 1 : c < 0x10000 ? 3 : 4; }
+  for (const ch of String(s ?? '').replace(/\r\n?/g, '\n')){ const c = ch.codePointAt(0); n += c < 0x80 ? 1 : c < 0x10000 ? 3 : 4; }
   return n;
 }
 // 두 글의 차이 — 글자 단위(공통 앞뒤를 떼고 가운데만 LCS). [[0 같음 | -1 지움 | 1 넣음, 글], …].
