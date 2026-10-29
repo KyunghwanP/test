@@ -1170,10 +1170,8 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
   check('이름 찾기 — 반이 달라도 찾고, 반-번호를 같이 보인다', found.join() === '1-1-1 김가람', found);
   await p.click('#stus .stu');
   await p.waitForFunction(() => document.querySelector('#stuOut .s-name')?.textContent === '김가람');
-  await p.click('#copyAll');
-  const all = await p.evaluate(() => window.__copied);
-  check('기재 문안 전체 복사 — 입력 영역·활동명을 머리에 붙여서, 문안 있는 것만', all.includes('[자율 · 진로] 진로탐색 로봇공학 캠프\n로봇 코딩')
-    && all.includes('수학 대중화 강연') && !all.includes('헌혈'), all);
+  check('「📋 기재 문안 전체 복사」 단추는 없다(선생님 — 실용성 없음, 2026-10-29) · 위쪽 줄의 「최근 올린 파일」 줄도 없고 「📤 엑셀 올리기」 에 마우스를 올리면 보인다',
+    !(await p.$('#copyAll')) && !(await p.$('#fileNote')) && (await p.getAttribute('#upBtn', 'title') || '').startsWith('최근 올린 파일: '));
   await p.fill('#hakbun', '');
   await p.waitForFunction(() => !document.querySelector('.roster-head').textContent.includes('찾은 학생'));
 
@@ -1822,8 +1820,12 @@ STORE = STORE_B;
   await p.click('#stuOut .card:has-text("진로탐색 로봇공학 캠프") [data-to="jin"]');
   check('「→ 진로」 — 작성 칸의 진로에 그 문안이 붙는다', (await p.inputValue('#drT-jin')) === ROBOT);
   await p.waitForFunction(t => window.__FS__['saenggibuDraft/1-1-1']?.jin === t, ROBOT);
+  // 진로에 이미 들어간 기록을 자율에도 — 한 기록은 한 영역에만(2026-10-29): 한 번은 알리고, 한 번 더 누르면 붙인다
   await p.click('#stuOut .card:has-text("진로탐색 로봇공학 캠프") [data-to="ja"]');
-  check('— 쓴 글이 있으면 그 뒤에 한 칸 띄우고 붙는다', (await p.inputValue('#drT-ja')) === `${JA} ${ROBOT}`);
+  check('— 진로에 이미 들어간 기록을 「→ 자율」: 「이미 진로에 들어간 기록입니다 …」 만, 붙이지 않는다', (await p.inputValue('#drT-ja')) === JA
+    && (await p.textContent('#toast')).startsWith('이미 진로에 들어간 기록입니다 — 한 기록은 한 영역에만 씁니다'), await p.textContent('#toast'));
+  await p.click('#stuOut .card:has-text("진로탐색 로봇공학 캠프") [data-to="ja"]');
+  check('— 한 번 더 누르면 쓴 글 뒤에 한 칸 띄우고 붙는다', (await p.inputValue('#drT-ja')) === `${JA} ${ROBOT}`);
   // 빼 둔 내용·메모 — 저장되지만 바이트에는 안 든다
   const beforeB = await p.textContent('#drB-ja');
   check('빼 둔 내용 칸은 글이 없으면 접혀 있다', !(await p.isVisible('#drHT-ja')) && !(await p.isVisible('#drHT-jin')));
@@ -2408,8 +2410,17 @@ STORE = STORE_B;
     (await p.inputValue('#drT-ja')) === ja1 && (await p.textContent('#toast')) === '이미 자율에 들어간 문장입니다 — 한 번 더 누르면 붙입니다', await p.textContent('#toast'));
   await p.click('#stuOut .card:has-text("진로탐색 로봇공학 캠프") [data-to="ja"]');
   check('— 한 번 더 누르면 붙인다', (await p.inputValue('#drT-ja')) === `${ja1} ${ROBOT}`);
-  check('— 안 들어간 칸(로봇 → 진로)은 바로 붙는다', await (async () => { const j = await p.inputValue('#drT-jin');
-    await p.click('#stuOut .card:has-text("진로탐색 로봇공학 캠프") [data-to="jin"]'); return (await p.inputValue('#drT-jin')) === `${j} ${ROBOT}`; })());
+  // 다른 영역(자율)에 이미 들어간 기록을 「→ 진로」 — 한 기록은 한 영역에만(선생님 요청 2026-10-29): 한 번은 알리고 붙이지 않는다
+  const j0 = await p.inputValue('#drT-jin');
+  await p.click('#stuOut .card:has-text("진로탐색 로봇공학 캠프") [data-to="jin"]');
+  await p.waitForTimeout(100);
+  check('자율에 들어간 기록을 또 「→ 진로」 — 「이미 자율에 들어간 기록입니다 — 한 기록은 한 영역에만 씁니다…」, 붙이지 않는다',
+    (await p.inputValue('#drT-jin')) === j0 && (await p.textContent('#toast')).startsWith('이미 자율에 들어간 기록입니다 — 한 기록은 한 영역에만 씁니다'), await p.textContent('#toast'));
+  await p.click('#stuOut .card:has-text("진로탐색 로봇공학 캠프") [data-to="jin"]');
+  await p.waitForFunction(() => { const c = [...document.querySelectorAll('#stuOut .card[data-a]')].find(x => x.textContent.includes('진로탐색 로봇공학 캠프'));
+    return !!c?.querySelector('.used-mark.dup'); }, null, { timeout: 3000 }).catch(() => {});
+  const md = await mark('진로탐색 로봇공학 캠프');
+  check('— 한 번 더 누르면 붙이고, 카드에 「⚠ 자율·진로 두 곳에 들어감」(빨강)', (await p.inputValue('#drT-jin')) === `${j0} ${ROBOT}` && md?.t === '⚠ 자율·진로 두 곳에 들어감' && md.cls.includes('dup'), md);
   if (process.env.SGB_SHOTS) await shot(p, '#stuPanes', '17-used-marks');
   check('오류 없음(들어간 문안 표시)', p.errors.length === 0, p.errors);
   await p.context().close();
@@ -2592,6 +2603,59 @@ console.log('\n[사용설명서 · 전체화면 단추]');
   await r.context().close();
 }
 
+// ── 글자 크기(선생님 요청 2026-10-29) ── 학생 이름 옆 「가− 가+」 는 조회창(보기 화면), 행특 가리기 옆 「가− 가+」 는 작성창(쓰는 칸). 이 기기에 남는다
+console.log('\n[글자 크기]');
+{
+  const p = await openAs(KIM);
+  await p.waitForSelector('#stus .stu');
+  await p.click('#stus .stu[data-n="1"]');
+  await p.waitForSelector('#stuOut .card .body');
+  const V = '#stuOut .s-btns .fs-ctl[data-fs="v"]', D = '#drPane .fs-ctl[data-fs="d"]';
+  const look = () => p.evaluate(([V, D]) => { const sh = document.querySelector('#stuOut .sheet'), bd = document.querySelector('#stuOut .card .body'), t = document.getElementById('drT-ja');
+    const n = sel => { const b = document.querySelector(sel + ' .fs-n'); return b ? (b.hidden ? '' : b.textContent) : null; };
+    return { zoom: sh && getComputedStyle(sh).zoom, h: bd && Math.round(bd.getBoundingClientRect().height), fs: t && getComputedStyle(t).fontSize, th: t && t.offsetHeight, tsh: t && t.scrollHeight,
+      nv: n(V), nd: n(D) }; }, [V, D]);
+  check('학생 이름 옆(기재 문안 전체 복사가 있던 자리)에 조회창 「가− 가+」', !!(await p.$(`${V} [data-fs-d="-1"]`)) && (await p.textContent(V)).includes('가−') && (await p.textContent(V)).includes('가+'));
+  const m0 = await look();
+  await p.click(`${V} [data-fs-d="1"]`);
+  await p.click(`${V} [data-fs-d="1"]`);
+  const m1 = await look();
+  check('— 가+ 두 번: 보기 화면이 130%(카드 글자째 커짐), 가운데에 「130%」', m0.zoom === '1' && m0.nv === '' && m1.zoom === '1.3' && m1.h > m0.h * 1.2 && m1.nv === '130%', [m0, m1]);
+  await p.click('#drOpenBtn');
+  await p.waitForSelector('#drT-ja', { state: 'visible' });
+  check('작성 칸의 「행특 가리기」 바로 옆에 작성창 「가− 가+」', await p.evaluate(D => { const c = document.querySelector(D); return !!c && c.previousElementSibling?.classList.contains('drp-sw')
+    && c.previousElementSibling.textContent.includes('행특 가리기'); }, D));
+  await p.fill('#drT-ja', '학급 자치회의에서 함께 쓰는 교실 규칙을 제안하고 친구들의 의견을 모아 실천 방안을 정리함. '.repeat(5).trim());   // 칸이 최소 높이를 넘게
+  await p.waitForTimeout(150);
+  const d0 = await look();
+  await p.click(`${D} [data-fs-d="1"]`);
+  await p.click(`${D} [data-fs-d="1"]`);
+  const d1 = await look();
+  check('— 가+ 두 번: 쓰는 글자 14.5px → 18.85px(130%), 칸 높이도 글에 맞춰 늘어남(잘리지 않음) · 조회창은 그대로', d0.fs === '14.5px' && d1.fs === '18.85px'
+    && d1.th > d0.th && d1.th >= d1.tsh && d1.zoom === '1.3' && d1.nd === '130%', [d0, d1]);
+  await p.evaluate(([V, D]) => { for (let i = 0; i < 6; i++) document.querySelector(`${D} [data-fs-d="1"]`).click();
+    for (let i = 0; i < 6; i++) document.querySelector(`${V} [data-fs-d="-1"]`).click(); }, [V, D]);
+  const ends = await p.evaluate(([V, D]) => ({ nd: document.querySelector(`${D} .fs-n`).textContent, up: document.querySelector(`${D} [data-fs-d="1"]`).disabled,
+    nv: document.querySelector(`${V} .fs-n`).textContent, down: document.querySelector(`${V} [data-fs-d="-1"]`).disabled }), [V, D]);
+  check('— 끝(170% · 85%)에서는 더 가는 단추가 꺼진다', ends.nd === '170%' && ends.up && ends.nv === '85%' && ends.down, ends);
+  const saved = await p.evaluate(() => JSON.parse(localStorage.getItem('ynhs-sgb-fs') || '{}'));
+  await p.reload();
+  await p.waitForSelector(V, { state: 'attached', timeout: 8000 }).catch(() => {});
+  const after = await p.evaluate(() => ({ v: getComputedStyle(document.documentElement).getPropertyValue('--fs-view').trim(), d: getComputedStyle(document.documentElement).getPropertyValue('--fs-draft').trim() }));
+  check('— 이 기기에 남아 다시 열어도 그대로', saved.v === 0.85 && saved.d === 1.7 && after.v === '0.85' && after.d === '1.7', [saved, after]);
+  await p.waitForSelector(D, { state: 'attached', timeout: 8000 }).catch(() => {});
+  await p.click(`${V} .fs-n`).catch(() => {});
+  await p.click(`${D} .fs-n`).catch(() => {});
+  const reset = await p.evaluate(() => ({ v: getComputedStyle(document.documentElement).getPropertyValue('--fs-view').trim(), d: getComputedStyle(document.documentElement).getPropertyValue('--fs-draft').trim() }));
+  check('— 가운데 숫자를 누르면 처음 크기(100%)로', reset.v === '1' && reset.d === '1', reset);
+  check('위쪽 줄에는 글자 크기 단추가 없다(자리를 덜 먹게)', !(await p.$('.top #fsDl')) && !(await p.$('.top .fs-ctl')));
+  await p.goto(ORIGIN + '/test/saenggibu.html?solo=1&k=1-1-1');
+  await p.waitForSelector('#stuOut .s-btns .fs-ctl', { timeout: 8000 }).catch(() => {});
+  check('— 새 창에도 학생 이름 옆 「가− 가+」', !!(await p.$('#stuOut .s-btns .fs-ctl[data-fs="v"]')));
+  check('— 오류 없음', !p.errors.length, p.errors);
+  await p.context().close();
+}
+
 await b.close();
 
 // ── 4. 앱에 붙인 곳 ──
@@ -2643,10 +2707,12 @@ for (const c of ['saenggibu', 'saenggibuStu', 'saenggibuAct']) {
     && !/<script/i.test(SMAN) && !/(src|href)="https?:/i.test(SMAN) && SMAN.includes('예시 자료로 재현했습니다'), imgs.length);
   const labels = ['✏️ 작성', '🔤 맞춤법', '📋 복사한 글 반영', '📘 반 전체', '📘 우리 반 생기부', '📘 반별 생기부', '🖨 인쇄', '행특 빼고 인쇄', '학생마다 인쇄', '엑셀로 저장',
     '📄 양식 받기', '📤 엑셀 올리기', '↗ 새 창', '행특 가리기', '다른 창에서 이 칸이 수정되었습니다.', '다른 창에서 수정된 내용을 불러왔습니다', '그 글로 바꾸기', '이 창 글로 저장',
-    '저장하지 못했습니다', '이미 ', '에 들어간 문장입니다 — 한 번 더 누르면 붙입니다', '📋 기재 문안 전체 복사', '✏️ 작성하러 가기', '⚠ 확인 필요', '⚠ 유의 사항',
+    '저장하지 못했습니다', '이미 ', '에 들어간 문장입니다 — 한 번 더 누르면 붙입니다', '✏️ 작성하러 가기', '⚠ 확인 필요', '⚠ 유의 사항',
     // 부서·교과 탭 — 양식·미리보기·활동별
     '기재 내용만', '추가 기재 칸', '⚠ 확인할 시트', '반·번호·이름 확인', '새 판인가요?', '따로 추가', '건너뛰기(그대로 둠)', '선생님이 올리는 중입니다',
-    '새로 추가', '내용이 바뀜', '올렸습니다', '활동별', '활동·부서 찾기', '추가·수정만', '⚙ 관리'];
+    '새로 추가', '내용이 바뀜', '올렸습니다', '활동별', '활동·부서 찾기', '추가·수정만', '⚙ 관리',
+    // 한 기록이 두 영역에 — 카드 표시와 붙일 때 알림
+    '곳에 들어감', '에 들어간 기록입니다 — 한 기록은 한 영역에만 씁니다'];
   const gone = labels.filter(l => !SMAN.includes(l) || !HTML.includes(l));
   check('— 설명서가 부르는 단추·알림 이름이 앱에 그대로 있다(앱에서 이름을 바꾸면 여기서 걸린다)', !gone.length && HTML.includes('→ ${DR_NAME[k]}') && HTML.includes('에 들어감`')
     && SMAN.includes('→ 자율') && SMAN.includes('✓ 진로에 들어감'), gone);

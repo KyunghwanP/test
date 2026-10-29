@@ -84,6 +84,16 @@
   .top-tools .btn{display:inline-flex;align-items:center;gap:5px;}
   #fullBtn[aria-pressed="true"]{background:var(--mon);border-color:var(--mon);color:#fff;}
   html.solo .top-tools{display:none !important;}
+  /* 글자 크기 — 조회창은 보기 화면(.sheet)을 통째로 키우고, 작성창은 쓰는 글자만(칸 높이는 글에 맞춰 다시 잰다) */
+  .sheet{zoom:var(--fs-view,1);}
+  /* 「가− 가+」 — 학생 이름 옆(조회창) · 행특 가리기 옆(작성창). 100% 가 아니면 가운데 숫자가 보이고, 누르면 처음 크기 */
+  .fs-ctl{display:inline-flex;align-items:center;gap:3px;flex:none;}
+  .fs-ctl button{border:1px solid var(--rule);background:var(--paper);color:var(--ink);border-radius:8px;padding:3px 8px;
+    font:inherit;font-size:13px;font-weight:800;line-height:1.4;cursor:pointer;white-space:nowrap;}
+  .fs-ctl button:hover:not(:disabled){border-color:var(--mon);color:var(--mon);}
+  .fs-ctl button:disabled{opacity:.35;cursor:default;}
+  .fs-ctl .fs-n{border:none;background:none;padding:3px 2px;color:var(--mon);font-variant-numeric:tabular-nums;}
+  .fs-ctl .fs-n[hidden]{display:none;}
   .btn.line{border-color:var(--mon);color:var(--mon);}
   .btn.line:hover{background:var(--mon);color:#fff;}
   /* 카드의 학생 글 접기(details{margin-top:10px})가 여기에도 걸려 단추가 아래로 처졌다 — 따로 0 */
@@ -100,8 +110,6 @@
   .form-dl-menu button:hover{background:var(--paper-soft);}
   .form-dl-menu label{display:flex;align-items:center;gap:6px;padding:8px 10px;margin-top:2px;border-top:1px solid var(--rule);
     font-size:14px;font-weight:700;color:var(--ink);cursor:pointer;}
-  #fileNote{width:100%;font-size:13px;color:var(--ink-soft);font-weight:600;}
-  #fileNote:empty{display:none;}
 
   #main{flex:1;min-height:0;display:flex;flex-direction:column;}
   #upPanel{display:none;margin:12px 16px 0;}
@@ -444,7 +452,7 @@
   .drp-meter.over i{background:var(--warn) !important;}
   @media (prefers-reduced-motion:reduce){ .drp-meter i{transition:none;} }
   .drp-t{display:block;width:100%;min-height:88px;resize:none;overflow:hidden;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;
-    background:var(--paper-soft);color:var(--ink);font:inherit;font-size:14.5px;line-height:1.7;}
+    background:var(--paper-soft);color:var(--ink);font:inherit;font-size:calc(14.5px * var(--fs-draft,1));line-height:1.7;}
   .drp-t[hidden]{display:none;}               /* display:block 이 hidden 을 이기지 않게 */
   .drp-t:focus{outline:none;background:var(--paper);border-color:var(--mon);box-shadow:0 0 0 3px var(--sel);}
   .drp-t.over{border-color:var(--warn);}
@@ -480,7 +488,7 @@
   html.dark .drp-conf del{color:#FCA5A5;background:#3B1414;} html.dark .drp-conf ins{color:#86EFAC;background:#0F2E1B;}
   .drp-spell-steps{font-size:13.5px;line-height:1.6;color:var(--ink);}
   .drp-spell-in[hidden]{display:none;}
-  .drp-hold{margin-top:6px;min-height:60px;border-style:dashed;background:transparent;font-size:13.5px;}
+  .drp-hold{margin-top:6px;min-height:60px;border-style:dashed;background:transparent;font-size:calc(13.5px * var(--fs-draft,1));}
   .drp-hist{margin-top:6px;padding:4px;border:1px solid var(--rule);border-radius:10px;background:var(--paper-soft);}
   .drp-hist button{display:block;width:100%;padding:7px 9px;border:none;border-radius:7px;background:transparent;color:var(--ink);font:inherit;font-size:13px;text-align:left;cursor:pointer;}
   .drp-hist button:hover{background:var(--paper);}
@@ -499,8 +507,8 @@
   /* 그 문안이 작성 칸에 들어갔는지 — ✓ 거의 다(초록) · ◐ 일부(주황) */
   .used-mark{align-self:center;font-size:12.5px;font-weight:800;white-space:nowrap;}
   .used-mark[hidden]{display:none;}
-  .used-mark.full{color:#067647;} .used-mark.part{color:#B54708;}
-  html.dark .used-mark.full{color:#86EFAC;} html.dark .used-mark.part{color:#FDBA74;}
+  .used-mark.full{color:#067647;} .used-mark.part{color:#B54708;} .used-mark.dup{color:#B42318;}
+  html.dark .used-mark.full{color:#86EFAC;} html.dark .used-mark.part{color:#FDBA74;} html.dark .used-mark.dup{color:#FDA29B;}
   .cl-me{font-size:11px;margin-left:3px;}
   /* 반·명단 숨기기(「« 숨기기」) · 단독 개인별 조회 — 목록 대신 위쪽 줄(☰ 반 · ◀ 이전 · 다음 ▶) */
   .list-off-btn{margin-left:auto;padding:2px 8px;border:1px solid var(--rule);border-radius:7px;background:var(--paper);color:var(--ink-soft);
@@ -511,7 +519,7 @@
     padding:9px 16px;background:var(--paper);border-bottom:1px solid var(--rule);}
   .pane3.list-off .m-nav .btn,html.solo .m-nav .btn{padding:6px 12px;font-size:13.5px;max-width:220px;overflow:hidden;text-overflow:ellipsis;}
   html.solo #mBack{display:none;}
-  html.solo .top #views,html.solo .top .admin,html.solo #fileNote{display:none !important;}
+  html.solo .top #views,html.solo .top .admin{display:none !important;}
   .ic-ph{display:none;}
   @media (min-width:901px) and (max-width:1179px){
     .pane3.dr-open .m-nav{display:flex;gap:6px;align-items:center;position:sticky;top:-16px;z-index:5;margin:-16px -16px 14px;
@@ -735,7 +743,6 @@
     <button class="btn" id="fullBtn" type="button" title="전체화면" aria-label="전체화면" aria-pressed="false"><span aria-hidden="true">⛶</span><span class="tl">전체화면</span></button>
   </div>
   <input type="file" id="upFile" accept=".xlsx,.xlsm,.xls" style="display:none;">
-  <span id="fileNote"></span>
 </div>
 <div id="main">
   <div id="upPanel" class="up"></div>
@@ -1845,7 +1852,8 @@ async function loadMeta(){
   const changed = !META || !next || META.at !== next.at;
   META = sgbApplyFix(next);                // 관리자가 앱에서 고친 값으로 덮어 보인다(원본은 그대로)
   if (changed){ stuCache.clear(); actCache.clear(); }
-  $('fileNote').textContent = META ? `최근 올린 파일: ${META.file || ''}${META.at ? ' · ' + fmtAt(META.at) : ''}` : '';
+  // 최근 올린 파일 — 위쪽 줄 한 줄을 통째로 먹어서(선생님 2026-10-29) 「📤 엑셀 올리기」 에 마우스를 올리면 보이게만
+  $('upBtn').title = META ? `최근 올린 파일: ${META.file || ''}${META.at ? ' · ' + fmtAt(META.at) : ''}` : '';
   return changed;
 }
 async function loadStudent(key){
@@ -2129,7 +2137,6 @@ async function renderStuOut(){
   }
   const ordered = [...groups.values()].sort((x, y) => groupRank(x.a) - groupRank(y.a));
   // 「전체 복사」 — 기재 문안만, 입력 영역·활동명을 머리에 붙여서
-  out._all = ordered.flatMap(gr => gr.list.filter(it => it.b).map(it => { const a = actById(it.a); return `[${tagTxt(a)}] ${a.title}\n${it.b}`; })).join('\n\n');
   // 봉사활동 누가기록 — 일반 봉사·프로젝트 봉사를 나이스 입력창처럼 날짜 순 한 표로.
   // 「활동별로 나눠 보기」를 누르면 원래 활동 카드들이 펼쳐진다.
   const vol = sgbVolunteerRows(items, actById);
@@ -2172,7 +2179,7 @@ async function renderStuOut(){
         <div class="s-top">
           <div><div class="s-name">${esc(nm)}</div>
             <div class="s-id">${esc(st.g)}학년 ${esc(st.c)}반 ${esc(st.n)}번 · ${hakbunOf(st.g, st.c, st.n)}</div></div>
-          <div class="s-btns">${out._all ? '<button type="button" class="btn line" id="copyAll">📋 기재 문안 전체 복사</button>' : ''}
+          <div class="s-btns">${fsCtl('v')}
             ${SOLO || EMBED || !can ? '' : '<button type="button" class="btn line new-win" id="soloBtn" title="이 학생만 새 창으로 — 창 두 개를 띄워 놓고 작업할 때">↗ 새 창</button>'}
             ${can ? `<button type="button" class="btn${st.drOpen ? ' pri' : ''}" id="drOpenBtn" aria-pressed="${!!st.drOpen}" title="오른쪽에 작성 칸을 띄웁니다 — 보조자료의 「→ 자율」 로 붙여 고칩니다">✏️ 작성</button>` : ''}</div>
         </div>
@@ -2196,7 +2203,6 @@ async function renderStuOut(){
       return head + volPart + gr.cards.map(it => itemCard(actById(it.a), it, { to: can })).join('');
     }).join('')}
   </div>`;
-  if ($('copyAll')) $('copyAll').onclick = () => copyText(out._all);
   if ($('drOpenBtn')) $('drOpenBtn').onclick = () => drToggle();
   out.querySelector('.sheet').onclick = e => { const b = e.target.closest('[data-to]'); if (b) drAppend(b.dataset.to, b.closest('.card').dataset.b); };
   out._acts = acts.map(({ a, n }) => ({ id: a.id, title: a.title, n, tag: SGB_TAG_CLS[(a.tags || [])[0]] || '' }));   // 종합검색 위쪽 줄에 알려 줄 활동
@@ -2486,8 +2492,9 @@ const drPct = (v, t) => Math.min(100, sgbNeisBytes(v) / SGB_NEIS_LIMIT[t] * 100)
 const drToHtml = a => { const ks = [...new Set((a?.tags || []).map(t => DR_TAG_AREA[t]).filter(Boolean))].filter(k => k !== 'haeng' || !st.hideHaeng);
   return ks.length ? `<span class="to-btns">${ks.map(k => `<button type="button" class="btn line" data-to="${k}">→ ${DR_NAME[k]}</button>`).join('')}<span class="used-mark" hidden></span></span>` : ''; };
 // 이 카드 문안이 작성 칸에 들어갔나 — 「→ 자율」 로 붙였든, 복사해 붙여 넣고 고쳤든(sgbUsed). 어느 칸에 넣었든 찾는다(행특을 가리면 행특은 빼고).
-// 거의 다 들어갔으면 「✓ 자율에 들어감」, 4분의 1 넘게면 「◐ 자율에 일부」
-const DR_USED_FULL = .8, DR_USED_PART = .25;
+// 거의 다 들어갔으면 「✓ 자율에 들어감」, 4분의 1 넘게면 「◐ 자율에 일부」.
+// 한 기록이 두 영역 이상에 들어갔으면(일부라도) 「⚠ 자율·진로 두 곳에 들어감」 — 나이스에 같은 기록이 두 번 들어가면 안 된다(선생님 요청 2026-10-29)
+const DR_USED_FULL = .8, DR_USED_PART = .25, DR_CNT = ['', '한', '두', '세', '네'];
 function drUsedMarks(){
   const out = $('stuOut'), marks = out ? [...out.querySelectorAll('.card[data-b] .used-mark')] : [];
   if (!marks.length) return;
@@ -2496,9 +2503,12 @@ function drUsedMarks(){
   if (d) for (const k of ks){ const v = d[k] || ''; if (v.trim()) marks.forEach((m, i) => { r[i][k] = sgbUsed(m.closest('.card').dataset.b, v); }); }   // 칸마다 한 번에(조각표를 한 번만)
   marks.forEach((m, i) => {
     const full = ks.filter(k => r[i][k] >= DR_USED_FULL), part = ks.filter(k => r[i][k] >= DR_USED_PART).sort((x, y) => r[i][y] - r[i][x]);
-    const t = full.length ? `✓ ${full.map(k => DR_NAME[k]).join('·')}에 들어감` : part.length ? `◐ ${DR_NAME[part[0]]}에 일부` : '';
-    m.hidden = !t; m.textContent = t; m.className = 'used-mark' + (full.length ? ' full' : part.length ? ' part' : '');
-    m.title = full.length ? '이 문안이 작성 칸에 거의 다 들어가 있습니다(고쳐 쓴 것도 찾습니다)' : part.length ? '이 문안의 일부 문장이 작성 칸에 들어가 있습니다' : '';
+    const dup = part.length >= 2 ? ks.filter(k => part.includes(k)) : [];     // 영역 차례(자율·진로·개세특·행특)로
+    const t = dup.length ? `⚠ ${dup.map(k => DR_NAME[k]).join('·')} ${DR_CNT[dup.length]} 곳에 들어감`
+      : full.length ? `✓ ${full.map(k => DR_NAME[k]).join('·')}에 들어감` : part.length ? `◐ ${DR_NAME[part[0]]}에 일부` : '';
+    m.hidden = !t; m.textContent = t; m.className = 'used-mark' + (dup.length ? ' dup' : full.length ? ' full' : part.length ? ' part' : '');
+    m.title = dup.length ? '한 기록이 두 영역 이상에 들어가 있습니다 — 나이스에 같은 기록이 두 번 들어가지 않게 한 영역에서만 쓰세요'
+      : full.length ? '이 문안이 작성 칸에 거의 다 들어가 있습니다(고쳐 쓴 것도 찾습니다)' : part.length ? '이 문안의 일부 문장이 작성 칸에 들어가 있습니다' : '';
   });
 }
 let drUsedT = 0;
@@ -2569,7 +2579,7 @@ function drPanelHtml(ck, list, at, d){
     </div>
     <div class="drp-bar">
       <div class="drp-nav">${step(prev, 'drPrev', '이전 학생', '◀')}<span class="drp-pos">${at + 1} / ${list.length}</span>${step(next, 'drNext', '다음 학생', '▶')}</div>
-      <label class="drp-sw"><input type="checkbox" id="drHide"${st.hideHaeng ? ' checked' : ''}> 행특 가리기</label>
+      <label class="drp-sw"><input type="checkbox" id="drHide"${st.hideHaeng ? ' checked' : ''}> 행특 가리기</label>${fsCtl('d')}
       <button type="button" class="btn sm" id="drClassBtn" title="우리 반 생기부 — 반 전체를 한 페이지에(자율 전체, 진로 전체 …)">📘 반 전체</button>
       <details class="form-dl drp-print" id="drPrint"><summary class="btn sm">🖨 인쇄</summary><div class="form-dl-menu">
         <button type="button" data-pr="one">이 학생 인쇄</button>
@@ -3030,11 +3040,13 @@ async function drAppend(k, text){
   catch (e) { toast('작성 내용을 불러오지 못해 붙이지 못했습니다'); return; }
   if (key !== drKey()) return;
   const ta = $('drT-' + k), cur = ta ? ta.value : drGet(d, k), ask = `${key}|${k}|${text}`;
-  if (sgbUsed(text, cur) >= DR_USED_FULL && drDupAsk !== ask){
-    drDupAsk = ask; clearTimeout(drDupT); drDupT = setTimeout(() => { drDupAsk = ''; }, 6000);
-    toast(`이미 ${DR_NAME[k]}에 들어간 문장입니다 — 한 번 더 누르면 붙입니다`, 3500);
-    return;
-  }
+  const askAgain = (msg, ms) => { drDupAsk = ask; clearTimeout(drDupT); drDupT = setTimeout(() => { drDupAsk = ''; }, 6000); toast(msg, ms); };
+  if (sgbUsed(text, cur) >= DR_USED_FULL && drDupAsk !== ask) return askAgain(`이미 ${DR_NAME[k]}에 들어간 문장입니다 — 한 번 더 누르면 붙입니다`, 3500);
+  // 다른 영역에 이미 들어간 기록 — 한 기록은 한 영역에만(행특을 가렸으면 행특은 안 본다 — 가린 칸 이야기를 하지 않게)
+  const elsewhere = DR_AREAS.map(([a]) => a).filter(a => a !== k && (a !== 'haeng' || !st.hideHaeng)
+    && sgbUsed(text, ($('drT-' + a) ? $('drT-' + a).value : drGet(d, a)) || '') >= DR_USED_PART);
+  if (elsewhere.length && drDupAsk !== ask)
+    return askAgain(`이미 ${elsewhere.map(a => DR_NAME[a]).join('·')}에 들어간 기록입니다 — 한 기록은 한 영역에만 씁니다. 그래도 붙이려면 한 번 더 누르세요`, 5000);
   drDupAsk = ''; clearTimeout(drDupT);
   const base = cur.replace(/\s+$/, ''), v = base ? `${base} ${text}` : text;
   if (ta){
@@ -3880,6 +3892,42 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Escape' || !IN_APP || !FULL_ON || $('zoom').classList.contains('open')) return;
   try { parent.postMessage({ type: 'sgb-full', on: false }, location.origin); } catch (err) {}
 }, true);
+// ── 글자 크기 ── 조회창(보기 화면)과 작성창(쓰는 칸)을 따로 — 학생 이름 옆 · 행특 가리기 옆 「가− 가+」(선생님 2026-10-29).
+// 이 기기에 남기고, 본 창·새 창·종합검색 탭이 같이 쓴다(다른 창에서 바꾸면 바로 따라감)
+const FS_KEY = 'ynhs-sgb-fs', FS_STEPS = [0.85, 1, 1.15, 1.3, 1.5, 1.7];
+let FS = { v: 1, d: 1 };
+function fsLoad(){
+  try { const o = JSON.parse(localStorage.getItem(FS_KEY) || '{}') || {};
+    FS = { v: FS_STEPS.includes(+o.v) ? +o.v : 1, d: FS_STEPS.includes(+o.d) ? +o.d : 1 }; } catch (e) { FS = { v: 1, d: 1 }; }
+}
+// 「가− 가+」 단추 — 학생 화면·작성 칸을 그릴 때 그 자리에서 지금 크기로 만든다(v 조회창, d 작성창)
+function fsCtl(k){
+  const i = FS_STEPS.indexOf(FS[k]), n = Math.round(FS[k] * 100), nm = k === 'v' ? '조회창' : '작성창';
+  return `<span class="fs-ctl" data-fs="${k}" title="${nm} 글자 크기"><button type="button" data-fs-d="-1" aria-label="${nm} 글자 작게"${i <= 0 ? ' disabled' : ''}>가−</button>`
+    + `<button type="button" class="fs-n" data-fs-reset title="${nm} 글자 처음 크기로"${n === 100 ? ' hidden' : ''}>${n}%</button>`
+    + `<button type="button" data-fs-d="1" aria-label="${nm} 글자 크게"${i >= FS_STEPS.length - 1 ? ' disabled' : ''}>가+</button></span>`;
+}
+function fsApply(){
+  const r = document.documentElement.style;
+  r.setProperty('--fs-view', FS.v); r.setProperty('--fs-draft', FS.d);
+  document.querySelectorAll('.fs-ctl').forEach(c => {           // 다시 그리지 않고 그 자리에서(누른 단추에 초점이 남게)
+    const k = c.dataset.fs, i = FS_STEPS.indexOf(FS[k]), n = Math.round(FS[k] * 100), nb = c.querySelector('.fs-n');
+    c.querySelector('[data-fs-d="-1"]').disabled = i <= 0;
+    c.querySelector('[data-fs-d="1"]').disabled = i >= FS_STEPS.length - 1;
+    nb.textContent = n + '%'; nb.hidden = n === 100;
+  });
+  document.querySelectorAll('#drPane textarea[data-f]').forEach(ta => { if (!ta.hidden) drGrow(ta); });   // 글자가 커지면 칸도 따라 늘린다
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('.fs-ctl [data-fs-d], .fs-ctl [data-fs-reset]'); if (!b) return;
+  const k = b.closest('.fs-ctl').dataset.fs;
+  if (b.hasAttribute('data-fs-reset')) FS[k] = 1;
+  else { const i = FS_STEPS.indexOf(FS[k]) + +b.dataset.fsD; FS[k] = FS_STEPS[Math.max(0, Math.min(FS_STEPS.length - 1, i))]; }
+  try { localStorage.setItem(FS_KEY, JSON.stringify(FS)); } catch (err) {}
+  fsApply();
+});
+window.addEventListener('storage', e => { if (e.key === FS_KEY){ fsLoad(); fsApply(); } });
+fsLoad(); fsApply();
 // 앱이 탭에 다시 들어올 때 보내는 신호 — 그사이 새로 올라왔을 수 있다
 window.addEventListener('message', e => {
   if (e.origin !== location.origin || e.data?.type !== 'sgb-refresh' || !fbAuth.currentUser) return;
