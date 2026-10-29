@@ -2602,10 +2602,12 @@ const RULES = fs.readFileSync(ROOT + '/firestore.rules', 'utf8');
 // 생기부 작성 인쇄 — 쪽 여백을 0 으로 둬야 브라우저 머리말·꼬리말(주소·날짜·쪽 번호)이 안 찍힌다(선생님 요청 2026-10-28). 색은 그대로
 check('인쇄 — 쪽 여백 0(브라우저 머리말·꼬리말이 안 찍힘), 컬러 그대로', /@page\s*\{\s*size:\s*A4;\s*margin:\s*0;?\s*\}/.test(HTML) && /print-color-adjust:\s*exact/.test(HTML));
 check('탭·메뉴는 처음엔 숨김', /id="tabSaenggibu" style="display:none;"/.test(IDX) && /id="navSaenggibu" style="display:none;"/.test(IDX));
-const reveal = IDX.match(/if \(_IS_ADMIN\(\)\) \{\s*\[([^\]]*)\]\.forEach/);
-check('로그인한 교사 모두에게 드러낸다(관리자 조건 목록에서 빠짐 · 따로 연다)', reveal && !reveal[1].includes('Saenggibu')
-  && /\[\s*'navSaenggibu',\s*'tabSaenggibu'\s*\]\.forEach/.test(IDX));
-check('탭 전환 목록에 들어 있다', /'duty','saenggibu','usage'/.test(IDX) && IDX.includes("if(page === 'saenggibu') openSaenggibuFrame();"));
+// 누구에게 드러내나 — SGB_OPEN_ALL 하나로(test 는 교사 전체, 운영 ynhs 는 지금 관리자만 — 선생님이 먼저 써 본다, 2026-10-29)
+const openAll = (IDX.match(/const SGB_OPEN_ALL = (true|false);/) || [])[1];
+check(`드러내는 조건이 한 곳 — SGB_OPEN_ALL(지금 ${openAll === 'true' ? '교사 전체' : '관리자만'})이거나 관리자`, !!openAll
+  && /if \(SGB_OPEN_ALL \|\| _IS_ADMIN\(\)\) \{\s*\[\s*'navSaenggibu',\s*'tabSaenggibu'\s*\]\.forEach/.test(IDX));
+const pages = (IDX.match(/\[('home'[^\]]*)\]\.forEach\(p => \{/) || [])[1] || '';
+check('탭 전환 목록에 들어 있다', pages.includes("'saenggibu'") && IDX.includes("if(page === 'saenggibu') openSaenggibuFrame();"));
 check('프레임 주소에 버전', IDX.includes('saenggibu.html?in=1&v=${encodeURIComponent(APP_VER)}'));
 check('사용 현황에 이름이 있다', USG.includes("saenggibu:'📑 생기부 보조자료'"));
 check('앱·사용 현황 버전이 같다', IDX.match(/const APP_VER = '([^']+)'/)[1] === USG.match(/const APP_VER = '([^']+)'/)[1]);
@@ -2648,8 +2650,12 @@ for (const c of ['saenggibu', 'saenggibuStu', 'saenggibuAct']) {
   const gone = labels.filter(l => !SMAN.includes(l) || !HTML.includes(l));
   check('— 설명서가 부르는 단추·알림 이름이 앱에 그대로 있다(앱에서 이름을 바꾸면 여기서 걸린다)', !gone.length && HTML.includes('→ ${DR_NAME[k]}') && HTML.includes('에 들어감`')
     && SMAN.includes('→ 자율') && SMAN.includes('✓ 진로에 들어감'), gone);
-  check('통합앱 사용설명서 — 14번 절 「생기부 보조자료」(탭마다 가는 단추 둘), Q&A 는 15번', MAN.includes('<a href="#s14"><i>14</i>생기부 보조자료</a><a href="#s15"><i>15</i>Q&A</a>')
-    && /<section id="s14"><h2 class="sh"><span class="n">14<\/span>생기부 보조자료<\/h2>[\s\S]*?href="saenggibu-manual\.html#write"[\s\S]*?href="saenggibu-manual\.html#upload"[\s\S]*?<section id="s15"><h2 class="sh"><span class="n">15<\/span>Q&A<\/h2>/.test(MAN));
+  // 통합앱 설명서의 14번 절은 생기부 탭을 교사 전체에 열었을 때만(index.html 의 SGB_OPEN_ALL). 관리자만 볼 때 넣으면 다른 선생님은 없는 탭을 읽게 된다
+  const OPEN_ALL = /const SGB_OPEN_ALL = true;/.test(fs.readFileSync(ROOT + '/index.html', 'utf8'));
+  const s14 = MAN.includes('<a href="#s14"><i>14</i>생기부 보조자료</a><a href="#s15"><i>15</i>Q&A</a>')
+    && /<section id="s14"><h2 class="sh"><span class="n">14<\/span>생기부 보조자료<\/h2>[\s\S]*?href="saenggibu-manual\.html#write"[\s\S]*?href="saenggibu-manual\.html#upload"[\s\S]*?<section id="s15"><h2 class="sh"><span class="n">15<\/span>Q&A<\/h2>/.test(MAN);
+  check(OPEN_ALL ? '통합앱 사용설명서 — 14번 절 「생기부 보조자료」(탭마다 가는 단추 둘), Q&A 는 15번(생기부 탭을 교사 전체에 열었다)'
+    : '통합앱 사용설명서 — 생기부 탭이 관리자만이라 14번 절이 없다(열 때 넣는다)', OPEN_ALL ? s14 : !MAN.includes('생기부 보조자료</h2>') && !MAN.includes('saenggibu-manual.html'));
   const mids = [...MAN.matchAll(/<a href="#([a-z0-9]+)">/g)].map(m => m[1]);
   check('— 통합앱 설명서 목차도 절이 다 있다', mids.length >= 16 && mids.every(id => MAN.includes(`id="${id}"`)), mids.filter(id => !MAN.includes(`id="${id}"`)));
   // 탭 동작 — 브라우저로 연다: 처음엔 담임, 탭·목차·주소 끝으로 바뀌고, 폰 폭에서 가로로 넘치지 않는다

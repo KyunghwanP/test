@@ -15,8 +15,9 @@
 선생님은 **⚙ 관리**(선생님만 보임)에서 잘못 올라간 활동을 통째로 지우고 부서·활동명 등을 바로 고친다.
 시트 이름의 **배포 차수(-1차…)는 앞으로 안 붙인다** — 무엇이 새로 들어왔는지는 앱의 「추가」「수정」 꼬리표가 알려 준다.
 
-- 현재 **test 저장소에만** 있다(`KyunghwanP/test`). 운영(ynhs)으로는 아직 안 옮겼다. 선생님이 test 에서 더 다듬은 뒤 옮긴다.
-- 탭·종합검색 「생기부 보조자료」 탭은 **test 에서 교사 전체에 열었다**. 엑셀로 받기·관리는 관리자만.
+- **운영(ynhs)에도 옮겼다(2026-10-29) — 다만 탭은 관리자만.** 스위치 하나 `SGB_OPEN_ALL`(index.html): test `true`(교사 전체), ynhs `false`.
+  메뉴 탭과 종합검색 「생기부 보조자료」 탭이 같이 따른다. 통합앱 설명서 `manual.html` 의 14번 절은 test 에만(열 때 함께 옮긴다 — 검사가 본다).
+- 엑셀로 받기·관리는 관리자만(saenggibu.html 안).
 - **사용설명서** `saenggibu-manual.html` — 탭 둘(「✏️ 담임 선생님」 / 「📤 부서·교과 선생님」). 통합앱 설명서(`manual.html`) 14번 절의 단추 둘이 탭마다 바로 간다(→ 2장 「사용설명서 고치기」).
 - **위쪽 줄 오른쪽 끝 「📖 사용설명서」 · 「⛶ 전체화면」**(2026-10-29, 폰은 그림 글자만). 앱 안에서는 앱(index.html)에 알린다 —
   설명서는 앱 모달 `#sgbManualModal`(진단 모달 껍데기 + 제목 줄, 담임·관리자는 `#write` 아니면 `#upload`), 전체화면은 `#saenggibuPage.sgb-full`
@@ -361,6 +362,10 @@
 ## 8. 운영(ynhs)으로 옮길 때 / 교사 전체에 열 때
 
 CLAUDE.md: **화면 변경은 test 먼저 → 선생님 확인 → ynhs PR·병합**. 운영을 먼저 병합하지 않는다.
+
+**2026-10-29 옮겼다(탭은 관리자만, 선생님 뜻).** 아래 파일을 옮기고, `index.html` 은 **생기부 부분만** 떼어 옮겼다
+(초과근무·감독표 탭, 주간교육활동 그리기 차이, 관리자 확인용 담임 반 고르기, `REMOTE_BASE`·`APP_VER` 는 저장소마다 그대로).
+`manual.html` 14번 절은 안 옮겼다. 남은 것: 교사 전체에 열기 — ynhs `SGB_OPEN_ALL = true` + `manual.html` 14번 절(검사가 둘이 맞는지 본다).
 
 - ynhs 로 옮길 파일: `saenggibu.html`, `saenggibu-manual.html`, `manual.html`(14번 절), `index.html`(탭·껍데기·종합검색 탭 부분), `usage.html`, `firestore.rules`(규칙은 두 저장소 같은 파일), `sw.js` 버전,
   양식 `docs/saenggibu-form.xlsx`·`docs/saenggibu-form-extra.xlsx` 와 **`.gitignore` 의 예외 두 줄**(`!docs/saenggibu-form.xlsx`·`!docs/saenggibu-form-extra.xlsx` — 없으면 엑셀이라 안 올라가 「📄 양식 받기」 가 빈 링크가 된다),

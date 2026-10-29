@@ -183,9 +183,9 @@ ynhs 배포가 그대로 받는다. 양쪽에 두면 중복 실행이 된다.
   배포는 Cloudflare 대시보드라 저장소 위치와 상관없다. 그 검사들도 test 에 있다
 - 초과근무·감독표 `overtime.html` · `gas/overtime/` · `docs/duty-template.xlsx` —
   아직 시험 중(관리자 탭). 운영으로 옮길 때 이 줄을 지운다
-- 생기부 보조자료 `saenggibu.html` · 사용설명서 `saenggibu-manual.html` · 양식 `docs/saenggibu-form.xlsx`·`docs/saenggibu-form-extra.xlsx`
-  (`.gitignore` 의 예외 두 줄도), 그리고 `manual.html` 의 14번 절(생기부 보조자료) —
-  아직 시험 중(test 에서 교사 전체에 열어 둠). 운영으로 옮길 때 같이 옮기고 이 줄을 지운다
+- 생기부 보조자료는 운영에도 옮겼지만(2026-10-29) **탭은 관리자만**이다 — `index.html` 의 `SGB_OPEN_ALL` 이 test 는 `true`,
+  ynhs 는 `false`(메뉴 탭과 종합검색의 생기부 탭이 같이 따른다). `manual.html` 의 14번 절(생기부 보조자료)은 test 에만 둔다.
+  교사 전체에 열 때 ynhs 의 `SGB_OPEN_ALL` 을 `true` 로 바꾸고 14번 절을 함께 옮긴 뒤 이 줄을 고친다(검사가 둘이 맞는지 본다)
 
 **③ 그대로 두는 것**
 
