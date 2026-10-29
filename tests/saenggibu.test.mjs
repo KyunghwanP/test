@@ -725,6 +725,9 @@ for (const [fname, hr, extra, self] of [['saenggibu-form.xlsx', 5, '', ''], ['sa
   const ws = wb.Sheets[wb.SheetNames[0]];
   const left = Object.keys(ws).filter(k => k[0] !== '!' && (c => c.r >= hr && c.c >= 1 && c.c <= 7)(XLSX.utils.decode_cell(k)) && String(ws[k].v ?? '').trim());
   check(`${fname} — 학생 줄에 값이 없다(공개 저장소)`, left.length === 0, left.slice(0, 5));
+  // 숨긴 A열(학번 수식)의 계산값 — 원래 파일의 학번이 남아 있던 것을 지웠다(2026-10-29). 빈 줄의 계산값 '0000' 만
+  const hak = Object.keys(ws).filter(k => k[0] !== '!' && (c => c.r >= hr && c.c === 0)(XLSX.utils.decode_cell(k)) && !/^0*$/.test(String(ws[k].v ?? '').trim()));
+  check(`${fname} — 숨긴 A열(학번 수식)에 남은 계산값이 없다(공개 저장소)`, hak.length === 0, hak.slice(0, 5));
   const tp = P.sgbParseBook(P.sgbBookToSheets(XLSX, wb));
   const ta = tp.activities[0];
   check(`${fname} — 앱이 읽는다: 기재 내용 칸, 입력 영역(드롭다운 G2)·경로(VLOOKUP G3), 숨긴 참고 표는 안 섞임`, tp.activities.length === 1 && ta.body === '기재 내용'
