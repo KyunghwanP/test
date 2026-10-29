@@ -85,6 +85,7 @@ await p.waitForTimeout(150);
 const m1 = await p.evaluate(() => ({ open: document.getElementById('sgbManualModal').classList.contains('open'),
   src: document.getElementById('sgbManualFrame').getAttribute('src'), nt: document.getElementById('sgbManualNewTab').getAttribute('href') }));
 check('「📖 사용설명서」 — 앱 모달로, 부서·교과 탭(#upload) · 새 탭 단추도 같은 주소', m1.open && m1.src === 'saenggibu-manual.html?v=tver#upload' && m1.nt === m1.src, m1);
+check('— 안쪽 창에 「열었다」 고 대답한다(안 오면 안쪽이 새 탭으로 연다 — 예전 앱 대비)', (await child.evaluate(() => window.__got)).some(m => m.type === 'sgb-manual-open'));
 const man = await (await p.$('#sgbManualFrame')).contentFrame();
 await man.waitForSelector('#upload');
 const tabs = await man.evaluate(() => ({ u: getComputedStyle(document.getElementById('upload')).display !== 'none', w: getComputedStyle(document.getElementById('write')).display !== 'none' }));

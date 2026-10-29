@@ -83,7 +83,10 @@
   .top-tools{display:flex;gap:6px;align-items:center;}
   .top-tools .btn{display:inline-flex;align-items:center;gap:5px;}
   #fullBtn[aria-pressed="true"]{background:var(--mon);border-color:var(--mon);color:#fff;}
-  html.solo .top-tools{display:none !important;}
+  html.solo .top-tools,html.solo #manBtn{display:none !important;}
+  #manBtn{display:inline-flex;align-items:center;gap:5px;}
+  /* 폰·태블릿(손가락)은 보기만 — 올리기·양식·엑셀로 받기·관리 단추를 감춘다(선생님 2026-10-29). 좁은 PC 창은 그대로 */
+  @media (max-width:900px) and (pointer:coarse){ .top .admin{display:none !important;} }
   /* 글자 크기 — 조회창은 보기 화면(.sheet)을 통째로 키우고, 작성창은 쓰는 글자만(칸 높이는 글에 맞춰 다시 잰다) */
   .sheet{zoom:var(--fs-view,1);}
   /* 「가− 가+」 — 학생 이름 옆(조회창) · 행특 가리기 옆(작성창). 100% 가 아니면 가운데 숫자가 보이고, 누르면 처음 크기 */
@@ -682,7 +685,7 @@
     .card{padding:13px 13px;}
     .search{max-width:none;}
     .admin{margin-left:0;flex-wrap:wrap;}   /* 관리자는 단추가 넷 — 폰 폭을 넘지 않게 줄바꿈 */
-    .top-tools .tl{display:none;} .top-tools .btn{padding:7px 10px;}
+    .top-tools .tl,#manBtn .tl{display:none;} .top-tools .btn,#manBtn{padding:7px 10px;}
     .seg{max-width:100%;overflow-x:auto;}
     .seg button{padding:7px 10px;}
     /* 생기부 작성 — 띄우면 화면 가득(✕ 로 보조자료에 돌아온다). 폰에서는 「→ 자율」 이 늘 보인다(작성 칸과 함께 못 보므로) */
@@ -723,6 +726,7 @@
     <button type="button" data-view="cls" id="clsTab" style="display:none;">📘 우리 반 생기부</button>
     <button type="button" data-view="chk" id="chkTab" style="display:none;">⚠ 확인 필요</button>
   </div>
+  <button class="btn" id="manBtn" type="button" title="사용설명서" aria-label="사용설명서"><span aria-hidden="true">📖</span><span class="tl">사용설명서</span></button>
   <input type="search" class="search" id="hakbun" placeholder="🔍 학생 이름 · 학번(30101)" autocomplete="off" aria-label="학생 이름이나 학번으로 찾기">
   <div class="admin">
     <button class="btn" id="upBtn" type="button" style="display:none;">📤 엑셀 올리기</button>
@@ -739,7 +743,6 @@
   </div>
   <!-- 사용설명서 · 전체화면 — 앱 안에서는 앱이 모달로 열고, 앱 머리·메뉴를 덮어 꽉 채운다 -->
   <div class="top-tools">
-    <button class="btn" id="manBtn" type="button" title="사용설명서" aria-label="사용설명서"><span aria-hidden="true">📖</span><span class="tl">사용설명서</span></button>
     <button class="btn" id="fullBtn" type="button" title="전체화면" aria-label="전체화면" aria-pressed="false"><span aria-hidden="true">⛶</span><span class="tl">전체화면</span></button>
   </div>
   <input type="file" id="upFile" accept=".xlsx,.xlsm,.xls" style="display:none;">
@@ -3877,15 +3880,27 @@ function paintFull(on){
   b.setAttribute('aria-pressed', String(FULL_ON));
   b.title = t; b.setAttribute('aria-label', t); b.querySelector('.tl').textContent = t;
 }
+// 앱(index.html)이 알아듣는지 — 지금 앱은 이 화면이 다 뜨면(sgb-ready) 전체화면 상태(sgb-full-state)를 보내 준다.
+// 그걸 못 받았으면 예전 앱일 수 있다(배포 뒤에도 앱을 켜 둔 채 쓰면 앱만 예전 판으로 남고, 이 화면은 새로 뜬다).
+// 그때만 0.6초 대답을 기다려, 없으면 설명서는 새 탭으로 열고 전체화면은 새로고침하라고 알린다(조용히 안 되는 일이 없게)
+let appOk = false, manAck = 0, fullAck = 0;
+const openManTab = () => window.open(`saenggibu-manual.html#${manTab()}`, '_blank', 'noopener');
 $('manBtn').onclick = () => {
-  if (IN_APP) try { parent.postMessage({ type: 'sgb-manual', tab: manTab() }, location.origin); return; } catch (e) {}
-  window.open(`saenggibu-manual.html#${manTab()}`, '_blank', 'noopener');
+  if (!IN_APP) return openManTab();
+  const t = ++manAck;
+  try { parent.postMessage({ type: 'sgb-manual', tab: manTab() }, location.origin); } catch (e) { return openManTab(); }
+  if (!appOk) setTimeout(() => { if (manAck === t) openManTab(); }, 600);
 };
-$('fullBtn').onclick = () => { try { parent.postMessage({ type: 'sgb-full', on: !FULL_ON }, location.origin); } catch (e) {} };
+$('fullBtn').onclick = () => {
+  const t = ++fullAck;
+  try { parent.postMessage({ type: 'sgb-full', on: !FULL_ON }, location.origin); } catch (e) {}
+  if (!appOk) setTimeout(() => { if (fullAck === t) toast('앱이 예전 판이라 전체화면이 안 됩니다 — 앱을 새로고침해 주세요(폰은 껐다 켜기)', 5000); }, 600);
+};
 if (!IN_APP) $('fullBtn').style.display = 'none';
 window.addEventListener('message', e => {
-  if (e.origin !== location.origin || e.source !== window.parent || e.data?.type !== 'sgb-full-state') return;
-  paintFull(e.data.on);
+  if (e.origin !== location.origin || e.source !== window.parent) return;
+  if (e.data?.type === 'sgb-full-state'){ appOk = true; fullAck++; paintFull(e.data.on); }
+  else if (e.data?.type === 'sgb-manual-open'){ appOk = true; manAck++; }
 });
 // 앱 안 전체화면을 Esc 로 끈다(사진 크게 보기가 열려 있으면 그것만 닫힌다)
 document.addEventListener('keydown', e => {
