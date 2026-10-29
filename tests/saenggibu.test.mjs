@@ -153,7 +153,7 @@ const FILE2 = await xlsxFile('sgb-5.xlsx', { dropOfficers: true, robotText: '로
 // ── 1. 해석 (페이지의 순수 함수 블록을 그대로) ──
 console.log('\n[해석]');
 const code = HTML.match(/<script id="sgbParser">([\s\S]*?)<\/script>/)[1];
-const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches, sgbOddSheets, sgbActKey, sgbStamp, sgbLookalikes, sgbApplyFix, sgbFresh, sgbRosterView, sgbMisFor, sgbAreaTags, sgbNeisBytes, sgbNeisLimit, sgbDiff };')();
+const P = new Function(code + ';return { sgbParseBook, sgbBuildDocs, sgbBookToSheets, sgbSheetInfo, sgbCompare, sgbMerge, sgbFormOf, sgbExportPlan, sgbRowHeight, sgbVolunteerRows, sgbMismatches, sgbOddSheets, sgbActKey, sgbStamp, sgbLookalikes, sgbApplyFix, sgbFresh, sgbRosterView, sgbMisFor, sgbAreaTags, sgbNeisBytes, sgbNeisLimit, sgbDiff, sgbUsed };')();
 const wb1 = XLSX.read(fs.readFileSync(FILE1), { type: 'buffer' });
 const parsed = P.sgbParseBook(P.sgbBookToSheets(XLSX, wb1));
 const act = t => parsed.activities.find(a => a.sheet.includes(t));
@@ -602,6 +602,17 @@ check('바이트 — 한글 3 · 영문/숫자/공백 1 · 줄바꿈(엔터) 1',
   check('— 바뀐 덩어리 사이에 낀 한 글자는 묶는다, 같으면 그대로, 빈 글에서', D('가나다', '마나바') === '[-가나다][+마나바]' && D('같음', '같음') === '같음'
     && D('', '새 글') === '[+새 글]', [D('가나다', '마나바'), D('같음', '같음'), D('', '새 글')]);
 }
+// 보조자료 문안이 작성 글에 들어갔나 — 「→ 자율」 이 아니라 복사해 붙여 넣고 고쳐도 알아본다(선생님 질문 2026-10-29). 지어낸 문장
+{
+  const SRC = "학급 자치회의에서 '함께 쓰는 교실' 규칙 만들기를 제안하여 친구들의 의견을 모으고 실천 방안을 정리함. 환경 정화 활동에서 분리배출 안내문을 직접 만들어 게시하고, 한 달 동안의 실천 결과를 그래프로 나타내 학급에 공유함.";
+  const U = d => +P.sgbUsed(SRC, d).toFixed(2);
+  const light = "학급 자치회의에서 '함께 쓰는 교실' 규칙을 제안하고 친구들의 의견을 모아 실천 방안을 정리하였음. 환경 정화 활동에서는 분리배출 안내문을 만들어 게시하고, 한 달간의 실천 결과를 그래프로 정리해 학급에 공유함.";
+  const half = "학급 자치회의에서 '함께 쓰는 교실' 규칙 만들기를 제안하여 친구들의 의견을 모으고 실천 방안을 정리함. 체육대회에서 응원 도구를 만듦.";
+  check('들어갔나 — 그대로 1 · 앞뒤에 다른 글이 붙어도 1 · 낱말 몇 개를 고쳐도 1', U(SRC) === 1 && U('독서 토론에 참여함. ' + SRC + ' 학기 말에 소감문을 씀.') === 1 && U(light) === 1, [U(SRC), U(light)]);
+  check('— 한 문장만 넣으면 절반쯤(일부) · 요약해 다시 쓰면 0 · 다른 글 0 · 빈 글 0', U(half) > .3 && U(half) < .7 && U('자치회의에서 학급 규칙을 제안하고 분리배출 캠페인을 이끎.') === 0
+    && U('진로 탐색 주간에 데이터 과학 직업인의 인터뷰를 찾아보며 필요한 역량을 정리함.') === 0 && U('') === 0 && P.sgbUsed('', SRC) === 0, [U(half)]);
+  check('— 짧은 문안(한 문장 4자)은 통째로 — 다른 강연은 아니다', P.sgbUsed('첫 강연.', '첫 강연. 둘째 강연.') === 1 && P.sgbUsed('첫 강연.', '둘째 강연.') === 0);
+}
 // 진로는 2026학년도부터 500자(1500바이트)로 줄었다(선생님 알림 2026-10-28)
 check('한도 — 영역 하나일 때만(자율·동아리·진로·개인별·행특 모두 1500), 둘 중 고름·누가기록은 없음',
   P.sgbNeisLimit(['자']) === 1500 && P.sgbNeisLimit(['동']) === 1500 && P.sgbNeisLimit(['진']) === 1500 && P.sgbNeisLimit(['개']) === 1500
@@ -790,21 +801,40 @@ const STUB = {
     export async function getDoc(ref){ const o = ops(); o.get++; (o.r = o.r || []).push(ref); const d = fs()[ref]; return { exists: () => !!d, data: () => d && clone(d) }; }
     // { merge: true } — Firestore 처럼 안쪽 묶음(map)까지 합친다(배열은 통째로 바꾼다)
     const deep = (a, b) => { for (const [k, v] of Object.entries(b)) a[k] = v && typeof v === 'object' && !Array.isArray(v) && a[k] && typeof a[k] === 'object' && !Array.isArray(a[k]) ? deep(a[k], v) : v; return a; };
-    export async function setDoc(ref, data, opt){ rec('s', ref); fs()[ref] = opt && opt.merge && fs()[ref] ? deep(fs()[ref], clone(data)) : clone(data); }
-    export async function deleteDoc(ref){ rec('d', ref); delete fs()[ref]; }
+    // 지켜보기(onSnapshot) — 처음 한 번, 그리고 쓸 때마다 그 자리에서 알린다(실제 Firestore 도 이 창의 쓰기는 서버 답을 기다리지 않고 바로 알린다).
+    // 지켜보기도 읽기로 센다(다른 반 문서를 지켜보지 않는지 같이 본다)
+    const subs = {};
+    const snap = ref => { const d = fs()[ref]; return { exists: () => !!d, data: () => d && clone(d), metadata: { hasPendingWrites: false } }; };
+    const ping = ref => { for (const fn of [...(subs[ref] || [])]) fn(snap(ref)); };
+    export function onSnapshot(ref, next){
+      const o = ops(); o.get++; (o.r = o.r || []).push(ref);
+      (subs[ref] = subs[ref] || []).push(next);
+      setTimeout(() => { if ((subs[ref] || []).includes(next)) next(snap(ref)); }, 0);
+      return () => { subs[ref] = (subs[ref] || []).filter(f => f !== next); };
+    }
+    // 다른 창·다른 선생님이 쓴 것처럼(검사가 부른다) · 지켜보는 수
+    window.__fsRemote = (ref, data) => { fs()[ref] = deep(fs()[ref] || {}, clone(data)); ping(ref); };
+    window.__fsSubs = ref => (subs[ref] || []).length;
+    // 같은 브라우저의 다른 창(본 창 + 「↗ 새 창」)과 Firestore 를 나눠 쓴다 — __FS_SHARE__ 일 때만(그 밖의 검사는 창마다 따로)
+    const bc = window.__FS_SHARE__ ? new BroadcastChannel('fs') : null;
+    if (bc) bc.onmessage = e => { const { ref, data, merge, del } = e.data;
+      if (del) delete fs()[ref]; else fs()[ref] = merge && fs()[ref] ? deep(fs()[ref], data) : data; ping(ref); };
+    export async function setDoc(ref, data, opt){ rec('s', ref); fs()[ref] = opt && opt.merge && fs()[ref] ? deep(fs()[ref], clone(data)) : clone(data);
+      bc?.postMessage({ ref, data: clone(data), merge: !!(opt && opt.merge) }); ping(ref); }
+    export async function deleteDoc(ref){ rec('d', ref); delete fs()[ref]; bc?.postMessage({ ref, del: true }); ping(ref); }
     // 트랜잭션 — 한 탭 안에서는 차례로 도니 읽고 쓰기만 흉내 낸다
     export async function runTransaction(db, fn){
-      return fn({ get: async ref => getDoc(ref), set(ref, d){ rec('s', ref); fs()[ref] = clone(d); }, delete(ref){ rec('d', ref); delete fs()[ref]; } });
+      return fn({ get: async ref => getDoc(ref), set(ref, d){ rec('s', ref); fs()[ref] = clone(d); ping(ref); }, delete(ref){ rec('d', ref); delete fs()[ref]; ping(ref); } });
     }
     export function writeBatch(){
       const q = [];
       return { set(ref, d){ q.push(['s', ref, clone(d)]); }, delete(ref){ q.push(['d', ref]); },
-        async commit(){ for (const [k, ref, d] of q){ rec(k, ref); if (k === 's') fs()[ref] = d; else delete fs()[ref]; } } };
+        async commit(){ for (const [k, ref, d] of q){ rec(k, ref); if (k === 's') fs()[ref] = d; else delete fs()[ref]; ping(ref); } } };
     }`,
 };
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 let STORE = {};   // 문맥이 바뀌어도(다른 사람으로 열어도) 같은 Firestore 를 보게
-async function openAs(email, { width = 1100, blockExcel = false } = {}) {
+async function openAs(email, { width = 1100, blockExcel = false, share = false } = {}) {
   const ctx = await b.newContext({ viewport: { width, height: 900 } });
   await ctx.route(ORIGIN + '/test/saenggibu.html*', r => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HTML }));
   await ctx.route(ORIGIN + '/test/favicon-32.png', r => r.fulfill({ status: 404, body: '' }));
@@ -828,13 +858,13 @@ async function openAs(email, { width = 1100, blockExcel = false } = {}) {
       ? '<!doctype html><meta charset="utf-8"><title>검사기</title><textarea id="text1"></textarea><button>검사하기</button>'
       : `<!doctype html><meta charset="utf-8"><title>검사 결과</title><div id="tdCorrection1stBox"></div><button id="btnOrgCopy">결과 복사하기</button><script>document.getElementById('tdCorrection1stBox').textContent = ${JSON.stringify(got).replace(/</g, '\\u003c')};</script>` });
   });
-  await ctx.addInitScript(([e, store]) => {
-    window.__TEST_EMAIL__ = e; window.__FS__ = store;
+  await ctx.addInitScript(([e, store, share]) => {
+    window.__TEST_EMAIL__ = e; window.__FS__ = store; window.__FS_SHARE__ = share;
     navigator.clipboard.writeText = async t => { window.__copied = t; };
     // 내려받을 때 붙인 파일 이름 — Playwright 의 Chromium 은 한글 이름을 'download' 로 바꿔 버려서 여기서 본다
     const click = HTMLAnchorElement.prototype.click;
     HTMLAnchorElement.prototype.click = function () { if (this.download) window.__dlName = this.download; return click.call(this); };
-  }, [email, STORE]);
+  }, [email, STORE, share]);
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -2324,6 +2354,189 @@ STORE = STORE_B;
     && !(await q.evaluate(() => (window.__OPS__.r || []).some(r => r.startsWith('saenggibuDraft') && r.includes('/3-2-')))));
   check('오류 없음(단독 개인별 조회)', q.errors.length === 0, q.errors);
   await q.context().close();
+}
+// 3-8 보조자료 카드 「✓ 자율에 들어감」 — 「→ 자율」 로 붙였든, 복사해 붙여 넣고 고쳤든 알아본다. 이미 들어간 문안은 다시 붙이기 전에 한 번 알린다
+// (선생님 질문 2026-10-29: 「→ 자율 로 넣지 않고 복사해서 붙여넣고 수정했어도 인식 가능?」)
+{
+  // 두 문장짜리 문안(지어낸) — 한 문장만 넣으면 「◐ 일부」
+  const TWO_A = '학급 자치회의에서 규칙 만들기를 제안하여 의견을 모음.', TWO_B = '환경 정화 활동에서 분리배출 안내문을 만들어 게시함.';
+  {
+    const fTwo = await oneSheet('draft-two.xlsx', [['<자>교무(학급 자치)', [...readHead('학급 자치 활동'), [1, 1, 1, '김가람', `${TWO_A} ${TWO_B}`]]]]);
+    const a = await openAs(ADMIN);
+    await a.waitForSelector('#upBtn');
+    await a.setInputFiles('#upFile', fTwo);
+    await a.waitForSelector('#upGo');
+    await a.click('#upGo');
+    await a.waitForFunction(() => document.getElementById('upPanel').textContent.includes('올렸습니다'));
+    await keep(a);
+    await a.context().close();
+  }
+  const ROBOT = '로봇 코딩 캠프에 참여하여 센서 제어를 익힘.';
+  const p = await openAs(KIM, { width: 1700 });
+  await p.waitForSelector('#stus .stu');
+  await p.click('#stus .stu[data-n="1"]');
+  await p.waitForSelector('#drOpenBtn');
+  await p.click('#drOpenBtn');
+  await p.waitForSelector('#drT-ja', { state: 'visible' });
+  const mark = t => p.evaluate(t => { const c = [...document.querySelectorAll('#stuOut .card[data-a]')].find(x => x.textContent.includes(t)), m = c?.querySelector('.used-mark');
+    return m ? { t: m.hidden ? '' : m.textContent, cls: m.className, vis: !!m.offsetParent } : null; }, t);
+  await p.waitForFunction(() => [...document.querySelectorAll('#stuOut .used-mark')].some(m => !m.hidden), null, { timeout: 3000 }).catch(() => {});
+  const m1 = await mark('진로탐색 로봇공학 캠프');
+  check('자율 칸에 붙여 둔 문안(로봇 캠프) — 카드에 「✓ 자율에 들어감」(초록)', m1?.t === '✓ 자율에 들어감' && m1.cls.includes('full') && m1.vis, m1);
+  check('— 아직 안 넣은 문안(수학 강연 · 학급 자치)에는 없다', (await mark('수학 대중화 강연'))?.t === '' && (await mark('학급 자치 활동'))?.t === '');
+  // 복사해 붙여 넣고 고친 것 — 한 문장만, 낱말을 바꿔서
+  const ja0 = await p.inputValue('#drT-ja');
+  await p.fill('#drT-ja', `${ja0} 학급 자치회의에서 규칙 만들기를 제안해 친구들 의견을 모음.`);
+  await p.waitForFunction(() => { const c = [...document.querySelectorAll('#stuOut .card[data-a]')].find(x => x.textContent.includes('학급 자치 활동')); return !c.querySelector('.used-mark').hidden; }, null, { timeout: 3000 }).catch(() => {});
+  const m2 = await mark('학급 자치 활동');
+  check('복사해 붙여 넣고 고친 문장(두 문장 중 하나) — 「◐ 자율에 일부」(주황)', m2?.t === '◐ 자율에 일부' && m2.cls.includes('part'), m2);
+  await p.fill('#drT-jin', '진로 고침 — 바로 넘김 수학 대중화 강연을 청취하고 수학의 쓸모를 정리함.');
+  await p.waitForFunction(() => { const c = [...document.querySelectorAll('#stuOut .card[data-a]')].find(x => x.textContent.includes('수학 대중화 강연')); return !c.querySelector('.used-mark').hidden; }, null, { timeout: 3000 }).catch(() => {});
+  check('— 고쳐서 진로 칸에 넣은 문안은 「✓ 진로에 들어감」(어느 칸이든 찾는다)', (await mark('수학 대중화 강연'))?.t === '✓ 진로에 들어감');
+  // 이미 들어간 문안을 또 「→ 자율」 — 한 번은 알리고 붙이지 않는다, 한 번 더 누르면 붙인다
+  const ja1 = await p.inputValue('#drT-ja');
+  await p.click('#stuOut .card:has-text("진로탐색 로봇공학 캠프") [data-to="ja"]');
+  await p.waitForTimeout(100);
+  check('이미 자율에 들어간 문안을 또 「→ 자율」 — 「이미 자율에 들어간 문장입니다 — 한 번 더 누르면 붙입니다」, 붙이지 않는다',
+    (await p.inputValue('#drT-ja')) === ja1 && (await p.textContent('#toast')) === '이미 자율에 들어간 문장입니다 — 한 번 더 누르면 붙입니다', await p.textContent('#toast'));
+  await p.click('#stuOut .card:has-text("진로탐색 로봇공학 캠프") [data-to="ja"]');
+  check('— 한 번 더 누르면 붙인다', (await p.inputValue('#drT-ja')) === `${ja1} ${ROBOT}`);
+  check('— 안 들어간 칸(로봇 → 진로)은 바로 붙는다', await (async () => { const j = await p.inputValue('#drT-jin');
+    await p.click('#stuOut .card:has-text("진로탐색 로봇공학 캠프") [data-to="jin"]'); return (await p.inputValue('#drT-jin')) === `${j} ${ROBOT}`; })());
+  if (process.env.SGB_SHOTS) await shot(p, '#stuPanes', '17-used-marks');
+  check('오류 없음(들어간 문안 표시)', p.errors.length === 0, p.errors);
+  await p.context().close();
+}
+// 3-9 같은 학생을 두 곳에서 고칠 때 — 본 창 + 「↗ 새 창」, 담임 + 관리자(선생님 요청 2026-10-29: 덮어쓰기 막기).
+// 남이 고친 칸은 바로 불러오고, 이 창에서도 고치던 칸이면 덮어쓰지 않고 고르게 한다(고르지 않은 쪽은 되돌리기 기록에)
+{
+  const REF = 'saenggibuDraft/1-1-2', HREF = 'saenggibuDraftHist/1-1-2';
+  const p = await openAs(KIM, { width: 1700 });
+  await p.waitForSelector('#stus .stu');
+  await p.click('#stus .stu[data-n="2"]');
+  await p.waitForSelector('#drOpenBtn');
+  await p.click('#drOpenBtn');
+  await p.waitForSelector('#drT-ja', { state: 'visible' });
+  await p.waitForFunction(r => window.__fsSubs(r) === 1, REF, { timeout: 3000 }).catch(() => {});
+  check('작성 칸을 띄우면 그 학생 문서를 지켜본다(하나만)', await p.evaluate(r => window.__fsSubs(r), REF) === 1);
+  const remote = data => p.evaluate(([r, d]) => window.__fsRemote(r, { upd: new Date().toISOString(), ...d }), [REF, data]);
+  const writes = () => p.evaluate(r => (window.__OPS__.w || []).filter(([, x]) => x === r).length, REF);
+  const hist = k => p.evaluate(([r, k]) => (window.__FS__[r]?.[k] || []).map(x => x.t), [HREF, k]);
+  const server = k => p.evaluate(([r, k]) => window.__FS__[r]?.[k], [REF, k]);
+  // 이 창에서 고치던 칸이 아니면 — 바로 불러온다(쓰지 않는다)
+  const CARD = '문안에 <b>태그</b> 가 섞임.';   // 최다온의 로봇 캠프 문안
+  const w0 = await writes();
+  await remote({ ja: '관리자가 쓴 자율. ' + CARD, by: ADMIN });
+  await p.waitForFunction(() => document.getElementById('drT-ja').value.startsWith('관리자가 쓴 자율.'), null, { timeout: 3000 }).catch(() => {});
+  const r1 = await p.evaluate(() => ({ v: document.getElementById('drT-ja').value, b: document.getElementById('drB-ja').textContent, saved: document.getElementById('drSaved').textContent }));
+  const jaB = [...('관리자가 쓴 자율. ' + CARD)].reduce((n, ch) => n + (ch.charCodeAt(0) < 128 ? 1 : 3), 0);
+  check('다른 선생님(관리자)이 고치면 — 작성 칸에 바로, 바이트도, 「↻ 다른 선생님이 고친 내용을 불러왔습니다 · 관리자」', r1.v === '관리자가 쓴 자율. ' + CARD
+    && r1.b.startsWith(`${jaB} /`) && r1.saved.includes('다른 선생님이 고친 내용을 불러왔습니다') && r1.saved.includes('관리자'), r1);
+  check('— 불러오기만 하고 다시 쓰지 않는다', (await writes()) === w0, [w0, await writes()]);
+  check('— 카드 표시도 따라온다(그 문안이 들어 있으면 「✓ 자율에 들어감」)', await p.evaluate(() => { const c = [...document.querySelectorAll('#stuOut .card[data-a]')].find(x => x.textContent.includes('진로탐색 로봇공학 캠프'));
+    return c.querySelector('.used-mark').textContent === '✓ 자율에 들어감'; }));
+  await remote({ memo: '다른 창에서 쓴 메모', by: KIM });
+  await p.waitForFunction(() => document.getElementById('drMemo').value === '다른 창에서 쓴 메모', null, { timeout: 3000 }).catch(() => {});
+  check('같은 선생님의 다른 창(새 창)이 고치면 — 「↻ 다른 창에서 고친 내용을 불러왔습니다」', (await p.inputValue('#drMemo')) === '다른 창에서 쓴 메모'
+    && (await p.textContent('#drSaved')).includes('다른 창에서 고친 내용을 불러왔습니다'));
+  // 같은 칸을 이 창에서도 고치던 중 — 덮어쓰지 않고 고르게 한다
+  await p.fill('#drT-ja', '이 창에서 고친 자율.');
+  await remote({ ja: '관리자가 또 고친 자율.', by: ADMIN });
+  await p.waitForSelector('#drC-ja', { timeout: 3000 }).catch(() => {});
+  const cf = await p.evaluate(() => { const t = document.getElementById('drT-ja'), box = document.getElementById('drC-ja');
+    return { ro: t.readOnly, v: t.value, box: !!box, above: !!box && box.nextElementSibling === t, h: box?.querySelector('.drp-conf-h')?.textContent || '',
+      del: [...(box?.querySelectorAll('.drp-conf-diff del') || [])].map(d => d.textContent).join(''), ins: [...(box?.querySelectorAll('.drp-conf-diff ins') || [])].map(d => d.textContent).join(''),
+      saved: document.getElementById('drSaved').textContent }; });
+  check('같은 칸을 이 창에서도 고치던 중이면 — 덮어쓰지 않고 칸을 잠근 채 위에 알림(누가 고쳤는지 · 다른 곳 빨강/초록)', cf.box && cf.above && cf.ro && cf.v === '이 창에서 고친 자율.'
+    && cf.h.includes('다른 선생님(관리자)이') && cf.del.includes('창에서') && cf.ins.includes('관리자가') && cf.saved.includes('다른 선생님이 같은 칸을 고쳤습니다'), cf);
+  await p.waitForTimeout(1200);   // 손을 멈추고 저장할 때(0.9초)가 지나도
+  check('— 고르기 전에는 이 창 글을 저장하지 않는다(그 글이 그대로)', (await server('ja')) === '관리자가 또 고친 자율.', await server('ja'));
+  await p.click('#stuOut .card:has-text("진로탐색 로봇공학 캠프") [data-to="ja"]');
+  check('— 겹친 칸에는 「→ 자율」 로도 붙지 않는다(먼저 고르라고)', (await p.inputValue('#drT-ja')) === '이 창에서 고친 자율.' && (await p.textContent('#toast')).includes('먼저'));
+  if (process.env.SGB_SHOTS) await shot(p, '#drPane .drp-area[data-k="ja"]', '18-conflict');
+  await p.click('[data-conf-keep="ja"]', { timeout: 3000 }).catch(() => {});
+  await p.waitForFunction(r => window.__FS__[r].ja === '이 창에서 고친 자율.', REF, { timeout: 3000 }).catch(() => {});
+  check('「이 창 글로 저장」 — 이 창 글이 저장되고 칸이 풀린다, 그 글은 되돌리기 기록에', (await server('ja')) === '이 창에서 고친 자율.' && !(await p.$('#drC-ja'))
+    && !(await p.$eval('#drT-ja', t => t.readOnly)) && (await hist('ja')).includes('관리자가 또 고친 자율.'), await hist('ja'));
+  await p.fill('#drT-ja', '이 창 두 번째 글.');
+  await remote({ ja: '관리자 세 번째 글.', by: ADMIN });
+  await p.waitForSelector('#drC-ja', { timeout: 3000 }).catch(() => {});
+  const w1 = await writes();
+  await p.click('[data-conf-take="ja"]', { timeout: 3000 }).catch(() => {});
+  await p.waitForFunction(() => !document.getElementById('drC-ja'), null, { timeout: 3000 }).catch(() => {});
+  await p.waitForTimeout(1000);
+  check('「그 글로 바꾸기」 — 그 글로 바뀌고(다시 쓰지 않는다), 이 창 글은 되돌리기 기록에', (await p.inputValue('#drT-ja')) === '관리자 세 번째 글.' && (await server('ja')) === '관리자 세 번째 글.'
+    && (await writes()) === w1 && (await hist('ja')).includes('이 창 두 번째 글.') && !(await p.$eval('#drT-ja', t => t.readOnly)), await hist('ja'));
+  // 메모(되돌리기 기록이 없는 칸)도 — 고르지 않은 글은 복사해 둔다
+  await p.fill('#drMemo', '이 창 메모');
+  await remote({ memo: '그 창 메모', by: KIM });
+  await p.waitForSelector('#drC-memo', { timeout: 3000 }).catch(() => {});
+  check('메모가 겹쳐도 같은 알림(다른 창에서)', (await txt(p, '#drC-memo .drp-conf-h')).includes('다른 창에서'));
+  await p.click('[data-conf-keep="memo"]', { timeout: 3000 }).catch(() => {});
+  await p.waitForFunction(r => window.__FS__[r].memo === '이 창 메모', REF, { timeout: 3000 }).catch(() => {});
+  check('— 「이 창 글로 저장」, 그 글은 복사해 둔다', (await server('memo')) === '이 창 메모' && (await p.evaluate(() => window.__copied)) === '그 창 메모');
+  // 이 창이 쓴 것은 다시 불러오지 않는다 · 이 창이 쓴 글을 남이 통째로 바꾸면 이 창 글은 기록에
+  await p.fill('#drT-jin', '이 창에서 쓴 진로.');
+  await p.waitForFunction(r => window.__FS__[r]?.jin === '이 창에서 쓴 진로.', REF, { timeout: 3000 }).catch(() => {});
+  await p.waitForTimeout(100);
+  check('이 창이 쓴 것은 「저장됨」(제 글을 「불러왔습니다」 하지 않는다)', (await p.textContent('#drSaved')).includes('저장됨') && (await p.inputValue('#drT-jin')) === '이 창에서 쓴 진로.');
+  await remote({ jin: '관리자가 통째로 바꾼 진로.', by: ADMIN });
+  await p.waitForFunction(h => (window.__FS__[h]?.jin || []).some(x => x.t === '이 창에서 쓴 진로.'), HREF, { timeout: 3000 }).catch(() => {});
+  check('이 창이 쓴 글을 남이 통째로 바꾸면 — 불러오고, 이 창 글은 되돌리기 기록에(「이 창 글은 되돌리기에 남겼습니다」)', (await p.inputValue('#drT-jin')) === '관리자가 통째로 바꾼 진로.'
+    && (await hist('jin')).includes('이 창에서 쓴 진로.') && (await p.textContent('#drSaved')).includes('되돌리기에 남겼습니다'), await p.textContent('#drSaved'));
+  await p.fill('#drT-jin', '진로 첫 문장.');
+  await p.waitForFunction(r => window.__FS__[r]?.jin === '진로 첫 문장.', REF, { timeout: 3000 }).catch(() => {});
+  const nh = (await hist('jin')).length;
+  await remote({ jin: '진로 첫 문장. 관리자가 덧붙임.', by: ADMIN });
+  await p.waitForFunction(() => document.getElementById('drT-jin').value === '진로 첫 문장. 관리자가 덧붙임.', null, { timeout: 3000 }).catch(() => {});
+  await p.waitForTimeout(150);
+  check('— 덧붙인 것이면(이 창 글이 그대로 들어 있으면) 기록을 늘리지 않는다', (await p.inputValue('#drT-jin')) === '진로 첫 문장. 관리자가 덧붙임.' && (await hist('jin')).length === nh
+    && !(await p.textContent('#drSaved')).includes('되돌리기'), [nh, await hist('jin')]);
+  // 창을 떠나면 바로 저장 — 0.9초를 기다리는 사이 다른 창에서 같은 칸을 고치지 않게
+  await p.fill('#drT-ja', '창을 떠나면 바로 저장.');
+  await p.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await p.waitForTimeout(150);
+  check('창을 떠나면(다른 창으로 옮기면) 0.9초를 기다리지 않고 바로 저장', (await server('ja')) === '창을 떠나면 바로 저장.', await server('ja'));
+  // 고르지 않고 다음 학생으로 — 이 창 글은 기록에 남기고 서버 글은 그대로
+  await p.fill('#drT-ja', '고르지 않고 넘긴 글.');
+  await remote({ ja: '그사이 바뀐 글.', by: ADMIN });
+  await p.waitForSelector('#drC-ja', { timeout: 3000 }).catch(() => {});
+  await p.click('#drNext');
+  await p.waitForFunction(() => (document.querySelector('#drPane .drp-who')?.textContent || '').includes('정하늘'));
+  await p.waitForFunction(h => (window.__FS__[h]?.ja || []).some(x => x.t === '고르지 않고 넘긴 글.'), HREF, { timeout: 3000 }).catch(() => {});
+  check('고르지 않고 다음 학생으로 넘기면 — 이 창 글은 되돌리기 기록에, 서버 글은 그대로', (await server('ja')) === '그사이 바뀐 글.' && (await hist('ja')).includes('고르지 않고 넘긴 글.'), await hist('ja'));
+  await p.waitForFunction(() => window.__fsSubs('saenggibuDraft/1-1-3') === 1, null, { timeout: 3000 }).catch(() => {});
+  check('— 지켜보기도 다음 학생으로(앞 학생은 그친다)', await p.evaluate(r => window.__fsSubs(r) === 0 && window.__fsSubs('saenggibuDraft/1-1-3') === 1, REF));
+  await p.click('#drClose');
+  await p.waitForFunction(() => window.__fsSubs('saenggibuDraft/1-1-3') === 0, null, { timeout: 3000 }).catch(() => {});
+  check('작성 칸을 닫으면 지켜보기도 그친다', await p.evaluate(() => window.__fsSubs('saenggibuDraft/1-1-3')) === 0);
+  check('오류 없음(두 곳에서 고칠 때)', p.errors.length === 0, p.errors);
+  await p.context().close();
+}
+// 본 창 + 「↗ 새 창」 을 실제로 — 같은 브라우저의 두 창이 Firestore 를 나눠 쓴다(가짜 Firestore 를 창끼리 이어서)
+{
+  const JIN1 = '새 창에서 쓴 진로.', JIN2 = '새 창에서 쓴 진로. 본 창에서 덧붙임.';
+  const p = await openAs(KIM, { width: 1400, share: true });
+  await p.waitForSelector('#stus .stu');
+  await p.click('#stus .stu[data-n="3"]');
+  await p.waitForSelector('#drOpenBtn');
+  await p.click('#drOpenBtn');
+  await p.waitForSelector('#drT-jin', { state: 'visible' });
+  const [pop] = await Promise.all([p.context().waitForEvent('page'), p.click('#soloBtn')]);
+  const popErr = []; pop.on('pageerror', e => popErr.push(e.message));
+  await pop.waitForSelector('#drOpenBtn');
+  if (!(await pop.isVisible('#drT-jin'))) await pop.click('#drOpenBtn');
+  await pop.waitForSelector('#drT-jin', { state: 'visible' });
+  await pop.fill('#drT-jin', JIN1);
+  await p.waitForFunction(t => document.getElementById('drT-jin').value === t, JIN1, { timeout: 4000 }).catch(() => {});
+  check('본 창 + 「↗ 새 창」 — 새 창에서 쓰면 본 창 작성 칸에 바로(본 창은 손대지 않아도)', (await p.inputValue('#drT-jin')) === JIN1 && (await p.textContent('#drSaved')).includes('다른 창에서'));
+  await p.fill('#drT-jin', JIN2);
+  await pop.waitForFunction(t => document.getElementById('drT-jin').value === t, JIN2, { timeout: 4000 }).catch(() => {});
+  check('— 본 창에서 이어 쓰면 새 창에도(낡은 글에 덮어쓰지 않는다)', (await pop.inputValue('#drT-jin')) === JIN2 && (await pop.textContent('#drSaved')).includes('다른 창에서'));
+  check('— 두 창이 같은 글, 새 창 글은 덧붙인 글에 그대로 들어 있어 「되돌리기에 남겼습니다」 가 없다', (await p.evaluate(() => window.__FS__['saenggibuDraft/1-1-3']?.jin)) === JIN2
+    && (await pop.evaluate(() => window.__FS__['saenggibuDraft/1-1-3']?.jin)) === JIN2 && !(await pop.textContent('#drSaved')).includes('되돌리기'));
+  check('오류 없음(본 창 + 새 창)', p.errors.length === 0 && popErr.length === 0, [p.errors, popErr]);
+  await p.context().close();
 }
 await b.close();
 
