@@ -2430,15 +2430,16 @@ STORE = STORE_B;
   await p.waitForFunction(() => document.getElementById('drT-ja').value.startsWith('관리자가 쓴 자율.'), null, { timeout: 3000 }).catch(() => {});
   const r1 = await p.evaluate(() => ({ v: document.getElementById('drT-ja').value, b: document.getElementById('drB-ja').textContent, saved: document.getElementById('drSaved').textContent }));
   const jaB = [...('관리자가 쓴 자율. ' + CARD)].reduce((n, ch) => n + (ch.charCodeAt(0) < 128 ? 1 : 3), 0);
-  check('다른 선생님(관리자)이 고치면 — 작성 칸에 바로, 바이트도, 「↻ 다른 선생님이 고친 내용을 불러왔습니다 · 관리자」', r1.v === '관리자가 쓴 자율. ' + CARD
-    && r1.b.startsWith(`${jaB} /`) && r1.saved.includes('다른 선생님이 고친 내용을 불러왔습니다') && r1.saved.includes('관리자'), r1);
+  // 알림은 누가 썼든 「다른 창에서」 — 다른 선생님은 권한이 없고 관리자는 고치지 않는다(선생님 결정 2026-10-29)
+  check('다른 곳에서 고치면 — 작성 칸에 바로, 바이트도, 「↻ 다른 창에서 수정된 내용을 불러왔습니다」(누가 썼는지는 안 씀)', r1.v === '관리자가 쓴 자율. ' + CARD
+    && r1.b.startsWith(`${jaB} /`) && r1.saved.startsWith('↻ 다른 창에서 수정된 내용을 불러왔습니다') && !r1.saved.includes('관리자') && !r1.saved.includes('선생님'), r1);
   check('— 불러오기만 하고 다시 쓰지 않는다', (await writes()) === w0, [w0, await writes()]);
   check('— 카드 표시도 따라온다(그 문안이 들어 있으면 「✓ 자율에 들어감」)', await p.evaluate(() => { const c = [...document.querySelectorAll('#stuOut .card[data-a]')].find(x => x.textContent.includes('진로탐색 로봇공학 캠프'));
     return c.querySelector('.used-mark').textContent === '✓ 자율에 들어감'; }));
   await remote({ memo: '다른 창에서 쓴 메모', by: KIM });
   await p.waitForFunction(() => document.getElementById('drMemo').value === '다른 창에서 쓴 메모', null, { timeout: 3000 }).catch(() => {});
-  check('같은 선생님의 다른 창(새 창)이 고치면 — 「↻ 다른 창에서 고친 내용을 불러왔습니다」', (await p.inputValue('#drMemo')) === '다른 창에서 쓴 메모'
-    && (await p.textContent('#drSaved')).includes('다른 창에서 고친 내용을 불러왔습니다'));
+  check('같은 선생님의 다른 창(새 창)이 고치면 — 「↻ 다른 창에서 수정된 내용을 불러왔습니다」', (await p.inputValue('#drMemo')) === '다른 창에서 쓴 메모'
+    && (await p.textContent('#drSaved')).includes('다른 창에서 수정된 내용을 불러왔습니다'));
   // 같은 칸을 이 창에서도 고치던 중 — 덮어쓰지 않고 고르게 한다
   await p.fill('#drT-ja', '이 창에서 고친 자율.');
   await remote({ ja: '관리자가 또 고친 자율.', by: ADMIN });
@@ -2447,8 +2448,8 @@ STORE = STORE_B;
     return { ro: t.readOnly, v: t.value, box: !!box, above: !!box && box.nextElementSibling === t, h: box?.querySelector('.drp-conf-h')?.textContent || '',
       del: [...(box?.querySelectorAll('.drp-conf-diff del') || [])].map(d => d.textContent).join(''), ins: [...(box?.querySelectorAll('.drp-conf-diff ins') || [])].map(d => d.textContent).join(''),
       saved: document.getElementById('drSaved').textContent }; });
-  check('같은 칸을 이 창에서도 고치던 중이면 — 덮어쓰지 않고 칸을 잠근 채 위에 알림(누가 고쳤는지 · 다른 곳 빨강/초록)', cf.box && cf.above && cf.ro && cf.v === '이 창에서 고친 자율.'
-    && cf.h.includes('다른 선생님(관리자)이') && cf.del.includes('창에서') && cf.ins.includes('관리자가') && cf.saved.includes('다른 선생님이 같은 칸을 고쳤습니다'), cf);
+  check('같은 칸을 이 창에서도 고치던 중이면 — 덮어쓰지 않고 칸을 잠근 채 위에 「⚠ 다른 창에서 이 칸이 수정되었습니다.」(다른 곳 빨강/초록)', cf.box && cf.above && cf.ro && cf.v === '이 창에서 고친 자율.'
+    && cf.h === '⚠ 다른 창에서 이 칸이 수정되었습니다.' && cf.del.includes('창에서') && cf.ins.includes('관리자가') && cf.saved.includes('다른 창에서 수정된 칸이 있습니다'), cf);
   await p.waitForTimeout(1200);   // 손을 멈추고 저장할 때(0.9초)가 지나도
   check('— 고르기 전에는 이 창 글을 저장하지 않는다(그 글이 그대로)', (await server('ja')) === '관리자가 또 고친 자율.', await server('ja'));
   await p.click('#stuOut .card:has-text("진로탐색 로봇공학 캠프") [data-to="ja"]');
@@ -2564,6 +2565,30 @@ for (const c of ['saenggibuDraft', 'saenggibuDraftHist']) {
 for (const c of ['saenggibu', 'saenggibuStu', 'saenggibuAct']) {
   const m = RULES.match(new RegExp(`match /${c}/\\{docId\\} \\{([^}]*)\\}`));
   check(`규칙 ${c} — 읽기·쓰기 교사 전체(부서가 바로 올린다)`, m && /allow read:\s*if isYnhsTeacher\(\);/.test(m[1]) && /allow write: if isYnhsTeacher\(\);/.test(m[1]), m && m[1]);
+}
+// 사용설명서 — 통합앱 설명서(manual.html)와 같은 형식으로 따로 한 장, 핵심 먼저(선생님 요청 2026-10-29).
+// 앱의 단추·알림 이름을 바꾸면 설명서도 고치라고 여기서 걸린다
+{
+  const SMAN = fs.readFileSync(ROOT + '/saenggibu-manual.html', 'utf8');
+  const MAN = fs.readFileSync(ROOT + '/manual.html', 'utf8');
+  const style = s => (s.match(/<body>\s*<style>([\s\S]*?)<\/style>/) || [])[1] || '';
+  check('생기부 사용설명서 — 통합앱 설명서와 같은 형식(같은 스타일에 덧붙임 · 왼쪽 목차), 맨 위가 「이것만 알면 됩니다」', style(MAN).length > 1000 && style(SMAN).startsWith(style(MAN))
+    && SMAN.includes('<aside>') && /<main>\s*<div class="page" id="top">[\s\S]*?<h1>이것만 알면 됩니다<\/h1>/.test(SMAN));
+  const ids = [...SMAN.matchAll(/<a href="#([a-z0-9]+)">/g)].map(m => m[1]);
+  check('— 목차가 가리키는 절이 다 있다(1~13 + 핵심)', ids.length >= 14 && ids.every(id => SMAN.includes(`id="${id}"`)), ids.filter(id => !SMAN.includes(`id="${id}"`)));
+  const imgs = [...SMAN.matchAll(/<img [^>]*src="([^"]*)"/g)].map(m => m[1]);
+  check('— 그림은 모두 파일 안에(data:image/png), 바깥 주소·스크립트 없음, 예시 자료라고 밝힌다', imgs.length >= 15 && imgs.every(u => u.startsWith('data:image/png;base64,'))
+    && !/<script/i.test(SMAN) && !/(src|href)="https?:/i.test(SMAN) && SMAN.includes('예시 자료로 재현했습니다'), imgs.length);
+  const labels = ['✏️ 작성', '🔤 맞춤법', '📋 복사한 글 반영', '📘 반 전체', '📘 우리 반 생기부', '📘 반별 생기부', '🖨 인쇄', '행특 빼고 인쇄', '학생마다 인쇄', '엑셀로 저장',
+    '📄 양식 받기', '📤 엑셀 올리기', '↗ 새 창', '행특 가리기', '다른 창에서 이 칸이 수정되었습니다.', '다른 창에서 수정된 내용을 불러왔습니다', '그 글로 바꾸기', '이 창 글로 저장',
+    '저장하지 못했습니다', '이미 ', '에 들어간 문장입니다 — 한 번 더 누르면 붙입니다'];
+  const gone = labels.filter(l => !SMAN.includes(l) || !HTML.includes(l));
+  check('— 설명서가 부르는 단추·알림 이름이 앱에 그대로 있다(앱에서 이름을 바꾸면 여기서 걸린다)', !gone.length && HTML.includes('→ ${DR_NAME[k]}') && HTML.includes('에 들어감`')
+    && SMAN.includes('→ 자율') && SMAN.includes('✓ 진로에 들어감'), gone);
+  check('통합앱 사용설명서 — 14번 절 「생기부 보조자료」(따로 만든 설명서로 가는 단추), Q&A 는 15번', MAN.includes('<a href="#s14"><i>14</i>생기부 보조자료</a><a href="#s15"><i>15</i>Q&A</a>')
+    && /<section id="s14"><h2 class="sh"><span class="n">14<\/span>생기부 보조자료<\/h2>[\s\S]*?href="saenggibu-manual\.html"[\s\S]*?<section id="s15"><h2 class="sh"><span class="n">15<\/span>Q&A<\/h2>/.test(MAN));
+  const mids = [...MAN.matchAll(/<a href="#([a-z0-9]+)">/g)].map(m => m[1]);
+  check('— 통합앱 설명서 목차도 절이 다 있다', mids.length >= 16 && mids.every(id => MAN.includes(`id="${id}"`)), mids.filter(id => !MAN.includes(`id="${id}"`)));
 }
 
 fs.rmSync(TMP, { recursive: true, force: true });
