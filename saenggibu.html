@@ -640,9 +640,21 @@
     .pane3.has-detail .p-classes,.pane3.has-detail .p-roster{display:none;}
     /* 학생별 단계식만 — 활동별(.pane3 를 같이 쓴다)에 걸리면 폰에서 활동 상세가 아예 안 보인다 */
     #stuPanes:not(.has-detail) .p-detail{display:none;}
-    .m-nav{display:flex;gap:6px;align-items:center;position:sticky;top:-12px;z-index:5;margin:-12px -10px 12px;padding:10px;
+    /* 폰은 칸이 아니라 화면(#body)이 스크롤된다 — top 은 0(-12px 이면 붙었을 때 위 12px 가 잘린다) */
+    /* (노트북에서 반·명단을 숨긴 채 창을 좁힌 경우 · 단독 창도 — 그쪽 규칙은 노트북 칸 여백(16px) 기준이라 폰에서 덮어쓴다) */
+    .m-nav,.pane3.list-off .m-nav,html.solo .m-nav{display:flex;gap:6px;align-items:center;position:sticky;top:0;z-index:5;margin:-12px -10px 12px;padding:10px;
       background:var(--paper);border-bottom:1px solid var(--rule);}
-    .m-nav .btn{padding:9px 10px;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+    /* 폰도 위쪽 줄(선생님 2026-10-29) — 이동 줄 바로 아래 이름 · 참여한 활동. 폭이 좁아 활동은 한 줄로 두고 옆으로 밀어 본다
+       (줄을 바꾸면 활동이 많을 때 화면을 반쯤 덮는다). 학년·반은 이동 줄에 있어 이름만. 오른쪽 끝은 흐리게 — 더 있다는 표시 */
+    html:not(.embed) .s-mini{display:block;position:sticky;top:var(--navH, 0px);z-index:4;height:0;}
+    .s-mini-in{left:-10px;right:-10px;align-items:center;gap:10px;padding:6px 0 6px 10px;}
+    .s-mini-who span{display:none;}
+    .s-mini-acts{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;
+      -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 24px),transparent);}
+    .s-mini-acts::-webkit-scrollbar{display:none;}
+    .s-mini-acts::after{content:'';flex:0 0 18px;}   /* 끝까지 밀면 마지막 칩이 흐린 자리 밖으로 */
+    .s-mini-acts button{flex-shrink:0;}
+    .m-nav .btn,.pane3.list-off .m-nav .btn,html.solo .m-nav .btn{padding:9px 10px;font-size:14px;min-width:0;max-width:none;overflow:hidden;text-overflow:ellipsis;}
     .m-nav #mBack{flex-shrink:0;}
     .m-nav .m-step{flex:1;}
     .m-nav .m-step-none{flex:1;}
@@ -682,6 +694,7 @@
     .s-sum,.s-acts{flex-basis:100%;}
     .s-acts ul{grid-template-columns:minmax(0,1fr);}
     .card{scroll-margin-top:72px;}
+    html:not(.embed) .card{scroll-margin-top:calc(var(--navH, 0px) + var(--miniH, 40px) + 10px);}   /* 이동 줄 · 위쪽 줄 아래로 */
     .card{padding:13px 13px;}
     .search{max-width:none;}
     .admin{margin-left:0;flex-wrap:wrap;}   /* 관리자는 단추가 넷 — 폰 폭을 넘지 않게 줄바꿈 */
@@ -2261,18 +2274,22 @@ function actCard(out, id){
     || [...out.querySelectorAll('.card[data-a]')].find(c => c.dataset.a === id && !c.closest('.vol-split'));
 }
 // 좁은 칸 위쪽 줄 — 학생 머리(사진·이름·활동 목록)가 위로 지나가면 나타난다. 위쪽 이동 줄(☰ · ◀ ▶)이 있으면 그 아래에.
-// 활동은 잘리지 않게 다 보인다(많으면 줄바꿈) — 카드로 건너뛸 때 그 높이만큼 아래로(--miniH)
+// 활동은 잘리지 않게 다 보인다(많으면 줄바꿈, 폰은 한 줄로 옆으로) — 카드로 건너뛸 때 그 높이만큼 아래로(--miniH).
+// 노트북은 칸(out)이, 폰은 화면(#body)이 스크롤된다 — 둘 다 듣는다
 function miniWire(out, goAct){
-  const mini = $('sMini'), head = out.querySelector('.s-head'), nav = $('mNav'), bar = mini?.firstElementChild;
+  const mini = $('sMini'), head = out.querySelector('.s-head'), nav = $('mNav'), bar = mini?.firstElementChild, sc = $('body');
   if (!mini || !head) return;
   const navH = () => nav && nav.offsetParent ? nav.offsetHeight : 0;
+  const line = () => nav && nav.offsetParent ? nav.getBoundingClientRect().bottom : out.getBoundingClientRect().top;
   const sync = () => {
+    if (!mini.isConnected) return;               // 다른 화면으로 옮긴 뒤 남은 듣기
     out.style.setProperty('--navH', navH() + 'px');
     out.style.setProperty('--miniH', (bar?.offsetHeight || 44) + 'px');
-    mini.classList.toggle('on', getComputedStyle(mini).display !== 'none'
-      && head.getBoundingClientRect().bottom < out.getBoundingClientRect().top + navH() + 6);
+    mini.classList.toggle('on', getComputedStyle(mini).display !== 'none' && head.getBoundingClientRect().bottom < line() + 6);
   };
   out.onscroll = sync;
+  if (sc._miniSync) sc.removeEventListener('scroll', sc._miniSync);
+  sc._miniSync = sync; sc.addEventListener('scroll', sync, { passive: true });
   out._miniRO?.disconnect();
   if (window.ResizeObserver){ out._miniRO = new ResizeObserver(sync); out._miniRO.observe(out); if (nav) out._miniRO.observe(nav); if (bar) out._miniRO.observe(bar); }
   mini.onclick = goAct;
