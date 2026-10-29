@@ -2581,16 +2581,14 @@ console.log('\n[사용설명서 · 전체화면 단추]');
   const gq = await q.evaluate(() => window.__got.filter(m => m?.type === 'sgb-manual'));
   check('— 담임이 아니면 부서·교과 탭으로', gq.length === 1 && gq[0].tab === 'upload', gq);
   await q.context().close();
-  // 단독으로 연 창(앱 밖) — 설명서는 새 탭, 전체화면은 브라우저 전체화면
+  // 단독으로 연 창(앱 밖) — 설명서는 새 탭, 전체화면 단추는 없다(F11 이 아니라 앱 머리·메뉴를 덮는 것이라서)
   const r = await openAs(KIM);
   await r.waitForSelector('#manBtn');
-  await r.evaluate(() => { window.__opened = []; window.open = (u, t) => { window.__opened.push([u, t]); return null; };
-    document.documentElement.requestFullscreen = function () { window.__fs = (window.__fs || 0) + 1; return Promise.resolve(); }; });
+  await r.evaluate(() => { window.__opened = []; window.open = (u, t) => { window.__opened.push([u, t]); return null; }; });
   await r.waitForTimeout(400);
   await r.click('#manBtn');
-  await r.click('#fullBtn');
-  const so = await r.evaluate(() => ({ o: window.__opened, fs: window.__fs || 0 }));
-  check('— 단독 창: 설명서는 새 탭(saenggibu-manual.html#write), 전체화면은 브라우저 전체화면', so.o.length === 1 && so.o[0][0] === 'saenggibu-manual.html#write' && so.o[0][1] === '_blank' && so.fs === 1, so);
+  const so = await r.evaluate(() => ({ o: window.__opened, full: getComputedStyle(document.getElementById('fullBtn')).display }));
+  check('— 단독 창: 설명서는 새 탭(saenggibu-manual.html#write), 전체화면 단추는 없다', so.o.length === 1 && so.o[0][0] === 'saenggibu-manual.html#write' && so.o[0][1] === '_blank' && so.full === 'none', so);
   await r.context().close();
 }
 

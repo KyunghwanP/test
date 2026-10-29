@@ -3854,12 +3854,11 @@ window.addEventListener('message', e => {
   if (e.data.dr && drCanWrite(st.g, st.c)) st.drOpen = true;
   save(); render();
 });
-// ── 사용설명서 · 전체화면 ── 앱 안에서는 앱(index.html)에 맡긴다 — 앱 모달로 설명서, 앱 머리·메뉴를 덮는 전체화면.
-// 단독으로 연 창은 설명서를 새 탭으로, 전체화면은 브라우저 전체화면으로. 설명서는 담임(·관리자)이면 담임 탭, 아니면 부서·교과 탭
+// ── 사용설명서 · 전체화면 ── 앱 안에서는 앱(index.html)에 맡긴다 — 앱 모달로 설명서, 앱 머리·메뉴 자리까지 덮는 전체화면(F11 아님).
+// 단독으로 연 창은 설명서를 새 탭으로, 전체화면 단추는 없다(덮을 앱 머리가 없다). 설명서는 담임(·관리자)이면 담임 탭, 아니면 부서·교과 탭
 const IN_APP = document.documentElement.classList.contains('in-app') && window.parent !== window;
 let FULL_ON = false;
 const manTab = () => ROLE.home || ROLE.master ? 'write' : 'upload';
-const fsNow = () => document.fullscreenElement || document.webkitFullscreenElement;
 function paintFull(on){
   FULL_ON = !!on;
   const b = $('fullBtn'), t = FULL_ON ? '원래 크기' : '전체화면';
@@ -3870,22 +3869,13 @@ $('manBtn').onclick = () => {
   if (IN_APP) try { parent.postMessage({ type: 'sgb-manual', tab: manTab() }, location.origin); return; } catch (e) {}
   window.open(`saenggibu-manual.html#${manTab()}`, '_blank', 'noopener');
 };
-$('fullBtn').onclick = () => {
-  if (IN_APP) { try { parent.postMessage({ type: 'sgb-full', on: !FULL_ON }, location.origin); } catch (e) {} return; }
-  const root = document.documentElement, fn = fsNow() ? (document.exitFullscreen || document.webkitExitFullscreen) : (root.requestFullscreen || root.webkitRequestFullscreen);
-  try { const r = fn?.call(fsNow() ? document : root); if (r && r.catch) r.catch(() => {}); } catch (e) {}
-};
-if (!IN_APP){
-  const root = document.documentElement;
-  if (!(root.requestFullscreen || root.webkitRequestFullscreen)) $('fullBtn').style.display = 'none';   // 아이폰 — 단독 창은 이미 화면 가득
-  const sync = () => paintFull(!!fsNow());
-  document.addEventListener('fullscreenchange', sync); document.addEventListener('webkitfullscreenchange', sync);
-}
+$('fullBtn').onclick = () => { try { parent.postMessage({ type: 'sgb-full', on: !FULL_ON }, location.origin); } catch (e) {} };
+if (!IN_APP) $('fullBtn').style.display = 'none';
 window.addEventListener('message', e => {
   if (e.origin !== location.origin || e.source !== window.parent || e.data?.type !== 'sgb-full-state') return;
   paintFull(e.data.on);
 });
-// 앱 안 전체화면을 Esc 로 끈다(브라우저 전체화면이 안 되는 기기의 창 가득 — 사진 크게 보기가 열려 있으면 그것만 닫힌다)
+// 앱 안 전체화면을 Esc 로 끈다(사진 크게 보기가 열려 있으면 그것만 닫힌다)
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape' || !IN_APP || !FULL_ON || $('zoom').classList.contains('open')) return;
   try { parent.postMessage({ type: 'sgb-full', on: false }, location.origin); } catch (err) {}

@@ -18,6 +18,7 @@ const CSS = between('/* 적정 대학 진단(jindan.html) 모달', 'html.dark .s
 const MODAL = between('<div class="jd-overlay" id="sgbManualModal">', '</iframe>\n  </div>\n</div>');
 const JS = between('// ── 생기부 보조자료 — 전체화면 · 사용설명서 ──', "if (k.key === 'Escape') closeSgbManual(); }); } catch (err) {}\n});");
 check('전체화면 CSS — 생기부 화면이 창 가득(앱 머리·메뉴 위, 모달 아래)', /#saenggibuPage\.sgb-full\.active\{position:fixed;inset:0;z-index:8900;/.test(CSS));
+check('— 브라우저 F11 전체화면은 쓰지 않는다(앱 머리·옆 메뉴 자리만 쓴다 — 선생님 뜻)', !/requestFullscreen|webkitRequestFullscreen/.test(JS));
 check('설명서 모달 — 진단 모달 껍데기(jd-overlay) + 제목 줄 + 닫기 + iframe', MODAL.includes('class="sgbm-head"') && MODAL.includes('id="sgbManualClose"') && MODAL.includes('<iframe id="sgbManualFrame"'));
 check('뒤로가기 — 설명서 모달, 그다음 전체화면', /getElementById\('sgbManualModal'\)\?\.classList\.contains\('open'\)\) \{ closeSgbManual\(\); armExitGuard\(\); return; \}/.test(HTML)
   && /if \(_sgbFull\) \{ setSgbFull\(false\); armExitGuard\(\); return; \}/.test(HTML));

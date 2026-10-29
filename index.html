@@ -6470,7 +6470,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver8.37';
+const APP_VER = 'ver8.38';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -10768,34 +10768,17 @@ function openSaenggibuFrame(){
   try { f.contentWindow.postMessage({ type: 'sgb-refresh' }, location.origin); } catch (e) {}
 }
 // ── 생기부 보조자료 — 전체화면 · 사용설명서 ── 단추는 생기부 화면(saenggibu.html) 위쪽 줄에 있고, 누르면 여기로 알린다.
-// 전체화면: 생기부 화면이 앱 머리·메뉴를 덮고 창을 꽉 채운다. 브라우저 전체화면도 같이 켜 본다 — 안 되는 기기(아이폰)는 창 가득만.
-// 다시 누르기 · Esc(브라우저 전체화면을 끄면 같이) · 뒤로가기 · 다른 탭으로 옮기면 원래대로.
-let _sgbFull = false, _sgbFsMine = false;
-const sgbFsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+// 전체화면: 생기부 화면이 앱 머리·메뉴 자리까지 덮어 창을 꽉 채운다(브라우저 F11 전체화면은 아니다 — 선생님 뜻 2026-10-29).
+// 다시 누르기 · Esc · 뒤로가기 · 다른 탭으로 옮기면 원래대로.
+let _sgbFull = false;
 function setSgbFull(on){
   on = !!on;
   const pg = document.getElementById('saenggibuPage'), f = document.getElementById('saenggibuPageFrame');
   if (!pg) return;
   _sgbFull = on;
   pg.classList.toggle('sgb-full', on);
-  const root = document.documentElement;
-  if (on && !sgbFsEl()){
-    const req = root.requestFullscreen || root.webkitRequestFullscreen;
-    if (req) try { _sgbFsMine = true; const r = req.call(root); if (r && r.catch) r.catch(() => { _sgbFsMine = false; }); } catch (e) { _sgbFsMine = false; }
-  } else if (!on && sgbFsEl() && _sgbFsMine){
-    _sgbFsMine = false;
-    const ex = document.exitFullscreen || document.webkitExitFullscreen;
-    if (ex) try { const r = ex.call(document); if (r && r.catch) r.catch(() => {}); } catch (e) {}
-  }
   try { f?.contentWindow?.postMessage({ type: 'sgb-full-state', on }, location.origin); } catch (e) {}
 }
-function onSgbFsChange(){
-  if (sgbFsEl() || !_sgbFsMine) return;
-  _sgbFsMine = false;                       // Esc 로 브라우저 전체화면을 껐다 — 창 가득도 같이 푼다
-  if (_sgbFull) setSgbFull(false);
-}
-document.addEventListener('fullscreenchange', onSgbFsChange);
-document.addEventListener('webkitfullscreenchange', onSgbFsChange);
 function openSgbManual(tab){
   clearTimeout(exitArmTimer);
   const url = `saenggibu-manual.html?v=${encodeURIComponent(APP_VER)}#${tab === 'upload' ? 'upload' : 'write'}`;
