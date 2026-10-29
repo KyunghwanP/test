@@ -62,6 +62,7 @@ const MODALS = {
   passDetailOverlay: 'passCloseDetail',
   passModalOverlay:  'passCloseForm',
   swapModal:         'closeSwapModal',
+  sgbManualModal:    'closeSgbManual',
 };
 
 // 뒤로가기는 modalDepth 로 따로 처리한다(교체/보강). ESC 에는 직접 걸려 있다.

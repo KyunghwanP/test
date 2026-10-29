@@ -79,6 +79,11 @@
   .btn:disabled{opacity:.5;cursor:not-allowed;}
   .btn.pri{background:var(--mon);border-color:var(--mon);color:#fff;}
   .btn.pri:hover{background:var(--mon-deep);color:#fff;}
+  /* 위쪽 줄 오른쪽 끝 — 사용설명서 · 전체화면(켜져 있으면 파랗게). 폰은 그림 글자만 */
+  .top-tools{display:flex;gap:6px;align-items:center;}
+  .top-tools .btn{display:inline-flex;align-items:center;gap:5px;}
+  #fullBtn[aria-pressed="true"]{background:var(--mon);border-color:var(--mon);color:#fff;}
+  html.solo .top-tools{display:none !important;}
   .btn.line{border-color:var(--mon);color:var(--mon);}
   .btn.line:hover{background:var(--mon);color:#fff;}
   /* 카드의 학생 글 접기(details{margin-top:10px})가 여기에도 걸려 단추가 아래로 처졌다 — 따로 0 */
@@ -669,6 +674,7 @@
     .card{padding:13px 13px;}
     .search{max-width:none;}
     .admin{margin-left:0;flex-wrap:wrap;}   /* 관리자는 단추가 넷 — 폰 폭을 넘지 않게 줄바꿈 */
+    .top-tools .tl{display:none;} .top-tools .btn{padding:7px 10px;}
     .seg{max-width:100%;overflow-x:auto;}
     .seg button{padding:7px 10px;}
     /* 생기부 작성 — 띄우면 화면 가득(✕ 로 보조자료에 돌아온다). 폰에서는 「→ 자율」 이 늘 보인다(작성 칸과 함께 못 보므로) */
@@ -722,6 +728,11 @@
     </details>
     <button class="btn" id="dlBtn" type="button" style="display:none;" title="원본 양식 그대로 — 내부결재용">📥 엑셀로 받기</button>
     <button class="btn" id="admBtn" type="button" style="display:none;" title="관리자에게만 보입니다">⚙ 관리</button>
+  </div>
+  <!-- 사용설명서 · 전체화면 — 앱 안에서는 앱이 모달로 열고, 앱 머리·메뉴를 덮어 꽉 채운다 -->
+  <div class="top-tools">
+    <button class="btn" id="manBtn" type="button" title="사용설명서" aria-label="사용설명서"><span aria-hidden="true">📖</span><span class="tl">사용설명서</span></button>
+    <button class="btn" id="fullBtn" type="button" title="전체화면" aria-label="전체화면" aria-pressed="false"><span aria-hidden="true">⛶</span><span class="tl">전체화면</span></button>
   </div>
   <input type="file" id="upFile" accept=".xlsx,.xlsm,.xls" style="display:none;">
   <span id="fileNote"></span>
@@ -3843,6 +3854,42 @@ window.addEventListener('message', e => {
   if (e.data.dr && drCanWrite(st.g, st.c)) st.drOpen = true;
   save(); render();
 });
+// ── 사용설명서 · 전체화면 ── 앱 안에서는 앱(index.html)에 맡긴다 — 앱 모달로 설명서, 앱 머리·메뉴를 덮는 전체화면.
+// 단독으로 연 창은 설명서를 새 탭으로, 전체화면은 브라우저 전체화면으로. 설명서는 담임(·관리자)이면 담임 탭, 아니면 부서·교과 탭
+const IN_APP = document.documentElement.classList.contains('in-app') && window.parent !== window;
+let FULL_ON = false;
+const manTab = () => ROLE.home || ROLE.master ? 'write' : 'upload';
+const fsNow = () => document.fullscreenElement || document.webkitFullscreenElement;
+function paintFull(on){
+  FULL_ON = !!on;
+  const b = $('fullBtn'), t = FULL_ON ? '원래 크기' : '전체화면';
+  b.setAttribute('aria-pressed', String(FULL_ON));
+  b.title = t; b.setAttribute('aria-label', t); b.querySelector('.tl').textContent = t;
+}
+$('manBtn').onclick = () => {
+  if (IN_APP) try { parent.postMessage({ type: 'sgb-manual', tab: manTab() }, location.origin); return; } catch (e) {}
+  window.open(`saenggibu-manual.html#${manTab()}`, '_blank', 'noopener');
+};
+$('fullBtn').onclick = () => {
+  if (IN_APP) { try { parent.postMessage({ type: 'sgb-full', on: !FULL_ON }, location.origin); } catch (e) {} return; }
+  const root = document.documentElement, fn = fsNow() ? (document.exitFullscreen || document.webkitExitFullscreen) : (root.requestFullscreen || root.webkitRequestFullscreen);
+  try { const r = fn?.call(fsNow() ? document : root); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+};
+if (!IN_APP){
+  const root = document.documentElement;
+  if (!(root.requestFullscreen || root.webkitRequestFullscreen)) $('fullBtn').style.display = 'none';   // 아이폰 — 단독 창은 이미 화면 가득
+  const sync = () => paintFull(!!fsNow());
+  document.addEventListener('fullscreenchange', sync); document.addEventListener('webkitfullscreenchange', sync);
+}
+window.addEventListener('message', e => {
+  if (e.origin !== location.origin || e.source !== window.parent || e.data?.type !== 'sgb-full-state') return;
+  paintFull(e.data.on);
+});
+// 앱 안 전체화면을 Esc 로 끈다(브라우저 전체화면이 안 되는 기기의 창 가득 — 사진 크게 보기가 열려 있으면 그것만 닫힌다)
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || !IN_APP || !FULL_ON || $('zoom').classList.contains('open')) return;
+  try { parent.postMessage({ type: 'sgb-full', on: false }, location.origin); } catch (err) {}
+}, true);
 // 앱이 탭에 다시 들어올 때 보내는 신호 — 그사이 새로 올라왔을 수 있다
 window.addEventListener('message', e => {
   if (e.origin !== location.origin || e.data?.type !== 'sgb-refresh' || !fbAuth.currentUser) return;

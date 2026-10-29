@@ -2870,6 +2870,16 @@
   }
   .jd-open:hover{ background:#eef2ff; }
   @media (max-width:640px){ .jd-overlay{padding:0;} .jd-box{border-radius:0;height:100%;} }
+  /* 생기부 보조자료 전체화면 — 생기부 화면 위쪽 「⛶ 전체화면」. 앱 머리·메뉴를 덮고 창을 꽉 채운다(모달·알림은 그 위) */
+  #saenggibuPage.sgb-full.active{position:fixed;inset:0;z-index:8900;background:var(--bg-base);
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
+  /* 생기부 사용설명서 모달 — 진단 모달 껍데기 + 제목 줄(닫기 단추가 설명서 글을 가리지 않게) */
+  #sgbManualModal .jd-box{display:flex;flex-direction:column;width:min(1240px,100%);}
+  #sgbManualModal iframe{flex:1;height:auto;min-height:0;}
+  .sgbm-head{display:flex;align-items:center;gap:8px;padding:9px 12px 9px 18px;background:#fff;border-bottom:1px solid #e2e8f0;flex-shrink:0;}
+  .sgbm-head b{margin-right:auto;font-size:15px;font-weight:800;color:#0f172a;}
+  .sgbm-head .jd-close,.sgbm-head .jd-open{position:static;text-decoration:none;}
+  html.dark .sgbm-head{background:#111A2B;border-color:#243149;} html.dark .sgbm-head b{color:#E8EEF7;}
   .swap-list{display:flex;flex-direction:column;gap:8px;}
   .swap-cand{
     background:var(--paper-soft);border-radius:8px;padding:10px 12px;
@@ -6308,6 +6318,18 @@
   </div>
 </div>
 
+<!-- 생기부 보조자료 사용설명서(saenggibu-manual.html) — 생기부 화면 위쪽 「📖 사용설명서」 가 연다. 담임이면 담임 탭, 아니면 부서·교과 탭 -->
+<div class="jd-overlay" id="sgbManualModal">
+  <div class="jd-box">
+    <div class="sgbm-head">
+      <b>📖 생기부 보조자료 사용설명서</b>
+      <a class="jd-open" id="sgbManualNewTab" href="saenggibu-manual.html" target="_blank" rel="noopener" title="새 탭에서 크게 봅니다">↗ 새 탭</a>
+      <button class="jd-close" id="sgbManualClose" title="닫기">✕</button>
+    </div>
+    <iframe id="sgbManualFrame" title="생기부 보조자료 사용설명서"></iframe>
+  </div>
+</div>
+
 <!-- 협의 시간 찾기 — #timetablePage 바깥에 둔다(위젯이 시간표 페이지를 늘려도 영향 없게) -->
 <!-- 공지 안 그림 크게 보기. 공지 창보다 위에 뜬다(z-index). -->
 <div class="notice-zoom" id="noticeImgZoom">
@@ -6448,7 +6470,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver8.36';
+const APP_VER = 'ver8.37';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -8383,10 +8405,13 @@ window.addEventListener('popstate', (e)=>{
   if (document.querySelector('.cd-overlay.open')) { document.querySelector('.cd-overlay.open').classList.remove('open'); armExitGuard(); return; }
   if (document.getElementById('jindanModal')?.classList.contains('open')) { closeJindanModal(); armExitGuard(); return; }
   if (document.getElementById('seatModal')?.classList.contains('open')) { closeSeatModal(); armExitGuard(); return; }
+  if (document.getElementById('sgbManualModal')?.classList.contains('open')) { closeSgbManual(); armExitGuard(); return; }
   if (document.getElementById('classOrgModal')?.classList.contains('open')) { closeClassOrgModal(); armExitGuard(); return; }
   // 외출증 — 상세를 먼저 본다(상세 위에 발급이 겹칠 일은 없지만, 수정 중이면 상세가 위다)
   if (document.getElementById('passDetailOverlay')?.classList.contains('open')) { passCloseDetail(); armExitGuard(); return; }
   if (document.getElementById('passModalOverlay')?.classList.contains('open'))  { passCloseForm();   armExitGuard(); return; }
+  // 생기부 전체화면 — 뒤로가기 한 번이면 원래 크기로(폰에서 앱 메뉴가 가려져 있다)
+  if (_sgbFull) { setSgbFull(false); armExitGuard(); return; }
 
   // 2. 교체/보강 모달 뎁스
   const newDepth = st.modalDepth || 0;
@@ -10742,6 +10767,59 @@ function openSaenggibuFrame(){
   if (!f.src || f.src === 'about:blank') { f.dataset.ready = ''; f.src = `saenggibu.html?in=1&v=${encodeURIComponent(APP_VER)}`; return; }
   try { f.contentWindow.postMessage({ type: 'sgb-refresh' }, location.origin); } catch (e) {}
 }
+// ── 생기부 보조자료 — 전체화면 · 사용설명서 ── 단추는 생기부 화면(saenggibu.html) 위쪽 줄에 있고, 누르면 여기로 알린다.
+// 전체화면: 생기부 화면이 앱 머리·메뉴를 덮고 창을 꽉 채운다. 브라우저 전체화면도 같이 켜 본다 — 안 되는 기기(아이폰)는 창 가득만.
+// 다시 누르기 · Esc(브라우저 전체화면을 끄면 같이) · 뒤로가기 · 다른 탭으로 옮기면 원래대로.
+let _sgbFull = false, _sgbFsMine = false;
+const sgbFsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+function setSgbFull(on){
+  on = !!on;
+  const pg = document.getElementById('saenggibuPage'), f = document.getElementById('saenggibuPageFrame');
+  if (!pg) return;
+  _sgbFull = on;
+  pg.classList.toggle('sgb-full', on);
+  const root = document.documentElement;
+  if (on && !sgbFsEl()){
+    const req = root.requestFullscreen || root.webkitRequestFullscreen;
+    if (req) try { _sgbFsMine = true; const r = req.call(root); if (r && r.catch) r.catch(() => { _sgbFsMine = false; }); } catch (e) { _sgbFsMine = false; }
+  } else if (!on && sgbFsEl() && _sgbFsMine){
+    _sgbFsMine = false;
+    const ex = document.exitFullscreen || document.webkitExitFullscreen;
+    if (ex) try { const r = ex.call(document); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+  }
+  try { f?.contentWindow?.postMessage({ type: 'sgb-full-state', on }, location.origin); } catch (e) {}
+}
+function onSgbFsChange(){
+  if (sgbFsEl() || !_sgbFsMine) return;
+  _sgbFsMine = false;                       // Esc 로 브라우저 전체화면을 껐다 — 창 가득도 같이 푼다
+  if (_sgbFull) setSgbFull(false);
+}
+document.addEventListener('fullscreenchange', onSgbFsChange);
+document.addEventListener('webkitfullscreenchange', onSgbFsChange);
+function openSgbManual(tab){
+  clearTimeout(exitArmTimer);
+  const url = `saenggibu-manual.html?v=${encodeURIComponent(APP_VER)}#${tab === 'upload' ? 'upload' : 'write'}`;
+  document.getElementById('sgbManualFrame').src = url;
+  document.getElementById('sgbManualNewTab').href = url;
+  document.getElementById('sgbManualModal').classList.add('open');
+}
+function closeSgbManual(){
+  document.getElementById('sgbManualModal').classList.remove('open');
+  document.getElementById('sgbManualFrame').src = 'about:blank';
+}
+function onSgbFrameMsg(e){
+  const f = document.getElementById('saenggibuPageFrame');
+  if (e.origin !== location.origin || !f || e.source !== f.contentWindow) return;
+  if (e.data?.type === 'sgb-full') setSgbFull(e.data.on);
+  else if (e.data?.type === 'sgb-manual') openSgbManual(e.data.tab);
+}
+window.addEventListener('message', onSgbFrameMsg);
+document.getElementById('sgbManualClose').addEventListener('click', closeSgbManual);
+document.getElementById('sgbManualModal').addEventListener('click', e => { if (isOutsideClick(e)) closeSgbManual(); });
+// 설명서 안을 누른 뒤에는 키가 그 안으로 간다 — 같은 출처라 Esc 를 거기서도 듣는다(설명서는 스크립트가 없다)
+document.getElementById('sgbManualFrame').addEventListener('load', e => {
+  try { e.target.contentDocument?.addEventListener('keydown', k => { if (k.key === 'Escape') closeSgbManual(); }); } catch (err) {}
+});
 
 // 🥚 학기 라벨을 빠르게 5번 클릭하면 1학기 아카이브 ↔ 2학기 토글 (숨겨진 기능)
 let _semClicks = 0, _semTimer = null;
@@ -15376,7 +15454,8 @@ function sgbFlushGo(){
 window.addEventListener('message', e => {
   if (e.origin !== location.origin || e.data?.type !== 'sgb-ready') return;
   const f = document.getElementById('saenggibuPageFrame');
-  if (f && e.source === f.contentWindow){ f.dataset.ready = '1'; sgbFlushGo(); }
+  if (f && e.source === f.contentWindow){ f.dataset.ready = '1'; sgbFlushGo();
+    try { f.contentWindow.postMessage({ type: 'sgb-full-state', on: _sgbFull }, location.origin); } catch (err) {} }
 });
 function s360BindTabs(s){
   const tabs = document.getElementById('s360Tabs2');
@@ -18122,6 +18201,7 @@ function navigateTo(page) {
   }
   if(page === 'overtime' || page === 'duty') openOvertimeFrame(page);
   if(page === 'saenggibu') openSaenggibuFrame();
+  else if(_sgbFull) setSgbFull(false);  // 생기부 전체화면은 다른 탭으로 옮기면 푼다
   if(page === 'notice') initNoticePage();
   else if(currentPage === 'notice') { _noticeEditing = false; _noticeDirty = false; rtReleaseImages(); }
   if(page !== 'consult') stopConsultWatch();
@@ -23442,6 +23522,9 @@ document.addEventListener('keydown', e => {
   }
   if (document.getElementById('seatModal')?.classList.contains('open')) {
     closeSeatModal(); return;
+  }
+  if (document.getElementById('sgbManualModal')?.classList.contains('open')) {
+    closeSgbManual(); return;
   }
   if (document.getElementById('classOrgModal')?.classList.contains('open')) {
     closeClassOrgModal(); return;

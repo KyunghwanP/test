@@ -837,7 +837,7 @@ const STUB = {
 };
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 let STORE = {};   // 문맥이 바뀌어도(다른 사람으로 열어도) 같은 Firestore 를 보게
-async function openAs(email, { width = 1100, blockExcel = false, share = false } = {}) {
+async function openAs(email, { width = 1100, blockExcel = false, share = false, framed = false } = {}) {
   const ctx = await b.newContext({ viewport: { width, height: 900 } });
   await ctx.route(ORIGIN + '/test/saenggibu.html*', r => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HTML }));
   await ctx.route(ORIGIN + '/test/favicon-32.png', r => r.fulfill({ status: 404, body: '' }));
@@ -868,10 +868,14 @@ async function openAs(email, { width = 1100, blockExcel = false, share = false }
     const click = HTMLAnchorElement.prototype.click;
     HTMLAnchorElement.prototype.click = function () { if (this.download) window.__dlName = this.download; return click.call(this); };
   }, [email, STORE, share]);
+  // framed — 앱처럼 바깥 창(index.html 흉내) 안의 iframe 으로 띄운다. 바깥 창은 받은 알림을 window.__got 에 모은다
+  if (framed) await ctx.route(ORIGIN + '/test/sgb-parent.html', r => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8',
+    body: '<!doctype html><meta charset="utf-8"><body style="margin:0"><iframe id="f" src="saenggibu.html?in=1" style="width:100%;height:880px;border:0"></iframe>'
+      + '<script>window.__got=[];addEventListener("message",e=>{if(e.origin===location.origin)window.__got.push(e.data)});</' + 'script>' }));
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto(ORIGIN + '/test/saenggibu.html?in=1');
+  await page.goto(ORIGIN + (framed ? '/test/sgb-parent.html' : '/test/saenggibu.html?in=1'));
   page.errors = errors;
   return page;
 }
@@ -2542,6 +2546,54 @@ STORE = STORE_B;
   check('오류 없음(본 창 + 새 창)', p.errors.length === 0 && popErr.length === 0, [p.errors, popErr]);
   await p.context().close();
 }
+// ── 사용설명서 · 전체화면 단추(선생님 요청 2026-10-29) ── 앱 안에서는 앱에 알리고(모달 · 앱 머리를 덮는 전체화면), 단독 창은 새 탭 · 브라우저 전체화면
+console.log('\n[사용설명서 · 전체화면 단추]');
+{
+  const p = await openAs(KIM, { framed: true });
+  const fr = await (await p.waitForSelector('#f')).contentFrame();
+  await fr.waitForSelector('#stus .stu', { timeout: 8000 }).catch(() => {});
+  const vis = sel => fr.evaluate(s => { const e = document.querySelector(s); return !!e && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0; }, sel);
+  check('위쪽 줄 오른쪽에 「📖 사용설명서」 · 「⛶ 전체화면」', await vis('.top .top-tools #manBtn') && await vis('.top .top-tools #fullBtn')
+    && (await fr.textContent('#manBtn')).includes('사용설명서') && (await fr.textContent('#fullBtn')).includes('전체화면'));
+  await fr.click('#manBtn');
+  await fr.click('#fullBtn');
+  await p.waitForTimeout(150);
+  const got = await p.evaluate(() => window.__got.filter(m => /^sgb-(manual|full)$/.test(m?.type)));
+  check('— 앱 안: 담임은 사용설명서를 담임 탭으로 열어 달라고, 전체화면은 켜 달라고 앱에 알린다', JSON.stringify(got) === JSON.stringify([{ type: 'sgb-manual', tab: 'write' }, { type: 'sgb-full', on: true }]), got);
+  await p.evaluate(() => document.getElementById('f').contentWindow.postMessage({ type: 'sgb-full-state', on: true }, location.origin));
+  await p.waitForTimeout(100);
+  const on = await fr.evaluate(() => ({ pressed: document.getElementById('fullBtn').getAttribute('aria-pressed'), t: document.getElementById('fullBtn').textContent, bg: getComputedStyle(document.getElementById('fullBtn')).backgroundColor }));
+  check('— 앱이 전체화면이라고 알려 주면 단추가 「원래 크기」(파랗게)', on.pressed === 'true' && on.t.includes('원래 크기') && on.bg !== 'rgba(0, 0, 0, 0)' && on.bg !== 'rgb(255, 255, 255)', on);
+  await fr.click('#fullBtn');
+  await fr.press('body', 'Escape');
+  await p.waitForTimeout(150);
+  const off = await p.evaluate(() => window.__got.filter(m => m?.type === 'sgb-full').slice(1));
+  check('— 다시 누르거나 Esc 를 누르면 끄라고 알린다', off.length === 2 && off.every(m => m.on === false), off);
+  check('— 오류 없음', !p.errors.length, p.errors);
+  await p.context().close();
+  // 담임이 아닌 선생님(부서·교과 — 지어낸 계정)은 부서·교과 탭으로
+  const q = await openAs('dept@yeungnam.hs.kr', { framed: true });
+  const fq = await (await q.waitForSelector('#f')).contentFrame();
+  await fq.waitForSelector('#manBtn');
+  await fq.waitForTimeout(600);
+  await fq.click('#manBtn');
+  await q.waitForTimeout(150);
+  const gq = await q.evaluate(() => window.__got.filter(m => m?.type === 'sgb-manual'));
+  check('— 담임이 아니면 부서·교과 탭으로', gq.length === 1 && gq[0].tab === 'upload', gq);
+  await q.context().close();
+  // 단독으로 연 창(앱 밖) — 설명서는 새 탭, 전체화면은 브라우저 전체화면
+  const r = await openAs(KIM);
+  await r.waitForSelector('#manBtn');
+  await r.evaluate(() => { window.__opened = []; window.open = (u, t) => { window.__opened.push([u, t]); return null; };
+    document.documentElement.requestFullscreen = function () { window.__fs = (window.__fs || 0) + 1; return Promise.resolve(); }; });
+  await r.waitForTimeout(400);
+  await r.click('#manBtn');
+  await r.click('#fullBtn');
+  const so = await r.evaluate(() => ({ o: window.__opened, fs: window.__fs || 0 }));
+  check('— 단독 창: 설명서는 새 탭(saenggibu-manual.html#write), 전체화면은 브라우저 전체화면', so.o.length === 1 && so.o[0][0] === 'saenggibu-manual.html#write' && so.o[0][1] === '_blank' && so.fs === 1, so);
+  await r.context().close();
+}
+
 await b.close();
 
 // ── 4. 앱에 붙인 곳 ──

@@ -18,7 +18,11 @@
 - 현재 **test 저장소에만** 있다(`KyunghwanP/test`). 운영(ynhs)으로는 아직 안 옮겼다. 선생님이 test 에서 더 다듬은 뒤 옮긴다.
 - 탭·종합검색 「생기부 보조자료」 탭은 **test 에서 교사 전체에 열었다**. 엑셀로 받기·관리는 관리자만.
 - **사용설명서** `saenggibu-manual.html` — 탭 둘(「✏️ 담임 선생님」 / 「📤 부서·교과 선생님」). 통합앱 설명서(`manual.html`) 14번 절의 단추 둘이 탭마다 바로 간다(→ 2장 「사용설명서 고치기」).
-- 마지막 버전: `APP_VER = 'ver8.36'`(index.html·usage.html), `CACHE_VER = 'v680'`(sw.js) — 2026-10-29 사용설명서를 탭 둘로(담임 선생님 / 부서·교과 선생님), 통합앱 설명서 14번 절 단추 둘
+- **위쪽 줄 오른쪽 끝 「📖 사용설명서」 · 「⛶ 전체화면」**(2026-10-29, 폰은 그림 글자만). 앱 안에서는 앱(index.html)에 알린다 —
+  설명서는 앱 모달 `#sgbManualModal`(진단 모달 껍데기 + 제목 줄, 담임·관리자는 `#write` 아니면 `#upload`), 전체화면은 `#saenggibuPage.sgb-full`
+  (창 가득 z-index 8900 — 앱 머리·메뉴 위, 모달 아래) + 브라우저 전체화면(안 되는 기기는 창 가득만). 다시 누르기 · Esc · 뒤로가기 · 다른 탭으로 옮기면 푼다.
+  알림: 안쪽→앱 `sgb-manual {tab}` · `sgb-full {on}`, 앱→안쪽 `sgb-full-state {on}`(단추 글자 「원래 크기」). 단독으로 연 창은 설명서 새 탭 · 브라우저 전체화면.
+- 마지막 버전: `APP_VER = 'ver8.37'`(index.html·usage.html), `CACHE_VER = 'v681'`(sw.js) — 2026-10-29 생기부 화면 위쪽 「📖 사용설명서」(앱 모달) · 「⛶ 전체화면」
 
 ### 원본 엑셀의 모양(이걸 알아야 코드가 읽힌다)
 - 시트 하나 = 활동 하나. 시트 이름 앞 꼬리표가 입력 영역: `<자>` 자율, `<진>` 진로, `<개>` 개인별 세특,
@@ -58,7 +62,8 @@
 | `usage.html` | 사용 현황에 `saenggibu`·`notice` 이름 |
 | `firestore.rules` | `saenggibu`·`saenggibuStu`·`saenggibuAct` — 읽기·쓰기 `isYnhsTeacher()`(2026-10-28 쓰기를 교사 전체로) |
 | `tests/saenggibu-draft-rules.test.mjs` | 생기부 작성 규칙(에뮬레이터) 22개 — 담임은 자기 반만, 다른 반·다른 교사·전체열람 권한자·학생은 못 봄, 관리자는 모든 반 |
-| `tests/saenggibu.test.mjs` | 583개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기·생기부 작성·우리 반 생기부·맞춤법·들어간 문안 표시·두 곳에서 고칠 때·사용설명서 탭) |
+| `tests/sgb-full-manual.test.mjs` | 20개 — 앱 쪽 전체화면(창 가득 · 원래대로 · 남이 보낸 알림 무시) · 설명서 모달(탭 · Esc · ✕ · 전체화면 위에도) |
+| `tests/saenggibu.test.mjs` | 590개 검사(해석·양식 변형·짝짓기(차수)·고친 값·꼬리표·표준 양식·저장·양식·내려받기·화면·부서 올리기·잠금·관리·폰·학적 변동·사진·한 학생 보기·생기부 작성·우리 반 생기부·맞춤법·들어간 문안 표시·두 곳에서 고칠 때·사용설명서 탭) |
 | `docs/saenggibu-form.xlsx` · `docs/saenggibu-form-extra.xlsx` | 「📄 양식 받기」 가 주는 빈 양식 두 가지(선생님이 만든 파일 — 학생 줄 값과 숨긴 학번 열 계산값을 비움). 엑셀이라 `.gitignore` 예외 두 줄로 올린다(5장) |
 | `tests/make-saenggibu-template.mjs` | **표준 양식** 엑셀 만들기(부서에 나눠 줄 빈 양식). `node tests/make-saenggibu-template.mjs <폴더>` |
 | `tests/s360-tabs.test.mjs` | 30개 검사(종합검색 탭 — 앱 스타일을 그대로 얹어 회색 상자가 안 덮이는지, 「✏️ 작성하러 가기」 판정·이동, 보조자료 탭 위쪽 줄) |
@@ -383,7 +388,8 @@ CLAUDE.md: **화면 변경은 test 먼저 → 선생님 확인 → ynhs PR·병�
 
 ### 검사 돌리기 (이 환경 기준)
 ```bash
-node tests/saenggibu.test.mjs        # 583
+node tests/saenggibu.test.mjs        # 590
+node tests/sgb-full-manual.test.mjs  # 20 — 앱 쪽 전체화면 · 설명서 모달(index.html 코드를 떼어 작은 앱 화면에서)
 # 규칙(생기부 작성) — 에뮬레이터: tests/README.md 「보안 규칙」. 이 환경에선 패키지를 임시 폴더에 깔고 거기서 돌렸다:
 #   npm i firebase-tools@13 @firebase/rules-unit-testing@3 firebase@10 (임시 폴더) → firebase emulators:start --only firestore (8099)
 #   cp tests/saenggibu-draft-rules.test.mjs <임시 폴더>/ && node <임시 폴더>/saenggibu-draft-rules.test.mjs   (저장소 폴더에서) # 22

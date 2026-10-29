@@ -124,6 +124,7 @@ node tests/seat-inpage.test.mjs                    # 자리 배치 '크게 보�
 node tests/weekly-chips-live.test.mjs              # 주차 칩이 새로고침 없이 늘어나는지
 node tests/usage-stats.test.mjs                    # 사용 현황 · 전체 새로고침
 node tests/saenggibu.test.mjs                      # 생기부 보조자료 — 엑셀 해석 · 저장 문서 · 화면 · 사용설명서
+node tests/sgb-full-manual.test.mjs                # 생기부 탭 전체화면 · 사용설명서 모달(앱 쪽)
 node tests/s360-tabs.test.mjs                      # 학생 종합검색 — 성적 / 생기부 보조자료 탭, 회색 상자 없음, 담임의 「✏️ 작성하러 가기」, 보조자료 탭 위쪽 줄
 node tests/weekly-render-mode.test.mjs             # 주간교육활동을 원본대로 그리는가
 node tests/consult-weekend.test.mjs                # 상담 주말 슬롯 + 7칸 폭 측정
