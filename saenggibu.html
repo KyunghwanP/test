@@ -463,6 +463,32 @@
   .drp-links{display:flex;gap:14px;margin-top:6px;}
   .drp-link{padding:0;border:none;background:none;font:inherit;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;}
   .drp-link:hover,.drp-link[aria-expanded="true"]{color:var(--mon);}
+  /* 기재요령 점검 — 바이트 옆 「⚠ 2」(가장 높은 단계 색: 🔴 빨강 · 🟠 주황 · 🔵 파랑), 누르면 칸 아래 목록 */
+  .drp-ck{padding:1px 9px;border:1px solid transparent;border-radius:999px;font:inherit;font-size:12.5px;font-weight:800;line-height:1.5;cursor:pointer;white-space:nowrap;}
+  .drp-ck[hidden]{display:none;}
+  .drp-ck.r{background:#FEE4E2;color:#B42318;border-color:#FECDCA;} .drp-ck.o{background:#FEF0C7;color:#B54708;border-color:#FEDF89;}
+  .drp-ck.b{background:#EFF8FF;color:#175CD3;border-color:#B2DDFF;}
+  html.dark .drp-ck.r{background:#3B1513;color:#FDA29B;border-color:#7A271A;} html.dark .drp-ck.o{background:#3A2A0D;color:#FEC84B;border-color:#7A4D0B;}
+  html.dark .drp-ck.b{background:#102A43;color:#84CAFF;border-color:#1E4F7A;}
+  .drp-ckp{margin:8px 0 4px;padding:8px 12px 6px;border:1px solid var(--rule);border-radius:10px;background:var(--paper-soft);font-size:13px;}
+  .drp-ckp[hidden]{display:none;}
+  .ck-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:2px 0 6px;font-weight:800;color:var(--ink-soft);}
+  .ck-head .d{font-weight:600;}
+  .ck-head .btn{margin-left:auto;}
+  .ck-row{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-top:1px dashed var(--rule);}
+  .ck-lv{flex-shrink:0;width:18px;text-align:center;line-height:1.55;}
+  .ck-body{flex:1;min-width:0;line-height:1.55;color:var(--ink);}
+  .ck-t{font-weight:800;word-break:break-all;}
+  .ck-cat{margin-left:6px;font-size:12px;font-weight:700;color:var(--ink-soft);}
+  .ck-alt{font-size:12.5px;color:var(--ink-soft);} .ck-alt b{color:var(--ink);}
+  .ck-acts{display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
+  .ck-acts button{padding:3px 8px;border:1px solid var(--rule);border-radius:7px;background:var(--paper);font:inherit;font-size:12px;font-weight:700;color:var(--ink-soft);cursor:pointer;white-space:nowrap;}
+  .ck-acts button:hover{color:var(--mon);border-color:var(--mon);}
+  @media (max-width:520px){ .ck-row{flex-wrap:wrap;} .ck-acts{flex-basis:100%;justify-content:flex-start;padding-left:26px;} }   /* 폰 — 단추는 글 아래로(글이 좁게 접히지 않게) */
+  /* 우리 반 생기부 한눈에 — 점검 칸 */
+  .cls-all td.ck{text-align:right;white-space:nowrap;font-size:12.5px;font-weight:800;}
+  .ck-n{margin-left:4px;} .ck-n.r{color:#B42318;} .ck-n.o{color:#B54708;} .ck-n.b{color:#175CD3;}
+  html.dark .ck-n.r{color:#FDA29B;} html.dark .ck-n.o{color:#FEC84B;} html.dark .ck-n.b{color:#84CAFF;}
   /* 맞춤법 — 부산대 검사기에서 고친 글을 붙여 넣으면 바뀐 곳(∨ 띄움 · ⌒ 붙임)과 바이트 변화를 보여 주고 반영 */
   .drp-spell{display:flex;flex-direction:column;gap:8px;margin:8px 0 4px;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--paper-soft);}
   .drp-spell[hidden]{display:none;}
@@ -565,6 +591,20 @@
       white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;}
     .pr-empty{font-family:'Noto Sans KR',sans-serif;color:#A0A6AF;}
     .pr-foot{display:flex;justify-content:space-between;padding-top:2.6mm;font-size:7.8pt;color:var(--mute);}
+    /* 참여한 활동 — 기재안에 들어갔는지(✓ 들어감 · ◐ 일부 · □ 아직), 아직인 것은 굵게. 봉사활동 기록은 뺀다(선생님 2026-10-30) */
+    tr.pr-acts{break-inside:avoid;}
+    tr.pr-acts > td{padding:3.4mm 0 3.6mm;border-bottom:.5pt solid var(--hair);}
+    .pr-ash{display:flex;align-items:baseline;justify-content:space-between;gap:6mm;margin-bottom:1.4mm;}
+    .pr-ash b{font-size:10.2pt;font-weight:700;color:var(--ac);}
+    .pr-ash span{font-size:7.8pt;color:var(--mute);white-space:nowrap;}
+    .pr-al{display:grid;grid-template-columns:1fr 1fr;gap:.9mm 8mm;margin:0;padding:0;list-style:none;font-size:9pt;}
+    .pr-al li{display:flex;align-items:baseline;gap:1.6mm;line-height:1.45;min-width:0;}
+    .pr-al i{flex-shrink:0;width:3.6mm;font-style:normal;text-align:center;color:var(--ac);}
+    .pr-al .pr-an{min-width:0;}
+    .pr-al .pr-aw{margin-left:auto;padding-left:2mm;flex-shrink:0;font-size:7.6pt;font-weight:500;color:var(--mute);white-space:nowrap;}
+    .pr-al li.full,.pr-al li.part,.pr-al li.nob{color:#4A5058;}
+    .pr-al li.none,.pr-al li.none i{font-weight:700;color:#111;}
+    .pr-legend{margin-top:1.5mm;font-size:7.3pt;color:var(--mute);}
     /* 영역 인쇄 — 반 전체를 한 표로(자율만, 진로만 …). 쪽마다 제목·머리줄을 다시 */
     table.pr-list{table-layout:fixed;}
     .pr-list col.c-n{width:11mm;} .pr-list col.c-nm{width:19mm;} .pr-list col.c-b{width:16mm;}
@@ -1763,6 +1803,312 @@ function sgbBuildDocs(parsed, partBytes = SGB_PART_BYTES){
     .map((x, i) => [x.id, (x.pos ?? 999) + i / 1e4]).sort((p, q) => p[1] - q[1]).map(p => p[0]);
   return { docs, meta: { v: 1, activities, schedules: parsed.schedules, roster, order } };
 }
+// ── 기재요령 점검(2026-10-30) ── 2026학년도 고등학교 기재요령의 「어떤 항목에도 기재할 수 없는 사항」을 중심으로
+// 작성 글에서 걸리는 곳을 찾는다. 브라우저 안에서만 돌고(글이 밖으로 나가지 않는다) 막지 않고 알려 주기만 한다.
+//   r(🔴) 기재 불가로 보임 · o(🟠) 선생님이 판단 · b(🔵) 형식 다듬기(「고치기」)
+// 낱말은 뒤에 조사가 붙어도 잡고(토익을), 앞 글자가 한글이면 다른 낱말 속이라 안 잡는다(대학원의 「학원」).
+// 영문은 앞뒤가 영문자가 아닐 때만. 짝(가족 + 직업, 대회 + 수상)은 같은 문장 안에서만 찾는다.
+// 옛 아이폰(iOS 16.3 이하)은 정규식의 「앞 글자 보기」 를 못 읽어 페이지가 통째로 멈춘다 — 앞 글자는 따로 잡아 떼어 낸다.
+// 목록은 선생님이 고르셨다(2026-10-30): 수업 도구는 켜되 문서·발표 도구(엑셀·파워포인트·한글 문서 등)는 빼고, 프로그래밍 언어는 끈다.
+const SGB_CK_OPT = { gov: true, tools: true, langs: false };   // 정부 부처·청 · 수업 도구 · 프로그래밍 언어
+const SGB_CK_SCHOOL = ['영남고등학교', '영남고교', '영남고'];   // 재학 학교를 알 수 있는 말 — 재단명·축제명·별칭은 알려 주시면 더한다
+const SGB_CK_LV = { r: 3, o: 2, b: 1 };
+const ckAlt = (...p) => '(?:' + p.flat().sort((x, y) => y.length - x.length).join('|') + ')';   // 긴 것부터(삼성전자가 삼성보다 먼저)
+const CK_PRIZE = '(?:대|금|은|동|최우수|우수|장려|특별|인기|으뜸|버금)상';
+const CK_PRIZE_MATE = '(?:금|은|동|최우수|우수|장려|특별|인기|으뜸|버금)상(?![가-힣])|(?:금|은|동|최우수|우수|장려|특별|인기|으뜸|버금)상(?=을|이|의|과|와|도|으로)|대상(?=을|이|\\s?(?:수상|받|차지|획득))';
+const CK_PLACE = ckAlt('한국', '대한민국', '대한', '국립', '국가', '서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '경기', '강원',
+  '충북', '충남', '충청북도', '충청남도', '전북', '전남', '전라북도', '전라남도', '경북', '경남', '경상북도', '경상남도', '제주',
+  '중구', '동구', '서구', '남구', '북구', '수성', '달서', '달성', '군위', '경산', '구미', '포항', '경주', '안동', '김천', '영천', '칠곡', '청도', '고령', '성주');
+const CK_ORG_TAIL = ckAlt('연구원', '연구소', '연구센터', '진흥원', '평가원', '개발원', '기술원', '과학원', '교육원', '연수원', '정보원', '관리원', '기록원', '생태원',
+  '자원관', '과학관', '박물관', '미술관', '기념관', '전시관', '체험관', '도서관', '문화원', '회관', '재단', '협회', '협의회', '학회', '위원회', '센터',
+  '교육청', '교육지원청', '시청', '도청', '구청', '군청', '의회', '경찰청', '경찰서', '소방서', '소방본부', '법원', '검찰청', '세무서', '우체국', '보건소',
+  '의료원', '병원', '공사', '공단', '은행', '방송', '일보', '신문', '수목원', '천문대');
+// 상호명 — 한글은 앞 글자가 한글이 아니어야, 영문은 앞뒤가 영문자가 아니어야 걸린다
+const CK_BRAND_KO = [
+  // 국내 기업·제품
+  '삼성전자', '삼성바이오로직스', '삼성', '엘지', '현대자동차', '현대차', '현대모비스', '현대중공업', '현대건설', '현대백화점', '기아자동차', '기아차',
+  '하이닉스', '롯데월드', '롯데리아', '롯데', '한화에어로스페이스', '한화', '포스코', '두산', '신세계백화점', '이마트', '홈플러스', '다이소', '올리브영',
+  '셀트리온', '농심', '오뚜기', '풀무원', '빙그레', '아모레퍼시픽', '넥슨', '엔씨소프트', '넷마블', '크래프톤', '하이브(?!리드)', '이월드', '대구은행', 'iM뱅크', '국민은행', '신한은행', '하나은행', '우리은행', '농협은행', '카카오뱅크', '토스뱅크', '갤럭시',
+  // 해외 기업·제품
+  '구글', '애플(?!리케이션|릿)', '아이폰', '아이패드', '에어팟', '마이크로소프트', '아마존(?!\\s?(?:열대|우림|강|밀림|숲|유역|지역))', '페이스북',
+  '메타\\s?플랫폼스', '테슬라', '엔비디아', '인텔(?!리)', '퀄컴', '소니', '플레이스테이션', '닌텐도', '파나소닉', '토요타', '도요타', '벤츠', '메르세데스',
+  '폭스바겐', '보잉', '에어버스', '화이자', '모더나', '아스트라제네카', '오픈에이아이', '스페이스엑스', '나이키', '아디다스', '스타벅스', '맥도날드',
+  '코카콜라', '펩시', '레고', '이케아', '디즈니', '유니클로',
+  // 플랫폼·SNS·서비스
+  '네이버', '카카오톡', '카톡', '카카오맵', '카카오페이', '카카오뱅크', '카카오\\s?T', '배달의민족', '배민', '쿠팡플레이', '쿠팡', '당근마켓', '토스뱅크',
+  '야놀자', '무신사', '마켓컬리', '왓챠', '티빙', '유튜브', '인스타그램', '인스타', '틱톡', '트위터', '디스코드', '텔레그램', '위챗', '에어비앤비', '우버',
+  '넷플릭스', '스포티파이', '위키백과', '위키피디아', '나무위키', '지식iN',
+  // 생성형 AI
+  '챗GPT', '챗지피티', '제미나이', '클로드(?!\\s?(?:모네|드뷔시|레비))', '코파일럿', '미드저니', '뤼튼', '클로바X', '하이퍼클로바', '퍼플렉시티', '딥시크', '노트북LM',
+  // 언론·방송·강연
+  '연합뉴스', '뉴시스', '뉴스1', '조선일보', '중앙일보', '동아일보', '한겨레', '경향신문', '국민일보', '문화일보', '매일경제', '한국경제', '머니투데이',
+  '전자신문', '매일신문', '영남일보', '채널A', '뉴욕타임스', '워싱턴포스트', '가디언', '이코노미스트지', '타임지', '내셔널지오그래픽', '네이처',
+  '사이언스지', '테드(?=\\s?(?:강연|강의|영상|토크))', '세바시',
+  // 프로 구단
+  '라이온즈', '트윈스', '베어스', '자이언츠', '이글스', '타이거즈', '랜더스', '다이노스', '히어로즈', '대구FC',
+];
+const CK_BRAND_EN = ['Samsung', 'Hyundai', 'POSCO', 'Naver', 'Google', 'iPhone', 'iPad', 'AirPods', 'Microsoft', 'Amazon', 'Facebook', 'Tesla',
+  'NVIDIA', 'Qualcomm', 'Sony', 'PlayStation', 'Nintendo', 'Panasonic', 'Toyota', 'Mercedes', 'Volkswagen', 'Boeing', 'Airbus', 'Pfizer', 'Moderna',
+  'AstraZeneca', 'OpenAI', 'SpaceX', 'Adidas', 'Starbucks', "McDonald'?s", 'Coca-?Cola', 'Pepsi', 'IKEA', 'Disney', 'Uniqlo', 'YouTube', 'Instagram',
+  'TikTok', 'Twitter', 'WeChat', 'Airbnb', 'Netflix', 'Spotify', 'Wikipedia', 'ChatGPT', 'Midjourney', 'Perplexity', 'DeepSeek', 'NotebookLM', 'UNESCO',
+  'UNICEF', 'Greenpeace'];
+// 대소문자를 가리는 영문 약칭 — 「who」 같은 보통 낱말과 섞이지 않게
+const CK_BRAND_AB = ['LG', 'SK', 'KT', 'CJ', 'GS', 'BMW', 'AMD', 'TSMC', 'ASML', 'GPT(?:-?\\d)?', 'KBS', 'MBC', 'SBS', 'EBS', 'JTBC', 'tvN', 'YTN', 'MBN',
+  'TBC', 'BBC', 'CNN', 'NYT', 'TEDx', 'TED', 'RISS', 'DBpia', 'KTX', 'SKT', 'Apple', 'Nature', 'Gemini', 'Claude', 'Copilot', 'Uber', 'Discord', 'Telegram', 'Nike', 'Intel', 'LEGO'];
+// 국제기구·단체 · 연구 기관 약칭 — 기관명
+const CK_INTL_KO = ['유엔', '국제연합', '유네스코', '유니세프', '세계보건기구', '세계무역기구', '국제통화기금', '세계은행', '미국항공우주국', '유럽입자물리연구소',
+  '그린피스', '국경없는의사회', '월드비전', '굿네이버스', '세이브더칠드런', '초록우산', '국제앰네스티', '세계자연기금', '대한적십자사', '적십자'];
+const CK_INTL_EN = ['UNESCO', 'UNICEF', 'Greenpeace'];
+const CK_INTL_AB = ['UN', 'WHO', 'WTO', 'OECD', 'IMF', 'IPCC', 'NASA', 'ESA', 'CERN', 'WWF', 'KIST', 'ETRI', 'KERIS', 'LH'];
+const CK_GOV = ['교육부(?!족|문|서)', '보건복지부', '환경부(?!담)', '과학기술정보통신부', '과기정통부', '고용노동부', '국토교통부', '해양수산부', '농림축산식품부',
+  '산업통상자원부', '기획재정부', '행정안전부', '여성가족부', '문화체육관광부', '외교부', '국방부', '법무부', '통일부', '중소벤처기업부', '통계청', '기상청',
+  '특허청', '국세청', '경찰청', '질병관리청', '질병청', '식약처', '식품의약품안전처', '국회(?!의원)', '대법원', '헌법재판소', '대통령실', '청와대', '한전',
+  '코레일', '국과수'];
+// 수업 도구 — 문서·발표 도구(엑셀·파워포인트·MS 워드·한컴오피스·한셀·한쇼)는 넣지 않는다(선생님 2026-10-30)
+const CK_TOOLS_KO = ['포토샵', '어도비', '프리미어\\s?프로', '캡컷', '키네마스터', '오토캐드', '스케치업', '틴커캐드', '피그마', '캔바', '미리캔버스', '노션',
+  '패들렛', '띵커벨', '클래스카드', '퀴즈앤', '카훗', '멘티미터', '구글\\s?클래스룸', '지오지브라', '데스모스', '매트랩', '마인크래프트', '로블록스',
+  '유니티(?=\\s?(?:엔진|로|를|으로|에서|프로그램))', '언리얼', '아두이노', '라즈베리\\s?파이', '마이크로비트', '마인드스톰', '오조봇', '티처블\\s?머신', '오렌지3',
+  '엔트리(?=\\s?(?:블록|코딩|프로그램)|로\\s?(?:코딩|프로그래밍|만들|구현|제작|게임)|(?:를|을)\\s?(?:활용|이용|사용))',
+  '스크래치(?=\\s?(?:블록|코딩|프로그램|3)|로\\s?(?:코딩|프로그래밍|만들|구현|제작|게임)|(?:를|을)\\s?(?:활용|이용|사용))', '앱\\s?인벤터'];
+const CK_TOOLS_EN = ['Photoshop', 'CapCut', 'AutoCAD', 'SketchUp', 'Tinkercad', 'Figma', 'Canva', 'Padlet', 'Kahoot', 'Mentimeter', 'GeoGebra',
+  'Desmos', 'MATLAB', 'Minecraft', 'Roblox', 'Arduino', 'Raspberry\\s?Pi', 'micro:?bit', 'Mindstorms', 'Ozobot', 'Teachable\\s?Machine', 'Orange3'];
+const CK_TOOLS_AB = ['Scratch', 'Premiere(?=\\s?Pro)'];
+const CK_LANGS_KO = ['파이썬', 'C언어', '자바스크립트', '자바(?!섬|\\s?원인)', '코틀린'];
+const CK_LANGS_EN = ['Python', 'JavaScript', 'Java', 'C\\+\\+', 'Kotlin'];
+// 바꿔 쓸 말 — 걸린 낱말 → 일반 명칭(앞부분이 맞으면)
+const CK_ALT = [
+  [/^(유튜브|YouTube)/i, '동영상 공유 플랫폼'], [/^(인스타|틱톡|트위터|페이스북|Instagram|TikTok|Twitter|Facebook)/i, '사회관계망서비스(SNS)'],
+  [/^(챗GPT|챗지피티|GPT|ChatGPT|제미나이|Gemini|클로드|Claude|코파일럿|Copilot|뤼튼|딥시크|DeepSeek|퍼플렉시티|Perplexity|미드저니|Midjourney|클로바|하이퍼클로바|노트북LM|NotebookLM)/i, '생성형 인공지능'],
+  [/^(넷플릭스|Netflix|왓챠|티빙|쿠팡플레이)/i, '온라인 동영상 서비스(OTT)'], [/^(네이버|구글|Naver|Google)$/i, '검색 엔진·포털'],
+  [/^(나무위키|위키백과|위키피디아|Wikipedia)/i, '온라인 백과사전'], [/^(TED|테드|세바시)/i, '온라인 강연'],
+  [/^(네이처|Nature|사이언스지)/i, '국제 학술지'], [/^(삼성전자|하이닉스|SK하이닉스|엔비디아|NVIDIA|TSMC|인텔|Intel|퀄컴)/i, '반도체 기업'],
+  [/^(현대자동차|현대차|기아자동차|기아차|테슬라|Tesla|토요타|도요타|벤츠|폭스바겐|BMW)/i, '자동차 기업'],
+  [/^(포토샵|Photoshop)/i, '사진 편집 프로그램'], [/^(캔바|미리캔버스|Canva|피그마|Figma)/i, '디자인 도구'],
+  [/^(패들렛|멘티미터|카훗|띵커벨|퀴즈앤|클래스카드|Padlet|Mentimeter|Kahoot)/i, '온라인 참여 도구'],
+  [/^(아두이노|마이크로비트|라즈베리|Arduino|micro|Raspberry)/i, '마이크로컨트롤러 보드'], [/^(스크래치|엔트리|Scratch)/i, '블록 코딩 도구'],
+  [/^(통계청)/, '공공 통계 자료'], [/(일보|신문|뉴스|뉴시스|타임스|포스트|가디언|경제|투데이)$/, '신문 기사'],
+  [/^(KBS|MBC|SBS|EBS|JTBC|tvN|YTN|MBN|TBC|BBC|CNN|채널A)$/, '방송 프로그램'],
+  [/^(UN|유엔|국제연합|유네스코|UNESCO|유니세프|UNICEF|WHO|세계보건기구|WTO|세계무역기구|OECD|IMF|국제통화기금|세계은행|IPCC)$/i, '국제기구'],
+  [/^(NASA|미국항공우주국|ESA|CERN|유럽입자물리연구소)$/i, '우주·과학 연구 기관'], [/^(KIST|ETRI|KERIS)$/, '연구 기관'], [/^LH$/, '공공 기관'],
+  [/^(그린피스|Greenpeace|월드비전|굿네이버스|세이브더칠드런|초록우산|국제앰네스티|국경없는의사회|WWF|세계자연기금|대한적십자사|적십자)$/i, '구호·환경 단체'],
+  [/(부|청|처)$/, '관계 기관'],
+];
+const CK_SKIP_BEFORE = [[/^테슬라/, /니콜라\s?$/]];   // 사람 이름 — 니콜라 테슬라
+const ckAltOf = t => (CK_ALT.find(([re]) => re.test(t)) || [])[1] || '';
+// 일반 명칭 — 기관 꼬리 앞에 이 말이 붙으면 특정 기관이 아니다(지역 박물관, 동물병원)
+const CK_GENERIC = new Set(['학교', '지역', '시립', '도립', '구립', '국립', '공립', '사립', '마을', '어린이', '작은', '가상', '온라인', '디지털', '인근', '근처', '동네',
+  '해당', '여러', '각종', '주변', '교내', '미니', '우리', '큰', '동물', '요양', '종합', '대학', '치과', '한방', '소아', '정신', '재활', '아동', '전문', '공공', '대형', '개인', '협력',
+  '기업', '민간', '국책', '부설', '정부', '공익', '비영리', '관련', '전문가', '장학', '문화', '복지', '상담', '청소년', '고객', '데이터', '주민', '스포츠', '진로',
+  '체험', '건강', '돌봄', '서비스', '지원', '연구', '과학', '역사', '자연사', '민속', '향토', '미술', '음악', '영화', '방송', '경제', '일반', '특성화', '자율형',
+  '타', '다른', '모든', '출신', '남자', '여자', '인문계', '실업계', '대안', '상급', '하급', '이웃', '자매', '각', '희망', '목표', '지망', '원하는', '국내', '해외',
+  '외국', '명문', '사이버', '방송통신', '교육', '과학기술', '주요', '상위', '미국', '영국', '일본', '중국', '종합대학', '단과', '원격', '공영', '민영', '중소',
+  '지방', '중앙', '시민', '사회적', '벤처', '소규모', '대규모', '외부', '현지', '본', '그', '이', '한']);
+const CK_SURNAME = '김이박최정강조윤장임한오서신권황안송류유전홍고문양손배백허남심노하곽성차주우구민진나지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용예봉경';
+const CK_NOT_NAME = new Set(['한국인', '외국인', '전문가', '이번에', '이후에', '정확히', '조사한', '조사를', '지도의', '담당한', '강의를', '주제로', '진로를',
+  '대학의', '대학원', '연구소', '연구원', '박사과', '교수법', '방문한', '초청한', '초청된', '현직의', '유명한', '기초과', '이야기', '장래의', '진학을',
+  '전공한', '지도한', '초빙한', '외부의', '대학교', '고등학', '만나본', '인터뷰', '좋아하', '존경하', '유명한', '여러분', '정치학', '경제학', '심리학', '공학자']);
+// 규칙 — { lv, cat, msg, ko: [낱말], en: [영문(대소문자 무시)], ab: [영문 약칭(대소문자 그대로)], opt, pair: { ko|re, gap }, alt }
+// pair 가 있으면 같은 문장 안에서 gap 글자 안에 짝이 있을 때만 걸린다(짝까지 이어서 선택)
+const SGB_CK_RULES = [
+  // 🔴 기재 불가
+  { lv: 'r', cat: '공인어학시험', msg: '공인어학시험은 참여 사실·성적 모두 어떤 칸에도 쓸 수 없음', alt: '영어 학습 활동',
+    ko: ['토익', '토플', '텝스', '오픽', '아이엘츠', '토셀', '지텔프', '공인\\s?어학', '어학\\s?(?:성적|점수|시험)'],
+    en: ['TOEIC', 'TOEFL', 'TEPS', 'OPIc', 'IELTS', 'TOSEL', 'G-?TELP', 'HSK', 'JLPT', 'JPT', 'DELF', 'DALF', 'DELE', 'TORFL', 'TestDaF', 'TSC'] },
+  { lv: 'r', cat: '대회 수상', msg: '수상은 「수상경력」 칸에만 — 교외 대회는 어디에도 쓸 수 없음',
+    ko: [CK_PRIZE + '(?:을|를|이)?\\s?(?:수상|받|차지|획득)', '대상(?:을|이)?\\s?(?:수상|받|차지|획득)', '(?:수상|입상|입선)(?:함|하였|했|하여|해|을\\s?(?:함|하였|했))',
+      '표창(?:장)?(?:을|를)?\\s?(?:받|수상)', '(?:우승|준우승)(?:함|하였|했|을\\s?(?:함|차지))'] },
+  { lv: 'r', cat: '대회 수상', msg: '수상은 「수상경력」 칸에만 — 교외 대회는 어디에도 쓸 수 없음',
+    ko: ['대회', '경진대회', '경시대회', '올림피아드', '공모전', '콘테스트', '컨테스트', '챌린지', '경연', '대항전'],
+    pair: { ko: [CK_PRIZE_MATE, '수상', '입상', '입선', '우승', '준우승', '[1-3]\\s?(?:위|등)(?!급)'], gap: 60 } },
+  { lv: 'r', cat: '교외 대회', msg: '교외 대회는 참가 사실도 쓸 수 없음(학교장 허락을 받았어도)',
+    ko: ['(?:교외|전국|국제|세계)(?=\\s|대회|올림피아드|공모전)(?:\\s?[가-힣A-Za-z·]{1,12}){0,4}?\\s?(?:대회|올림피아드|공모전|경시대회|경진대회)'] },
+  { lv: 'r', cat: '인증시험', msg: '교내·외 인증시험은 참여 사실·성적 모두 쓸 수 없음',
+    ko: ['한국사\\s?능력\\s?검정', '한자\\s?능력\\s?검정', '한자\\s?[1-8](?:급|단계)'], en: ['ITQ', 'MOS', 'DIAT', 'GTQ', 'TOPIK'] },
+  { lv: 'r', cat: '모의고사 성적', msg: '모의고사·학력평가 성적은 쓸 수 없음',
+    ko: ['모의고사', '모의\\s?평가', '학력\\s?평가', '전국\\s?연합', '학평', '모평', '수능\\s?모의'],
+    pair: { ko: ['등급', '백분위', '표준\\s?점수', '원점수', '\\d+\\s?점', '석차', '상위\\s?\\d+\\s?%'], gap: 30 } },
+  { lv: 'r', cat: '논문·학회', msg: '논문 투고·게재·학회 발표는 쓸 수 없음',
+    ko: ['논문', '학술지', '학회지', '저널'], pair: { ko: ['투고', '게재', '등재', '실리', '실렸', '실림'], gap: 30 } },
+  { lv: 'r', cat: '논문·학회', msg: '논문 투고·게재·학회 발표는 쓸 수 없음',
+    ko: ['[가-힣]{0,8}학회', '학술\\s?대회', '심포지엄', '컨퍼런스', '콘퍼런스'], pair: { ko: ['발표', '참가', '참석', '포스터'], gap: 30 } },
+  { lv: 'r', cat: '도서 출간', msg: '도서 출간 사실은 쓸 수 없음',
+    ko: ['책', '도서', '저서', '시집', '소설', '수필집', '에세이', '그림책', '전자책', '단행본'],
+    pair: { ko: ['(?:출간|출판|발간)(?:함|하였|했|하여|해서|되었|됐|됨)', '펴(?:냄|냈|내었)'], gap: 40 } },
+  { lv: 'r', cat: '지식재산권', msg: '특허·실용신안·상표·디자인 출원·등록은 쓸 수 없음',
+    ko: ['특허', '실용신안', '상표', '디자인권', '지식\\s?재산권', '저작권'],
+    pair: { ko: ['(?:출원|등록|취득|획득)(?:함|하였|했|하여|해|되었|됐|됨)', '(?:출원|등록)(?:을|를)\\s?(?:함|하였|했)'], gap: 20 } },
+  { lv: 'r', cat: '해외 활동', msg: '해외 활동 실적(봉사·연수 등)은 쓸 수 없음',
+    ko: ['(?:해외|국외)\\s?(?:봉사|연수|캠프|탐방|체험|유학|교류|여행|방문|어학|인턴)', '외국\\s?(?:봉사|연수|캠프|유학|여행)', '어학\\s?연수', '교환\\s?학생',
+      '유학(?=을|생활|중|하|길|했|하였|함)'] },
+  { lv: 'r', cat: '부모·친인척 직업', msg: '부모·친인척의 직업·직장·직위를 짐작하게 하는 내용은 쓸 수 없음',
+    ko: ['아버지', '어머니', '아빠', '엄마', '부모님', '부모', '부친', '모친', '양친', '아버님', '어머님', '조부모', '조부', '조모', '할아버지', '할머니',
+      '외할아버지', '외할머니', '삼촌', '외삼촌', '숙부', '숙모', '이모부', '고모부', '이모(?!티콘|지)', '고모(?!음)', '큰아버지', '작은아버지', '큰어머니',
+      '작은어머니', '사촌', '친척', '친인척', '형님', '형(?=[이은과의도께]|님)', '오빠', '누나', '언니', '가업'],
+    pair: { ko: ['의사(?!소통|결정|표현|전달)', '치과의사', '한의사', '약사', '간호사', '변호사', '판사', '검사(?!를|결과|하|지|에서)', '법조인', '교수', '교사', '교장', '교감',
+      '목사', '스님', '공무원', '경찰', '소방관', '군인', '장교', '장군', '기자', '사장', '임원', '원장', '국회의원', '시의원', '구청장', '군수',
+      '대기업', '회사원', '근무', '재직', '운영하', '경영하', '일하시', '자영업', '사업(?:을|가|체|장)', '농부', '농사', '어부',
+      '(?:식당|가게|회사|공장|병원|약국|학원)(?:을|를)?\\s?(?:운영|경영|하시|차리)'], en: ['CEO', 'PD'], gap: 15 },
+    self: ['가업'] },
+  { lv: 'r', cat: '대학명', msg: '특정 대학명은 쓸 수 없음', alt: '대학',
+    ko: ['서울대(?!공원|입구|로)', '연세대', '고려대', '카이스트', '포스텍', '포항공대', '유니스트', '디지스트', '지스트', '성균관대', '한양대', '중앙대', '경희대',
+      '서강대', '이화여대', '한국외대', '서울시립대', '건국대', '동국대', '홍익대', '국민대', '숭실대', '세종대', '단국대', '아주대', '인하대', '광운대', '명지대',
+      '상명대', '가톨릭대', '숙명여대', '성신여대', '동덕여대', '덕성여대', '서울여대', '한국항공대', '서울과기대', '부산대', '경북대', '전남대', '전북대',
+      '충남대', '충북대', '강원대', '제주대', '경상국립대', '부경대', '울산대', '동아대', '영남대', '계명대', '대구대', '대구가톨릭대', '대구한의대', '경일대',
+      '금오공대', '안동대', '한동대', '대구교대', '서울교대', '경인교대', '한국교원대', '공주대', '한밭대', '육군사관학교', '해군사관학교', '공군사관학교',
+      '경찰대학?', '과학기술원'],
+    en: ['KAIST', 'POSTECH', 'UNIST', 'DGIST', 'GIST'], ab: ['SKY(?=\\s?대)'] },
+  { lv: 'r', cat: '우리 학교', msg: '재학 중인 학교를 알 수 있는 말(학교명·재단명·축제명·별칭)은 쓸 수 없음', alt: '본교',
+    ko: [ckAlt(SGB_CK_SCHOOL) + '(?=$|[^가-힣]|의|에|를|을|가|이|와|과|는|은|도|만|로|생)'] },
+  { lv: 'r', cat: '사교육', msg: '사교육(학원·과외·인강 등) 이야기는 쓸 수 없음',
+    ko: ['[가-힣A-Za-z]{0,8}(?:어학원|학원)(?=$|[^가-힣]|에|의|을|를|에서|과|와|이|가)', '인강', '인터넷\\s?강의', '사교육',
+      '과외(?!\\s?활동)', '학습지', '선행\\s?학습', '메가스터디', '대성마이맥', '마이맥', '이투스', '스카이에듀', '시대인재', '강남대성', '비상에듀', '해커스',
+      '에듀윌', '야나두', '윤선생', '구몬', '웅진씽크빅', '재능교육', '밀크T', '엘리하이', '와이즈만'], skip: /대학원$/ },
+  { lv: 'r', cat: '방과후학교', msg: '방과후학교 활동은 기재하지 않음(학교스포츠클럽은 예외)', ko: ['방과\\s?후\\s?(?:학교|수업|강좌|프로그램|활동)'] },
+  { lv: 'r', cat: '상호명', msg: '상호명은 쓸 수 없음', re: /(㈜|\(주\)|주식회사)/g },
+  // 🟠 확인
+  { lv: 'o', cat: '대회 참가', msg: '교내 대회는 「수상경력」 칸에만 — 이 칸에 써도 되는지 확인',
+    ko: ['대회', '경진대회', '경시대회', '올림피아드', '공모전', '콘테스트', '경연'],
+    pair: { ko: ['참가(?!자)', '참여(?!자)', '출전', '응모', '출품', '본선', '예선', '결선', '진출'], gap: 30 } },
+  { lv: 'o', cat: '모의고사', msg: '모의고사·학력평가 이야기 — 성적은 쓸 수 없음', ko: ['모의고사', '학력\\s?평가', '모의\\s?평가', '전국\\s?연합'] },
+  { lv: 'o', cat: '도서 출간', msg: '출간·출판 사실이면 쓸 수 없음 — 확인', ko: ['(?:출간|출판|발간)(?:함|하였|했|하여|되었|됐|됨)', '펴(?:냄|냈|내었)'] },
+  { lv: 'o', cat: '소논문', msg: '소논문 — 올해 기재요령에서 쓸 수 있는지 확인', ko: ['소논문'] },
+  { lv: 'o', cat: '장학', msg: '장학생·장학금 — 올해 기재요령에서 쓸 수 있는지 확인', ko: ['장학생', '장학금', '장학\\s?재단'] },
+  { lv: 'o', cat: '석차·등급', msg: '석차·등급 — 성적 이야기는 성적 칸에',
+    ko: ['(?:전교|학년|학급|반|계열|과목)\\s?\\d{1,3}\\s?(?:등|위)(?!급)', '석차', '상위\\s?\\d+(?:\\.\\d+)?\\s?%', '(?:내신|성적|교과)\\s?\\d(?:\\.\\d+)?\\s?등급'] },
+  { lv: 'o', cat: '자격증', msg: '자격증은 「자격증 및 인증 취득상황」 칸에만',
+    ko: ['자격증', '(?:자격|면허)(?:을|를)?\\s?(?:취득|땄|따|획득)', '[1-3]\\s?급(?:을|를)?\\s?(?:취득|합격|땄)', '컴퓨터\\s?활용\\s?능력', '컴활', '워드프로세서',
+      '정보처리기능사', '정보처리산업기사'] },
+  { lv: 'o', cat: '청소년단체', msg: '정규교육과정 밖 청소년단체 활동은 기재하지 않음',
+    ko: ['걸스카우트', '보이스카우트', '스카우트', '청소년\\s?적십자', '아람단', '누리단', '해양소년단', '우주소년단', '청소년\\s?연맹'], ab: ['RCY'] },
+  { lv: 'o', cat: '상호명', msg: '상호명으로 보임 — 일반 명칭으로', ko: CK_BRAND_KO, en: CK_BRAND_EN, ab: CK_BRAND_AB },
+  { lv: 'o', cat: '상호명', msg: '상호명(수업 도구)으로 보임 — 일반 명칭으로', opt: 'tools', ko: CK_TOOLS_KO, en: CK_TOOLS_EN, ab: CK_TOOLS_AB },
+  { lv: 'o', cat: '상호명', msg: '상호명(프로그래밍 언어)으로 보임 — 일반 명칭으로', opt: 'langs', ko: CK_LANGS_KO, en: CK_LANGS_EN },
+  { lv: 'o', cat: '기관명', msg: '특정 기관명은 쓸 수 없음 — 일반 명칭으로', ko: CK_INTL_KO, en: CK_INTL_EN, ab: CK_INTL_AB },
+  { lv: 'o', cat: '기관명', msg: '특정 기관명은 쓸 수 없음 — 「공공 통계 자료」처럼 일반 명칭으로', opt: 'gov', ko: CK_GOV },
+];
+const ckEsc = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// 낱말 목록 → 정규식. 앞 글자를 잡는 묶음(1번)을 떼어 내고 2번이 찾은 낱말
+function ckCompile(r){
+  if (r._res) return r._res;
+  const res = [];
+  if (r.re) res.push(new RegExp('()' + r.re.source, 'g'));
+  if (r.ko?.length) res.push(new RegExp(`(^|[^가-힣])(${ckAlt(r.ko)})`, 'g'));
+  if (r.en?.length) res.push(new RegExp(`(^|[^A-Za-z])(${ckAlt(r.en)})(?![A-Za-z])`, 'gi'));
+  if (r.ab?.length) res.push(new RegExp(`(^|[^A-Za-z])(${ckAlt(r.ab)})(?![A-Za-z])`, 'g'));
+  r._res = res;
+  if (r.pair) r.pair._res = ckCompile({ ko: r.pair.ko, en: r.pair.en });
+  return res;
+}
+function ckFind(res, s){
+  const out = [];
+  for (const re of res){
+    re.lastIndex = 0; let m;
+    while ((m = re.exec(s))){
+      const pre = m[1] || '', t = m[2] ?? m[0].slice(pre.length), i = m.index + pre.length;
+      if (t) out.push([i, i + t.length, t]);
+      re.lastIndex = Math.max(re.lastIndex, i + Math.max(t.length, 1));
+    }
+  }
+  return out;
+}
+// 문장 — 마침표·물음표·느낌표 뒤, 줄바꿈에서 끊는다. [시작, 끝]
+function ckSentences(s){
+  const out = []; let a = 0;
+  const re = /[.!?。](?=\s|$)|\n/g; let m;
+  while ((m = re.exec(s))){ out.push([a, m.index + 1]); a = m.index + 1; }
+  if (a < s.length) out.push([a, s.length]);
+  return out;
+}
+// 학생 이름 — 성까지 세 글자 이상만(「한결」 처럼 두 글자 이름은 보통 낱말과 겹친다)
+let ckNameCache = [null, null];
+function ckNameRe(names){
+  if (ckNameCache[0] === names) return ckNameCache[1];
+  const list = [...new Set((names || []).map(n => String(n || '').trim()).filter(n => /^[가-힣]{3,5}$/.test(n)))].sort((x, y) => y.length - x.length);
+  const re = list.length ? new RegExp(`(^|[^가-힣])(${list.map(ckEsc).join('|')})`, 'g') : null;
+  ckNameCache = [names, re];
+  return re;
+}
+// 점검 — [{ s, e, t, lv, cat, msg, alt, rep? }]. rep 이 있으면 「고치기」 로 그 자리를 rep 으로 바꾼다(s === e 면 끼워 넣기)
+function sgbCheck(text, ctx = {}){
+  const s = String(text ?? '');
+  const hits = [];
+  if (!s.trim()) return hits;
+  const sents = ckSentences(s);
+  const sentOf = i => sents.find(([a, b]) => i >= a && i < b) || [0, s.length];
+  const add = (st, en, lv, cat, msg, alt, rep) => hits.push({ s: st, e: en, t: s.slice(st, en), lv, cat, msg, alt: alt || '', ...(rep !== undefined ? { rep } : {}) });
+  for (const r of SGB_CK_RULES){
+    if (r.opt && !SGB_CK_OPT[r.opt]) continue;
+    const found = ckFind(ckCompile(r), s);
+    if (!r.pair){
+      for (const [a, b, t] of found){
+        if (r.skip?.test(t) || CK_SKIP_BEFORE.some(([w, pre]) => w.test(t) && pre.test(s.slice(Math.max(0, a - 8), a)))) continue;
+        add(a, b, r.lv, r.cat, r.msg, r.alt || ckAltOf(t));
+      }
+      continue;
+    }
+    const mates = ckFind(r.pair._res, s);
+    for (const [a, b, t] of found){
+      if (r.self?.includes(t)){ add(a, b, r.lv, r.cat, r.msg, r.alt); continue; }
+      const [sa, sb] = sentOf(a);
+      const m = mates.filter(([c, d]) => c >= sa && d <= sb && (c >= b ? c - b : a - d) <= r.pair.gap && !(c < b && d > a))
+        .sort((x, y) => Math.abs(x[0] - a) - Math.abs(y[0] - a))[0];
+      if (m) add(Math.min(a, m[0]), Math.max(b, m[1]), r.lv, r.cat, r.msg, r.alt);
+    }
+  }
+  for (const m of s.matchAll(/(^|[^가-힣])([가-힣]{2,8})(대학교|대학원|대학병원)/g)){
+    if (CK_GENERIC.has(m[2])) continue;
+    const i = m.index + m[1].length; add(i, i + m[2].length + m[3].length, 'r', '대학명', '특정 대학명은 쓸 수 없음', '대학');
+  }
+  // 기관명 꼴 — ① 지명·나라 이름으로 시작해 기관 꼬리로 끝나는 붙여 쓴 낱말 ② 꼬리만(앞말이 일반 명칭이 아니면) ③ 다른 학교 이름
+  for (const [a, b, t] of ckFind([new RegExp(`(^|[^가-힣])(${CK_PLACE}[가-힣]{0,10}?${CK_ORG_TAIL})(?!각|률|자)`, 'g')], s))
+    add(a, b, 'o', '기관명', '특정 기관명은 쓸 수 없음 — 일반 명칭으로', t.match(new RegExp(CK_ORG_TAIL + '$'))?.[0] || '');
+  const tail2 = ckAlt('박물관', '미술관', '과학관', '기념관', '연구소', '재단', '협회', '학회', '병원', '출판사', '방송국', '신문사');
+  for (const m of s.matchAll(new RegExp(`(^|[^가-힣])([가-힣A-Za-z]{2,10}?)(${tail2})`, 'g'))){
+    if (CK_GENERIC.has(m[2]) || new RegExp('^' + CK_PLACE).test(m[2])) continue;
+    const i = m.index + m[1].length; add(i, i + m[2].length + m[3].length, 'o', '기관명', '특정 기관명은 쓸 수 없음 — 일반 명칭으로', m[3]);
+  }
+  const school = ckAlt('고등학교', '중학교', '초등학교', '고교', '여고', '여중', '과학고', '외고', '국제고', '예고', '마이스터고');
+  for (const m of s.matchAll(new RegExp(`(^|[^가-힣])([가-힣]{2,8}?)(${school})`, 'g'))){
+    if (CK_GENERIC.has(m[2]) || SGB_CK_SCHOOL.includes(m[2] + m[3])) continue;
+    const i = m.index + m[1].length; add(i, i + m[2].length + m[3].length, 'o', '다른 학교', '다른 학교 이름 — 기관명은 쓸 수 없음', '다른 학교');
+  }
+  // 강사명 — 성씨 + 두 글자 바로 뒤 교수·박사·작가·강사 …
+  for (const m of s.matchAll(new RegExp(`(^|[^가-힣])([${CK_SURNAME}][가-힣]{2})\\s?(교수|박사|작가|강사|연구원|소장|원장|변호사|기자|선생님)(?=님|의|을|를|과|와|에게|께|이|가|로|으로|\\s|$|[,.·)」』])`, 'g'))){
+    if (CK_NOT_NAME.has(m[2])) continue;
+    const i = m.index + m[1].length; add(i, i + m[0].length - m[1].length, 'o', '강사명', '강사명은 쓸 수 없음 — 「외부 강사」·「전문가」로', '외부 강사');
+  }
+  // 학생 이름 — 다른 학생(🟠) · 그 학생 본인(🔵, 보통 쓰지 않음)
+  const nre = ckNameRe(ctx.names);
+  if (nre) for (const [a, b, t] of ckFind([nre], s)){
+    if (ctx.self && t === ctx.self) add(a, b, 'b', '학생 이름', '학생 본인 이름은 보통 쓰지 않음');
+    else add(a, b, 'o', '다른 학생 이름', '다른 학생 이름 — 넣지 않음(개인정보)');
+  }
+  // 🔵 형식 — 고치기
+  for (const m of s.matchAll(/[  ]{2,}/g)) add(m.index, m.index + m[0].length, 'b', '띄어쓰기', '두 칸 이상 띄어 씀', '', ' ');
+  for (const m of s.matchAll(/[.!?](?=[가-힣A-Za-z])/g)) add(m.index, m.index + 1, 'b', '띄어쓰기', '마침표 뒤에 띄어 쓰지 않음', '', m[0] + ' ');
+  for (const m of s.matchAll(/[​-‍⁠﻿]+/g)) add(m.index, m.index + m[0].length, 'b', '보이지 않는 문자', '보이지 않는 문자(복사할 때 따라옴)', '', '');
+  for (const m of s.matchAll(/[\t　]| (?![  ])/g)) add(m.index, m.index + 1, 'b', '보이지 않는 문자', '탭·전각 공백(복사할 때 따라옴)', '', ' ');
+  for (const m of s.matchAll(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu)) add(m.index, m.index + m[0].length, 'b', '특수 문자', '나이스에서 깨질 수 있는 문자', '', '');
+  const end = s.replace(/\s+$/, '');
+  if (end && !/[.!?。…"'”’」』)\]]$/.test(end)) add(end.length, end.length, 'b', '마침표', '끝에 마침표가 없음', '', '.');
+  // 같은 문장이 두 번 — 띄어쓰기는 보지 않고, 열 글자 이상만. 뒤에 나온 것을 가리킨다
+  const seen = new Map();
+  for (const [a, b] of sents){
+    const k = s.slice(a, b).replace(/\s+/g, '');
+    if (k.length < 10) continue;
+    if (seen.has(k)){ const lead = s.slice(a, b).match(/^\s*/)[0].length; add(a + lead, b, 'b', '같은 문장', '같은 문장이 두 번 들어감'); }
+    else seen.set(k, a);
+  }
+  // 겹치면 높은 단계 · 긴 쪽만(🔵 형식은 따로 남긴다), 앞에서부터
+  hits.sort((x, y) => SGB_CK_LV[y.lv] - SGB_CK_LV[x.lv] || (y.e - y.s) - (x.e - x.s) || x.s - y.s);
+  const kept = [];
+  for (const h of hits){
+    const clash = kept.some(k => k.lv !== 'b' && h.lv !== 'b' && h.s < k.e && k.s < h.e);
+    const dup = kept.some(k => k.s === h.s && k.e === h.e && k.cat === h.cat);
+    if (!clash && !dup) kept.push(h);
+  }
+  return kept.sort((x, y) => x.s - y.s || SGB_CK_LV[y.lv] - SGB_CK_LV[x.lv]);
+}
 </script>
 
 <script type="module">
@@ -2584,10 +2930,12 @@ async function drRenderPanel(){
   // 글은 값으로 넣는다(태그 안에 쓰면 맨 앞 줄바꿈이 사라진다)
   pane.querySelectorAll('textarea[data-f]').forEach(ta => { ta.value = drGet(d, ta.dataset.f); if (!ta.hidden) drGrow(ta); });
   pane.oninput = drOnInput; pane.onchange = drOnChange; pane.onclick = drOnClick;
+  pane.onfocusout = e => { const f = e.target.dataset?.f; if (DR_AREAS.some(([k]) => k === f)) setTimeout(() => drCkRun(f), 200); };   // 끝 마침표는 칸을 벗어날 때(누름이 끝난 뒤)
   pane.scrollTop = 0;
   Object.keys(drConf.get(key) || {}).forEach(f => drConfPaint(key, f));   // 고르지 않은 겹친 칸이 있으면 다시
   drWatch(key);                                // 다른 창(새 창·폰)에서 고치면 바로 불러온다
   drUsedMarks();
+  DR_AREAS.forEach(([k]) => drCkRun(k));       // 기재요령 점검
 }
 function drPanelHtml(ck, list, at, d){
   const r = list[at], prev = list[at - 1], next = list[at + 1], [g, c] = ck.split('-'), me = fbAuth.currentUser?.email || '';
@@ -2615,9 +2963,11 @@ function drPanelHtml(ck, list, at, d){
 function drAreaHtml(k, nm, t, d){
   const v = d[k] || '', hv = d.hold?.[k] || '', over = sgbNeisBytes(v) > SGB_NEIS_LIMIT[t];
   return `<section class="drp-area" data-k="${k}">
-    <div class="drp-ah"><span class="tag ${SGB_TAG_CLS[t]}">${nm}</span><span class="drp-b${over ? ' over' : ''}" id="drB-${k}">${drBytesTxt(v, t)}</span></div>
+    <div class="drp-ah"><span class="tag ${SGB_TAG_CLS[t]}">${nm}</span><span class="drp-b${over ? ' over' : ''}" id="drB-${k}">${drBytesTxt(v, t)}</span>
+      <button type="button" class="drp-ck" id="drCk-${k}" data-ck="${k}" aria-expanded="false" hidden></button></div>
     <div class="drp-meter${over ? ' over' : ''}" id="drM-${k}"><i style="width:${drPct(v, t).toFixed(1)}%"></i></div>
     <textarea class="drp-t${over ? ' over' : ''}" id="drT-${k}" data-f="${k}" aria-label="${nm} 작성" placeholder="직접 쓰거나, 보조자료 카드의 「→ ${nm}」 단추로 붙입니다"></textarea>
+    <div class="drp-ckp" id="drCkP-${k}" hidden></div>
     <div class="drp-links">
       <button type="button" class="drp-link" data-holdt="${k}" aria-expanded="${hv ? 'true' : 'false'}">빼 둔 내용<span id="drHoldN-${k}">${hv ? ' ' + hv.length.toLocaleString() + '자' : ''}</span></button>
       <button type="button" class="drp-link" data-hist="${k}" aria-expanded="false">되돌리기</button>
@@ -2627,6 +2977,70 @@ function drAreaHtml(k, nm, t, d){
     <textarea class="drp-t drp-hold" id="drHT-${k}" data-f="hold.${k}" aria-label="${nm} 빼 둔 내용" placeholder="바이트가 넘쳐 뺀 문장 — 상담하며 다시 넣을 수 있게(바이트·인쇄 제외)"${hv ? '' : ' hidden'}></textarea>
     <div class="drp-hist" id="drH-${k}" hidden></div>
   </section>`;
+}
+// ── 기재요령 점검(작성 칸) ── 칸마다 바이트 옆 「⚠ 2」(가장 높은 단계 색), 누르면 칸 아래 목록 —
+// 「그 자리로」(글 상자에서 그 부분을 고른다) · 「괜찮음」(이 기기에 기억 — 그 학생 그 칸의 그 말은 다시 안 건다) · 🔵 「고치기」.
+// 쓰는 대로(손을 멈추고 0.3초), 다른 창에서 불러올 때도 다시 본다. 저장은 막지 않는다. 규칙은 sgbCheck(순수 함수 블록)
+const CK_OK_KEY = 'ynhs-sgb-ckok';
+let ckOk = (() => { try { return JSON.parse(localStorage.getItem(CK_OK_KEY) || '{}') || {}; } catch (e) { return {}; } })();
+const ckOkKey = (key, f, h) => `${key}|${f}|${h.cat}|${h.t}`;
+const CK_ICON = { r: '🔴', o: '🟠', b: '🔵' };
+let ckBookSrc = null, ckBookNames = [];
+function ckNames(){ if (ckBookSrc !== BOOK){ ckBookSrc = BOOK; ckBookNames = BOOK.map(x => x.name); } return ckBookNames; }   // 명단이 바뀔 때만 새로
+const ckItems = (key, f, v, self) => sgbCheck(v, { names: ckNames(), self }).filter(h => !ckOk[ckOkKey(key, f, h)]);
+const drCkSelf = () => drStudents(`${+st.g}-${+st.c}`).find(r => +r.n === +st.n)?.nm || '';
+const drCkOpen = new Set();                   // 목록을 펼친 칸(학생을 넘겨도 펼친 채로)
+const drCkTimer = {};
+function drCkLater(f){ clearTimeout(drCkTimer[f]); drCkTimer[f] = setTimeout(() => drCkRun(f), 300); }
+function drCkRun(f){
+  const ta = $('drT-' + f), chip = $('drCk-' + f), box = $('drCkP-' + f);   // drC- 는 겹친 칸 알림이 쓴다
+  if (!ta || !chip || !box) return;
+  // 쓰는 중(그 칸에 커서)에는 끝 마침표를 묻지 않는다 — 마지막 문장을 아직 쓰고 있다. 칸을 벗어나면 다시 본다
+  const items = ta._ck = ckItems(drKey(), f, ta.value, drCkSelf()).filter(h => !(h.cat === '마침표' && document.activeElement === ta));
+  const n = items.length, top = items.reduce((m, h) => SGB_CK_LV[h.lv] > SGB_CK_LV[m] ? h.lv : m, 'b');
+  const cnt = ['r', 'o', 'b'].map(l => [l, items.filter(h => h.lv === l).length]).filter(([, c]) => c);
+  const sum = cnt.map(([l, c]) => `${CK_ICON[l]} ${c}`).join(' · ');
+  chip.hidden = !n; chip.className = 'drp-ck' + (n ? ' ' + top : '');
+  chip.textContent = `⚠ ${n}`;
+  chip.title = `기재요령 점검 — ${sum} (누르면 목록)`; chip.setAttribute('aria-label', `기재요령 점검 ${n}건`);
+  const open = !!n && drCkOpen.has(f);
+  chip.setAttribute('aria-expanded', String(open));
+  box.hidden = !open;
+  // 걸린 것이 그대로면 목록을 다시 그리지 않는다 — 누르는 사이에 단추가 바뀌면 그 누름이 사라진다
+  const sig = open ? items.map(h => `${h.lv}${h.s}:${h.e}${h.cat}${h.t}`).join('|') : '';
+  if (box._sig === sig) return;
+  box._sig = sig;
+  box.innerHTML = !open ? '' : `<div class="ck-head">기재요령 점검 <span class="d">${sum} — 막지 않고 알려 주기만 합니다</span>
+      ${items.filter(h => 'rep' in h).length > 1 ? `<button type="button" class="btn sm" data-ckfixall="${f}">🔵 ${items.filter(h => 'rep' in h).length}곳 모두 고치기</button>` : ''}</div>
+    ${items.map((h, i) => `<div class="ck-row" data-lv="${h.lv}"><span class="ck-lv" aria-hidden="true">${CK_ICON[h.lv]}</span>
+      <div class="ck-body">${h.t.trim() ? `<span class="ck-t">「${esc(h.t.length > 40 ? h.t.slice(0, 40) + '…' : h.t)}」</span>` : ''}<span class="ck-cat">${esc(h.cat)}</span>
+        <div>${esc(h.msg)}</div>${h.alt ? `<div class="ck-alt">바꿔 쓰기: <b>${esc(h.alt)}</b></div>` : ''}</div>
+      <div class="ck-acts"><button type="button" data-ckgo="${f}" data-i="${i}">그 자리로</button>${'rep' in h ? `<button type="button" data-ckfix="${f}" data-i="${i}">고치기</button>`
+        : `<button type="button" data-ckok="${f}" data-i="${i}" title="이 학생 이 칸의 이 말은 다시 걸지 않습니다(이 기기)">괜찮음</button>`}</div></div>`).join('')}`;
+}
+// 그 자리로 — 글 상자에서 그 부분을 고르고, 글 상자가 보이게
+function drCkGo(f, i){
+  const ta = $('drT-' + f), h = ta?._ck?.[i]; if (!h) return;
+  ta.scrollIntoView({ block: 'nearest' });
+  ta.focus({ preventScroll: true }); ta.setSelectionRange(h.s, h.e);
+  ta.classList.add('hit'); setTimeout(() => ta.classList.remove('hit'), 1200);
+}
+// 고치기 — 뒤에서부터 바꿔 앞자리가 밀리지 않게, 겹치는 것은 건너뛴다. 쓰는 것과 똑같이 저장·바이트·점검
+function drCkFix(f, idx){
+  const ta = $('drT-' + f); if (!ta?._ck) return;
+  const list = idx.map(i => ta._ck[i]).filter(h => h && 'rep' in h).sort((a, b) => b.s - a.s || b.e - a.e);
+  if (!list.length) return;
+  let v = ta.value, lim = Infinity;
+  for (const h of list){ if (h.e > lim) continue; v = v.slice(0, h.s) + h.rep + v.slice(h.e); lim = h.s; }
+  ta.value = v;
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
+  drCkRun(f);
+}
+function drCkOkSet(f, i){
+  const ta = $('drT-' + f), h = ta?._ck?.[i]; if (!h) return;
+  ckOk[ckOkKey(drKey(), f, h)] = 1;
+  try { localStorage.setItem(CK_OK_KEY, JSON.stringify(ckOk)); } catch (e) {}
+  drCkRun(f);
 }
 function drGrow(ta){ ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 2) + 'px'; }
 function drSaved(txt, err){ const el = $('drSaved'); if (!el) return; el.textContent = txt; el.classList.toggle('err', !!err); }
@@ -2646,6 +3060,7 @@ function drPaint(ta){
     const over = sgbNeisBytes(v) > SGB_NEIS_LIMIT[area[2]], lab = $('drB-' + f), m = $('drM-' + f);
     lab.textContent = drBytesTxt(v, area[2]); lab.classList.toggle('over', over); ta.classList.toggle('over', over);
     m.classList.toggle('over', over); m.firstElementChild.style.width = drPct(v, area[2]).toFixed(1) + '%';
+    drCkLater(f);
   }
   if (f.startsWith('hold.')) $('drHoldN-' + f.slice(5)).textContent = v ? ' ' + v.length.toLocaleString() + '자' : '';
 }
@@ -2670,6 +3085,11 @@ function drOnClick(e){
   const ct = e.target.closest('[data-conf-take]'); if (ct){ drConfTake(ct.dataset.confTake); return; }
   const ck = e.target.closest('[data-conf-keep]'); if (ck){ drConfKeep(ck.dataset.confKeep); return; }
   const pr = e.target.closest('[data-pr]'); if (pr){ drPrint(pr.dataset.pr, { ck: `${+st.g}-${+st.c}`, noH: !!$('drPrNoH')?.checked }); return; }
+  const ckc = e.target.closest('[data-ck]'); if (ckc){ const f = ckc.dataset.ck; if (drCkOpen.has(f)) drCkOpen.delete(f); else drCkOpen.add(f); drCkRun(f); return; }
+  const cg = e.target.closest('[data-ckgo]'); if (cg){ drCkGo(cg.dataset.ckgo, +cg.dataset.i); return; }
+  const cf = e.target.closest('[data-ckfix]'); if (cf){ drCkFix(cf.dataset.ckfix, [+cf.dataset.i]); return; }
+  const ca = e.target.closest('[data-ckfixall]'); if (ca){ const f = ca.dataset.ckfixall; drCkFix(f, ($('drT-' + f)?._ck || []).map((h, i) => 'rep' in h ? i : -1).filter(i => i >= 0)); return; }
+  const co = e.target.closest('[data-ckok]'); if (co){ drCkOkSet(co.dataset.ckok, +co.dataset.i); return; }
   if (e.target.closest('#drClassBtn')){ drFlush(); st.clsK = `${+st.g}-${+st.c}`; st.view = 'cls'; save(); render(); return; }
   if (e.target.closest('#drSaved.err')) drFlush();
 }
@@ -3098,6 +3518,38 @@ async function prFonts(){
     new Promise(r => setTimeout(r, 2000)),
   ]).catch(() => {});
 }
+// 참여한 활동(보조자료) — 기재안에 들어갔는지 ✓ 들어감 · ◐ 일부 · □ 아직(선생님 요청 2026-10-30). 봉사활동 기록은 뺀다.
+// 학번·이름이 어긋나 빌려 온 자료도 학생 화면처럼 넣는다. 들어갔는지는 카드의 「✓ 자율에 들어감」 과 같은 잣대(sgbUsed)
+async function prActsOf(key){
+  let d = null; try { d = await loadStudent(key); } catch (e) {}
+  const items = [...(d?.items || [])];
+  for (const m of sgbMisFor(META?.mismatch, key).borrow){
+    let src = null; try { src = await loadStudent(sgbMisKey(m)); } catch (e) {}
+    for (const it of src?.items || []) if (it.a === m.a) items.push(it);
+  }
+  const by = new Map();
+  for (const it of items){ const a = actById(it.a); if (!a || sgbIsVolunteer(a)) continue; if (!by.has(a)) by.set(a, []); by.get(a).push(it.b || ''); }
+  return [...by].map(([a, texts]) => ({ a, texts }));
+}
+function prActsHtml(acts, d, noH){
+  const ks = DR_AREAS.map(([k]) => k).filter(k => !(noH && k === 'haeng'));
+  const onlyH = a => (a.tags || []).length > 0 && a.tags.every(t => t === '행');
+  const list = acts.filter(({ a }) => !(noH && onlyH(a))).map(({ a, texts }) => {
+    const ts = texts.filter(t => t.trim()), best = {};
+    for (const k of ks){ const v = d[k] || ''; if (v.trim() && ts.length) best[k] = Math.max(...ts.map(t => sgbUsed(t, v))); }
+    const full = ks.filter(k => best[k] >= DR_USED_FULL), part = ks.filter(k => best[k] >= DR_USED_PART).sort((x, y) => best[y] - best[x]);
+    const st = !ts.length ? 'nob' : full.length ? 'full' : part.length ? 'part' : 'none';
+    const where = st === 'full' ? full.map(k => DR_NAME[k]).join('·') : st === 'part' ? `${DR_NAME[part[0]]} 일부` : st === 'nob' ? '문안 없음'
+      : (a.tags || []).map(t => SGB_TAGS[t] || t).join('·');
+    return { a, st, where };
+  });
+  if (!list.length) return '';
+  const n = x => list.filter(y => y.st === x).length, mark = { full: '✓', part: '◐', none: '□', nob: '·' };
+  return `<tr class="pr-acts"><td>
+    <div class="pr-ash"><b>참여한 활동</b><span>${list.length}개 · 들어감 ${n('full')} · 일부 ${n('part')} · 아직 ${n('none')}</span></div>
+    <ul class="pr-al">${list.map(x => `<li class="${x.st}"><i>${mark[x.st]}</i><span class="pr-an">${esc(x.a.title)}</span><span class="pr-aw">${esc(x.where)}</span></li>`).join('')}</ul>
+    <div class="pr-legend">✓ 기재안에 들어감 · ◐ 일부 들어감 · □ 아직 — 보조자료 기준, 봉사활동 기록은 뺌</div></td></tr>`;
+}
 async function drPrint(which, { ck, noH }){
   await drFlush();
   const [g, c] = ck.split('-');
@@ -3106,12 +3558,13 @@ async function drPrint(which, { ck, noH }){
     try { await drLoadClass(ck, list); }
     catch (e) { toast('반 작성 내용을 불러오지 못했습니다'); return; }
   }
-  const ds = prDate();
+  const ds = prDate(), acts = new Map();
+  await Promise.all(rows.map(async r => acts.set(+r.n, await prActsOf(`${g}-${c}-${r.n}`))));   // 참여한 활동(보조자료)
   $('printArea').innerHTML = rows.map((r, i) => {
     const d = drCache.get(`${ck}-${r.n}`) || {};
     return `<section class="pr-page"><table class="pr-frame">
       <thead><tr><td>${prHead(esc(r.nm), `${esc(g)}학년 ${esc(c)}반 ${esc(r.n)}번`, ds)}</td></tr></thead>
-      <tbody>${DR_AREAS.filter(([k]) => !(noH && k === 'haeng') && !(DR_PR_SKIP.has(k) && !(d[k] || '').trim())).map(([k, , tg]) => {
+      <tbody>${prActsHtml(acts.get(+r.n) || [], d, noH)}${DR_AREAS.filter(([k]) => !(noH && k === 'haeng') && !(DR_PR_SKIP.has(k) && !(d[k] || '').trim())).map(([k, , tg]) => {
         const v = d[k] || '', b = sgbNeisBytes(v), lim = SGB_NEIS_LIMIT[tg], over = b > lim;
         return `<tr class="pr-sec${over ? ' over' : ''}" data-k="${k}"><td>
           <div class="pr-sh"><b>${DR_FULL[k]}</b><span class="pr-bytes">${b.toLocaleString()} / ${lim.toLocaleString()}바이트${over ? ` · ${(b - lim).toLocaleString()} 초과` : ''}</span></div>
@@ -3153,14 +3606,24 @@ function clsDraw(ck, list, at){
   if (tab === 'all'){
     const cnt = areas.map(([k, , t]) => { const lim = SGB_NEIS_LIMIT[t]; let f = 0, o = 0;
       for (const r of list){ const v = drCache.get(`${ck}-${r.n}`)?.[k] || ''; if (v.trim()) f++; if (sgbNeisBytes(v) > lim) o++; } return { f, o }; });
-    main = `<div class="cls-sum">한눈에 — 영역마다 바이트(한도 1,500). 빨강은 넘음, 「—」 는 아직 쓰지 않음. 이름을 누르면 그 학생 작성 칸으로</div>
-      <table class="cls-t cls-all"><thead><tr><th>번호</th><th>이름</th>${areas.map(([, nm]) => `<th class="r">${nm}</th>`).join('')}<th class="r c-up">마지막 저장</th></tr></thead><tbody>
-      ${list.map(r => { const d = drCache.get(`${ck}-${r.n}`) || {};
+    // 점검 — 학생마다 기재요령에 걸린 수(🔴 기재 불가로 보임 · 🟠 확인, 둘 다 없으면 🔵). 「괜찮음」 한 것은 빼고(이 기기)
+    let flagged = 0;
+    const ckCell = (key, d, nm) => {
+      const c = { r: 0, o: 0, b: 0 }, cats = new Set();
+      for (const [k] of areas) for (const h of ckItems(key, k, d[k] || '', nm)){ c[h.lv]++; if (h.lv !== 'b') cats.add(h.cat); }
+      if (c.r || c.o) flagged++;
+      const txt = c.r || c.o ? `${c.r ? `<span class="ck-n r">🔴 ${c.r}</span>` : ''}${c.o ? `<span class="ck-n o">🟠 ${c.o}</span>` : ''}` : c.b ? `<span class="ck-n b">🔵 ${c.b}</span>` : '—';
+      return `<td class="ck" title="${esc(cats.size ? '기재요령 점검 — ' + [...cats].join(' · ') : '기재요령 점검')}">${txt}</td>`;
+    };
+    const rows = list.map(r => { const d = drCache.get(`${ck}-${r.n}`) || {};
         return `<tr><td class="n">${esc(r.n)}</td><td class="nm"><button type="button" data-n="${r.n}" title="이 학생 작성 칸으로">${esc(r.nm)}</button></td>
           ${areas.map(([k, nm, t]) => { const v = d[k] || '', b = sgbNeisBytes(v), lim = SGB_NEIS_LIMIT[t];
             return `<td class="bx ${!v.trim() ? 'none' : b > lim ? 'over' : 'ok'}" data-k="${k}" title="${nm} ${b.toLocaleString()} / ${lim.toLocaleString()}바이트">${v.trim() ? b.toLocaleString() : '—'}</td>`; }).join('')}
-          <td class="r c-up">${d.upd ? fmtAt(d.upd) : ''}</td></tr>`; }).join('')}
-      </tbody><tfoot><tr><td></td><td>쓴 학생</td>${cnt.map(x => `<td class="r">${x.f} / ${list.length}${x.o ? ` <span class="err">· 넘음 ${x.o}</span>` : ''}</td>`).join('')}<td class="c-up"></td></tr></tfoot></table>`;
+          ${ckCell(`${ck}-${r.n}`, d, r.nm)}<td class="r c-up">${d.upd ? fmtAt(d.upd) : ''}</td></tr>`; }).join('');
+    main = `<div class="cls-sum">한눈에 — 영역마다 바이트(한도 1,500). 빨강은 넘음, 「—」 는 아직 쓰지 않음. 점검은 기재요령에 걸린 수(🔴 기재 불가로 보임 · 🟠 확인). 이름을 누르면 그 학생 작성 칸으로</div>
+      <table class="cls-t cls-all"><thead><tr><th>번호</th><th>이름</th>${areas.map(([, nm]) => `<th class="r">${nm}</th>`).join('')}<th class="r">점검</th><th class="r c-up">마지막 저장</th></tr></thead><tbody>
+      ${rows}
+      </tbody><tfoot><tr><td></td><td>쓴 학생</td>${cnt.map(x => `<td class="r">${x.f} / ${list.length}${x.o ? ` <span class="err">· 넘음 ${x.o}</span>` : ''}</td>`).join('')}<td class="r">${flagged ? `걸림 ${flagged}명` : ''}</td><td class="c-up"></td></tr></tfoot></table>`;
   } else {
     const [k, nm, t] = area, lim = SGB_NEIS_LIMIT[t];
     const rows = list.map(r => { const v = drCache.get(`${ck}-${r.n}`)?.[k] || ''; return { r, v, b: sgbNeisBytes(v) }; });
@@ -3958,7 +4421,10 @@ document.addEventListener('click', e => {
   try { localStorage.setItem(FS_KEY, JSON.stringify(FS)); } catch (err) {}
   fsApply();
 });
-window.addEventListener('storage', e => { if (e.key === FS_KEY){ fsLoad(); fsApply(); } });
+window.addEventListener('storage', e => {
+  if (e.key === FS_KEY){ fsLoad(); fsApply(); }
+  if (e.key === CK_OK_KEY){ try { ckOk = JSON.parse(e.newValue || '{}') || {}; } catch (err) { ckOk = {}; } DR_AREAS.forEach(([k]) => drCkRun(k)); }
+});
 fsLoad(); fsApply();
 // 앱이 탭에 다시 들어올 때 보내는 신호 — 그사이 새로 올라왔을 수 있다
 window.addEventListener('message', e => {

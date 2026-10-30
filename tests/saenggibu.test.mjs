@@ -2735,6 +2735,117 @@ console.log('\n[글자 크기]');
   await p.context().close();
 }
 
+// ── 기재요령 점검(선생님 요청 2026-10-30) ── 작성 칸 바이트 옆 「⚠ N」(가장 높은 단계 색), 누르면 칸 아래 목록 —
+// 「그 자리로」 · 「괜찮음」(이 기기에 기억) · 🔵 「고치기」. 우리 반 생기부 한눈에 「점검」 칸. 규칙 자체는 sgb-check.test.mjs 가 본다
+console.log('\n[기재요령 점검]');
+{
+  const p = await openAs(KIM, { width: 1440 });
+  await p.waitForSelector('#stus .stu');
+  await p.click('#stus .stu[data-n="1"]');
+  await p.waitForSelector('#drOpenBtn');
+  await p.click('#drOpenBtn');
+  await p.waitForSelector('#drT-jin', { state: 'visible' });
+  const chipOf = f => p.evaluate(f => { const c = document.getElementById('drCk-' + f); return { hidden: c.hidden, cls: c.className, t: c.textContent }; }, f);
+  check('처음(걸린 것 없는 칸)에는 ⚠ 가 없다', (await chipOf('haeng')).hidden || !(await p.$('#drCk-haeng')));
+  const TXT = '전국 과학 탐구 대회에서 금상을 수상함. 유튜브 영상을 참고하여  발표함.의사인 아버지를 보며 진로를 고민함';
+  await p.fill('#drT-jin', TXT);
+  await p.waitForFunction(() => document.getElementById('drCk-jin').classList.contains('r'), null, { timeout: 3000 }).catch(() => {});   // 0.3초 뒤 새 글로
+  const c1 = await chipOf('jin');
+  check('쓰는 대로 바이트 옆에 「⚠ N」 — 가장 높은 단계 색(🔴 빨강)', !c1.hidden && c1.cls.split(' ').includes('r') && /^⚠ \d+$/.test(c1.t), c1);
+  check('— 쓰는 중(커서가 그 칸)에는 끝 마침표를 묻지 않는다', await p.evaluate(() => { const t = document.getElementById('drT-jin');
+    return document.activeElement === t && (t._ck || []).length > 0 && !(t._ck || []).some(h => h.cat === '마침표'); }));
+  await p.click('#drCk-jin');
+  await p.waitForSelector('#drCkP-jin .ck-row', { timeout: 3000 }).catch(() => {});
+  const rows = await p.$$eval('#drCkP-jin .ck-row', rs => rs.map(r => ({ lv: r.dataset.lv, t: r.innerText.replace(/\s+/g, ' ') })));
+  const inRows = re => rows.some(r => re.test(r.t));
+  check('누르면 칸 아래 목록 — 교외 대회 · 대회 수상 · 부모 직업(🔴) · 상호명과 바꿔 쓸 말(🟠) · 띄어쓰기(🔵) · 끝 마침표(칸을 벗어나면)',
+    inRows(/전국 과학 탐구 대회.*교외 대회/) && inRows(/금상을 수상.*대회 수상/) && inRows(/의사인 아버지.*부모·친인척 직업/)
+    && inRows(/유튜브.*상호명.*바꿔 쓰기: 동영상 공유 플랫폼/) && inRows(/두 칸 이상 띄어 씀/) && inRows(/끝에 마침표가 없음/)
+    && rows.filter(r => r.lv === 'r').length === 3 && (await p.$eval('#drCk-jin', c => c.getAttribute('aria-expanded'))) === 'true', rows);
+  // 그 자리로 — 글 상자에서 그 부분을 고른다
+  await p.click('#drCkP-jin [data-ckgo="jin"][data-i="0"]');
+  const sel = await p.evaluate(() => { const t = document.getElementById('drT-jin'); return [document.activeElement === t, t.value.slice(t.selectionStart, t.selectionEnd)]; });
+  check('「그 자리로」 — 글 상자에서 그 부분(「전국 과학 탐구 대회」)을 고른다', sel[0] && sel[1] === '전국 과학 탐구 대회', sel);
+  // 괜찮음 — 그 학생 그 칸의 그 말은 다시 안 건다(이 기기)
+  const iYT = rows.findIndex(r => /유튜브/.test(r.t));
+  await p.click(`#drCkP-jin [data-ckok="jin"][data-i="${iYT}"]`);
+  await p.waitForTimeout(150);
+  const afterOk = await p.$$eval('#drCkP-jin .ck-row', rs => rs.map(r => r.innerText));
+  check('「괜찮음」 — 그 줄이 빠지고 이 기기에 남는다', !afterOk.some(t => /유튜브/.test(t)) && afterOk.length === rows.length - 1
+    && Object.keys(await p.evaluate(() => JSON.parse(localStorage.getItem('ynhs-sgb-ckok') || '{}'))).some(k => k === '1-1-1|jin|상호명|유튜브'), afterOk);
+  // 모두 고치기 — 두 칸 띄어쓰기 · 마침표 뒤 · 끝 마침표
+  await p.click('#drCkP-jin [data-ckfixall="jin"]');
+  await p.waitForTimeout(1300);                // 저장(0.9초)까지
+  const fixed = await p.inputValue('#drT-jin');
+  check('「🔵 모두 고치기」 — 두 칸 → 한 칸, 마침표 뒤 띄움, 끝에 마침표', fixed === '전국 과학 탐구 대회에서 금상을 수상함. 유튜브 영상을 참고하여 발표함. 의사인 아버지를 보며 진로를 고민함.', fixed);
+  check('— 쓰는 것과 똑같이 저장된다', (await p.evaluate(() => window.__FS__['saenggibuDraft/1-1-1']?.jin)) === fixed);
+  check('— 🔵 는 다 빠지고 🔴 만 남는다', (await p.$$eval('#drCkP-jin .ck-row', rs => rs.map(r => r.dataset.lv))).every(l => l === 'r'));
+  // 다른 학생으로 갔다 와도 괜찮음은 그대로(작성 칸을 새로 그린다 — 검사 틀은 새로고침하면 저장소를 처음으로 되돌려서 이렇게 본다)
+  await p.click('#drNext');
+  await p.waitForFunction(() => document.getElementById('drPrev') && !document.getElementById('drPrev').disabled, null, { timeout: 5000 }).catch(() => {});
+  await p.click('#drPrev');
+  await p.waitForFunction(() => document.getElementById('drT-jin')?.value.startsWith('전국 과학'), null, { timeout: 5000 }).catch(() => {});
+  await p.waitForTimeout(150);
+  const back = await p.evaluate(() => ({ ts: (document.getElementById('drT-jin')?._ck || []).map(h => h.t), chip: document.getElementById('drCk-jin')?.textContent }));
+  check('다른 학생으로 갔다 와도 「괜찮음」 한 말은 걸리지 않는다(🔴 3 만)', back.ts.length === 3 && back.ts.every(t => t !== '유튜브') && back.chip === '⚠ 3', back);
+  // 우리 반 생기부 한눈에 — 점검 칸
+  await p.click('#drClassBtn');
+  await p.waitForSelector('.cls-all', { timeout: 5000 }).catch(() => {});
+  const cls = await p.evaluate(() => { const th = [...document.querySelectorAll('.cls-all thead th')].map(x => x.textContent), tr = document.querySelector('.cls-all tbody tr');
+    return { th, ck: tr?.querySelector('td.ck')?.textContent.trim(), title: tr?.querySelector('td.ck')?.title, foot: document.querySelector('.cls-all tfoot')?.textContent }; });
+  check('「우리 반 생기부 → 한눈에」 에 「점검」 칸 — 1번 학생 🔴 3, 무엇에 걸렸는지는 마우스를 올리면, 아래 줄에 걸린 학생 수', cls.th.includes('점검') && cls.ck === '🔴 3'
+    && /교외 대회/.test(cls.title) && /걸림 1명/.test(cls.foot), cls);
+  // 깨끗한 글이면 ⚠ 가 사라진다
+  await p.click('#clsPage .nm [data-n="1"]');
+  await p.waitForSelector('#drT-jin', { state: 'visible', timeout: 8000 }).catch(() => {});
+  await p.fill('#drT-jin', '진로 탐색 주간에 관심 분야의 직업을 조사하고 필요한 역량을 정리함.');
+  await p.waitForFunction(() => document.getElementById('drCk-jin').hidden, null, { timeout: 3000 }).catch(() => {});
+  check('걸린 것이 없어지면 ⚠ 도 목록도 사라진다', (await chipOf('jin')).hidden && await p.$eval('#drCkP-jin', b => b.hidden));
+  check('— 오류 없음', !p.errors.length, p.errors);
+  await p.context().close();
+}
+
+// ── 인쇄 — 참여한 활동(선생님 요청 2026-10-30) ── 기재안 인쇄에 그 학생이 참여한 활동을, 기재안에 들어간 것(✓)과 아직인 것(□, 굵게)을 다르게. 봉사활동 기록은 뺀다
+console.log('\n[인쇄 — 참여한 활동]');
+{
+  const p = await openAs(KIM, { width: 1440 });
+  await p.waitForSelector('#stus .stu');
+  await p.click('#stus .stu[data-n="1"]');
+  await p.waitForSelector('#drOpenBtn');
+  await p.click('#drOpenBtn');
+  await p.waitForSelector('#drT-jin', { state: 'visible' });
+  const robot = await p.evaluate(() => [...document.querySelectorAll('#stuOut .card[data-a]')].find(c => /로봇/.test(c.textContent))?.dataset.b || '');
+  await p.fill('#drT-jin', robot);                                   // 로봇 문안을 진로에 그대로
+  for (const f of ['ja', 'gae', 'haeng']) if (await p.$('#drT-' + f)) await p.fill('#drT-' + f, '관련 없는 다른 글을 씀.');
+  await p.waitForTimeout(1200);
+  await p.evaluate(() => { window.__printed = []; window.print = () => window.__printed.push(document.getElementById('printArea').innerHTML); });
+  await p.click('#drPrint summary');
+  await p.click('#drPrint [data-pr="one"]');
+  await p.waitForFunction(() => (window.__printed || []).length === 1, null, { timeout: 5000 }).catch(() => {});
+  const pr = await p.evaluate(() => { const box = document.createElement('div'); box.innerHTML = window.__printed.at(-1) || '';
+    const li = [...box.querySelectorAll('.pr-acts .pr-al li')].map(x => ({ st: x.className, mark: x.querySelector('i')?.textContent, nm: x.querySelector('.pr-an')?.textContent, where: x.querySelector('.pr-aw')?.textContent }));
+    return { li, sum: box.querySelector('.pr-ash span')?.textContent, legend: box.querySelector('.pr-legend')?.textContent || '', first: box.querySelector('.pr-frame > tbody > tr')?.className,
+      heads: [...box.querySelectorAll('.pr-sec .pr-sh b')].map(b => b.textContent.trim()), txt: box.textContent }; });
+  check('기재안 인쇄 맨 위(이름 아래 첫 칸)에 「참여한 활동」 — 로봇 · 수학 …, 봉사활동 기록은 뺀다', robot.length > 10 && pr.first === 'pr-acts' && pr.li.length >= 2
+    && pr.li.some(x => /로봇/.test(x.nm)) && pr.li.some(x => /수학/.test(x.nm)) && !pr.li.some(x => /봉사/.test(x.nm)), pr);
+  const rb = pr.li.find(x => /로봇/.test(x.nm)) || {}, ma = pr.li.find(x => /수학/.test(x.nm)) || {};
+  check('— 기재안에 들어간 것은 ✓ 와 들어간 칸(로봇 → 진로)', rb.st === 'full' && rb.mark === '✓' && rb.where === '진로', rb);
+  check('— 아직인 것은 □(굵게)와 넣을 영역(수학 → 자율·진로)', ma.st === 'none' && ma.mark === '□' && ma.where === '자율·진로', ma);
+  const cnt = st => pr.li.filter(x => x.st === st).length;
+  check('— 오른쪽에 「N개 · 들어감 · 일부 · 아직」 수(목록과 같게), 아래에 표시 뜻 · 봉사활동 기록은 뺌',
+    pr.sum === `${pr.li.length}개 · 들어감 ${cnt('full')} · 일부 ${cnt('part')} · 아직 ${cnt('none')}` && cnt('full') === 1 && /봉사활동 기록은 뺌/.test(pr.legend), [pr.sum, pr.legend]);
+  check('— 영역 칸(자율·진로 …)은 그대로', pr.heads.slice(0, 2).join('|') === '자율·자치활동 특기사항|진로활동 특기사항', pr.heads);
+  // 반 전체 인쇄에도 학생마다
+  await p.click('#drPrint summary');
+  await p.click('#drPrint [data-pr="all"]');
+  await p.waitForFunction(() => (window.__printed || []).length === 2, null, { timeout: 5000 }).catch(() => {});
+  const all = await p.evaluate(() => { const box = document.createElement('div'); box.innerHTML = window.__printed.at(-1) || '';
+    return [...box.querySelectorAll('.pr-page')].map(pg => ({ nm: pg.querySelector('.pr-nm')?.textContent, n: pg.querySelectorAll('.pr-acts li').length })); });
+  check('— 반 전체 인쇄에도 학생마다(이 학생 인쇄와 같은 목록)', all.length >= 2 && all[0].nm === '김가람' && all[0].n === pr.li.length && all.slice(1).every(x => x.n >= 0), all);
+  check('— 오류 없음', !p.errors.length, p.errors);
+  await p.context().close();
+}
+
 await b.close();
 
 // ── 4. 앱에 붙인 곳 ──
