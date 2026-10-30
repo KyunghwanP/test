@@ -2015,8 +2015,9 @@ STORE = STORE_B;
   await p.click('#clsPrAll');
   await p.waitForFunction(() => (window.__printed || []).length === 1);
   const pall = await p.evaluate(() => { const box = document.createElement('div'); box.innerHTML = window.__printed[0];
-    return { pages: box.querySelectorAll('.pr-page').length, haeng: !!box.querySelector('.pr-sec[data-k="haeng"]'), txt: box.textContent }; });
-  check('— 「🖨 학생마다 인쇄」 — 한 장씩(3장), 행특 빼고', pall.pages === 3 && !pall.haeng && !pall.txt.includes('배려심'), pall.pages);
+    return { pages: box.querySelectorAll('.pr-page:not(.pr-blank)').length, blanks: box.querySelectorAll('.pr-blank').length, haeng: !!box.querySelector('.pr-sec[data-k="haeng"]'), txt: box.textContent }; });
+  // 양면 인쇄용이 처음엔 켜져 있다 — 1쪽짜리 학생 뒤마다(맨 끝 빼고) 빈 쪽
+  check('— 「🖨 학생마다 인쇄」 — 학생마다 따로(3명, 1쪽 학생 뒤마다 양면용 빈 쪽 2장), 행특 빼고', pall.pages === 3 && pall.blanks === 2 && !pall.haeng && !pall.txt.includes('배려심'), pall);
   await p.click('#views [data-view="stu"]');
   await p.waitForSelector('#drOffH');
   // 닫기 — ✕ 로 닫으면 작성 칸·「→ 자율」 이 사라지고, 다시 열어도 행특은 가려진 채(기억)
@@ -2030,18 +2031,18 @@ STORE = STORE_B;
   // 인쇄 — 반 전체(학생마다 한 장)·이 학생, 행특 빼고 고를 수 있다
   await p.evaluate(() => { window.__printed = []; window.print = () => window.__printed.push(document.getElementById('printArea').innerHTML); });
   const printed = () => p.evaluate(() => { const box = document.createElement('div'); box.innerHTML = window.__printed.at(-1) || '';
-    return { pages: box.querySelectorAll('.pr-page').length, names: [...box.querySelectorAll('.pr-nm')].map(b => b.textContent), haeng: !!box.querySelector('.pr-sec[data-k="haeng"]'),
-      pageHeads: [...box.querySelectorAll('.pr-page')].map(pg => [...pg.querySelectorAll('.pr-sec .pr-sh b')].map(b => b.textContent.trim()).join('|')),
+    return { pages: box.querySelectorAll('.pr-page:not(.pr-blank)').length, blanks: box.querySelectorAll('.pr-blank').length, names: [...box.querySelectorAll('.pr-nm')].map(b => b.textContent), haeng: !!box.querySelector('.pr-sec[data-k="haeng"]'),
+      pageHeads: [...box.querySelectorAll('.pr-page:not(.pr-blank)')].map(pg => [...pg.querySelectorAll('.pr-sec .pr-sh b')].map(b => b.textContent.trim()).join('|')),
       ids: [...box.querySelectorAll('.pr-id')].map(t => t.textContent.trim()), heads: [...box.querySelectorAll('.pr-sec .pr-sh b')].map(b => b.textContent.trim()),
       doc: box.querySelector('.pr-doc')?.textContent.replace(/\s+/g, ' ').trim(), deco: box.querySelectorAll('.pr-chip, .pr-gauge, table.pr-id').length,
-      repeat: [...box.querySelectorAll('.pr-page')].every(s => !!s.querySelector('table.pr-frame > thead .pr-head')),
+      repeat: [...box.querySelectorAll('.pr-page:not(.pr-blank)')].every(s => !!s.querySelector('table.pr-frame > thead .pr-head')),
       over: [...box.querySelectorAll('.pr-sec.over')].map(a => a.dataset.k), foot: [...box.querySelectorAll('.pr-foot')].map(f => f.textContent.replace(/\s+/g, ' ')), txt: box.textContent }; });
   await p.click('#drPrint summary');
   check('인쇄 메뉴 — 행특을 가려 두었으면 「행특 빼고 인쇄」 가 켜져 있다', await p.isChecked('#drPrNoH'));
   await p.click('#drPrint [data-pr="all"]');
   await p.waitForFunction(() => (window.__printed || []).length === 1);
   const pa = await printed();
-  check('우리 반 전체 인쇄 — 학생마다 한 장(3장), 행특 빼고', pa.pages === 3 && pa.names[0] === '김가람' && !pa.haeng && !pa.txt.includes('배려심'), pa);
+  check('우리 반 전체 인쇄 — 학생마다 따로(3명 + 양면용 빈 쪽 2장), 행특 빼고', pa.pages === 3 && pa.blanks === 2 && pa.names[0] === '김가람' && !pa.haeng && !pa.txt.includes('배려심'), pa);
   // 문서처럼(선생님: 색 카드는 「너무 AI스러워」, 생기부 양식 표는 「더 안예뻐짐」 2026-10-28) — 남색 하나·가는 줄·본문 명조, 칩·막대·양식 표 없이
   check('— 문서처럼: 이름 옆 학년·반·번호, 오른쪽에 「학교생활기록부 기재안」·날짜, 영역 제목, 칩·막대·양식 표 없음', pa.ids[0] === '1학년 1반 1번'
     && /^학교생활기록부 기재안 \d{4}\. \d{1,2}\. \d{1,2}\.$/.test(pa.doc) && pa.heads.slice(0, 3).join('|') === '자율·자치활동 특기사항|진로활동 특기사항|개인별 세부능력 및 특기사항' && pa.deco === 0, pa);
@@ -2055,7 +2056,7 @@ STORE = STORE_B;
   await p.click('#drPrint [data-pr="one"]');
   await p.waitForFunction(() => (window.__printed || []).length === 2);
   const p1 = await printed();
-  check('이 학생 인쇄 — 한 장, 「행특 빼고」 를 끄면 행특도', p1.pages === 1 && p1.names[0] === '정하늘' && p1.ids[0] === '1학년 1반 3번' && p1.haeng
+  check('이 학생 인쇄 — 한 장(빈 쪽 없음), 「행특 빼고」 를 끄면 행특도', p1.pages === 1 && !p1.blanks && p1.names[0] === '정하늘' && p1.ids[0] === '1학년 1반 3번' && p1.haeng
     && p1.heads.includes('행동특성 및 종합의견') && p1.txt.includes('배려심이 깊음.'), p1);
   // 개세특·행특은 비어 있으면 그 칸을 찍지 않는다(선생님 요청 2026-10-28). 자율·진로는 비어도 「작성 전」 으로 찍는다
   const AJ = '자율·자치활동 특기사항', JN = '진로활동 특기사항', GS = '개인별 세부능력 및 특기사항', HT = '행동특성 및 종합의견';
@@ -2795,9 +2796,24 @@ console.log('\n[기재요령 점검]');
     return { th, ck: tr?.querySelector('td.ck')?.textContent.trim(), title: tr?.querySelector('td.ck')?.title, foot: document.querySelector('.cls-all tfoot')?.textContent }; });
   check('「우리 반 생기부 → 한눈에」 에 「점검」 칸 — 1번 학생 🔴 3, 무엇에 걸렸는지는 마우스를 올리면, 아래 줄에 걸린 학생 수', cls.th.includes('점검') && cls.ck === '🔴 3'
     && /교외 대회/.test(cls.title) && /걸림 1명/.test(cls.foot), cls);
-  // 깨끗한 글이면 ⚠ 가 사라진다
   await p.click('#clsPage .nm [data-n="1"]');
   await p.waitForSelector('#drT-jin', { state: 'visible', timeout: 8000 }).catch(() => {});
+  // 마침표 — 문장 사이 빠진 것은 쓰는 중에도, 글 끝은 커서가 끝에 있을 때만 미룬다(선생님 「마침표는 제대로 인식 못하는 듯」 2026-10-30)
+  await p.fill('#drT-jin', '성실하게 참여함 친구들과 협력함');
+  await p.waitForFunction(() => (document.getElementById('drT-jin')._ck || []).some(h => h.cat === '마침표'), null, { timeout: 3000 }).catch(() => {});
+  const dots = () => p.evaluate(() => (document.getElementById('drT-jin')._ck || []).filter(h => h.cat === '마침표').map(h => h.t || '(끝)'));
+  const typing = await dots();
+  check('마침표 — 쓰는 중(커서가 끝)에도 문장 사이 빠진 마침표는 보인다(「참여함」), 글 끝은 아직 묻지 않는다', JSON.stringify(typing) === '["참여함"]', typing);
+  // 칸 밖(저장 상태 글)을 눌러 벗어난다 — el.blur() 로는 이 검사 브라우저에서 focusout 이 안 난다(실제 누름처럼)
+  await p.click('#drSaved');
+  await p.waitForTimeout(500);
+  const left = await dots();
+  check('— 칸을 벗어나면 글 끝 마침표도(focusout — onfocusout 속성은 Chromium 에 없어 안 불렸다)', JSON.stringify(left) === '["참여함","(끝)"]', left);
+  check('— 🔵 줄에도 「괜찮음」(잘못 걸린 마침표를 넘길 수 있게)', (await p.$$('#drCkP-jin .ck-row[data-lv="b"] [data-ckok]')).length === 2);
+  await p.click('#drCkP-jin [data-ckfixall="jin"]');
+  await p.waitForTimeout(300);
+  check('— 「모두 고치기」 → 「성실하게 참여함. 친구들과 협력함.」', (await p.inputValue('#drT-jin')) === '성실하게 참여함. 친구들과 협력함.', await p.inputValue('#drT-jin'));
+  // 깨끗한 글이면 ⚠ 가 사라진다
   await p.fill('#drT-jin', '진로 탐색 주간에 관심 분야의 직업을 조사하고 필요한 역량을 정리함.');
   await p.waitForFunction(() => document.getElementById('drCk-jin').hidden, null, { timeout: 3000 }).catch(() => {});
   check('걸린 것이 없어지면 ⚠ 도 목록도 사라진다', (await chipOf('jin')).hidden && await p.$eval('#drCkP-jin', b => b.hidden));
@@ -2805,7 +2821,8 @@ console.log('\n[기재요령 점검]');
   await p.context().close();
 }
 
-// ── 인쇄 — 참여한 활동(선생님 요청 2026-10-30) ── 기재안 인쇄에 그 학생이 참여한 활동을, 기재안에 들어간 것(✓)과 아직인 것(□, 굵게)을 다르게. 봉사활동 기록은 뺀다
+// ── 인쇄 — 참여한 활동(선생님 요청 2026-10-30) ── 기재안 인쇄에 그 학생이 참여한 활동을, 기재안에 들어간 것(✓)과 아직인 것(□, 굵게)을 다르게.
+// 봉사활동은 판정 없이 따로 — 학생 화면의 「봉사활동 누가기록」 표를 여덟 칸 그대로, 진로 다음에(확인용 — 선생님 「봉사활동은 내용 다 넣으면 좋겠다 · 정확하게는 이 내용」)
 console.log('\n[인쇄 — 참여한 활동]');
 {
   const p = await openAs(KIM, { width: 1440 });
@@ -2824,17 +2841,28 @@ console.log('\n[인쇄 — 참여한 활동]');
   await p.waitForFunction(() => (window.__printed || []).length === 1, null, { timeout: 5000 }).catch(() => {});
   const pr = await p.evaluate(() => { const box = document.createElement('div'); box.innerHTML = window.__printed.at(-1) || '';
     const li = [...box.querySelectorAll('.pr-acts .pr-al li')].map(x => ({ st: x.className, mark: x.querySelector('i')?.textContent, nm: x.querySelector('.pr-an')?.textContent, where: x.querySelector('.pr-aw')?.textContent }));
-    return { li, sum: box.querySelector('.pr-ash span')?.textContent, legend: box.querySelector('.pr-legend')?.textContent || '', first: box.querySelector('.pr-frame > tbody > tr')?.className,
-      heads: [...box.querySelectorAll('.pr-sec .pr-sh b')].map(b => b.textContent.trim()), txt: box.textContent }; });
-  check('기재안 인쇄 맨 위(이름 아래 첫 칸)에 「참여한 활동」 — 로봇 · 수학 …, 봉사활동 기록은 뺀다', robot.length > 10 && pr.first === 'pr-acts' && pr.li.length >= 2
-    && pr.li.some(x => /로봇/.test(x.nm)) && pr.li.some(x => /수학/.test(x.nm)) && !pr.li.some(x => /봉사/.test(x.nm)), pr);
+    const cells = tr => [...tr.children].map(c => c.textContent.trim());
+    return { li, sum: box.querySelector('.pr-acts .pr-ash span')?.textContent, legend: box.querySelector('.pr-legend')?.textContent || '', first: box.querySelector('.pr-frame > tbody > tr')?.className,
+      heads: [...box.querySelectorAll('.pr-sec .pr-sh b')].map(b => b.textContent.trim()), txt: box.textContent,
+      vol: { rows: [...box.querySelectorAll('.pr-vol .pr-vt tr')].map(cells), sum: box.querySelector('.pr-vol .pr-ash span')?.textContent,
+        before: box.querySelector('.pr-vol')?.previousElementSibling?.dataset.k, order: [...box.querySelectorAll('.pr-frame > tbody > tr')].map(tr => tr.dataset.k || tr.className) } }; });
+  // 학생 화면의 봉사활동 누가기록 표(머리 줄 + 줄마다 여덟 칸)
+  const screenVol = await p.evaluate(() => [...document.querySelectorAll('#stuOut .card.vol table.neis tr')].map(tr => [...tr.children].map(c => c.textContent.trim())));
+  check('기재안 인쇄 맨 위(이름 아래 첫 칸)에 「참여한 활동」 — 로봇 · 수학 …', robot.length > 10 && pr.first === 'pr-acts' && pr.li.length >= 3
+    && pr.li.some(x => /로봇/.test(x.nm)) && pr.li.some(x => /수학/.test(x.nm)), pr);
   const rb = pr.li.find(x => /로봇/.test(x.nm)) || {}, ma = pr.li.find(x => /수학/.test(x.nm)) || {};
   check('— 기재안에 들어간 것은 ✓ 와 들어간 칸(로봇 → 진로)', rb.st === 'full' && rb.mark === '✓' && rb.where === '진로', rb);
   check('— 아직인 것은 □(굵게)와 넣을 영역(수학 → 자율·진로)', ma.st === 'none' && ma.mark === '□' && ma.where === '자율·진로', ma);
   const cnt = st => pr.li.filter(x => x.st === st).length;
-  check('— 오른쪽에 「N개 · 들어감 · 일부 · 아직」 수(목록과 같게), 아래에 표시 뜻 · 봉사활동 기록은 뺌',
-    pr.sum === `${pr.li.length}개 · 들어감 ${cnt('full')} · 일부 ${cnt('part')} · 아직 ${cnt('none')}` && cnt('full') === 1 && /봉사활동 기록은 뺌/.test(pr.legend), [pr.sum, pr.legend]);
+  check('— 오른쪽에 「N개 · 들어감 · 일부 · 아직」 수(목록과 같게), 아래에 표시 뜻',
+    pr.sum === `${pr.li.length}개 · 들어감 ${cnt('full')} · 일부 ${cnt('part')} · 아직 ${cnt('none')}` && cnt('full') === 1 && /✓ 기재안에 들어감/.test(pr.legend), [pr.sum, pr.legend]);
   check('— 영역 칸(자율·진로 …)은 그대로', pr.heads.slice(0, 2).join('|') === '자율·자치활동 특기사항|진로활동 특기사항', pr.heads);
+  check('봉사활동 — 참여한 활동 목록에는 없고(표로 따로), 진로 다음에 「봉사활동 누가기록」(학생부 차례: 자율 · 진로 · 봉사 · 개세특 · 행특)',
+    !pr.li.some(x => /교과학습도우미/.test(x.nm)) && pr.vol.before === 'jin' && pr.vol.order.slice(0, 4).join() === 'pr-acts,ja,jin,pr-vol', pr.vol.order);
+  check('— 학생 화면의 봉사활동 표와 똑같이: 여덟 칸(시작일자 … 시간 누계) · 같은 줄 · 같은 내용', screenVol.length >= 2 && screenVol[0].length === 8
+    && JSON.stringify(pr.vol.rows) === JSON.stringify(screenVol) && pr.vol.rows[0].join('|') === '시작일자|종료일자|영역구분|봉사활동내용|학교/개인 구분|장소 또는 주관 기관명|시간|시간 누계'
+    && pr.vol.rows[1][0] === '2026.04.10.' && pr.vol.rows[1][3] === '헌혈' && pr.vol.rows[1][6] === '4' && pr.vol.rows[1][7] === '4', { print: pr.vol.rows, screen: screenVol });
+  check('— 오른쪽에 건수 · 총 시간 · 확인용', pr.vol.sum === '1건 · 총 4시간 · 확인용(봉사활동 실적에 입력)', pr.vol.sum);
   // 반 전체 인쇄에도 학생마다
   await p.click('#drPrint summary');
   await p.click('#drPrint [data-pr="all"]');
@@ -2844,6 +2872,70 @@ console.log('\n[인쇄 — 참여한 활동]');
   check('— 반 전체 인쇄에도 학생마다(이 학생 인쇄와 같은 목록)', all.length >= 2 && all[0].nm === '김가람' && all[0].n === pr.li.length && all.slice(1).every(x => x.n >= 0), all);
   check('— 오류 없음', !p.errors.length, p.errors);
   await p.context().close();
+}
+
+// ── 인쇄 — 양면 인쇄용 빈 쪽(선생님 요청 2026-10-30) ── 반 전체를 양면으로 찍을 때 3쪽 학생이 있으면 다음 학생이 그 종이 뒷면부터 찍혀 섞인다 →
+// 쪽 수가 홀수인 학생 뒤에 빈 쪽. 크롬은 break-after:right 를 무시해서 앱이 칸 높이를 재고 쪽을 나눈다 —
+// 그래서 앱이 센 쪽 수가 크롬이 실제로 찍는 쪽 수(PDF)와 같은지를 학생마다 본다
+console.log('\n[인쇄 — 양면 인쇄용 빈 쪽]');
+{
+  const saved = STORE;
+  const S = '학급 행사를 계획하고 친구들과 역할을 나누어 끝까지 책임감 있게 참여함. ';
+  const long = S.repeat(26), mid = S.repeat(11), short = S.repeat(2);
+  STORE = { ...STORE, 'saenggibuDraft/1-1-1': { ja: long, jin: long, gae: long, haeng: long },   // 3쪽
+    'saenggibuDraft/1-1-2': { ja: short, jin: short },                                           // 1쪽
+    'saenggibuDraft/1-1-3': { ja: mid, jin: mid, gae: mid, haeng: mid } };                       // 2쪽
+  const p = await openAs(KIM, { width: 1440 });
+  await p.waitForSelector('#stus .stu');
+  await p.click('#stus .stu[data-n="1"]');
+  await p.waitForSelector('#drOpenBtn');
+  await p.click('#drOpenBtn');
+  await p.waitForSelector('#drT-jin', { state: 'visible' });
+  await p.evaluate(() => { window.__printed = []; window.print = () => window.__printed.push(document.getElementById('printArea').innerHTML); });
+  check('「양면 인쇄용」 은 처음에 켜져 있다(작성 칸 🖨 인쇄 메뉴)', await p.$eval('#drPrDup', x => x.checked));
+  const menu = () => p.evaluate(() => { document.getElementById('drPrint').open = true; });
+  const printAll = async n => { await menu(); await p.click('#drPrint [data-pr="all"]');
+    await p.waitForFunction(n => (window.__printed || []).length === n, n, { timeout: 8000 }).catch(() => {});
+    return p.evaluate(() => { const box = document.createElement('div'); box.innerHTML = window.__printed.at(-1) || '';
+      return { html: box.innerHTML, secs: [...box.children].map(x => ({ blank: x.classList.contains('pr-blank'), nm: x.querySelector('.pr-nm')?.textContent || '',
+        pages: +x.dataset.pages || 0, brk: x.querySelectorAll('.pr-brk').length, html: x.outerHTML })) }; }); };
+  // 크롬이 실제로 찍는 쪽 수 — 인쇄 때와 같은 #printArea 를 PDF 로
+  const pdfPages = async html => { await p.evaluate(h => { document.getElementById('printArea').innerHTML = h; }, html);
+    const buf = await p.pdf({ format: 'A4', printBackground: true, preferCSSPageSize: true });
+    return (buf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length; };
+  const on = await printAll(1);
+  const toastOn = await p.textContent('#toast');
+  const kids = on.secs.filter(x => !x.blank);
+  check('반 전체 인쇄 — 학생 3명, 쪽 수 3 · 1 · 2 (긴 글 · 짧은 글 · 중간)', kids.map(x => x.pages).join() === '3,1,2', on.secs.map(x => [x.nm, x.pages, x.blank]));
+  check('— 쪽 수가 홀수인 학생(3쪽 · 1쪽) 뒤에만 빈 쪽, 맨 끝 학생 뒤에는 없다', on.secs.map(x => x.blank ? '□' : x.pages).join(' ') === '3 □ 1 □ 2', on.secs.map(x => x.blank ? '□' : x.pages));
+  check('— 빈 쪽에는 「양면 인쇄를 위해 비워 두었습니다」 한 줄', on.secs.filter(x => x.blank).every(x => /양면 인쇄를 위해 비워 두었습니다/.test(x.html)));
+  check('— 쪽을 나눌 자리는 앱이 정한다(3쪽 학생 2곳, 2쪽 학생 1곳, 1쪽 학생 0곳)', kids.map(x => x.brk).join() === '2,0,1', kids.map(x => x.brk));
+  const real = [];
+  for (const k of kids) real.push(await pdfPages(k.html));
+  check('— 앱이 센 쪽 수 = 크롬이 실제로 찍는 쪽 수(학생마다 PDF)', real.join() === kids.map(x => x.pages).join(), { real, app: kids.map(x => x.pages) });
+  const whole = await pdfPages(on.html);
+  check('— 반 전체 PDF 8쪽, 학생마다 홀수 쪽(새 종이 앞면)에서 시작 — 1 · 5 · 7쪽', whole === 8
+    && on.secs.reduce((a, x) => { if (!x.blank) a.st.push(a.at); a.at += x.blank ? 1 : x.pages; return a; }, { at: 1, st: [] }).st.join() === '1,5,7', whole);
+  check('— 빈 쪽을 넣었다고 알린다(한 면만 찍을 때는 끄라고)', /양면 인쇄용 빈 쪽 2장/.test(toastOn) && /꺼 주세요/.test(toastOn), toastOn);
+  // 끄면 — 빈 쪽도 앱이 나눈 자리도 없이 예전 그대로(크롬이 나눈다). 끈 것은 기억한다
+  await menu();
+  await p.uncheck('#drPrDup');
+  const off = await printAll(2);
+  check('끄면 빈 쪽도 앱이 나눈 자리도 없다(예전 그대로)', off.secs.length === 3 && !off.secs.some(x => x.blank || x.brk || x.pages), off.secs.map(x => [x.nm, x.blank, x.brk]));
+  check('— 끄고 찍어도 6쪽(3 + 1 + 2 — 앱이 잰 것과 같은 자리에서 크롬이 나눈다)', (await pdfPages(off.html)) === 6);
+  check('— 끈 것은 기억한다(이 기기)', await p.evaluate(() => JSON.parse(localStorage.getItem('ynhs-sgb') || '{}').prDup === false));
+  // 우리 반 생기부의 「🖨 학생마다 인쇄」 옆에도 같은 값
+  await p.click('#drClassBtn');
+  await p.waitForSelector('#clsDup', { timeout: 5000 }).catch(() => {});
+  check('「우리 반 생기부」 의 「학생마다 인쇄」 옆에도 「양면 인쇄용」 — 같은 값(꺼져 있음)', (await p.$('#clsDup')) && !(await p.$eval('#clsDup', x => x.checked)));
+  await p.check('#clsDup');
+  await p.click('#clsPrAll');
+  await p.waitForFunction(() => (window.__printed || []).length === 3, null, { timeout: 8000 }).catch(() => {});
+  const cls = await p.evaluate(() => { const box = document.createElement('div'); box.innerHTML = window.__printed.at(-1) || ''; return box.querySelectorAll('.pr-blank').length; });
+  check('— 거기서 켜고 찍어도 빈 쪽 2장', cls === 2 && await p.evaluate(() => JSON.parse(localStorage.getItem('ynhs-sgb') || '{}').prDup === true), cls);
+  check('— 오류 없음', !p.errors.length, p.errors);
+  await p.context().close();
+  STORE = saved;
 }
 
 await b.close();

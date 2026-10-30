@@ -559,66 +559,84 @@
   @media (min-width:901px) and (max-width:1439px){ .pane3.dr-open .p-classes{display:none;} }
   @media (min-width:901px) and (max-width:1179px){ .pane3.dr-open .p-roster{display:none;} }
   /* 인쇄 — 화면은 감추고 #printArea 만. 학생마다 한 장.
-     쪽 여백을 0 으로 둬야 브라우저 머리말·꼬리말(주소·날짜·쪽 번호)이 안 찍힌다 — 위아래 여백은 표의 머리·꼬리 칸으로 준다 */
-  #printArea{display:none;}
+     쪽 여백을 0 으로 둬야 브라우저 머리말·꼬리말(주소·날짜·쪽 번호)이 안 찍힌다 — 위아래 여백은 표의 머리·꼬리 칸으로 준다.
+     꾸밈은 @media print 밖에 둔다 — 양면 인쇄용으로 학생마다 쪽 수를 잴 때 화면 밖에 A4 너비로 똑같이 그린다(.pr-measure) */
+  #printArea{display:none;--ac:#1E3A5F;--hair:#D5DAE1;--mute:#858B95;color:#1F2328;background:#fff;font-family:'Noto Sans KR',sans-serif;font-size:10pt;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  #printArea.pr-measure{display:block;position:absolute;left:-10000px;top:0;width:210mm;visibility:hidden;pointer-events:none;}
   @page{size:A4;margin:0;}
   @media print{
     html,body{height:auto;background:#fff;}
     body > *:not(#printArea){display:none !important;}
-    #printArea{display:block;--ac:#1E3A5F;--hair:#D5DAE1;--mute:#858B95;color:#1F2328;font-family:'Noto Sans KR',sans-serif;font-size:10pt;
-      -webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    /* 문서처럼 — 색은 남색 하나, 가는 줄, 본문은 명조(칩·막대·카드 없이). 학생 하나가 표 하나:
-       두 장을 넘기면 표 머리(이름·학번)가 다음 장에도 찍히고, 영역은 쪽 사이에서 갈라지지 않는다 */
-    .pr-page{padding:0 17mm;break-after:page;page-break-after:always;}
-    .pr-page:last-child{break-after:auto;page-break-after:auto;}
-    table.pr-frame{width:100%;border-collapse:collapse;}
-    .pr-frame td,.pr-frame th{padding:0;vertical-align:top;}
-    .pr-frame > thead > tr:first-child > td{padding-top:15mm;}
-    .pr-frame > tfoot > tr > td{padding-bottom:11mm;}
-    .pr-head{display:flex;align-items:flex-end;justify-content:space-between;gap:8mm;padding-bottom:3.2mm;border-bottom:1.4pt solid var(--ac);}
-    .pr-nm{font-family:'Noto Serif KR','Nanum Myeongjo','Batang',serif;font-size:19pt;font-weight:700;color:#111;letter-spacing:.03em;}
-    .pr-id{margin-left:3mm;font-size:10.5pt;font-weight:500;color:#555;}
-    .pr-doc{text-align:right;line-height:1.35;}
-    .pr-doc b{display:block;font-size:9.5pt;font-weight:700;color:var(--ac);letter-spacing:.04em;}
-    .pr-doc span{display:block;margin-top:.6mm;font-size:8pt;color:var(--mute);}
-    tr.pr-sec{break-inside:avoid;}
-    tr.pr-sec > td{padding:3.8mm 0 4.2mm;border-bottom:.5pt solid var(--hair);}
-    .pr-sh{display:flex;align-items:baseline;justify-content:space-between;gap:6mm;margin-bottom:1.5mm;}
-    .pr-sh b{font-size:10.2pt;font-weight:700;color:var(--ac);}
-    .pr-bytes{font-size:7.8pt;color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap;}
-    .pr-sec.over .pr-bytes,.pr-row.over .c-b{color:#B42318;font-weight:700;}
-    .pr-t{font-family:'Noto Serif KR','Nanum Myeongjo','Batang',serif;font-size:9.8pt;line-height:1.72;color:#202428;
-      white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;}
-    .pr-empty{font-family:'Noto Sans KR',sans-serif;color:#A0A6AF;}
-    .pr-foot{display:flex;justify-content:space-between;padding-top:2.6mm;font-size:7.8pt;color:var(--mute);}
-    /* 참여한 활동 — 기재안에 들어갔는지(✓ 들어감 · ◐ 일부 · □ 아직), 아직인 것은 굵게. 봉사활동 기록은 뺀다(선생님 2026-10-30) */
-    tr.pr-acts{break-inside:avoid;}
-    tr.pr-acts > td{padding:3.4mm 0 3.6mm;border-bottom:.5pt solid var(--hair);}
-    .pr-ash{display:flex;align-items:baseline;justify-content:space-between;gap:6mm;margin-bottom:1.4mm;}
-    .pr-ash b{font-size:10.2pt;font-weight:700;color:var(--ac);}
-    .pr-ash span{font-size:7.8pt;color:var(--mute);white-space:nowrap;}
-    .pr-al{display:grid;grid-template-columns:1fr 1fr;gap:.9mm 8mm;margin:0;padding:0;list-style:none;font-size:9pt;}
-    .pr-al li{display:flex;align-items:baseline;gap:1.6mm;line-height:1.45;min-width:0;}
-    .pr-al i{flex-shrink:0;width:3.6mm;font-style:normal;text-align:center;color:var(--ac);}
-    .pr-al .pr-an{min-width:0;}
-    .pr-al .pr-aw{margin-left:auto;padding-left:2mm;flex-shrink:0;font-size:7.6pt;font-weight:500;color:var(--mute);white-space:nowrap;}
-    .pr-al li.full,.pr-al li.part,.pr-al li.nob{color:#4A5058;}
-    .pr-al li.none,.pr-al li.none i{font-weight:700;color:#111;}
-    .pr-legend{margin-top:1.5mm;font-size:7.3pt;color:var(--mute);}
-    /* 영역 인쇄 — 반 전체를 한 표로(자율만, 진로만 …). 쪽마다 제목·머리줄을 다시 */
-    table.pr-list{table-layout:fixed;}
-    .pr-list col.c-n{width:11mm;} .pr-list col.c-nm{width:19mm;} .pr-list col.c-b{width:16mm;}
-    .pr-list .pr-head{margin-bottom:1.5mm;}
-    .pr-list .pr-nm{font-size:16pt;}
-    .pr-cols th{padding:2.2mm 2mm 1.8mm;border-bottom:.9pt solid var(--ac);font-size:8.3pt;font-weight:700;color:var(--ac);text-align:left;white-space:nowrap;}
-    .pr-list tbody td{padding:2.6mm 2mm 2.8mm;border-bottom:.5pt solid var(--hair);}
-    .pr-list .c-n{text-align:center;} .pr-list .c-b{text-align:right;}
-    .pr-list td.c-n{color:#555;font-variant-numeric:tabular-nums;}
-    .pr-list td.c-nm{font-weight:700;white-space:nowrap;}
-    .pr-list td.c-b{font-size:7.8pt;color:var(--mute);font-variant-numeric:tabular-nums;}
-    .pr-list td.pr-t{font-size:9.5pt;line-height:1.66;}
-    .pr-list tbody tr{break-inside:avoid;}
+    #printArea{display:block;}
   }
+  /* 문서처럼 — 색은 남색 하나, 가는 줄, 본문은 명조(칩·막대·카드 없이). 학생 하나가 표 하나:
+     두 장을 넘기면 표 머리(이름·학번)가 다음 장에도 찍히고, 영역은 쪽 사이에서 갈라지지 않는다 */
+  .pr-page{padding:0 17mm;break-after:page;page-break-after:always;}
+  .pr-page:last-child{break-after:auto;page-break-after:auto;}
+  table.pr-frame{width:100%;border-collapse:collapse;}
+  .pr-frame td,.pr-frame th{padding:0;vertical-align:top;}
+  .pr-frame > thead > tr:first-child > td{padding-top:15mm;}
+  .pr-frame > tfoot > tr > td{padding-bottom:11mm;}
+  .pr-head{display:flex;align-items:flex-end;justify-content:space-between;gap:8mm;padding-bottom:3.2mm;border-bottom:1.4pt solid var(--ac);}
+  .pr-nm{font-family:'Noto Serif KR','Nanum Myeongjo','Batang',serif;font-size:19pt;font-weight:700;color:#111;letter-spacing:.03em;}
+  .pr-id{margin-left:3mm;font-size:10.5pt;font-weight:500;color:#555;}
+  .pr-doc{text-align:right;line-height:1.35;}
+  .pr-doc b{display:block;font-size:9.5pt;font-weight:700;color:var(--ac);letter-spacing:.04em;}
+  .pr-doc span{display:block;margin-top:.6mm;font-size:8pt;color:var(--mute);}
+  tr.pr-sec{break-inside:avoid;}
+  tr.pr-sec > td{padding:3.8mm 0 4.2mm;border-bottom:.5pt solid var(--hair);}
+  .pr-sh{display:flex;align-items:baseline;justify-content:space-between;gap:6mm;margin-bottom:1.5mm;}
+  .pr-sh b{font-size:10.2pt;font-weight:700;color:var(--ac);}
+  .pr-bytes{font-size:7.8pt;color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .pr-sec.over .pr-bytes,.pr-row.over .c-b{color:#B42318;font-weight:700;}
+  .pr-t{font-family:'Noto Serif KR','Nanum Myeongjo','Batang',serif;font-size:9.8pt;line-height:1.72;color:#202428;
+    white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;}
+  .pr-empty{font-family:'Noto Sans KR',sans-serif;color:#A0A6AF;}
+  .pr-foot{display:flex;justify-content:space-between;padding-top:2.6mm;font-size:7.8pt;color:var(--mute);}
+  /* 참여한 활동 — 기재안에 들어갔는지(✓ 들어감 · ◐ 일부 · □ 아직), 아직인 것은 굵게 */
+  tr.pr-acts{break-inside:avoid;}
+  tr.pr-acts > td{padding:3.4mm 0 3.6mm;border-bottom:.5pt solid var(--hair);}
+  .pr-ash{display:flex;align-items:baseline;justify-content:space-between;gap:6mm;margin-bottom:1.4mm;}
+  .pr-ash b{font-size:10.2pt;font-weight:700;color:var(--ac);}
+  .pr-ash span{font-size:7.8pt;color:var(--mute);white-space:nowrap;}
+  .pr-al{display:grid;grid-template-columns:1fr 1fr;gap:.9mm 8mm;margin:0;padding:0;list-style:none;font-size:9pt;}
+  .pr-al li{display:flex;align-items:baseline;gap:1.6mm;line-height:1.45;min-width:0;}
+  .pr-al i{flex-shrink:0;width:3.6mm;font-style:normal;text-align:center;color:var(--ac);}
+  .pr-al .pr-an{min-width:0;}
+  .pr-al .pr-aw{margin-left:auto;padding-left:2mm;flex-shrink:0;font-size:7.6pt;font-weight:500;color:var(--mute);white-space:nowrap;}
+  .pr-al li.full,.pr-al li.part,.pr-al li.nob{color:#4A5058;}
+  .pr-al li.none,.pr-al li.none i{font-weight:700;color:#111;}
+  .pr-legend{margin-top:1.5mm;font-size:7.3pt;color:var(--mute);}
+  /* 봉사활동 누가기록(확인용) — 학생 화면 표와 같은 여덟 칸. 줄마다 쪽 사이에서 안 갈리게 */
+  tr.pr-vol{break-inside:avoid;}
+  tr.pr-vol > td{padding:3.4mm 0 3.8mm;border-bottom:.5pt solid var(--hair);}
+  table.pr-vt{width:100%;border-collapse:collapse;table-layout:fixed;font-size:8.2pt;}
+  .pr-vt col.v-start,.pr-vt col.v-end{width:19mm;} .pr-vt col.v-area{width:17mm;} .pr-vt col.v-type{width:14mm;}
+  .pr-vt col.v-place{width:27mm;} .pr-vt col.v-hours{width:9mm;} .pr-vt col.v-total{width:10mm;}
+  .pr-frame .pr-vt th{padding:1mm 1.2mm 1.2mm;border-bottom:.8pt solid var(--ac);font-size:7.3pt;font-weight:700;line-height:1.3;color:var(--ac);text-align:left;vertical-align:bottom;word-break:keep-all;}
+  .pr-frame .pr-vt td{padding:1.2mm 1.2mm;border-bottom:.4pt solid var(--hair);line-height:1.42;overflow-wrap:anywhere;}
+  .pr-vt tr{break-inside:avoid;}
+  .pr-vt .v-start,.pr-vt .v-end{white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .pr-vt td.v-content{word-break:keep-all;}
+  .pr-frame .pr-vt .v-hours,.pr-frame .pr-vt .v-total{text-align:right;font-variant-numeric:tabular-nums;}
+  .pr-vt td.v-total{font-weight:700;}
+  /* 영역 인쇄 — 반 전체를 한 표로(자율만, 진로만 …). 쪽마다 제목·머리줄을 다시 */
+  table.pr-list{table-layout:fixed;}
+  .pr-list col.c-n{width:11mm;} .pr-list col.c-nm{width:19mm;} .pr-list col.c-b{width:16mm;}
+  .pr-list .pr-head{margin-bottom:1.5mm;}
+  .pr-list .pr-nm{font-size:16pt;}
+  .pr-cols th{padding:2.2mm 2mm 1.8mm;border-bottom:.9pt solid var(--ac);font-size:8.3pt;font-weight:700;color:var(--ac);text-align:left;white-space:nowrap;}
+  .pr-list tbody td{padding:2.6mm 2mm 2.8mm;border-bottom:.5pt solid var(--hair);}
+  .pr-list .c-n{text-align:center;} .pr-list .c-b{text-align:right;}
+  .pr-list td.c-n{color:#555;font-variant-numeric:tabular-nums;}
+  .pr-list td.c-nm{font-weight:700;white-space:nowrap;}
+  .pr-list td.c-b{font-size:7.8pt;color:var(--mute);font-variant-numeric:tabular-nums;}
+  .pr-list td.pr-t{font-size:9.5pt;line-height:1.66;}
+  .pr-list tbody tr{break-inside:avoid;}
+  /* 양면 인쇄용(반 전체) — 쪽을 나눌 자리는 앱이 정하고(.pr-brk), 쪽 수가 홀수인 학생 뒤에는 빈 쪽 */
+  .pr-brk{break-before:page;page-break-before:always;}
+  .pr-blank{padding:15mm 17mm 0;text-align:center;font-size:7.5pt;color:#B4B9C0;}
   /* ── 우리 반 생기부(담임) — 반 전체를 한 페이지에. 한눈에(학생 × 영역) · 영역별 표. 이름을 누르면 그 학생 작성 칸으로 ── */
   .cls-wrap{height:100%;overflow-y:auto;padding:16px 16px 48px;}
   .cls-sheet{max-width:1180px;}
@@ -1986,6 +2004,11 @@ const SGB_CK_RULES = [
   { lv: 'o', cat: '기관명', msg: '특정 기관명은 쓸 수 없음 — 일반 명칭으로', ko: CK_INTL_KO, en: CK_INTL_EN, ab: CK_INTL_AB },
   { lv: 'o', cat: '기관명', msg: '특정 기관명은 쓸 수 없음 — 「공공 통계 자료」처럼 일반 명칭으로', opt: 'gov', ko: CK_GOV },
 ];
+// 문장이 끝난 꼴 — ~함·~됨(참여함·구성됨), ~보임·~있음·~했음·~드러남 … 뒤에 띄어 쓰고 다음 낱말이 바로 오면 마침표가 빠진 것.
+// 다음 낱말이 「등·및·때문·덕분·속에·과정 …」 이면 문장이 아니라 이름씨로 쓴 것(꼼꼼함 덕분에)이라 뺀다. 괄호·쉼표가 오면 안 본다
+const CK_RE_SENT_END = new RegExp('(^|[^가-힣])([가-힣]*(?:함|됨)|(?:돋)?보임|있음|없음|했음|하였음|되었음|였음|었음|았음|뛰어남|드러남|나타냄|보여\\s?줌|살펴봄|갖춤|이끎|만듦|키움)'
+  + '(?=[ \\t]+(?!(?:등|및)(?![가-힣])|또는|혹은|때문|덕분|가운데|속에|중에|과정|자체|정도|만큼|뿐)[가-힣A-Za-z0-9「『‘“])', 'g');
+const CK_NOT_END = new Set(['포함', '고함', '결함', '함', '사물함', '우편함', '신발함', '건의함', '함장', '안됨']);
 const ckEsc = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // 낱말 목록 → 정규식. 앞 글자를 잡는 묶음(1번)을 떼어 내고 2번이 찾은 낱말
 function ckCompile(r){
@@ -2089,8 +2112,22 @@ function sgbCheck(text, ctx = {}){
   for (const m of s.matchAll(/[​-‍⁠﻿]+/g)) add(m.index, m.index + m[0].length, 'b', '보이지 않는 문자', '보이지 않는 문자(복사할 때 따라옴)', '', '');
   for (const m of s.matchAll(/[\t　]| (?![  ])/g)) add(m.index, m.index + 1, 'b', '보이지 않는 문자', '탭·전각 공백(복사할 때 따라옴)', '', ' ');
   for (const m of s.matchAll(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu)) add(m.index, m.index + m[0].length, 'b', '특수 문자', '나이스에서 깨질 수 있는 문자', '', '');
+  // 마침표 — 글 끝 · 줄 끝 · 문장이 끝난 꼴(~함·~됨·~보임·~있음 …) 뒤에 마침표 없이 다음 문장이 이어질 때(선생님 「마침표는 제대로 인식 못하는 듯」 2026-10-30).
+  // 괄호·따옴표로 끝나도 그 앞에 마침표가 있어야 한다(봉사함(4시간) → 끝에 붙인다)
+  const endOk = t => /[.!?。…](?:["'”’」』)\]])*$/.test(t);
   const end = s.replace(/\s+$/, '');
-  if (end && !/[.!?。…"'”’」』)\]]$/.test(end)) add(end.length, end.length, 'b', '마침표', '끝에 마침표가 없음', '', '.');
+  if (end && !endOk(end)) add(end.length, end.length, 'b', '마침표', '끝에 마침표가 없음', '', '.');
+  let at = 0;
+  const lines = s.split('\n');
+  lines.forEach((ln, i) => {
+    const t = ln.replace(/\s+$/, '');
+    if (t.trim() && i < lines.length - 1 && lines.slice(i + 1).some(x => x.trim()) && !endOk(t)) add(at + t.length, at + t.length, 'b', '마침표', '줄 끝에 마침표가 없음', '', '.');
+    at += ln.length + 1;
+  });
+  for (const m of s.matchAll(CK_RE_SENT_END)){
+    if (CK_NOT_END.has(m[2])) continue;
+    const i = m.index + m[1].length; add(i, i + m[2].length, 'b', '마침표', '문장 끝에 마침표가 없는 것 같음 — 다음 문장이 바로 이어짐', '', m[2] + '.');
+  }
   // 같은 문장이 두 번 — 띄어쓰기는 보지 않고, 열 글자 이상만. 뒤에 나온 것을 가리킨다
   const seen = new Map();
   for (const [a, b] of sents){
@@ -2930,7 +2967,7 @@ async function drRenderPanel(){
   // 글은 값으로 넣는다(태그 안에 쓰면 맨 앞 줄바꿈이 사라진다)
   pane.querySelectorAll('textarea[data-f]').forEach(ta => { ta.value = drGet(d, ta.dataset.f); if (!ta.hidden) drGrow(ta); });
   pane.oninput = drOnInput; pane.onchange = drOnChange; pane.onclick = drOnClick;
-  pane.onfocusout = e => { const f = e.target.dataset?.f; if (DR_AREAS.some(([k]) => k === f)) setTimeout(() => drCkRun(f), 200); };   // 끝 마침표는 칸을 벗어날 때(누름이 끝난 뒤)
+  pane.addEventListener('focusout', drOnLeave);   // onfocusout 속성은 Chromium 에 없다(붙여도 안 불린다). 같은 함수라 다시 그려도 한 번만 붙는다
   pane.scrollTop = 0;
   Object.keys(drConf.get(key) || {}).forEach(f => drConfPaint(key, f));   // 고르지 않은 겹친 칸이 있으면 다시
   drWatch(key);                                // 다른 창(새 창·폰)에서 고치면 바로 불러온다
@@ -2951,8 +2988,9 @@ function drPanelHtml(ck, list, at, d){
       <button type="button" class="btn sm" id="drClassBtn" title="우리 반 생기부 — 반 전체를 한 페이지에(자율 전체, 진로 전체 …)">📘 반 전체</button>
       <details class="form-dl drp-print" id="drPrint"><summary class="btn sm">🖨 인쇄</summary><div class="form-dl-menu">
         <button type="button" data-pr="one">이 학생 인쇄</button>
-        <button type="button" data-pr="all">우리 반 전체 인쇄 <span class="d">— 학생마다 한 장(${list.length}장)</span></button>
-        <label><input type="checkbox" id="drPrNoH"${st.hideHaeng ? ' checked' : ''}> 행특 빼고 인쇄</label></div></details>
+        <button type="button" data-pr="all">우리 반 전체 인쇄 <span class="d">— 학생마다 따로(${list.length}명)</span></button>
+        <label><input type="checkbox" id="drPrNoH"${st.hideHaeng ? ' checked' : ''}> 행특 빼고 인쇄</label>
+        <label title="반 전체를 양면으로 찍을 때 — 쪽 수가 홀수인 학생 뒤에 빈 쪽을 넣어, 학생마다 새 종이 앞면에서 시작합니다"><input type="checkbox" id="drPrDup"${prDup() ? ' checked' : ''}> 양면 인쇄용 <span class="d">— 학생마다 새 종이에서</span></label></div></details>
     </div>
     <div class="drp-saved" id="drSaved">${d.upd ? `저장됨 ${fmtAt(d.upd)}${d.by && d.by !== me ? ' · ' + esc(whoTxt(d.by)) : ''}` : '쓰는 대로 저장됩니다'}</div>
     ${DR_AREAS.map(([k, nm, t]) => k === 'haeng' && st.hideHaeng ? '<div class="drp-off" id="drOffH">행특은 가려 두었습니다</div>' : drAreaHtml(k, nm, t, d)).join('')}
@@ -2995,8 +3033,10 @@ function drCkLater(f){ clearTimeout(drCkTimer[f]); drCkTimer[f] = setTimeout(() 
 function drCkRun(f){
   const ta = $('drT-' + f), chip = $('drCk-' + f), box = $('drCkP-' + f);   // drC- 는 겹친 칸 알림이 쓴다
   if (!ta || !chip || !box) return;
-  // 쓰는 중(그 칸에 커서)에는 끝 마침표를 묻지 않는다 — 마지막 문장을 아직 쓰고 있다. 칸을 벗어나면 다시 본다
-  const items = ta._ck = ckItems(drKey(), f, ta.value, drCkSelf()).filter(h => !(h.cat === '마침표' && document.activeElement === ta));
+  // 글 맨 끝에서 쓰는 중(커서가 끝)에는 끝 마침표를 묻지 않는다 — 마지막 문장을 아직 쓰고 있다. 칸을 벗어나거나 커서를 옮기면 다시 본다.
+  // 문장 사이 · 줄 끝 마침표는 늘 본다
+  const endAt = ta.value.replace(/\s+$/, '').length, typing = document.activeElement === ta && ta.selectionEnd >= endAt;
+  const items = ta._ck = ckItems(drKey(), f, ta.value, drCkSelf()).filter(h => !(typing && h.cat === '마침표' && h.s === endAt && h.e === endAt));
   const n = items.length, top = items.reduce((m, h) => SGB_CK_LV[h.lv] > SGB_CK_LV[m] ? h.lv : m, 'b');
   const cnt = ['r', 'o', 'b'].map(l => [l, items.filter(h => h.lv === l).length]).filter(([, c]) => c);
   const sum = cnt.map(([l, c]) => `${CK_ICON[l]} ${c}`).join(' · ');
@@ -3015,8 +3055,8 @@ function drCkRun(f){
     ${items.map((h, i) => `<div class="ck-row" data-lv="${h.lv}"><span class="ck-lv" aria-hidden="true">${CK_ICON[h.lv]}</span>
       <div class="ck-body">${h.t.trim() ? `<span class="ck-t">「${esc(h.t.length > 40 ? h.t.slice(0, 40) + '…' : h.t)}」</span>` : ''}<span class="ck-cat">${esc(h.cat)}</span>
         <div>${esc(h.msg)}</div>${h.alt ? `<div class="ck-alt">바꿔 쓰기: <b>${esc(h.alt)}</b></div>` : ''}</div>
-      <div class="ck-acts"><button type="button" data-ckgo="${f}" data-i="${i}">그 자리로</button>${'rep' in h ? `<button type="button" data-ckfix="${f}" data-i="${i}">고치기</button>`
-        : `<button type="button" data-ckok="${f}" data-i="${i}" title="이 학생 이 칸의 이 말은 다시 걸지 않습니다(이 기기)">괜찮음</button>`}</div></div>`).join('')}`;
+      <div class="ck-acts"><button type="button" data-ckgo="${f}" data-i="${i}">그 자리로</button>${'rep' in h ? `<button type="button" data-ckfix="${f}" data-i="${i}">고치기</button>` : ''}<button
+        type="button" data-ckok="${f}" data-i="${i}" title="이 학생 이 칸의 이 말은 다시 걸지 않습니다(이 기기)">괜찮음</button></div></div>`).join('')}`;
 }
 // 그 자리로 — 글 상자에서 그 부분을 고르고, 글 상자가 보이게
 function drCkGo(f, i){
@@ -3064,9 +3104,16 @@ function drPaint(ta){
   }
   if (f.startsWith('hold.')) $('drHoldN-' + f.slice(5)).textContent = v ? ' ' + v.length.toLocaleString() + '자' : '';
 }
+// 끝 마침표는 칸을 벗어날 때(누름이 끝난 뒤) 다시 본다. ⚠ · 목록 단추로 옮겨 가는 것이면 그 단추가 다시 그린다(그사이 목록이 바뀌어 누름이 사라지지 않게)
+function drOnLeave(e){
+  const f = e.target.dataset?.f; if (!DR_AREAS.some(([k]) => k === f)) return;
+  if (e.relatedTarget?.closest?.('.drp-ckp, .drp-ck')) return;
+  setTimeout(() => drCkRun(f), 200);
+}
 function drOnChange(e){
   // 행특 가리기 — 보조자료의 행특 카드·「→ 행특」 도 함께 빠지게 학생 화면째 다시 그린다
   if (e.target.id === 'drHide'){ st.hideHaeng = e.target.checked; save(); drFlush(); renderStuOut(); }
+  if (e.target.id === 'drPrDup'){ st.prDup = e.target.checked; save(); }   // 양면 인쇄용 — 기억한다(우리 반 생기부의 것과 같은 값)
 }
 function drOnClick(e){
   if (e.target.closest('#drClose')){ drToggle(false); return; }
@@ -3518,8 +3565,9 @@ async function prFonts(){
     new Promise(r => setTimeout(r, 2000)),
   ]).catch(() => {});
 }
-// 참여한 활동(보조자료) — 기재안에 들어갔는지 ✓ 들어감 · ◐ 일부 · □ 아직(선생님 요청 2026-10-30). 봉사활동 기록은 뺀다.
-// 학번·이름이 어긋나 빌려 온 자료도 학생 화면처럼 넣는다. 들어갔는지는 카드의 「✓ 자율에 들어감」 과 같은 잣대(sgbUsed)
+// 참여한 활동(보조자료) — 기재안에 들어갔는지 ✓ 들어감 · ◐ 일부 · □ 아직(선생님 요청 2026-10-30).
+// 봉사활동은 작성 칸이 아니라 봉사활동 실적에 들어가니 판정 없이 따로 — 학생 화면의 「봉사활동 누가기록」 표를 그대로(확인용 — 선생님
+// 「봉사활동은 내용 다 넣으면 좋겠다 · 정확하게는 이 내용」). 학번·이름이 어긋나 빌려 온 자료도 학생 화면처럼 넣는다. 들어갔는지는 카드의 「✓ 자율에 들어감」 과 같은 잣대(sgbUsed)
 async function prActsOf(key){
   let d = null; try { d = await loadStudent(key); } catch (e) {}
   const items = [...(d?.items || [])];
@@ -3529,7 +3577,7 @@ async function prActsOf(key){
   }
   const by = new Map();
   for (const it of items){ const a = actById(it.a); if (!a || sgbIsVolunteer(a)) continue; if (!by.has(a)) by.set(a, []); by.get(a).push(it.b || ''); }
-  return [...by].map(([a, texts]) => ({ a, texts }));
+  return { acts: [...by].map(([a, texts]) => ({ a, texts })), vol: sgbVolunteerRows(items, actById) };
 }
 function prActsHtml(acts, d, noH){
   const ks = DR_AREAS.map(([k]) => k).filter(k => !(noH && k === 'haeng'));
@@ -3548,7 +3596,17 @@ function prActsHtml(acts, d, noH){
   return `<tr class="pr-acts"><td>
     <div class="pr-ash"><b>참여한 활동</b><span>${list.length}개 · 들어감 ${n('full')} · 일부 ${n('part')} · 아직 ${n('none')}</span></div>
     <ul class="pr-al">${list.map(x => `<li class="${x.st}"><i>${mark[x.st]}</i><span class="pr-an">${esc(x.a.title)}</span><span class="pr-aw">${esc(x.where)}</span></li>`).join('')}</ul>
-    <div class="pr-legend">✓ 기재안에 들어감 · ◐ 일부 들어감 · □ 아직 — 보조자료 기준, 봉사활동 기록은 뺌</div></td></tr>`;
+    <div class="pr-legend">✓ 기재안에 들어감 · ◐ 일부 들어감 · □ 아직 — 보조자료 기준</div></td></tr>`;
+}
+// 봉사활동 누가기록 — 학생 화면 표와 같은 여덟 칸·같은 차례(날짜 순, 시간 누계). 빈 칸도 칸은 둔다(학생마다 같은 모양). 학생부 차례대로 진로 다음에
+const PR_VOL_KS = ['start', 'end', 'area', 'content', 'type', 'place', 'hours', 'total'];
+function prVolHtml(vol){
+  if (!vol.length) return '';
+  return `<tr class="pr-vol"><td>
+    <div class="pr-ash"><b>봉사활동 누가기록</b><span>${vol.length}건 · 총 ${vol.at(-1).total}시간 · 확인용(봉사활동 실적에 입력)</span></div>
+    <table class="pr-vt"><colgroup>${PR_VOL_KS.map(k => `<col class="v-${k}">`).join('')}</colgroup>
+      <thead><tr>${SGB_VOL_COLS.map((c, i) => `<th class="v-${PR_VOL_KS[i]}">${esc(c)}</th>`).join('')}</tr></thead>
+      <tbody>${vol.map(r => `<tr>${PR_VOL_KS.map(k => `<td class="v-${k}">${esc(String(r[k] ?? ''))}</td>`).join('')}</tr>`).join('')}</tbody></table></td></tr>`;
 }
 async function drPrint(which, { ck, noH }){
   await drFlush();
@@ -3559,23 +3617,59 @@ async function drPrint(which, { ck, noH }){
     catch (e) { toast('반 작성 내용을 불러오지 못했습니다'); return; }
   }
   const ds = prDate(), acts = new Map();
-  await Promise.all(rows.map(async r => acts.set(+r.n, await prActsOf(`${g}-${c}-${r.n}`))));   // 참여한 활동(보조자료)
+  await Promise.all(rows.map(async r => acts.set(+r.n, await prActsOf(`${g}-${c}-${r.n}`))));   // 참여한 활동 · 봉사활동(보조자료)
   $('printArea').innerHTML = rows.map((r, i) => {
-    const d = drCache.get(`${ck}-${r.n}`) || {};
+    const d = drCache.get(`${ck}-${r.n}`) || {}, { acts: al = [], vol = [] } = acts.get(+r.n) || {};
     return `<section class="pr-page"><table class="pr-frame">
       <thead><tr><td>${prHead(esc(r.nm), `${esc(g)}학년 ${esc(c)}반 ${esc(r.n)}번`, ds)}</td></tr></thead>
-      <tbody>${prActsHtml(acts.get(+r.n) || [], d, noH)}${DR_AREAS.filter(([k]) => !(noH && k === 'haeng') && !(DR_PR_SKIP.has(k) && !(d[k] || '').trim())).map(([k, , tg]) => {
+      <tbody>${prActsHtml(al, d, noH)}${DR_AREAS.filter(([k]) => !(noH && k === 'haeng') && !(DR_PR_SKIP.has(k) && !(d[k] || '').trim())).map(([k, , tg]) => {
         const v = d[k] || '', b = sgbNeisBytes(v), lim = SGB_NEIS_LIMIT[tg], over = b > lim;
         return `<tr class="pr-sec${over ? ' over' : ''}" data-k="${k}"><td>
           <div class="pr-sh"><b>${DR_FULL[k]}</b><span class="pr-bytes">${b.toLocaleString()} / ${lim.toLocaleString()}바이트${over ? ` · ${(b - lim).toLocaleString()} 초과` : ''}</span></div>
-          <div class="pr-t">${v.trim() ? esc(v) : '<span class="pr-empty">작성 전</span>'}</div></td></tr>`;
+          <div class="pr-t">${v.trim() ? esc(v) : '<span class="pr-empty">작성 전</span>'}</div></td></tr>${k === 'jin' ? prVolHtml(vol) : ''}`;
       }).join('')}</tbody>
       <tfoot><tr><td><footer class="pr-foot"><span>${noH ? '행동특성 및 종합의견 제외' : ''}</span><span>${i + 1} / ${rows.length}</span></footer></td></tr></tfoot>
     </table></section>`;
   }).join('');
   if ($('drPrint')) $('drPrint').open = false;
   await prFonts();
+  if (which === 'all' && prDup()){
+    const blanks = prDuplex();
+    if (blanks) toast(`양면 인쇄용 빈 쪽 ${blanks}장을 넣었습니다(쪽 수가 홀수인 학생 뒤) — 한 면만 찍을 때는 「양면 인쇄용」 을 꺼 주세요`, 6000);
+  }
   window.print();
+}
+// 양면 인쇄용(반 전체) — 학생마다 새 종이 앞면에서 시작하게, 쪽 수가 홀수인 학생 뒤에 빈 쪽(선생님 요청 2026-10-30 — 3쪽 학생이 있으면 뒤 학생이 앞 학생 종이 뒷면에 찍혀 섞인다).
+// 크롬은 break-after:right(다음 앞면부터)를 무시하고 몇 쪽이 됐는지도 알려 주지 않아서, 화면 밖에 A4 너비로 똑같이 그려 칸 높이를 재고
+// 쪽을 나눌 자리를 앱이 정한다(.pr-brk = break-before:page). 쪽마다 머리(이름 줄)·꼬리(쪽 번호 줄)를 뺀 높이에 칸을 차례로 담는다 — 칸은 쪽 사이에서 안 갈린다.
+// 4mm 덜 담는다: 잰 높이와 인쇄 높이가 조금 달라도 크롬이 쪽을 더 나누지 않게(나누는 자리는 늘 앱이 정한 곳). 한 쪽보다 긴 칸만 크롬이 줄 단위로 나눈다
+function prDup(){ return st.prDup !== false; }   // 처음엔 켜 둔다(학교 프린터는 양면이 많다)
+function prDuplex(){
+  const area = $('printArea'), mm = 96 / 25.4, PAGE = 297 * mm, SAFE = 4 * mm;
+  area.classList.add('pr-measure');
+  const plan = [...area.querySelectorAll(':scope > .pr-page')].map(sec => {
+    const t = sec.querySelector('table.pr-frame'), brk = [];
+    const room = PAGE - t.tHead.getBoundingClientRect().height - t.tFoot.getBoundingClientRect().height;
+    let pages = 1, used = 0;
+    for (const tr of t.tBodies[0].rows){
+      const h = tr.getBoundingClientRect().height;
+      if (used && used + h > room - SAFE){ pages++; used = 0; brk.push(tr); }
+      if (h > room - SAFE){ pages += Math.ceil(h / room) - 1; used = room; }   // 한 쪽보다 긴 칸 — 다음 칸은 새 쪽에서
+      else used += h;
+    }
+    return { sec, pages, brk };
+  });
+  area.classList.remove('pr-measure');
+  let blanks = 0;
+  plan.forEach(({ sec, pages, brk }, i) => {
+    brk.forEach(tr => tr.classList.add('pr-brk'));
+    sec.dataset.pages = pages;
+    if (pages % 2 && i < plan.length - 1){
+      sec.insertAdjacentHTML('afterend', '<section class="pr-page pr-blank" aria-hidden="true">이 쪽은 양면 인쇄를 위해 비워 두었습니다</section>');
+      blanks++;
+    }
+  });
+  return blanks;
 }
 window.addEventListener('afterprint', () => { $('printArea').innerHTML = ''; });   // 인쇄가 끝나면 비운다(행특이 화면 뒤에 남지 않게)
 // ── 우리 반 생기부(담임) ── 반 전체를 한 페이지에. 한눈에(학생 × 영역 바이트) · 자율 · 진로 · 개세특 · 행특,
@@ -3646,7 +3740,8 @@ function clsDraw(ck, list, at){
       <div class="cls-act">
         <label class="drp-sw"><input type="checkbox" id="clsHide"${st.hideHaeng ? ' checked' : ''}> 행특 가리기</label>
         ${tab === 'all' ? '' : `<button type="button" class="btn sm" id="clsPrArea" title="${DR_FULL[tab]}만 반 전체를 한 표로">🖨 ${area[1]} 인쇄</button>`}
-        <button type="button" class="btn sm" id="clsPrAll" title="학생마다 한 장(${list.length}장)">🖨 학생마다 인쇄</button>
+        <button type="button" class="btn sm" id="clsPrAll" title="학생마다 따로(${list.length}명)">🖨 학생마다 인쇄</button>
+        <label class="drp-sw" title="양면으로 찍을 때 — 쪽 수가 홀수인 학생 뒤에 빈 쪽을 넣어, 학생마다 새 종이 앞면에서 시작합니다"><input type="checkbox" id="clsDup"${prDup() ? ' checked' : ''}> 양면 인쇄용</label>
         <button type="button" class="btn sm" id="clsXlsx" title="영역마다 시트 — 번호·이름·내용·바이트">📥 엑셀로 저장</button>
       </div>
     </div>
@@ -3666,6 +3761,7 @@ function clsDraw(ck, list, at){
   };
   page.onchange = e => {
     if (e.target.id === 'clsHide'){ st.hideHaeng = e.target.checked; save(); clsDraw(ck, list, at); return; }
+    if (e.target.id === 'clsDup'){ st.prDup = e.target.checked; save(); return; }
     if (e.target.id === 'clsG'){ st.clsK = cls.find(k => k.split('-')[0] === e.target.value) || st.clsK; save(); renderCls(); return; }
     if (e.target.id === 'clsC'){ st.clsK = e.target.value; save(); renderCls(); }
   };
