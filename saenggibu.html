@@ -3649,7 +3649,8 @@ function prActsHtml(acts, d, noH){
     <ul class="pr-al">${list.map(x => `<li class="${x.st}"><i>${mark[x.st]}</i><span class="pr-an">${esc(x.a.title)}</span><span class="pr-aw">${esc(x.where)}</span></li>`).join('')}</ul>
     <div class="pr-legend">✓ 기재안에 들어감 · ◐ 일부 들어감 · □ 아직 — 보조자료 기준</div></td></tr>`;
 }
-// 봉사활동 누가기록 — 학생 화면 표와 같은 여덟 칸·같은 차례(날짜 순, 시간 누계). 빈 칸도 칸은 둔다(학생마다 같은 모양). 학생부 차례대로 진로 다음에
+// 봉사활동 누가기록 — 학생 화면 표와 같은 여덟 칸·같은 차례(날짜 순, 시간 누계). 빈 칸도 칸은 둔다(학생마다 같은 모양).
+// 맨 아래에(영역 칸이 다 끝난 뒤 — 선생님 「인쇄할 때 봉사는 젤 아래에」 2026-10-30, 처음엔 학생부 차례대로 진로 다음이었다)
 const PR_VOL_KS = ['start', 'end', 'area', 'content', 'type', 'place', 'hours', 'total'];
 function prVolHtml(vol){
   if (!vol.length) return '';
@@ -3677,8 +3678,8 @@ async function drPrint(which, { ck, noH }){
         const v = d[k] || '', b = sgbNeisBytes(v), lim = SGB_NEIS_LIMIT[tg], over = b > lim;
         return `<tr class="pr-sec${over ? ' over' : ''}" data-k="${k}"><td>
           <div class="pr-sh"><b>${DR_FULL[k]}</b><span class="pr-bytes">${b.toLocaleString()} / ${lim.toLocaleString()}바이트${over ? ` · ${(b - lim).toLocaleString()} 초과` : ''}</span></div>
-          <div class="pr-t">${v.trim() ? esc(v) : '<span class="pr-empty">작성 전</span>'}</div></td></tr>${k === 'jin' ? prVolHtml(vol) : ''}`;
-      }).join('')}</tbody>
+          <div class="pr-t">${v.trim() ? esc(v) : '<span class="pr-empty">작성 전</span>'}</div></td></tr>`;
+      }).join('')}${prVolHtml(vol)}</tbody>
       <tfoot><tr><td><footer class="pr-foot"><span>${noH ? '행동특성 및 종합의견 제외' : ''}</span><span>${i + 1} / ${rows.length}</span></footer></td></tr></tfoot>
     </table></section>`;
   }).join('');

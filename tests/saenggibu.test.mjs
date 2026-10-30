@@ -2883,8 +2883,10 @@ console.log('\n[인쇄 — 참여한 활동]');
   check('— 오른쪽에 「N개 · 들어감 · 일부 · 아직」 수(목록과 같게), 아래에 표시 뜻',
     pr.sum === `${pr.li.length}개 · 들어감 ${cnt('full')} · 일부 ${cnt('part')} · 아직 ${cnt('none')}` && cnt('full') === 1 && /✓ 기재안에 들어감/.test(pr.legend), [pr.sum, pr.legend]);
   check('— 영역 칸(자율·진로 …)은 그대로', pr.heads.slice(0, 2).join('|') === '자율·자치활동 특기사항|진로활동 특기사항', pr.heads);
-  check('봉사활동 — 참여한 활동 목록에는 없고(표로 따로), 진로 다음에 「봉사활동 누가기록」(학생부 차례: 자율 · 진로 · 봉사 · 개세특 · 행특)',
-    !pr.li.some(x => /교과학습도우미/.test(x.nm)) && pr.vol.before === 'jin' && pr.vol.order.slice(0, 4).join() === 'pr-acts,ja,jin,pr-vol', pr.vol.order);
+  // 처음엔 학생부 차례대로 진로 다음에 넣었다가 선생님 「인쇄할 때 봉사는 젤 아래에」(2026-10-30) — 영역 칸이 다 끝난 맨 아래
+  check('봉사활동 — 참여한 활동 목록에는 없고(표로 따로), 맨 아래(행특까지 영역 칸이 다 끝난 뒤)에 「봉사활동 누가기록」',
+    !pr.li.some(x => /교과학습도우미/.test(x.nm)) && pr.vol.order.at(-1) === 'pr-vol' && pr.vol.order.indexOf('pr-vol') === pr.vol.order.length - 1
+    && pr.vol.order.join() === 'pr-acts,ja,jin,gae,haeng,pr-vol', pr.vol.order);
   check('— 학생 화면의 봉사활동 표와 똑같이: 여덟 칸(시작일자 … 시간 누계) · 같은 줄 · 같은 내용', screenVol.length >= 2 && screenVol[0].length === 8
     && JSON.stringify(pr.vol.rows) === JSON.stringify(screenVol) && pr.vol.rows[0].join('|') === '시작일자|종료일자|영역구분|봉사활동내용|학교/개인 구분|장소 또는 주관 기관명|시간|시간 누계'
     && pr.vol.rows[1][0] === '2026.04.10.' && pr.vol.rows[1][3] === '헌혈' && pr.vol.rows[1][6] === '4' && pr.vol.rows[1][7] === '4', { print: pr.vol.rows, screen: screenVol });
