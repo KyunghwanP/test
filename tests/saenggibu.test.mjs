@@ -1610,13 +1610,15 @@ const adminDone = (p, word) => p.waitForFunction(w => { const a = document.getEl
   await p.click('#views [data-view="act"]');
   await p.waitForSelector('#acts .act');
   const tagOf = async id => txt(p, `#acts .act[data-id="${id}"] .fresh`);
-  check('활동 목록 — 처음 올라온 것 「추가」, 바뀐 것 「수정」, 날짜 없는 옛 기록은 꼬리표 없음',
-    (await tagOf(mathId)) === '추가' && (await tagOf(rbId)) === '수정' && (await tagOf(flex.id)) === '', [await tagOf(mathId), await tagOf(rbId), await tagOf(flex.id)]);
+  // 「추가」 꼬리표는 당분간 감춘다(선생님 2026-10-30 「보조자료 업로드됐을 때 추가 생기는 거 — 당분간 안 보이게」, SGB_FRESH_NEW). 「수정」 은 그대로
+  check('활동 목록 — 처음 올라온 것은 꼬리표 없음(「추가」 는 당분간 감춤), 바뀐 것 「수정」, 날짜 없는 옛 기록도 없음',
+    (await tagOf(mathId)) === '' && (await tagOf(rbId)) === '수정' && (await tagOf(flex.id)) === '' && !(await p.$('.fresh.new')), [await tagOf(mathId), await tagOf(rbId), await tagOf(flex.id)]);
   check('— 8일 전에 바뀌었어도 아직 안 봤으면 「수정」', (await tagOf(off.id)) === '수정');
   await shot(p, '.p-acts', '5-fresh-tags');
   await p.click('#freshTg');
   const ids = await p.$$eval('#acts .act', bs => bs.map(b => b.dataset.id));
-  check('「추가·수정만」 — 꼬리표 있는 활동만 남는다', !ids.includes(flex.id) && ids.includes(off.id) && ids.includes(mathId), ids);
+  check('「수정만」 — 꼬리표 있는(바뀐) 활동만 남는다, 처음 올라온 것은 빠진다', !ids.includes(flex.id) && ids.includes(off.id) && !ids.includes(mathId)
+    && /^수정만 \d+$/.test(await txt(p, '#freshTg')), [ids, await txt(p, '#freshTg')]);
   await p.click('#freshTg');
   await p.click(`#acts .act[data-id="${off.id}"]`);
   await p.waitForFunction(() => (document.querySelector('#actOut .card-h')?.textContent || '').includes('학생자치회'), null, { timeout: 8000 }).catch(() => {});
@@ -1630,7 +1632,7 @@ const adminDone = (p, word) => p.waitForFunction(w => { const a = document.getEl
   await p.click('.cls-pc .cl-item[data-k="1-1"]');
   await p.click('#stus .stu[data-n="1"]');
   await p.waitForSelector('#stuOut .card');
-  check('학생 카드에도 꼬리표(1-1-1)', (await p.$$('#stuOut .card .fresh')).length > 0);
+  check('학생 카드에도 꼬리표(1-1-1 — 「수정」 만, 「추가」 는 없음)', (await p.$$('#stuOut .card .fresh.mod')).length > 0 && !(await p.$('#stuOut .fresh.new')));
   check('오류 없음(꼬리표)', p.errors.length === 0, p.errors);
   await p.context().close();
 }
@@ -2746,23 +2748,29 @@ console.log('\n[기재요령 점검]');
   await p.waitForSelector('#drOpenBtn');
   await p.click('#drOpenBtn');
   await p.waitForSelector('#drT-jin', { state: 'visible' });
-  const chipOf = f => p.evaluate(f => { const c = document.getElementById('drCk-' + f); return { hidden: c.hidden, cls: c.className, t: c.textContent }; }, f);
-  check('처음(걸린 것 없는 칸)에는 ⚠ 가 없다', (await chipOf('haeng')).hidden || !(await p.$('#drCk-haeng')));
+  // 목록은 누르지 않아도 칸 바로 아래에 늘 보인다(선생님 2026-10-30 「경고 버튼으로 보이게 말고 걍 계속 띄워 주면」 — 처음엔 ⚠ N 을 눌러야 펼쳤다)
+  const boxOf = f => p.evaluate(f => { const b = document.getElementById('drCkP-' + f);
+    return { hidden: !b || b.hidden, cls: b?.className || '', n: b ? b.querySelectorAll('.ck-row').length : 0, head: b?.querySelector('.ck-head')?.textContent.replace(/\s+/g, ' ').trim() || '' }; }, f);
+  check('처음(걸린 것 없는 칸)에는 점검 목록도 ⚠ 단추도 없다', (await boxOf('haeng')).hidden && await p.$eval('#drCk-haeng', c => c.hidden));
   const TXT = '전국 과학 탐구 대회에서 금상을 수상함. 유튜브 영상을 참고하여  발표함.의사인 아버지를 보며 진로를 고민함';
   await p.fill('#drT-jin', TXT);
-  await p.waitForFunction(() => document.getElementById('drCk-jin').classList.contains('r'), null, { timeout: 3000 }).catch(() => {});   // 0.3초 뒤 새 글로
-  const c1 = await chipOf('jin');
-  check('쓰는 대로 바이트 옆에 「⚠ N」 — 가장 높은 단계 색(🔴 빨강)', !c1.hidden && c1.cls.split(' ').includes('r') && /^⚠ \d+$/.test(c1.t), c1);
+  await p.waitForFunction(() => document.getElementById('drCkP-jin').classList.contains('r'), null, { timeout: 3000 }).catch(() => {});   // 0.3초 뒤 새 글로
+  const c1 = await boxOf('jin');
+  const chip = () => p.evaluate(() => { const c = document.getElementById('drCk-jin'); return { t: c.textContent, cls: c.className, pressed: c.getAttribute('aria-pressed'), hidden: c.hidden }; });
+  const k1 = await chip();
+  check('쓰는 대로 칸 바로 아래에 점검 목록이 뜬다(누르지 않아도) — 가장 높은 단계 색(🔴 빨강), 머리에 단계별 수, 바이트 옆 ⚠ 에 건수', !c1.hidden && c1.cls.split(' ').includes('r') && c1.n > 0
+    && /^기재요령 점검\s?🔴 3 · 🟠 1 · 🔵 \d/.test(c1.head) && !k1.hidden && k1.t === `⚠ ${c1.n}` && k1.cls.split(' ').includes('r'), [c1, k1]);
   check('— 쓰는 중(커서가 그 칸)에는 끝 마침표를 묻지 않는다', await p.evaluate(() => { const t = document.getElementById('drT-jin');
     return document.activeElement === t && (t._ck || []).length > 0 && !(t._ck || []).some(h => h.cat === '마침표'); }));
-  await p.click('#drCk-jin');
-  await p.waitForSelector('#drCkP-jin .ck-row', { timeout: 3000 }).catch(() => {});
+  await p.click('#drSaved');                     // 칸을 벗어나면 끝 마침표까지
+  await p.waitForFunction(() => (document.getElementById('drT-jin')._ck || []).some(h => h.cat === '마침표'), null, { timeout: 3000 }).catch(() => {});
+  await p.waitForTimeout(100);
   const rows = await p.$$eval('#drCkP-jin .ck-row', rs => rs.map(r => ({ lv: r.dataset.lv, t: r.innerText.replace(/\s+/g, ' ') })));
   const inRows = re => rows.some(r => re.test(r.t));
-  check('누르면 칸 아래 목록 — 교외 대회 · 대회 수상 · 부모 직업(🔴) · 상호명과 바꿔 쓸 말(🟠) · 띄어쓰기(🔵) · 끝 마침표(칸을 벗어나면)',
+  check('목록 — 교외 대회 · 대회 수상 · 부모 직업(🔴) · 상호명과 바꿔 쓸 말(🟠) · 띄어쓰기(🔵) · 끝 마침표(칸을 벗어나면)',
     inRows(/전국 과학 탐구 대회.*교외 대회/) && inRows(/금상을 수상.*대회 수상/) && inRows(/의사인 아버지.*부모·친인척 직업/)
     && inRows(/유튜브.*상호명.*바꿔 쓰기: 동영상 공유 플랫폼/) && inRows(/두 칸 이상 띄어 씀/) && inRows(/끝에 마침표가 없음/)
-    && rows.filter(r => r.lv === 'r').length === 3 && (await p.$eval('#drCk-jin', c => c.getAttribute('aria-expanded'))) === 'true', rows);
+    && rows.filter(r => r.lv === 'r').length === 3, rows);
   // 그 자리로 — 글 상자에서 그 부분을 고른다
   await p.click('#drCkP-jin [data-ckgo="jin"][data-i="0"]');
   const sel = await p.evaluate(() => { const t = document.getElementById('drT-jin'); return [document.activeElement === t, t.value.slice(t.selectionStart, t.selectionEnd)]; });
@@ -2774,6 +2782,22 @@ console.log('\n[기재요령 점검]');
   const afterOk = await p.$$eval('#drCkP-jin .ck-row', rs => rs.map(r => r.innerText));
   check('「괜찮음」 — 그 줄이 빠지고 이 기기에 남는다', !afterOk.some(t => /유튜브/.test(t)) && afterOk.length === rows.length - 1
     && Object.keys(await p.evaluate(() => JSON.parse(localStorage.getItem('ynhs-sgb-ckok') || '{}'))).some(k => k === '1-1-1|jin|상호명|유튜브'), afterOk);
+  // ⚠ 단추 — 「괜찮음」 한 것을 다시 본다(선생님 2026-10-30 「괜찮음 누른 건 안 보여도 될 듯 · 다시 경고 버튼 누르면 보이는 걸로」), 「다시 걸기」 로 되돌린다
+  const k2 = await chip();
+  check('— 바이트 옆 ⚠ 단추에 「⚠ N · 괜찮음 1」(괜찮음 한 것은 목록에 안 보임)', k2.t === `⚠ ${rows.length - 1} · 괜찮음 1` && k2.pressed === 'false', k2);
+  await p.click('#drCk-jin');
+  const shown = await p.evaluate(() => ({ sep: document.querySelector('#drCkP-jin .ck-oksep')?.textContent, ok: [...document.querySelectorAll('#drCkP-jin .ck-row.is-ok')].map(r => r.innerText.replace(/\s+/g, ' ')),
+    undo: !!document.querySelector('#drCkP-jin .ck-row.is-ok [data-ckundo]'), okBtn: !!document.querySelector('#drCkP-jin .ck-row.is-ok [data-ckok]') }));
+  check('⚠ 단추를 누르면 「괜찮음 한 것 1」 아래에 흐리게 다시 보인다 — 「다시 걸기」 단추', shown.sep === '괜찮음 한 것 1' && shown.ok.length === 1 && /유튜브/.test(shown.ok[0])
+    && shown.undo && !shown.okBtn && (await chip()).pressed === 'true', shown);
+  await p.click('#drCkP-jin .ck-row.is-ok [data-ckundo]');
+  const re = await p.evaluate(() => ({ act: [...document.querySelectorAll('#drCkP-jin .ck-row:not(.is-ok)')].map(r => r.innerText), ok: document.querySelectorAll('#drCkP-jin .ck-row.is-ok').length,
+    mem: Object.keys(JSON.parse(localStorage.getItem('ynhs-sgb-ckok') || '{}')) }));
+  check('— 「다시 걸기」 → 다시 걸린다(이 기기 기억에서도 빠짐)', re.act.some(t => /유튜브/.test(t)) && !re.ok && !re.mem.includes('1-1-1|jin|상호명|유튜브') && (await chip()).t === `⚠ ${rows.length}`, re);
+  await p.click(`#drCkP-jin [data-ckok="jin"][data-i="${re.act.findIndex(t => /유튜브/.test(t))}"]`);   // 다시 괜찮음
+  check('— 괜찮음을 다시 누르면 보이는 채로 흐리게 아래로', (await p.$$('#drCkP-jin .ck-row.is-ok')).length === 1);
+  await p.click('#drCk-jin');
+  check('— ⚠ 단추를 다시 누르면 감춘다', !(await p.$('#drCkP-jin .ck-row.is-ok')) && (await chip()).pressed === 'false' && (await chip()).t === `⚠ ${rows.length - 1} · 괜찮음 1`);
   // 모두 고치기 — 두 칸 띄어쓰기 · 마침표 뒤 · 끝 마침표
   await p.click('#drCkP-jin [data-ckfixall="jin"]');
   await p.waitForTimeout(1300);                // 저장(0.9초)까지
@@ -2787,8 +2811,10 @@ console.log('\n[기재요령 점검]');
   await p.click('#drPrev');
   await p.waitForFunction(() => document.getElementById('drT-jin')?.value.startsWith('전국 과학'), null, { timeout: 5000 }).catch(() => {});
   await p.waitForTimeout(150);
-  const back = await p.evaluate(() => ({ ts: (document.getElementById('drT-jin')?._ck || []).map(h => h.t), chip: document.getElementById('drCk-jin')?.textContent }));
-  check('다른 학생으로 갔다 와도 「괜찮음」 한 말은 걸리지 않는다(🔴 3 만)', back.ts.length === 3 && back.ts.every(t => t !== '유튜브') && back.chip === '⚠ 3', back);
+  const back = await p.evaluate(() => ({ ts: (document.getElementById('drT-jin')?._ck || []).map(h => h.t), rows: document.querySelectorAll('#drCkP-jin .ck-row').length,
+    open: !document.getElementById('drCkP-jin')?.hidden, chip: document.getElementById('drCk-jin')?.textContent }));
+  check('다른 학생으로 갔다 와도 「괜찮음」 한 말은 걸리지 않는다(🔴 3 만, 목록은 그대로 펼쳐져 있다)', back.ts.length === 3 && back.ts.every(t => t !== '유튜브') && back.rows === 3 && back.open
+    && back.chip === '⚠ 3 · 괜찮음 1', back);
   // 우리 반 생기부 한눈에 — 점검 칸
   await p.click('#drClassBtn');
   await p.waitForSelector('.cls-all', { timeout: 5000 }).catch(() => {});
@@ -2815,8 +2841,8 @@ console.log('\n[기재요령 점검]');
   check('— 「모두 고치기」 → 「성실하게 참여함. 친구들과 협력함.」', (await p.inputValue('#drT-jin')) === '성실하게 참여함. 친구들과 협력함.', await p.inputValue('#drT-jin'));
   // 깨끗한 글이면 ⚠ 가 사라진다
   await p.fill('#drT-jin', '진로 탐색 주간에 관심 분야의 직업을 조사하고 필요한 역량을 정리함.');
-  await p.waitForFunction(() => document.getElementById('drCk-jin').hidden, null, { timeout: 3000 }).catch(() => {});
-  check('걸린 것이 없어지면 ⚠ 도 목록도 사라진다', (await chipOf('jin')).hidden && await p.$eval('#drCkP-jin', b => b.hidden));
+  await p.waitForFunction(() => document.getElementById('drCkP-jin').hidden, null, { timeout: 3000 }).catch(() => {});
+  check('걸린 것이 없어지면 목록도 ⚠ 단추도 사라진다', (await boxOf('jin')).hidden && (await chip()).hidden);
   check('— 오류 없음', !p.errors.length, p.errors);
   await p.context().close();
 }
@@ -2992,9 +3018,11 @@ for (const c of ['saenggibu', 'saenggibuStu', 'saenggibuAct']) {
     '저장하지 못했습니다', '이미 ', '에 들어간 문장입니다 — 한 번 더 누르면 붙입니다', '✏️ 작성하러 가기', '⚠ 확인 필요', '⚠ 유의 사항',
     // 부서·교과 탭 — 양식·미리보기·활동별
     '기재 내용만', '추가 기재 칸', '⚠ 확인할 시트', '반·번호·이름 확인', '새 판인가요?', '따로 추가', '건너뛰기(그대로 둠)', '선생님이 올리는 중입니다',
-    '새로 추가', '내용이 바뀜', '올렸습니다', '활동별', '활동·부서 찾기', '추가·수정만', '⚙ 관리',
+    '새로 추가', '내용이 바뀜', '올렸습니다', '활동별', '활동·부서 찾기', '수정만', '⚙ 관리',
     // 한 기록이 두 영역에 — 카드 표시와 붙일 때 알림
-    '곳에 들어감', '에 들어간 기록입니다 — 한 기록은 한 영역에만 씁니다'];
+    '곳에 들어감', '에 들어간 기록입니다 — 한 기록은 한 영역에만 씁니다',
+    // 기재요령 점검 · 인쇄(봉사활동 누가기록 · 양면 인쇄용)
+    '기재요령 점검', '그 자리로', '괜찮음', '모두 고치기', '봉사활동 누가기록', '양면 인쇄용', '이 쪽은 양면 인쇄를 위해 비워 두었습니다'];
   const gone = labels.filter(l => !SMAN.includes(l) || !HTML.includes(l));
   check('— 설명서가 부르는 단추·알림 이름이 앱에 그대로 있다(앱에서 이름을 바꾸면 여기서 걸린다)', !gone.length && HTML.includes('→ ${DR_NAME[k]}') && HTML.includes('에 들어감`')
     && SMAN.includes('→ 자율') && SMAN.includes('✓ 진로에 들어감'), gone);

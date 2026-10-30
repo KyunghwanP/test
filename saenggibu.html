@@ -464,27 +464,36 @@
   .drp-link{padding:0;border:none;background:none;font:inherit;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;}
   .drp-link:hover,.drp-link[aria-expanded="true"]{color:var(--mon);}
   /* 기재요령 점검 — 바이트 옆 「⚠ 2」(가장 높은 단계 색: 🔴 빨강 · 🟠 주황 · 🔵 파랑), 누르면 칸 아래 목록 */
+  /* 기재요령 점검 — 걸린 것이 있으면 칸 아래에 늘 보인다. 한 건에 한 줄, 왼쪽 띠는 가장 높은 단계 색.
+     바이트 옆 ⚠ 단추는 수(가장 높은 단계 색) — 누르면 「괜찮음」 한 것도 보인다 */
   .drp-ck{padding:1px 9px;border:1px solid transparent;border-radius:999px;font:inherit;font-size:12.5px;font-weight:800;line-height:1.5;cursor:pointer;white-space:nowrap;}
   .drp-ck[hidden]{display:none;}
   .drp-ck.r{background:#FEE4E2;color:#B42318;border-color:#FECDCA;} .drp-ck.o{background:#FEF0C7;color:#B54708;border-color:#FEDF89;}
-  .drp-ck.b{background:#EFF8FF;color:#175CD3;border-color:#B2DDFF;}
+  .drp-ck.b{background:#EFF8FF;color:#175CD3;border-color:#B2DDFF;} .drp-ck.ok{background:var(--paper-soft);color:var(--ink-soft);border-color:var(--rule);}
+  .drp-ck[aria-pressed="true"]{box-shadow:inset 0 0 0 1.5px currentColor;}
   html.dark .drp-ck.r{background:#3B1513;color:#FDA29B;border-color:#7A271A;} html.dark .drp-ck.o{background:#3A2A0D;color:#FEC84B;border-color:#7A4D0B;}
   html.dark .drp-ck.b{background:#102A43;color:#84CAFF;border-color:#1E4F7A;}
-  .drp-ckp{margin:8px 0 4px;padding:8px 12px 6px;border:1px solid var(--rule);border-radius:10px;background:var(--paper-soft);font-size:13px;}
+  .drp-ckp{margin:6px 0 2px;padding:4px 10px 3px;border:1px solid var(--rule);border-left:3px solid #84CAFF;border-radius:8px;background:var(--paper-soft);font-size:12.5px;}
+  .drp-ckp.r{border-left-color:#F04438;} .drp-ckp.o{border-left-color:#F79009;} .drp-ckp.ok{border-left-color:var(--rule);}
   .drp-ckp[hidden]{display:none;}
-  .ck-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:2px 0 6px;font-weight:800;color:var(--ink-soft);}
-  .ck-head .d{font-weight:600;}
-  .ck-head .btn{margin-left:auto;}
-  .ck-row{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-top:1px dashed var(--rule);}
-  .ck-lv{flex-shrink:0;width:18px;text-align:center;line-height:1.55;}
+  .ck-head{display:flex;align-items:center;gap:3px 8px;flex-wrap:wrap;padding:1px 0 3px;color:var(--ink-soft);}
+  .ck-head b{font-weight:800;}
+  .ck-sum{font-weight:800;}
+  .ck-head .d{font-size:11.5px;font-weight:600;}
+  .ck-head .btn{margin-left:auto;padding:2px 9px;font-size:12px;}
+  .ck-row{display:flex;gap:6px;align-items:flex-start;padding:3px 0;border-top:1px dashed var(--rule);}
+  .ck-lv{flex-shrink:0;width:16px;font-size:11px;line-height:1.75;text-align:center;}
   .ck-body{flex:1;min-width:0;line-height:1.55;color:var(--ink);}
-  .ck-t{font-weight:800;word-break:break-all;}
-  .ck-cat{margin-left:6px;font-size:12px;font-weight:700;color:var(--ink-soft);}
-  .ck-alt{font-size:12.5px;color:var(--ink-soft);} .ck-alt b{color:var(--ink);}
-  .ck-acts{display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
-  .ck-acts button{padding:3px 8px;border:1px solid var(--rule);border-radius:7px;background:var(--paper);font:inherit;font-size:12px;font-weight:700;color:var(--ink-soft);cursor:pointer;white-space:nowrap;}
+  .ck-t{margin-right:5px;font-weight:800;word-break:break-all;}
+  .ck-cat{margin-right:5px;font-size:11.5px;font-weight:800;color:var(--ink-soft);}
+  .ck-msg{color:var(--ink-soft);}
+  .ck-alt{margin-left:6px;color:var(--ink-soft);} .ck-alt b{color:var(--ink);}
+  .ck-acts{display:flex;gap:3px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
+  .ck-oksep{padding:5px 0 2px;border-top:1px solid var(--rule);font-size:11.5px;font-weight:800;color:var(--ink-soft);}
+  .ck-row.is-ok{opacity:.62;} .ck-oksep + .ck-row{border-top:0;}
+  .ck-acts button{padding:1px 7px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);font:inherit;font-size:11.5px;font-weight:700;line-height:1.6;color:var(--ink-soft);cursor:pointer;white-space:nowrap;}
   .ck-acts button:hover{color:var(--mon);border-color:var(--mon);}
-  @media (max-width:520px){ .ck-row{flex-wrap:wrap;} .ck-acts{flex-basis:100%;justify-content:flex-start;padding-left:26px;} }   /* 폰 — 단추는 글 아래로(글이 좁게 접히지 않게) */
+  @media (max-width:520px){ .ck-row{flex-wrap:wrap;} .ck-acts{flex-basis:100%;justify-content:flex-start;padding-left:22px;} }   /* 폰 — 단추는 글 아래로(글이 좁게 접히지 않게) */
   /* 우리 반 생기부 한눈에 — 점검 칸 */
   .cls-all td.ck{text-align:right;white-space:nowrap;font-size:12.5px;font-weight:800;}
   .ck-n{margin-left:4px;} .ck-n.r{color:#B42318;} .ck-n.o{color:#B54708;} .ck-n.b{color:#175CD3;}
@@ -2047,6 +2056,16 @@ function ckSentences(s){
   return out;
 }
 // 학생 이름 — 성까지 세 글자 이상만(「한결」 처럼 두 글자 이름은 보통 낱말과 겹친다)
+// 명단에 있는 이름이라도 유명인·저자일 수 있다(선생님 2026-10-30 「유재석이라는 학생이 있으면?」 · 「롤모델은 예시였을 뿐」) — 글만으로는 확실히 모르니
+// ① 같은 반 학생 이름인지(ctx.mates — 같은 반이면 🟠, 다른 반·학년에만 있는 이름은 🔵 「같은 이름의 학생이 있음」) ② 앞뒤 말로 가린다:
+// 친구·짝·모둠원 바로 뒤, 「학생」·「~과 함께」 앞이면 어느 반이든 학생(🟠). 같은 문장 앞에 롤모델·존경하는·좋아하는·작가·가수·축구선수 …,
+// 바로 뒤에 작가·선수·씨 …, 「~의 책·자서전·노래·방송·업적 …」, 「~처럼」, 『책』(이름) · 「이름 지음」 이면 유명인·저자로 보고 걸지 않는다
+const CK_FAME = '롤\\s?모델|존경하는|좋아하는|닮고\\s?싶은|본받고\\s?싶은|위인|작가|저자|지은이|시인|소설가|화가|작곡가|가수|배우|개그맨|코미디언|방송인|대통령|과학자|철학자|사상가|기업가|창업자|발명가|독립운동가|유튜버|연예인|유명인|(?:축구|야구|농구|배구|운동|피겨|수영|국가\\s?대표)\\s?선수|프로\\s?게이머';
+const CK_NAME_FAME_PRE = new RegExp(`(?:${CK_FAME})|[」』]\\s?\\(\\s?$`);
+const CK_JOSA = '(?=$|[^가-힣]|의|이|가|은|는|을|를|과|와|으로|로|에게|께|님|도|만|인|처럼)';   // 낱말 끝(조사가 붙어도) — 「선수권」 같은 긴 낱말은 아니다
+const CK_NAME_FAME_POST = new RegExp(`^(?:\\s?(?:${CK_FAME}|선수|감독|교수|박사|씨|님|대왕|장군)${CK_JOSA}|의\\s?(?:책|저서|저작|소설|시집|수필|에세이|자서전|전기|강연|강의|명언|어록|노래|곡|앨범|영화|드라마|방송|프로그램|예능|유튜브|채널|공연|연기|이론|사상|철학|업적|발명|생애|일대기|『|「)|처럼|\\s?(?:지음|저|著)(?![가-힣]))`);
+const CK_NAME_MATE_PRE = /(?:친구|짝꿍|짝|모둠원|조원|팀원|부원|학우|급우|동급생|선배|후배)\s?$/;
+const CK_NAME_MATE_POST = new RegExp(`^(?:\\s?(?:학생|군|양)${CK_JOSA}|(?:과|와|이와|하고)\\s?(?:함께|같이|협력|짝|한\\s?(?:팀|조|모둠)))`);
 let ckNameCache = [null, null];
 function ckNameRe(names){
   if (ckNameCache[0] === names) return ckNameCache[1];
@@ -2102,13 +2121,19 @@ function sgbCheck(text, ctx = {}){
   // 강사명 — 성씨 + 두 글자 바로 뒤 교수·박사·작가·강사 …
   for (const m of s.matchAll(new RegExp(`(^|[^가-힣])([${CK_SURNAME}][가-힣]{2})\\s?(교수|박사|작가|강사|연구원|소장|원장|변호사|기자|선생님)(?=님|의|을|를|과|와|에게|께|이|가|로|으로|\\s|$|[,.·)」』])`, 'g'))){
     if (CK_NOT_NAME.has(m[2])) continue;
+    // 책 이야기(작가의 소설 · 교수의 책 · 『…』)는 강사가 아니다
+    if (/^님?(?:의|이|가)\s?(?:책|저서|소설|시집|수필|에세이|자서전|칼럼|『|「|쓴|지은)/.test(s.slice(m.index + m[0].length, m.index + m[0].length + 10))) continue;
     const i = m.index + m[1].length; add(i, i + m[0].length - m[1].length, 'o', '강사명', '강사명은 쓸 수 없음 — 「외부 강사」·「전문가」로', '외부 강사');
   }
   // 학생 이름 — 다른 학생(🟠) · 그 학생 본인(🔵, 보통 쓰지 않음)
   const nre = ckNameRe(ctx.names);
   if (nre) for (const [a, b, t] of ckFind([nre], s)){
-    if (ctx.self && t === ctx.self) add(a, b, 'b', '학생 이름', '학생 본인 이름은 보통 쓰지 않음');
-    else add(a, b, 'o', '다른 학생 이름', '다른 학생 이름 — 넣지 않음(개인정보)');
+    if (ctx.self && t === ctx.self){ add(a, b, 'b', '학생 이름', '학생 본인 이름은 보통 쓰지 않음'); continue; }
+    const pre = s.slice(Math.max(sentOf(a)[0], a - 14), a), post = s.slice(b, b + 16);
+    const mate = CK_NAME_MATE_PRE.test(pre) || CK_NAME_MATE_POST.test(post);
+    if (!mate && (CK_NAME_FAME_PRE.test(pre) || CK_NAME_FAME_POST.test(post))) continue;   // 유명인·저자로 본다
+    if (mate || !ctx.mates || ctx.mates.includes(t)) add(a, b, 'o', '다른 학생 이름', '다른 학생 이름 — 넣지 않음(개인정보). 같은 이름의 유명인·저자면 「괜찮음」');
+    else add(a, b, 'b', '다른 학생 이름', '같은 이름의 학생이 다른 반에 있음 — 학생이면 빼고, 유명인·저자면 그대로');
   }
   // 🔵 형식 — 고치기
   for (const m of s.matchAll(/[  ]{2,}/g)) add(m.index, m.index + m[0].length, 'b', '띄어쓰기', '두 칸 이상 띄어 씀', '', ' ');
@@ -2244,7 +2269,11 @@ function markSeen(list){
   for (const k of Object.keys(SEEN)) if (!ids.has(k)) delete SEEN[k];
   try { localStorage.setItem(SEEN_KEY, JSON.stringify(SEEN)); } catch (e) {}
 }
-const freshHtml = a => { const f = sgbFresh(a, SEEN);
+// 「추가」 꼬리표는 당분간 감춘다(선생님 2026-10-30 「보조자료 업로드됐을 때 추가 생기는 거 — 당분간 안 보이게, 일단은」 — 처음 올리면 모든 활동이 새것이라
+// 온통 빨갛다). 다시 보이려면 true. 「수정」(내용이 바뀜)은 그대로. 「추가·수정만」 거르기도 같이 「수정만」
+const SGB_FRESH_NEW = false;
+const freshOf = a => { const f = sgbFresh(a, SEEN); return f === 'new' && !SGB_FRESH_NEW ? '' : f; };
+const freshHtml = a => { const f = freshOf(a);
   return f ? `<span class="fresh ${f}" title="${f === 'new' ? '새로 추가됨' : '내용이 바뀜'} · ${fmtAt(a.upd)}">${f === 'new' ? '추가' : '수정'}</span>` : ''; };
 const fmtAt = iso => { try { const d = new Date(iso); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; } catch (e) { return ''; } };
 
@@ -2712,7 +2741,7 @@ function drSplitWire(){
 function actListHtml(){
   const acts = [...(META.activities || [])].sort((x, y) => groupRank(x) - groupRank(y) || (x.pos ?? 0) - (y.pos ?? 0));
   const q = (st.q || '').trim();
-  const shown = acts.filter(a => (!q || (a.title + a.dept + a.sheet).includes(q)) && (!st.fresh || sgbFresh(a, SEEN)));
+  const shown = acts.filter(a => (!q || (a.title + a.dept + a.sheet).includes(q)) && (!st.fresh || freshOf(a)));
   let last = null, html = '';
   for (const x of shown){
     const k = groupKey(x);
@@ -2720,19 +2749,19 @@ function actListHtml(){
     html += `<button type="button" class="act${x.id === st.act ? ' on' : ''}" data-id="${x.id}">
       <span class="t">${titleHtml(x)}${freshHtml(x)}<small>${esc(x.dept)}${roundTxt(x) ? ' · ' + roundTxt(x) : ''}</small></span><span class="n">${x.count}</span></button>`;
   }
-  return html || `<div class="empty">${st.fresh ? '추가되거나 바뀐 활동이 없습니다.' : '맞는 활동이 없습니다.'}</div>`;
+  return html || `<div class="empty">${st.fresh ? (SGB_FRESH_NEW ? '추가되거나 바뀐 활동이 없습니다.' : '바뀐 활동이 없습니다.') : '맞는 활동이 없습니다.'}</div>`;
 }
 async function renderAct(){
   const body = $('body');
   const acts = META.activities || [];
   if (!acts.some(a => a.id === st.act)) st.act = [...acts].sort((x, y) => groupRank(x) - groupRank(y))[0]?.id || '';
-  const nFresh = acts.filter(a => sgbFresh(a, SEEN)).length;
+  const nFresh = acts.filter(a => freshOf(a)).length;
   if (!nFresh) st.fresh = false;
   save();
   body.innerHTML = `<div class="pane3">
     <section class="p-acts" aria-label="활동 목록">
       <div class="acts-q"><input type="search" id="actQ" placeholder="활동·부서 찾기" value="${esc(st.q || '')}" aria-label="활동 찾기">
-        ${nFresh ? `<button type="button" class="fresh-tg${st.fresh ? ' on' : ''}" id="freshTg" aria-pressed="${!!st.fresh}">추가·수정만 ${nFresh}</button>` : ''}</div>
+        ${nFresh ? `<button type="button" class="fresh-tg${st.fresh ? ' on' : ''}" id="freshTg" aria-pressed="${!!st.fresh}">${SGB_FRESH_NEW ? '추가·수정만' : '수정만'} ${nFresh}</button>` : ''}</div>
       <div id="acts">${actListHtml()}</div></section>
     <section class="p-detail" id="actOut"></section>
   </div>`;
@@ -3006,7 +3035,7 @@ function drAreaHtml(k, nm, t, d){
   const v = d[k] || '', hv = d.hold?.[k] || '', over = sgbNeisBytes(v) > SGB_NEIS_LIMIT[t];
   return `<section class="drp-area" data-k="${k}">
     <div class="drp-ah"><span class="tag ${SGB_TAG_CLS[t]}">${nm}</span><span class="drp-b${over ? ' over' : ''}" id="drB-${k}">${drBytesTxt(v, t)}</span>
-      <button type="button" class="drp-ck" id="drCk-${k}" data-ck="${k}" aria-expanded="false" hidden></button></div>
+      <button type="button" class="drp-ck" id="drCk-${k}" data-ck="${k}" hidden></button></div>
     <div class="drp-meter${over ? ' over' : ''}" id="drM-${k}"><i style="width:${drPct(v, t).toFixed(1)}%"></i></div>
     <textarea class="drp-t${over ? ' over' : ''}" id="drT-${k}" data-f="${k}" aria-label="${nm} 작성" placeholder="직접 쓰거나, 보조자료 카드의 「→ ${nm}」 단추로 붙입니다"></textarea>
     <div class="drp-ckp" id="drCkP-${k}" hidden></div>
@@ -3029,50 +3058,62 @@ const ckOkKey = (key, f, h) => `${key}|${f}|${h.cat}|${h.t}`;
 const CK_ICON = { r: '🔴', o: '🟠', b: '🔵' };
 let ckBookSrc = null, ckBookNames = [];
 function ckNames(){ if (ckBookSrc !== BOOK){ ckBookSrc = BOOK; ckBookNames = BOOK.map(x => x.name); } return ckBookNames; }   // 명단이 바뀔 때만 새로
-const ckItems = (key, f, v, self) => sgbCheck(v, { names: ckNames(), self }).filter(h => !ckOk[ckOkKey(key, f, h)]);
+const ckItems = (key, f, v, self, mates) => sgbCheck(v, { names: ckNames(), self, mates }).filter(h => !ckOk[ckOkKey(key, f, h)]);
 const drCkSelf = () => drStudents(`${+st.g}-${+st.c}`).find(r => +r.n === +st.n)?.nm || '';
-const drCkOpen = new Set();                   // 목록을 펼친 칸(학생을 넘겨도 펼친 채로)
+const drCkMates = () => drStudents(`${+st.g}-${+st.c}`).map(r => r.nm);   // 같은 반 — 이 이름이면 학생일 가능성이 크다
+const drCkShowOk = new Set();                 // 「괜찮음」 한 것도 보이는 칸(바이트 옆 ⚠ 단추로 켜고 끈다, 학생을 넘겨도 그대로)
 const drCkTimer = {};
 function drCkLater(f){ clearTimeout(drCkTimer[f]); drCkTimer[f] = setTimeout(() => drCkRun(f), 300); }
+// 걸린 것이 있으면 칸 바로 아래에 목록이 늘 보인다(선생님 2026-10-30 「경고 버튼으로 보이게 말고 걍 계속 띄워 주면」 — 처음엔 ⚠ 를 눌러야 펼쳤다).
+// 「괜찮음」 한 것은 목록에서 빠지고, 바이트 옆 ⚠ 단추를 누르면 다시 보인다(「다시 걸기」 로 되돌림 — 선생님 「괜찮음 누른 건 안 보여도 될 듯, 다시 경고 버튼 누르면 보이는 걸로」).
+// 늘 보이니 한 건에 한 줄로 낮게, 왼쪽 띠 색은 가장 높은 단계
 function drCkRun(f){
   const ta = $('drT-' + f), chip = $('drCk-' + f), box = $('drCkP-' + f);   // drC- 는 겹친 칸 알림이 쓴다
   if (!ta || !chip || !box) return;
   // 글 맨 끝에서 쓰는 중(커서가 끝)에는 끝 마침표를 묻지 않는다 — 마지막 문장을 아직 쓰고 있다. 칸을 벗어나거나 커서를 옮기면 다시 본다.
   // 문장 사이 · 줄 끝 마침표는 늘 본다
-  const endAt = ta.value.replace(/\s+$/, '').length, typing = document.activeElement === ta && ta.selectionEnd >= endAt;
-  const items = ta._ck = ckItems(drKey(), f, ta.value, drCkSelf()).filter(h => !(typing && h.cat === '마침표' && h.s === endAt && h.e === endAt));
-  const n = items.length, top = items.reduce((m, h) => SGB_CK_LV[h.lv] > SGB_CK_LV[m] ? h.lv : m, 'b');
+  const endAt = ta.value.replace(/\s+$/, '').length, typing = document.activeElement === ta && ta.selectionEnd >= endAt, key = drKey();
+  const all = sgbCheck(ta.value, { names: ckNames(), self: drCkSelf(), mates: drCkMates() }).filter(h => !(typing && h.cat === '마침표' && h.s === endAt && h.e === endAt));
+  const items = ta._ck = all.filter(h => !ckOk[ckOkKey(key, f, h)]), oks = all.filter(h => ckOk[ckOkKey(key, f, h)]);
+  const n = items.length, okN = oks.length, showOk = okN > 0 && drCkShowOk.has(f);
+  const top = items.reduce((m, h) => SGB_CK_LV[h.lv] > SGB_CK_LV[m] ? h.lv : m, 'b');
   const cnt = ['r', 'o', 'b'].map(l => [l, items.filter(h => h.lv === l).length]).filter(([, c]) => c);
-  const sum = cnt.map(([l, c]) => `${CK_ICON[l]} ${c}`).join(' · ');
-  chip.hidden = !n; chip.className = 'drp-ck' + (n ? ' ' + top : '');
-  chip.textContent = `⚠ ${n}`;
-  chip.title = `기재요령 점검 — ${sum} (누르면 목록)`; chip.setAttribute('aria-label', `기재요령 점검 ${n}건`);
-  const open = !!n && drCkOpen.has(f);
-  chip.setAttribute('aria-expanded', String(open));
-  box.hidden = !open;
+  const sum = cnt.map(([l, c]) => `${CK_ICON[l]} ${c}`).join(' · '), fixN = items.filter(h => 'rep' in h).length;
+  chip.hidden = !all.length;
+  chip.className = 'drp-ck ' + (n ? top : 'ok');
+  chip.textContent = n ? `⚠ ${n}${okN ? ` · 괜찮음 ${okN}` : ''}` : `괜찮음 ${okN}`;
+  chip.title = okN ? (showOk ? '「괜찮음」 한 것을 다시 감춥니다' : `「괜찮음」 한 것 ${okN}건도 보입니다`) : `기재요령 점검 ${n}건 — 칸 아래 목록`;
+  if (okN) chip.setAttribute('aria-pressed', String(showOk)); else chip.removeAttribute('aria-pressed');
+  box.hidden = !(n || showOk);
+  box.className = 'drp-ckp ' + (n ? top : 'ok');
+  // 단추가 가리키는 줄 — 걸린 것 다음에 괜찮음 한 것(보일 때만)
+  const rows = box._rows = [...items, ...(showOk ? oks.map(h => ({ ...h, ok: true })) : [])];
   // 걸린 것이 그대로면 목록을 다시 그리지 않는다 — 누르는 사이에 단추가 바뀌면 그 누름이 사라진다
-  const sig = open ? items.map(h => `${h.lv}${h.s}:${h.e}${h.cat}${h.t}`).join('|') : '';
+  const sig = rows.map(h => `${h.ok ? '~' : ''}${h.lv}${h.s}:${h.e}${h.cat}${h.t}${h.msg}`).join('|');
   if (box._sig === sig) return;
   box._sig = sig;
-  box.innerHTML = !open ? '' : `<div class="ck-head">기재요령 점검 <span class="d">${sum} — 막지 않고 알려 주기만 합니다</span>
-      ${items.filter(h => 'rep' in h).length > 1 ? `<button type="button" class="btn sm" data-ckfixall="${f}">🔵 ${items.filter(h => 'rep' in h).length}곳 모두 고치기</button>` : ''}</div>
-    ${items.map((h, i) => `<div class="ck-row" data-lv="${h.lv}"><span class="ck-lv" aria-hidden="true">${CK_ICON[h.lv]}</span>
-      <div class="ck-body">${h.t.trim() ? `<span class="ck-t">「${esc(h.t.length > 40 ? h.t.slice(0, 40) + '…' : h.t)}」</span>` : ''}<span class="ck-cat">${esc(h.cat)}</span>
-        <div>${esc(h.msg)}</div>${h.alt ? `<div class="ck-alt">바꿔 쓰기: <b>${esc(h.alt)}</b></div>` : ''}</div>
-      <div class="ck-acts"><button type="button" data-ckgo="${f}" data-i="${i}">그 자리로</button>${'rep' in h ? `<button type="button" data-ckfix="${f}" data-i="${i}">고치기</button>` : ''}<button
-        type="button" data-ckok="${f}" data-i="${i}" title="이 학생 이 칸의 이 말은 다시 걸지 않습니다(이 기기)">괜찮음</button></div></div>`).join('')}`;
+  const row = (h, i) => `<div class="ck-row${h.ok ? ' is-ok' : ''}" data-lv="${h.lv}"><span class="ck-lv" aria-hidden="true">${CK_ICON[h.lv]}</span>
+      <div class="ck-body">${h.t.trim() ? `<span class="ck-t">「${esc(h.t.length > 40 ? h.t.slice(0, 40) + '…' : h.t)}」</span>` : ''}<span class="ck-cat">${esc(h.cat)}</span><span
+        class="ck-msg">${esc(h.msg)}</span>${h.alt ? `<span class="ck-alt">바꿔 쓰기: <b>${esc(h.alt)}</b></span>` : ''}</div>
+      <div class="ck-acts"><button type="button" data-ckgo="${f}" data-i="${i}">그 자리로</button>${h.ok
+        ? `<button type="button" data-ckundo="${f}" data-i="${i}" title="이 말을 다시 걸어 목록에 올립니다">다시 걸기</button>`
+        : `${'rep' in h ? `<button type="button" data-ckfix="${f}" data-i="${i}">고치기</button>` : ''}<button
+        type="button" data-ckok="${f}" data-i="${i}" title="이 학생 이 칸의 이 말은 다시 걸지 않습니다(이 기기) — 바이트 옆 단추로 다시 볼 수 있음">괜찮음</button>`}</div></div>`;
+  box.innerHTML = !rows.length ? '' : `<div class="ck-head"><b>기재요령 점검</b><span class="ck-sum">${sum || '걸린 것 없음'}</span><span class="d">막지 않고 알려 주기만 합니다</span>
+      ${fixN > 1 ? `<button type="button" class="btn sm" data-ckfixall="${f}">🔵 ${fixN}곳 모두 고치기</button>` : ''}</div>
+    ${rows.map((h, i) => (h.ok && !rows[i - 1]?.ok ? `<div class="ck-oksep">괜찮음 한 것 ${okN}</div>` : '') + row(h, i)).join('')}`;
 }
 // 그 자리로 — 글 상자에서 그 부분을 고르고, 글 상자가 보이게
 function drCkGo(f, i){
-  const ta = $('drT-' + f), h = ta?._ck?.[i]; if (!h) return;
+  const ta = $('drT-' + f), h = $('drCkP-' + f)?._rows?.[i]; if (!ta || !h) return;
   ta.scrollIntoView({ block: 'nearest' });
   ta.focus({ preventScroll: true }); ta.setSelectionRange(h.s, h.e);
   ta.classList.add('hit'); setTimeout(() => ta.classList.remove('hit'), 1200);
 }
-// 고치기 — 뒤에서부터 바꿔 앞자리가 밀리지 않게, 겹치는 것은 건너뛴다. 쓰는 것과 똑같이 저장·바이트·점검
+// 고치기 — 뒤에서부터 바꿔 앞자리가 밀리지 않게, 겹치는 것은 건너뛴다. 쓰는 것과 똑같이 저장·바이트·점검. 괜찮음 한 것은 고치지 않는다
 function drCkFix(f, idx){
-  const ta = $('drT-' + f); if (!ta?._ck) return;
-  const list = idx.map(i => ta._ck[i]).filter(h => h && 'rep' in h).sort((a, b) => b.s - a.s || b.e - a.e);
+  const ta = $('drT-' + f), rows = $('drCkP-' + f)?._rows; if (!ta || !rows) return;
+  const list = idx.map(i => rows[i]).filter(h => h && !h.ok && 'rep' in h).sort((a, b) => b.s - a.s || b.e - a.e);
   if (!list.length) return;
   let v = ta.value, lim = Infinity;
   for (const h of list){ if (h.e > lim) continue; v = v.slice(0, h.s) + h.rep + v.slice(h.e); lim = h.s; }
@@ -3080,9 +3121,10 @@ function drCkFix(f, idx){
   ta.dispatchEvent(new Event('input', { bubbles: true }));
   drCkRun(f);
 }
-function drCkOkSet(f, i){
-  const ta = $('drT-' + f), h = ta?._ck?.[i]; if (!h) return;
-  ckOk[ckOkKey(drKey(), f, h)] = 1;
+// 괜찮음 · 다시 걸기 — 이 기기에 기억(학생·칸·분류·낱말)
+function drCkOkSet(f, i, on = true){
+  const h = $('drCkP-' + f)?._rows?.[i]; if (!h) return;
+  if (on) ckOk[ckOkKey(drKey(), f, h)] = 1; else delete ckOk[ckOkKey(drKey(), f, h)];
   try { localStorage.setItem(CK_OK_KEY, JSON.stringify(ckOk)); } catch (e) {}
   drCkRun(f);
 }
@@ -3136,11 +3178,16 @@ function drOnClick(e){
   const ct = e.target.closest('[data-conf-take]'); if (ct){ drConfTake(ct.dataset.confTake); return; }
   const ck = e.target.closest('[data-conf-keep]'); if (ck){ drConfKeep(ck.dataset.confKeep); return; }
   const pr = e.target.closest('[data-pr]'); if (pr){ drPrint(pr.dataset.pr, { ck: `${+st.g}-${+st.c}`, noH: !!$('drPrNoH')?.checked }); return; }
-  const ckc = e.target.closest('[data-ck]'); if (ckc){ const f = ckc.dataset.ck; if (drCkOpen.has(f)) drCkOpen.delete(f); else drCkOpen.add(f); drCkRun(f); return; }
+  // ⚠ 단추 — 「괜찮음」 한 것을 보이기·감추기(없으면 목록으로)
+  const ckc = e.target.closest('[data-ck]');
+  if (ckc){ const f = ckc.dataset.ck;
+    if (!ckc.hasAttribute('aria-pressed')){ $('drCkP-' + f)?.scrollIntoView({ block: 'nearest' }); return; }
+    if (drCkShowOk.has(f)) drCkShowOk.delete(f); else drCkShowOk.add(f); drCkRun(f); return; }
   const cg = e.target.closest('[data-ckgo]'); if (cg){ drCkGo(cg.dataset.ckgo, +cg.dataset.i); return; }
   const cf = e.target.closest('[data-ckfix]'); if (cf){ drCkFix(cf.dataset.ckfix, [+cf.dataset.i]); return; }
-  const ca = e.target.closest('[data-ckfixall]'); if (ca){ const f = ca.dataset.ckfixall; drCkFix(f, ($('drT-' + f)?._ck || []).map((h, i) => 'rep' in h ? i : -1).filter(i => i >= 0)); return; }
+  const ca = e.target.closest('[data-ckfixall]'); if (ca){ const f = ca.dataset.ckfixall; drCkFix(f, ($('drCkP-' + f)?._rows || []).map((h, i) => !h.ok && 'rep' in h ? i : -1).filter(i => i >= 0)); return; }
   const co = e.target.closest('[data-ckok]'); if (co){ drCkOkSet(co.dataset.ckok, +co.dataset.i); return; }
+  const cu = e.target.closest('[data-ckundo]'); if (cu){ drCkOkSet(cu.dataset.ckundo, +cu.dataset.i, false); return; }
   if (e.target.closest('#drClassBtn')){ drFlush(); st.clsK = `${+st.g}-${+st.c}`; st.view = 'cls'; save(); render(); return; }
   if (e.target.closest('#drSaved.err')) drFlush();
 }
@@ -3706,9 +3753,10 @@ function clsDraw(ck, list, at){
       for (const r of list){ const v = drCache.get(`${ck}-${r.n}`)?.[k] || ''; if (v.trim()) f++; if (sgbNeisBytes(v) > lim) o++; } return { f, o }; });
     // 점검 — 학생마다 기재요령에 걸린 수(🔴 기재 불가로 보임 · 🟠 확인, 둘 다 없으면 🔵). 「괜찮음」 한 것은 빼고(이 기기)
     let flagged = 0;
+    const mates = list.map(r => r.nm);
     const ckCell = (key, d, nm) => {
       const c = { r: 0, o: 0, b: 0 }, cats = new Set();
-      for (const [k] of areas) for (const h of ckItems(key, k, d[k] || '', nm)){ c[h.lv]++; if (h.lv !== 'b') cats.add(h.cat); }
+      for (const [k] of areas) for (const h of ckItems(key, k, d[k] || '', nm, mates)){ c[h.lv]++; if (h.lv !== 'b') cats.add(h.cat); }
       if (c.r || c.o) flagged++;
       const txt = c.r || c.o ? `${c.r ? `<span class="ck-n r">🔴 ${c.r}</span>` : ''}${c.o ? `<span class="ck-n o">🟠 ${c.o}</span>` : ''}` : c.b ? `<span class="ck-n b">🔵 ${c.b}</span>` : '—';
       return `<td class="ck" title="${esc(cats.size ? '기재요령 점검 — ' + [...cats].join(' · ') : '기재요령 점검')}">${txt}</td>`;
