@@ -641,7 +641,8 @@ document.getElementById('cancelBtn').addEventListener('click', async () => {
   cancelBtn.textContent = '취소 중...';
 
   try {
-    const data = await callApi('cancel', { classKey });
+    // 지금 보고 있는 예약 id 를 함께 보낸다 — 서버는 그 칸만 취소한다(지난 예약을 대신 취소하지 않게)
+    const data = await callApi('cancel', { classKey, slotId: (myBooking && myBooking.id) || '' });
     if(data.success){
       myBooking = null;          // 취소했으니 다시 목록 화면으로
       await loadSlots();
@@ -649,7 +650,11 @@ document.getElementById('cancelBtn').addEventListener('click', async () => {
     }
     alert(data.error === 'TEACHER_BOOKED'
       ? '선생님이 직접 잡아 주신 상담이라 여기서는 취소할 수 없습니다. 담임 선생님께 연락해 주세요.'
+      : data.error === 'PAST'
+      ? '이미 지난 상담은 취소할 수 없습니다. 화면을 새로 불러옵니다.'
       : '취소에 실패했습니다: ' + (data.error||''));
+    // 보고 있던 예약이 지났거나 없어졌으면 화면을 서버 기준으로 다시 그린다
+    if(data.error === 'PAST' || data.error === 'NO_BOOKING'){ myBooking = null; await loadSlots(); }
   } catch(e){
     alert('취소 처리 중 오류가 발생했습니다. 다시 시도해 주세요.');
   } finally {

@@ -15,6 +15,8 @@ node tests/widget-config.test.mjs      # 위젯이 설정 폴더를 만들고 �
 node workers/teacher-api.test.mjs      # teacher-api 워커 — fetch 를 스텁으로 물림
 node workers/roster-split.test.mjs     # upload.html 분리 저장 → 워커 조회
 node workers/parent-verify.test.mjs    # 학부모 인증 — 나뉜 명렬에서 생년월일 찾기
+node workers/consult-cancel.test.mjs   # 상담 취소 — 지난 예약을 대신 취소하지 않는지(slotId · 오늘 이후)
+node tests/saenggibu-commit.test.mjs   # 생기부 올리기 — 단계마다 끊어 보기 · 복구 · 같은 계정 두 창 · 잠금 만료 뒤 옛 창
 ```
 
 ## 설치가 필요한 것

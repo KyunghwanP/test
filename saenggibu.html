@@ -115,6 +115,12 @@
     font-size:14px;font-weight:700;color:var(--ink);cursor:pointer;}
 
   #main{flex:1;min-height:0;display:flex;flex-direction:column;}
+  /* 덜 끝난 업로드 알림 — 올리는 중(파랑) · 쓰다가 멈춤(빨강). 자료가 섞여 보일 수 있을 때만 뜬다 */
+  .sgb-state{margin:12px 16px 0;padding:9px 13px;border:1px solid var(--warn);border-radius:10px;background:var(--paper);
+    color:var(--ink);font-size:14px;line-height:1.6;}
+  .sgb-state.busy{border-color:var(--mon);}
+  .sgb-state[hidden]{display:none;}
+  html.embed .sgb-state{margin:0 0 10px;}
   #upPanel{display:none;margin:12px 16px 0;}
   #admPanel{display:none;margin:12px 16px 0;}
   .adm-wrap{overflow-x:auto;margin-top:8px;border:1px solid var(--rule);border-radius:9px;}
@@ -828,6 +834,7 @@
   <input type="file" id="upFile" accept=".xlsx,.xlsm,.xls" style="display:none;">
 </div>
 <div id="main">
+  <div id="sgbState" class="sgb-state" role="status" hidden></div>
   <div id="upPanel" class="up"></div>
   <div id="admPanel" class="up"></div>
   <div id="body"><div class="empty">불러오는 중…</div></div>
@@ -1798,6 +1805,11 @@ function sgbExportPlan(meta, rowsById, forms = {}){
   return [...out, { name: tocName, form: tocForm, rows: toc.map(v => ['', ...v]), heights: [], styled: false }];
 }
 
+// 활동 조각·원본 양식 문서 이름 — 내용 지문(ver)이 있으면 이름에 붙인다(바뀐 활동은 새 이름으로 써서, 끝나지 않은
+// 업로드가 남길 기존 활동 문서를 덮어쓰지 못하게 — 아래 「올리기 엔진」). ver 가 없는 예전 자료는 예전 이름 그대로
+const sgbActBase = a => a.ver ? `${a.id}.${a.ver}` : a.id;
+const sgbFmtPath = x => `saenggibu/fmt-${sgbActBase(x)}`;
+
 // 저장할 문서들. 학생 하나 = 문서 하나(학생별 보기 = 읽기 1번),
 // 활동 하나 × 학년 = 문서 하나(활동별 보기 = 학년마다 읽기 1번) — 크면 여러 조각으로.
 function sgbBuildDocs(parsed, partBytes = SGB_PART_BYTES){
@@ -1811,7 +1823,7 @@ function sgbBuildDocs(parsed, partBytes = SGB_PART_BYTES){
     const parts = {};
     for (const [g, list] of Object.entries(byG)){
       let chunk = [], bytes = 0, k = 0;
-      const flush = () => { docs.set(`saenggibuAct/${a.id}-${g}-${k}`, { a: a.id, g: +g, k, rows: chunk }); k++; chunk = []; bytes = 0; };
+      const flush = () => { docs.set(`saenggibuAct/${sgbActBase(a)}-${g}-${k}`, { a: a.id, g: +g, k, rows: chunk }); k++; chunk = []; bytes = 0; };
       for (const r of list){
         const sz = size(r);
         if (chunk.length && bytes + sz > partBytes) flush();
@@ -2175,6 +2187,220 @@ function sgbCheck(text, ctx = {}){
   }
   return kept.sort((x, y) => x.s - y.s || SGB_CK_LV[y.lv] - SGB_CK_LV[x.lv]);
 }
+
+// ── 올리기 엔진(2026-10-31) ── 엑셀 올리기 · 관리에서 지우기 · 목록 고치기가 같이 쓴다.
+// Firestore 는 io 로 받는다 — 페이지는 실제 Firestore(아래 모듈의 sgbIo), 검사는 단계마다 끊어 볼 수 있는 가짜
+// (tests/saenggibu-commit.test.mjs). io = { me, who(email), now(), uid(), get(path), tx(fn), scan(컬렉션), every?(ms, fn) }
+//   tx(fn): fn(t) 안에서 t.get(path) 를 먼저 다 하고 t.set(path, data) · t.del(path). 읽은 문서가 그사이 바뀌면 다시 돈다.
+//   scan(c): 서버에 있는 그 컬렉션 문서 전부 [[id, data], …]. 다 못 읽으면(오류·캐시에서 옴) throw.
+// 지키는 것:
+//  1. 잠금 — 작업마다 새 id. 저장하는 트랜잭션마다 잠금이 「내 id 이고 아직 유효」 한지 맨 먼저 읽고 쓴다(쓰면서 시각을 늘림).
+//     멈췄다 깨어난 창 · 같은 계정의 다른 창에 잠금을 넘긴 작업은 그다음 저장부터 아무것도 쓰지 못한다.
+//     풀 때도 내 id 일 때만 — 남이 이어받은 잠금을 지우지 않는다. (규칙이 아니라 앱이 지키는 약속 — 권한 있는 교사가
+//     콘솔에서 직접 쓰는 것까지 막지는 못한다)
+//  2. 덜 끝난 표시(saenggibu/dirty) — 자료를 쓰기 전에 먼저 저장하고, 그 저장이 성공한 뒤에야 자료를 쓴다. 다 끝나야 지운다.
+//     표시가 남아 있으면 다음 올리기는 목록(manifest) 대신 서버에 실제로 있는 문서를 전부 읽어 맞댄다 — 합친 최종 목록
+//     (이번 파일 + 남길 기존 자료)과 내용이 다르면 다시 쓰고, 최종 목록에 없으면 지운다. 서버를 다 못 읽으면 복구한 것으로
+//     치지 않고 멈춘다(표시는 그대로 — 다음 올리기가 다시 한다). 기록할 목록이 따로 없으니 실패가 겹쳐도 커지지 않는다.
+//  3. 바뀐 활동은 새 이름으로 — 활동 조각(saenggibuAct)과 원본 양식(saenggibu/fmt-)은 내용 지문(ver)을 이름에 붙인다.
+//     끝나지 않은 업로드는 새 이름에만 쓰므로, 지금 목록이 가리키는 「남길 기존 활동」 문서는 늘 온전하다(복구 때 그걸 읽는다).
+//     학생 문서(saenggibuStu)는 그 자리에 쓰므로, 올리는 동안(그리고 멈춘 뒤 복구 전까지) 섞여 보일 수 있다 — 알고 감수한 한계.
+//  4. 바꿔 달기 — 목록(meta) · 지문(manifest) · 표시(정리 단계)를 한 트랜잭션에. 옛 문서 지우기는 그 뒤에(지우다 멈춰도 자료는 맞다).
+//     마무리 — 표시 지우기 · 올린 기록 · 잠금 풀기를 한 트랜잭션에.
+const SGB_LOCK_MS = 5 * 60 * 1000;          // 이보다 오래 소식이 없는 잠금은 버려진 것(창을 닫았거나 끊겼다)
+const SGB_BEAT_MS = 60 * 1000;               // 쓰는 동안 잠금 시각을 늘리는 간격
+const SGB_TX_OPS = 200, SGB_TX_BYTES = 3000000;
+const SGB_LOCK = 'saenggibu/lock', SGB_DIRTY = 'saenggibu/dirty', SGB_META = 'saenggibu/meta',
+  SGB_MANI = 'saenggibu/manifest', SGB_LOG = 'saenggibu/log';
+const SGB_SCAN = ['saenggibuStu', 'saenggibuAct', 'saenggibu'];   // saenggibu 에서는 fmt- 문서만 자료로 본다
+const sgbIso = ms => new Date(ms).toISOString();
+const sgbErr = (msg, extra) => Object.assign(new Error(msg), extra);
+// 필드 차례와 상관없는 JSON — 서버에서 읽어 온 문서(필드 차례가 바뀌어 온다)와 만들 문서를 맞댈 때
+function sgbCanon(v){
+  if (Array.isArray(v)) return '[' + v.map(sgbCanon).join(',') + ']';
+  if (v && typeof v === 'object') return '{' + Object.keys(v).filter(k => v[k] !== undefined).sort()
+    .map(k => JSON.stringify(k) + ':' + sgbCanon(v[k])).join(',') + '}';
+  return JSON.stringify(v) ?? 'null';
+}
+const sgbCanonHash = d => { const s = sgbCanon(d); return sgbHash(s) + '.' + s.length; };
+// 활동·창체 일정의 내용 지문 — 이번 파일에서 온 것만 매긴다(남긴 것은 저장돼 있던 ver 그대로)
+const sgbVerOf = (x, rows, form) => { const j = JSON.stringify([x.hash || '', rows || null, form || null]); return sgbHash(j) + j.length.toString(36); };
+const sgbLockAlive = (lock, now) => !!lock && now - Date.parse(lock.at || 0) < SGB_LOCK_MS;
+// 읽는 화면에 알릴 것 — 'busy' 올리는 중(학생 자료가 잠깐 섞여 보일 수 있음) · 'broken' 쓰다가 멈춤(다시 올리면 바로잡힘).
+// 정리 단계(phase 'clean')는 자료가 이미 맞아서 알리지 않는다(남은 옛 문서는 다음 올리기가 지운다)
+function sgbDirtyState(dirty, lock, now){
+  if (!dirty || dirty.phase !== 'write') return '';
+  return lock && lock.id === dirty.id && sgbLockAlive(lock, now) ? 'busy' : 'broken';
+}
+
+async function sgbLockTake(io, op){
+  await io.tx(async t => {
+    const lock = await t.get(SGB_LOCK), now = io.now();
+    if (lock && lock.id !== op && sgbLockAlive(lock, now))
+      throw sgbErr(lock.by === io.me ? '이 계정의 다른 창에서 올리는 중입니다 — 그 창이 끝난 뒤 다시 눌러 주세요'
+        : `${io.who(lock.by)} 선생님이 올리는 중입니다 — 잠시 뒤 다시 눌러 주세요`, { busy: true });
+    t.set(SGB_LOCK, { id: op, by: io.me, at: sgbIso(now), since: sgbIso(now) });
+  });
+}
+function sgbLockMine(lock, op, now){
+  if (!lock || lock.id !== op)
+    throw sgbErr('다른 창이나 다른 선생님이 잠금을 이어받아 여기서 멈췄습니다 — 이 창은 더 저장하지 않습니다', { lost: true });
+  if (!sgbLockAlive(lock, now))
+    throw sgbErr('잠금 시간이 지나 여기서 멈췄습니다(창이 오래 멈춰 있었음) — 다시 올리면 바로잡힙니다', { lost: true });
+}
+// 잠금을 확인하고 쓰는 트랜잭션. reads: 같이 읽을 문서, write(t, got). last 면 잠금을 풀고, 아니면 잠금 시각을 늘린다
+function sgbLockedTx(io, op, reads, write, last = false){
+  return io.tx(async t => {
+    const lock = await t.get(SGB_LOCK), got = {};
+    for (const p of reads) got[p] = await t.get(p);
+    const now = io.now();
+    sgbLockMine(lock, op, now);
+    write(t, got);
+    if (last) t.del(SGB_LOCK); else t.set(SGB_LOCK, { ...lock, at: sgbIso(now) });
+  });
+}
+async function sgbLockDrop(io, op){
+  try { await io.tx(async t => { const lock = await t.get(SGB_LOCK); if (lock && lock.id === op) t.del(SGB_LOCK); }); } catch (e) {}
+}
+// 남기기로 한 옛 활동의 줄을 저장된 조각에서 모은다. 하나라도 못 읽으면 멈춘다 — 그대로 올리면 그 활동이 조용히 비어 버린다.
+async function sgbLoadRows(io, a){
+  const rows = [];
+  for (const [g, n] of Object.entries(a.parts || {})) for (let k = 0; k < n; k++){
+    const d = await io.get(`saenggibuAct/${sgbActBase(a)}-${g}-${k}`);
+    if (!d) throw new Error(`남길 자료(${a.title})의 일부를 못 읽었습니다`);
+    rows.push(...(d.rows || []));
+  }
+  return rows;
+}
+// 한 트랜잭션에 담을 만큼씩 — [path, data, len]
+function sgbChunks(list, ops = SGB_TX_OPS, maxBytes = SGB_TX_BYTES){
+  const out = [];
+  let cur = [], bytes = 0;
+  for (const it of list){
+    const len = it[2] || 0;
+    if (cur.length && (cur.length >= ops || bytes + len > maxBytes)){ out.push(cur); cur = []; bytes = 0; }
+    cur.push(it); bytes += len;
+  }
+  if (cur.length) out.push(cur);
+  return out;
+}
+
+// 이 파일 + 남길 기존 자료를 합쳐 다시 짠 뒤, 바뀐 문서만 쓰고 이제 없는 문서는 지운다(올리기·관리에서 지우기가 같이 쓴다).
+// 무엇을 썼는지는 saenggibu/manifest 에 문서마다 지문으로, 누가 무엇을 했는지는 saenggibu/log 에(최근 200).
+// plan: { parsed, keep: [{ kind, old }], forms, order, metaAt, file?, roster?, changed?, log }
+// 돌려줌: { writes, dels, recovered(지난 업로드를 바로잡았나), tidy(옛 문서 정리·마무리까지 끝났나), tidyErr }
+async function sgbCommitCore(io, plan, say = () => {}){
+  const op = io.uid();
+  const ops = io.txOps || SGB_TX_OPS;
+  await sgbLockTake(io, op);
+  // 오래 걸려도 잠금이 묵지 않게 — 1분마다 시각을 늘린다(잠금을 잃었으면 그 저장은 거절되고, 본 흐름도 다음 저장에서 멈춘다)
+  const stopBeat = io.every ? io.every(SGB_BEAT_MS, () => sgbLockedTx(io, op, [], () => {}).catch(() => {})) : () => {};
+  try {
+    const metaNow = await io.get(SGB_META);
+    if ((metaNow?.at || null) !== (plan.metaAt || null))
+      throw sgbErr('그 사이 다른 선생님이 올렸습니다 — 다시 미리보기를 하세요', { stale: true });
+    const dirty = await io.get(SGB_DIRTY);
+    say(plan.keep.some(x => x.kind === 'act') ? '남길 자료 읽는 중…' : '이전 기록 확인 중…');
+    const keepActs = [], keepForms = {};
+    for (const x of plan.keep.filter(x => x.kind === 'act')) keepActs.push({ a: x.old, rows: await sgbLoadRows(io, x.old) });
+    // 남길 것의 양식 — 저장돼 있던 것을 그대로(안 넣으면 지워진다)
+    for (const x of plan.keep){ const f = await io.get(sgbFmtPath(x.old)); if (f) keepForms[x.old.id] = f; }
+    const merged = sgbMerge(plan.parsed, keepActs, plan.keep.filter(x => x.kind === 'sch').map(x => x.old), plan.order || []);
+    const fresh = new Set([...plan.parsed.activities, ...plan.parsed.schedules]);
+    const items = [...merged.activities, ...merged.schedules];
+    for (const x of items) if (fresh.has(x)) x.ver = sgbVerOf(x, merged.actRows.get(x.id), plan.forms?.[x.id]);
+    const built = sgbBuildDocs(merged, io.partBytes || SGB_PART_BYTES);
+    // 양식 문서 — 이번 파일 시트는 새로 뜬 것, 남긴 시트는 저장돼 있던 것
+    for (const x of items){ const f = fresh.has(x) ? plan.forms?.[x.id] : keepForms[x.id]; if (f) built.docs.set(sgbFmtPath(x), f); }
+    const metaBytes = new TextEncoder().encode(JSON.stringify(built.meta)).length;
+    if (metaBytes > 900000) throw new Error(`목록 문서가 너무 큽니다(${Math.round(metaBytes / 1024)}KB) — 나눠 저장하도록 고쳐야 합니다`);
+    const now = {}, docs = [];
+    for (const [path, data] of built.docs){
+      const json = JSON.stringify(data);
+      now[path.replace('/', ':')] = sgbHash(json) + '.' + json.length;
+      docs.push([path, data, json.length]);
+    }
+    let writes, dels;
+    if (dirty){
+      // 지난 업로드가 끝나지 않았다 — 목록(manifest)은 믿지 않고 서버에 실제로 있는 문서와 맞댄다
+      say('지난번에 끝나지 않은 업로드가 있어 서버 문서를 모두 확인하는 중…');
+      const actual = new Map();
+      for (const c of SGB_SCAN){
+        let list;
+        try { list = await io.scan(c); }
+        catch (e) { throw sgbErr(`서버 문서를 다 읽지 못해 복구를 멈췄습니다(${c}: ${e.message || e}) — 아무것도 바꾸지 않았습니다. 잠시 뒤 다시 올려 주세요`, { scan: true }); }
+        for (const [id, data] of list) if (c !== 'saenggibu' || id.startsWith('fmt-')) actual.set(`${c}/${id}`, sgbCanonHash(data));
+      }
+      // 덜 읽혔는지 — 방금(잠금 안에서) 읽어 온 남길 자료가 서버 목록에 다 있어야 한다. 빠졌으면 목록을 믿지 않는다
+      const known = [];
+      for (const x of plan.keep){
+        if (keepForms[x.old.id]) known.push(sgbFmtPath(x.old));
+        if (x.kind === 'act') for (const [g, n] of Object.entries(x.old.parts || {})) for (let k = 0; k < n; k++) known.push(`saenggibuAct/${sgbActBase(x.old)}-${g}-${k}`);
+      }
+      const miss = known.filter(p => !actual.has(p));
+      if (miss.length) throw sgbErr(`서버 문서 목록이 덜 읽혀(${miss.length}개 빠짐) 복구를 멈췄습니다 — 아무것도 바꾸지 않았습니다. 잠시 뒤 다시 올려 주세요`, { scan: true });
+      writes = docs.filter(([p, d]) => actual.get(p) !== sgbCanonHash(d));
+      dels = [...actual.keys()].filter(p => !built.docs.has(p));
+    } else {
+      const old = (await io.get(SGB_MANI))?.h || {};
+      writes = docs.filter(([p]) => old[p.replace('/', ':')] !== now[p.replace('/', ':')]);
+      dels = Object.keys(old).filter(k => !(k in now)).map(k => k.replace(':', '/'));
+    }
+    let { roster, changed } = plan;
+    if (!roster){ roster = []; try { roster = (await io.get('students/main'))?.students || []; } catch (e) {} }
+    if (!changed){ changed = []; try { changed = (await io.get('students/changed'))?.students || []; } catch (e) {} }
+    const mismatch = sgbMismatches(merged.activities, merged.actRows, roster, changed);
+    const at = sgbIso(io.now()), file = plan.file || metaNow?.file || '';
+    const mark = phase => ({ id: op, by: io.me, at, phase, file: plan.file || '' });   // 관리에서 지우기는 파일 이름이 없다
+    // 1) 덜 끝난 표시 — 이게 저장된 뒤에야 자료를 쓴다
+    say('올리기 시작…');
+    await sgbLockedTx(io, op, [], t => t.set(SGB_DIRTY, mark('write')));
+    // 2) 쓰기 — 묶음마다 잠금 확인
+    let done = 0;
+    for (const part of sgbChunks(writes, ops)){
+      await sgbLockedTx(io, op, [], t => { for (const [p, d] of part) t.set(p, d); });
+      done += part.length;
+      say(`쓰는 중… ${done}/${writes.length}`);
+    }
+    // 3) 바꿔 달기 — 목록·지문·표시(정리 단계)를 한 번에. 여기서부터 새 자료가 보인다
+    say('목록 저장 중…');
+    await sgbLockedTx(io, op, [SGB_META], (t, got) => {
+      if ((got[SGB_META]?.at || null) !== (plan.metaAt || null))
+        throw sgbErr('그 사이 다른 선생님이 올렸습니다 — 다시 미리보기를 하세요', { stale: true });
+      t.set(SGB_META, { ...built.meta, mismatch, file, at, by: io.me });
+      t.set(SGB_MANI, { h: now });
+      t.set(SGB_DIRTY, mark('clean'));
+    });
+    // 4) 옛 문서 지우기 · 마무리 — 여기서 멈춰도 자료는 이미 맞다(표시가 정리 단계로 남아 다음 올리기가 마저 지운다)
+    let tidy = true, tidyErr = '';
+    try {
+      for (const part of sgbChunks(dels.map(p => [p, null, 0]), ops)){
+        await sgbLockedTx(io, op, [], t => { for (const [p] of part) t.del(p); });
+        say(`정리 중… 옛 문서 ${dels.length}개`);
+      }
+      await sgbLockedTx(io, op, [SGB_LOG], (t, got) => {
+        t.del(SGB_DIRTY);
+        t.set(SGB_LOG, { items: [{ at, by: io.me, ...plan.log, ...(dirty ? { recovered: true } : {}) }, ...(got[SGB_LOG]?.items || [])].slice(0, 200) });
+      }, true);
+    } catch (e) { tidy = false; tidyErr = e.message || String(e); }
+    return { writes: writes.length, dels: dels.length, recovered: !!dirty, tidy, tidyErr };
+  } finally { stopBeat(); await sgbLockDrop(io, op); }
+}
+// 목록 문서만 고친다(관리의 「고치기」) — 같은 잠금 안에서 새로 읽어 고쳐 쓰고, 기록·잠금 풀기까지 한 트랜잭션에
+async function sgbMetaPatchCore(io, fn, log){
+  const op = io.uid();
+  await sgbLockTake(io, op);
+  try {
+    await sgbLockedTx(io, op, [SGB_META, SGB_LOG], (t, got) => {
+      const m = got[SGB_META];
+      if (!m) throw new Error('목록이 없습니다');
+      fn(m);
+      const at = sgbIso(io.now());
+      t.set(SGB_META, { ...m, at });
+      t.set(SGB_LOG, { items: [{ at, by: io.me, ...log }, ...(got[SGB_LOG]?.items || [])].slice(0, 200) });
+    }, true);
+  } finally { await sgbLockDrop(io, op); }
+}
 </script>
 
 <script type="module">
@@ -2182,7 +2408,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebas
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged,
          setPersistence, browserLocalPersistence, indexedDBLocalPersistence }
   from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, writeBatch, runTransaction, onSnapshot }
+import { getFirestore, doc, getDoc, setDoc, runTransaction, onSnapshot,
+  collection, query, orderBy, limit, startAfter, documentId, getDocsFromServer }
   from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -2286,7 +2513,28 @@ async function loadMeta(){
   if (changed){ stuCache.clear(); actCache.clear(); }
   // 최근 올린 파일 — 위쪽 줄 한 줄을 통째로 먹어서(선생님 2026-10-29) 「📤 엑셀 올리기」 에 마우스를 올리면 보이게만
   $('upBtn').title = META ? `최근 올린 파일: ${META.file || ''}${META.at ? ' · ' + fmtAt(META.at) : ''}` : '';
+  await loadDirty();
   return changed;
+}
+// 덜 끝난 업로드(saenggibu/dirty) — 올리는 중인지, 쓰다가 멈췄는지(잠금으로 가른다 — sgbDirtyState). 못 읽으면 알리지 않는다
+let DIRTY = { state: '', d: null };
+async function loadDirty(){
+  try {
+    const d = (await getDoc(doc(fbDb, 'saenggibu', 'dirty'))).data() || null;
+    const lock = d?.phase === 'write' ? (await getDoc(doc(fbDb, 'saenggibu', 'lock'))).data() || null : null;
+    DIRTY = { state: sgbDirtyState(d, lock, Date.now()), d };
+  } catch (e) { DIRTY = { state: '', d: null }; }
+  const el = $('sgbState'), { state, d } = DIRTY;
+  el.hidden = !state;
+  el.className = 'sgb-state' + (state === 'busy' ? ' busy' : '');
+  el.innerHTML = state === 'busy'
+    ? `⏳ <b>${esc(whoTxt(d.by))} 선생님이 자료를 올리는 중입니다</b> — 끝날 때까지 일부 학생 자료가 섞여 보일 수 있습니다.
+       <button type="button" class="btn" id="sgbStateRe">새로 보기</button>`
+    : state === 'broken'
+    ? `⚠ <b>지난 업로드가 끝나지 않았습니다</b>(${esc(whoTxt(d.by))} · ${esc(fmtAt(d.at))}${d.file ? ' · ' + esc(d.file) : ''}) —
+       일부 학생 자료가 섞여 있을 수 있습니다. 엑셀을 다시 올리면(📤 엑셀 올리기) 서버 문서와 맞대어 바로잡습니다.`
+    : '';
+  if ($('sgbStateRe')) $('sgbStateRe').onclick = () => loadMeta().then(() => render()).catch(() => {});
 }
 async function loadStudent(key){
   if (stuCache.has(key)) return stuCache.get(key);
@@ -2300,8 +2548,10 @@ async function loadActGrade(a, g){
   if (actCache.has(key)) return actCache.get(key);
   const n = (a.parts || {})[g] || 0, rows = [];
   for (let k = 0; k < n; k++){
-    const s = await getDoc(doc(fbDb, 'saenggibuAct', `${a.id}-${g}-${k}`));
+    const s = await getDoc(doc(fbDb, 'saenggibuAct', `${sgbActBase(a)}-${g}-${k}`));
     if (s.exists()) rows.push(...(s.data().rows || []));
+    // 조각이 없다 — 이 화면을 연 뒤에 누가 새로 올려 옛 판 조각이 지워졌을 수 있다. 목록이 바뀌었으면 새 목록으로 다시 그린다
+    else if (await loadMeta()) throw sgbErr('자료가 새로 올라와 다시 불러옵니다', { gone: true });
   }
   actCache.set(key, rows);
   return rows;
@@ -2836,7 +3086,10 @@ async function renderActOut(){
     if (rows) drawRows();
   };
   try { rows = all ? (await Promise.all(grades.map(g => loadActGrade(a, g)))).flat() : await loadActGrade(a, st.ag); }
-  catch (e) { $('actRows').innerHTML = `<div class="empty err">불러오지 못했습니다: ${esc(e.message || e)}</div>`; return; }
+  catch (e) {
+    if (e.gone){ toast(e.message); render(); return; }          // 그 사이 새로 올라옴 — 새 목록으로 다시 그린다
+    $('actRows').innerHTML = `<div class="empty err">불러오지 못했습니다: ${esc(e.message || e)}</div>`; return;
+  }
   drawRows();
 }
 
@@ -4005,6 +4258,9 @@ async function previewFile(f){
     [...parsed.activities, ...parsed.schedules].forEach(a => { a.file = f.name; });
     // 맞대 볼 기준은 지금 올라가 있는 목록 — 화면이 들고 있는 것 말고 새로 읽는다
     const oldMeta = (await getDoc(doc(fbDb, 'saenggibu', 'meta'))).data() || null;
+    // 지난 업로드가 끝나지 않았으면 — 이번 올리기가 서버 문서를 전부 읽어 맞댄다(sgbCommitCore). 미리 알린다
+    let dirtyNow = null;
+    try { dirtyNow = (await getDoc(doc(fbDb, 'saenggibu', 'dirty'))).data() || null; } catch (e) {}
     const cmp = sgbCompare(oldMeta, parsed);
     const look = sgbLookalikes(cmp);
     // 반·번호·이름 맞추기 — 학교 명렬(교사 읽기 가능)과. 못 읽으면 시트끼리.
@@ -4029,6 +4285,8 @@ async function previewFile(f){
         <li>이 파일: 활동 시트 <b>${parsed.activities.length}</b>개 · 창체 일정 <b>${parsed.schedules.length}</b>개 · 학생 <b>${parsed.students.length}</b>명 · 기재 <b>${parsed.activities.reduce((n, a) => n + a.count, 0).toLocaleString()}</b>건</li>
         <li>${formErr ? `<span class="err">서식을 못 읽었습니다(${esc(formErr)}) — 자료는 올라가고, 내려받을 때 단순한 표로 나옵니다.</span>`
           : `원본 양식 ${nForms}/${nAll}개 시트 함께 저장 (내려받을 때 그 틀에 채웁니다)`}</li>
+        ${dirtyNow ? `<li id="upFix">${dirtyNow.phase === 'write' ? '⚠ 지난 업로드가 끝나지 않았습니다' : '지난 업로드의 옛 문서 정리가 덜 끝났습니다'}
+          (${esc(whoTxt(dirtyNow.by))} · ${esc(fmtAt(dirtyNow.at))}) — 이번에 서버 문서를 모두 읽어 맞댄 뒤 올립니다(조금 더 걸립니다).</li>` : ''}
         ${parsed.skipped.length ? `<li>건너뛴 시트: ${parsed.skipped.map(x => `${esc(x.name)} <span style="color:var(--ink-soft)">(${esc(x.why)})</span>`).join(', ')}</li>` : ''}
         ${guessed.length ? `<li id="upGuess">꼬리표 없는 시트 ${guessed.length}개 — ⊙ 입력 영역 칸으로 읽었습니다(엑셀로 받을 때 꼬리표를 붙입니다):
           ${guessed.map(a => `${esc(a.sheet)} → <b>${esc(tagTxt(a) || '창체 일정')}</b>`).join(', ')}</li>` : ''}
@@ -4142,8 +4400,8 @@ $('dlBtn').onclick = async () => {
     for (let i = 0; i < all.length; i++){
       const a = all[i];
       btn.textContent = `📥 모으는 중… ${i + 1}/${all.length}`;
-      if ((META.activities || []).includes(a)) rowsById[a.id] = await loadAllRows(a);
-      const fm = await getDoc(doc(fbDb, 'saenggibu', `fmt-${a.id}`));
+      if ((META.activities || []).includes(a)) rowsById[a.id] = await sgbLoadRows(sgbIo(), a);
+      const fm = await getDoc(refOf(sgbFmtPath(a)));
       if (fm.exists()) forms[a.id] = fm.data();
     }
     btn.textContent = '📥 만드는 중…';
@@ -4162,96 +4420,39 @@ $('dlBtn').onclick = async () => {
   }
 };
 
-// 남기기로 한 옛 활동의 줄을 저장된 조각에서 모은다. 하나라도 못 읽으면 멈춘다 —
-// 그대로 올리면 그 활동이 조용히 비어 버린다.
-async function loadAllRows(a){
-  const rows = [];
-  for (const [g, n] of Object.entries(a.parts || {})) for (let k = 0; k < n; k++){
-    const snap = await getDoc(doc(fbDb, 'saenggibuAct', `${a.id}-${g}-${k}`));
-    if (!snap.exists()) throw new Error(`남길 자료(${a.title})의 일부를 못 읽었습니다`);
-    rows.push(...(snap.data().rows || []));
-  }
-  return rows;
-}
-
 // ── 바로 반영 ── 모든 교사가 올린다. 학생 문서 하나에 여러 부서 문안이 함께 들어 있어, 두 사람이 동시에 쓰면
 // 나중 사람이 앞사람 것을 지운다. 그래서 쓰는 동안 잠그고(saenggibu/lock), 잠근 뒤에는 미리보기 때 본 목록이
-// 그대로인지 다시 본다(그 사이 누가 올렸으면 다시 미리보기).
-const LOCK_MS = 5 * 60 * 1000;              // 이보다 오래된 잠금은 버려진 것(창을 닫았거나 끊겼다)
-const lockRef = () => doc(fbDb, 'saenggibu', 'lock');
-async function lockTake(){
-  const mine = me();
-  await runTransaction(fbDb, async tx => {
-    const s = await tx.get(lockRef());
-    const d = s.exists() ? s.data() : null;
-    if (d && d.by !== mine && Date.now() - Date.parse(d.at || 0) < LOCK_MS)
-      throw new Error(`${whoTxt(d.by)} 선생님이 올리는 중입니다 — 잠시 뒤 다시 눌러 주세요`);
-    tx.set(lockRef(), { by: mine, at: new Date().toISOString() });
-  });
+// 그대로인지 다시 본다(그 사이 누가 올렸으면 다시 미리보기). 순서·잠금·복구는 위쪽 순수 블록의 「올리기 엔진」(sgbCommitCore).
+// 여기는 그 엔진에 실제 Firestore 를 물리는 곳(io)뿐이다.
+const SCAN_PAGE = 100;                        // 복구 때 서버 문서를 이만큼씩 읽는다(활동 조각은 한 문서가 수백 KB 일 수 있다)
+const refOf = p => { const [c, id] = p.split('/'); return doc(fbDb, c, id); };
+function sgbIo(){
+  return {
+    me: me(), who: whoTxt, now: () => Date.now(),
+    uid: () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)),
+    get: async p => { const s = await getDoc(refOf(p)); return s.exists() ? s.data() : null; },
+    tx: fn => runTransaction(fbDb, tr => fn({
+      get: async p => { const s = await tr.get(refOf(p)); return s.exists() ? s.data() : null; },
+      set: (p, d) => { tr.set(refOf(p), d); },
+      del: p => { tr.delete(refOf(p)); },
+    })),
+    // 서버에서만(캐시에서 온 답은 덜 읽은 것일 수 있어 거절) · 문서 id 차례로 끝까지
+    scan: async c => {
+      const out = [];
+      for (let last = null; ; ){
+        const q = last ? query(collection(fbDb, c), orderBy(documentId()), startAfter(last), limit(SCAN_PAGE))
+                       : query(collection(fbDb, c), orderBy(documentId()), limit(SCAN_PAGE));
+        const s = await getDocsFromServer(q);
+        if (s.metadata.fromCache) throw new Error('서버가 아니라 이 기기에 남은 것만 읽혔습니다');
+        s.docs.forEach(d => out.push([d.id, d.data()]));
+        if (s.docs.length < SCAN_PAGE) return out;
+        last = s.docs[s.docs.length - 1];
+      }
+    },
+    every: (ms, fn) => { const h = setInterval(fn, ms); return () => clearInterval(h); },
+  };
 }
-async function lockDrop(){ try { await deleteDoc(lockRef()); } catch (e) {} }
-
-// 이 파일 + 남길 기존 자료를 합쳐 다시 짠 뒤, 바뀐 문서만 쓰고 이제 없는 문서는 지운다(올리기·지우기가 같이 쓴다).
-// 무엇을 썼는지는 saenggibu/manifest 에 문서마다 지문으로, 누가 무엇을 했는지는 saenggibu/log 에(최근 200).
-// plan: { parsed, keep: [{ kind, old }], forms, order, metaAt, file?, roster?, changed?, log }
-async function sgbCommit(plan, say = () => {}){
-  await lockTake();
-  try {
-    const metaNow = (await getDoc(doc(fbDb, 'saenggibu', 'meta'))).data() || null;
-    if ((metaNow?.at || null) !== (plan.metaAt || null))
-      throw Object.assign(new Error('그 사이 다른 선생님이 올렸습니다 — 다시 미리보기를 하세요'), { stale: true });
-    say(plan.keep.some(x => x.kind === 'act') ? '남길 자료 읽는 중…' : '이전 기록 확인 중…');
-    const keepActs = [];
-    for (const x of plan.keep.filter(x => x.kind === 'act')) keepActs.push({ a: x.old, rows: await loadAllRows(x.old) });
-    const merged = sgbMerge(plan.parsed, keepActs, plan.keep.filter(x => x.kind === 'sch').map(x => x.old), plan.order || []);
-    const built = sgbBuildDocs(merged);
-    // 양식 문서 — 이번 파일 시트는 새로 뜬 것, 남긴 시트는 저장돼 있던 것을 그대로(안 넣으면 지워진다)
-    for (const [id, fm] of Object.entries(plan.forms || {})) built.docs.set(`saenggibu/fmt-${id}`, fm);
-    for (const x of plan.keep){
-      const snap = await getDoc(doc(fbDb, 'saenggibu', `fmt-${x.old.id}`));
-      if (snap.exists()) built.docs.set(`saenggibu/fmt-${x.old.id}`, snap.data());
-    }
-    const metaBytes = new TextEncoder().encode(JSON.stringify(built.meta)).length;
-    if (metaBytes > 900000) throw new Error(`목록 문서가 너무 큽니다(${Math.round(metaBytes / 1024)}KB) — 나눠 저장하도록 고쳐야 합니다`);
-    const old = (await getDoc(doc(fbDb, 'saenggibu', 'manifest'))).data()?.h || {};
-    const now = {};
-    const writes = [];
-    for (const [path, data] of built.docs){
-      const json = JSON.stringify(data);
-      const key = path.replace('/', ':');
-      now[key] = sgbHash(json) + '.' + json.length;
-      if (old[key] !== now[key]) writes.push([path, data, json.length]);
-    }
-    const dels = Object.keys(old).filter(k => !(k in now));
-    let done = 0, batch = writeBatch(fbDb), ops = 0, bytes = 0;
-    const flush = async () => { if (!ops) return; await batch.commit(); batch = writeBatch(fbDb); ops = 0; bytes = 0; };
-    for (const [path, data, len] of writes){
-      if (ops >= 200 || bytes + len > 3000000) await flush();
-      const [c, id] = path.split('/');
-      batch.set(doc(fbDb, c, id), data); ops++; bytes += len; done++;
-      if (done % 50 === 0) say(`쓰는 중… ${done}/${writes.length}`);
-    }
-    for (const k of dels){
-      if (ops >= 200) await flush();
-      const [c, id] = k.split(':');
-      batch.delete(doc(fbDb, c, id)); ops++;
-    }
-    await flush();
-    say('목록 저장 중…');
-    let { roster, changed } = plan;
-    if (!roster){ roster = []; try { const rs = await getDoc(doc(fbDb, 'students', 'main')); roster = rs.exists() ? (rs.data().students || []) : []; } catch (e) {} }
-    if (!changed){ changed = []; try { const rc = await getDoc(doc(fbDb, 'students', 'changed')); changed = rc.exists() ? (rc.data().students || []) : []; } catch (e) {} }
-    const mismatch = sgbMismatches(merged.activities, merged.actRows, roster, changed);
-    const at = new Date().toISOString(), by = me();
-    await setDoc(doc(fbDb, 'saenggibu', 'meta'), { ...built.meta, mismatch, file: plan.file || metaNow?.file || '', at, by });
-    await setDoc(doc(fbDb, 'saenggibu', 'manifest'), { h: now });
-    try {
-      const lg = (await getDoc(doc(fbDb, 'saenggibu', 'log'))).data()?.items || [];
-      await setDoc(doc(fbDb, 'saenggibu', 'log'), { items: [{ at, by, ...plan.log }, ...lg].slice(0, 200) });
-    } catch (e) {}
-    return { writes: writes.length, dels: dels.length };
-  } finally { await lockDrop(); }
-}
+const sgbCommit = (plan, say) => sgbCommitCore(sgbIo(), plan, say);
 
 async function doUpload(){
   if (!_pending) return;
@@ -4285,7 +4486,7 @@ async function doUpload(){
       txt => { msg.textContent = txt; });
     _pending = null;
     panel.innerHTML = `✅ 올렸습니다 — 추가 ${c2.added.length} · 바뀜 ${c2.changed.length} · 남김 ${keep.length - skip.length} · 지움 ${gone.length}${skip.length ? ` · 건너뜀 ${skip.length}` : ''}
-      <span style="color:var(--ink-soft)">(문서 ${res.writes}개 쓰고 ${res.dels}개 지움)</span>
+      <span style="color:var(--ink-soft)">(문서 ${res.writes}개 쓰고 ${res.dels}개 지움)</span>${commitNote(res)}
       <button type="button" class="btn" onclick="this.parentNode.style.display='none'">닫기</button>`;
     await loadMeta();
     render();
@@ -4294,15 +4495,20 @@ async function doUpload(){
     msg.innerHTML = `<span class="err">실패: ${esc(err.message || err)}</span>${stale ? ' <button type="button" class="btn" id="upRetry">다시 미리보기</button>' : ''}`;
     if (stale) $('upRetry').onclick = () => previewFile(_pending.f);
     go.disabled = false;
+    loadDirty().catch(() => {});                // 쓰다가 멈췄으면 위쪽 알림이 「끝나지 않았습니다」 로 바뀐다
   }
 }
+// 올리기·지우기 결과에 덧붙일 말 — 지난 업로드를 바로잡았는지, 옛 문서 정리가 덜 끝났는지(자료는 이미 맞다)
+const commitNote = res => (res.recovered ? '<div class="d" id="upFixed">지난번에 끝나지 않은 업로드를 서버 문서와 맞대어 바로잡았습니다.</div>' : '')
+  + (res.tidy ? '' : `<div class="d" id="upTidy">자료는 다 올라갔고, 옛 문서 정리만 덜 끝났습니다(${esc(res.tidyErr)}) — 다음에 올릴 때 마저 정리합니다.</div>`);
 
 // ── 관리(관리자만) ── 잘못 올라간 활동·창체 일정을 통째로 지우고, 부서·활동명 같은 안내를 앱에서 바로 고친다.
 // 화면만 관리자에게 보인다(쓰기 규칙은 교사 전체 — 학생 문서를 부서별로 가를 수 없어서). 누가 했는지는 log 에.
 $('admBtn').onclick = () => { if ($('admPanel').style.display === 'block'){ $('admPanel').style.display = 'none'; return; } renderAdmin(); };
 const logLine = x => {
   const parts = [x.added?.length && `추가 ${x.added.join(', ')}`, x.changed?.length && `바뀜 ${x.changed.join(', ')}`,
-    x.removed?.length && `지움 ${x.removed.join(', ')}`, x.skipped?.length && `건너뜀 ${x.skipped.join(', ')}`, x.fixed && `고침 ${x.fixed}`].filter(Boolean);
+    x.removed?.length && `지움 ${x.removed.join(', ')}`, x.skipped?.length && `건너뜀 ${x.skipped.join(', ')}`, x.fixed && `고침 ${x.fixed}`,
+    x.recovered && '지난 업로드 바로잡음'].filter(Boolean);
   return `<div>${fmtAt(x.at)} · <b>${esc(whoTxt(x.by))}</b>${x.file ? ' · ' + esc(x.file) : ''} — ${esc(parts.join(' / ') || '바뀐 것 없음')}</div>`;
 };
 async function renderAdmin(){
@@ -4355,10 +4561,11 @@ async function adminDelete(ids, raw){
       keep, forms: {}, order: raw.order || [], metaAt: raw.at || null, log: { removed: names } }, t => { $('admMsg').textContent = t; });
     await loadMeta(); render();
     await renderAdmin();
-    $('admMsg').textContent = `✅ ${names.length}개를 지웠습니다(문서 ${res.writes}개 쓰고 ${res.dels}개 지움)`;
+    $('admMsg').innerHTML = `✅ ${names.length}개를 지웠습니다(문서 ${res.writes}개 쓰고 ${res.dels}개 지움)${commitNote(res)}`;
   } catch (err) {
     if (err.stale){ await renderAdmin(); $('admMsg').textContent = '그 사이 다른 선생님이 올려 목록을 다시 불러왔습니다 — 다시 골라 주세요'; return; }
     $('admMsg').innerHTML = `<span class="err">실패: ${esc(err.message || err)}</span>`; $('admDel').disabled = false;
+    loadDirty().catch(() => {});
   }
 }
 // 바로 고치기 — 목록 문서(meta)의 그 활동에 fix 만 쓴다(학생·활동 문서는 그대로)
@@ -4414,22 +4621,8 @@ async function adminEditSave(a, ed, reset){
     $('admMsg').textContent = reset ? '✅ 원래대로 돌렸습니다' : '✅ 고쳤습니다';
   } catch (err) { msg.innerHTML = `<span class="err">실패: ${esc(err.message || err)}</span>`; }
 }
-// 목록 문서만 고친다 — 올리기와 같은 잠금 안에서 새로 읽어 고쳐 쓴다(그 사이 올린 것을 덮지 않게)
-async function metaPatch(fn, log){
-  await lockTake();
-  try {
-    const ref = doc(fbDb, 'saenggibu', 'meta');
-    const m = (await getDoc(ref)).data();
-    if (!m) throw new Error('목록이 없습니다');
-    fn(m);
-    const at = new Date().toISOString(), by = me();
-    await setDoc(ref, { ...m, at });
-    try {
-      const lg = (await getDoc(doc(fbDb, 'saenggibu', 'log'))).data()?.items || [];
-      await setDoc(doc(fbDb, 'saenggibu', 'log'), { items: [{ at, by, ...log }, ...lg].slice(0, 200) });
-    } catch (e) {}
-  } finally { await lockDrop(); }
-}
+// 목록 문서만 고친다 — 올리기와 같은 잠금 안에서 새로 읽어 고쳐 쓴다(그 사이 올린 것을 덮지 않게 — sgbMetaPatchCore)
+const metaPatch = (fn, log) => sgbMetaPatchCore(sgbIo(), fn, log);
 
 // ── 시작 ──
 if (SOLO){

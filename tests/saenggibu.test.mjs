@@ -833,6 +833,22 @@ const STUB = {
       const q = [];
       return { set(ref, d){ q.push(['s', ref, clone(d)]); }, delete(ref){ q.push(['d', ref]); },
         async commit(){ for (const [k, ref, d] of q){ rec(k, ref); if (k === 's') fs()[ref] = d; else delete fs()[ref]; ping(ref); } } };
+    }
+    // 컬렉션 훑기(올리기 복구가 서버 문서를 전부 읽는다) — 문서 id 차례 · limit · startAfter.
+    // __SCAN_CACHE__ 면 「캐시에서 온 답」(fromCache) — 앱이 덜 읽은 것으로 보고 복구를 멈춰야 한다
+    export function collection(db, c){ return { c }; }
+    export function documentId(){ return '__name__'; }
+    export function orderBy(f){ return { orderBy: f }; }
+    export function limit(n){ return { limit: n }; }
+    export function startAfter(d){ return { after: d.id }; }
+    export function query(col, ...cs){ return Object.assign({ c: col.c }, ...cs); }
+    export async function getDocsFromServer(q){
+      const o = ops(); o.get++; (o.r = o.r || []).push(q.c + '/*');
+      if (window.__SCAN_CACHE__) return { docs: [], metadata: { fromCache: true } };
+      const ids = Object.keys(fs()).filter(k => k.startsWith(q.c + '/')).map(k => k.slice(q.c.length + 1)).sort();
+      const from = q.after == null ? 0 : ids.findIndex(i => i > q.after);
+      const pick = (from < 0 ? [] : ids.slice(from)).slice(0, q.limit || 1e9);
+      return { docs: pick.map(id => ({ id, data: () => clone(fs()[q.c + '/' + id]) })), metadata: { fromCache: false } };
     }`,
 };
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
@@ -885,8 +901,8 @@ async function openAs(email, { width = 1100, blockExcel = false, share = false, 
   return page;
 }
 const keep = async page => { STORE = await page.evaluate(() => window.__FS__); };
-// 자료 문서 쓰기만 — 잠금(saenggibu/lock)·올린 기록(saenggibu/log)은 빼고 센다
-const dataOps = o => { const w = (o.w || []).filter(([, r]) => !/^saenggibu\/(lock|log)$/.test(r));
+// 자료 문서 쓰기만 — 잠금(saenggibu/lock)·올린 기록(saenggibu/log)·덜 끝난 표시(saenggibu/dirty)는 빼고 센다
+const dataOps = o => { const w = (o.w || []).filter(([, r]) => !/^saenggibu\/(lock|log|dirty)$/.test(r));
   return { set: w.filter(([k]) => k === 's').length, del: w.filter(([k]) => k === 'd').length }; };
 // 요소가 없으면 빈 글자(흐름이 틀어져도 멈추지 말고 ❌ 로)
 const txt = async (p, sel) => (await p.$(sel)) ? p.textContent(sel) : '';
@@ -1284,13 +1300,18 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
   const ops = await p.evaluate(() => window.__OPS__);
   const keys = await p.evaluate(() => Object.keys(window.__FS__));
   const msg = await p.textContent('#upPanel');
-  check('남기면 — 바뀐 문서만 쓴다(로봇 활동 · 학생 1-1-1 · 목록 둘)', dataOps(ops).set === 4 && dataOps(ops).del === 0, dataOps(ops));
+  // 바뀐 활동은 새 이름(내용 지문 ver)으로 쓰고 옛 판은 목록을 바꿔 단 뒤 지운다 — 끊긴 업로드가 남길 기존 문서를 덮지 못하게(2026-10-31)
+  const wr = (ops.w || []).filter(([k, r]) => k === 's' && !/^saenggibu\/(lock|log|dirty)$/.test(r)).map(x => x[1]);
+  const dl = (ops.w || []).filter(([k, r]) => k === 'd' && !/^saenggibu\/(lock|log|dirty)$/.test(r)).map(x => x[1]);
+  check('남기면 — 바뀐 문서만 쓴다(로봇 활동 새 판 조각·양식 · 학생 1-1-1 · 목록 둘) · 옛 판 조각·양식 둘은 지운다', dataOps(ops).set === 5 && dataOps(ops).del === 2
+    && wr.includes('saenggibuStu/1-1-1') && wr.some(r => r.startsWith(`saenggibuAct/${robot.id}.`)) && wr.some(r => r.startsWith(`saenggibu/fmt-${robot.id}.`))
+    && dl.length === 2 && dl.every(r => r.startsWith(`saenggibuAct/${robot.id}`) || r.startsWith(`saenggibu/fmt-${robot.id}`)) && !wr.some(r => r.includes(officer.id)), { wr, dl });
   check('쓰는 동안 잠그고, 다 쓰면 푼다', ops.w[0]?.[1] === 'saenggibu/lock' && ops.w.at(-1)?.[0] === 'd' && ops.w.at(-1)?.[1] === 'saenggibu/lock'
     && !keys.includes('saenggibu/lock'), ops.w.map(x => x.join(':')));
   const lg = await p.evaluate(() => window.__FS__['saenggibu/log']);
   check('올린 기록 — 누가 · 어느 파일 · 바뀐 활동', lg?.items?.[0]?.by === ADMIN_E && lg.items[0].file === 'sgb-5.xlsx'
     && lg.items[0].changed.length === 1, lg?.items?.[0]);
-  check('남긴 시트의 활동 문서·양식 문서가 그대로 있다', keys.some(k => k.startsWith(`saenggibuAct/${officer.id}`)) && keys.includes(`saenggibu/fmt-${officer.id}`));
+  check('남긴 시트의 활동 문서·양식 문서가 그대로 있다', keys.some(k => k.startsWith(`saenggibuAct/${officer.id}`)) && keys.some(k => k.startsWith(`saenggibu/fmt-${officer.id}`)));
   check('결과 안내 — 추가·바뀜·남김·지움', msg.includes('추가 0 · 바뀜 1 · 남김 1 · 지움 0'), msg);
   const s325 = await p.evaluate(() => window.__FS__['saenggibuStu/3-2-5']);
   check('남긴 시트의 문안이 학생 문서에 그대로(3-2-5 세 건)', s325.items.length === 3, s325);
@@ -1344,7 +1365,7 @@ STORE = { 'students/main': { students: [...ROSTER, { grade: 1, room: 1, num: 3, 
   const keys = await p.evaluate(() => Object.keys(window.__FS__));
   check('지우기 전에 확인 창 — 몇 개 · 무엇', asked.includes('1개를 지웁니다') && asked.includes('학생회 임원'), asked);
   check('지우면 — 그 활동 문서·양식 문서를 지우고 3-2-5 · 목록 둘만 쓴다', dataOps(ops).del === 2 && dataOps(ops).set === 3
-    && !keys.some(k => k.startsWith(`saenggibuAct/${officer.id}`)) && !keys.includes(`saenggibu/fmt-${officer.id}`), ops);
+    && !keys.some(k => k.startsWith(`saenggibuAct/${officer.id}`)) && !keys.some(k => k.startsWith(`saenggibu/fmt-${officer.id}`)), ops);
   check('결과 안내 — 지움 1', (await p.textContent('#upPanel')).includes('남김 0 · 지움 1'));
   const s325 = await p.evaluate(() => window.__FS__['saenggibuStu/3-2-5']);
   check('3-2-5 학생 문서에서도 그 활동이 빠졌다', s325.items.length === 2, s325);
@@ -1519,6 +1540,78 @@ const adminDone = (p, word) => p.waitForFunction(w => { const a = document.getEl
   await p.context().close();
   delete STORE['saenggibu/lock'];                // 이 묶음에서 심어 둔 잠금 — 뒤 검사로 넘기지 않는다
 }
+// 3-3d2 덜 끝난 업로드 — 위쪽 알림(「끝나지 않았습니다」 · 「올리는 중」), 다시 올리면 서버 문서와 맞대어 바로잡기.
+// 서버 목록이 캐시에서만 읽히면(fromCache) 복구로 치지 않고 멈춘다(2026-10-31)
+{
+  const saved = STORE;
+  STORE = JSON.parse(JSON.stringify(saved));
+  // 쓰다가 멈춘 흔적 — 표시(쓰기 단계)만 있고 잠금은 없다. 학생 1-1-1 문서에 끊긴 업로드의 문안이 섞였고, 새 이름 조각 하나가 남았다
+  STORE['saenggibu/dirty'] = { id: 'op-dead', by: KIM, at: new Date(Date.now() - 60000).toISOString(), phase: 'write', file: 'dept-k9.xlsx' };
+  STORE['saenggibuStu/1-1-1'] = { ...STORE['saenggibuStu/1-1-1'], items: [...(STORE['saenggibuStu/1-1-1'].items || []), { a: 'zzghost', b: '끊긴 업로드가 남긴 문안.' }] };
+  STORE['saenggibuAct/zzghost.v1-1-0'] = { a: 'zzghost', g: 1, k: 0, rows: [] };
+  const FILE_FIX = await oneSheet('dept-fix.xlsx', [['<자>교무(복구 확인)', [...readHead('복구 확인'), [1, 1, 2, '박나래', '복구를 확인하는 문안.']]]]);
+  const p = await openAs(LEE);
+  await p.waitForSelector('#upBtn');
+  await p.waitForFunction(() => !document.getElementById('sgbState').hidden).catch(() => {});
+  const banner = await txt(p, '#sgbState');
+  check('끝나지 않은 업로드 — 위쪽에 「지난 업로드가 끝나지 않았습니다」(누가 · 어느 파일) · 다시 올리면 바로잡는다는 안내',
+    await p.isVisible('#sgbState') && banner.includes('지난 업로드가 끝나지 않았습니다') && banner.includes('kim') && banner.includes('dept-k9.xlsx')
+    && banner.includes('다시 올리면'), banner);
+  await upload(p, FILE_FIX);
+  check('미리보기 — 「이번에 서버 문서를 모두 읽어 맞댄 뒤 올립니다」', (await txt(p, '#upFix')).includes('서버 문서를 모두 읽어 맞댄'), await txt(p, '#upFix'));
+  await p.evaluate(() => { window.__SCAN_CACHE__ = true; window.__OPS__ = { get: 0, set: 0, del: 0, w: [] }; });
+  await p.click('#upGo'); await done(p);
+  const ops1 = await p.evaluate(() => window.__OPS__);
+  check('서버 목록이 캐시에서만 읽힘 — 멈추고 자료는 하나도 안 바꾼다(표시·남은 조각 그대로, 알림 그대로)',
+    (await txt(p, '#upMsg')).includes('복구를 멈췄습니다') && dataOps(ops1).set === 0 && dataOps(ops1).del === 0
+    && await p.evaluate(() => !!window.__FS__['saenggibu/dirty'] && !!window.__FS__['saenggibuAct/zzghost.v1-1-0'] && !window.__FS__['saenggibu/lock'])
+    && await p.isVisible('#sgbState'), await txt(p, '#upMsg'));
+  await p.evaluate(() => { window.__SCAN_CACHE__ = false; });
+  await p.click('#upGo');
+  await p.waitForFunction(() => document.getElementById('upPanel').textContent.includes('올렸습니다'), null, { timeout: 15000 }).catch(() => {});
+  const after = await p.evaluate(() => window.__FS__);
+  check('다시 누르면 — 「바로잡았습니다」, 표시·남은 조각·끊긴 문안이 사라지고 새 활동은 들어간다',
+    (await txt(p, '#upPanel')).includes('바로잡았습니다') && !after['saenggibu/dirty'] && !after['saenggibuAct/zzghost.v1-1-0']
+    && !JSON.stringify(after['saenggibuStu/1-1-1']).includes('끊긴 업로드') && JSON.stringify(after['saenggibuStu/1-1-2']).includes('복구를 확인하는 문안'), await txt(p, '#upPanel'));
+  check('— 위쪽 알림이 사라지고, 올린 기록에 「지난 업로드 바로잡음」', !(await p.isVisible('#sgbState')) && after['saenggibu/log']?.items?.[0]?.recovered === true);
+  check('오류 없음(바로잡기)', p.errors.length === 0, p.errors);
+  await p.context().close();
+  // 올리는 중 — 그 작업의 잠금이 살아 있으면 「올리는 중」(지금 보는 학생 자료가 잠깐 섞여 보일 수 있다)
+  STORE = JSON.parse(JSON.stringify(after));
+  STORE['saenggibu/dirty'] = { id: 'op-live', by: KIM, at: new Date().toISOString(), phase: 'write', file: 'dept-k9.xlsx' };
+  STORE['saenggibu/lock'] = { id: 'op-live', by: KIM, at: new Date().toISOString(), since: new Date().toISOString() };
+  const q = await openAs(LEE);
+  await q.waitForSelector('#upBtn');
+  await q.waitForFunction(() => !document.getElementById('sgbState').hidden).catch(() => {});
+  const b2 = await txt(q, '#sgbState');
+  check('올리는 중 — 위쪽에 「kim 선생님이 자료를 올리는 중입니다」 · 섞여 보일 수 있다는 말 · 「새로 보기」', await q.isVisible('#sgbState')
+    && b2.includes('kim 선생님이 자료를 올리는 중입니다') && b2.includes('섞여 보일 수') && !!(await q.$('#sgbStateRe'))
+    && await q.$eval('#sgbState', e => e.classList.contains('busy')), b2);
+  // 끝났다(표시·잠금이 사라짐) → 「새로 보기」 를 누르면 알림이 사라진다
+  await q.evaluate(() => { delete window.__FS__['saenggibu/dirty']; delete window.__FS__['saenggibu/lock']; });
+  await q.click('#sgbStateRe');
+  await q.waitForFunction(() => document.getElementById('sgbState').hidden).catch(() => {});
+  check('— 끝난 뒤 「새로 보기」 를 누르면 알림이 사라진다', !(await q.isVisible('#sgbState')));
+  await q.context().close();
+  // 종합검색 안(한 학생만 보기)에도 같은 알림 — 끝나지 않음
+  STORE['saenggibu/dirty'] = { id: 'op-dead', by: KIM, at: new Date().toISOString(), phase: 'write', file: 'dept-k9.xlsx' };
+  delete STORE['saenggibu/lock'];
+  const ctx = await b.newContext({ viewport: { width: 900, height: 900 } });
+  await ctx.route(ORIGIN + '/test/saenggibu.html*', r => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HTML }));
+  await ctx.route('https://www.gstatic.com/firebasejs/**', r => r.fulfill({ status: 200, contentType: 'text/javascript', body: STUB[r.request().url().split('/').pop()] || '' }));
+  await ctx.route('https://teacher-api.pkh910518.workers.dev/**', r => r.fulfill({ status: 404, body: '' }));
+  await ctx.route('https://fonts.googleapis.com/**', r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+  await ctx.route('https://cdn.jsdelivr.net/**', r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+  await ctx.route('https://fonts.gstatic.com/**', r => r.abort());
+  await ctx.addInitScript(([e, store]) => { window.__TEST_EMAIL__ = e; window.__FS__ = store; }, [LEE, STORE]);
+  const em = await ctx.newPage();
+  const emErr = []; em.on('pageerror', e => emErr.push(e.message));
+  await em.goto(ORIGIN + '/test/saenggibu.html?in=1&embed=1&k=1-1-1');
+  await em.waitForFunction(() => !document.getElementById('sgbState').hidden, null, { timeout: 8000 }).catch(() => {});
+  check('종합검색 안(한 학생만 보기)에도 「지난 업로드가 끝나지 않았습니다」', (await txt(em, '#sgbState')).includes('지난 업로드가 끝나지 않았습니다') && !emErr.length, emErr);
+  await ctx.close();
+  STORE = saved;                               // 이 묶음에서 만든 흔적은 뒤 검사로 넘기지 않는다
+}
 // 3-3e 차수를 떼면 이름이 같은 시트 둘 — 알려 주고 따로 올린다
 {
   const p = await openAs(LEE);
@@ -1574,7 +1667,7 @@ const adminDone = (p, word) => p.waitForFunction(w => { const a = document.getEl
   const m2 = await p.evaluate(() => window.__FS__['saenggibu/meta']);
   const keys = await p.evaluate(() => Object.keys(window.__FS__));
   check('통째로 지우기 — 확인 창, 목록·활동 문서·양식에서 빠진다', asked.includes('1개를 지웁니다') && asked.includes('독서 토론')
-    && !m2.activities.some(a => a.id === rd.id) && !keys.some(k => k.startsWith(`saenggibuAct/${rd.id}`)) && !keys.includes(`saenggibu/fmt-${rd.id}`), [asked, await txt(p, '#admMsg')]);
+    && !m2.activities.some(a => a.id === rd.id) && !keys.some(k => k.startsWith(`saenggibuAct/${rd.id}`)) && !keys.some(k => k.startsWith(`saenggibu/fmt-${rd.id}`)), [asked, await txt(p, '#admMsg')]);
   check('— 학생 문서에서도 빠진다(1-1-1)', !((await p.evaluate(() => window.__FS__['saenggibuStu/1-1-1']))?.items || []).some(i => i.a === rd.id));
   check('— 나머지는 그대로(활동 하나만 줄고, 고친 값도 남는다)', m2.activities.length === m1.activities.length - 1
     && m2.activities.find(a => a.id === target.id)?.fix?.title === '학생자치회 임원');
@@ -3024,7 +3117,9 @@ for (const c of ['saenggibu', 'saenggibuStu', 'saenggibuAct']) {
     // 한 기록이 두 영역에 — 카드 표시와 붙일 때 알림
     '곳에 들어감', '에 들어간 기록입니다 — 한 기록은 한 영역에만 씁니다',
     // 기재요령 점검 · 인쇄(봉사활동 누가기록 · 양면 인쇄용)
-    '기재요령 점검', '그 자리로', '괜찮음', '모두 고치기', '봉사활동 누가기록', '양면 인쇄용', '이 쪽은 양면 인쇄를 위해 비워 두었습니다'];
+    '기재요령 점검', '그 자리로', '괜찮음', '모두 고치기', '봉사활동 누가기록', '양면 인쇄용', '이 쪽은 양면 인쇄를 위해 비워 두었습니다',
+    // 덜 끝난 업로드 알림 · 같은 계정 다른 창 · 바로잡기(2026-10-31)
+    '선생님이 자료를 올리는 중입니다', '지난 업로드가 끝나지 않았습니다', '이 계정의 다른 창에서 올리는 중입니다', '바로잡았습니다', '새로 보기'];
   const gone = labels.filter(l => !SMAN.includes(l) || !HTML.includes(l));
   check('— 설명서가 부르는 단추·알림 이름이 앱에 그대로 있다(앱에서 이름을 바꾸면 여기서 걸린다)', !gone.length && HTML.includes('→ ${DR_NAME[k]}') && HTML.includes('에 들어감`')
     && SMAN.includes('→ 자율') && SMAN.includes('✓ 진로에 들어감'), gone);

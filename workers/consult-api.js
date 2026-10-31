@@ -418,20 +418,32 @@ async function handleBook(env, body) {
   return { success: false, error: 'BUSY' };
 }
 
-// 취소 — 예약 정보 필드를 지우고 다시 open 으로
+// 취소 — 예약 정보 필드를 지우고 다시 open 으로.
+//   화면이 보고 있는 예약 id(slotId)를 받아 그 칸만 취소한다. 그 칸이 이 세션 학생의 예약인지
+//   (학급은 세션의 classKey 문서 안에서만 찾으니 저절로 맞다) · 아직 지나지 않았는지 본다.
+//   예전에는 이름·번호가 같은 '첫 booked 칸' 을 골라, 슬롯이 학기 내내 쌓인 문서에서
+//   지난 예약이 취소되고 다가오는 예약은 남았다(2026-10). slotId 가 없는 예전 화면은
+//   조회(findMine)와 같은 기준 — 오늘 이후 예약 — 으로만 고른다.
 async function handleCancel(env, body) {
   const sess = await readSession(env, body.session);
   if (!sess) return { success: false, error: 'AUTH' };
   const { classKey, studentName, studentNum } = sess;
+  const slotId = String(body.slotId || '');
+  const isMine = s => s && s.status === 'booked' &&
+    String(s.studentName || '').trim() === String(studentName || '').trim() &&
+    String(s.studentNum || '') === String(studentNum || '');
 
   for (let attempt = 0; attempt < 4; attempt++) {
     const { data, updateTime } = await fsGet(env, 'consultations', classKey);
     const slots = (data && Array.isArray(data.slots)) ? data.slots : [];
-    const idx = slots.findIndex(s =>
-      s && s.status === 'booked' &&
-      String(s.studentName || '').trim() === String(studentName || '').trim() &&
-      String(s.studentNum || '') === String(studentNum || '')
-    );
+    let idx;
+    if (slotId) {
+      idx = slots.findIndex(s => s && s.id === slotId);
+      if (idx === -1 || !isMine(slots[idx])) return { success: false, error: 'NO_BOOKING' };
+      if (String(slots[idx].date || '') < todayKst()) return { success: false, error: 'PAST' };
+    } else {
+      idx = slots.indexOf(findMine(slots, studentName, studentNum));
+    }
     if (idx === -1) return { success: false, error: 'NO_BOOKING' };
     // 교사가 직접 넣은 예약(token:'teacher')은 학부모가 취소할 수 없다(교사 앱과 동일 규칙).
     if (slots[idx].token === 'teacher') return { success: false, error: 'TEACHER_BOOKED' };

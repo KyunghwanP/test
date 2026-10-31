@@ -34,6 +34,7 @@
 node workers/teacher-api.test.mjs     # 워커 로직 (fetch를 스텁으로 물려 실제 경로를 태움)
 node workers/notice-api.test.mjs      # 공지 이미지 (권한·키·청소)
 node workers/roster-split.test.mjs    # upload.html 분리 저장 → 워커 조회가 이어지는지
+node workers/consult-cancel.test.mjs  # 상담 취소 — 지난 예약 + 다가오는 예약이 함께 있을 때 화면이 보는 예약만
 node tests/overtime-worker.test.mjs   # 초과근무 — Apps Script 와 같은 결과인지 + 잠금·실패·크론
 node workers/riro-ingest.test.mjs      # 상벌점 받기 — 열쇠·주소·몸통 그대로 전달 (설치는 riro/README.md)
 ```
