@@ -216,12 +216,12 @@ for (const [label, hit] of cases){
   if (label.startsWith('쓰기 도중')){
     const stu = [...r.db.docs.keys()].filter(k => k.startsWith('saenggibuStu/'));
     const mixed = stu.filter(k => P.sgbCanon(r.db.get(k)) !== P.sgbCanon(new FakeDb(S0).get(k)));
-    check('— (재현) 이때 학생 문서 일부만 새것 — 섞인 상태', mixed.length > 0 && mixed.length < stu.length, [mixed.length, stu.length]);
+    check(`— (재현) 이때 학생 문서 ${stu.length}개 중 ${mixed.length}개만 새것 — 섞인 상태`, mixed.length > 0 && mixed.length < stu.length, [mixed.length, stu.length]);
     // 예전처럼 표시 없이(지문 목록만 믿고) 옛 파일을 다시 올리면 — 섞인 채 남는다(검사가 실제로 잡는지 대조)
     const ctl = new FakeDb(r.db.snap()); ctl.del('saenggibu/dirty');
     await ok(run(ctl, FILE_A, { name: 'ctl' }).p);
     const dc = diff(ctl, await clean(S0, FILE_A));
-    check('— (대조) 표시가 없다면 옛 파일을 다시 올려도 섞인 문서가 그대로 남는다 — 예전 버그', dc.length > 0, dc.length);
+    check(`— (대조) 표시가 없다면(예전처럼 지문 목록만 믿으면) 옛 파일을 다시 올려도 문서 ${dc.length}개가 섞인 채 남는다 — 예전 버그 재현`, dc.length > 0, dc.length);
   }
   const f = await fix(r);
   check(`${label} — 옛 파일(A)을 다시 올리면 바로잡힌다: 끊김 없이 올린 것과 문서가 같고, 표시·잠금이 안 남는다`,
