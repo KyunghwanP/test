@@ -148,7 +148,8 @@ GitHub 의 `schedule` 은 **정확한 시각을 보장하지 않는다.** 공용
   하나 놓쳐도 다음이 받는다
 
 정확한 시각이 필요하면 `schedule` 로는 안 된다. 바깥에서 찔러야 한다 —
-GAS 의 `triggerWeeklySummary` 가 그 길이고, 앱의 '새로 받기' 가 그것을 쓴다.
+GAS 의 `triggerWeeklySummary` 가 그 길이다(교사 로그인 · 10분 간격 · 하루 8번 — 2026-11). 앱의 '새로 받기'는
+이것이 아니라 주간업무 원문을 바로 다시 가져오는 것이다. 급하면 GitHub → Actions 에서 「Run workflow」 가 빠르다.
 
 ### 60일 손 놓으면 예약이 꺼진다
 
@@ -170,7 +171,7 @@ GAS 의 `triggerWeeklySummary` 가 그 길이고, 앱의 '새로 받기' 가 그
 - 긁어 오는 쪽(구글 사이트)의 화면이 바뀜 → `scripts/` 의 해당 파일 수정
 
 또 하나, GAS 가 **`triggerWeeklySummary`** 로 `scrape` → `Summarize` 를 연달아
-부르는 길이 있다(앱의 '새로 받기'가 이걸 쓴다). GAS 스크립트 속성의
+부르는 길이 있다(교사 로그인 토큰이 있어야 하고 10분에 한 번 · 하루 8번 — `gas/README.md`). GAS 스크립트 속성의
 `GITHUB_TOKEN` 이 만료되면 이 길만 조용히 죽는다.
 
 ---

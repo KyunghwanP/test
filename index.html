@@ -6470,7 +6470,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver8.47';
+const APP_VER = 'ver8.48';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -18254,6 +18254,22 @@ function navigateTo(page) {
 // 상벌점 조회·입력 기능 (ver2.42)
 // ══════════════════════════════════════════
 const POINTS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
+// 상벌점 한 줄 저장 — 로그인 확인값(idToken)과 함께 본문(POST)으로 보낸다(2026-11).
+// Apps Script 에 새 판(doPost)이 아직 안 올라가 있으면 답이 JSON 이 아니다(「doPost 를 찾을 수 없음」 쪽) —
+// 그때만 예전 방식(GET, 확인값 없이) 그대로 한 번 더 보낸다. 스크립트가 그 방식을 받아 주는 기간에만 쓰이고,
+// 새 판이 올라간 뒤에는 POST 가 바로 JSON 을 돌려줘 여기까지 오지 않는다(저장은 한 번만 된다 — 옛 판은 POST 에서 아무것도 안 쓴다)
+async function postPoints(params){
+  const res = await fetch(POINTS_SCRIPT_URL, { method: 'POST', body: params, redirect: 'follow' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  try { return JSON.parse(text); } catch (e) {}
+  const legacy = new URLSearchParams(params);
+  legacy.delete('idToken');
+  const r2 = await fetch(POINTS_SCRIPT_URL + '?' + legacy.toString(), { redirect: 'follow' });
+  if (!r2.ok) throw new Error('HTTP ' + r2.status);
+  const t2 = await r2.text();
+  try { return JSON.parse(t2); } catch (e) { throw new Error('응답 파싱 오류: ' + t2.slice(0, 80)); }
+}
 // 상벌점 구글 시트 링크 — 값이 있으면 세션 내역 위에 "시트에서 확인" 버튼 표시
 const POINTS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1fJpTxEWEJHZ6Xg1dWjBB0G8w9Rf_Nev30UoJ8bDbXZk/edit?gid=264713345#gid=264713345';
 {
@@ -18845,12 +18861,17 @@ async function submitPoints() {
 
   let successCount = 0;
   const savedEntries = [];
+  // 로그인 확인값 — Apps Script 가 구글에 물어 학교 교사인지 확인한다(2026-11, 주소만 알면 누구나 시트에 쓰던 구멍).
+  // 주소창·기록에 남지 않게 본문(POST)으로 보낸다. 못 얻으면 빈 값 — 스크립트가 거절하고 그 말이 아래에 뜬다
+  let idToken = '';
+  try { idToken = await fbAuth.currentUser.getIdToken(); } catch (e) {}
   for (let i = 0; i < validStudents.length; i++) {
     const s = validStudents[i];
     // 상점 유형이면 학생별 구분(상점/감점활동)을, 벌점이면 벌점 그대로
     const sendType = ptsType === '상점' ? (s.subType || '상점') : ptsType;
     const params = new URLSearchParams({
       action: 'savePoints',
+      idToken,
       grade: s.grade,
       classNum: s.room,
       studentNum: s.num,
@@ -18862,13 +18883,7 @@ async function submitPoints() {
       teacher,
     });
     try {
-      const res = await fetch(POINTS_SCRIPT_URL + '?' + params.toString(), {
-        redirect: 'follow',
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const text = await res.text();
-      let json;
-      try { json = JSON.parse(text); } catch(pe) { throw new Error('응답 파싱 오류: ' + text.slice(0,80)); }
+      const json = await postPoints(params);
       if (json.success) {
         successCount++;
         savedEntries.push({ ...s, classNum: s.room, studentNum: s.num, type: sendType, detail: s._detail, date, score: s._score, teacher });
@@ -19710,12 +19725,14 @@ async function triggerWeeklySummaryAction() {
   btns.forEach(b => { b.textContent = '⏳ 실행 중...'; b.disabled = true; });
   try {
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
-    const res  = await fetch(`${SCRIPT_URL}?action=triggerWeeklySummary`);
+    // 교사 로그인 확인값과 함께(본문으로) — 스크립트가 교사인지 보고, 10분에 한 번 · 하루 8번까지만 받는다(2026-11)
+    const idToken = await fbAuth.currentUser.getIdToken();
+    const res  = await fetch(SCRIPT_URL, { method: 'POST', body: new URLSearchParams({ action: 'triggerWeeklySummary', idToken }), redirect: 'follow' });
     const data = await res.json();
     if (data.success) {
       alert('✅ AI 요약 갱신 시작!\n스크래핑 후 약 2분 뒤 요약이 업데이트돼요.');
     } else {
-      alert('❌ 실패: ' + JSON.stringify(data));
+      alert('❌ 실패: ' + (data.message || JSON.stringify(data)));
     }
   } catch(e) {
     alert('❌ 오류: ' + e.message);

@@ -234,23 +234,13 @@
 
 <script>
 // ※ 다른 학부모의 개인정보는 어떤 경로로도 이 브라우저에 오지 않습니다.
-//   · 인증·예약·취소 → 서버(Worker 또는 GAS)가 처리
+//   · 인증·예약·취소 → 서버(Cloudflare 워커 consult-api)가 처리
 //   · 슬롯 목록      → 개인정보를 뺀 공개 미러(consultationsPublic)만 직접 읽음
 //
-// USE_WORKER=true 면 Cloudflare Worker를 쓴다(GAS의 302 리다이렉트·콜드 스타트가
-// 없어 훨씬 빠르고, 예약 오픈 시각의 동시 접속도 견딘다).
-// 문제가 생기면 false 로만 바꾸면 즉시 기존 GAS 경로로 돌아간다
-// → 그래서 워커가 안정화될 때까지 GAS 배포는 지우지 말 것.
-// 워커 경로 실동작(인증→목록→예약→취소)을 확인해 전체 전환함.
-// 문제가 생기면 이 값만 false 로 되돌리면 즉시 GAS로 복귀한다.
-// 한 방문만 강제하려면 주소에 ?worker=0(GAS) / ?worker=1(워커) 을 붙인다.
-const USE_WORKER_DEFAULT = true;
-const _workerQuery = new URLSearchParams(location.search).get('worker');
-const USE_WORKER = _workerQuery === '1' ? true
-                 : _workerQuery === '0' ? false
-                 : USE_WORKER_DEFAULT;
-const WORKER_URL = 'https://consult-api.pkh910518.workers.dev';   // ← 배포 후 실제 주소로 교체
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
+// 서버는 Cloudflare 워커 하나다. 예전의 Apps Script(GAS) 예비 경로(?worker=0)는 2026-11 에 걷어 냈다 —
+// GAS 쪽 상담 코드는 토큰을 확인하지 않아(아무 글자나 토큰으로 받고, 'teacher' 로 교사 예약까지 취소)
+// 주소만 알면 누구나 예약을 건드릴 수 있었다. 지금 GAS 는 상담 요청에 「MOVED」 만 돌려준다.
+const WORKER_URL = 'https://consult-api.pkh910518.workers.dev';
 
 // 슬롯 목록 직접 읽기용 (공개 미러 문서 전용 — 개인정보 없음)
 const FB_API_KEY = 'AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA';
@@ -284,22 +274,8 @@ function fmtDate(dateStr){
 }
 function typeLabel(t){ return t === 'phone' ? '전화' : '대면'; }
 
-// GAS 호출 (GET, 파라미터 인코딩)
-async function callGas(action, params){
-  const usp = new URLSearchParams(Object.assign({ action }, params));
-  const res = await fetch(`${GAS_URL}?${usp.toString()}`, { redirect: 'follow' });
-  return await res.json();
-}
-
-// 서버 호출 — 워커(POST JSON) 또는 GAS(GET). 액션 이름·응답 형태를 여기서 흡수해
-// 아래 화면 코드는 어느 쪽을 쓰든 동일하게 동작한다.
-const GAS_ACTION = { verify:'verifyParent', slots:'getOpenSlots', book:'bookSlot', cancel:'cancelBooking' };
+// 서버 호출 — 워커(POST JSON)
 async function callApi(action, params){
-  if(!USE_WORKER){
-    const data = await callGas(GAS_ACTION[action] || action, Object.assign({ token: parentToken }, params));
-    if(action === 'verify' && data && data.success) data.session = data.token;   // 이름 통일
-    return data;
-  }
   const res = await fetch(WORKER_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -395,7 +371,7 @@ authBtn.addEventListener('click', async () => {
   }
 });
 
-// ── STEP 2: 슬롯 로드 (GAS가 빈 칸만 + 내 예약만 내려줌) ──
+// ── STEP 2: 슬롯 로드 (공개 미러에 빈 칸 · 내 예약은 서버 응답) ──
 const slotList    = document.getElementById('slotList');
 const slotCard    = document.getElementById('slotCard');
 const confirmCard = document.getElementById('confirmCard');
@@ -433,7 +409,7 @@ async function loadSlots(){
     data = Object.assign({ success:true }, firstPayload);
     firstPayload = null;
   } else {
-    const pub = USE_WORKER ? await fetchPublicSlots() : null;
+    const pub = await fetchPublicSlots();
     if(pub){
       data = { success:true, slots:pub.slots, openAt:pub.openAt, mine:myBooking };
     } else {

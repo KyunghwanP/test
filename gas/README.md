@@ -4,7 +4,33 @@
 여기 있는 파일은 리뷰와 변경 이력을 남기기 위한 거울입니다.
 고친 뒤에는 **Apps Script 편집기에 붙여넣고 새 버전으로 배포해야** 실제로 반영됩니다.
 
-배포 URL은 `scripts/scrape-weekly.js` 의 `GAS_URL`, `parent.html` 의 GAS 경로에서 씁니다.
+배포 URL(`…C0YA`) 하나를 앱(`index.html` 의 주간업무·상벌점), `scripts/scrape-weekly.js`(학사일정),
+`scripts/summarize.js`(요약용 주간업무 원문)가 같이 씁니다. `tests/gas-main.test.mjs` 가 이 셋이 같은 배포를
+부르는지 봅니다.
+
+## 고친 것을 올리는 법 — 주소를 바꾸지 않는다
+
+1. Apps Script 편집기에 `Code.gs` 를 통째로 붙여 넣고 저장
+2. **배포 → 배포 관리 → 「앱용」 배포 고르기 → 연필(수정) → 버전: 「새 버전」 → 배포**
+3. 앱에서 주간업무 주차를 눌러 내용이 뜨는지, 상벌점이 저장되는지 확인
+
+**「새 배포」 를 만들지 않습니다.** 새 배포는 주소가 새로 생기고 옛 주소(옛 코드)가 그대로 살아 있습니다 —
+2026-11 확인 때 활성 배포가 20개였고 그 주소 상당수가 공개 저장소 이력에 남아 있었습니다(앱이 쓰는 둘만 두고
+보관처리). 되돌릴 때는 같은 화면에서 버전을 이전 번호로 골라 배포합니다.
+
+## 누구나 부를 수 있다는 전제(2026-11)
+
+배포가 「실행: 나 · 액세스: 모든 사용자」입니다 — GitHub 작업이 로그인 없이 부르기 때문입니다. 그래서:
+
+- **상벌점 저장**은 앱 로그인 토큰을 구글(Identity Toolkit)에 물어 학교 교사 계정인지 확인합니다
+  (학생 숫자 7자리 계정 · 학교 밖 계정 · 메일 미확인 · 사용 중지는 거절). 앱은 토큰을 본문(POST)으로 보냅니다.
+  예전 화면(토큰 없이 GET)은 `TOKEN_REQUIRED_FROM`(지금 **2026-11-16**) 전날까지만 받아 주고, 그날부터는
+  「앱을 새로 고친 뒤 다시 저장해 주세요」 로 거절합니다(예전 화면도 그 말을 그대로 보여 줍니다).
+- **AI 요약 갱신**(`triggerWeeklySummary`)은 교사 토큰 + 10분 간격 · 하루 8번. 부를 때마다 GitHub 작업 둘
+  (Gemini 요약 포함)이 돌아, 아무나 되풀이하면 사용량·실행 시간이 바닥나기 때문입니다. 지금 앱에는 이 단추가 없습니다.
+- **주간교육활동 가져오기**(`?url=`)는 `https://sites.google.com/yeungnam.hs.kr/…` 만. 주소를 쪼개 호스트·경로를 보고,
+  넘겨주기(리디렉션)도 저절로 따라가지 않고 넘어갈 때마다 같은 검사를 합니다(열린 중계기가 되지 않게).
+- **학부모 상담**은 워커로 옮겨 `MOVED` 만 돌려줍니다.
 
 `overtime/` 은 **다른 스크립트**입니다 — 초과근무 관리대장 시트에 붙어 학교 계정이 따로
 소유·배포합니다. 설치와 규칙은 `overtime/README.md`.
@@ -15,24 +41,27 @@
 |---|---|
 | (없음) | 주간교육활동 구글 사이트 HTML 정리해서 반환 |
 | `getSchedule` | 학사일정 시트 → 월별 JSON (`scripts/scrape-weekly.js` 가 부름) |
-| `savePoints` | 상벌점 원본 시트에 한 줄 추가 |
-| `triggerWeeklySummary` | scrape → summarize 워크플로 연달아 실행 |
-| `verifyParent` · `getOpenSlots` · `bookSlot` · `getMyBooking` · `cancelBooking` | 학부모 상담 예약 (`parent.html`) |
+| `savePoints` | 상벌점 원본 시트에 한 줄 추가 — 교사 토큰(POST). 토큰 없는 GET 은 2026-11-15 까지만 |
+| `triggerWeeklySummary` | scrape → summarize 워크플로 연달아 실행 — 교사 토큰 · 10분 간격 · 하루 8번 |
+| `verifyParent` · `getOpenSlots` · `bookSlot` · `getMyBooking` · `cancelBooking` | **옮김** — `MOVED`. 학부모 상담은 `workers/consult-api` |
 
 ## 비밀값
 
 코드에는 없습니다. Apps Script **스크립트 속성**에만 있습니다.
 
 - `GITHUB_TOKEN` — 워크플로 dispatch
-- `FIREBASE_PROJECT_ID`, `FIREBASE_SA_JSON` — Firestore REST 접근용 서비스 계정
+- ~~`FIREBASE_PROJECT_ID`, `FIREBASE_SA_JSON`~~ — 상담 예약 코드를 뺀 뒤로 쓰지 않습니다. 새 판을 올리고
+  상담이 워커로 잘 되는지 본 다음 스크립트 속성에서 지우면 됩니다(서비스 계정 키가 한 곳 줄어든다).
+
+Firebase 웹 API 키(`FIREBASE_API_KEY`)는 코드에 있습니다 — 앱에 이미 공개된 값이라 비밀이 아닙니다.
 
 시트 ID(`SCHEDULE_SHEET_ID`, 상벌점 `SHEET_ID`)는 코드에 있지만, ID만으로는 열 수
 없고 시트 공유 권한이 따로 필요합니다.
 
-## 상담 예약은 워커로 옮기는 중
+## 상담 예약은 워커로 옮겼다(2026-11)
 
-`workers/consult-api` 가 같은 일을 합니다. `parent.html` 의 `USE_WORKER` 를
-`false` 로 되돌리면 이 GAS 경로로 돌아가므로, **배포를 아직 지우지 마세요.**
+`workers/consult-api` 가 맡습니다. `parent.html` 의 GAS 예비 경로(`USE_WORKER`, `?worker=0`)는 걷어 냈고,
+이 스크립트의 상담 코드(토큰을 확인하지 않던 것)와 서비스 계정 코드도 뺐습니다.
 자세한 것은 `workers/README.md`.
 
 ## 고칠 때 조심할 것 — `getSchedule` 의 이름 걸러내기

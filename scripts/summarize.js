@@ -7,8 +7,17 @@ admin.initializeApp({
 });
 const db = admin.firestore();
 
-const APPS_SCRIPT_PROXY = 'https://script.google.com/macros/s/AKfycbxVT4Z20BvZ9DUwLH79h3_5LhJCazcPOJ3lAWNi1Z_WkwjvOXsomWrs242wpiPUokmbXA/exec';
+// 앱(index.html)이 쓰는 것과 같은 Apps Script 배포(2026-11). 예전에는 요약만 따로 옛 배포(…mbXA)를 썼는데,
+// 그 배포는 옛 코드로 돌아 손볼 수 없어 보관처리하려고 옮겼다.
+const APPS_SCRIPT_PROXY = 'https://script.google.com/macros/s/AKfycbyLEakkCuV36RSsqg6NxGXhCeXe8OQP4tPb2d4Lzuy6yxML9caVY02st-fxT0xrO0C0YA/exec';
 const SITES_BASE = 'https://sites.google.com/yeungnam.hs.kr/202633';
+
+// 프록시 답에서 본문만 — 이 배포는 앞에 주차 링크 목록(===NAV===)을 붙여 준다. 그대로 두면 링크 수십 줄이
+// Gemini 에 보내는 4000자를 먼저 차지한다. 표시가 없는 답(옛 배포 · 다른 형식)은 그대로 쓴다
+function weeklyBody(raw) {
+  const i = raw.indexOf('===CONTENT===');
+  return i >= 0 && raw.includes('===NAV===') ? raw.slice(i + '===CONTENT==='.length) : raw;
+}
 
 async function summarizeWeekly() {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -28,7 +37,7 @@ async function summarizeWeekly() {
   const res = await fetch(`${APPS_SCRIPT_PROXY}?url=${encodeURIComponent(url)}`,
     { signal: AbortSignal.timeout(20000) });
   if (!res.ok) throw new Error('프록시 fetch 실패: ' + res.status);
-  const html = await res.text();
+  const html = weeklyBody(await res.text());
 
   // 디버그: HTML 내용 확인
   console.log(`  → HTML 길이: ${html.length}자`);

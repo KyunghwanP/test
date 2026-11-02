@@ -1,39 +1,153 @@
 // Learn more about Web apps at https://developers.google.com/apps-script/guides/web
+//
+// ── 보안(2026-11) ──────────────────────────────────────────────────────────────
+// 이 웹 앱은 「실행: 나 · 액세스: 모든 사용자」(로그인 없이)로 배포돼 있다 — GitHub 작업(학사일정·요약)이
+// 로그인 없이 부르기 때문이다. 그래서 주소를 아는 누구나 부를 수 있다는 전제로 짠다:
+//  · 쓰기(상벌점 저장)·비용이 드는 일(AI 요약 갱신)은 앱 로그인 토큰을 구글(Identity Toolkit)에 물어
+//    학교 교사 계정인지 확인한다. 초과근무 스크립트(gas/overtime)와 같은 방법이다.
+//    상벌점 저장은 예전 화면(토큰을 안 보냄)을 TOKEN_REQUIRED_FROM 전날까지만 받아 준다.
+//  · 주간교육활동 가져오기(?url=)는 학교 구글 사이트 주소만 — 아무 주소나 대신 가져오는 「열린 중계기」가 되지 않게.
+//    넘겨주기(리디렉션)도 저절로 따라가지 않고, 넘어갈 때마다 같은 검사를 한다.
+//  · 학부모 상담 예약은 Cloudflare 워커(consult-api)로 옮겨 여기서는 받지 않는다(서비스 계정 코드도 뺐다).
+// 새로 쓴 코드는 예전 실행 환경(Rhino)에서도 돌게 var·function 만 쓴다.
+//
+// 고친 뒤에는 「배포 관리 → (앱용 배포) 연필 → 버전: 새 버전 → 배포」 — 주소가 그대로다. 「새 배포」 를 만들지 않는다.
+
+var FIREBASE_API_KEY = 'AIzaSyCrYCGksB-Nv8LNIv1kZc_a8d6bIL_5CvA';   // 앱(index.html)에 이미 공개된 웹 키 — 비밀이 아니다
+var SCHOOL_DOMAIN = 'yeungnam.hs.kr';
+var TOKEN_REQUIRED_FROM = '2026-11-16';   // 이날(한국 날짜)부터 토큰 없는 상벌점 저장은 거절 — 그 전에 모두 새 앱으로
+var SITES_HOST = 'sites.google.com';
+var SITES_PATH = '/yeungnam.hs.kr';       // 이 경로 아래만 가져온다
+var SITES_DEFAULT = 'https://sites.google.com/yeungnam.hs.kr/202633';
+var TRIGGER_GAP_MIN = 10;                 // AI 요약 갱신 — 이 간격(분) 안에 또 오면 거절
+var TRIGGER_DAY_MAX = 8;                  //               하루 이만큼까지
+var CONSULT_ACTIONS = { verifyParent: 1, getOpenSlots: 1, bookSlot: 1, getMyBooking: 1, cancelBooking: 1 };
 
 function doGet(e) {
-  // ── 주간교육활동 AI 요약 트리거 ──
-  if (e.parameter.action === 'triggerWeeklySummary') {
-    return triggerWeeklySummary();
-  }
+  var p = (e && e.parameter) || {};
 
-  // ── 상벌점 저장 분기 ──
-  if (e.parameter.action === 'savePoints') {
-    return savePointsToSheet(e.parameter);
+  // ── 주간교육활동 AI 요약 트리거(교사 로그인 + 횟수 제한) ──
+  if (p.action === 'triggerWeeklySummary') return triggerWeeklySummary(p);
+
+  // ── 상벌점 저장 분기(교사 로그인 — 예전 화면은 TOKEN_REQUIRED_FROM 전까지) ──
+  if (p.action === 'savePoints') {
+    var why = savePointsGate_(p);
+    if (why) return json_({ success: false, code: 'AUTH', error: why });   // 예전 화면은 「저장 실패: {error}」 로 보여 준다
+    return savePointsToSheet(p);
   }
 
   // ── 학사일정 읽기 분기 ──
-  if (e.parameter.action === 'getSchedule') {
+  if (p.action === 'getSchedule') {
     return getSchedule();
   }
 
-  // ── 학부모 상담 예약 분기 ──
-  if (e.parameter.action === 'verifyParent')  return verifyParent_(e);
-  if (e.parameter.action === 'getOpenSlots')  return getOpenSlots_(e);
-  if (e.parameter.action === 'bookSlot')      return bookSlot_(e);
-  if (e.parameter.action === 'getMyBooking')  return getMyBooking_(e);
-  if (e.parameter.action === 'cancelBooking') return cancelBooking_(e);
+  // ── 학부모 상담 예약 — 워커(consult-api)로 옮겼다 ──
+  if (CONSULT_ACTIONS.hasOwnProperty(p.action)) {
+    return json_({ success: false, error: 'MOVED', message: '상담 예약 주소가 바뀌었습니다. 학부모 화면을 새로 고쳐 주세요.' });
+  }
 
-  var url = e.parameter.url || 'https://sites.google.com/yeungnam.hs.kr/202633';
+  // ── 주간교육활동 가져오기(학교 구글 사이트만) ──
+  return proxyWeekly_(p.url);
+}
 
-  var res = UrlFetchApp.fetch(url, {
-    muteHttpExceptions: true,
-    followRedirects: true,
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-      'Accept': 'text/html,application/xhtml+xml',
-      'Accept-Language': 'ko-KR,ko;q=0.9'
-    }
-  });
+// 앱(새 판)은 로그인 확인값이 주소창·기록에 남지 않게 본문(POST, 폼)으로 보낸다.
+// 폼 칸은 e.parameter 로 들어오므로 doGet 과 똑같이 처리한다(같은 검사를 거친다)
+function doPost(e) {
+  return doGet(e);
+}
+
+function json_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+function todayKst_() {
+  return Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+}
+
+// ── 본인 확인 — 앱의 Firebase 로그인 토큰을 구글에 묻는다(초과근무 스크립트 verifyToken_ 과 같은 규칙) ──
+// 학교 도메인 · 메일 확인됨 · 사용 중지 아님 · 학생(숫자 7자리) 계정 아님. 맞으면 이메일, 아니면 null.
+function verifyToken_(tok) {
+  if (typeof tok !== 'string' || tok.length < 20 || tok.length > 4096) return null;
+  var cache = CacheService.getScriptCache();
+  var key = 'tok:' + hash_(tok);
+  var hit = cache.get(key);
+  if (hit) return hit;
+  var res;
+  try {
+    res = UrlFetchApp.fetch(
+      'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + FIREBASE_API_KEY,
+      { method: 'post', contentType: 'application/json',
+        payload: JSON.stringify({ idToken: tok }), muteHttpExceptions: true });
+  } catch (err) { return null; }
+  if (res.getResponseCode() !== 200) return null;
+  var u;
+  try { u = (JSON.parse(res.getContentText()).users || [])[0]; } catch (err) { return null; }
+  if (!u || u.emailVerified !== true || u.disabled === true) return null;
+  var email = String(u.email || '').toLowerCase();
+  var tail = '@' + SCHOOL_DOMAIN;
+  if (email.length <= tail.length || email.slice(-tail.length) !== tail) return null;
+  if (/^[0-9]{7}@/.test(email)) return null;              // 학생 계정
+  cache.put(key, email, 300);
+  return email;
+}
+function hash_(s) {
+  return Utilities.base64EncodeWebSafe(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8));
+}
+
+// 상벌점 저장을 받아도 되나 — 토큰이 있으면 반드시 맞아야 하고, 없으면 TOKEN_REQUIRED_FROM 전날까지만(예전 화면).
+// 받으면 null, 아니면 화면에 보일 말.
+function savePointsGate_(p) {
+  if (p.idToken) return verifyToken_(p.idToken) ? null : '로그인을 확인하지 못했습니다. 앱을 새로 고친 뒤 다시 저장해 주세요.';
+  if (todayKst_() >= TOKEN_REQUIRED_FROM) return '앱을 새로 고친 뒤 다시 저장해 주세요(예전 화면이라 로그인을 확인할 수 없습니다).';
+  return null;
+}
+
+// ── 주간교육활동 가져오기 ──
+// 주소를 쪼개 프로토콜(https)·호스트(sites.google.com)·경로(/yeungnam.hs.kr 아래)를 본다.
+// 사용자 정보(@)·포트·'..' 조각·역슬래시·인코딩한 점과 빗금으로 다른 곳으로 빠져나가는 주소는 거절.
+function sitesUrlOk_(u) {
+  if (typeof u !== 'string' || !u || u.length > 2000) return false;
+  var m = /^https:\/\/([^\/?#]*)(\/[^?#]*)?(\?[^#]*)?(#.*)?$/i.exec(u);
+  if (!m || m[1].toLowerCase() !== SITES_HOST) return false;
+  var path = m[2] || '/';
+  var dec;
+  try { dec = decodeURIComponent(path); } catch (err) { return false; }
+  if (dec.indexOf('\\') !== -1 || /[\u0000-\u001f\u007f]/.test(dec)) return false;
+  if (/(^|\/)\.{1,2}(\/|$)/.test(dec)) return false;
+  return dec === SITES_PATH || dec.indexOf(SITES_PATH + '/') === 0;
+}
+// 넘겨주기(3xx)는 손으로 따라간다 — 넘어갈 주소도 sitesUrlOk_ 를 지나야 한다. 네 번까지.
+function fetchSites_(url) {
+  for (var hop = 0; hop < 4; hop++) {
+    if (!sitesUrlOk_(url)) throw new Error('학교 사이트(' + SITES_HOST + SITES_PATH + ') 주소가 아닙니다');
+    var res = UrlFetchApp.fetch(url, {
+      muteHttpExceptions: true,
+      followRedirects: false,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'ko-KR,ko;q=0.9'
+      }
+    });
+    var code = res.getResponseCode();
+    if (code < 300 || code >= 400) return res;
+    var h = res.getHeaders() || {};
+    var loc = String(h.Location || h.location || '');
+    if (!loc) throw new Error('넘겨줄 주소가 없습니다(' + code + ')');
+    // 같은 호스트 안의 경로('/…')만 앞에 붙인다. '//다른곳' 은 그대로 두어 위 검사에서 걸리게
+    url = (loc.charAt(0) === '/' && loc.charAt(1) !== '/') ? 'https://' + SITES_HOST + loc : loc;
+  }
+  throw new Error('넘겨주기(리디렉션)가 너무 많습니다');
+}
+
+function proxyWeekly_(url) {
+  var res;
+  try {
+    res = fetchSites_(url || SITES_DEFAULT);
+  } catch (err) {
+    // 앱·요약 스크립트는 짧은 답을 실패로 본다(앱 200자 · 요약 100자 미만)
+    return ContentService.createTextOutput('ERROR: ' + err.message).setMimeType(ContentService.MimeType.TEXT);
+  }
 
   var html = res.getContentText('UTF-8');
 
@@ -113,8 +227,30 @@ function doGet(e) {
     .setMimeType(ContentService.MimeType.TEXT);
 }
 
-// ── 주간교육활동 AI 요약 트리거 ──
-function triggerWeeklySummary() {
+// ── 주간교육활동 AI 요약 트리거 ── scrape → Summarize 워크플로를 연달아 실행(GITHUB_TOKEN).
+// 부를 때마다 GitHub 작업 둘(Gemini 요약 포함)이 돌고 이 스크립트가 60초 붙잡힌다 — 아무나 되풀이해 부르면
+// 요약 사용량·하루 실행 시간이 바닥나 주간업무·상벌점 저장까지 멈출 수 있다. 그래서 교사 로그인을 확인하고
+// TRIGGER_GAP_MIN 분에 한 번 · 하루 TRIGGER_DAY_MAX 번까지만(2026-11). 지금 앱 화면에는 이 단추가 없다 —
+// 급하면 GitHub → Actions 에서 scrape · Summarize 를 「Run workflow」 로 돌려도 된다.
+function triggerWeeklySummary(p) {
+  if (!verifyToken_(p && p.idToken)) return json_({ success: false, error: 'AUTH', message: '로그인을 확인하지 못했습니다. 앱을 새로 고친 뒤 다시 해 주세요.' });
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return json_({ success: false, error: 'BUSY', message: '다른 요청을 처리하는 중입니다. 잠시 뒤 다시 해 주세요.' });
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var now = new Date().getTime(), day = todayKst_();
+    var last = Number(props.getProperty('WEEKLY_TRIGGER_AT') || 0);
+    var cnt = props.getProperty('WEEKLY_TRIGGER_DAY') === day ? Number(props.getProperty('WEEKLY_TRIGGER_CNT') || 0) : 0;
+    var wait = Math.ceil((last + TRIGGER_GAP_MIN * 60000 - now) / 60000);
+    if (wait > 0) return json_({ success: false, error: 'TOO_SOON', message: '방금 갱신했습니다. ' + wait + '분 뒤에 다시 해 주세요.' });
+    if (cnt >= TRIGGER_DAY_MAX) return json_({ success: false, error: 'DAY_LIMIT', message: '오늘은 더 갱신할 수 없습니다(하루 ' + TRIGGER_DAY_MAX + '번).' });
+    props.setProperties({ WEEKLY_TRIGGER_AT: String(now), WEEKLY_TRIGGER_DAY: day, WEEKLY_TRIGGER_CNT: String(cnt + 1) });
+  } finally {
+    lock.releaseLock();
+  }
+  return dispatchWeeklySummary_();
+}
+function dispatchWeeklySummary_() {
   var GITHUB_TOKEN = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
   if (!GITHUB_TOKEN) {
     return ContentService
@@ -343,460 +479,7 @@ function getSchedule() {
 
 
 // ════════════════════════════════════════════════════════════════
-//  학부모 상담 예약 — 엔드포인트 (안전 모드: 학부모는 GAS만 경유)
-//
-//  스크립트 속성 필요: FIREBASE_PROJECT_ID, FIREBASE_SA_JSON
+//  학부모 상담 예약 — Cloudflare 워커(workers/consult-api.js)로 옮겼다(2026-11).
+//  여기 있던 인증·예약·취소 코드와 서비스 계정(Firestore) 코드는 뺐다 — doGet 이 MOVED 로 답한다.
+//  스크립트 속성 FIREBASE_PROJECT_ID · FIREBASE_SA_JSON 은 이제 쓰지 않으니 지워도 된다.
 // ════════════════════════════════════════════════════════════════
-
-// 한 자녀당 1건만 예약 허용
-var ONE_BOOKING_PER_CHILD = true;
-
-
-// ── 1) 학부모 인증 ──
-function verifyParent_(e) {
-  try {
-    var grade = String(e.parameter.grade || '').trim();
-    var room  = String(e.parameter.room  || '').trim();
-    var name  = String(e.parameter.name  || '').trim().replace(/\s+/g, '');
-    var birth = String(e.parameter.birth || '').trim();
-
-    if (!grade || !room || !name || !birth) {
-      return _cjson({ success: false, error: '입력값이 부족합니다.' });
-    }
-
-    var matched = _findStudent(grade, room, name, birth);
-    if (!matched) {
-      return _cjson({ success: false, error: '일치하는 자녀 정보를 찾을 수 없습니다.' });
-    }
-
-    var classKey = grade + '-' + String(parseInt(room, 10));
-    var teacher  = _homeroomOf(classKey);
-    var token    = _csha256(classKey + '|' + name + '|' + birth);
-
-    return _cjson({
-      success: true,
-      classKey: classKey,
-      teacher: teacher,
-      token: token,
-      studentName: String(matched.name || '').trim(),
-      studentNum: String(matched.num || '').trim()
-    });
-  } catch (err) {
-    return _cjson({ success: false, error: '서버 오류: ' + err.message });
-  }
-}
-
-
-// ── 2) 빈 슬롯 조회 (남의 예약 정보는 내보내지 않음, 예약 여부만 표시) ──
-function getOpenSlots_(e) {
-  try {
-    var classKey = String(e.parameter.classKey || '').trim();
-    var token    = String(e.parameter.token || '').trim();
-    if (!classKey || !token) return _cjson({ success: false, error: '잘못된 요청입니다.' });
-
-    var slots = _readSlots(classKey);
-    var today = _ctoday();
-
-    var mine = null;
-    for (var i = 0; i < slots.length; i++) {
-      if (slots[i].status === 'booked' && slots[i].token === token) {
-        mine = {
-          id: slots[i].id, date: slots[i].date, time: slots[i].time,
-          type: slots[i].type, duration: slots[i].duration,
-          bookedType: slots[i].bookedType || slots[i].type || 'face',
-          bookedName: slots[i].bookedName || ''
-        };
-        break;
-      }
-    }
-
-    var open = [];
-    for (var j = 0; j < slots.length; j++) {
-      var s = slots[j];
-      if (s.date < today) continue;
-      if (s.status === 'booked' && s.token === token) continue; // 내 예약은 mine으로 따로 내려줌
-      open.push({
-        id: s.id, date: s.date, time: s.time, type: s.type, duration: s.duration,
-        booked: s.status === 'booked'  // 다른 학부모의 예약 여부만 표시 (개인정보 없음)
-      });
-    }
-    open.sort(function (a, b) { return (a.date + a.time).localeCompare(b.date + b.time); });
-
-    return _cjson({ success: true, mine: mine, slots: open, openAt: _readOpenAt(classKey) });
-  } catch (err) {
-    return _cjson({ success: false, error: '서버 오류: ' + err.message });
-  }
-}
-
-
-// ── 3) 예약 ──
-function bookSlot_(e) {
-  var lock = LockService.getScriptLock();
-  try {
-    lock.waitLock(10000);
-
-    var classKey = String(e.parameter.classKey || '').trim();
-    var token    = String(e.parameter.token || '').trim();
-    var slotId   = String(e.parameter.slotId || '').trim();
-    var bkName   = String(e.parameter.bkName || '').trim();
-    var bkPhone  = String(e.parameter.bkPhone || '').trim();
-    var bkMemo   = String(e.parameter.bkMemo || '').trim();
-    var sName    = String(e.parameter.studentName || '').trim();
-    var sNum     = String(e.parameter.studentNum || '').trim();
-    var bkType   = String(e.parameter.bkType || '').trim();  // 학부모가 고른 상담 방식(face/phone)
-
-    if (!classKey || !token || !slotId || !bkName || !bkPhone) {
-      return _cjson({ success: false, error: '입력값이 부족합니다.' });
-    }
-
-    var slots = _readSlots(classKey);
-
-    // ── 예약 오픈 시각 체크 (선착순) ──
-    var _openAt = _readOpenAt(classKey);
-    if (_openAt && Date.now() < new Date(_openAt).getTime()) {
-      return _cjson({ success: false, error: 'NOT_OPEN', openAt: _openAt });
-    }
-
-    if (ONE_BOOKING_PER_CHILD) {
-      for (var i = 0; i < slots.length; i++) {
-        if (slots[i].status === 'booked' && slots[i].token === token) {
-          return _cjson({ success: false, error: 'ALREADY_BOOKED' });
-        }
-      }
-    }
-
-    var idx = -1;
-    for (var j = 0; j < slots.length; j++) {
-      if (slots[j].id === slotId) { idx = j; break; }
-    }
-    if (idx === -1)                     return _cjson({ success: false, error: 'GONE' });
-    if (slots[idx].status === 'booked') return _cjson({ success: false, error: 'TAKEN' });
-
-    slots[idx].status      = 'booked';
-    slots[idx].token       = token;
-    slots[idx].bookedName  = bkName;
-    slots[idx].bookedPhone = bkPhone;
-    slots[idx].bookedMemo  = bkMemo;
-    slots[idx].studentName = sName;
-    slots[idx].studentNum  = sNum;
-    if (bkType) slots[idx].bookedType = bkType;  // 있으면 학부모 선택 방식 저장
-    slots[idx].bookedAt    = new Date().toISOString();
-
-    _writeSlots(classKey, slots);
-    return _cjson({ success: true });
-  } catch (err) {
-    return _cjson({ success: false, error: '서버 오류: ' + err.message });
-  } finally {
-    try { lock.releaseLock(); } catch (e2) {}
-  }
-}
-
-
-// ── 4) 내 예약 조회 ──
-function getMyBooking_(e) {
-  try {
-    var classKey = String(e.parameter.classKey || '').trim();
-    var token    = String(e.parameter.token || '').trim();
-    if (!classKey || !token) return _cjson({ success: false, error: '잘못된 요청입니다.' });
-
-    var slots = _readSlots(classKey);
-    for (var i = 0; i < slots.length; i++) {
-      if (slots[i].status === 'booked' && slots[i].token === token) {
-        return _cjson({ success: true, booking: {
-          id: slots[i].id, date: slots[i].date, time: slots[i].time,
-          type: slots[i].type, bookedName: slots[i].bookedName || ''
-        }});
-      }
-    }
-    return _cjson({ success: true, booking: null });
-  } catch (err) {
-    return _cjson({ success: false, error: '서버 오류: ' + err.message });
-  }
-}
-
-
-// ── 5) 예약 취소 (본인 token만) ──
-function cancelBooking_(e) {
-  var lock = LockService.getScriptLock();
-  try {
-    lock.waitLock(10000);
-
-    var classKey = String(e.parameter.classKey || '').trim();
-    var token    = String(e.parameter.token || '').trim();
-    if (!classKey || !token) return _cjson({ success: false, error: '잘못된 요청입니다.' });
-
-    var slots = _readSlots(classKey);
-    var found = false;
-    for (var i = 0; i < slots.length; i++) {
-      if (slots[i].status === 'booked' && slots[i].token === token) {
-        slots[i] = {
-          id: slots[i].id, date: slots[i].date, time: slots[i].time,
-          type: slots[i].type, duration: slots[i].duration, status: 'open'
-        };
-        found = true;
-        break;
-      }
-    }
-    if (!found) return _cjson({ success: false, error: 'NONE' });
-
-    _writeSlots(classKey, slots);
-    return _cjson({ success: true });
-  } catch (err) {
-    return _cjson({ success: false, error: '서버 오류: ' + err.message });
-  } finally {
-    try { lock.releaseLock(); } catch (e2) {}
-  }
-}
-
-
-// ── 학생 명단 / 담임 조회 (Firestore: students/main, appdata/main) ──
-
-// 명렬은 두 문서로 나뉘어 있다(upload.html 의 saveSplit).
-//   students/main        — 학년·반·번호·이름
-//   studentsContact/main — 생년월일·전화 (규칙은 막혀 있고 서비스 계정만 읽는다)
-// 예전에는 students/main 의 s.birth 만 봤는데, 분리 후 그 필드가 사라져
-// 모든 학부모가 인증에 실패했다. 워커(consult-api handleVerify)와 같은 방식으로 고친다.
-// 두 배열은 길이·순서가 같고 grade/room/num 이 양쪽에 다 있다.
-function _findStudent(grade, room, name, birth) {
-  var students = _readDocArray('students/main', 'students');
-  var contact  = _readDocArray('studentsContact/main', 'students');
-  var birthOf = {};
-  for (var c = 0; c < contact.length; c++) {
-    var ct = contact[c];
-    if (ct && ct.birth) {
-      birthOf[parseInt(ct.grade, 10) + '-' + parseInt(ct.room, 10) + '-' + parseInt(ct.num, 10)]
-        = _cnormBirth(ct.birth);
-    }
-  }
-  for (var i = 0; i < students.length; i++) {
-    var s = students[i];
-    var key = parseInt(s.grade, 10) + '-' + parseInt(s.room, 10) + '-' + parseInt(s.num, 10);
-    // 되돌림(KEEP_CONTACT_IN_ROSTER=true)이면 명렬에도 남아 있으므로 그것도 본다
-    var have = _cnormBirth(s.birth) || birthOf[key] || '';
-    if (String(s.grade).trim() === grade
-      && String(parseInt(s.room, 10)) === String(parseInt(room, 10))
-      && String(s.name).trim().replace(/\s+/g, '') === name
-      && have === birth) {
-      return s;
-    }
-  }
-  return null;
-}
-
-function _homeroomOf(classKey) {
-  try {
-    var teachers = _readDocArray('appdata/main', 'teachers');
-    for (var i = 0; i < teachers.length; i++) {
-      if (String(teachers[i].homeroom).trim() === classKey) {
-        return String(teachers[i].name || '').trim();
-      }
-    }
-    return '';
-  } catch (e) { return ''; }
-}
-
-function _cnormBirth(v) {
-  if (v == null) return '';
-  var s = String(v).trim().replace(/[.\/]/g, '-');
-  var p = s.split('-');
-  if (p.length === 3) return p[0] + '-' + ('0' + p[1]).slice(-2) + '-' + ('0' + p[2]).slice(-2);
-  return s;
-}
-
-function _readDocArray(docPath, fieldName) {
-  var cache = CacheService.getScriptCache();
-  var cacheKey = 'arr_' + docPath + '_' + fieldName;
-  var hit = cache.get(cacheKey);
-  if (hit) {
-    try { return JSON.parse(hit); } catch (e) {}
-  }
-
-  var token = _cfsToken();
-  var url = 'https://firestore.googleapis.com/v1/projects/' + _cprojectId()
-          + '/databases/(default)/documents/' + docPath;
-  var res = UrlFetchApp.fetch(url, {
-    method: 'get',
-    headers: { Authorization: 'Bearer ' + token },
-    muteHttpExceptions: true
-  });
-  if (res.getResponseCode() !== 200) {
-    throw new Error('Firestore 읽기 실패(' + docPath + '): ' + res.getResponseCode());
-  }
-  var doc = JSON.parse(res.getContentText());
-  var out = [];
-  if (doc.fields && doc.fields[fieldName] && doc.fields[fieldName].arrayValue) {
-    var arr = doc.fields[fieldName].arrayValue.values || [];
-    out = arr.map(function (v) {
-      var f = (v.mapValue && v.mapValue.fields) || {};
-      var o = {};
-      Object.keys(f).forEach(function (k) { o[k] = _cFsVal(f[k]); });
-      return o;
-    });
-  }
-  try {
-    var str = JSON.stringify(out);
-    if (str.length < 95000) cache.put(cacheKey, str, 60);
-  } catch (e) {}
-  return out;
-}
-
-
-// ── Firestore REST 접근 (서비스계정 JWT) ──
-function _cprojectId() {
-  return PropertiesService.getScriptProperties().getProperty('FIREBASE_PROJECT_ID');
-}
-function _cdocUrl(classKey) {
-  return 'https://firestore.googleapis.com/v1/projects/' + _cprojectId()
-       + '/databases/(default)/documents/consultations/' + encodeURIComponent(classKey);
-}
-
-// ── 예약 오픈 시각 읽기 (consultations/{classKey}.openAt) ──
-function _readOpenAt(classKey) {
-  try {
-    var token = _cfsToken();
-    var res = UrlFetchApp.fetch(_cdocUrl(classKey), {
-      method: 'get',
-      headers: { Authorization: 'Bearer ' + token },
-      muteHttpExceptions: true
-    });
-    if (res.getResponseCode() !== 200) return '';
-    var doc = JSON.parse(res.getContentText());
-    return (doc.fields && doc.fields.openAt && doc.fields.openAt.stringValue) || '';
-  } catch (e) { return ''; }
-}
-
-function _readSlots(classKey) {
-  var token = _cfsToken();
-  var res = UrlFetchApp.fetch(_cdocUrl(classKey), {
-    method: 'get',
-    headers: { Authorization: 'Bearer ' + token },
-    muteHttpExceptions: true
-  });
-  var code = res.getResponseCode();
-  if (code === 404) return [];
-  if (code !== 200) throw new Error('Firestore 읽기 실패: ' + code);
-  var doc = JSON.parse(res.getContentText());
-  return _cFsToSlots(doc);
-}
-
-function _writeSlots(classKey, slots) {
-  var token = _cfsToken();
-  var url = _cdocUrl(classKey) + '?updateMask.fieldPaths=slots&updateMask.fieldPaths=updatedAt';
-  var body = {
-    fields: {
-      slots: _cSlotsToFs(slots),
-      updatedAt: { stringValue: new Date().toISOString() }
-    }
-  };
-  var res = UrlFetchApp.fetch(url, {
-    method: 'patch',
-    contentType: 'application/json',
-    headers: { Authorization: 'Bearer ' + token },
-    payload: JSON.stringify(body),
-    muteHttpExceptions: true
-  });
-  if (res.getResponseCode() !== 200) {
-    throw new Error('Firestore 쓰기 실패: ' + res.getResponseCode() + ' ' + res.getContentText());
-  }
-}
-
-function _cFsToSlots(doc) {
-  if (!doc.fields || !doc.fields.slots || !doc.fields.slots.arrayValue) return [];
-  var arr = doc.fields.slots.arrayValue.values || [];
-  return arr.map(function (v) {
-    var f = v.mapValue.fields || {};
-    var o = {};
-    Object.keys(f).forEach(function (k) { o[k] = _cFsVal(f[k]); });
-    return o;
-  });
-}
-
-function _cSlotsToFs(slots) {
-  return {
-    arrayValue: {
-      values: slots.map(function (s) {
-        var fields = {};
-        Object.keys(s).forEach(function (k) {
-          var val = s[k];
-          if (typeof val === 'number') fields[k] = { integerValue: String(val) };
-          else                         fields[k] = { stringValue: String(val == null ? '' : val) };
-        });
-        return { mapValue: { fields: fields } };
-      })
-    }
-  };
-}
-
-function _cFsVal(v) {
-  if (v.stringValue  !== undefined) return v.stringValue;
-  if (v.integerValue !== undefined) return parseInt(v.integerValue, 10);
-  if (v.doubleValue  !== undefined) return v.doubleValue;
-  if (v.booleanValue !== undefined) return v.booleanValue;
-  if (v.nullValue    !== undefined) return null;
-  return '';
-}
-
-function _cfsToken() {
-  var cache = CacheService.getScriptCache();
-  var hit = cache.get('fs_token');
-  if (hit) return hit;
-
-  var saJson = PropertiesService.getScriptProperties().getProperty('FIREBASE_SA_JSON');
-  if (!saJson) throw new Error('FIREBASE_SA_JSON 스크립트 속성이 없습니다.');
-  var sa = JSON.parse(saJson);
-
-  var now = Math.floor(Date.now() / 1000);
-  var header = { alg: 'RS256', typ: 'JWT' };
-  var claim = {
-    iss: sa.client_email,
-    scope: 'https://www.googleapis.com/auth/datastore',
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600
-  };
-  var toSign = _cb64u(JSON.stringify(header)) + '.' + _cb64u(JSON.stringify(claim));
-  var sig = Utilities.computeRsaSha256Signature(toSign, sa.private_key);
-  var jwt = toSign + '.' + _cb64u(sig);
-
-  var res = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
-    method: 'post',
-    payload: {
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt
-    },
-    muteHttpExceptions: true
-  });
-  if (res.getResponseCode() !== 200) {
-    throw new Error('토큰 발급 실패: ' + res.getContentText());
-  }
-  var token = JSON.parse(res.getContentText()).access_token;
-  cache.put('fs_token', token, 300);
-  return token;
-}
-
-function _cb64u(data) {
-  var bytes = (typeof data === 'string')
-    ? Utilities.newBlob(data).getBytes()
-    : data;
-  return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/, '');
-}
-
-function _csha256(str) {
-  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, str, Utilities.Charset.UTF_8);
-  return bytes.map(function (b) {
-    var v = (b < 0 ? b + 256 : b).toString(16);
-    return v.length === 1 ? '0' + v : v;
-  }).join('');
-}
-
-function _ctoday() {
-  var d = new Date();
-  var kst = new Date(d.getTime() + 9 * 3600 * 1000);
-  return kst.toISOString().slice(0, 10);
-}
-
-function _cjson(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}
