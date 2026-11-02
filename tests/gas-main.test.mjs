@@ -246,7 +246,9 @@ console.log('\n[부르는 쪽]');
 const ROOT = new URL('..', import.meta.url);
 const IDX = fs.readFileSync(new URL('index.html', ROOT), 'utf8');
 const PARENT = fs.readFileSync(new URL('parent.html', ROOT), 'utf8');
-const SUM = fs.readFileSync(new URL('scripts/summarize.js', ROOT), 'utf8');
+// 요약·학사일정 작업(scripts/)은 test 저장소에만 있다 — 운영(ynhs)에서는 그 검사를 건너뛴다
+const readIf = rel => fs.existsSync(new URL(rel, ROOT)) ? fs.readFileSync(new URL(rel, ROOT), 'utf8') : null;
+const SUM = readIf('scripts/summarize.js'), SCRAPE = readIf('scripts/scrape-weekly.js');
 const grab = (src, name) => {
   const m = new RegExp(`^(?:async )?function ${name}\\(`, 'm').exec(src);
   if (!m) throw new Error('못 찾음: ' + name);
@@ -296,10 +298,13 @@ const PARENT_CODE = PARENT.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n
 check('학부모 화면 — Apps Script 예비 경로(?worker=0)가 없다, 워커만', !/script\.google\.com|USE_WORKER|callGas|worker=0/.test(PARENT_CODE)
   && /const WORKER_URL = 'https:\/\/consult-api\./.test(PARENT));
 {
-  const ids = [IDX, PARENT, SUM, fs.readFileSync(new URL('scripts/scrape-weekly.js', ROOT), 'utf8')]
+  const ids = [IDX, PARENT, SUM, SCRAPE].filter(Boolean)
     .flatMap(t => [...t.matchAll(/script\.google\.com\/macros\/s\/([A-Za-z0-9_-]+)\/exec/g)].map(m => m[1]));
-  check('앱·요약·학사일정이 부르는 Apps Script 배포가 하나뿐(…C0YA) — 나머지는 보관처리해도 된다', ids.length >= 4
+  check(`${SUM ? '앱·요약·학사일정' : '앱'}이 부르는 Apps Script 배포가 하나뿐(…C0YA) — 나머지는 보관처리해도 된다`, ids.length >= (SUM ? 4 : 2)
     && new Set(ids).size === 1 && ids[0].endsWith('C0YA'), [...new Set(ids)].map(x => x.slice(0, 14) + '…' + x.slice(-4)));
+}
+if (!SUM) console.log('  (요약 작업 scripts/summarize.js 는 test 저장소에만 있어 건너뜀)');
+else {
   const weeklyBody = new Function(grab(SUM, 'weeklyBody') + '\nreturn weeklyBody;')();
   const raw = '===NAV===\n' + Array.from({ length: 40 }, (_, i) => SITE + '/week-' + i).join('\n') + '\n===CONTENT===\n<h1>주간 교육활동</h1><p>11월 2일 행사</p>';
   check('요약 작업 — 주차 링크 목록은 떼고 본문만 Gemini 에(4000자를 링크가 먹지 않게)', weeklyBody(raw).trim().startsWith('<h1>주간 교육활동')
