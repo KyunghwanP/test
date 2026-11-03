@@ -218,6 +218,10 @@
         .elig-chip.active .n { background: #fff; color: var(--indigo); }
         .elig-tip { flex-basis: 100%; margin: 0 0 0 16px; font-size: 11.5px; color: var(--slate-400); line-height: 1.5; }
         .elig-tip b { color: var(--indigo); }
+        .region-row { margin-top: 2px; }
+        .elig-chip.zero:not(.active) { opacity: .45; }
+        .elig-chip.all-chip.active { background: var(--slate-800); border-color: var(--slate-800); }
+        .elig-chip.all-chip.active .n { color: var(--slate-800); }
         .filter-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
         @media (min-width: 768px) { .filter-grid { grid-template-columns: 1fr 1fr; } }
         .filter-grid label { display: block; font-size: 11.5px; font-weight: 900; color: var(--slate-400); text-transform: uppercase; letter-spacing: .15em; margin: 0 0 8px 16px; }
@@ -703,6 +707,11 @@
                 <div class="elig-chips" id="elig-chips"></div>
                 <p class="elig-tip">처음엔 <b>일반</b>만 보입니다. 농어촌·기회균형 등 자격이 있는 학생은 해당 단추를 더 누르세요. 전형명으로 가른 것이라 지원 자격은 모집요강에서 꼭 확인하세요.</p>
             </div>
+            <div class="elig-row region-row">
+                <span class="elig-k">지역</span>
+                <div class="elig-chips" id="region-chips"></div>
+                <p class="elig-tip">대학이 있는 시·도로 거릅니다. 여러 곳을 함께 고를 수 있고, <b>전체</b>를 누르면 풀립니다. 예: 대구·경북 지역인재전형은 <b>대구</b>·<b>경북</b>을 켜고 학과·전형 검색에 <b>지역인재</b>.</p>
+            </div>
 
             <div class="filter-grid">
                 <div>
@@ -843,6 +852,7 @@
         let showAmbitious = true;
         let admissionKind = '교과';           // 학생부 전형 구분: '교과' | '종합' (스위치 토글)
         let eligSel = new Set(['일반']);       // 지원 자격 단추 — 처음엔 일반만. 학생을 바꾸면 일반만으로 되돌린다
+        let regionSel = new Set();             // 지역 단추 — 비면 전체. 학생을 바꿔도 그대로 둔다(상담하는 지역은 같다)
         let susiMincut = {};                    // 대학코드(int문자열) → 수능최저 규칙 배열
         let currentFiltered = [];              // 현재 필터 결과 (모달·더 보기에서 참조)
         let visibleCount = 150;
@@ -857,6 +867,9 @@
             { id: 'gwangju', name: '광주시 교육청 버전', desc: '광주시 교육청 버전' },
             { id: 'mixed', name: '통합 분석 버전', desc: '경기/부산/광주시 평균' },
         ];
+        // 지역 단추 — CSV 맨 끝 '지역' 칸(대학이 있는 시·도) 값. 행정구역 순서
+        const REGIONS = ['서울', '경기', '인천', '강원', '대전', '세종', '충북', '충남',
+                         '대구', '경북', '부산', '울산', '경남', '광주', '전북', '전남', '제주'];
         const CATEGORIES = [
             { id: '전체', emoji: '🔍' }, { id: '인문', emoji: '📖' }, { id: '사회', emoji: '🤝' },
             { id: '자연', emoji: '🌿' }, { id: '공학', emoji: '⚙️' }, { id: '의약', emoji: '🏥' },
@@ -969,7 +982,7 @@
         }
 
         // 컬럼: 조회연도,대학명,대학코드,전형명,구분,모집단위,모집인원_최초,모집인원_이월,모집인원_총,경쟁률,충원인원,환산점수_50,환산점수_70,환산등급_50,환산등급_70
-        //       ,지역 (16번째 — 대학별 시·도. 여기선 안 쓴다. 2024·2025학년도 경쟁률과 함께 다른 어디가 자료에서 옮겨 채움)
+        //       ,지역 (16번째 — 대학별 시·도. 지역 단추가 쓴다. 2024·2025학년도 경쟁률과 함께 다른 어디가 자료에서 옮겨 채움)
         // 같은 학과(대학코드|전형명|모집단위)를 3개 조회연도에 걸쳐 하나로 묶는다.
         // averageGrade = 사용 가능한 연도들의 환산등급_70 평균 (필터·정렬·차이표시 기준)
         // 원자료에서 가운뎃점(·)이 ? 로 깨져 있다(768행 — '도시계획?조경학부', '건축 ? 토목 ? 환경공학부').
@@ -1004,6 +1017,7 @@
                         kind: admName.includes('교과') ? '교과' : (admName.includes('종합') ? '종합' : '기타'),
                         elig: eligibilityOf(admName),
                         uniCode: cols[2], type: cols[4], years: {},
+                        region: (cols[15] || '').trim(),
                     };
                     groups.set(key, rec);
                 }
@@ -1068,8 +1082,9 @@
             const m = t.match(/^(.+?)교대$/); if (m) return m[1] + '교육대';   // OO교대 → OO교육대(학교)
             return t;
         }
-        function baseFilter(record, bounds, ignoreElig) {
+        function baseFilter(record, bounds, ignoreElig, ignoreRegion) {
             if (!ignoreElig && !eligSel.has(record.elig)) return false;
+            if (!ignoreRegion && regionSel.size && !regionSel.has(record.region)) return false;
             const kindMatch = record.kind === '기타' || record.kind === admissionKind;
             const uni = record.university.toLowerCase();
             const uqRaw = selectedUniversity.trim().toLowerCase();
@@ -1303,10 +1318,17 @@
             render();
         }
         function addElig(id) { eligSel.add(id); render(); }
+        // 지역 단추 — 여러 개를 함께 고른다. 다 끄면(또는 '전체') 지역으로 거르지 않는다
+        function toggleRegion(id) {
+            if (regionSel.has(id)) regionSel.delete(id); else regionSel.add(id);
+            render();
+        }
+        function clearRegion() { regionSel = new Set(); render(); }
         window.resetElig = function() { eligSel = new Set(['일반']); if (allRecords.length) render(); };
         function resetFilters() {
             selectedUniversity = ''; selectedCategory = '전체'; searchQuery = '';
             searchRange = 0.3; showAmbitious = true; admissionKind = '교과'; eligSel = new Set(['일반']);
+            regionSel = new Set();
             document.getElementById('search-input').value = '';
             document.getElementById('uni-input').value = '';
             document.getElementById('ambitious-toggle').checked = true;
@@ -1389,6 +1411,19 @@
                 return `<button type="button" class="elig-chip ${on ? 'active' : ''}" aria-pressed="${on}" onclick="toggleElig('${g.id}')">${on ? '✓ ' : ''}${g.label}<span class="n">${n.toLocaleString()}</span></button>`;
             }).join('');
 
+            // 지역 단추 (개수 = 지역만 빼고 지금 조건 그대로일 때 그 지역에 해당하는 수)
+            const regionPool = allRecords.filter(r => baseFilter(r, bounds, false, true) &&
+                (selectedCategory === '전체' || r.category === selectedCategory));
+            const regionCounts = {};
+            regionPool.forEach(r => { regionCounts[r.region] = (regionCounts[r.region] || 0) + 1; });
+            const allOn = !regionSel.size;
+            document.getElementById('region-chips').innerHTML =
+                `<button type="button" class="elig-chip all-chip ${allOn ? 'active' : ''}" aria-pressed="${allOn}" onclick="clearRegion()">${allOn ? '✓ ' : ''}전체<span class="n">${regionPool.length.toLocaleString()}</span></button>` +
+                REGIONS.map(g => {
+                    const on = regionSel.has(g), n = regionCounts[g] || 0;
+                    return `<button type="button" class="elig-chip ${on ? 'active' : ''}${n ? '' : ' zero'}" aria-pressed="${on}" onclick="toggleRegion('${g}')">${on ? '✓ ' : ''}${g}<span class="n">${n.toLocaleString()}</span></button>`;
+                }).join('');
+
             // 범위 탭 / 라벨
             const rangeText = searchRange === 'all' ? '전체' : '±' + searchRange.toFixed(2);
             // 소신 지원을 켜면 위(상향)로 더 넓어진다 — 숫자만 ±0.10 이라 실제 범위와 달라 보였다
@@ -1429,7 +1464,7 @@
                            r.department.toLowerCase().includes(raw) || r.admissionName.toLowerCase().includes(raw); };
                 const inB = r => r.averageGrade >= bounds.lower && r.averageGrade <= bounds.upper;
                 const other = admissionKind === '교과' ? '종합' : '교과';
-                const termRecs = allRecords.filter(r => eligSel.has(r.elig) && matchTerm(r));
+                const termRecs = allRecords.filter(r => eligSel.has(r.elig) && (!regionSel.size || regionSel.has(r.region)) && matchTerm(r));
                 const curAll = termRecs.filter(r => r.kind === '기타' || r.kind === admissionKind);
                 const curInB = curAll.filter(inB);
                 const otherAll = termRecs.filter(r => r.kind === other);
@@ -1452,6 +1487,13 @@
                 if (off.length) hintHtml = `지금 고른 지원 자격(${ELIG_GROUPS.filter(g => eligSel.has(g.id)).map(g => g.label).join('·')})에는 없지만, 다른 자격 전형에는 있어요.
                     <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px;">${off.map(g =>
                         `<button class="expand-btn" style="margin:0;padding:10px 16px;" onclick="addElig('${g.id}')">${g.label} 켜기 (${eligCounts[g.id]}건)</button>`).join('')}</div>`;
+            }
+            // 그래도 없고, 고른 지역 밖에만 결과가 있으면 → 지역을 풀 수 있게 알려 준다
+            if (!currentFiltered.length && !hintHtml && regionSel.size && regionPool.length) {
+                const top = Object.entries(regionCounts).sort((a, b) => b[1] - a[1]).slice(0, 3)
+                    .map(([g, n]) => `${g} ${n.toLocaleString()}건`).join(' · ');
+                hintHtml = `지금 고른 지역(${REGIONS.filter(g => regionSel.has(g)).join('·')})에는 없지만, 다른 지역에는 <b>${regionPool.length.toLocaleString()}건</b> 있어요 (${top}).
+                    <button class="expand-btn" style="margin-top:10px;" onclick="clearRegion()">지역 전체로 보기</button>`;
             }
             if (kindHint) { kindHint.style.display = hintHtml ? 'block' : 'none'; if (hintHtml) kindHint.innerHTML = hintHtml; }
             if (rangeHint) rangeHint.style.display = hintHtml ? 'none' : 'block';
@@ -1527,7 +1569,7 @@
                                 <span class="diag-badge ${d.cls}${d.uncertain ? ' uncertain' : ''}">${d.label}${d.uncertain ? ' <span class="diag-edge">경계</span>' : ''}</span>
                             </div>` : ''}
                             <h3 class="serif">${r.university}</h3>
-                            <p class="campus-txt">${r.campus}</p>
+                            <p class="campus-txt">${r.campus}${r.region ? ' · ' + r.region : ''}</p>
                         </div>
                         <div class="avg-box"><p class="k">${cutLabel(r)}</p><p class="v">${r.averageGrade.toFixed(2)}</p><div class="gap-box ${gap.cls}"><span class="arr">${gap.arrow}</span>${gap.text}</div></div>
                     </div>
@@ -1577,7 +1619,7 @@
                 const q = lastNum(r, 'quotaTotal'), cp = lastNum(r, 'competition');
                 const cell = {
                     diag: d ? `<span class="diag-badge ${d.cls}${d.uncertain ? ' uncertain' : ''}">${d.label}</span>` : dim,
-                    univ: `${r.university}<span class="cp">${r.campus}</span>`,
+                    univ: `${r.university}<span class="cp">${r.campus}${r.region ? ' · ' + r.region : ''}</span>`,
                     dept: r.department,
                     adm: r.admissionName,
                     cat: r.category,
@@ -1631,7 +1673,7 @@
                 if (yearCut(r, latest) == null) few.push('최근 미공개');
                 return `<div class="bar-row" onclick="openDetail(${idx})">
                     <div class="bar-name">
-                        <div class="u">${r.university}<span class="cp">${r.campus}</span>${d ? `<span class="lab ${d.cls}">${d.label}</span>` : ''}</div>
+                        <div class="u">${r.university}<span class="cp">${r.campus}${r.region ? ' · ' + r.region : ''}</span>${d ? `<span class="lab ${d.cls}">${d.label}</span>` : ''}</div>
                         <div class="d">${r.department} · ${r.admissionName}</div>
                         ${few.length ? `<div class="few">${few.join(' · ')}</div>` : ''}
                     </div>
@@ -1701,7 +1743,7 @@
                 `<span class="cat-badge">${r.category}</span>
                  <span class="cat-badge">${r.type}</span>`;
             document.getElementById('dm-uni').textContent = r.university;
-            document.getElementById('dm-campus').textContent = r.campus;
+            document.getElementById('dm-campus').textContent = r.campus + (r.region ? ' · ' + r.region : '');
             document.getElementById('dm-dept').textContent = r.department;
             document.getElementById('dm-adm').textContent = r.admissionName;
             const myG = getTargetGrade();
