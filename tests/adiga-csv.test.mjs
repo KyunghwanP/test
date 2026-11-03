@@ -7,6 +7,13 @@
 //   · 짝(전형명 표기가 서로 다르다)이 확실할 때만 채운다. 정답을 아는 2026학년도로
 //     같은 방법을 돌려 21,332건 중 오답 0건을 확인했다. 애매하면 비워 둔다
 //
+// 경북대 2025학년도(조회 2026)는 어디가 자료에 통째로 없었다(2024학년도도 등급이 전부 0).
+// 경북대 입학처 '2025학년도 전형 결과' 엑셀에서 옮긴 515행을 더했다(2026-11). 옮길 때:
+//   · 원본 엑셀 → 대응표 → 결과 CSV 를 한 칸씩 대조해 515행 모두 일치를 확인했다
+//   · 등급은 원본의 '입학자 학생부 등급' 50%·70%, 충원은 '추합최종번호'(어디가 충원합격순위와 같은 뜻)
+//   · 환산점수는 비웠다 — 원본의 '반영점수(500점)' 는 어디가 환산점수와 다른 값이다
+//   · 논술·실기 시트는 넣지 않았다(다른 해에도 없다). 기존 줄은 한 칸도 안 바꿨다
+//
 // 어디가에서 CSV 를 새로 받아 통째로 덮으면 이 두 가지가 조용히 사라진다.
 // 이 검사가 그때 알려 준다 — 덮기 전에 다시 채울지 정할 것.
 import { chromium } from 'playwright';
@@ -30,20 +37,31 @@ const pg = await b.newPage();
 await pg.setContent('<body>');
 const SY = /const SURVEY_YEARS = \[[^\]]+\];/.exec(H)[0];
 const ER = /const ELIG_RULES = \[[\s\S]*?\n\s*\];/.exec(H)[0];   // parseCSV 가 전형마다 지원 자격(elig)을 붙인다
-await pg.addScriptTag({ content: SY + ER + grab('eligibilityOf') + grab('categorizeDepartment') + grab('parseCSVLine') + grab('parseCSV') });
+await pg.addScriptTag({ content: SY + ER + grab('eligibilityOf') + grab('fixDot') + grab('gradeVal') + grab('categorizeDepartment') + grab('parseCSVLine') + grab('parseCSV') });
 const r = await pg.evaluate(csv => {
   const recs = parseCSV(csv);
   const has = (x, y) => x.years[y] && parseFloat(x.years[y].competition) > 0;
   const find = (u, d, a) => recs.find(x => x.university === u && x.department === d && x.admissionName.includes(a));
   const g = find('가천대학교', '물리치료학과', '지역균형');
-  return { n: recs.length, y24: recs.filter(x => has(x, '2025')).length, y25: recs.filter(x => has(x, '2026')).length,
+  const knu = recs.filter(x => x.university === '경북대학교');
+  const kg = knu.find(x => x.department === '국어국문학과' && x.admissionName === '학생부교과(교과우수자전형)');
+  const knuInfo = { n: knu.length, two: knu.filter(x => x.yearCount === 2).length,
+                    y25: knu.filter(x => x.years['2026'] && x.years['2026'].grade70 != null).length,
+                    kg: kg && { g25: kg.years['2026'] && kg.years['2026'].grade70, c25: kg.years['2026'] && kg.years['2026'].competition, w25: kg.years['2026'] && kg.years['2026'].waitlist } };
+  return { knuInfo, n: recs.length, y24: recs.filter(x => has(x, '2025')).length, y25: recs.filter(x => has(x, '2026')).length,
            y26: recs.filter(x => has(x, '2027')).length, g: g && Object.fromEntries(Object.entries(g.years).map(([y, v]) => [y, v.competition])) };
 }, CSV);
 await b.close();
 
 console.log('\n■ 진단 페이지가 읽는 결과');
-check('학과 묶음 수는 그대로 (채우기 전 19,759)', r.n === 19759, r.n);
-check('2026학년도 경쟁률은 원래 것 그대로', r.y26 === 18383, r.y26);
+// 경북대 2025학년도를 더하자 2026학년도 등급이 미제출이라 빠져 있던 경북대 28곳이 살아났다
+check('학과 묶음 수 (채우기 전 19,759 + 경북대 28)', r.n === 19787, r.n);
+check('2026학년도 경쟁률은 원래 것 그대로 (+ 위 경북대 28)', r.y26 === 18411, r.y26);
+console.log('\n■ 경북대 2025학년도 (경북대 입학처 원자료)');
+check('경북대 2025학년도 수시 515행', (CSV.match(/^2026,경북대학교\[본교\],/gm) || []).length === 515);
+check('진단에 나오는 경북대 329곳 (전 301)', r.knuInfo.n === 329, r.knuInfo);
+check('그중 280곳이 2년치가 됐다', r.knuInfo.two === 280, r.knuInfo);
+check('원본 대조 한 건 — 국어국문 교과우수: 70%컷 2.96 · 경쟁률 11.8 · 추합 6', r.knuInfo.kg && r.knuInfo.kg.g25 === 2.96 && r.knuInfo.kg.c25 === '11.8' && r.knuInfo.kg.w25 === '6', r.knuInfo.kg);
 check('2024학년도 경쟁률이 있다 (채운 것 8,581)', r.y24 >= 8500, r.y24);
 check('2025학년도 경쟁률이 있다 (채운 것 11,226)', r.y25 >= 11000, r.y25);
 // 어디가 공개값과 대조한 한 건: 2024 12.8 · 2025 38.5 · 2026 21
