@@ -87,8 +87,8 @@ check('최근 7일 모달에 누적 경고를 함께 넘긴다',
       /const warns = ptsWarnStudents\(ptsViewData, room, grade\)/.test(HTML)
       && /renderPtsNewModal\(hr, within, title, [^,]+, warns\)/.test(HTML));
 check('선도관심은 명렬에 있는 학생만 (전출·자퇴가 계속 뜨던 자리)',
-      /if \(roster && !roster\.names\.has\(ptsRosterKey\(s\)\)\) continue;/.test(HTML));
-// 실제로 '김태형 3-10-04' 이 선도관심에 두 줄로 떴다. 원인은 자료를 두 번 담은 것.
+      /짝이 없으면 뺀다 — 전출·자퇴[^\n]*\n\s*return out\.filter\(Boolean\);/.test(HTML));
+// 실제로 선도관심에 같은 학생이 두 줄로 떴다. 원인은 자료를 두 번 담은 것.
 check('불러오기가 두 번 돌지 않는다 (같은 학생이 두 줄로 뜨던 원인)',
       /if \(ptsViewLoading\) return ptsViewLoading;/.test(HTML) &&
       /ptsViewLoading = _loadPtsViewData\(\)\.finally/.test(HTML));
@@ -101,7 +101,7 @@ check('조회 자료 자체를 명렬로 거른다 (통계·목록·검색이 �
 check('거르는 것이 통계를 그리기 전이다',
       HTML.indexOf('ptsViewData = ptsOnRoster(rows,') < HTML.indexOf('ptsViewLoaded = true;'));
 check('배지 쪽도 명렬을 읽고 나서 그린다',
-      /ensurePtsRoster\(\)\.then\(\(\) => renderHomeroomPtsBadge/.test(HTML));
+      /ensurePtsRoster\(\)\.then\(\(\) => \{\s*const students = ptsOnRoster\(raw, ptsRosterSet\(allStudents\)\);\s*renderHomeroomPtsBadge\(hr, room, students\);/.test(HTML));
 check('조회 화면도 명렬을 같이 읽는다', /await ensurePtsRoster\(\);/.test(HTML));
 check('그 주에 아무것도 없을 때만 이전 것으로 물러난다',
       /if \(within\.length\)[\s\S]{0,200}ptsRecentEntries\([\s\S]{0,80}PTS_FALLBACK_LIMIT\)/.test(HTML));
@@ -644,18 +644,18 @@ console.log('\n■ 선도관심학생 — 전출·자퇴한 학생은 뺀다');
   const spaced = await warn([{ grade:1, room:1, num:3, name:'김 하나', total:-7 }], ROSTER);
   check('이름의 공백은 무시한다', spaced.length === 1, spaced);
 
-  // 화면에서 실제로 본 것: '김태형 3-10-04 · 벌점22' 이 똑같이 두 줄.
+  // 화면에서 실제로 본 것: 같은 학생 한 명이 똑같이 두 줄.
   // 자료를 두 번 담아 그렇다. 담는 쪽을 고쳤지만 여기서도 한 번 더 막는다.
   const dup = (rows, roster) => pg.evaluate(a =>
     window.ptsOnRoster(a[0], window.ptsRosterSet(a[1])).map(s => s.name + '/' + s.num), [rows, roster]);
-  const KT = { grade:3, room:10, num:4, name:'김태형', total:-12 };
-  const R3 = [{ grade:3, room:10, num:4, name:'김태형' },
-              { grade:3, room:10, num:5, name:'김태형' },   // 동명이인, 다른 자리
-              { grade:3, room:7,  num:23, name:'정찬영' }];
+  const KT = { grade:3, room:2, num:4, name:'아두번', total:-12 };
+  const R3 = [{ grade:3, room:2, num:4, name:'아두번' },
+              { grade:3, room:2, num:5, name:'아두번' },   // 동명이인, 다른 자리
+              { grade:3, room:6,  num:12, name:'자다른' }];
   check('같은 학생이 두 번 들어오면 한 줄만',
-        (await dup([KT, { ...KT }], R3)).join() === '김태형/4', await dup([KT, { ...KT }], R3));
+        (await dup([KT, { ...KT }], R3)).join() === '아두번/4', await dup([KT, { ...KT }], R3));
   check('동명이인은 자리가 달라 둘 다 남는다',
-        (await dup([KT, { ...KT, num:5 }], R3)).join() === '김태형/4,김태형/5',
+        (await dup([KT, { ...KT, num:5 }], R3)).join() === '아두번/4,아두번/5',
         await dup([KT, { ...KT, num:5 }], R3));
   check('명렬이 없어도 겹치는 것은 줄인다',
         (await dup([KT, { ...KT }], [])).length === 1, await dup([KT, { ...KT }], []));
@@ -671,6 +671,76 @@ console.log('\n■ 선도관심학생 — 전출·자퇴한 학생은 뺀다');
   const strNum = await warn([{ grade:'1', room:'1', num:'3', name:'김하나', total:-7 }], ROSTER);
   check('숫자가 글자로 와도 같은 사람', strNum.length === 1, strNum);
 }
+
+console.log('\n■ 반별 인원이 명렬과 같다 — 2026-11 신고: 1-5 27(명렬 26)·1-9 24(25)·2-11 30(29)·3-4 28(27)');
+{
+  // 지어낸 이름. 반마다 명렬과 리로가 같은 학생을 같은 자리로 갖고 시작한다.
+  const nm = (g, r, n) => `가${g}${String(r).padStart(2,'0')}${String(n).padStart(2,'0')}`;
+  const ROSTER = [], RIRO = [];
+  const fill = (g, r, cnt) => { for (let n = 1; n <= cnt; n++) {
+    ROSTER.push({ grade:g, room:r, num:n, name:nm(g, r, n) });
+    RIRO.push({ grade:g, room:r, num:n, name:nm(g, r, n), total:0, merit:0, demerit:0, deducted:0, records:[] });
+  } };
+  fill(1, 5, 26); fill(1, 9, 24); fill(2, 3, 28); fill(2, 11, 29); fill(3, 4, 27);
+  // ① 반을 옮긴 학생 — 명렬은 1-9 25번, 리로는 아직 1-5 27번
+  ROSTER.push({ grade:1, room:9, num:25, name:'나반옮김' });
+  RIRO.push({ grade:1, room:5, num:27, name:'나반옮김', total:-6, merit:0, demerit:-6, deducted:0,
+              records:[{ date:'10/15', detail:'무단지각 -3' }] });
+  // ② 전출한 학생 — 리로에만 2-11 30번으로 남았는데, 2-3 에 같은 이름의 재학생이 있다
+  ROSTER.push({ grade:2, room:3, num:29, name:'다같은이름' });
+  RIRO.push({ grade:2, room:3, num:29, name:'다같은이름', total:0 });
+  RIRO.push({ grade:2, room:11, num:30, name:'다같은이름', total:-12 });
+  // ③ 전출했는데 다른 학년에 같은 이름이 있다 — 3-4 28번, 명렬에는 1-5 에만
+  ROSTER.push({ grade:1, room:5, num:27, name:'라학년다름' });
+  RIRO.push({ grade:1, room:5, num:28, name:'라학년다름', total:0 });
+  RIRO.push({ grade:3, room:4, num:28, name:'라학년다름', total:-8 });
+
+  const counts = list => list.reduce((m, s) => (m[`${s.grade}-${s.room}`] = (m[`${s.grade}-${s.room}`] || 0) + 1, m), {});
+  const want = counts(ROSTER);
+  const got = await pg.evaluate(a => window.ptsOnRoster(a[0], window.ptsRosterSet(a[1])), [RIRO, ROSTER]);
+  const have = counts(got);
+  for (const k of ['1-5', '1-9', '2-3', '2-11', '3-4'])
+    check(`${k}반 인원이 명렬과 같다 (${want[k]}명)`, have[k] === want[k], { 명렬: want[k], 상벌점: have[k] });
+  check('학년 합계도 같다', got.length === ROSTER.length, { 명렬: ROSTER.length, 상벌점: got.length });
+  const mv = got.find(s => s.name === '나반옮김');
+  check('반을 옮긴 학생은 명렬의 반·번호로 보인다', mv && mv.room === 9 && mv.num === 25, mv);
+  check('옮긴 학생의 점수·이력은 그대로 따라간다', mv && mv.total === -6 && mv.records.length === 1, mv);
+  check('전출생의 벌점이 같은 이름 재학생에게 붙지 않는다',
+        got.filter(s => s.name === '다같은이름').map(s => `${s.room}/${s.total}`).join() === '3/0',
+        got.filter(s => s.name === '다같은이름'));
+  check('다른 학년 동명이인으로도 살아남지 않는다',
+        got.filter(s => s.name === '라학년다름').map(s => `${s.grade}-${s.room}/${s.total}`).join() === '1-5/0',
+        got.filter(s => s.name === '라학년다름'));
+  // 담임 배지·선도관심 — 명렬의 1-9 담임에게 옮겨 온 학생이 보여야 한다
+  const w19 = await pg.evaluate(a =>
+    window.ptsWarnStudents(a[0], 9, 1, -5, window.ptsRosterSet(a[1])).map(s => s.name), [RIRO, ROSTER]);
+  check('1-9 선도관심에 옮겨 온 학생이 뜬다', w19.join() === '나반옮김', w19);
+  const w15 = await pg.evaluate(a =>
+    window.ptsWarnStudents(a[0], 5, 1, -5, window.ptsRosterSet(a[1])).map(s => s.name), [RIRO, ROSTER]);
+  check('1-5 에는 더 이상 안 뜬다', w15.length === 0, w15);
+  // 같은 학년에 같은 이름 둘 다 자리가 안 맞으면 누구인지 모른다 — 지우지 않고 리로 자리 그대로 둔다
+  const amb = await pg.evaluate(a => window.ptsOnRoster(a[0], window.ptsRosterSet(a[1])).map(s => `${s.room}/${s.num}`),
+    [[{ grade:1, room:2, num:7, name:'마둘' }],
+     [{ grade:1, room:3, num:1, name:'마둘' }, { grade:1, room:4, num:1, name:'마둘' }]]);
+  check('누구인지 모르면 지우지도 옮기지도 않는다', amb.join() === '2/7', amb);
+  // 전출생(2-11)이 리로 순서상 먼저 와도, 같은 반에서 번호만 다른 재학생이 제 자리를 차지한다
+  const order = await pg.evaluate(a => window.ptsOnRoster(a[0], window.ptsRosterSet(a[1])).map(s => `${s.room}/${s.num}/${s.total}`),
+    [[{ grade:2, room:11, num:30, name:'바순서', total:-12 }, { grade:2, room:3, num:28, name:'바순서', total:-1 }],
+     [{ grade:2, room:3, num:29, name:'바순서' }]]);
+  check('같은 반의 번호만 다른 줄이 먼저 짝을 찾는다', order.join() === '3/29/-1', order);
+  // 명렬의 같은 이름 둘 중 한 명의 줄이 두 번 들어와도, 두 번째 줄을 다른 사람에게 붙이지 않는다
+  const twice = await pg.evaluate(a => window.ptsOnRoster(a[0], window.ptsRosterSet(a[1])).map(s => `${s.num}/${s.total}`),
+    [[{ grade:3, room:10, num:4, name:'사겹침', total:-12 }, { grade:3, room:10, num:4, name:'사겹침', total:-12 }],
+     [{ grade:3, room:10, num:4, name:'사겹침' }, { grade:3, room:10, num:5, name:'사겹침' }]]);
+  check('두 번 담긴 줄이 동명이인 자리로 가지 않는다', twice.join() === '4/-12', twice);
+}
+
+console.log('\n■ 종합검색·상벌점 상세도 같은 대조를 쓴다 (정적)');
+check('조회 자료를 명렬 자리로 맞춘다', /ptsViewData = ptsOnRoster\(rows, ptsRosterSet\(allStudents\)\);/.test(HTML));
+check('담임 배지도 명렬 자리로 맞춘 뒤 센다',
+      /const students = ptsOnRoster\(raw, ptsRosterSet\(allStudents\)\);/.test(HTML));
+check('종합검색의 상벌점도 명렬 자리로 찾는다 (학번만으로 찾으면 남의 점수가 붙는다)',
+      /ptsOnRoster\(ptsRows, ptsRosterSet\(allStudents\)\)\.forEach\(p => spotPts\.set\(spotKey\(p\), p\)\)/.test(HTML));
 
 console.log(errs.length ? '\n❌ 런타임 오류:\n' + errs.slice(0,4).join('\n') : '\n✅ 런타임 오류 없음');
 console.log(`\n${fail || errs.length ? '❌' : '✅'} 통과 ${pass} / 실패 ${fail}`);
