@@ -37,7 +37,9 @@ const pg = await b.newPage();
 await pg.setContent('<body>');
 const SY = /const SURVEY_YEARS = \[[^\]]+\];/.exec(H)[0];
 const ER = /const ELIG_RULES = \[[\s\S]*?\n\s*\];/.exec(H)[0];   // parseCSV 가 전형마다 지원 자격(elig)을 붙인다
-await pg.addScriptTag({ content: SY + ER + grab('eligibilityOf') + grab('fixDot') + grab('gradeVal') + grab('categorizeDepartment') + grab('parseCSVLine') + grab('parseCSV') });
+// parseCSV 가 다른 시·도 캠퍼스 학과의 캠퍼스·지역을 바로잡는다(경북대 상주 등)
+const CF = /const CAMPUS_FIX = \{[\s\S]*?\n\s*\};/.exec(H)[0] + /const campusKey = .*\n/.exec(H)[0] + /const CAMPUS_FIX_SET = .*\n/.exec(H)[0];
+await pg.addScriptTag({ content: SY + ER + CF + grab('campusFixOf') + grab('eligibilityOf') + grab('fixDot') + grab('gradeVal') + grab('categorizeDepartment') + grab('parseCSVLine') + grab('parseCSV') });
 const r = await pg.evaluate(csv => {
   const recs = parseCSV(csv);
   const has = (x, y) => x.years[y] && parseFloat(x.years[y].competition) > 0;

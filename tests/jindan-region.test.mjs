@@ -7,7 +7,7 @@
 //   · CSV 의 모든 묶음에 지역이 붙고, 그 값이 단추 17개 안에 든다
 //   · 처음엔 '전체' — 지역으로 거르지 않는다
 //   · 대구를 누르면 대구만, 경북을 더 누르면 대구 + 경북 (결과 수 = 두 단추 숫자의 합)
-//   · 한 대학은 한 지역 (경북대 → 대구, 국립경국대 → 경북)
+//   · 한 대학·캠퍼스는 한 지역 (경북대 본교 → 대구, 경북대 상주캠퍼스 → 경북, 국립경국대 → 경북)
 //   · 지원 자격 단추와 함께 걸린다(지역 + 일반 + 검색 '지역인재')
 //   · '전체' 를 누르거나 필터 초기화하면 풀리고, 학생을 바꿔도(resetElig) 지역은 남는다
 //   · 고른 지역에 없는 대학을 찾으면 '지역 전체로 보기' 안내
@@ -44,14 +44,15 @@ const r0 = await pg.evaluate(() => {
   const by = {}; allRecords.forEach(r => { by[r.region] = (by[r.region] || 0) + 1; });
   const uniReg = {}; allRecords.forEach(r => { const k = r.university + '|' + r.campus; (uniReg[k] = uniReg[k] || new Set()).add(r.region); });
   const multi = Object.entries(uniReg).filter(([, v]) => v.size > 1).map(([k]) => k);
-  const reg = rx => [...new Set(allRecords.filter(r => rx.test(r.university)).map(r => r.region))];
+  const reg = (rx, campus) => [...new Set(allRecords.filter(r => rx.test(r.university) && (!campus || r.campus === campus)).map(r => r.region))];
   return { by, outside: Object.keys(by).filter(g => !REGIONS.includes(g)), multi,
-           knu: reg(/^경북대학교$/), gk: reg(/^국립경국대학교$/), n: REGIONS.length };
+           knu: reg(/^경북대학교$/, '본교'), knuSj: reg(/^경북대학교$/, '상주캠퍼스'), gk: reg(/^국립경국대학교$/), n: REGIONS.length };
 });
 check('지역 단추는 17개 시·도', r0.n === 17, r0.n);
 check('모든 묶음의 지역이 단추 안에 든다(빈 칸 없음)', r0.outside.length === 0, r0.outside);
 check('한 대학·캠퍼스는 한 지역', r0.multi.length === 0, r0.multi);
-check('경북대 → 대구', r0.knu.join() === '대구', r0.knu);
+check('경북대 본교 → 대구', r0.knu.join() === '대구', r0.knu);
+check('경북대 상주캠퍼스 → 경북', r0.knuSj.join() === '경북', r0.knuSj);
 check('국립경국대 → 경북', r0.gk.join() === '경북', r0.gk);
 
 console.log('\n■ 단추 누르기');
