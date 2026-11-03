@@ -204,6 +204,17 @@
         #ambitious-hint p { font-size: 12px; font-weight: 700; color: #92400e; }
         #ambitious-hint p b { color: var(--indigo); }
 
+        /* 지원 자격 단추 (여러 개 선택) */
+        .elig-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin-top: -12px; }
+        .elig-k { font-size: 11.5px; font-weight: 900; color: var(--slate-400); letter-spacing: .15em; margin-left: 16px; }
+        .elig-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+        .elig-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; border: 2px solid var(--slate-200); background: #fff; font-size: 12.5px; font-weight: 900; color: var(--slate-500); cursor: pointer; transition: all .15s; }
+        .elig-chip:hover { border-color: var(--indigo); color: var(--indigo); }
+        .elig-chip .n { font-size: 10.5px; font-weight: 900; padding: 1px 7px; border-radius: 999px; background: var(--slate-100); color: var(--slate-500); }
+        .elig-chip.active { background: var(--indigo); border-color: var(--indigo); color: #fff; }
+        .elig-chip.active .n { background: #fff; color: var(--indigo); }
+        .elig-tip { flex-basis: 100%; margin: 0 0 0 16px; font-size: 11.5px; color: var(--slate-400); line-height: 1.5; }
+        .elig-tip b { color: var(--indigo); }
         .filter-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
         @media (min-width: 768px) { .filter-grid { grid-template-columns: 1fr 1fr; } }
         .filter-grid label { display: block; font-size: 11.5px; font-weight: 900; color: var(--slate-400); text-transform: uppercase; letter-spacing: .15em; margin: 0 0 8px 16px; }
@@ -684,6 +695,12 @@
                 <p>1등급대 최상위 대학을 더 많이 보려면 <b>'소신 지원 포함'</b>을 켜주세요!</p>
             </div>
 
+            <div class="elig-row">
+                <span class="elig-k">지원 자격</span>
+                <div class="elig-chips" id="elig-chips"></div>
+                <p class="elig-tip">처음엔 <b>일반</b>만 보입니다. 농어촌·기회균형 등 자격이 있는 학생은 해당 단추를 더 누르세요. 전형명으로 가른 것이라 지원 자격은 모집요강에서 꼭 확인하세요.</p>
+            </div>
+
             <div class="filter-grid">
                 <div>
                     <label>University Filter</label>
@@ -822,6 +839,7 @@
         let searchRange = 0.1;
         let showAmbitious = true;
         let admissionKind = '교과';           // 학생부 전형 구분: '교과' | '종합' (스위치 토글)
+        let eligSel = new Set(['일반']);       // 지원 자격 단추 — 처음엔 일반만. 학생을 바꾸면 일반만으로 되돌린다
         let susiMincut = {};                    // 대학코드(int문자열) → 수능최저 규칙 배열
         let currentFiltered = [];              // 현재 필터 결과 (모달·더 보기에서 참조)
         let visibleCount = 150;
@@ -841,6 +859,26 @@
             { id: '자연', emoji: '🌿' }, { id: '공학', emoji: '⚙️' }, { id: '의약', emoji: '🏥' },
             { id: '교육', emoji: '🎓' },
         ];
+        // 지원 자격 단추 — 전형명 낱말로 가른다. 위에서부터 먼저 걸리는 쪽으로 간다
+        // (예: '정원외_농어촌학생' → 농어촌, '고른기회전형[특수교육대상자]' → 특수교육).
+        // 어느 것에도 안 걸리면 일반 — 지역인재·지역균형·학교장추천·계약학과(채용조건형)는 일반이다.
+        // '성인'만 쓰면 한성인재·덕성인재·교직적성인재가 걸려서 '성인학습' 처럼 붙여 쓴다.
+        const ELIG_GROUPS = [
+            { id: '일반', label: '일반' }, { id: '농어촌', label: '농어촌' },
+            { id: '기회', label: '기회균형·저소득' }, { id: '특성화', label: '특성화고' },
+            { id: '특수', label: '특수교육·장애' }, { id: '그밖', label: '그 밖' },
+        ];
+        const ELIG_RULES = [
+            ['특수', /특수교육|장애/],
+            ['농어촌', /농어촌|농·어촌|농산어촌|농어산촌/],
+            ['특성화', /특성화|특성과고|마이스터|직업계/],
+            ['기회', /기회균형|기회균등|교육기회|고른기회|기초생활|기초수급|수급자|수급권자|\[기초\]|차상위|저소득|사회통합|사회배려|사회적배려|배려대상|배려자|사회다양성|이웃사랑|고운사회|어울림|한부모|자립|보호대상|아동복지|가계곤란/],
+            ['그밖', /서해5도|서해 5도|보훈|유공|만학|성인학습|성인등|성인전형|평생학습|재직자|재교육|취업자|선원|다문화|북한이탈|새터민|탈북|재외|외국인|정부위탁|군위탁|특기자|사회기여|사회공헌|다자녀|순직|검정고시|대안학교|해외고|목회자|교역자|담임목사|교회추천|종단추천|교구장|수도회|성직|신학|선교사|가톨릭지도자|재림교회|기독교인|기독인재|크리스천|크리스찬|불교추천|운동선수|운동부|선수출신/],
+        ];
+        function eligibilityOf(admissionName) {
+            for (const [id, re] of ELIG_RULES) if (re.test(admissionName)) return id;
+            return '일반';
+        }
 
         // ─── 원본 admissionUtils.ts 이식 ───
         function convertGrade(grade5, version) {
@@ -933,6 +971,7 @@
                         university, campus, department,
                         admissionName: cols[3], category: categorizeDepartment(department),
                         kind: cols[3].includes('교과') ? '교과' : (cols[3].includes('종합') ? '종합' : '기타'),
+                        elig: eligibilityOf(cols[3]),
                         uniCode: cols[2], type: cols[4], years: {},
                     };
                     groups.set(key, rec);
@@ -998,7 +1037,8 @@
             const m = t.match(/^(.+?)교대$/); if (m) return m[1] + '교육대';   // OO교대 → OO교육대(학교)
             return t;
         }
-        function baseFilter(record, bounds) {
+        function baseFilter(record, bounds, ignoreElig) {
+            if (!ignoreElig && !eligSel.has(record.elig)) return false;
             const kindMatch = record.kind === '기타' || record.kind === admissionKind;
             const uni = record.university.toLowerCase();
             const uqRaw = selectedUniversity.trim().toLowerCase();
@@ -1217,9 +1257,17 @@
         function setRange(r) { searchRange = r; render(); }
         function toggleKind() { admissionKind = admissionKind === '교과' ? '종합' : '교과'; render(); }
         function setAdmissionKind(k) { admissionKind = k; render(); }
+        // 지원 자격 단추 — 여러 개를 함께 고른다. 마지막 하나는 끌 수 없다(목록이 통째로 비지 않게)
+        function toggleElig(id) {
+            if (eligSel.has(id)) { if (eligSel.size > 1) eligSel.delete(id); }
+            else eligSel.add(id);
+            render();
+        }
+        function addElig(id) { eligSel.add(id); render(); }
+        window.resetElig = function() { eligSel = new Set(['일반']); if (allRecords.length) render(); };
         function resetFilters() {
             selectedUniversity = ''; selectedCategory = '전체'; searchQuery = '';
-            searchRange = 0.3; showAmbitious = true; admissionKind = '교과';
+            searchRange = 0.3; showAmbitious = true; admissionKind = '교과'; eligSel = new Set(['일반']);
             document.getElementById('search-input').value = '';
             document.getElementById('uni-input').value = '';
             document.getElementById('ambitious-toggle').checked = true;
@@ -1292,6 +1340,16 @@
                 </button>`;
             }).join('');
 
+            // 지원 자격 단추 (개수 = 자격만 빼고 지금 조건 그대로일 때 그 단추에 해당하는 수)
+            const eligPool = allRecords.filter(r => baseFilter(r, bounds, true) &&
+                (selectedCategory === '전체' || r.category === selectedCategory));
+            const eligCounts = {};
+            eligPool.forEach(r => { eligCounts[r.elig] = (eligCounts[r.elig] || 0) + 1; });
+            document.getElementById('elig-chips').innerHTML = ELIG_GROUPS.map(g => {
+                const on = eligSel.has(g.id), n = eligCounts[g.id] || 0;
+                return `<button type="button" class="elig-chip ${on ? 'active' : ''}" aria-pressed="${on}" onclick="toggleElig('${g.id}')">${on ? '✓ ' : ''}${g.label}<span class="n">${n.toLocaleString()}</span></button>`;
+            }).join('');
+
             // 범위 탭 / 라벨
             const rangeText = searchRange === 'all' ? '전체' : '±' + searchRange.toFixed(2);
             document.getElementById('range-label').textContent = rangeText;
@@ -1330,7 +1388,7 @@
                            r.department.toLowerCase().includes(raw) || r.admissionName.toLowerCase().includes(raw); };
                 const inB = r => r.averageGrade >= bounds.lower && r.averageGrade <= bounds.upper;
                 const other = admissionKind === '교과' ? '종합' : '교과';
-                const termRecs = allRecords.filter(matchTerm);
+                const termRecs = allRecords.filter(r => eligSel.has(r.elig) && matchTerm(r));
                 const curAll = termRecs.filter(r => r.kind === '기타' || r.kind === admissionKind);
                 const curInB = curAll.filter(inB);
                 const otherAll = termRecs.filter(r => r.kind === other);
@@ -1346,6 +1404,13 @@
                     hintHtml = `“${term}”은(는) <b>${other} 전형</b>에만 <b>${n}건</b> 있어요. 지금은 <b>${admissionKind} 전형</b>만 보는 중입니다.${rangeNote}
                         <button class="expand-btn" style="margin-top:10px;" onclick="setAdmissionKind('${other}')">${other} 전형으로 보기</button>`;
                 }
+            }
+            // 위 안내가 없고, 켜지 않은 자격 단추에만 결과가 있으면 → 그 단추를 알려 준다
+            if (!currentFiltered.length && !hintHtml) {
+                const off = ELIG_GROUPS.filter(g => !eligSel.has(g.id) && eligCounts[g.id]);
+                if (off.length) hintHtml = `지금 고른 지원 자격(${ELIG_GROUPS.filter(g => eligSel.has(g.id)).map(g => g.label).join('·')})에는 없지만, 다른 자격 전형에는 있어요.
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px;">${off.map(g =>
+                        `<button class="expand-btn" style="margin:0;padding:10px 16px;" onclick="addElig('${g.id}')">${g.label} 켜기 (${eligCounts[g.id]}건)</button>`).join('')}</div>`;
             }
             if (kindHint) { kindHint.style.display = hintHtml ? 'block' : 'none'; if (hintHtml) kindHint.innerHTML = hintHtml; }
             if (rangeHint) rangeHint.style.display = hintHtml ? 'none' : 'block';
@@ -2029,6 +2094,7 @@
         bunSel.addEventListener('change', async () => {
             const g = gradeSel.value, b = banSel.value, n = bunSel.value;
             if (!g || !b || !n) { resultEl.style.display = 'none'; clearCsat(); return; }
+            if (window.resetElig) window.resetElig();   // 앞 학생이 켜 둔 농어촌 등이 다음 학생에게 남지 않게
             const key = g + '-' + b;
             const name = (tree[g] && tree[g][b] && tree[g][b][n]) || '';
             try {
