@@ -29,7 +29,8 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
 const pg = await b.newPage();
 await pg.setContent('<body>');
 const SY = /const SURVEY_YEARS = \[[^\]]+\];/.exec(H)[0];
-await pg.addScriptTag({ content: SY + grab('categorizeDepartment') + grab('parseCSVLine') + grab('parseCSV') });
+const ER = /const ELIG_RULES = \[[\s\S]*?\n\s*\];/.exec(H)[0];   // parseCSV 가 전형마다 지원 자격(elig)을 붙인다
+await pg.addScriptTag({ content: SY + ER + grab('eligibilityOf') + grab('categorizeDepartment') + grab('parseCSVLine') + grab('parseCSV') });
 const r = await pg.evaluate(csv => {
   const recs = parseCSV(csv);
   const has = (x, y) => x.years[y] && parseFloat(x.years[y].competition) > 0;
