@@ -23,6 +23,7 @@
             font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
             letter-spacing: -0.02em; background-color: var(--slate-50); color: var(--slate-900);
             -webkit-font-smoothing: antialiased;
+            word-break: keep-all; overflow-wrap: break-word;
         }
         /* 원본은 Georgia 세리프 이탤릭이었으나 한글에 안 어울려 본문과 같은 고딕체로 통일 */
         .serif { font-weight: 900; letter-spacing: -0.04em; }
@@ -150,8 +151,8 @@
         .range-pill { display: flex; align-items: center; gap: 8px; background: var(--indigo-50); padding: 8px 16px; border-radius: 1rem; border: 1px solid var(--indigo-100); }
         .range-pill .dot { width: 8px; height: 8px; background: var(--indigo); border-radius: 50%; animation: pulse 1.5s ease-in-out infinite; }
         .range-pill span { font-size: 11.5px; font-weight: 900; color: var(--indigo-dark); text-transform: uppercase; letter-spacing: .15em; }
-        .cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-        @media (min-width: 640px) { .cat-grid { grid-template-columns: repeat(7, 1fr); } }
+        .cat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+        @media (min-width: 640px) { .cat-grid { grid-template-columns: repeat(9, 1fr); } }
         .cat-chip { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 11px 4px; border-radius: 1.2rem; border: 2px solid var(--slate-100); background: #fff; color: var(--slate-500); transition: all .2s; }
         .cat-chip:hover { border-color: var(--slate-200); background: var(--slate-50); }
         .cat-chip .emoji { font-size: 24px; transition: transform .2s; }
@@ -175,7 +176,9 @@
         .list-controls { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
         /* 데스크톱: 스위치·토글·초기화 / 범위탭 / 결과수를 한 줄로 가로 배치해 여백 축소 */
         @media (min-width: 768px) { .list-controls { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px 16px; } }
-        .control-row { display: flex; align-items: center; gap: 16px; }
+        .control-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+        /* 한글은 낱말 단위로 줄을 바꾼다('교/과', '필터 초/기화' 방지). 작은 단추는 아예 한 줄로 */
+        .kind-opt, .reset-btn, .range-tab, .toggle-label span, .range-pill span, .elig-chip, .cat-chip .name { white-space: nowrap; }
         .toggle-label { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 9px 16px; border: 2px solid var(--slate-200); border-radius: 999px; background: #fff; transition: border-color .2s, background .2s, box-shadow .2s; }
         .toggle-label.on { border-color: var(--indigo); background: var(--indigo-50); box-shadow: 0 3px 10px rgba(79,70,229,.18); }
         .toggle-track { position: relative; width: 40px; height: 20px; border-radius: 999px; background: var(--slate-200); transition: background .2s; }
@@ -634,8 +637,8 @@
             <hr class="lg-div">
             <div class="lg-group">
                 <p class="lg-h">3개년 추세 (합격선)</p>
-                <div class="lg-item"><span class="lg-sw" style="color:#b45309;">▲ 컷 상승</span><span class="lg-tx">합격선 오름세 — <b>경쟁 심화</b></span></div>
-                <div class="lg-item"><span class="lg-sw" style="color:#2563eb;">▼ 컷 하락</span><span class="lg-tx">합격선 내림세 — 다소 완화</span></div>
+                <div class="lg-item"><span class="lg-sw" style="color:#b45309;">↗ 컷 상승</span><span class="lg-tx">합격선 오름세 — <b>경쟁 심화</b></span></div>
+                <div class="lg-item"><span class="lg-sw" style="color:#2563eb;">↘ 컷 하락</span><span class="lg-tx">합격선 내림세 — 다소 완화</span></div>
                 <div class="lg-item"><span class="lg-sw" style="color:#64748b;">→ 컷 보합</span><span class="lg-tx">큰 변동 없음</span></div>
             </div>
             <hr class="lg-div">
@@ -772,7 +775,7 @@
         <div class="brand-line"><span>🎓</span><span>9등급 환산 적정 대학 찾기 (경기, 부산, 광주 자료)</span></div>
         <p>등급 환산 : 경기진학지도협의회 · 부산시교육청 · 광주시교육청 2025 분석자료</p>
         <p class="fine">DATA SOURCE : 2026 ADIGA(어디가) · BUSAN OFFICE OF EDUCATION · GYEONGGI JINHAK · GWANGJU OFFICE OF EDUCATION</p>
-        <p class="disclaimer">본 도구는 2026학년도 어디가 수시 입결 자료(환산등급 70% 컷) 기반의 <b>참고용</b>이며, 실제 지원 판단은 반드시 담임·진학 상담과 병행하세요.</p>
+        <p class="disclaimer">본 도구는 2024~2026학년도 어디가 수시 입결 자료(환산등급 70% 컷) 기반의 <b>참고용</b>이며, 실제 지원 판단은 반드시 담임·진학 상담과 병행하세요.</p>
     </footer>
 
     <script>
@@ -857,7 +860,7 @@
         const CATEGORIES = [
             { id: '전체', emoji: '🔍' }, { id: '인문', emoji: '📖' }, { id: '사회', emoji: '🤝' },
             { id: '자연', emoji: '🌿' }, { id: '공학', emoji: '⚙️' }, { id: '의약', emoji: '🏥' },
-            { id: '교육', emoji: '🎓' },
+            { id: '교육', emoji: '🎓' }, { id: '예체능', emoji: '🎨' }, { id: '기타', emoji: '📦' },
         ];
         // 지원 자격 단추 — 전형명 낱말로 가른다. 위에서부터 먼저 걸리는 쪽으로 간다
         // (예: '정원외_농어촌학생' → 농어촌, '고른기회전형[특수교육대상자]' → 특수교육).
@@ -913,19 +916,39 @@
             return { grade9: Number(grade9.toFixed(2)), reason };
         }
 
+        // 학과명 낱말로 계열을 가른다. 위에서부터 먼저 걸리는 쪽.
+        //  · '문화학' 의 '화학' 이 자연으로 잡혀 언어문화학과가 자연이 됐다 → 문화 는 빼고 본다
+        //  · '산업'·'정보' 만으로는 공학이 아니다(골프산업·문헌정보·경영정보) → 공학다운 말로만
+        //  · 해양경찰 → 자연('해양'), 스포츠의학 → 의약('의학') 이 되지 않게 경찰·예체능을 먼저 본다
+        //  · 예체능을 따로 둔다. 어디에도 안 맞으면 기타 — 둘 다 계열 단추가 있다
         function categorizeDepartment(dept) {
+            const s = dept.replace(/문화/g, '□').replace(/전공/g, '▽');   // '자율전공학부' 의 '공학' 도 막는다
+            const has = list => list.some(k => s.includes(k));
             const edu = ['교육', '사범'];
-            const med = ['의예', '치의예', '한의예', '약학', '간호', '임상병리', '방사선', '물리치료', '작업치료', '치위생', '응급구조', '수의예', '의학', '한약', '의료', '치기공', '보건'];
-            const eng = ['전자', '컴퓨터', '기계', '신소재', '건축', '에너지', '토목', '환경', '산업', '소프트웨어', '인공지능', '로봇', '반도체', '자동차', '화학공학', '고분자', '시스템', '전기', '정보', '공학', 'AI', '데이터', '융합기술', '드론', '메카'];
-            const nat = ['수학', '물리', '화학', '생물', '천문', '지질', '해양', '통계', '의생명', '생명과학', '과학', '나노', '식품', '원예', '산림', '조경', '생명'];
-            const soc = ['경영', '경제', '법학', '행정', '미디어', '사회복지', '심리', '정치', '외교', '무역', '회계', '관광', '언론', '아동', '소비자', '지리', '사회', '광고', '홍보', '금융', '부동산', '세무', '국제', '커뮤니케이션'];
-            const hum = ['인문', '어문', '역사', '철학', '종교', '국어', '영어', '독어', '불어', '일어', '중어', '한문', '사학', '고고', '미학', '문학', '언어', '신학', '창작', '문화'];
-            if (edu.some(k => dept.includes(k))) return '교육';
-            if (med.some(k => dept.includes(k))) return '의약';
-            if (eng.some(k => dept.includes(k))) return '공학';
-            if (nat.some(k => dept.includes(k))) return '자연';
-            if (soc.some(k => dept.includes(k))) return '사회';
-            if (hum.some(k => dept.includes(k))) return '인문';
+            const socFirst = ['문헌정보', '경찰'];
+            const humFirst = ['미술사'];
+            const art = ['체육', '스포츠', '골프', '무용', '음악', '성악', '작곡', '피아노', '관현악', '국악', '미술', '회화', '조소', '조형',
+                         '공예', '디자인', '연기', '연극', '영화', '공연', '방송연예', '뮤지컬', '패션', '뷰티', '미용', '메이크업', '만화', '웹툰',
+                         '애니메이션', '사진', '태권도', '레저', 'e스포츠', 'K-POP', '엔터테인먼트'];
+            // '의예' 만 쓰면 '창의예술' 이 걸린다 → '의예과'(치의예과·한의예과·수의예과도 걸린다)·'(의예)'
+            const med = ['의예과', '(의예)', '약학', '간호', '임상병리', '방사선', '물리치료', '작업치료', '치위생', '응급구조', '의학', '한약', '의료', '치기공', '보건', '안경광학'];
+            const eng = ['전자', '컴퓨터', '기계', '신소재', '건축', '에너지', '토목', '환경', '소프트웨어', '인공지능', '로봇', '반도체', '자동차', '화학공학', '고분자', '시스템', '전기',
+                         '정보통신', '정보보호', '정보보안', '정보공학', '정보기술', '정보과학', '정보처리', '정보융합', '지능정보', '양자', '디스플레이', '보안', '소방', '방재', '스마트팩토리', '스마트시티', '항공정비', '게임', '공학', 'AI', '데이터', '융합기술', '드론', '메카'];
+            const nat = ['수학', '물리', '화학', '생물', '천문', '지질', '해양', '통계', '의생명', '생명과학', '과학', '나노', '식품', '원예', '산림', '조경', '생명', '바이오', '축산', '동물', '농'];
+            const soc = ['경영', '경제', '법학', '행정', '미디어', '사회복지', '심리', '정치', '외교', '무역', '회계', '관광', '언론', '아동', '소비자', '지리', '사회', '광고', '홍보', '금융', '부동산', '세무', '국제', '커뮤니케이션', '법', '상경', '신문방송', '마케팅', '공공'];
+            const hum = ['인문', '어문', '역사', '철학', '종교', '국어', '영어', '독어', '불어', '일어', '중어', '한문', '사학', '고고', '미학', '문학', '언어', '신학', '창작', '일본학', '중국학', '□'];
+            if (has(edu)) return '교육';
+            if (has(socFirst)) return '사회';
+            if (has(humFirst)) return '인문';
+            if (has(['스포츠', '체육', '골프'])) return '예체능';   // 스포츠의학 → 의약이 아니다
+            if (has(med)) return '의약';
+            if (s.includes('공학')) return '공학';          // 섬유공학·건축공학처럼 '공학' 이 붙으면 디자인이 있어도 공학
+            if (has(art)) return '예체능';
+            if (has(eng)) return '공학';
+            if (has(nat)) return '자연';
+            if (has(soc)) return '사회';
+            if (has(hum)) return '인문';
+            if (s.includes('예술')) return '예체능';
             return '기타';
         }
 
@@ -949,6 +972,13 @@
         //       ,지역 (16번째 — 대학별 시·도. 여기선 안 쓴다. 2024·2025학년도 경쟁률과 함께 다른 어디가 자료에서 옮겨 채움)
         // 같은 학과(대학코드|전형명|모집단위)를 3개 조회연도에 걸쳐 하나로 묶는다.
         // averageGrade = 사용 가능한 연도들의 환산등급_70 평균 (필터·정렬·차이표시 기준)
+        // 원자료에서 가운뎃점(·)이 ? 로 깨져 있다(768행 — '도시계획?조경학부', '건축 ? 토목 ? 환경공학부').
+        // 원본 CSV 는 그대로 두고 읽을 때만 바꾼다.
+        function fixDot(s) { return s.replace(/\s\?\s/g, '·').replace(/(\S)\?(?=\S)/g, '$1·'); }
+        // 등급은 1~9. 0(미제출)과 9 를 넘는 값(원자료 오타 — 신라대 항공정비 '24)은 그 해 자료 없음으로.
+        // 3.9·2.4 처럼 '고쳐 넣지' 않는다 — 추측이다.
+        function gradeVal(v) { const n = parseFloat(v); return (isNaN(n) || n <= 0 || n > 9) ? null : n; }
+        // 모집인원 '0' 은 자료 없음 — 2024·2025학년도는 원자료에 모집인원이 없어 0 으로 들어 있다(충원은 있는데 모집 0).
         function parseCSV(csv) {
             const lines = csv.trim().split('\n');
             const groups = new Map();
@@ -960,18 +990,19 @@
                 const m = rawName.match(/^(.*?)\[(.+)\]$/);    // "가야대학교[본교]" → 대학명/캠퍼스 분리
                 const university = m ? m[1].trim() : rawName;
                 const campus = m ? m[2] : '본교';
-                const department = cols[5];
+                const department = fixDot(cols[5]);
+                const admName = fixDot(cols[3]);
                 if (!university || !department) continue;
                 const year = cols[0];
-                const grade70 = parseFloat(cols[14]);
-                const key = `${cols[2]}|${cols[3]}|${department}`;   // 대학코드|전형명|모집단위
+                const grade70 = gradeVal(cols[14]);
+                const key = `${cols[2]}|${admName}|${department}`;   // 대학코드|전형명|모집단위
                 let rec = groups.get(key);
                 if (!rec) {
                     rec = {
                         university, campus, department,
-                        admissionName: cols[3], category: categorizeDepartment(department),
-                        kind: cols[3].includes('교과') ? '교과' : (cols[3].includes('종합') ? '종합' : '기타'),
-                        elig: eligibilityOf(cols[3]),
+                        admissionName: admName, category: categorizeDepartment(department),
+                        kind: admName.includes('교과') ? '교과' : (admName.includes('종합') ? '종합' : '기타'),
+                        elig: eligibilityOf(admName),
                         uniCode: cols[2], type: cols[4], years: {},
                     };
                     groups.set(key, rec);
@@ -979,10 +1010,10 @@
                 // 등급·점수 컷이 0이면 미제출/데이터 없음으로 간주 (원문 표기는 유지)
                 const posVal = v => { const n = parseFloat(v); return (isNaN(n) || n <= 0) ? null : v; };
                 const yv = {
-                    grade70: (isNaN(grade70) || grade70 <= 0) ? null : grade70,
-                    grade50: posVal(cols[13]), score70: posVal(cols[12]), score50: posVal(cols[11]),
+                    grade70,
+                    grade50: gradeVal(cols[13]) == null ? null : cols[13], score70: posVal(cols[12]), score50: posVal(cols[11]),
                     competition: cols[9], waitlist: cols[10],
-                    quotaTotal: cols[8], quotaInitial: cols[6], quotaCarry: cols[7],
+                    quotaTotal: cols[8] === '0' ? '' : cols[8], quotaInitial: cols[6], quotaCarry: cols[7],
                 };
                 // 같은 연도 중복행이면 유효 등급이 있는 쪽을 우선
                 if (!rec.years[year] || (rec.years[year].grade70 == null && yv.grade70 != null)) rec.years[year] = yv;
@@ -1072,7 +1103,11 @@
         function classify(myG, rec) {
             const a70 = rec.averageGrade;
             const no50 = (rec.avg50 == null);
-            const a50 = no50 ? a70 : rec.avg50;
+            // 50%컷이 70%컷보다 나쁘게(숫자가 크게) 공개된 곳이 있다(등급컷은 환산점수 순위의 50%째·70%째
+            // 학생 등급이라 뒤집히기도 한다). 그대로 쓰면 '50%컷 − 여유폭' 이 70%컷 아래로 내려가
+            // 70%컷보다 나쁜 성적에 '안정' 이 붙는다(309곳) → 그런 곳은 70%컷을 기준으로 잡고 경계로 둔다.
+            const inverted = !no50 && rec.avg50 > a70 + 1e-9;
+            const a50 = (no50 || inverted) ? a70 : rec.avg50;
             const m = Math.min(0.4, Math.max(0.15, (rec.vol70 || 0) / 2));
             let label, cls;
             if (myG <= a50 - m)      { label = '안정'; cls = 'lab-safe';  }
@@ -1081,18 +1116,22 @@
             else                     { label = '위험'; cls = 'lab-risk';  }
             // 경계/불확실: 데이터 부족·변동 과다·판정선 바로 옆(환산 오차 감안)이면 단정하지 않는다.
             const near = Math.min(Math.abs(myG - (a50 - m)), Math.abs(myG - a70), Math.abs(myG - (a70 + m)));
-            const uncertain = (rec.yearCount < 2) || ((rec.vol70 || 0) >= 0.8) || (near < 0.1);
-            return { label, cls, uncertain, a50, a70, m, no50 };
+            const uncertain = (rec.yearCount < 2) || ((rec.vol70 || 0) >= 0.8) || (near < 0.1) || inverted;
+            return { label, cls, uncertain, a50, a70, m, no50, inverted };
         }
         // 상세모달용: 왜 이 라벨인지 한 문장으로 설명 (학부모 앞 방어용)
         function diagReason(myG, d) {
             const me = myG.toFixed(2), a50 = d.a50.toFixed(2), a70 = d.a70.toFixed(2);
-            if (d.label === '안정') return `내 등급 ${me}이(가) 합격자 중위(50%컷 ${a50})보다 위 — 무난 지원권입니다.`;
+            const inv = d.inverted ? ' (이곳은 50%컷이 70%컷보다 낮게 공개돼 70%컷 기준으로 판정)' : '';
+            return diagReasonBase(d, me, a50, a70) + inv;
+        }
+        function diagReasonBase(d, me, a50, a70) {
+            if (d.label === '안정') return `${me}등급은 합격자 중위(50%컷 ${a50})보다 위 — 무난 지원권입니다.`;
             if (d.label === '적정') return (d.no50 || a50 === a70)
-                ? `내 등급 ${me}이(가) 합격선(70%컷 ${a70}) 부근 — 적정 지원권입니다.${d.no50 ? ' (50%컷 미제출)' : ''}`
-                : `내 등급 ${me}이(가) 합격자 분포(50%컷 ${a50} ~ 70%컷 ${a70}) 안 — 소신껏 지원권입니다.`;
-            if (d.label === '소신') return `내 등급 ${me}이(가) 70%컷(${a70}) 하한 부근 — 도전(소신) 지원권입니다.`;
-            return `내 등급 ${me}이(가) 70%컷(${a70})보다 아래 — 합격 가능성이 낮습니다.`;
+                ? `${me}등급은 합격선(70%컷 ${a70}) 부근 — 적정 지원권입니다.${d.no50 ? ' (50%컷 미제출)' : ''}`
+                : `${me}등급은 합격자 분포(50%컷 ${a50} ~ 70%컷 ${a70}) 안 — 소신껏 지원권입니다.`;
+            if (d.label === '소신') return `${me}등급은 70%컷(${a70}) 하한 부근 — 도전(소신) 지원권입니다.`;
+            return `${me}등급은 70%컷(${a70})보다 아래 — 합격 가능성이 낮습니다.`;
         }
 
         // ─── 3개년 합격선 추세 ───
@@ -1101,8 +1140,8 @@
             const dl = rec.trendDelta;
             if (dl == null) return null;                        // 단년 → 추세 없음
             if (Math.abs(dl) < 0.15) return { label: '컷 보합', cls: 'tr-flat', dir: 'flat', arrow: '→', delta: dl };
-            if (dl < 0)             return { label: '컷 상승', cls: 'tr-up',   dir: 'up',   arrow: '▲', delta: dl };  // 합격선↑(경쟁 심화)
-            return                        { label: '컷 하락', cls: 'tr-down', dir: 'down', arrow: '▼', delta: dl };  // 합격선↓(완화)
+            if (dl < 0)             return { label: '컷 상승', cls: 'tr-up',   dir: 'up',   arrow: '↗', delta: dl };  // 합격선↑ (▲▼ 는 '내 등급과의 차이' 에만 쓴다)(경쟁 심화)
+            return                        { label: '컷 하락', cls: 'tr-down', dir: 'down', arrow: '↘', delta: dl };  // 합격선↓(완화)
         }
         // 상세모달용 추세 설명
         function trendReason(t) {
@@ -1352,7 +1391,9 @@
 
             // 범위 탭 / 라벨
             const rangeText = searchRange === 'all' ? '전체' : '±' + searchRange.toFixed(2);
-            document.getElementById('range-label').textContent = rangeText;
+            // 소신 지원을 켜면 위(상향)로 더 넓어진다 — 숫자만 ±0.10 이라 실제 범위와 달라 보였다
+            document.getElementById('range-label').textContent = (showAmbitious && searchRange !== 'all')
+                ? `${rangeText} · 소신 포함 ${bounds.lower.toFixed(2)}~${bounds.upper.toFixed(2)}` : rangeText;
             document.getElementById('empty-range').textContent = rangeText;
             document.getElementById('range-tabs').innerHTML = [0.1, 0.3, 0.5, 'all'].map(r =>
                 `<button class="range-tab ${searchRange === r ? 'active' : ''}" onclick="setRange(${typeof r === 'number' ? r : `'${r}'`})">${r === 'all' ? '전체' : '±' + r}</button>`
@@ -1461,6 +1502,12 @@
             }
         }
 
+        // 카드 위 '평균 70%컷' 제목. 1년치뿐이면 평균이라 하지 않고 그 학년도를 적는다.
+        function cutLabel(r) {
+            if (r.yearCount !== 1) return `${r.yearCount}년 평균 70%컷`;
+            const y = SURVEY_YEARS.find(y => r.years[y] && r.years[y].grade70 != null);
+            return `${parseInt(y, 10) - 1} 70%컷`;
+        }
         function cardsHtml(target) {
             return currentFiltered.slice(0, visibleCount).map((r, idx) => {
                 const gap = gradeGap(r.averageGrade, target);
@@ -1482,7 +1529,7 @@
                             <h3 class="serif">${r.university}</h3>
                             <p class="campus-txt">${r.campus}</p>
                         </div>
-                        <div class="avg-box"><p class="k">${r.yearCount}년 평균 70%컷</p><p class="v">${r.averageGrade.toFixed(2)}</p><div class="gap-box ${gap.cls}"><span class="arr">${gap.arrow}</span>${gap.text}</div></div>
+                        <div class="avg-box"><p class="k">${cutLabel(r)}</p><p class="v">${r.averageGrade.toFixed(2)}</p><div class="gap-box ${gap.cls}"><span class="arr">${gap.arrow}</span>${gap.text}</div></div>
                     </div>
                     <div class="uni-card-bottom">
                         <p class="dept-name">${r.department}</p>
@@ -1694,7 +1741,7 @@
                 : `<div class="d-tile wide diag-note"><p class="k">입시 진단</p><p class="diag-lg">종합전형은 성적만으로 판단하지 않습니다</p><p class="diag-why">활동·세특·면접 등 성적 외 요소가 크게 작용해 안정/적정/소신 라벨은 제공하지 않습니다. 아래 컷·추세·추합·수능최저는 참고 지표로만 활용하세요.</p></div>`;
             document.getElementById('dm-grid').innerHTML = `
                 ${diagTileHtml}
-                <div class="d-tile hl" style="grid-column:1/-1;"><p class="k">${r.yearCount}개년 평균 환산등급 70%컷</p><p class="v">${r.averageGrade.toFixed(2)}</p><p class="gap-box ${gap.cls}" style="justify-content:flex-start;margin-top:3px;font-size:11.5px;">내 등급 대비 <span class="arr">${gap.arrow}</span>${gap.text}</p></div>
+                <div class="d-tile hl" style="grid-column:1/-1;"><p class="k">${r.yearCount === 1 ? cutLabel(r).replace(' 70%컷', '학년도 환산등급 70%컷') : r.yearCount + '개년 평균 환산등급 70%컷'}</p><p class="v">${r.averageGrade.toFixed(2)}</p><p class="gap-box ${gap.cls}" style="justify-content:flex-start;margin-top:3px;font-size:11.5px;">내 등급 대비 <span class="arr">${gap.arrow}</span>${gap.text}</p></div>
                 <div style="grid-column:1/-1;overflow-x:auto;"><table class="dm-year-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
             document.getElementById('dm-tip').innerHTML =
                 `<div class="d-tile wide"><p class="k">상담 포인트</p><p class="tip-line"><b class="tip-ic ${t ? t.cls : 'tr-flat'}">추세</b> ${trendReason(t)}</p>${ch ? `<p class="tip-line"><b class="tip-ic ${ch.cls}">추합</b> ${ch.note} (평균 추합률 ${ch.pct}%)</p>` : ''}<p class="tip-caveat">※ 어디가 컷은 최종등록자 기준이라 추합이 이미 반영됨 — 추합률은 예비번호 기대·안정성 참고용입니다.</p></div>`;
