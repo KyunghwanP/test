@@ -372,13 +372,14 @@
         clearBtn.addEventListener('click', () => { searchEl.value = ''; clearBtn.style.display = 'none'; renderList(''); searchEl.focus(); });
         document.addEventListener('click', e => { if (!e.target.closest('.combo')) closeList(); });
 
-        function selectUniv(i) {
+        function selectUniv(i, opts) {
             const u = univs[i]; if (!u) return;
             searchEl.value = u.name; clearBtn.style.display = 'block'; closeList();
-            loadPdf(u);
+            loadPdf(u, opts);
         }
         // 외부(진단 모달 iframe 등)에서 ?code=대학코드 / ?uni=대학명&campus=본교 로 진입 시 자동 선택
         // embed=1 이면 iframe 안이므로 '← 홈' 링크 숨김
+        // &page=쪽 이면 그 쪽으로, &q=낱말 이면 본문 검색까지(page 가 있으면 그 쪽부터 찾은 첫 자리로) — 진단의 '수능최저 쪽 보기'
         function autoSelectFromParams() {
             const p = new URLSearchParams(location.search);
             if (p.get('embed')) { const b = document.querySelector('.back-link'); if (b) b.style.display = 'none'; }
@@ -389,7 +390,7 @@
                 idx = univs.findIndex(u => u.base === uni && (!campus || u.campus === campus));
                 if (idx < 0) idx = univs.findIndex(u => u.base.includes(uni));
             }
-            if (idx >= 0) selectUniv(idx);
+            if (idx >= 0) selectUniv(idx, { page: parseInt(p.get('page'), 10) || 0, q: (p.get('q') || '').trim() });
         }
         document.getElementById('pdfDownload').addEventListener('click', downloadOriginalPdf);
 
@@ -413,6 +414,7 @@
         let query = '';
         let occ = [];                // [{ page, k }] 전체 일치 목록
         let curOcc = -1;
+        let searchStartPage = 0;     // 주소로 받은 page — 첫 검색은 이 쪽부터 찾은 자리로 간다
 
         function setStatus(msg, spin, isErr) {
             statusEl.className = 'pdf-status show' + (isErr ? ' pdf-error' : '');
@@ -528,11 +530,12 @@
             if (Math.abs(f - cssScale) > 0.02) setZoom(f, false);
         });
 
-        async function loadPdf(u) {
+        async function loadPdf(u, opts) {
             const token = ++loadToken;
+            const o = opts || {};
             // 초기화
             if (pdfDoc) { try { pdfDoc.destroy(); } catch (e) {} }
-            pdfDoc = null; pages = []; pageItems = []; occ = []; curOcc = -1; query = '';
+            pdfDoc = null; pages = []; pageItems = []; occ = []; curOcc = -1; query = ''; searchStartPage = 0;
             resetSearchUI(); searchInput.disabled = true;
             pageNav.hidden = true; pageInput.disabled = true; pageInput.value = '1'; pageTotalEl.textContent = '–';
             container.innerHTML = '';
@@ -572,6 +575,11 @@
                 renderVisible();               // 첫 화면 페이지 렌더
                 pageNav.hidden = false; pageInput.disabled = false; pageInput.value = '1'; pageTotalEl.textContent = doc.numPages;
                 searchInput.disabled = false;
+                if (o.page) gotoPage(o.page);
+                if (o.q) {   // 색인이 끝나면 buildTextIndex 가 이 검색을 돌린다
+                    searchInput.value = o.q; query = o.q; searchStartPage = o.page || 0;
+                    countEl.textContent = '색인 중…';
+                }
                 buildTextIndex(doc, token, phH);
             } catch (err) {
                 if (token !== loadToken) return;
@@ -674,9 +682,11 @@
             if (!query) { countEl.textContent = ''; prevBtn.disabled = nextBtn.disabled = true; return; }
             if (!pageItems.length || pageItems.some(x => x === null)) { countEl.textContent = '색인 중…'; return; }
             pageItems.forEach((items, p) => { const n = countInItems(items, query); for (let k = 0; k < n; k++) occ.push({ page: p, k }); });
-            if (!occ.length) { countEl.textContent = '0'; prevBtn.disabled = nextBtn.disabled = true; return; }
+            if (!occ.length) { countEl.textContent = '0'; prevBtn.disabled = nextBtn.disabled = true; searchStartPage = 0; return; }
             prevBtn.disabled = nextBtn.disabled = false;
-            gotoOcc(0);
+            let first = 0;
+            if (searchStartPage) { const k = occ.findIndex(x => x.page >= searchStartPage - 1); if (k >= 0) first = k; searchStartPage = 0; }
+            gotoOcc(first);
         }
 
         function waitFor(cond, ms) { return new Promise(res => { const t0 = Date.now(); (function chk() { if (cond() || Date.now() - t0 > ms) return res(); setTimeout(chk, 80); })(); }); }
