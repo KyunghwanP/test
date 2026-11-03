@@ -137,6 +137,50 @@ console.log('\n■ 화면 — 네트워크가 살아 있으면 최신을 준다'
   check('네트워크 응답을 그대로 준다', (await out)?.body === 'FRESH');
 }
 
+console.log('\n■ 화면 — 배포 직후 예전 화면이 안 나온다 (브라우저 보관본을 그냥 쓰지 않는다)');
+{
+  // 신고(2026-11): test 에 병합·배포가 끝났는데 진로진학 탭의 진단(jindan.html)만 예전 화면이었다.
+  // GitHub Pages 는 파일을 브라우저에 10분 보관하게 한다(max-age=600). 워커가 fetch(req) 로
+  // 받으면 그 보관본이 그대로 나온다. 화면은 cache:'no-cache' 로 받아 서버에 바뀌었는지 묻는다
+  // — 안 바뀌었으면 304 라 느려지지 않는다.
+  const calls = [];
+  const { listeners } = loadSW({ fetchImpl: async (r, init) => { calls.push({ url: typeof r === 'string' ? r : r.url, init }); return mkRes('FRESH'); } });
+  let out;
+  await listeners.fetch({
+    request: { url: 'https://x.io/test/jindan.html?embed=1&gpa5=2.1', mode: 'navigate', method: 'GET' },
+    respondWith: p => { out = p; }, waitUntil: () => {}
+  });
+  check('화면을 받는다', (await out)?.body === 'FRESH');
+  check('화면은 서버에 바뀌었는지 묻는다(no-cache)', calls[0]?.init?.cache === 'no-cache', calls);
+  check('주소(쿼리 포함)는 그대로', calls[0]?.url === 'https://x.io/test/jindan.html?embed=1&gpa5=2.1', calls[0]);
+
+  // 자원(js·png·csv)은 지금처럼 캐시 우선 + 배경 갱신 — 묻지 않는다
+  const calls2 = [];
+  const { listeners: l2 } = loadSW({ fetchImpl: async (r, init) => { calls2.push({ init }); return mkRes('PNG'); } });
+  let out2;
+  await l2.fetch({ request: { url: 'https://x.io/test/a.png', mode: 'no-cors', method: 'GET' },
+                   respondWith: p => { out2 = p; }, waitUntil: () => {} });
+  await out2;
+  check('자원은 그대로 받는다(no-cache 아님)', calls2.length === 1 && !calls2[0].init, calls2);
+
+  // 주소가 다른 곳으로 넘어가면(예: /test → /test/) 그 응답을 화면에 줄 수 없다 → 원래 요청으로 다시
+  const calls3 = [];
+  const { listeners: l3 } = loadSW({ fetchImpl: async (r, init) => { calls3.push({ init });
+    return init ? Object.assign(mkRes('REDIR'), { redirected: true }) : mkRes('PLAIN'); } });
+  let out3;
+  await l3.fetch({ request: { url: 'https://x.io/test', mode: 'navigate', method: 'GET' },
+                   respondWith: p => { out3 = p; }, waitUntil: () => {} });
+  const r3 = await out3;
+  check('넘어간 응답은 버리고 원래 요청으로 받는다', r3?.body === 'PLAIN' && calls3.length === 2, { body: r3?.body, n: calls3.length });
+
+  // no-cache 로 받기가 실패해도(오래된 브라우저 등) 원래 요청으로 한 번 더
+  const { listeners: l4 } = loadSW({ fetchImpl: async (r, init) => { if (init) throw new TypeError('x'); return mkRes('PLAIN'); } });
+  let out4;
+  await l4.fetch({ request: { url: 'https://x.io/test/', mode: 'navigate', method: 'GET' },
+                   respondWith: p => { out4 = p; }, waitUntil: () => {} });
+  check('묻기가 실패하면 원래 요청으로', (await out4)?.body === 'PLAIN');
+}
+
 console.log('\n■ 화면 — 네트워크가 죽어도 캐시로 띄운다 (오프라인 안내가 아니라)');
 {
   const { listeners } = loadSW({

@@ -4,7 +4,7 @@ const BASE = self.location.pathname.replace(/[^/]*$/, '');   // 예: '/ynhs/' ·
 // 캐시 저장소는 '경로'가 아니라 '출처' 단위로 공유된다 → /ynhs/ 와 /test/ 는 같은 출처라
 // 캐시 이름이 같으면 서로의 캐시를 지운다(한쪽 버전이 올라갈 때 activate가 삭제).
 // 그래서 이름에 BASE를 넣어 배포별로 분리한다. 예: 'ynhs:/ynhs/:v496'
-const CACHE_VER  = 'v693';
+const CACHE_VER  = 'v694';
 const CACHE_NAME = 'ynhs:' + BASE + ':' + CACHE_VER;
 const CACHE_MINE = 'ynhs:' + BASE + ':';                     // 이 배포가 소유한 캐시 접두사
 // 화면(HTML)을 네트워크에서 기다려 주는 최대 시간. 이 시간을 넘기면 캐시로 즉시 전환한다.
@@ -78,9 +78,20 @@ self.addEventListener('activate', e => {
   })());
 });
 
+// 화면(HTML)은 브라우저 보관본을 그냥 쓰지 않고 서버에 바뀌었는지 묻는다(cache:'no-cache').
+// GitHub Pages 는 파일을 10분 보관하게 해서(max-age=600), fetch(req) 로 받으면 배포가 끝나도
+// 그 10분 동안 예전 화면이 나온다 — 진로진학 탭의 진단처럼 ?v= 없이 여는 페이지(2026-11 신고).
+// 안 바뀌었으면 서버가 304 로만 답하니 느려지지 않는다.
+// navigate 요청은 옵션을 붙여 다시 만들 수 없어 주소로 받는다. 그러다 주소가 넘어가면
+// (/test → /test/) 그 응답은 화면에 줄 수 없으므로, 그때와 실패했을 때는 원래 요청으로 받는다.
+function fetchFresh(req) {
+  return fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
+    .then(res => (res && res.redirected) ? fetch(req) : res, () => fetch(req));
+}
+
 // 성공하면 응답, 실패하면 null. 절대 던지지 않는다(= respondWith가 깨지지 않음).
-function netFetch(req, cache, cacheKey) {
-  return fetch(req).then(res => {
+function netFetch(req, cache, cacheKey, fresh) {
+  return (fresh ? fetchFresh(req) : fetch(req)).then(res => {
     // redirected 응답을 캐시했다가 네비게이션에 돌려주면 브라우저가 거부하므로 저장하지 않는다.
     if (res && res.ok && res.status === 200 && !res.redirected) {
       cache.put(cacheKey, res.clone()).catch(() => {});
@@ -156,7 +167,7 @@ self.addEventListener('fetch', e => {
 
   e.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
-    const net = netFetch(req, cache, cacheKey);
+    const net = netFetch(req, cache, cacheKey, isNav);
 
     if (isNav) {
       // 네트워크 우선 — 단, 3.5초까지만 기다린다.
