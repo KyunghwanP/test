@@ -1430,10 +1430,34 @@
             list.insertAdjacentHTML('afterbegin',
                 viewMode === 'list' ? tableHtml(target) : viewMode === 'bar' ? barsHtml(target) : cardsHtml(target));
             if (viewMode === 'list') placeStickyCols(list);
-            if (currentFiltered.length > visibleCount) {
+            syncLoadMore(list);
+            // 자세히(표)는 표가 자기 안에서 스크롤된다 → 표 끝 가까이 내리면 저절로 더 붙인다
+            const wrap = viewMode === 'list' && list.querySelector('.uni-table-wrap');
+            if (wrap) wrap.addEventListener('scroll', () => {
+                if (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 300) loadMore();
+            }, { passive: true });
+        }
+        // '결과 더 보기' 자리. 카드는 단추로만, 자세히·막대는 내리면 저절로 나온다(단추도 그대로 누를 수 있다).
+        const AUTO_MORE = () => viewMode === 'list' || viewMode === 'bar';
+        let moreObserver = null;
+        function syncLoadMore(list) {
+            let w = document.getElementById('load-more-wrap');
+            const left = currentFiltered.length - visibleCount;
+            if (moreObserver) { moreObserver.disconnect(); moreObserver = null; }
+            if (left <= 0) { if (w) w.remove(); return; }
+            if (!w) {
                 list.insertAdjacentHTML('beforeend', `<div id="load-more-wrap" style="grid-column:1/-1;text-align:center;padding:8px 0;">
-                    <button class="expand-btn" onclick="loadMore()">결과 더 보기 (${(currentFiltered.length - visibleCount).toLocaleString()}건 남음)</button>
-                </div>`);
+                    <button class="expand-btn" onclick="loadMore()"></button>
+                    <p class="more-auto" style="margin-top:8px;font-size:11.5px;color:var(--slate-400);">아래로 내리면 저절로 더 나옵니다</p></div>`);
+                w = document.getElementById('load-more-wrap');
+            }
+            // 단추는 그대로 두고 글자만 바꾼다(바꿔 끼우면 누르던 단추가 사라진다)
+            w.querySelector('button').textContent = `결과 더 보기 (${left.toLocaleString()}건 남음)`;
+            w.querySelector('.more-auto').style.display = AUTO_MORE() ? '' : 'none';
+            // 막대는 페이지가 스크롤된다 → 이 자리가 화면 가까이 오면 더 붙인다
+            if (viewMode === 'bar' && 'IntersectionObserver' in window) {
+                moreObserver = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) loadMore(); }, { rootMargin: '0px 0px 600px 0px' });
+                moreObserver.observe(w);
             }
         }
 
@@ -1592,7 +1616,31 @@
                 </div>
             </div>`;
         }
-        function loadMore() { visibleCount += PAGE_SIZE; renderList(getTargetGrade()); }
+        // 더 보기 — 목록을 통째로 다시 그리지 않고 새 줄만 뒤에 붙인다.
+        // 통째로 다시 그리면 스크롤이 맨 위로 간다(자세히 표는 자기 안 스크롤이 0 으로, 2026-11 신고).
+        const MORE_ROW = { list: '.uni-table tbody > tr', bar: '.bar-rows > .bar-row', card: '.uni-card' };
+        function loadMore() {
+            const from = visibleCount;
+            if (from >= currentFiltered.length) return;
+            const list = document.getElementById('data-list');
+            const dest = viewMode === 'list' ? list.querySelector('.uni-table tbody')
+                       : viewMode === 'bar' ? list.querySelector('.bar-rows') : list;
+            visibleCount += PAGE_SIZE;
+            if (!dest || !list.querySelector(MORE_ROW[viewMode])) { renderList(getTargetGrade()); return; }
+            const wrap = list.querySelector('.uni-table-wrap');
+            const keep = { y: window.scrollY, t: wrap ? wrap.scrollTop : 0 };
+            const target = getTargetGrade();
+            const tmp = document.createElement('div');
+            tmp.innerHTML = viewMode === 'list' ? tableHtml(target) : viewMode === 'bar' ? barsHtml(target) : cardsHtml(target);
+            const fresh = [...tmp.querySelectorAll(MORE_ROW[viewMode])].slice(from);
+            const before = viewMode === 'card' ? document.getElementById('load-more-wrap') : null;
+            fresh.forEach(el => dest.insertBefore(el, before));
+            if (viewMode === 'list') placeStickyCols(list);
+            syncLoadMore(list);
+            // 혹시 브라우저가 옮겨 놓았으면 제자리로
+            if (window.scrollY !== keep.y) window.scrollTo(0, keep.y);
+            if (wrap && wrap.scrollTop !== keep.t) wrap.scrollTop = keep.t;
+        }
 
         // ─── 대학 상세 모달 ───
         const fmt = v => (v === undefined || v === null || v === '') ? '—' : v;
