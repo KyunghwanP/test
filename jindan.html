@@ -942,12 +942,12 @@
             const humFirst = ['미술사'];
             const art = ['체육', '스포츠', '골프', '무용', '음악', '성악', '작곡', '피아노', '관현악', '국악', '미술', '회화', '조소', '조형',
                          '공예', '디자인', '연기', '연극', '영화', '공연', '방송연예', '뮤지컬', '패션', '뷰티', '미용', '메이크업', '만화', '웹툰',
-                         '애니메이션', '사진', '태권도', '레저', 'e스포츠', 'K-POP', '엔터테인먼트'];
+                         '애니메이션', '사진', '태권도', '레저', 'e스포츠', 'K-POP', '엔터테인먼트', '운동', '피트니스', '축구', '도예'];
             // '의예' 만 쓰면 '창의예술' 이 걸린다 → '의예과'(치의예과·한의예과·수의예과도 걸린다)·'(의예)'
             const med = ['의예과', '(의예)', '약학', '간호', '임상병리', '방사선', '물리치료', '작업치료', '치위생', '응급구조', '의학', '한약', '의료', '치기공', '보건', '안경광학'];
             const eng = ['전자', '컴퓨터', '기계', '신소재', '건축', '에너지', '토목', '환경', '소프트웨어', '인공지능', '로봇', '반도체', '자동차', '화학공학', '고분자', '시스템', '전기',
                          '정보통신', '정보보호', '정보보안', '정보공학', '정보기술', '정보과학', '정보처리', '정보융합', '지능정보', '양자', '디스플레이', '보안', '소방', '방재', '스마트팩토리', '스마트시티', '항공정비', '게임', '공학', 'AI', '데이터', '융합기술', '드론', '메카'];
-            const nat = ['수학', '물리', '화학', '생물', '천문', '지질', '해양', '통계', '의생명', '생명과학', '과학', '나노', '식품', '원예', '산림', '조경', '생명', '바이오', '축산', '동물', '농'];
+            const nat = ['수학', '물리', '화학', '생물', '천문', '지질', '해양', '통계', '의생명', '생명과학', '과학', '나노', '식품', '원예', '산림', '조경', '생명', '바이오', '축산', '동물', '농', '식물', '스마트팜', '의류', '의상'];
             const soc = ['경영', '경제', '법학', '행정', '미디어', '사회복지', '심리', '정치', '외교', '무역', '회계', '관광', '언론', '아동', '소비자', '지리', '사회', '광고', '홍보', '금융', '부동산', '세무', '국제', '커뮤니케이션', '법', '상경', '신문방송', '마케팅', '공공'];
             const hum = ['인문', '어문', '역사', '철학', '종교', '국어', '영어', '독어', '불어', '일어', '중어', '한문', '사학', '고고', '미학', '문학', '언어', '신학', '창작', '일본학', '중국학', '□'];
             if (has(edu)) return '교육';
@@ -961,6 +961,7 @@
             if (has(nat)) return '자연';
             if (has(soc)) return '사회';
             if (has(hum)) return '인문';
+            if (/어(학과|과|학부|학▽)$/.test(s)) return '인문';   // 일본어학과·아랍어과·프랑스어학부 — 어문
             if (s.includes('예술')) return '예체능';
             return '기타';
         }
@@ -1029,6 +1030,8 @@
                     competition: cols[9], waitlist: cols[10],
                     quotaTotal: cols[8] === '0' ? '' : cols[8], quotaInitial: cols[6], quotaCarry: cols[7],
                 };
+                // 등급·점수·모집인원이 모두 빈 해(경북대 '24 등)는 충원 '0' 도 자료 없음이다. 0보다 큰 충원은 실제 값이라 둔다
+                if (yv.grade70 == null && yv.grade50 == null && !yv.score70 && !yv.score50 && !yv.quotaTotal && parseFloat(yv.waitlist) === 0) yv.waitlist = '';
                 // 같은 연도 중복행이면 유효 등급이 있는 쪽을 우선
                 if (!rec.years[year] || (rec.years[year].grade70 == null && yv.grade70 != null)) rec.years[year] = yv;
             }
@@ -1159,12 +1162,14 @@
             return                        { label: '컷 하락', cls: 'tr-down', dir: 'down', arrow: '↘', delta: dl };  // 합격선↓(완화)
         }
         // 상세모달용 추세 설명
-        function trendReason(t) {
+        // 해 수는 실제로 자료가 있는 해(yearCount) — 2년치인데 '3개년' 이라 쓰지 않는다
+        function trendReason(t, rec) {
             if (!t) return '3개년 중 유효 데이터가 1개뿐이라 추세를 판단할 수 없습니다.';
             const d = Math.abs(t.delta).toFixed(2);
-            if (t.cls === 'tr-up')   return `최근 3개년 합격선이 상승(약 ${d}등급 강화) — 올해는 더 치열할 수 있어 보수적으로.`;
-            if (t.cls === 'tr-down') return `최근 3개년 합격선이 하락(약 ${d}등급 완화) — 다소 여유가 생기는 추세.`;
-            return '최근 3개년 합격선이 큰 변동 없이 유지되는 추세입니다.';
+            const n = (rec && rec.yearCount) || 3;
+            if (t.cls === 'tr-up')   return `최근 ${n}개년 합격선이 상승(약 ${d}등급 강화) — 올해는 더 치열할 수 있어 보수적으로.`;
+            if (t.cls === 'tr-down') return `최근 ${n}개년 합격선이 하락(약 ${d}등급 완화) — 다소 여유가 생기는 추세.`;
+            return `최근 ${n}개년 합격선이 큰 변동 없이 유지되는 추세입니다.`;
         }
 
         // ─── 충원(추합) 여유 ───
@@ -1786,7 +1791,7 @@
                 <div class="d-tile hl" style="grid-column:1/-1;"><p class="k">${r.yearCount === 1 ? cutLabel(r).replace(' 70%컷', '학년도 환산등급 70%컷') : r.yearCount + '개년 평균 환산등급 70%컷'}</p><p class="v">${r.averageGrade.toFixed(2)}</p><p class="gap-box ${gap.cls}" style="justify-content:flex-start;margin-top:3px;font-size:11.5px;">내 등급 대비 <span class="arr">${gap.arrow}</span>${gap.text}</p></div>
                 <div style="grid-column:1/-1;overflow-x:auto;"><table class="dm-year-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
             document.getElementById('dm-tip').innerHTML =
-                `<div class="d-tile wide"><p class="k">상담 포인트</p><p class="tip-line"><b class="tip-ic ${t ? t.cls : 'tr-flat'}">추세</b> ${trendReason(t)}</p>${ch ? `<p class="tip-line"><b class="tip-ic ${ch.cls}">추합</b> ${ch.note} (평균 추합률 ${ch.pct}%)</p>` : ''}<p class="tip-caveat">※ 어디가 컷은 최종등록자 기준이라 추합이 이미 반영됨 — 추합률은 예비번호 기대·안정성 참고용입니다.</p></div>`;
+                `<div class="d-tile wide"><p class="k">상담 포인트</p><p class="tip-line"><b class="tip-ic ${t ? t.cls : 'tr-flat'}">추세</b> ${trendReason(t, r)}</p>${ch ? `<p class="tip-line"><b class="tip-ic ${ch.cls}">추합</b> ${ch.note} (평균 추합률 ${ch.pct}%)</p>` : ''}<p class="tip-caveat">※ 어디가 컷은 최종등록자 기준이라 추합이 이미 반영됨 — 추합률은 예비번호 기대·안정성 참고용입니다.</p></div>`;
             renderSusi(r);
             document.getElementById('dm-meta').innerHTML =
                 `<p class="k">계열 / 전형유형 / 대학코드</p><p class="v" style="font-size:15px;">${r.category} · ${r.kind} · ${fmt(r.uniCode)}</p>`;
@@ -1861,11 +1866,52 @@
             if (!ka || !kb) return 2;
             return 1;
         }
+        // 규칙 모집단위 풀기 — 빼 둔 모집단위(제외 목록)와 나머지(core)로 나눈다.
+        //   '인문사회계열(경찰행정학과 제외)' → core '인문사회계열', ex ['경찰행정학과']
+        //   '호텔관광학과 외 전 모집단위'·'약학과, 의예과 제외 전 모집단위' → core '전 모집단위', ex [...]
+        //   '자연 - 의예과 외' → core '자연', ex ['의예과']
+        function parseUnit(u) {
+            let core = String(u || '').trim();
+            const ex = [];
+            core = core.replace(/\(([^()]*(?:\([^()]*\)[^()]*)*)제외[^()]*\)/g, (m, a) => { ex.push(a); return ''; });
+            let m = core.match(/^(.+?)\s*(?:외|제외)\s*((?:전|모든)\s*\S.*|전체.*)$/);
+            if (m) { ex.push(m[1]); core = m[2]; }
+            m = core.match(/^(.+?)\s*-\s*(.+?)\s*외$/);
+            if (m) { ex.push(m[2]); core = m[1]; }
+            const list = ex.flatMap(e => e.split(/[,·、\/]/)).map(x => x.trim()).filter(Boolean);
+            return { core: core.trim(), ex: list };
+        }
+        // 규칙 모집단위가 '계열' 을 가리키는가 — 계열 낱말로만 되어 있을 때만(인문계열·자연계·인문·사회계·인문/자연).
+        // '농업토목공학과'·'한의예과(인문)'·'제약공학과' 처럼 학과 이름에 '공학'·'인문' 이 든 것은 계열이 아니다.
+        // (예전엔 '공학' 이 들어 있기만 하면 계열로 봐서 경북대 스마트플랜트공학과에 전기공학과 최저가 붙었다)
+        const GROUP_TOK = /^(인문|사회|자연|공학|이공|상경|예체능|예능|의약|이학|인문사회|자연공학|인문과학|사회과학|자연과학|공과|이과|문과)(계열|계)?(공통)?$/;
+        function isGroupUnit(core) {
+            const toks = String(core || '').replace(/\s+/g, '').replace(/[()]/g, '·').split(/[·,\/、・\-]+/).filter(Boolean);
+            return toks.length > 0 && toks.every(t => GROUP_TOK.test(t));
+        }
+        // 규칙 모집단위가 '그 대학(그 전형) 전체' 인가. 앞에 단과대학·계열이 붙으면('공과대학 전 모집단위'·'인문 전체') 전체가 아니다.
+        // 괄호 안(캠퍼스·인원·포함 목록)은 보지 않는다. '산업안전학과' 처럼 글자만 겹치는 것도 걸리지 않게 처음부터 맞춘다.
+        const WHOLE_RX = /^(?:(?:주간|야간|메디컬캠퍼스|메트로폴캠퍼스)\s*)?(?:전체|전\s*(?:모집단위|학과|학부|계열)(?:\s*공통)?|모든\s*(?:학과|모집단위)|해당\s*모집단위|공통|그\s*외\s*전\s*모집단위|상기\s*모집단위\s*외\s*모든\s*모집단위|전체\s*(?:모집단위|대학·학부\s*과?|대학·학과))$/;
+        function isWholeUnit(core) {
+            const c = String(core || '').replace(/\([^()]*(?:\([^()]*\)[^()]*)*\)/g, '').replace(/\s+/g, ' ').trim();
+            return WHOLE_RX.test(c) ||
+                /(?:전형|만학도|특성화고출신자|사회배려대상자|농어촌학생)\s*(?:기타\s*)?(?:모든\s*모집단위|전체)$/.test(c) ||
+                /^\S+\s*해당\s*모집단위$/.test(c);
+        }
+        // 빼 둔 목록에 이 학과가 들어 있는가
+        function excludedBy(ex, dep) {
+            const strip = x => x.replace(/학과|학부|전공|과$/g, '').replace(/\s+/g, '');
+            const d = strip(dep);
+            if (d.length < 2) return false;
+            return ex.some(x => { const k = strip(x); return k.length >= 2 && (k === d || d.includes(k) || k.includes(d)); });
+        }
         // 모집단위 일치도: 4=정확, 3=부분, 2=계열, 1=전체/해당모집단위, 0=불일치
         function unitMatch(rule, r) {
-            const u = rule['모집단위']||'', dep = r.department||'';
+            const raw = rule['모집단위']||'', dep = r.department||'';
+            const { core: u, ex } = parseUnit(raw);
+            if (dep && excludedBy(ex, dep)) return 0;
             if (u && dep) {
-                if (u === dep) return 4;
+                if (raw === dep || u === dep) return 4;
                 const d2 = dep.replace(/학과|학부|학전공|전공|계열|과$/g,'');
                 const u2 = u.replace(/학과|학부|학전공|전공|계열|과$/g,'');
                 if (d2.length>=2 && (u.includes(d2) || (u2.length>=2 && dep.includes(u2)))) return 3;
@@ -1878,16 +1924,34 @@
                     if (idx >= 0 && (idx === 0 || /[^가-힣]/.test(u[idx-1])) && dep.includes(dk)) return 3;
                 }
             }
-            if (/계열|인문|자연|공학|예체능|의약|사회|이공/.test(u)) {
+            if (isGroupUnit(u)) {
                 const kw = {인문:['인문'],사회:['사회','상경','인문'],자연:['자연','이학','이공'],
                             공학:['공학','이공','자연'],의약:['의약','의','약','간호','보건'],
                             교육:['사범','교육','인문'],기타:[]}[r.category]||[];
                 if (kw.some(k => u.includes(k))) return 2;
             }
-            if (/전체|전 ?모집|전 ?학과|전 ?학부|전 ?계열|모든|해당 ?모집단위|자율전공|자유전공/.test(u)) return 1;
+            // '자율전공학부' 같은 모집단위는 한 학부일 뿐 '전체' 가 아니다
+            if (isWholeUnit(u)) return 1;
             // 모집단위가 학과가 아니라 전형명(지역균형 등)을 그대로 반복 → 해당 전형 전체 적용(와일드카드)
-            if (canonName(u) && canonName(u) === canonName(rule['전형명'])) return 1;
+            if (canonName(raw) && canonName(raw) === canonName(rule['전형명'])) return 1;
             return 0;
+        }
+        // 이 학과·전형에 붙일 최저 규칙 고르기 (전형유형 > 모집단위 > 전형명 점수가 가장 높은 것들).
+        // 이 전형에 모집단위별 규칙이 따로 있는데 이 학과가 그 안에 없으면, 다른 전형·전 전형 규칙을
+        // 빌려 오지 않고 '자료 없음' 으로 둔다(전남대처럼 단과대학별로만 적힌 곳에 '최저 미적용' 이 붙지 않게,
+        // 서울대 일반전형에 지역균형 최저가 붙지 않게).
+        function pickMincut(r) {
+            const all = susiMincut[r.uniCode] || [];
+            const rows = all.map(rule => ({ rule, tm: typeMatch(rule, r), ns: nameScore(rule, r), um: unitMatch(rule, r) }));
+            const scored = rows.filter(x => x.tm > 0 && x.ns > 0 && x.um > 0);
+            if (!scored.length) return [];
+            const score = x => x.tm*1000 + x.um*100 + x.ns*10;
+            const best = Math.max(...scored.map(score));
+            const top = scored.filter(x => score(x) === best);
+            const own = rows.some(x => x.tm === 2 && x.ns === 3 && x.um === 0);
+            // 빌려 오는 것 = 이름이 다른 전형(ns 1)이나 전 전형 공통(tm 1) 규칙. 같은 전형의 줄인 이름(ns 2, '미래인재' ↔ '미래인재서류')은 그대로 둔다
+            if (own && (top[0].ns <= 1 || top[0].tm === 1)) return [];
+            return top.map(x => x.rule);
         }
         // ── 수능최저 충족 판정 (학생 모의고사 등급 vs 규칙) ──
         // 기준: 최근 모의고사 / 애매한 규칙은 보수적으로 '미판정'. 탐구는 기본 상위1과목, '2과목평균' 명시 시 평균.
@@ -1966,12 +2030,8 @@
                 <p style="margin:0 0 10px;">${basis}</p>`;
             if (!all.length) { el.innerHTML = html + `<p style="color:#64748b;font-size:13px;">이 대학의 수능최저 데이터가 없습니다.</p></div>`; return; }
 
-            // 이 학과·전형에 해당하는 규칙만 점수화(전형유형→전형명→모집단위)해서 최적 매칭 선택
-            const scored = all.map(rule => ({ rule, tm: typeMatch(rule, r), ns: nameScore(rule, r), um: unitMatch(rule, r) }))
-                              .filter(x => x.tm > 0 && x.ns > 0 && x.um > 0);
-            const score = x => x.tm*1000 + x.um*100 + x.ns*10;   // 전형유형 > 모집단위 > 전형명
-            const best = scored.length ? Math.max(...scored.map(score)) : 0;
-            const picked = scored.filter(x => score(x) === best).map(x => x.rule);
+            // 이 학과·전형에 해당하는 규칙만 점수화(전형유형→모집단위→전형명)해서 최적 매칭 선택
+            const picked = pickMincut(r);
 
             if (picked.length) {
                 const anyY = picked.some(p => p['최저있음'] === 'Y');
@@ -2002,7 +2062,10 @@
                     });
                 }
             } else {
-                html += `<p style="color:#64748b;font-size:13px;">이 학과·전형에 딱 맞는 최저 항목을 찾지 못했어요. 아래 '이 대학 전체 최저 보기'를 확인하세요.</p>`;
+                // 다른 학과 규칙을 빌려 와 판정하지 않는다 — 판정 없이 요강 확인으로 둔다
+                html += `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;">
+                    <b style="color:#b45309;">이 모집단위의 수능최저 자료가 없습니다.</b>
+                    <p style="font-size:12.5px;color:#92400e;margin:4px 0 0;">충족 여부를 판정하지 않았어요. 모집요강에서 확인하세요(아래 '이 대학 전체 최저 보기' 는 참고용).</p></div>`;
             }
 
             // 나머지는 접어두기 (매칭이 애매할 때 대비)
