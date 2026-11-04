@@ -485,6 +485,19 @@
             if (!pg.rendered) renderPage(n - 1);
             pg.div.classList.remove('flash'); void pg.div.offsetWidth; pg.div.classList.add('flash');
         }
+        // 주소로 받은 쪽(&page=) — 앞쪽 페이지가 그려지며 높이가 바뀌면 화면이 한 쪽 위로 밀린다(57 → 56).
+        // 사용자가 스크롤하기 전까지 몇 번 그 쪽에 다시 맞춘다.
+        function settleOnPage(n, token) {
+            n = Math.max(1, Math.min(pages.length, parseInt(n, 10) || 1));
+            let moved = false;
+            const stop = () => { moved = true; };
+            ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(ev => container.addEventListener(ev, stop, { once: true, passive: true }));
+            [350, 900, 1700].forEach(ms => setTimeout(() => {
+                if (moved || token !== loadToken || !pages[n - 1]) return;
+                pages[n - 1].div.scrollIntoView({ block: 'start' });
+                if (document.activeElement !== pageInput) pageInput.value = n;
+            }, ms));
+        }
         pageInput.addEventListener('keydown', e => {
             if (e.key === 'Enter') { e.preventDefault(); gotoPage(pageInput.value); pageInput.blur(); }
             else if (e.key === 'Escape') { updatePageIndicator(); pageInput.blur(); }
@@ -575,7 +588,7 @@
                 renderVisible();               // 첫 화면 페이지 렌더
                 pageNav.hidden = false; pageInput.disabled = false; pageInput.value = '1'; pageTotalEl.textContent = doc.numPages;
                 searchInput.disabled = false;
-                if (o.page) gotoPage(o.page);
+                if (o.page) { gotoPage(o.page); settleOnPage(o.page, token); }
                 if (o.q) {   // 색인이 끝나면 buildTextIndex 가 이 검색을 돌린다
                     searchInput.value = o.q; query = o.q; searchStartPage = o.page || 0;
                     countEl.textContent = '색인 중…';

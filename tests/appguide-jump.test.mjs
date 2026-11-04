@@ -55,7 +55,7 @@ const midPage = pg => pg.evaluate(() => {
 console.log('\n■ page=');
 {
   const { pg, errs } = await open('code=0002748&page=57');
-  await pg.waitForTimeout(1500);
+  await pg.waitForTimeout(2200);   // 앞쪽 페이지가 그려지며 높이가 바뀌어도 다시 맞추는 시간(settleOnPage)
   check('57쪽으로 간다(맨 위에 57쪽)', await topPage(pg) === 57, await topPage(pg));
   check('쪽 번호 칸도 57', await pg.inputValue('#pdfPageInput') === '57', await pg.inputValue('#pdfPageInput'));
   check('오류 없음', errs.length === 0, errs);
