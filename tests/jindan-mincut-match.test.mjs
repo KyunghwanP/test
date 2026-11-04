@@ -68,8 +68,9 @@ const el = await detail('경북대학교', '전기공학과', '교과우수자')
 check('경북대 전기공학과는 자기 규칙(전기공학과)이 붙고 판정된다',
   el && /전기공학과/.test(el.susi.split('이 대학 전체 최저')[0]) && el.badges > 0, el && el.susi.slice(0, 300));
 const gc = await detail('가천대학교', '사회복지학과', '학생부우수자');
-check('가천대 사회복지학과(학생부우수자)는 그대로 인문계열 규칙이 붙는다',
-  gc && /인문계열/.test(gc.susi.split('이 대학 전체 최저')[0]) && gc.badges > 0, gc && gc.susi.slice(0, 300));
+// 2026-11 외부 검토 뒤: 예전 자료 길은 학과명이 그대로 같을 때만 잇는다(계열 규칙도 잇지 않는다 — tests/jindan-mincut-safe.test.mjs)
+check('가천대 사회복지학과(학생부우수자): 인문계열 규칙을 잇지 않고 요강 확인으로',
+  gc && !/인문계열/.test(gc.susi.split('이 대학 전체 최저')[0]) && /요강 확인/.test(gc.susi) && gc.badges === 0, gc && gc.susi.slice(0, 300));
 
 const um = await pg.evaluate(() => {
   const R = (department, category) => ({ department, category });
@@ -128,7 +129,7 @@ const jnTop = jn ? jn.susi.split('이 대학 전체 최저')[0] : '';
 check("전남대 국제학부(일본학전공) 교과 일반에 '최저 미적용' 이 붙지 않는다", jn && !/적용하지 않습니다/.test(jnTop), jnTop.slice(0, 300));
 const ih = await detail('인하대학교', '스마트모빌리티공학과', '지역균형');
 const ihTop = ih ? ih.susi.split('이 대학 전체 최저')[0] : '';
-check("인하대 스마트모빌리티공학과(지역균형)엔 '자연 - 의예과 외' 규칙이 붙는다", ih && /자연 - 의예과 외/.test(ihTop) && !/인문 전체/.test(ihTop), ihTop.slice(0, 300));
+check("인하대 스마트모빌리티공학과(지역균형): 계열 규칙('자연 - 의예과 외'·'인문 전체')을 잇지 않는다", ih && !/자연 - 의예과 외/.test(ihTop) && !/인문 전체/.test(ihTop), ihTop.slice(0, 300));
 
 // 전체 자료에서: 계열 매칭(2점)으로 뽑힌 규칙의 모집단위가 모두 계열 낱말인지
 const whole = await pg.evaluate(() => {

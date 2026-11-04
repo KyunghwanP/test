@@ -286,6 +286,8 @@
         .ad-none { background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 10px; padding: 12px 14px; }
         .ad-warn { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 12px 14px; }
         .ad-warn li { font-size: 12.5px; color: #92400e; margin: 4px 0 0 16px; }
+        .ad-guide { margin-top: 8px; border: 1px solid #fcd34d; background: #fff; color: #b45309; font-weight: 800; font-size: 12px; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+        .ad-guide:hover { background: #fef3c7; }
         /* 3개년 추세 색 (모달 상담포인트 태그 + 카드 메타줄 공용) */
         .tr-up   { color: #b45309; }   /* 컷 상승(경쟁 심화) — 주황 */
         .tr-down { color: #2563eb; }   /* 컷 하락(완화) — 파랑 */
@@ -958,7 +960,7 @@
                          '공예', '디자인', '연기', '연극', '영화', '공연', '방송연예', '뮤지컬', '패션', '뷰티', '미용', '메이크업', '만화', '웹툰',
                          '애니메이션', '사진', '태권도', '레저', 'e스포츠', 'K-POP', '엔터테인먼트', '운동', '피트니스', '축구', '도예'];
             // '의예' 만 쓰면 '창의예술' 이 걸린다 → '의예과'(치의예과·한의예과·수의예과도 걸린다)·'(의예)'
-            const med = ['의예과', '(의예)', '약학', '간호', '임상병리', '방사선', '물리치료', '작업치료', '치위생', '응급구조', '의학', '한약', '의료', '치기공', '보건', '안경광학'];
+            const med = ['의예과', '(의예)', '약학', '간호', '언어치료', '언어재활', '청각', '임상병리', '방사선', '물리치료', '작업치료', '치위생', '응급구조', '의학', '한약', '의료', '치기공', '보건', '안경광학'];
             const eng = ['전자', '컴퓨터', '기계', '신소재', '건축', '에너지', '토목', '환경', '소프트웨어', '인공지능', '로봇', '반도체', '자동차', '화학공학', '고분자', '시스템', '전기',
                          '정보통신', '정보보호', '정보보안', '정보공학', '정보기술', '정보과학', '정보처리', '정보융합', '지능정보', '양자', '디스플레이', '보안', '소방', '방재', '스마트팩토리', '스마트시티', '항공정비', '게임', '공학', 'AI', '데이터', '융합기술', '드론', '메카'];
             const nat = ['수학', '물리', '화학', '생물', '천문', '지질', '해양', '통계', '의생명', '생명과학', '과학', '나노', '식품', '원예', '산림', '조경', '생명', '바이오', '축산', '동물', '농', '식물', '스마트팜', '의류', '의상'];
@@ -976,6 +978,8 @@
             if (has(soc)) return '사회';
             if (has(hum)) return '인문';
             if (/어(학과|과|학부|학▽)$/.test(s)) return '인문';   // 일본어학과·아랍어과·프랑스어학부 — 어문
+            // 러시아학과·독일학과·러시아·유라시아학과·독일유럽학과 — 나라·지역학은 어문(인문)
+            if (/(러시아|독일|프랑스|스페인|이탈리아|포르투갈|폴란드|헝가리|루마니아|체코|우크라이나|튀르키예|몽골|베트남|태국|인도|아랍|중동|유라시아|중앙아시아|중남미|라틴아메리카|유럽|아프리카|동남아)(학과|학부|학)$/.test(s.replace(/·/g, ''))) return '인문';
             if (s.includes('예술')) return '예체능';
             return '기타';
         }
@@ -2025,16 +2029,31 @@
         // 이 전형에 모집단위별 규칙이 따로 있는데 이 학과가 그 안에 없으면, 다른 전형·전 전형 규칙을
         // 빌려 오지 않고 '자료 없음' 으로 둔다(전남대처럼 단과대학별로만 적힌 곳에 '최저 미적용' 이 붙지 않게,
         // 서울대 일반전형에 지역균형 최저가 붙지 않게).
+        // 규칙 모집단위가 이 학과를 '그대로' 적었는가 — 통째로 같거나, 목록('간호학과, 물리치료학과')의 한 칸과 같을 때만.
+        // '실기/실적위주 - …' 처럼 실기 전형용 줄은 실기 전형이 아니면 쓰지 않는다(세명대 교과 디자인 학과에 실기 최저가 붙던 것).
+        function exactUnit(rule, r) {
+            const raw = rule['모집단위'] || '';
+            if (/실기|실적/.test(raw) && admKind(r.admissionName) !== '실기') return false;
+            const { core, ex } = parseUnit(raw);
+            if (excludedBy(ex, r.department)) return false;
+            const dk = deptKey(r.department);
+            if (deptKey(raw) === dk || deptKey(core) === dk) return true;
+            return String(core).split(/[,，·/()\[\]]+|\s+-\s+/).map(deptKey).filter(Boolean).includes(dk);
+        }
+        // 이 학과·전형에 붙일 예전 최저 규칙(어디가에서 못 찾은 곳만 쓴다).
+        // 2026-11 외부 검토: 이름 일부만 같거나(한의예과 ← 의예과, 공학계열 ← 자유전공학부, G2빅데이터경영학과 ← 경영학과)
+        // 계열로 잇던 것을 없앴다. 학과명이 그대로 같은 줄 → 없으면 같은 전형(ns 3)의 '전 모집단위' 줄. 그 밖은 '요강 확인'.
+        // 이 전형에 모집단위별 규칙이 따로 있는데 이 학과가 그 안에 없으면 다른 전형·전 전형 규칙을 빌려 오지 않는다.
         function pickMincut(r) {
             const all = susiMincut[r.uniCode] || [];
-            const rows = all.map(rule => ({ rule, tm: typeMatch(rule, r), ns: nameScore(rule, r), um: unitMatch(rule, r) }));
-            const scored = rows.filter(x => x.tm > 0 && x.ns > 0 && x.um > 0);
-            if (!scored.length) return [];
-            const score = x => x.tm*1000 + x.um*100 + x.ns*10;
-            const best = Math.max(...scored.map(score));
-            const top = scored.filter(x => score(x) === best);
-            const own = rows.some(x => x.tm === 2 && x.ns === 3 && x.um === 0);
-            // 빌려 오는 것 = 이름이 다른 전형(ns 1)이나 전 전형 공통(tm 1) 규칙. 같은 전형의 줄인 이름(ns 2, '미래인재' ↔ '미래인재서류')은 그대로 둔다
+            const rows = all.map(rule => ({ rule, tm: typeMatch(rule, r), ns: nameScore(rule, r), um: unitMatch(rule, r), ex: exactUnit(rule, r) }));
+            const exact = rows.filter(x => x.tm > 0 && x.ns >= 2 && x.ex);
+            const pool = exact.length ? exact : rows.filter(x => x.tm > 0 && x.ns === 3 && x.um === 1);
+            if (!pool.length) return [];
+            const score = x => x.tm*1000 + x.ns*10;
+            const best = Math.max(...pool.map(score));
+            const top = pool.filter(x => score(x) === best);
+            const own = rows.some(x => x.tm === 2 && x.ns === 3 && !x.ex && x.um === 0);
             if (own && (top[0].ns <= 1 || top[0].tm === 1)) return [];
             return top.map(x => x.rule);
         }
@@ -2240,17 +2259,24 @@
         //   absent  — 자료집 최저 표에 이 대학이 없음
         // 단과대학 이름('자연과학대학')은 학과와 이을 수 없어서, 학과명이 직접 나오거나 '전 모집단위'·'인문(계)'·'자연(계)' 같은 낱말일 때만 덮는다고 본다.
         const NONE_RX = /^(미적용|없음|미반영|해당\s*없음|수능최저\s*없음)$/;
+        // 자료집이 단과대학 이름으로만 적은 줄을 학과에 잇는 표 — 확인한 것만.
+        //   경북대 '모든전형 | 생태환경대학, 과학기술대학, 자율미래인재학부 | 미적용'(자료집 340쪽, 2027 요강 75쪽) = 상주캠퍼스 학과(CAMPUS_FIX)
+        const JARYO_COLLEGE = { '5': [{ rx: /생태환경대학|과학기술대학/, has: r => r.campus === '상주캠퍼스' }] };
         function jaryoCheck(r) {
             const rows = jaryoMin && jaryoMin.u && jaryoMin.u[String(parseInt(r.uniCode, 10))];
             if (!rows || !rows.length) return { state: 'absent' };
             const core = admCore(r.admissionName), kind = admKind(r.admissionName);
             const base = deptKey(r.department).replace(/(학과|학부|전공|과)$/, '');
             const humSide = ['인문', '사회', '교육'].includes(r.category), natSide = ['자연', '공학', '의약'].includes(r.category);
+            // 전형은 넓게 본다(덮는다고 보면 '확인 필요' 쪽이라 안전하다): '지역인재전형_기초생활수급자…' 는 '지역인재' 줄에도 걸린다
+            const parts = [core, ...core.split(/[_·,/]|및/)].filter(x => x && x.length >= 2);
             const covers = ([, adm, unit]) => {
                 const a = mk(adm), u = mk(unit);
                 if ((/종합/.test(a) && kind === '교과' && !/교과/.test(a)) || (/교과/.test(a) && kind === '종합' && !/종합/.test(a))) return false;
-                const admOk = (core.length >= 2 && a.includes(core)) || /모든전형|전전형|전형공통/.test(a);
+                const admOk = parts.some(x => a.includes(x)) || /모든전형|전전형|전형공통/.test(a);
                 if (!admOk) return false;
+                const code = String(parseInt(r.uniCode, 10));
+                if ((JARYO_COLLEGE[code] || []).some(m => m.rx.test(unit) && m.has(r))) return true;
                 const excl = (unit.match(/\(([^)]*)제외[^)]*\)|\[([^\]]*)제외[^\]]*\]/) || []).slice(1).join(',');
                 if (base.length >= 2 && excl && mk(excl).includes(base)) return false;
                 // 학과는 목록의 한 칸과 통째로 맞아야 한다('사회학과' 가 '사회복지학과' 에 걸리지 않게). 학부 이름이 앞에 붙은 것은 맞는 것으로 본다
@@ -2263,15 +2289,28 @@
                 if (natSide && toks.some(t => /^(자연|자연계|자연계열|이공계|이공계열|공학계열|자연공학계열)$/.test(t))) return true;
                 return false;
             };
-            if (rows.some(x => NONE_RX.test(String(x[3]).trim()) && covers(x))) return { state: 'none' };
             const hit = rows.filter(x => !NONE_RX.test(String(x[3]).trim()) && covers(x));
-            return hit.length ? { state: 'listed', rows: hit } : { state: 'notlisted' };
+            if (hit.length) return { state: 'listed', rows: hit };          // 최저 줄과 '미적용' 줄이 둘 다 덮으면 확인 필요 쪽
+            const none = rows.find(x => NONE_RX.test(String(x[3]).trim()) && covers(x));
+            return none ? { state: 'none', row: none } : { state: 'notlisted' };
         }
         // 자료집 줄을 '확인 필요' 상자로
-        function jaryoWarn(rows, lead) {
+        const GUIDE_BTN = `<button type="button" class="ad-guide" onclick="openGuide('최저학력')">📑 요강에서 '최저' 찾기</button>`;
+        function jaryoWarn(rows, lead, old) {
+            const li = [...(rows || []).slice(0, 4).map(x => `<li>자료집: ${x[1]} · ${x[2]} — <b>${x[3]}</b>${x[5] ? ` (자료집 ${x[5]}쪽)` : ''}</li>`),
+                        ...(old || []).slice(0, 3).map(x => `<li>예전 요강 자료: ${x['전형명'] || ''} · ${x['모집단위'] || ''} — <b>${critText(x)}</b>${x['원문'] && x['원문'] !== '-' ? ` (원문: ${x['원문']})` : ''}</li>`)];
             return `<div class="ad-warn"><b style="color:#b45309;">확인 필요 — 자료에 따라 다릅니다.</b>
                 <p style="font-size:12.5px;color:#92400e;margin:4px 0 0;">${lead} 모집요강에서 확인하세요.</p>
-                <ul style="margin:6px 0 0;padding:0;">${rows.slice(0, 4).map(x => `<li>${x[1]} · ${x[2]} — <b>${x[3]}</b>${x[5] ? ` (자료집 ${x[5]}쪽)` : ''}</li>`).join('')}</ul></div>`;
+                <ul style="margin:6px 0 0;padding:0;">${li.join('')}</ul>${GUIDE_BTN}</div>`;
+        }
+        // 어디가 '미포함' 인데 다른 근거도 없을 때 — 최저가 없다고 단정하지 않는다
+        function noMarkBox(title, lines) {
+            return `<div class="ad-warn"><b style="color:#b45309;">${title}</b>
+                ${lines.map(t => `<p style="font-size:12.5px;color:#92400e;margin:4px 0 0;">${t}</p>`).join('')}${GUIDE_BTN}</div>`;
+        }
+        // 예전 요강 자료에서 학과명·전형이 그대로 같은 최저 줄(어디가 '미포함' 과 엇갈리는지 보려고)
+        function oldExact(r) {
+            return (susiMincut[r.uniCode] || []).filter(x => x['최저있음'] === 'Y' && typeMatch(x, r) > 0 && nameScore(x, r) >= 2 && exactUnit(x, r));
         }
         function adigaBlock(r, ad, cs) {
             const meta = adigaMin.meta || {};
@@ -2279,11 +2318,17 @@
                 (ad.id ? ` · <a href="${adigaUrl(ad.id)}" target="_blank" rel="noopener">어디가에서 보기 ↗</a>` : '') +
                 (ad.how === '이름 손질' ? ` · 2027 전형명 '${ad.adm}' 으로 찾음` : '') + `</p>`;
             if (!ad.crit) {
-                const jc = jaryoCheck(r);
-                if (jc.state === 'listed') return jaryoWarn(jc.rows, '어디가 2027 전형정보에는 이 전형의 수능최저가 없지만, 전형분석 자료집(2026-08)에는 아래처럼 나옵니다.') + src;
-                const why = jc.state === 'absent' ? '최저 표에 이 대학이 없습니다' : jc.state === 'none' ? '이 학과는 최저 미적용으로 나옵니다' : '이 학과·전형이 없습니다';
-                return `<div class="ad-none"><b style="color:#059669;">이 학과·전형은 수능최저가 없습니다.</b>
-                    <p style="font-size:12px;color:#047857;margin:4px 0 0;">어디가 2027 전형정보에 최저 기준이 없고, 전형분석 자료집(2026-08)에도 ${why}.</p></div>${src}`;
+                // '포털 필터 미포함' 은 최저 없음으로 확정한 값이 아니다(자료 파일 메타). 자료집이 '미적용' 이라고 직접 말할 때만 초록.
+                // 2027 자료집이 '미적용' 이라고 직접 말하면 그것이 먼저다(예전 요강 자료가 최저를 적어 두었어도 — 경북대 상주 학과는 2027 요강 75쪽도 미적용)
+                const jc = jaryoCheck(r), old = oldExact(r);
+                if (jc.state === 'none')
+                    return `<div class="ad-none"><b style="color:#059669;">이 학과·전형은 수능최저가 없습니다.</b>
+                        <p style="font-size:12px;color:#047857;margin:4px 0 0;">전형분석 자료집(2026-08)에 '${jc.row[3]}' 으로 나옵니다(${jc.row[1]} · ${jc.row[2]}${jc.row[5] ? `, 자료집 ${jc.row[5]}쪽` : ''}). 어디가 2027 전형정보에도 최저 기준이 없습니다.${old.length ? ' (예전 요강 자료에는 최저가 있었지만 2027 자료는 미적용입니다.)' : ''}</p></div>${src}`;
+                if (jc.state === 'listed' || old.length)
+                    return jaryoWarn(jc.rows, '어디가 2027 전형정보의 최저 목록에는 이 전형이 없지만, 다른 자료에는 최저가 있다고 나옵니다.', old) + src;
+                return noMarkBox('어디가에 최저 표시 없음 — 요강 확인 필요', [
+                    '어디가 2027 전형정보의 최저 목록(포털 필터)에 이 전형이 없습니다. 최저가 없다고 확정한 값은 아니니 모집요강에서 확인하세요.',
+                    jc.state === 'absent' ? '전형분석 자료집(2026-08)에는 이 대학 최저 표가 없어 대조하지 못했습니다.' : '전형분석 자료집(2026-08) 최저 표에도 이 학과·전형은 없습니다.']) + src;
             }
             const c = ad.crit, ev = evalAdiga(c, cs);
             return `<div class="ad-card">
@@ -2346,7 +2391,8 @@
                 const anyY = picked.some(p => p['최저있음'] === 'Y');
                 if (!anyY) {
                     html += `<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:12px 14px;">
-                        <b style="color:#059669;">이 학과·전형은 수능최저를 적용하지 않습니다.</b></div>`;
+                        <b style="color:#059669;">이 학과·전형은 수능최저를 적용하지 않습니다.</b>
+                        <p style="font-size:12px;color:#047857;margin:4px 0 0;">예전 요강 자료에 이 학과·전형이 '최저 없음' 으로 나옵니다.</p></div>`;
                 } else {
                     const _seen = new Set();
                     picked.filter(p => p['최저있음']==='Y').filter(p => {   // 같은 값 규칙은 한 줄로
@@ -2370,18 +2416,19 @@
                         </div>`;
                     });
                 }
-            } else if (jaryoMin && jaryoCheck(r).state !== 'listed' && !(jaryoCheck(r).state === 'absent' && all.some(x => x['최저있음'] === 'Y'))) {
-                // 어디가·예전 자료에서 못 찾았고, 자료집 최저 표가 이 학과·전형을 덮지 않는다(또는 미적용이라고 한다)
-                const st = jaryoCheck(r).state;
-                html += `<div class="ad-none" style="background:#f0fdf4;"><b style="color:#059669;">수능최저가 없는 것으로 보입니다.</b>
-                    <p style="font-size:12px;color:#047857;margin:4px 0 0;">전형분석 자료집(2026-08) 최저 표에 ${st === 'absent' ? '이 대학이 없습니다' : st === 'none' ? '이 학과는 최저 미적용으로 나옵니다' : '이 학과·전형이 없습니다'}. 어디가에서는 이 학과·전형을 찾지 못했으니 모집요강으로 한 번 더 확인하세요.</p></div>`;
-            } else if (jaryoMin && jaryoCheck(r).state === 'listed') {
-                html += jaryoWarn(jaryoCheck(r).rows, '이 학과·전형의 최저를 어디가에서 찾지 못했지만, 전형분석 자료집(2026-08)에는 아래처럼 나옵니다.');
             } else {
-                // 다른 학과 규칙을 빌려 와 판정하지 않는다 — 판정 없이 요강 확인으로 둔다
-                html += `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;">
-                    <b style="color:#b45309;">이 모집단위의 수능최저 자료가 없습니다.</b>
-                    <p style="font-size:12.5px;color:#92400e;margin:4px 0 0;">충족 여부를 판정하지 않았어요. 모집요강에서 확인하세요(아래 '이 대학 전체 최저 보기' 는 참고용).</p></div>`;
+                // 예전 자료에도 학과명이 같은 줄이 없다 — 다른 학과 규칙을 빌려 와 판정하지 않는다
+                const jc = jaryoMin ? jaryoCheck(r) : null;
+                if (jc && jc.state === 'none') {
+                    html += `<div class="ad-none"><b style="color:#059669;">이 학과·전형은 수능최저가 없습니다.</b>
+                        <p style="font-size:12px;color:#047857;margin:4px 0 0;">전형분석 자료집(2026-08)에 '${jc.row[3]}' 으로 나옵니다(${jc.row[1]} · ${jc.row[2]}${jc.row[5] ? `, 자료집 ${jc.row[5]}쪽` : ''}).</p></div>`;
+                } else if (jc && jc.state === 'listed') {
+                    html += jaryoWarn(jc.rows, '이 학과·전형의 최저를 어디가·예전 자료에서 찾지 못했지만, 전형분석 자료집(2026-08)에는 아래처럼 나옵니다.');
+                } else {
+                    html += noMarkBox('이 모집단위의 수능최저 자료가 없습니다 — 요강 확인 필요', [
+                        '어디가 2027 전형정보와 예전 요강 자료에서 이 학과·전형을 찾지 못해 충족 여부를 판정하지 않았어요.',
+                        ...(jc ? [jc.state === 'absent' ? '전형분석 자료집(2026-08)에는 이 대학 최저 표가 없습니다.' : '전형분석 자료집(2026-08) 최저 표에도 이 학과·전형은 없습니다(없다는 뜻인지는 요강으로 확인).'] : [])]);
+                }
             }
 
             // 나머지는 접어두기 (매칭이 애매할 때 대비)
@@ -2410,12 +2457,12 @@
             document.body.style.overflow = '';
         }
         // 수시 모집요강 뷰어 (appguide.html을 iframe으로 — 대학코드로 자동 선택)
-        function openGuide() {
+        function openGuide(q) {
             const r = _guideRec;
             if (!r) return;
             document.getElementById('guide-title').textContent =
                 `📑 ${r.university}${r.campus && r.campus !== '본교' ? ' (' + r.campus + ')' : ''} 수시 모집요강`;
-            const qs = `code=${encodeURIComponent(r.uniCode || '')}&uni=${encodeURIComponent(r.university || '')}&campus=${encodeURIComponent(r.campus || '')}&embed=1`;
+            const qs = `code=${encodeURIComponent(r.uniCode || '')}&uni=${encodeURIComponent(r.university || '')}&campus=${encodeURIComponent(r.campus || '')}&embed=1` + (typeof q === 'string' && q ? `&q=${encodeURIComponent(q)}` : '');
             document.getElementById('guide-frame').src = `appguide.html?${qs}`;
             document.getElementById('guide-overlay').classList.add('open');
         }

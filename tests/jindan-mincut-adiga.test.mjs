@@ -67,12 +67,13 @@ check('  (수5 + 1 = 6 → 미충족)', d && d.badges[0] === '미충족', d && d
 
 console.log('\n■ 최저가 없는 학과');
 d = await open('대구대학교', '경찰학부(경찰행정학전공)', '학생부교과(일반전형)', null);
-check('대구대 경찰행정학전공(일반): 수능최저가 없습니다(어디가·자료집 일치)', d && /수능최저가 없습니다/.test(d.text) && /자료집/.test(d.text), d && d.text.slice(0, 300));
+// 2026-11 외부 검토: 어디가 '미포함' 은 확정값이 아니다 → 자료집이 '미적용' 이라 할 때만 '없습니다'(tests/jindan-mincut-safe.test.mjs)
+check("대구대 경찰행정학전공(일반): '어디가에 최저 표시 없음 — 요강 확인 필요'", d && /어디가에 최저 표시 없음/.test(d.text) && /자료집/.test(d.text), d && d.text.slice(0, 300));
 d = await open('경북대학교', '스마트플랜트공학과', '교과우수자', null);
 check('경북대 스마트플랜트공학과(상주, 교과우수자): 수능최저가 없습니다', d && /수능최저가 없습니다/.test(d.text), d && d.text.slice(0, 300));
 check('  다른 학과 최저가 붙지 않는다', d && !/건축학부|농업토목공학과|전기공학과/.test(d.text), d && d.text.slice(0, 300));
 d = await open('가톨릭관동대학교', '건축공학전공', '학생부교과(일반전형)', null);
-check("가톨릭관동대 건축공학전공(일반): 예전엔 '자료 없음' → '최저가 없는 것으로 보입니다(자료집 기준)'", d && /없는 것으로 보입니다/.test(d.text) && /자료집/.test(d.text), d && d.text.slice(0, 300));
+check("가톨릭관동대 건축공학전공(일반): 다른 학과 규칙을 빌리지 않고 '요강 확인 필요'(자료집 대조 문구와 함께)", d && /요강 확인 필요/.test(d.text) && /자료집/.test(d.text) && !/의학과|간호학과/.test(d.text), d && d.text.slice(0, 300));
 
 console.log('\n■ 자료끼리 다를 때');
 d = await open('경성대학교', '간호학과', '저소득층', null);
@@ -124,19 +125,20 @@ check('학생 등급이 모자라면 미판정', await ev({ h: 's', n: 3, v: 9, 
 
 console.log('\n■ 전체 진단에서');
 const tot = await pg.evaluate(() => {
-  let ad = 0, none = 0, old = 0, nodata = 0;
+  const c = { n: allRecords.length, 어디가기준: 0, 예전자료: 0, 최저없음: 0, 확인필요: 0, 요강확인: 0 };
   for (const r of allRecords) {
-    const a = adigaFind(r);
-    if (a) { if (a.crit) ad++; else none++; continue; }
-    if (pickMincut(r).length) { old++; continue; }
-    const jc = jaryoCheck(r), all = susiMincut[r.uniCode] || [];
-    if (jc.state === 'absent' && all.some(x => x['최저있음'] === 'Y')) nodata++;
+    const a = adigaFind(r), jc = jaryoCheck(r);
+    if (a && a.crit) c.어디가기준++;
+    else if (a) { if (jc.state === 'none') c.최저없음++; else if (jc.state === 'listed' || oldExact(r).length) c.확인필요++; else c.요강확인++; }
+    else if (pickMincut(r).length) c.예전자료++;
+    else if (jc.state === 'none') c.최저없음++; else if (jc.state === 'listed') c.확인필요++; else c.요강확인++;
   }
-  return { n: allRecords.length, ad, none, old, nodata };
+  return c;
 });
 console.log('     ', JSON.stringify(tot));
-check('어디가에서 찾는 학과·전형이 75% 이상', (tot.ad + tot.none) / tot.n > 0.75, tot);
-check("'자료 없음' 이 1% 아래 (예전 31%)", tot.nodata / tot.n < 0.01, tot);
+check('어디가 기준으로 판정하는 학과·전형이 3,700곳 이상', tot.어디가기준 >= 3700, tot);
+check("'최저 없음'(초록)은 자료집이 미적용이라 한 곳만 — 1% 아래", tot.최저없음 / tot.n < 0.01, tot);
+check('모든 학과·전형이 한 갈래에 든다', tot.어디가기준 + tot.예전자료 + tot.최저없음 + tot.확인필요 + tot.요강확인 === tot.n, tot);
 
 check('페이지 오류 없음', errs.length === 0, errs);
 await b.close();
