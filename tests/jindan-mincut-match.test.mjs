@@ -37,6 +37,10 @@ await pg.goto('http://t.local/jindan.html');
 await pg.waitForFunction(() => document.getElementById('main-ui').classList.contains('show'), null, { timeout: 30000 });
 await pg.waitForFunction(() => Object.keys(susiMincut).length > 100, null, { timeout: 30000 });
 
+// 이 검사는 '예전 최저 자료(susi_mincut.json)' 를 붙이는 규칙을 본다. 2026-11 부터 상세 창은 어디가 2027 전형정보를
+// 먼저 쓰므로(tests/jindan-mincut-adiga.test.mjs), 여기서는 어디가·자료집을 꺼서 예전 길만 그린다.
+await pg.evaluate(() => { adigaMin = null; jaryoMin = null; _adigaIdx = null; });
+
 // 학생 하나를 고른 상태(모의 등급)로 상세 창을 연다 — 충족/미충족 판정까지 보이게
 const detail = (uni, dept, adm) => pg.evaluate(([uni, dept, adm]) => {
   const r = allRecords.find(x => x.university === uni && x.department === dept && x.admissionName.includes(adm));

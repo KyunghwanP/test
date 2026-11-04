@@ -274,6 +274,18 @@
         .mc-pass { background: #dcfce7; color: #15803d; }
         .mc-fail { background: #fee2e2; color: #b91c1c; }
         .mc-unknown { background: #e2e8f0; color: #64748b; }
+        .mc-check { background: #fef3c7; color: #b45309; }
+        .ad-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; margin-bottom: 8px; }
+        .ad-card .ad-what { font-size: 12px; color: #64748b; }
+        .ad-card .ad-sum { font-size: 19px; font-weight: 900; margin: 6px 0 2px; color: #0f172a; }
+        .ad-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+        .ad-chips span { font-size: 11.5px; font-weight: 800; color: #4338ca; background: #eef2ff; border: 1px solid #e0e7ff; border-radius: 999px; padding: 2px 9px; }
+        .ad-raw { font-size: 11.5px; color: #64748b; font-weight: 600; margin: 8px 0 0; padding-top: 8px; border-top: 1px dashed #e2e8f0; line-height: 1.55; }
+        .ad-src { font-size: 11px; color: #94a3b8; font-weight: 600; margin: 6px 0 0; }
+        .ad-src a { color: #6366f1; font-weight: 800; }
+        .ad-none { background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 10px; padding: 12px 14px; }
+        .ad-warn { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 12px 14px; }
+        .ad-warn li { font-size: 12.5px; color: #92400e; margin: 4px 0 0 16px; }
         /* 3개년 추세 색 (모달 상담포인트 태그 + 카드 메타줄 공용) */
         .tr-up   { color: #b45309; }   /* 컷 상승(경쟁 심화) — 주황 */
         .tr-down { color: #2563eb; }   /* 컷 하락(완화) — 파랑 */
@@ -853,7 +865,9 @@
         let admissionKind = '교과';           // 학생부 전형 구분: '교과' | '종합' (스위치 토글)
         let eligSel = new Set(['일반']);       // 지원 자격 단추 — 처음엔 일반만. 학생을 바꾸면 일반만으로 되돌린다
         let regionSel = new Set();             // 지역 단추 — 비면 전체. 학생을 바꿔도 그대로 둔다(상담하는 지역은 같다)
-        let susiMincut = {};                    // 대학코드(int문자열) → 수능최저 규칙 배열
+        let susiMincut = {};                    // 대학코드(int문자열) → 수능최저 규칙 배열 (예전 자료 — 어디가에서 못 찾을 때만 쓴다)
+        let adigaMin = null;                    // 어디가 2027 전형정보 수능최저(susi_mincut_adiga.json) — 먼저 본다
+        let jaryoMin = null;                    // 2027 수시 지역별 전형분석 자료집 최저 표(susi_mincut_jaryojip.json) — 어디가 '미포함' 대조용
         let currentFiltered = [];              // 현재 필터 결과 (모달·더 보기에서 참조)
         let visibleCount = 150;
         const PAGE_SIZE = 150;
@@ -986,6 +1000,76 @@
         //       ,지역 (16번째 — 대학별 시·도. 지역 단추가 쓴다. 2024·2025학년도 경쟁률과 함께 다른 어디가 자료에서 옮겨 채움)
         // 같은 학과(대학코드|전형명|모집단위)를 3개 조회연도에 걸쳐 하나로 묶는다.
         // averageGrade = 사용 가능한 연도들의 환산등급_70 평균 (필터·정렬·차이표시 기준)
+        // 대학코드 하나에 시·도가 다른 캠퍼스가 섞여 있는 대학 — CSV 의 '지역' 은 본교 것 하나뿐이라
+        // (경북대 상주캠퍼스 학과가 '대구' 로 나왔다) 그 캠퍼스 학과만 여기서 캠퍼스·지역을 바로잡는다.
+        // 원본 CSV 는 그대로 두고 읽을 때만 바꾼다. 학과명은 CSV 표기 그대로(가운뎃점 ·/・ 와 띄어쓰기는 가리지 않는다).
+        // 출처: 각 대학 공식 학과 안내·학과 사무실 주소·모집요강(2026-11 웹 검색으로 확인).
+        // 확인하지 못한 학과는 넣지 않았다(그대로 본교 지역) — 예: 경북대 농산업학과, 성균관대 반도체융합공학과,
+        // 한국외대 우크라이나학과·특수외국어 계열, 동국대 고양 바이오메디캠퍼스·연세대 송도는 자료가 엇갈려 손대지 않았다.
+        const CAMPUS_FIX = {
+            '5': { campus: '상주캠퍼스', region: '경북', depts: [   // 경북대 — 과학기술대학·생태환경대학·자율미래인재학부
+                '건설방재공학과', '정밀기계공학과', '자동차공학과', '자동차공학부', '소프트웨어학과', '나노신소재공학과', '식품외식산업학과',
+                '섬유패션디자인학부 섬유공학전공', '섬유패션디자인학부 패션디자인전공', '위치정보시스템학과', '스마트플랜트공학과', '치위생학과',
+                '환경안전공학과', '에너지화학공학과',
+                '말/특수동물학과', '곤충생명과학과', '산림생태보호학과', '식물자원학과', '관광학과', '축산학과', '동물생명공학과',
+                '체육학부 체육학전공', '체육학부 건강운동관리전공', '체육학부(체육학전공)', '체육학부(건강운동관리전공)',
+                '자율미래인재학부'] },
+            '66': { campus: '국제캠퍼스', region: '경기', depts: [   // 경희대 — 공과·전자정보·소프트웨어융합·응용과학·생명과학·국제·외국어·예술디자인·체육대학, 자유전공학부
+                '기계공학과', '기계공학부', '산업경영공학과', '원자력공학과', '화학공학과', '신소재공학과', '사회기반시스템공학과',
+                '건축공학과', '환경학및환경공학과', '건축학과', '건축학과(자연계열)',
+                '전자공학부 전자공학과', '전자공학부 반도체공학과', '전자정보공학부 전자공학과', '전자정보공학부 반도체공학과', '생체의공학과',
+                '컴퓨터공학과', '인공지능학과', '소프트웨어융합학과',
+                '응용수학과', '응용물리학과', '응용화학과', '우주과학과',
+                '유전생명공학과', '식품생명공학과', '한방생명공학과', '식물·환경신소재공학과', '스마트팜과학과', '융합바이오·신소재공학과',
+                '국제학과',
+                '프랑스어학과', '스페인어학과', '러시아어학과', '중국어학과', '일본어학과', '한국어학과', '글로벌커뮤니케이션학부',
+                '산업디자인학과', '시각디자인학과', '환경조경디자인학과', '의류디자인학과', '디지털콘텐츠학과', '연극영화학과', '도예학과',
+                '체육학과', '스포츠지도학과', '스포츠의학과', '골프산업학과', '태권도학과',
+                '자유전공학부'] },   // 자율전공학부는 서울캠퍼스
+            '192': { campus: '글로벌캠퍼스', region: '경기', depts: [   // 한국외대 — 2026 수시 모집요강의 글로벌캠퍼스 모집단위
+                '인문대학[통합모집]', '철학과', '사학과', '언어인지과학과',
+                '국가전략언어계열', '폴란드학과', '루마니아학과', '체코·슬로바키아학과', '헝가리학과', '세르비아·크로아티아학과',
+                '그리스·불가리아학과', '중앙아시아학과', '아프리카학부',
+                '경상대학[통합모집]', 'Global Business & Technology학부', '국제금융학과',
+                '자연과학대학[통합모집]', '수학과', '통계학과', '전자물리학과', '환경학과', '생명공학과', '화학과',
+                '공과계열', '컴퓨터공학부', '정보통신공학과', '반도체전자공학부(반도체공학전공)', '반도체전자공학부(전자공학전공)',
+                '산업경영공학과', '바이오메디컬공학부',
+                '기후변화융합학부', '자유전공학부(글로벌)', '글로벌자유전공학부', '융합인재학부', '한국학과',
+                'Culture & Technology융합대학[통합모집]', '디지털콘텐츠학부', '투어리즘 & 웰니스학부', '투어리즘&웰니스학부', '글로벌스포츠산업학부',
+                'AI데이터융합학부', 'Finance & AI융합학부', 'Finance&AI융합학부'] },   // Language & AI·Social Science & AI 는 서울
+            '34': { campus: '의왕캠퍼스', region: '경기', depts: [   // 한국교통대 — 철도대학
+                '철도경영·물류학과', '철도AI·데이터공학부', 'AI·데이터공학부', '철도운전시스템공학과', '철도차량시스템공학과',
+                '철도인프라공학과', '철도전기정보공학과', '철도대학자유전공학부'] },
+            '133': { campus: '자연과학캠퍼스', region: '경기', depts: [   // 성균관대 — 수원
+                '자연과학계열', '수학과', '물리학과', '화학과', '생명과학과',
+                '공학계열', '건설환경공학부', '건축학과', '양자정보공학과',
+                '전자전기공학부', '반도체시스템공학과', '소프트웨어학과', '지능형소프트웨어학과',
+                '약학과', '의예과', '스포츠과학과', '에너지학과', '배터리학과'] },
+            '63': { campus: '메디컬캠퍼스', region: '인천', depts: [   // 가천대 — 의과·약학·간호·의과학대학
+                '의예과', '약학과', '바이오로직스학과', '간호학과', '치위생학과', '응급구조학과', '방사선학과', '물리치료학과', '운동재활학과'] },
+            '106': { campus: '동두천캠퍼스', region: '경기', depts: [   // 동양대 — 철도·간호·베어링은 영주
+                '철도시스템공학과', '도시철도시스템학과',
+                '경찰범죄심리학과', '공공인재학부', '군사학과', '보건행정학과', '유아교육과',
+                '게임학부', '디지털트윈소프트웨어학과', '스마트안전시스템학부', '웹툰애니메이션학과', 'AI빅데이터융합학과', 'IT융합경영학과', 'e스포츠학과',
+                '연기예술학과', '영상미디어학과', '디자인학부', '생활체육학과'] },
+            '92': { campus: '당진캠퍼스', region: '충남', depts: ['항공서비스학과', '항공운항학과', '항공정비학과'] },   // 세한대
+            '284': { campus: '인천캠퍼스', region: '인천', depts: [   // 청운대 — 공과대학·경영대학
+                '건축공학과', '설비소방학과', '토목환경공학과', '전자공학과', '컴퓨터공학과', '멀티미디어학과',
+                '경영학과', '광고홍보학과', '무역물류학과'] },
+            '154': { campus: '아산캠퍼스', region: '충남', depts: [   // 유원대
+                '미래자동차학과', '드론로봇응용학과', 'AI소프트웨어학과', '뷰티케어학과', '미디어콘텐츠학과', '창의설계학부',
+                '미래라이프융합학부', '문화복지융합학부', '작업치료학과', '중등특수교육과', '초등특수교육과', '유아교육과'] },
+            '157': { campus: '진천캠퍼스', region: '충북', depts: [   // 우석대
+                '휴먼테크 자율전공학부(진천)', '휴먼테크융합대학(진천)', '군사안보학과', '문예창작학과', '건축·인테리어디자인학과', '스포츠문화예술학부'] },
+            '173': { campus: '고양캠퍼스', region: '경기', depts: [   // 중부대 — 두 곳 이상에서 고양으로 확인된 것만
+                '문헌정보학전공', '경영학전공', '국제통상학전공', '항공서비스학전공', '미디어커뮤니케이션학전공'] },
+        };
+        const campusKey = s => String(s || '').replace(/[・·?]/g, '·').replace(/\s+/g, '');
+        const CAMPUS_FIX_SET = Object.fromEntries(Object.entries(CAMPUS_FIX).map(([c, v]) => [c, new Set(v.depts.map(campusKey))]));
+        function campusFixOf(code, department) {
+            const set = CAMPUS_FIX_SET[String(parseInt(code, 10))];
+            return set && set.has(campusKey(department)) ? CAMPUS_FIX[String(parseInt(code, 10))] : null;
+        }
         // 원자료에서 가운뎃점(·)이 ? 로 깨져 있다(768행 — '도시계획?조경학부', '건축 ? 토목 ? 환경공학부').
         // 원본 CSV 는 그대로 두고 읽을 때만 바꾼다.
         function fixDot(s) { return s.replace(/\s\?\s/g, '·').replace(/(\S)\?(?=\S)/g, '$1·'); }
@@ -1012,13 +1096,14 @@
                 const key = `${cols[2]}|${admName}|${department}`;   // 대학코드|전형명|모집단위
                 let rec = groups.get(key);
                 if (!rec) {
+                    const cf = campusFixOf(cols[2], department);   // 다른 시·도 캠퍼스 학과면 그 캠퍼스·지역으로
                     rec = {
-                        university, campus, department,
+                        university, campus: cf ? cf.campus : campus, department,
                         admissionName: admName, category: categorizeDepartment(department),
                         kind: admName.includes('교과') ? '교과' : (admName.includes('종합') ? '종합' : '기타'),
                         elig: eligibilityOf(admName),
                         uniCode: cols[2], type: cols[4], years: {},
-                        region: (cols[15] || '').trim(),
+                        region: cf ? cf.region : (cols[15] || '').trim(),
                     };
                     groups.set(key, rec);
                 }
@@ -2010,6 +2095,226 @@
             if (histNote) detail += ` · ${histNote}`;
             return { cls, label, detail };
         }
+        // ── 어디가 2027 전형정보 수능최저 ──
+        // 진단 입결은 2026학년도, 이 자료는 2027학년도 전형이라 이름이 바뀐 곳이 있다(그런 곳은 찾지 않음으로 두고 예전 자료를 쓴다).
+        const mk = s => String(s || '').replace(/\s*\?\s*/g, '·').replace(/[・·\s]/g, '');
+        const deptKey = s => mk(String(s || '').replace(/\((주간|주)\)$/, '').replace(/\((야간|야)\)$/, '(야)'));
+        function admCore(s) { const m = String(s || '').match(/\((.*)\)/); return mk(m ? m[1] : s).replace(/전형|특별/g, ''); }
+        const admKind = s => /교과/.test(s) ? '교과' : /종합/.test(s) ? '종합' : /논술/.test(s) ? '논술' : /실기|실적/.test(s) ? '실기' : '기타';
+        let _adigaIdx = null;
+        function adigaIndex() {   // 대학코드 → Map(전형키 → {adm, core, kind, units: Map(학과키 → {dep, ci, id})})
+            if (_adigaIdx || !adigaMin) return _adigaIdx;
+            _adigaIdx = {};
+            for (const [code, adms] of Object.entries(adigaMin.u || {})) {
+                const byAdm = new Map();
+                for (const [adm, list] of Object.entries(adms)) {
+                    const units = new Map();
+                    for (const [dep, ci, id] of list) units.set(deptKey(dep), { dep, ci, id, adm });
+                    byAdm.set(mk(adm), { adm, core: admCore(adm), kind: admKind(adm), units });
+                }
+                _adigaIdx[code] = byAdm;
+            }
+            return _adigaIdx;
+        }
+        // 이 학과·전형의 어디가 행. 전형명이 그대로 같으면 그것, 아니면 종류(교과/종합)와 핵심 낱말이 같은 전형이 하나뿐일 때만
+        function adigaFind(r) {
+            const idx = adigaIndex(); if (!idx) return null;
+            const byAdm = idx[String(parseInt(r.uniCode, 10))]; if (!byAdm) return null;
+            const dk = deptKey(r.department);
+            let a = byAdm.get(mk(r.admissionName)), how = '같은 이름';
+            if (!a || !a.units.has(dk)) {
+                const core = admCore(r.admissionName), kind = admKind(r.admissionName);
+                const c = [...byAdm.values()].filter(x => x.kind === kind && x.core === core && x.units.has(dk));
+                if (c.length !== 1) return null;
+                a = c[0]; how = '이름 손질';
+            }
+            const u = a.units.get(dk);
+            return { ...u, how, crit: u.ci >= 0 ? adigaMin.crit[u.ci] : null };
+        }
+        function adigaUrl(id) {
+            const m = adigaMin && adigaMin.meta; if (!id || !m || !m['주소']) return '';
+            const q = m['주소칸'].map((k, i) => `${k}=${encodeURIComponent(id.split('-')[i] || '')}`).join('&');
+            return m['주소'].replace('{q}', q);
+        }
+        // 학생 과목 → 갈래 (K 과탐 · S 사탐 · J 직탐). 모르면 null
+        function tamType(sub) {
+            const s = String(sub || ''); if (!s) return null;
+            if (/직업|농업|공업|상업|수산|해운|인간\s*발달/.test(s)) return 'J';
+            if (/물리|화학|생명|지구|과학/.test(s)) return 'K';
+            if (/윤리|사회|지리|경제|정치|법|역사|세계사|동아시아/.test(s)) return 'S';
+            return null;
+        }
+        function mathSubOf(sub) {
+            const s = String(sub || '');
+            return /미적분/.test(s) ? '미적분' : /기하/.test(s) ? '기하' : /확률|확통/.test(s) ? '확률과 통계' : null;
+        }
+        const AREA_LABEL = { '국': '국', '수': '수', '영': '영', '탐': '탐' };
+        // 판정: 학생 과목을 모르는 조건(수학 미적분·기하 지정, 과탐 지정, 가산·감점, 한국사 등급 없음)은
+        // 가장 유리하게(best) · 가장 불리하게(worst) 두 번 계산해서 둘 다 통과면 충족, 둘 다 탈락이면 미충족, 갈리면 확인 필요.
+        function evalAdiga(c, cs) {
+            if (!cs) return null;
+            if (c.x) return { cls: 'check', label: '확인 필요', detail: `자동 판정하지 않았어요 — ${c.x}. 원문을 확인하세요.` };
+            if (!c.h || !c.n || c.v == null) return { cls: 'check', label: '확인 필요', detail: '기준을 읽지 못했어요. 원문을 확인하세요.' };
+            const why = new Set();
+            const run = best => {
+                const g = { '국': gnum(cs['국']), '수': gnum(cs['수']), '영': gnum(cs['영']), '탐': null };
+                const areas = [...(c.a || '국수영탐')];
+                const raw = areas.filter(a => a === '탐' ? (cs.tamPairs || cs['탐'] || []).length : g[a] != null).length;
+                if (raw < c.n) return { ok: null };
+                const ms = mathSubOf(cs.mathSub);
+                if (g['수'] != null) {
+                    if (c.ms) { const okSub = ms ? c.ms.includes(ms) : best; if (!ms) why.add('수학 선택과목(' + c.ms.join('·') + ' 지정) 확인'); if (!okSub) g['수'] = null; }
+                    if (c.mu && g['수'] != null) { const on = ms ? (c.mus && c.mus.length ? c.mus : ['미적분', '기하']).includes(ms) : best; if (!ms) why.add('수학 가산 여부 확인'); if (on) g['수'] = Math.max(1, g['수'] - c.mu); }
+                    if (c.md && g['수'] != null) { const on = ms ? ms === '확률과 통계' : !best; if (!ms) why.add('확률과 통계 감점 여부 확인'); if (on) g['수'] = Math.min(9, g['수'] + c.md); }
+                }
+                if (c.em && g['영'] === 2) g['영'] = 1;
+                const pairs = (cs.tamPairs || (cs['탐'] || []).map(v => ({ g: v, sub: '' }))).map(p => ({ g: gnum(p.g), t: tamType(p.sub) })).filter(p => p.g != null);
+                const allow = c.ts || 'SK';
+                const usable = pairs.filter(p => p.t ? allow.includes(p.t) : best);
+                if (pairs.some(p => !p.t) && allow !== 'SKJ') why.add('탐구 과목(' + (allow === 'K' ? '과탐만' : allow === 'S' ? '사탐만' : '직탐 제외') + ') 확인');
+                // '탐구 중 과탐 1과목 이상 응시' — 못 지키면 최저 자체가 안 된다. 과목을 모르면 best 만 통과로 본다
+                if (c.sci && !pairs.some(p => p.t === 'K')) {
+                    if (pairs.some(p => !p.t) && best) why.add('과탐 1과목 이상 응시 확인');
+                    else return { ok: false, detail: '탐구에 과탐 1과목 이상을 응시해야 함' };
+                }
+                if (usable.length) {
+                    if (c.avg) {
+                        if (usable.length >= 2) {
+                            const top2 = usable.map(p => p.g).sort((a, b) => a - b).slice(0, 2);
+                            let av = (top2[0] + top2[1]) / 2;
+                            if (c.fl) av = Math.floor(av); else if (c.ce) av = Math.ceil(av);
+                            if (c.as) { const k = usable.filter(p => p.t === 'K').map(p => p.g); if (k.length) av = Math.min(av, Math.min(...k)); }
+                            g['탐'] = av;
+                        }
+                    } else g['탐'] = Math.min(...usable.map(p => p.g));
+                }
+                let histOk = true, histNote = '';
+                if (c.k != null) {
+                    const h = gnum(cs['한']);
+                    if (h == null) { why.add('한국사 등급 확인'); histOk = best; histNote = `한국사 ${c.k}등급 이내(등급 없음)`; }
+                    else { histOk = h <= c.k; histNote = `한국사 ${h}${histOk ? '≤' : '>'}${c.k}`; }
+                }
+                const avail = areas.filter(a => g[a] != null).map(a => ({ a, v: g[a] }));
+                const req = [...(c.r || '')].filter(a => areas.includes(a));
+                if (req.some(a => g[a] == null)) return { ok: false, detail: `${req.join('·')} 영역이 꼭 들어가야 하는데 인정되는 등급이 없음`, histNote };
+                if (avail.length < c.n) return { ok: false, detail: `인정되는 영역이 ${avail.length}개뿐(필요 ${c.n}개)`, histNote };
+                const rest = avail.filter(x => !req.includes(x.a)).sort((a, b) => a.v - b.v);
+                const chosen = [...avail.filter(x => req.includes(x.a)), ...rest].slice(0, Math.max(c.n, req.length));
+                const pick = chosen.slice(0, c.n);
+                const fmt = v => Number.isInteger(v) ? v : v.toFixed(1);
+                let ok, shown;
+                if (c.h === 's') { const sum = pick.reduce((t, x) => t + x.v, 0); ok = sum <= c.v; shown = `합 ${fmt(sum)} (기준 ${c.v})`; }
+                else { const worst = Math.max(...pick.map(x => x.v)); ok = worst <= c.v; shown = c.h === 'g' ? `${fmt(worst)}등급 (기준 ${c.v})` : `각 최고 ${fmt(worst)} (기준 ${c.v})`; }
+                return { ok: ok && histOk, detail: `${pick.map(x => AREA_LABEL[x.a] + fmt(x.v)).join('·')} → ${shown}`, histNote };
+            };
+            const B = run(true), W = run(false);
+            if (B.ok === null) return { cls: 'unknown', label: '미판정', detail: `학생 등급이 부족해 판정 불가 (필요 ${c.n}개 영역)` };
+            const tail = x => x.detail + (x.histNote ? ' · ' + x.histNote : '');
+            if (W.ok) return { cls: 'pass', label: '충족', detail: tail(W) };
+            if (!B.ok) return { cls: 'fail', label: '미충족', detail: tail(B) };
+            return { cls: 'check', label: '확인 필요', detail: `${tail(B)} — ${[...why].join(', ') || '조건 확인'}` };
+        }
+        function adigaSummary(c) {
+            if (c.x || !c.h) return '자동으로 읽지 못한 기준 — 아래 원문 참고';
+            const areas = [...(c.a || '국수영탐')].join('·');
+            const req = c.r ? ` (${[...c.r].join('·')} 포함)` : '';
+            const core = c.h === 's' ? `${areas} 중 ${c.n}개 합 ${c.v}` : c.h === 'e' ? `${areas} 중 ${c.n}개 각 ${c.v}등급` : `${areas} 중 1개 ${c.v}등급`;
+            return core + req + (c.k != null ? ` · 한국사 ${c.k}` : '');
+        }
+        function adigaChips(c) {
+            const ch = [];
+            if (c.ms) ch.push('수학: ' + c.ms.join('·') + '만');
+            if (c.ts === 'K') ch.push('탐구: 과탐만'); else if (c.ts === 'S') ch.push('탐구: 사탐만'); else if (c.ts && c.ts.includes('J')) ch.push('직탐 인정');
+            if ((c.a || '').includes('탐')) ch.push(c.avg ? '탐구 2과목 평균' + (c.fl ? '(버림)' : c.ce ? '(올림)' : '') : '탐구 상위 1과목');
+            if (c.sci) ch.push('과탐 1과목 이상');
+            if (c.as) ch.push('과탐 응시자는 나은 쪽');
+            if (c.mu) ch.push(`${(c.mus && c.mus.length ? c.mus : ['미적분', '기하']).join('·')} ${c.mu}등급 가산`);
+            if (c.md) ch.push(`확률과 통계 ${c.md}등급 감점`);
+            if (c.em) ch.push('영어 1·2등급 같게');
+            return ch.length ? `<div class="ad-chips">${ch.map(x => `<span>${x}</span>`).join('')}</div>` : '';
+        }
+        // 자료집 최저 표와 대조. 자료집에는 '미적용' 줄도 있다(예: 경북대 '모든전형 | 생태환경대학, 과학기술대학 | 미적용').
+        //   listed  — 이 학과·전형을 덮는 최저 줄이 있음      → 확인 필요
+        //   none    — '미적용' 줄이 이 학과를 덮음           → 최저 없음(자료집이 직접 말함)
+        //   notlisted — 대학은 있는데 이 학과·전형을 덮는 줄이 없음 → 최저 없음으로 보임
+        //   absent  — 자료집 최저 표에 이 대학이 없음
+        // 단과대학 이름('자연과학대학')은 학과와 이을 수 없어서, 학과명이 직접 나오거나 '전 모집단위'·'인문(계)'·'자연(계)' 같은 낱말일 때만 덮는다고 본다.
+        const NONE_RX = /^(미적용|없음|미반영|해당\s*없음|수능최저\s*없음)$/;
+        function jaryoCheck(r) {
+            const rows = jaryoMin && jaryoMin.u && jaryoMin.u[String(parseInt(r.uniCode, 10))];
+            if (!rows || !rows.length) return { state: 'absent' };
+            const core = admCore(r.admissionName), kind = admKind(r.admissionName);
+            const base = deptKey(r.department).replace(/(학과|학부|전공|과)$/, '');
+            const humSide = ['인문', '사회', '교육'].includes(r.category), natSide = ['자연', '공학', '의약'].includes(r.category);
+            const covers = ([, adm, unit]) => {
+                const a = mk(adm), u = mk(unit);
+                if ((/종합/.test(a) && kind === '교과' && !/교과/.test(a)) || (/교과/.test(a) && kind === '종합' && !/종합/.test(a))) return false;
+                const admOk = (core.length >= 2 && a.includes(core)) || /모든전형|전전형|전형공통/.test(a);
+                if (!admOk) return false;
+                const excl = (unit.match(/\(([^)]*)제외[^)]*\)|\[([^\]]*)제외[^\]]*\]/) || []).slice(1).join(',');
+                if (base.length >= 2 && excl && mk(excl).includes(base)) return false;
+                // 학과는 목록의 한 칸과 통째로 맞아야 한다('사회학과' 가 '사회복지학과' 에 걸리지 않게). 학부 이름이 앞에 붙은 것은 맞는 것으로 본다
+                const dk = deptKey(r.department);
+                const items = String(unit).split(/[,，·/()\[\]]+/).map(mk).filter(Boolean);
+                if (items.some(t => t === dk || (t.length >= 3 && dk.startsWith(t) && /^(학과|학부|전공|과)/.test(dk.slice(t.length)) === false && /(학부|대학)$/.test(t)) || (dk.length >= 3 && t.startsWith(dk) && /^\(?.{0,12}전공\)?$/.test(t.slice(dk.length))))) return true;
+                if (/^(전모집단위|전체|모든모집단위|전학과|전학부)/.test(u)) return true;
+                const toks = String(unit).split(/[,，·/\s()\[\]]+/).filter(Boolean);
+                if (humSide && toks.some(t => /^(인문|인문계|인문계열|인문사회|인문사회계열)$/.test(t))) return true;
+                if (natSide && toks.some(t => /^(자연|자연계|자연계열|이공계|이공계열|공학계열|자연공학계열)$/.test(t))) return true;
+                return false;
+            };
+            if (rows.some(x => NONE_RX.test(String(x[3]).trim()) && covers(x))) return { state: 'none' };
+            const hit = rows.filter(x => !NONE_RX.test(String(x[3]).trim()) && covers(x));
+            return hit.length ? { state: 'listed', rows: hit } : { state: 'notlisted' };
+        }
+        // 자료집 줄을 '확인 필요' 상자로
+        function jaryoWarn(rows, lead) {
+            return `<div class="ad-warn"><b style="color:#b45309;">확인 필요 — 자료에 따라 다릅니다.</b>
+                <p style="font-size:12.5px;color:#92400e;margin:4px 0 0;">${lead} 모집요강에서 확인하세요.</p>
+                <ul style="margin:6px 0 0;padding:0;">${rows.slice(0, 4).map(x => `<li>${x[1]} · ${x[2]} — <b>${x[3]}</b>${x[5] ? ` (자료집 ${x[5]}쪽)` : ''}</li>`).join('')}</ul></div>`;
+        }
+        function adigaBlock(r, ad, cs) {
+            const meta = adigaMin.meta || {};
+            const src = `<p class="ad-src">출처: 어디가 2027학년도 전형정보 (${meta['수집'] || ''} 수집)` +
+                (ad.id ? ` · <a href="${adigaUrl(ad.id)}" target="_blank" rel="noopener">어디가에서 보기 ↗</a>` : '') +
+                (ad.how === '이름 손질' ? ` · 2027 전형명 '${ad.adm}' 으로 찾음` : '') + `</p>`;
+            if (!ad.crit) {
+                const jc = jaryoCheck(r);
+                if (jc.state === 'listed') return jaryoWarn(jc.rows, '어디가 2027 전형정보에는 이 전형의 수능최저가 없지만, 전형분석 자료집(2026-08)에는 아래처럼 나옵니다.') + src;
+                const why = jc.state === 'absent' ? '최저 표에 이 대학이 없습니다' : jc.state === 'none' ? '이 학과는 최저 미적용으로 나옵니다' : '이 학과·전형이 없습니다';
+                return `<div class="ad-none"><b style="color:#059669;">이 학과·전형은 수능최저가 없습니다.</b>
+                    <p style="font-size:12px;color:#047857;margin:4px 0 0;">어디가 2027 전형정보에 최저 기준이 없고, 전형분석 자료집(2026-08)에도 ${why}.</p></div>${src}`;
+            }
+            const c = ad.crit, ev = evalAdiga(c, cs);
+            return `<div class="ad-card">
+                <span class="ad-what">${ad.adm} · ${ad.dep}</span>
+                <p class="ad-sum">${adigaSummary(c)}</p>
+                ${ev ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 0;"><span class="mc-badge mc-${ev.cls}">${ev.label}</span><span style="font-size:12px;color:#475569;font-weight:600;">${ev.detail}</span></div>` : ''}
+                ${adigaChips(c)}
+                <p class="ad-raw">📄 원문: ${c.t}</p>
+                ${src}
+            </div>`;
+        }
+        // 이 대학의 어디가 최저 전체(접어 둠) — 전형·기준이 같은 학과는 한 줄로
+        function adigaUniTable(r, ad, cs) {
+            const adms = adigaMin.u[String(parseInt(r.uniCode, 10))] || {};
+            const groups = [];
+            for (const [adm, list] of Object.entries(adms)) {
+                const by = new Map();
+                for (const [dep, ci] of list) if (ci >= 0) { if (!by.has(ci)) by.set(ci, []); by.get(ci).push(dep); }
+                for (const [ci, deps] of by) groups.push({ adm, ci, deps });
+            }
+            if (!groups.length) return '';
+            const rows = groups.map(gp => {
+                const c = adigaMin.crit[gp.ci], ev = cs ? evalAdiga(c, cs) : null;
+                const hi = gp.adm === ad.adm && gp.deps.includes(ad.dep) ? 'background:#fef9c3;' : '';
+                const depTxt = gp.deps.length > 3 ? `${gp.deps.slice(0, 3).join(', ')} 외 ${gp.deps.length - 3}개` : gp.deps.join(', ');
+                return `<tr style="border-top:1px solid #e2e8f0;${hi}"><td style="padding:6px;">${gp.adm}</td><td style="padding:6px;">${depTxt}</td><td style="padding:6px;">${adigaSummary(c)}</td>${cs ? `<td style="padding:6px;text-align:center;">${ev ? `<span class="mc-badge mc-${ev.cls}">${ev.label}</span>` : '-'}</td>` : ''}</tr>`;
+            }).join('');
+            return `<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;color:#6366f1;font-weight:800;">이 대학 전체 최저 보기 — 어디가 (${groups.length}건)</summary>
+                <div style="overflow-x:auto;margin-top:8px;"><table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <tr style="background:#eef2ff;"><th style="padding:6px;text-align:left;">전형</th><th style="padding:6px;text-align:left;">모집단위</th><th style="padding:6px;text-align:left;">최저 기준</th>${cs ? '<th style="padding:6px;">판정</th>' : ''}</tr>${rows}</table></div></details>`;
+        }
         function renderSusi(r) {
             const el = document.getElementById('dm-susi');
             const all = susiMincut[r.uniCode] || [];
@@ -2028,6 +2333,10 @@
                 <p style="font-weight:900;font-size:14px;margin:0 0 6px;">🎯 수능최저학력기준
                     <span style="font-size:11px;color:#94a3b8;font-weight:600;">${r.department || ''} · ${r.admissionName || ''}</span></p>
                 <p style="margin:0 0 10px;">${basis}</p>`;
+            const FOOT = `<p style="font-size:11px;color:#94a3b8;margin-top:8px;">※ 참고용 — 최종 지원 전 모집요강으로 확인하세요.</p></div>`;
+            const ad = adigaFind(r);
+            if (ad) { el.innerHTML = html + adigaBlock(r, ad, cs) + adigaUniTable(r, ad, cs) + FOOT; return; }
+            if (adigaMin) html += `<p style="font-size:12px;color:#94a3b8;font-weight:600;margin:0 0 8px;">어디가 2027 전형정보에서 이 학과·전형을 찾지 못했어요(2026 → 2027 전형·학과 이름 변경 등). 예전 최저 자료로 보여 드려요.</p>`;
             if (!all.length) { el.innerHTML = html + `<p style="color:#64748b;font-size:13px;">이 대학의 수능최저 데이터가 없습니다.</p></div>`; return; }
 
             // 이 학과·전형에 해당하는 규칙만 점수화(전형유형→모집단위→전형명)해서 최적 매칭 선택
@@ -2061,6 +2370,13 @@
                         </div>`;
                     });
                 }
+            } else if (jaryoMin && jaryoCheck(r).state !== 'listed' && !(jaryoCheck(r).state === 'absent' && all.some(x => x['최저있음'] === 'Y'))) {
+                // 어디가·예전 자료에서 못 찾았고, 자료집 최저 표가 이 학과·전형을 덮지 않는다(또는 미적용이라고 한다)
+                const st = jaryoCheck(r).state;
+                html += `<div class="ad-none" style="background:#f0fdf4;"><b style="color:#059669;">수능최저가 없는 것으로 보입니다.</b>
+                    <p style="font-size:12px;color:#047857;margin:4px 0 0;">전형분석 자료집(2026-08) 최저 표에 ${st === 'absent' ? '이 대학이 없습니다' : st === 'none' ? '이 학과는 최저 미적용으로 나옵니다' : '이 학과·전형이 없습니다'}. 어디가에서는 이 학과·전형을 찾지 못했으니 모집요강으로 한 번 더 확인하세요.</p></div>`;
+            } else if (jaryoMin && jaryoCheck(r).state === 'listed') {
+                html += jaryoWarn(jaryoCheck(r).rows, '이 학과·전형의 최저를 어디가에서 찾지 못했지만, 전형분석 자료집(2026-08)에는 아래처럼 나옵니다.');
             } else {
                 // 다른 학과 규칙을 빌려 와 판정하지 않는다 — 판정 없이 요강 확인으로 둔다
                 html += `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;">
@@ -2159,7 +2475,12 @@
                 const response = await fetch(DATA_URL);
                 if (!response.ok) throw new Error("Data fetch error");
                 allRecords = parseCSV(await response.text());
-                try { const mr = await fetch('./susi_mincut.json'); if (mr.ok) susiMincut = await mr.json(); } catch(e){}
+                // 최저 자료 세 가지를 함께 받는다(하나가 없어도 진단은 뜬다)
+                await Promise.all([
+                    fetch('./susi_mincut.json').then(x => x.ok ? x.json() : null).then(j => { if (j) susiMincut = j; }).catch(() => {}),
+                    fetch('./susi_mincut_adiga.json').then(x => x.ok ? x.json() : null).then(j => { if (j) adigaMin = j; }).catch(() => {}),
+                    fetch('./susi_mincut_jaryojip.json').then(x => x.ok ? x.json() : null).then(j => { if (j) jaryoMin = j; }).catch(() => {}),
+                ]);
                 document.getElementById('db-count').textContent = `${allRecords.length.toLocaleString()}개 학과·전형`;
                 const unis = Array.from(new Set(allRecords.map(r => r.university))).sort();
                 document.getElementById('uni-datalist').innerHTML = unis.map(u => `<option value="${u}">`).join('');
@@ -2255,7 +2576,8 @@
         function csatFromExam(h) {
             const kor = _gg(h.kor), math = _gg(h.math), eng = _sg(h.eng), his = _sg(h.hist), t1 = _gg(h.tam1), t2 = _gg(h.tam2);
             if (kor == null && math == null && eng == null && t1 == null && t2 == null) return null;
-            return { '국': kor, '수': math, '영': eng, '한': his, '탐': [t1, t2].filter(v => v != null), mathSub: (h.math && h.math.sub) || '', examDate: h.examDate || '' };
+            const tamPairs = [[t1, h.tam1], [t2, h.tam2]].filter(([g]) => g != null).map(([g, x]) => ({ g, sub: (x && x.sub) || '' }));
+            return { '국': kor, '수': math, '영': eng, '한': his, '탐': [t1, t2].filter(v => v != null), tamPairs, mathSub: (h.math && h.math.sub) || '', examDate: h.examDate || '' };
         }
         function examGradeStr(cs) {
             return [cs['국'] != null ? '국' + cs['국'] : '', cs['수'] != null ? '수' + cs['수'] : '', cs['영'] != null ? '영' + cs['영'] : '', cs['탐'].length ? '탐' + cs['탐'].join('·') : '', cs['한'] != null ? '한' + cs['한'] : ''].filter(Boolean).join(' ');
