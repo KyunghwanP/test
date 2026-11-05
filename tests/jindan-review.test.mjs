@@ -54,7 +54,8 @@ console.log('\n■ 1. 안정 판정 — 70%컷보다 나쁜 성적에 안정이 
       const c = classify(g, x);
       if (c.label === '안정' && g > x.averageGrade + 1e-9) { bad++; ex = ex || [x.university, x.department, g.toFixed(2), x.averageGrade, x.avg50]; break; }
     }
-    const inv = allRecords.filter(x => x.avg50 != null && x.avg50 > x.averageGrade + 1e-9);
+    // 역전 = 50%·70% 가 둘 다 있는 해끼리 본 차이가 양수(ver8.56 외부 검토 — 해 묶음이 다른 두 평균으로 보면 가짜 역전이 397곳)
+    const inv = allRecords.filter(x => x.gap50 != null && x.gap50 > 1e-9);
     const invUnc = inv.filter(x => classify(x.averageGrade - 0.5, x).uncertain).length;
     return { found: !!rec, a70: rec && rec.averageGrade, a50: rec && rec.avg50, label: d && d.label, unc: d && d.uncertain, bad, ex, inv: inv.length, invUnc };
   });
@@ -102,7 +103,7 @@ console.log('\n■ 4. 계열 분류');
     '시각디자인학과': '예체능', '실용음악과': '예체능', '체육학과': '예체능', '국어국문학과': '인문',
     '고고미술사학과': '인문', '섬유패션디자인학부 섬유공학전공': '공학', '미래정보디스플레이학부': '공학', '지능정보융합학과': '공학',
     '법과대학': '사회', '상경학부': '사회', '소방방재학부': '공학', '신문방송학과': '사회', '정보통계학과': '자연', '영화학과': '예체능',
-    '치기공학과': '의약', '보건복지자율전공학부': '의약', '창의예술자율전공학부': '예체능', '공과대학 자율학부': '기타',
+    '치기공학과': '의약', '보건복지자율전공학부': '의약', '창의예술자율전공학부': '예체능', '공과대학 자율학부': '공학',   // ver8.56 외부 검토: '공과대학' 은 공학(단과대학 안의 자율학부)
   };
   const got = await pg.evaluate(c => Object.fromEntries(Object.keys(c).map(k => [k, categorizeDepartment(k.trim())])), cases);
   for (const [k, v] of Object.entries(cases)) check(`${k.trim()} → ${v}`, got[k] === v, got[k]);

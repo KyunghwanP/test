@@ -39,7 +39,7 @@ const SY = /const SURVEY_YEARS = \[[^\]]+\];/.exec(H)[0];
 const ER = /const ELIG_RULES = \[[\s\S]*?\n\s*\];/.exec(H)[0];   // parseCSV 가 전형마다 지원 자격(elig)을 붙인다
 // parseCSV 가 다른 시·도 캠퍼스 학과의 캠퍼스·지역을 바로잡는다(경북대 상주 등)
 const CF = /const CAMPUS_FIX = \{[\s\S]*?\n\s*\};/.exec(H)[0] + /const campusKey = .*\n/.exec(H)[0] + /const CAMPUS_FIX_SET = .*\n/.exec(H)[0];
-await pg.addScriptTag({ content: SY + ER + CF + grab('campusFixOf') + grab('eligibilityOf') + grab('fixDot') + grab('gradeVal') + grab('categorizeDepartment') + grab('parseCSVLine') + grab('parseCSV') });
+await pg.addScriptTag({ content: SY + ER + CF + grab('campusFixOf') + grab('admNormKey') + grab('eligibilityOf') + grab('fixDot') + grab('gradeVal') + grab('categorizeDepartment') + grab('parseCSVLine') + grab('parseCSV') });
 const r = await pg.evaluate(csv => {
   const recs = parseCSV(csv);
   const has = (x, y) => x.years[y] && parseFloat(x.years[y].competition) > 0;
@@ -57,8 +57,10 @@ await b.close();
 
 console.log('\n■ 진단 페이지가 읽는 결과');
 // 경북대 2025학년도를 더하자 2026학년도 등급이 미제출이라 빠져 있던 경북대 28곳이 살아났다
-check('학과 묶음 수 (채우기 전 19,759 + 경북대 28)', r.n === 19787, r.n);
-check('2026학년도 경쟁률은 원래 것 그대로 (+ 위 경북대 28)', r.y26 === 18411, r.y26);
+// ver8.56 외부 검토(2026-11): 전형 이름만 바뀐 앞 해 기록을 잇는다(강원대 간호학과 농어촌전형 → 농어촌학생전형 등 799곳).
+// 그러면서 2026학년도 행에 등급이 없어 빠지던 86곳이 앞 해 등급과 이어져 살아난다 → 19,787 + 86 = 19,873
+check('학과 묶음 수 (채우기 전 19,759 + 경북대 28 + 이름 바뀐 앞 해와 이어진 86)', r.n === 19873, r.n);
+check('2026학년도 경쟁률이 있는 묶음 (18,411 + 이어진 71)', r.y26 === 18482, r.y26);
 console.log('\n■ 경북대 2025학년도 (경북대 입학처 원자료)');
 check('경북대 2025학년도 수시 515행', (CSV.match(/^2026,경북대학교\[본교\],/gm) || []).length === 515);
 check('진단에 나오는 경북대 329곳 (전 301)', r.knuInfo.n === 329, r.knuInfo);
