@@ -3059,6 +3059,43 @@ console.log('\n[인쇄 — 양면 인쇄용 빈 쪽]');
   STORE = saved;
 }
 
+// ── 창체 일정 — 봉사활동 줄 · 줄바꿈(선생님 요청 2026-11-05) ── 진로 「1학기 · 학급별 · 상이 · 10차시」 가 「1학 / 기」 처럼 접혔다 → 날짜·교시 칸은 한 줄.
+// 「자율·자치활동(봉사활동)」 은 봉사활동 누가기록에도 따로 넣어야 해서 눈에 띄게(주황 바탕 · 「누가기록 입력」) + 표 위에 설명. 지어낸 2학년 일정
+console.log('\n[창체 일정 — 봉사활동 줄 · 줄바꿈]');
+{
+  const saved = STORE;
+  STORE = JSON.parse(JSON.stringify(STORE));
+  const m = STORE['saenggibu/meta'], base = m.schedules[0], id2 = base.id + 'x2';
+  m.schedules.push({ ...base, id: id2, sheet: '<누>창의(2학년 창체)', title: '2학년 창의적 체험활동 상황', grade: 2, rows: [
+    { v: ['1학기', '학급별', '상이', '10차시', 1, null, null, null, 1, '진로활동', '진로 탐색하기-미래 계획 세우기'] },
+    { v: [6, 16, '화', '1~3', 3, 3, null, null, null, '자율·자치활동', '단체 수련 활동'] },
+    { v: [6, 16, '화', '4~5', 2, 2, null, 2, null, '자율·자치활동(봉사활동)', '교내 질서 캠페인 활동'] },
+    { v: [6, 17, '수', '4~5', 2, 2, null, 2, null, '자율·자치활동(봉사활동)', '하천 정화 활동'] }] });
+  const p = await openAs(KIM, { width: 1280 });
+  await p.waitForSelector('#views button[data-view="sch"]');
+  await p.click('#views button[data-view="sch"]');
+  await p.click(`#schTabs [data-id="${id2}"]`);
+  await p.waitForFunction(() => document.querySelectorAll('table.sch tbody tr').length === 4, null, { timeout: 5000 }).catch(() => {});
+  const r = await p.evaluate(() => {
+    const trs = [...document.querySelectorAll('table.sch tbody tr')];
+    const lines = td => { const rg = document.createRange(); rg.selectNodeContents(td); return new Set([...rg.getClientRects()].map(x => Math.round(x.top))).size; };
+    return { vol: trs.map(tr => tr.classList.contains('vol')), tag: trs.map(tr => tr.querySelector('.sch-vol-tag')?.textContent || ''),
+      bg: trs.map(tr => getComputedStyle(tr.cells[0]).backgroundColor),
+      note: document.querySelector('.sch-vol-note')?.textContent.replace(/\s+/g, ' ').trim() || '',
+      wrap: [...trs[0].cells].slice(0, 4).map(td => [td.textContent, getComputedStyle(td).whiteSpace, lines(td)]) };
+  });
+  check('창체 일정 — 날짜·교시 칸은 줄바꿈 없이(1학기 · 학급별 · 상이 · 10차시 — 한 줄)', r.wrap.length === 4 && r.wrap.every(([, ws, n]) => ws === 'nowrap' && n === 1), r.wrap);
+  check('— 봉사활동 줄(자율·자치활동(봉사활동))만 주황 바탕 + 「누가기록 입력」', r.vol.join() === 'false,false,true,true' && r.tag[2] === '누가기록 입력'
+    && r.tag[3] === '누가기록 입력' && !r.tag[0] && !r.tag[1] && r.bg[2] !== r.bg[1] && r.bg[2] === r.bg[3], r);
+  check('— 표 위에 설명: 봉사활동 2건 · 4시간 — 봉사활동 누가기록에도 입력', /봉사활동 2건 · 4시간/.test(r.note) && /봉사활동 누가기록/.test(r.note), r.note);
+  await p.click('#schKinds .chip[data-k="jin"]');
+  await p.waitForFunction(() => document.querySelectorAll('table.sch tbody tr').length === 1, null, { timeout: 5000 }).catch(() => {});
+  check('— 봉사 줄이 없으면(진로만) 설명도 없다', !(await p.$('.sch-vol-note')));
+  check('— 오류 없음', !p.errors.length, p.errors);
+  await p.context().close();
+  STORE = saved;
+}
+
 await b.close();
 
 // ── 4. 앱에 붙인 곳 ──

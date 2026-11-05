@@ -382,8 +382,20 @@
   table.sch td{padding:7px 10px;border-bottom:1px solid var(--rule);vertical-align:top;text-align:center;font-variant-numeric:tabular-nums;}
   table.sch td.long,table.sch th.long{text-align:left;}
   table.sch td.long{min-width:120px;}
+  /* 날짜·교시 칸(1학기 · 학급별 · 상이 · 10차시)은 접지 않는다 — 좁은 칸에서 「1학 / 기」 처럼 갈라졌다(선생님 2026-11-05) */
+  table.sch td:not(.long),table.sch th:not(.long){white-space:nowrap;}
   table.sch tr.sum td{background:var(--paper-soft);font-weight:800;}
   .sch-sum{font-size:14px;font-weight:800;color:var(--ink-soft);}
+  /* 봉사활동 줄 — 자율·자치활동(봉사활동)은 「봉사활동 누가기록」 에도 넣어야 한다: 주황 바탕 · 왼쪽 띠 · 「누가기록 입력」, 표 위에 설명 */
+  table.sch tr.vol td{background:#FFF1DC;}
+  table.sch tr.vol td:first-child{box-shadow:inset 4px 0 0 #F79009;}
+  table.sch tr.vol td.vh{color:#B54708;font-weight:900;}
+  .sch-vol-tag{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;background:#F79009;color:#fff;font-size:11.5px;font-weight:800;line-height:1.6;white-space:nowrap;vertical-align:1px;}
+  .sch-vol-note{display:flex;gap:10px;align-items:baseline;margin-top:12px;padding:10px 14px;border:1px solid #FEDF89;border-left:4px solid #F79009;border-radius:10px;background:#FFFAEB;font-size:14px;line-height:1.55;}
+  .sch-vol-note b{color:#B54708;font-weight:900;white-space:nowrap;}
+  .sch-vol-note span{color:var(--ink-soft);}
+  html.dark table.sch tr.vol td{background:#3A2A0D;} html.dark table.sch tr.vol td.vh{color:#FEC84B;}
+  html.dark .sch-vol-note{background:#2B2110;border-color:#7A4D0B;border-left-color:#F79009;} html.dark .sch-vol-note b{color:#FEC84B;}
 
   /* ── 올리기 (관리자) ── */
   .up{background:var(--paper);border:1px solid var(--mon);border-radius:12px;padding:14px 16px;font-size:14.5px;line-height:1.7;}
@@ -3132,6 +3144,13 @@ function renderSch(){
   const cnt = k => sgbSchFilter(s, k).rows.length;
   // 글 칸(활동 영역·활동 내용)은 길이가 제각각이라 늘 왼쪽 정렬 — 위아래로 훑어 읽기 쉽게. 숫자·날짜 칸은 가운데
   const textCols = new Set((s.cols || []).map((c, j) => /활동(영역|내용)/.test(sgbNorm(c)) ? j : -1).filter(j => j >= 0));
+  // 봉사활동 줄 — 활동 영역에 「봉사」(자율·자치활동(봉사활동))가 있거나 봉사 시간 칸에 값이 있는 줄. 창체 시간과 함께
+  // 「봉사활동 누가기록」 에도 넣어야 해서 주황 바탕 · 「누가기록 입력」, 표 위에 건수·시간 설명(선생님 요청 2026-11-05)
+  const colAt = name => (s.cols || []).findIndex(c => sgbNorm(c) === name);
+  const areaJ = colAt('활동영역'), volJ = colAt('봉사'), hourJ = colAt('이수시간'), tagJ = areaJ >= 0 ? areaJ : colAt('활동내용');
+  const cell = (r, j) => j >= 0 ? String((r.v || [])[j] ?? '').trim() : '';
+  const isVol = r => /봉사/.test(cell(r, areaJ)) || !!(parseFloat(cell(r, volJ)) > 0);
+  const vols = rows.filter(isVol), volH = Math.round(vols.reduce((t, r) => t + (parseFloat(cell(r, volJ)) || parseFloat(cell(r, hourJ)) || 0), 0) * 10) / 10;
   body.innerHTML = `<div class="sch-wrap">
     <div class="bar" style="margin-top:0;">
       <div class="seg" id="schTabs">${list.map(x => `<button type="button" data-id="${x.id}" class="${x.id === st.sg ? 'on' : ''}">${x.grade ? x.grade + '학년' : esc(x.title)}</button>`).join('')}</div>
@@ -3144,8 +3163,12 @@ function renderSch(){
       ${s.area ? `<div class="where">${esc(s.area)}</div>` : ''}
       ${s.path ? `<details><summary>입력 경로·안내 보기</summary><div class="txt">${esc(s.path)}</div></details>` : ''}
       ${noteHtml(s)}
+      ${vols.length ? `<div class="sch-vol-note"><b>봉사활동 ${vols.length}건 · ${volH}시간</b><span>주황 줄은 자율·자치활동 시간에 한 봉사활동입니다 —
+        나이스 「봉사활동 누가기록」에도 입력해 주세요${volJ >= 0 ? '(시간은 「봉사」 칸)' : ''}.</span></div>` : ''}
       <div class="tblwrap"><table class="sch"><thead><tr>${(s.cols || []).map((c, j) => `<th${textCols.has(j) ? ' class="long"' : ''}>${esc(c)}</th>`).join('')}</tr></thead>
-        <tbody>${rows.map(r => `<tr>${(r.v || []).map((v, j) => `<td${textCols.has(j) ? ' class="long"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+        <tbody>${rows.map(r => { const vol = isVol(r);
+          return `<tr${vol ? ' class="vol"' : ''}>${(r.v || []).map((v, j) => `<td${textCols.has(j) ? ' class="long"' : vol && j === volJ ? ' class="vh"' : ''}>${esc(v)}${vol && j === tagJ
+            ? '<span class="sch-vol-tag">누가기록 입력</span>' : ''}</td>`).join('')}</tr>`; }).join('')}</tbody></table></div>
     </div></div>`;
   $('schTabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; st.sg = b.dataset.id; renderSch(); };
   $('schKinds').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; st.sf = b.dataset.k; renderSch(); };
