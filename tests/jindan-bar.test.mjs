@@ -40,7 +40,7 @@ await pg.setContent(`<style>:root{--slate-50:#f8fafc;--slate-100:#f1f5f9;--slate
 await pg.addScriptTag({ content: [
   line(/const SURVEY_YEARS = \[[^\]]+\];/),
   line(/const yearCut = [^\n]+/),
-  line(/const AMBITIOUS_EXTEND = [^\n]+/),
+  line(/const REACH_MAX = [^\n]+/),
   line(/const BAR_MANY = [^\n]+/),
   line(/const barPct = [^\n]+/),
   "let visibleCount = 150, admissionKind = '교과', currentFiltered = [], searchRange = 0.5, showAmbitious = false, selectedUniversity = '';",
@@ -51,6 +51,7 @@ await pg.addScriptTag({ content: [
 const rec = (name, y, a70, a50, extra = {}) => ({
   university: name, campus: '본교', department: '전자공학과', admissionName: '학생부교과(' + name + ')',
   years: Object.fromEntries(y.map(k => [k, { grade70: a70 }])), averageGrade: a70, avg50: a50,
+  gap50: a50 == null ? null : a50 - a70,   // 판정용: 같은 해끼리 본 50·70 차이(parseCSV 가 만든다)
   yearCount: y.length, vol70: 0.2, ...extra });
 const Y3 = ['2025', '2026', '2027'];
 const draw = (recs, target, kind = '교과', range = 0.5, amb = false, uni = '') => pg.evaluate(([recs, target, kind, range, amb, uni]) => {
@@ -113,12 +114,16 @@ console.log('\n■ 소신 지원 포함 — 상향 쪽 확장은 옅은 두 번�
 {
   const off = await draw([rec('가', Y3, 3.5, 3.0)], 3.25, '교과', 0.5, false);
   check('소신 끄면 한 겹만', !off.lines.ext && /목록 범위 2\.75~3\.75/.test(off.legend) && !/소신 확장/.test(off.legend), off.legend);
-  const on = await draw([rec('가', Y3, 3.5, 3.0)], 3.25, '교과', 0.5, true);
-  // ±0.5 에 소신을 켜면 상향 쪽이 1.0 까지 → 2.25~2.75 가 확장, 2.75~3.75 가 기본
-  check('기본 범위는 그대로 2.75~3.75', on.lines.rg && near(on.lines.rg.l, at(2.75)) && near(on.lines.rg.r, at(3.75)), on.lines.rg);
-  check('확장 겹은 2.25~2.75 — 기본 범위 바로 왼쪽', on.lines.ext && near(on.lines.ext.l, at(2.25)) && near(on.lines.ext.r, at(2.75)), on.lines.ext);
-  check('범례에 둘을 나눠 적는다', /목록 범위 2\.75~3\.75/.test(on.legend) && /소신 확장 2\.25~2\.75/.test(on.legend), on.legend);
+  // 소신 확장은 내 등급에서 위로 0.4(REACH_MAX)까지만 — 소신 판정의 완충 폭(최대 0.4)보다 위는 소신일 수 없다.
+  // ±0.1 에 소신을 켜면 2.85~3.15 가 확장, 3.15~3.35 가 기본 (예전에는 1.0 까지 넓혀 위험이 쏟아졌다)
+  const on = await draw([rec('가', Y3, 3.5, 3.0)], 3.25, '교과', 0.1, true);
+  check('기본 범위는 그대로 3.15~3.35', on.lines.rg && near(on.lines.rg.l, at(3.15)) && near(on.lines.rg.r, at(3.35)), on.lines.rg);
+  check('확장 겹은 2.85~3.15 — 기본 범위 바로 왼쪽, 0.4 까지만', on.lines.ext && near(on.lines.ext.l, at(2.85)) && near(on.lines.ext.r, at(3.15)), on.lines.ext);
+  check('범례에 둘을 나눠 적는다', /목록 범위 3\.15~3\.35/.test(on.legend) && /소신 확장 2\.85~3\.15/.test(on.legend), on.legend);
   check('무엇을 기준으로 거른 범위인지 적는다(70%컷)', /범위는 70%컷 기준/.test(on.legend), on.legend);
+  // ±0.5 는 이미 0.4 보다 넓다 → 소신을 켜도 더 넓힐 곳이 없다(겹 하나)
+  const wide = await draw([rec('가', Y3, 3.5, 3.0)], 3.25, '교과', 0.5, true);
+  check('±0.5 면 소신을 켜도 확장 겹 없음 — 2.75~3.75 한 겹', !wide.lines.ext && wide.lines.rg && near(wide.lines.rg.l, at(2.75)) && !/소신 확장/.test(wide.legend), [wide.lines, wide.legend]);
 }
 
 console.log('\n■ 대학명을 지정하면 — 목록을 범위로 거르지 않으므로 띠도 없다');
