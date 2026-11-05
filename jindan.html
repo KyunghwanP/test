@@ -386,7 +386,7 @@
         .bar-name { padding: 10px 10px 10px 12px; min-width: 0; }
         .bar-name .u { font-weight: 800; font-size: 14px; color: #1d4ed8; }
         .bar-name .u .cp { font-weight: 600; font-size: 11.5px; color: var(--slate-400); margin-left: 3px; }
-        .bar-name .u .lab { font-size: 10.5px; font-weight: 800; border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: 1px; }
+        .bar-name .u .lab { font-size: 10.5px; font-weight: 800; border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: 1px; display: inline-block; white-space: nowrap; }   /* 대학명이 길면 '적정 · 경계' 가 두 줄로 쪼개졌다 */
         .bar-name .d { font-size: 12px; color: var(--slate-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .bar-name .few { font-size: 11px; color: var(--slate-400); margin-top: 1px; }
         .bar-cuts { text-align: center; font-size: 13px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;
@@ -962,7 +962,8 @@
             const s = dept.replace(/문화/g, '□').replace(/(?<!안)전공/g, '▽');
             const has = list => list.some(k => s.includes(k));
             const edu = ['교육', '사범'];
-            const socFirst = ['문헌정보', '경찰'];
+            // 철도경영·철도운전경영은 '철도'(공학)보다 '경영'(사회)이 먼저다(ver8.57 외부 검토)
+            const socFirst = ['문헌정보', '경찰', '철도경영', '운전경영'];
             const humFirst = ['미술사'];
             const art = ['체육', '스포츠', '골프', '무용', '음악', '성악', '작곡', '피아노', '관현악', '국악', '미술', '회화', '조소', '조형',
                          '공예', '디자인', '연기', '연극', '영화', '공연', '방송연예', '뮤지컬', '패션', '뷰티', '미용', '메이크업', '만화', '웹툰',
@@ -973,7 +974,7 @@
                          '정보통신', '정보보호', '정보보안', '정보공학', '정보기술', '정보과학', '정보처리', '정보융합', '지능정보', '양자', '디스플레이', '보안', '소방', '방재', '스마트팩토리', '스마트시티', '항공정비', '게임', '공학', 'AI', '데이터', '융합기술', '드론', '메카', '공과', '모빌리티', '철도'];
             const nat = ['수학', '물리', '화학', '생물', '천문', '지질', '해양', '통계', '의생명', '생명과학', '과학', '나노', '식품', '원예', '산림', '조경', '생명', '바이오', '축산', '동물', '농', '식물', '스마트팜', '의류', '의상'];
             const soc = ['경영', '경제', '법학', '행정', '미디어', '사회복지', '심리', '정치', '외교', '무역', '회계', '관광', '언론', '아동', '소비자', '지리', '사회', '광고', '홍보', '금융', '부동산', '세무', '국제', '커뮤니케이션', '법', '상경', '신문방송', '마케팅', '공공', '경상', '상담', '물류', '통상', '유통'];
-            const hum = ['인문', '어문', '역사', '철학', '종교', '국어', '영어', '독어', '불어', '일어', '중어', '한문', '사학', '고고', '미학', '문학', '언어', '신학', '창작', '일본학', '중국학', '□', '기독교', '선교', '성서', '불교', '원불교', '종학'];
+            const hum = ['인문', '어문', '역사', '철학', '종교', '국어', '영어', '독어', '불어', '일어', '중어', '한문', '사학', '고고', '미학', '문학', '언어', '신학', '창작', '일본학', '중국학', '□', '기독교', '선교', '성서', '불교', '원불교', '대순종학'];   // '종학' 만 쓰면 '헬리콥터조종학과' 가 걸린다
             if (has(edu)) return '교육';
             if (has(socFirst)) return '사회';
             if (has(humFirst)) return '인문';
@@ -1172,11 +1173,16 @@
                 // 진단 라벨용: 3개년 70%컷 변동폭(완충 산정) + 50%컷 평균(합격자 중위선)
                 rec.vol70 = vals.length >= 2 ? (Math.max(...vals) - Math.min(...vals)) : 0;
                 const vals50 = SURVEY_YEARS.map(y => rec.years[y] && parseFloat(rec.years[y].grade50)).filter(v => v != null && !isNaN(v));
-                rec.avg50 = vals50.length ? vals50.reduce((a, b) => a + b, 0) / vals50.length : null;   // 화면 표시용(50%컷이 있는 해 평균)
-                // 판정용: 50%·70% 가 둘 다 있는 해만 써서 '50%컷 − 70%컷' 차이(보통 음수)를 낸다. 해 묶음이 다른 두 평균을
+                // 50%·70% 가 둘 다 있는 해만 써서 '50%컷 − 70%컷' 차이(보통 음수)를 낸다. 해 묶음이 다른 두 평균을
                 // 견주면 안 뒤집힌 곳이 역전으로 보였다(동아대 교육학과 — '25 3.75<4.08, '26 3.08<3.33 · ver8.56 외부 검토).
                 const pairs = SURVEY_YEARS.map(y => rec.years[y]).filter(v => v && v.grade70 != null && v.grade50 != null && !isNaN(parseFloat(v.grade50)));
                 rec.gap50 = pairs.length ? pairs.reduce((t, v) => t + (parseFloat(v.grade50) - v.grade70), 0) / pairs.length : null;
+                // 화면(막대·진단 문구)의 50%컷 = 판정에 쓰는 50%컷 = 70%컷 평균 + 위 차이. 두 컷이 해마다 다 있으면 그냥
+                // 50%컷 평균과 같다. 동아대처럼 '24 에 70%컷만 있으면 50%컷 두 해 평균(3.42)을 70%컷 세 해 평균(3.39)과
+                // 나란히 그려 뒤집혀 보였고 진단 문구(3.10)와도 달랐다(ver8.57 외부 검토, 407곳) → 하나로. 맞춘 값이면 상세 창에 근거를 적는다.
+                rec.avg50 = rec.gap50 == null ? null : rec.averageGrade + rec.gap50;
+                rec.adj50 = rec.gap50 != null && (pairs.length !== vals.length || pairs.length !== vals50.length);
+                rec.lone50 = rec.gap50 == null && vals50.length > 0;   // 50%컷은 있는데 같은 해 70%컷이 없다 — 견줄 수 없어 70%컷으로만 판정
                 // 추세: 첫 유효연도 → 마지막 유효연도 70%컷 변화 (vals는 연도 오름차순)
                 rec.trendDelta = vals.length >= 2 ? (vals[vals.length - 1] - vals[0]) : null;
                 // 추합률: 충원인원/모집인원(총) — 둘 다 있는 해만 평균. 2024·2025학년도는 원자료에 모집인원이
@@ -1278,7 +1284,7 @@
             // ±0.1 범위가 전부 70%컷 선 옆이라 목록의 74% 가 경계였다(ver8.56 외부 검토). '소신' 은 그 자체로 도전이다.
             const near = Math.abs(myG - (a50 - m));
             const uncertain = (rec.yearCount < 2) || ((rec.vol70 || 0) >= 0.8) || (near < 0.1) || inverted;
-            return { label, cls, uncertain, a50, a70, m, no50, inverted };
+            return { label, cls, uncertain, a50, a70, m, no50, inverted, lone50: !!rec.lone50 };
         }
         // 상세모달용: 왜 이 라벨인지 한 문장으로 설명 (학부모 앞 방어용)
         function diagReason(myG, d) {
@@ -1287,9 +1293,13 @@
             return diagReasonBase(d, me, a50, a70) + inv;
         }
         function diagReasonBase(d, me, a50, a70) {
-            if (d.label === '안정') return `${me}등급은 합격자 중위(50%컷 ${a50})보다 위 — 무난 지원권입니다.`;
+            // 50%컷이 없으면(또는 70%컷과 같은 해에 없으면) 70%컷으로만 판정한다 — 그 값을 '50%컷' 이라 부르지 않는다
+            const no50 = d.no50 ? (d.lone50 ? ' (50%컷이 70%컷과 같은 해에 없어 70%컷으로만 판정)' : ' (50%컷 미제출)') : '';
+            if (d.label === '안정') return (d.no50 || d.inverted)
+                ? `${me}등급은 70%컷(${a70})보다 완충(${d.m.toFixed(2)}) 넘게 위 — 무난 지원권입니다.${no50}`
+                : `${me}등급은 합격자 중위(50%컷 ${a50})보다 위 — 무난 지원권입니다.`;
             if (d.label === '적정') return (d.no50 || a50 === a70)
-                ? `${me}등급은 합격선(70%컷 ${a70}) 부근 — 적정 지원권입니다.${d.no50 ? ' (50%컷 미제출)' : ''}`
+                ? `${me}등급은 합격선(70%컷 ${a70}) 부근 — 적정 지원권입니다.${no50}`
                 : `${me}등급은 합격자 분포(50%컷 ${a50} ~ 70%컷 ${a70}) 안 — 소신껏 지원권입니다.`;
             if (d.label === '소신') return `${me}등급은 70%컷(${a70}) 하한 부근 — 도전(소신) 지원권입니다.`;
             return `${me}등급은 70%컷(${a70})보다 아래 — 합격 가능성이 낮습니다.`;
@@ -1789,10 +1799,10 @@
         }
         // 막대 보기. 결과 하나가 '대학·전형·모집단위' 한 줄이라 전형을 섞어 평균 내지 않는다
         // (여러 전형을 평균 내면 어느 전형에도 없는 컷이 나온다 — 지역전형 1.27 과 일반전형 4.18 이 2.72 로).
-        //  · 값은 카드·진단과 같은 것(있는 해들의 평균)
+        //  · 값은 카드·진단과 같은 것(있는 해들의 평균. 50%컷은 판정과 같은 값 — 70%컷 평균 + 같은 해끼리 본 차이)
         //  · 50%컷이 없으면 50% 막대를 그리지 않는다. 없는 값을 지어내지 않는다
         //  · 50%컷이 70%컷보다 큰 곳도 그대로 그린다 — 등급컷은 대학 환산점수 순위의 50%째·70%째 학생
-        //    '등급'이라 순서가 뒤바뀌는 일이 실제로 있다(오류가 아니다)
+        //    '등급'이라 순서가 뒤바뀌는 일이 실제로 있다(오류가 아니다). 그런 줄에는 '50/70 역전' 을 적는다
         //  · 자료가 1~2년뿐이거나 최신 해가 비었으면 이름 아래 회색 글씨로 알린다
         const BAR_MANY = 60;
         const barPct = v => ((Math.min(9, Math.max(1, v)) - 1) / 8 * 100).toFixed(2) + '%';   // 1.0~9.0 고정 눈금
@@ -1820,6 +1830,7 @@
                 const few = [];
                 if (r.yearCount < SURVEY_YEARS.length) few.push(`${r.yearCount}년 자료`);
                 if (yearCut(r, latest) == null) few.push('최근 미공개');
+                if (r.gap50 != null && r.gap50 > 1e-9) few.push('50/70 역전');   // 같은 해끼리 봐도 50%컷이 70%컷보다 크다
                 return `<div class="bar-row" onclick="openDetail(${idx})">
                     <div class="bar-name">
                         <div class="u">${r.university}<span class="cp">${r.campus}${r.region ? ' · ' + r.region : ''}</span>${d ? `<span class="lab ${d.cls}${d.uncertain ? ' edge' : ''}">${d.label}${d.uncertain ? ' · 경계' : ''}</span>` : ''}</div>
@@ -1830,10 +1841,11 @@
                     <div class="bar-track">${range}${no50 ? '' : `<span class="bar-b b50" style="width:${barPct(a50)}"></span>`}<span class="bar-b b70" style="width:${barPct(a70)}"></span><span class="bar-me" style="left:${barPct(target)}"></span></div>
                 </div>`;
             }).join('');
+            const anyInv = currentFiltered.some(r => r.gap50 != null && r.gap50 > 1e-9);
             const many = currentFiltered.length > BAR_MANY
                 ? `<p class="bar-note tip">ⓘ 막대가 ${currentFiltered.length.toLocaleString()}개입니다. 위 <b>학과명 검색</b>(예: 전자공학)이나 대학명으로 좁히면 비교하기 쉽습니다.</p>` : '';
             return `<div class="bar-wrap">
-                <p class="bar-note">ⓘ 등급컷은 대학마다 계산 기준이 다릅니다. 반영 과목·과목별 비율·진로선택과목 처리가 달라 같은 학생도 대학마다 등급이 다르게 나오고, 합격 순위는 대학 환산점수로 매깁니다. 참고용으로 보고 합격 가능성은 대학별 환산점수로 확인하세요. (그래서 50%컷이 70%컷보다 큰 곳도 있습니다 — 오류가 아닙니다)</p>
+                <p class="bar-note">ⓘ 등급컷은 대학마다 계산 기준이 다릅니다. 반영 과목·과목별 비율·진로선택과목 처리가 달라 같은 학생도 대학마다 등급이 다르게 나오고, 합격 순위는 대학 환산점수로 매깁니다. 참고용으로 보고 합격 가능성은 대학별 환산점수로 확인하세요.${anyInv ? " ('50/70 역전' 이라고 적힌 줄은 같은 해끼리 봐도 50%컷이 70%컷보다 크게 공개된 곳입니다 — 오류가 아닙니다)" : ''}</p>
                 ${many}
                 <div class="bar-legend">
                     <span><i class="sw" style="background:#0b6bff"></i>50%컷</span>
@@ -1841,7 +1853,7 @@
                     ${hasRange ? `<span><i class="rg"></i>목록 범위 ${Math.max(1, baseLo).toFixed(2)}~${bd.upper.toFixed(2)}</span>` : ''}
                     ${extLo != null ? `<span><i class="rg ext"></i>소신 확장 ${extLo.toFixed(2)}~${baseLo.toFixed(2)}</span>` : ''}
                     <span><i class="me"></i>내 등급 ${target.toFixed(2)}</span>
-                    <span>· 값은 ${SURVEY_YEARS.length}년 중 있는 해 평균${hasRange ? ', 범위는 70%컷 기준' : ''}</span>
+                    <span>· 값은 ${SURVEY_YEARS.length}년 중 있는 해 평균(50%컷은 70%컷과 같은 해끼리 맞춤)${hasRange ? ', 범위는 70%컷 기준' : ''}</span>
                 </div>
                 <div class="bar-grid">
                     <div class="bar-axis"><div class="h1">대학 · 학과</div><div class="h2">50%컷<br>70%컷</div>
@@ -1926,6 +1938,15 @@
             const oldNames = SURVEY_YEARS.filter(y => r.nameByYear && r.nameByYear[y] && r.nameByYear[y] !== r.admissionName)
                                          .map(y => `'${schoolYearShort(y)} ${r.nameByYear[y]}`);
             const altHtml = oldNames.length ? `<p class="dm-alt">※ 전형 이름이 바뀐 해도 이어서 봅니다 — ${oldNames.join(' · ')}</p>` : '';
+            // 50%컷을 같은 해끼리 맞췄으면 그 셈을 적는다 — 진단·막대의 50%컷이 표의 어느 칸에도 없는 숫자라서(동아대 3.10)
+            let adjHtml = '';
+            if (r.adj50 && r.avg50 != null) {
+                const both = SURVEY_YEARS.filter(y => { const v = r.years[y]; return v && v.grade70 != null && v.grade50 != null && !isNaN(parseFloat(v.grade50)); });
+                const a70s = r.averageGrade.toFixed(2), a50s = r.avg50.toFixed(2), gs = Math.abs(+a50s - +a70s).toFixed(2), up = +a50s > +a70s;
+                const base70 = `${r.yearCount > 1 ? r.yearCount + '개년 70%컷 평균' : '70%컷'} ${a70s}`;
+                adjHtml = `<p class="dm-alt">※ 진단·막대의 50%컷 <b>${a50s}</b> — 같은 해끼리 맞춘 값입니다. 두 컷이 다 있는 해(${both.map(y => `'${schoolYearShort(y)}`).join('·')})에
+                    ${gs === '0.00' ? `50%컷과 70%컷이 같아서 → ${base70} 그대로` : `50%컷이 70%컷보다 평균 ${gs} ${up ? '커서(역전)' : '작아서'} → ${base70} ${up ? '+' : '−'} ${gs}`}</p>`;
+            }
             // 종합전형은 성적 외 요소가 커 성적 기반 진단 라벨을 표시하지 않고 안내로 대체
             const isJonghap = admissionKind === '종합';
             const d = isJonghap ? null : classify(myG, r);
@@ -1937,7 +1958,7 @@
             document.getElementById('dm-grid').innerHTML = `
                 ${diagTileHtml}
                 <div class="d-tile hl" style="grid-column:1/-1;"><p class="k">${r.yearCount === 1 ? cutLabel(r).replace(' 70%컷', '학년도 환산등급 70%컷') : r.yearCount + '개년 평균 환산등급 70%컷'}</p><p class="v">${r.averageGrade.toFixed(2)}</p><p class="gap-box ${gap.cls}" style="justify-content:flex-start;margin-top:3px;font-size:11.5px;">내 등급 대비 <span class="arr">${gap.arrow}</span>${gap.text}</p></div>
-                <div style="grid-column:1/-1;overflow-x:auto;"><table class="dm-year-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>${altHtml}`;
+                <div style="grid-column:1/-1;overflow-x:auto;"><table class="dm-year-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>${adjHtml}${altHtml}`;
             document.getElementById('dm-tip').innerHTML =
                 `<div class="d-tile wide"><p class="k">상담 포인트</p><p class="tip-line"><b class="tip-ic ${t ? t.cls : 'tr-flat'}">추세</b> ${trendReason(t, r)}</p>${ch ? `<p class="tip-line"><b class="tip-ic ${ch.cls}">추합</b> ${ch.note} (${r.chungN > 1 ? `${r.chungN}개년 평균 추합률` : `${parseInt(r.chungYears[0], 10) - 1}학년도 추합률`} ${ch.pct}%)</p>` : ''}<p class="tip-caveat">※ 어디가 컷은 최종등록자 기준이라 추합이 이미 반영됨 — 추합률은 예비번호 기대·안정성 참고용입니다.</p></div>`;
             renderSusi(r);
@@ -2357,6 +2378,21 @@
         const GUIDE_BTN = `<button type="button" class="ad-guide" onclick="openGuide('최저학력')">📑 요강에서 '최저' 찾기</button>`;
         // '최저 없음' 이라는 예전 자료의 비고·원문이 애매한가: 일부·제외·○○만·단서, 기준 숫자, '적용'(미적용·적용하지 않음 말고)
         const VAGUE_NONE_RX = /일부|제외|단[,\s]|만\s*적용|(교과|종합|논술|실기)만|합\s*\d|\d\s*등급|(?<!미)적용(?!하지)/;
+        // 예전 자료 '최저 없음' 의 단서가 다른 학과 이야기인가 — '(의학과 제외)'·'의예과에만 적용'·'(간호학과 : 적용)'·
+        // '※ 수의예과, 의예과, 약학과 적용'. 단서에 학과 이름이 있고 이 학과가 그 안에 들지 않으면 '최저 없음' 이 분명하다.
+        // 학과 이름이 없거나('일부학과 적용'), 전형 종류를 말하거나('교과만 적용'), 단서가 더 붙으면 그대로 확인 필요(ver8.57 외부 검토).
+        const noteDepts = t => [...new Set([...String(t || '').matchAll(/([가-힣A-Za-z]{2,20}?(?:학과|학부|과))(?=\s|[,·:)]|에만|만|제외|적용|$)/g)].map(m => m[1])
+            .filter(n => !/^(일부|해당|전|모든|각|타|기타|일반)(학과|학부)$/.test(n) && !/교과$|학생부|전형/.test(n)))];
+        function otherDeptOnly(note, dept) {
+            const t = String(note || '');
+            if (/일부|(교과|종합|논술|실기)만|단[,\s]/.test(t) || !/제외|적용/.test(t)) return false;
+            const names = noteDepts(t);
+            if (!names.length) return false;
+            const base = x => x.replace(/(학과|학부|과|전공)$/, '');
+            const med = x => /^(의예|의학)/.test(x);   // 의학과·의예과는 같은 학과로 본다
+            const d = deptKey(dept);
+            return !names.some(n => (med(n) && med(d)) || base(d) === base(n) || (base(n).length >= 2 && d.includes(base(n))));
+        }
         function jaryoWarn(rows, lead, old) {
             const li = [...(rows || []).slice(0, 4).map(x => `<li>자료집: ${x[1]} · ${x[2]} — <b>${x[3]}</b>${x[5] ? ` (자료집 ${x[5]}쪽)` : ''}</li>`),
                         ...(old || []).slice(0, 3).map(x => `<li>예전 요강 자료: ${x['전형명'] || ''} · ${x['모집단위'] || ''} — <b>${critText(x)}</b>${x['원문'] && x['원문'] !== '-' ? ` (원문: ${x['원문']})` : ''}</li>`)];
@@ -2455,18 +2491,30 @@
                     //  · 2027 자료집이 이 학과·전형에 최저를 적어 두었으면(경상국립대 소프트웨어공학과 '2개 영역 합 10') → 확인 필요
                     //  · 비고·원문이 애매하면('일부학과 적용', '최저 없음(교과만 적용)', '상위2개합6 최저 미적용') → 확인 필요
                     const jc = jaryoMin ? jaryoCheck(r) : null;
-                    const note = picked.map(p => `${p['비고'] || ''} ${p['원문'] || ''}`).join(' ');
-                    const vague = VAGUE_NONE_RX.test(note);
+                    const noteOf = p => `${p['비고'] || ''} ${p['원문'] || ''}`;
+                    const vagueRows = picked.filter(p => VAGUE_NONE_RX.test(noteOf(p)));
+                    // 애매한 단서가 모두 '다른 학과 이야기' 면(건양대 '(의학과 제외)' 가 사회복지학과에) 애매하지 않다
+                    const otherOnly = vagueRows.length > 0 && vagueRows.every(p => otherDeptOnly(noteOf(p), r.department));
+                    // 보여 줄 단서 = 애매하다고 걸린 그 칸(비고든 원문이든) — 연세대(미래)는 비고 '최저 없음', 원문 '의예과에만 적용'
+                    const clue = (vagueRows.map(p => [p['비고'], p['원문']].filter(x => x && x !== '-' && VAGUE_NONE_RX.test(x)).join(' ')).filter(Boolean).join(' / ')
+                        || picked.map(p => p['비고'] && p['비고'] !== '-' ? p['비고'] : (p['원문'] || '')).filter(Boolean).join(' / ')).slice(0, 160);
                     if (jc && jc.state === 'listed') {
                         html += jaryoWarn(jc.rows, '예전 요강 자료에는 이 학과·전형이 \'최저 없음\' 으로 나오지만, 2027 전형분석 자료집에는 최저가 있습니다.');
-                    } else if (vague) {
+                    } else if (vagueRows.length && !otherOnly) {
                         html += noMarkBox('확인 필요 — 예전 자료의 \'최저 없음\' 이 애매합니다', [
-                            `예전 요강 자료의 표시: “${picked.map(p => p['비고'] && p['비고'] !== '-' ? p['비고'] : (p['원문'] || '')).filter(Boolean).join(' / ').slice(0, 160)}”`,
+                            `예전 요강 자료의 표시: “${clue}”`,
                             '일부 학과·전형에만 최저가 있다는 뜻일 수 있으니 모집요강에서 확인하세요.']);
                     } else {
+                        // 자료집과 무엇을 대조했는지 그대로 적는다 — 대조하지 못한 곳(자료집에 그 대학 표가 없음, 540곳)에
+                        // '자료집도 이와 다르지 않습니다' 가 붙어 있었다(ver8.57 외부 검토)
+                        const cmp = !jc ? '2027 전형분석 자료집과는 대조하지 못했습니다(자료집을 불러오지 못함).'
+                            : jc.state === 'none' ? `2027 전형분석 자료집(2026-08)에도 '${jc.row[3]}' 으로 나옵니다(${jc.row[1]} · ${jc.row[2]}${jc.row[5] ? `, 자료집 ${jc.row[5]}쪽` : ''}).`
+                            : jc.state === 'absent' ? '2027 전형분석 자료집(2026-08)에는 이 대학 최저 표가 없어 대조하지 못했습니다.'
+                            : '2027 전형분석 자료집(2026-08)의 이 대학 최저 표에도 이 학과·전형은 없습니다.';
                         html += `<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:12px 14px;">
                             <b style="color:#059669;">이 학과·전형은 수능최저를 적용하지 않습니다.</b>
-                            <p style="font-size:12px;color:#047857;margin:4px 0 0;">예전 요강 자료에 이 학과·전형이 '최저 없음' 으로 나오고, 2027 전형분석 자료집도 이와 다르지 않습니다.</p></div>`;
+                            <p style="font-size:12px;color:#047857;margin:4px 0 0;">예전 요강 자료에 이 학과·전형이 '최저 없음' 으로 나옵니다. ${cmp}</p>
+                            ${otherOnly ? `<p style="font-size:12px;color:#047857;margin:4px 0 0;">예전 요강 자료의 단서 “${clue}” 에 적힌 ${noteDepts(clue).join('·')}는 이 학과가 아닙니다.</p>` : ''}</div>`;
                     }
                 } else {
                     const _seen = new Set();
