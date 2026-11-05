@@ -47,7 +47,9 @@ const find = (u, d) => pg.evaluate(([u, d]) => allRecords.findIndex(r => r.unive
 console.log('\n■ 1. 안정 판정 — 70%컷보다 나쁜 성적에 안정이 붙지 않는다');
 {
   const r = await pg.evaluate(() => {
-    const rec = allRecords.find(r => r.university === '가톨릭관동대학교' && r.department === '지리교육과' && r.avg50 > r.averageGrade);
+    // 신고된 줄: 기회균형전형 — '24 는 50%컷(5.94)만 있어 예전에는 50%컷 평균(5.17)이 70%컷(4.79)보다 커 보였다.
+    // 지금은 같은 해끼리 맞춰 50%컷 4.79(ver8.57 외부 검토) — 찾을 때 그 모양에 기대지 않고 이름으로 찾는다
+    const rec = allRecords.find(r => r.university === '가톨릭관동대학교' && r.department === '지리교육과' && r.admissionName.includes('기회균형'));
     const d = rec && classify(4.80, rec);
     let bad = 0, ex = null;
     for (const x of allRecords) for (let g = 1; g <= 9; g += 0.05) {
@@ -59,7 +61,7 @@ console.log('\n■ 1. 안정 판정 — 70%컷보다 나쁜 성적에 안정이 
     const invUnc = inv.filter(x => classify(x.averageGrade - 0.5, x).uncertain).length;
     return { found: !!rec, a70: rec && rec.averageGrade, a50: rec && rec.avg50, label: d && d.label, unc: d && d.uncertain, bad, ex, inv: inv.length, invUnc };
   });
-  check('가톨릭관동대 지리교육과가 있다 (50%컷 > 70%컷)', r.found, r);
+  check('가톨릭관동대 지리교육과(기회균형)가 있다', r.found, r);
   check('4.80 은 안정이 아니다 (70%컷 4.79 보다 나쁨)', r.label && r.label !== '안정', r);
   check('어느 곳에서도 70%컷보다 나쁜 성적에 안정이 붙지 않는다 (고치기 전 309곳)', r.bad === 0, r);
   check('50%컷이 뒤집힌 곳은 판정을 경계로 표시한다', r.inv > 0 && r.invUnc === r.inv, { inv: r.inv, invUnc: r.invUnc });
