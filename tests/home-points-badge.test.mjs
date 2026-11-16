@@ -87,7 +87,7 @@ check('최근 7일 모달에 누적 경고를 함께 넘긴다',
       /const warns = ptsWarnStudents\(ptsViewData, room, grade\)/.test(HTML)
       && /renderPtsNewModal\(hr, within, title, [^,]+, warns\)/.test(HTML));
 check('선도관심은 명렬에 있는 학생만 (전출·자퇴가 계속 뜨던 자리)',
-      /짝이 없으면 뺀다 — 전출·자퇴[^\n]*\n\s*return out\.filter\(Boolean\);/.test(HTML));
+      /if \(!p \|\| p\.dup\) return null;\s*\/\/ 짝이 없으면 뺀다 — 전출·자퇴/.test(HTML));
 // 실제로 선도관심에 같은 학생이 두 줄로 떴다. 원인은 자료를 두 번 담은 것.
 check('불러오기가 두 번 돌지 않는다 (같은 학생이 두 줄로 뜨던 원인)',
       /if \(ptsViewLoading\) return ptsViewLoading;/.test(HTML) &&
@@ -96,12 +96,13 @@ check('담는 동안 전역을 비워 두지 않는다',
       !/ptsViewData = \[\];/.test(HTML) && /const rows = \[\];/.test(HTML));
 // 통계·반별 목록·검색이 모두 ptsViewData 를 쓴다. 한 군데씩 거르면 어디선가
 // 빠뜨리므로 불러올 때 한 번에 걸러 낸다.
-check('조회 자료 자체를 명렬로 거른다 (통계·목록·검색이 다 이걸 쓴다)',
-      /ptsViewData = ptsOnRoster\(rows, ptsRosterSet\(allStudents\)\);/.test(HTML));
-check('거르는 것이 통계를 그리기 전이다',
-      HTML.indexOf('ptsViewData = ptsOnRoster(rows,') < HTML.indexOf('ptsViewLoaded = true;'));
+check('조회 자료 자체를 명렬로 맞춘다 (통계·목록·검색이 다 이걸 쓴다)',
+      /ptsViewData = view\.list;/.test(HTML));
+check('맞추는 것이 통계를 그리기 전이다',
+      HTML.indexOf('ptsViewData = view.list;') > 0
+      && HTML.indexOf('ptsViewData = view.list;') < HTML.indexOf('ptsViewLoaded = true;'));
 check('배지 쪽도 명렬을 읽고 나서 그린다',
-      /ensurePtsRoster\(\)\.then\(\(\) => \{\s*const students = ptsOnRoster\(raw, ptsRosterSet\(allStudents\)\);\s*renderHomeroomPtsBadge\(hr, room, students\);/.test(HTML));
+      /ensurePtsRoster\(\)\.then\(\(\) => \{\s*const students = ptsRosterView\(raw, [^\n]+\.list;\s*renderHomeroomPtsBadge\(hr, room, students\);/.test(HTML));
 check('조회 화면도 명렬을 같이 읽는다', /await ensurePtsRoster\(\);/.test(HTML));
 check('그 주에 아무것도 없을 때만 이전 것으로 물러난다',
       /if \(within\.length\)[\s\S]{0,200}ptsRecentEntries\([\s\S]{0,80}PTS_FALLBACK_LIMIT\)/.test(HTML));
@@ -124,6 +125,11 @@ const ptsRosterSetSrc = grab('ptsRosterSet');
 const ptsRosterKeySrc = /^const ptsRosterKey = [\s\S]*?;$/m.exec(HTML)[0];
 const ptsSeatKeySrc = /^const ptsSeatKey = [\s\S]*?;$/m.exec(HTML)[0];
 const ptsOnRosterSrc = grab('ptsOnRoster');
+const ptsPairSrc = grab('ptsPair');
+const ptsSeatedSrc = grab('ptsSeated');
+const ptsRosterViewSrc = grab('ptsRosterView');
+const renderPtsStudentListSrc = grab('renderPtsStudentList');
+const renderPtsOrphansSrc = grab('renderPtsOrphans');
 const ptsWatchListSrc = grab('ptsWatchList');
 // 상수도 원본에서 떼어 온다 — 베껴 적으면 원본을 바꿔도 검사가 안 문다
 const ptsWatchNetSrc = /^const PTS_WATCH_NET = [^\n]*$/m.exec(HTML)[0];
@@ -147,6 +153,9 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
     <span class="home-section-arrow">›</span>
   </div>
 </div>
+<div id="ptsViewOrphans" hidden></div>
+<div id="ptsStudentListWrap" style="display:none;"><div id="ptsStudentList"></div></div>
+<div id="ptsViewEmpty" style="display:none;"></div>
 <div class="pts-detail-modal" id="ptsNewModal">
   <div class="pts-detail-box">
     <div class="pts-detail-head-name" id="ptsNewTitle"></div>
@@ -190,8 +199,27 @@ const HARNESS = `<!doctype html><meta charset="utf-8">
   ${ptsRosterKeySrc}
   ${ptsSeatKeySrc}
   ${ptsRosterSetSrc}
+  ${ptsPairSrc}
+  ${ptsSeatedSrc}
   ${ptsOnRosterSrc}
   window.ptsOnRoster = ptsOnRoster;
+  ${ptsRosterViewSrc}
+  window.ptsRosterView = ptsRosterView;
+  // 반별 목록 · 관리자 확인용 상자 — 원본이 쓰는 전역만 가짜로 둔다
+  let ptsViewRoom = null, ptsViewData = [], ptsViewOrphans = [];
+  window.setPtsRoom = k => { ptsViewRoom = k; };
+  window.setPtsView = (l, o) => { ptsViewData = l; ptsViewOrphans = o; };
+  const ADMIN_EMAIL = 'admin@ynhs.test';
+  let __admin = true;
+  window.setAdmin = v => { __admin = v; };
+  const isViewAs = () => false;
+  const fbAuth = { get currentUser() { return { email: __admin ? ADMIN_EMAIL : 'teacher@ynhs.test' }; } };
+  ${renderPtsStudentListSrc}
+  ${renderPtsOrphansSrc}
+  window.renderPtsStudentList = renderPtsStudentList;
+  window.renderPtsOrphans = renderPtsOrphans;
+  // 줄을 누르면 원본은 상세 창을 연다 — 여기선 무엇을 넘겼는지만 받아 둔다
+  window.showPtsDetail = (i, enc) => { window.__opened = JSON.parse(decodeURIComponent(enc)); };
   ${ptsWatchNetSrc}
   ${ptsWatchMinRowsSrc}
   ${ptsWatchListSrc}
@@ -735,12 +763,173 @@ console.log('\n■ 반별 인원이 명렬과 같다 — 2026-11 신고: 1-5 27(
   check('두 번 담긴 줄이 동명이인 자리로 가지 않는다', twice.join() === '4/-12', twice);
 }
 
+console.log('\n■ 상벌점 명단은 편성표가 기준 — 2026-11-16 신고: "상벌점 명렬만 다르다 · 전출입이 리로스쿨에 바로 반영되지 않는다"');
+{
+  // 지어낸 이름. 1-9·2-11 은 편성표와 리로스쿨이 같은 학생을 같은 자리로 갖고 시작한다.
+  const nm = (g, r, n) => `차${g}${String(r).padStart(2,'0')}${String(n).padStart(2,'0')}`;
+  const ROSTER = [], RIRO = [];
+  const fill = (g, r, cnt) => { for (let n = 1; n <= cnt; n++) {
+    ROSTER.push({ grade:g, room:r, num:n, name:nm(g, r, n) });
+    RIRO.push({ grade:g, room:r, num:n, name:nm(g, r, n), total:n === 2 ? -7 : 0, merit:0,
+                demerit:n === 2 ? -7 : 0, deducted:0, records:n === 2 ? [{ date:'11/10', detail:'무단지각 -7' }] : [] });
+  } };
+  fill(1, 9, 24); fill(2, 11, 29);
+  // ① 전입생 — 편성표에는 1-9 25번으로 올렸는데 리로스쿨에는 아직 없다
+  ROSTER.push({ grade:1, room:9, num:25, name:'카전입' });
+  // ② 반을 옮긴 학생 — 편성표는 1-9 26번, 리로스쿨은 아직 1-5 27번
+  ROSTER.push({ grade:1, room:9, num:26, name:'파옮김' });
+  RIRO.push({ grade:1, room:5, num:27, name:'파옮김', total:-6, merit:0, demerit:-6, deducted:0,
+              records:[{ date:'10/15', detail:'무단지각 -3' }, { date:'10/16', detail:'무단지각 -3' }] });
+  // ③ 전출생 — 편성표에서는 뺐는데 리로스쿨에는 2-11 30번으로 남았다
+  RIRO.push({ grade:2, room:11, num:30, name:'타전출', total:-12, merit:0, demerit:-12, deducted:0,
+              records:[{ date:'09/01', detail:'흡연 -12' }] });
+  // ④ 같은 줄이 두 번 들어왔다
+  RIRO.push({ ...RIRO.find(s => s.grade === 2 && s.num === 3) });
+  // ⑤ 리로스쿨 이름에 공백이 섞여 왔다
+  RIRO.find(s => s.grade === 2 && s.num === 4).name = nm(2, 11, 4).replace(/^(.)/, '$1 ');
+
+  const counts = list => list.reduce((m, s) => (m[`${s.grade}-${s.room}`] = (m[`${s.grade}-${s.room}`] || 0) + 1, m), {});
+  const want = counts(ROSTER);
+
+  // 원인 재현: 리로 줄에서 출발하면 전입생이 빠진다 — 1-9 가 편성표보다 한 명 적다
+  const old = await pg.evaluate(a => window.ptsOnRoster(a[0], window.ptsRosterSet(a[1])), [RIRO, ROSTER]);
+  check('(원인) 리로 줄에서 출발하면 1-9 가 편성표보다 한 명 적다 — 전입생이 없다',
+        counts(old)['1-9'] === want['1-9'] - 1 && !old.some(s => s.name === '카전입'),
+        { 명렬: want['1-9'], 리로기준: counts(old)['1-9'] });
+
+  const view = await pg.evaluate(a => window.ptsRosterView(a[0], window.ptsRosterSet(a[1])), [RIRO, ROSTER]);
+  const have = counts(view.list);
+  for (const k of ['1-9', '2-11'])
+    check(`${k}반 인원이 편성표와 같다 (${want[k]}명)`, have[k] === want[k], { 명렬: want[k], 상벌점: have[k] });
+  check('편성표에 없는 반(리로에만 남은 1-5)은 안 생긴다', !('1-5' in have), have);
+  check('전체 인원도 편성표와 같다', view.list.length === ROSTER.length, { 명렬: ROSTER.length, 상벌점: view.list.length });
+  check('순서도 편성표 그대로', view.list.every((s, i) => s.name === ROSTER[i].name && s.num === ROSTER[i].num),
+        view.list.slice(0, 3));
+
+  const tin = view.list.find(s => s.name === '카전입');
+  check('전입생이 편성표 자리에 보인다', tin && tin.grade === 1 && tin.room === 9 && tin.num === 25, tin);
+  check('전입생은 리로 자료 없음 표시 · 0점 · 이력 없음',
+        tin && tin.noRiro === true && tin.total === 0 && tin.merit === 0 && tin.demerit === 0
+        && tin.deducted === 0 && Array.isArray(tin.records) && !tin.records.length && !tin.ambRiro, tin);
+  const mv = view.list.find(s => s.name === '파옮김');
+  check('반을 옮긴 학생은 편성표 반·번호로, 점수·이력을 그대로 갖고 온다',
+        mv && mv.room === 9 && mv.num === 26 && mv.total === -6 && mv.records.length === 2 && !mv.noRiro, mv);
+  check('리로 자료가 붙은 학생에게는 표시가 없다',
+        view.list.filter(s => s.noRiro).map(s => s.name).join() === '카전입',
+        view.list.filter(s => s.noRiro).map(s => s.name));
+  check('이름은 편성표 표기로 보인다 (리로의 공백 섞인 이름 대신)',
+        view.list.find(s => s.grade === 2 && s.num === 4)?.name === nm(2, 11, 4),
+        view.list.find(s => s.grade === 2 && s.num === 4));
+  check('두 번 들어온 줄은 한 사람으로', view.list.filter(s => s.grade === 2 && s.num === 3).length === 1);
+
+  check('전출생은 명단에서 빠지고 확인용 목록에만 있다',
+        !view.list.some(s => s.name === '타전출')
+        && view.orphans.map(s => `${s.name}/${s.why}/${s.total}`).join() === '타전출/gone/-12', view.orphans);
+  check('두 번 들어온 줄·반을 옮긴 학생은 확인용 목록에 안 뜬다', view.orphans.length === 1, view.orphans);
+
+  // 선도관심·담임 배지는 0점 줄을 세지 않는다
+  const w = await pg.evaluate(v =>
+    window.ptsWarnStudents(v, 9, 1, -5).map(s => s.name), view.list);
+  check('1-9 선도관심: 벌점 학생만 (전입생 0점은 안 뜬다)', w.join() === `${nm(1, 9, 2)},파옮김`, w);
+  const wl = await pg.evaluate(v => window.ptsWatchList(v).map(x => x.s.name), view.list);
+  check('선도관심 채우기에도 0점 줄은 안 들어간다', !wl.includes('카전입'), wl);
+
+  // 같은 학년에 같은 이름이 둘 — 리로 줄이 둘 중 누구 자리에도 없으면 누구 것인지 모른다.
+  // 예전에는 리로 자리에 그대로 남겨서, 그 자리의 다른 학생(종합검색은 자리로 찾는다)에게
+  // 남의 점수가 붙을 수 있었다.
+  const amb = await pg.evaluate(a => window.ptsRosterView(a[0], window.ptsRosterSet(a[1])),
+    [[{ grade:1, room:2, num:7, name:'하둘', total:-9, merit:0, demerit:-9, deducted:0, records:[] }],
+     [{ grade:1, room:3, num:1, name:'하둘' }, { grade:1, room:4, num:1, name:'하둘' },
+      { grade:1, room:2, num:7, name:'거자리' }]]);
+  check('누구인지 모르면 아무에게도 안 붙인다',
+        amb.list.length === 3 && amb.list.every(s => s.total === 0 && s.noRiro), amb.list);
+  check('그 자리의 다른 학생에게 남의 점수가 붙지 않는다',
+        amb.list.find(s => s.name === '거자리')?.total === 0 && !amb.list.find(s => s.name === '거자리')?.ambRiro,
+        amb.list.find(s => s.name === '거자리'));
+  check('같은 이름의 두 학생은 "확인 필요"로 표시한다',
+        amb.list.filter(s => s.ambRiro).map(s => `${s.room}/${s.num}`).join() === '3/1,4/1', amb.list);
+  check('확인용 목록에 "누구인지 모름"으로 남는다',
+        amb.orphans.map(s => `${s.name}/${s.why}/${s.total}`).join() === '하둘/amb/-9', amb.orphans);
+
+  // 명렬을 못 읽었으면 예전처럼 리로 줄 그대로 — 전원이 사라지느니 낫다
+  const noRoster = await pg.evaluate(a => window.ptsRosterView(a, null), RIRO);
+  check('명렬이 없으면 리로 줄을 그대로 쓴다 (겹친 줄만 줄여서)',
+        noRoster.list.length === RIRO.length - 1 && !noRoster.orphans.length && !noRoster.list.some(s => s.noRiro),
+        { 리로: RIRO.length, 결과: noRoster.list.length });
+  const emptyRoster = await pg.evaluate(a => window.ptsRosterView(a, window.ptsRosterSet([])), RIRO);
+  check('빈 명렬도 못 읽은 것으로 본다', emptyRoster.list.length === RIRO.length - 1, emptyRoster.list.length);
+  // 반을 모르는 명렬 줄은 어느 반 카드에도 못 넣는다 — NaN 반이 생기면 안 된다
+  const bad = await pg.evaluate(a => window.ptsRosterView([], window.ptsRosterSet(a)).list,
+    [{ grade:1, room:9, num:1, name:'가' }, { grade:'', room:'', num:'', name:'나빈칸' }]);
+  check('반을 모르는 명렬 줄은 건너뛴다', bad.length === 1 && bad[0].name === '가', bad);
+
+  // ── 반별 목록: 리로 자료 없음 표시 ──
+  const listHtml = await pg.evaluate(v => {
+    window.setPtsRoom('1-9');
+    window.renderPtsStudentList(v.filter(s => s.grade === 1 && s.room === 9));
+    return document.getElementById('ptsStudentList').innerHTML;
+  }, view.list);
+  const rowOf = name => (listHtml.split('class="pts-student-item"').find(x => x.includes(name)) || '');
+  check('전입생 줄에 "리로 자료 없음" 표시', /리로 자료 없음/.test(rowOf('카전입')), rowOf('카전입').slice(0, 300));
+  check('전입생 점수 칸은 0 이 아니라 – (자료가 없다)',
+        /pts-stotal[^>]*>–</.test(rowOf('카전입')), rowOf('카전입').slice(0, 400));
+  check('다른 학생 줄에는 표시가 없다', !/리로 자료 없음|리로 확인 필요/.test(rowOf('파옮김')), rowOf('파옮김').slice(0, 300));
+  const ambHtml = await pg.evaluate(v => {
+    window.renderPtsStudentList(v); return document.getElementById('ptsStudentList').innerHTML;
+  }, amb.list);
+  check('누구인지 모르는 이름에는 "리로 확인 필요"', (ambHtml.match(/리로 확인 필요/g) || []).length === 2, ambHtml.slice(0, 300));
+
+  // 리로스쿨 사유에 작은따옴표가 들어 있으면 줄의 onclick='…' 이 끊겨 눌러도 안 열렸다
+  const quoted = await pg.evaluate(() => {
+    window.__opened = null;
+    window.renderPtsStudentList([{ grade:1, room:9, num:3, name:'차작은', total:-2, merit:0, demerit:-2, deducted:0,
+      records:[{ date:'11/12', detail:"수업 중 '딴짓' -2" }] }]);
+    const row = document.querySelector('#ptsStudentList .pts-student-item');
+    row.click();
+    return window.__opened && window.__opened.records[0].detail;
+  });
+  check("사유에 작은따옴표가 있어도 줄을 누르면 상세가 열린다", quoted === "수업 중 '딴짓' -2", quoted);
+
+  // ── 관리자 확인용 상자 ──
+  const box = await pg.evaluate(v => {
+    window.setAdmin(true); window.setPtsView(v.list, v.orphans); window.renderPtsOrphans();
+    const el = document.getElementById('ptsViewOrphans');
+    return { hidden: el.hidden, text: el.textContent };
+  }, view);
+  check('관리자에게는 어긋난 학생 상자가 보인다', !box.hidden, box);
+  check('편성표에만 있는 학생 수', /리로스쿨에 아직 없는 학생 1명/.test(box.text) && /카전입/.test(box.text), box.text.slice(0, 200));
+  check('리로에만 있어 뺀 학생 수', /편성표에 없어 뺀 리로스쿨 학생 1명/.test(box.text) && /타전출/.test(box.text), box.text.slice(0, 300));
+  const boxT = await pg.evaluate(v => {
+    window.setAdmin(false); window.setPtsView(v.list, v.orphans); window.renderPtsOrphans();
+    return document.getElementById('ptsViewOrphans').hidden;
+  }, view);
+  check('담임·교사에게는 안 보인다', boxT === true);
+  const boxNone = await pg.evaluate(v => {
+    window.setAdmin(true); window.setPtsView(v, []); window.renderPtsOrphans();
+    return document.getElementById('ptsViewOrphans').hidden;
+  }, ROSTER.slice(0, 3).map(s => ({ ...s, total: 0 })));
+  check('어긋난 학생이 없으면 관리자에게도 안 뜬다', boxNone === true);
+  const xss = await pg.evaluate(() => {
+    window.setAdmin(true);
+    window.setPtsView([], [{ grade:1, room:1, num:1, name:'<img src=x onerror="window.__boom=1">', total:-3, why:'gone' }]);
+    window.renderPtsOrphans();
+    return { boom: !!window.__boom, imgs: document.querySelectorAll('#ptsViewOrphans img').length };
+  });
+  check('상자의 이름은 글자로만 넣는다', !xss.boom && xss.imgs === 0, xss);
+}
+
 console.log('\n■ 종합검색·상벌점 상세도 같은 대조를 쓴다 (정적)');
-check('조회 자료를 명렬 자리로 맞춘다', /ptsViewData = ptsOnRoster\(rows, ptsRosterSet\(allStudents\)\);/.test(HTML));
-check('담임 배지도 명렬 자리로 맞춘 뒤 센다',
-      /const students = ptsOnRoster\(raw, ptsRosterSet\(allStudents\)\);/.test(HTML));
-check('종합검색의 상벌점도 명렬 자리로 찾는다 (학번만으로 찾으면 남의 점수가 붙는다)',
-      /ptsOnRoster\(ptsRows, ptsRosterSet\(allStudents\)\)\.forEach\(p => spotPts\.set\(spotKey\(p\), p\)\)/.test(HTML));
+check('조회 명단은 편성표 기준으로 만든다',
+      /const view = ptsRosterView\(rows, ptsRosterSet\(allStudents\)\);\s*ptsViewData = view\.list;\s*ptsViewOrphans = view\.orphans;/.test(HTML));
+check('관리자 확인용 상자를 다시 그린다', /ptsViewLoaded = true;\s*renderPtsGroups\(\);\s*renderPtsOrphans\(\);/.test(HTML));
+check('담임 배지도 편성표 기준 명단으로 센다 (그 학년 명렬로)',
+      /const students = ptsRosterView\(raw, ptsRosterSet\(allStudents\.filter\(s => String\(parseInt\(s\.grade\)\) === grade\)\)\)\.list;/.test(HTML));
+check('종합검색의 상벌점도 편성표 자리로 찾는다 (학번만으로 찾으면 남의 점수가 붙는다)',
+      /ptsRosterView\(ptsRows, ptsRosterSet\(allStudents\)\)\.list\s*\.filter\(p => !p\.noRiro\)\s*\.forEach\(p => spotPts\.set\(spotKey\(p\), p\)\)/.test(HTML));
+check('리로 자료가 없는 학생은 종합검색에서 "상벌점 데이터 없음" 그대로 (0점으로 안 보인다)',
+      /\.filter\(p => !p\.noRiro\)/.test(HTML));
+check('조회 화면에 관리자 확인용 상자 자리가 있다', /id="ptsViewOrphans" hidden/.test(HTML));
+check('상자 CSS 가 hidden 을 덮지 않는다', !/\.pts-view-orphans\{[^}]*display:/.test(HTML));
 
 console.log(errs.length ? '\n❌ 런타임 오류:\n' + errs.slice(0,4).join('\n') : '\n✅ 런타임 오류 없음');
 console.log(`\n${fail || errs.length ? '❌' : '✅'} 통과 ${pass} / 실패 ${fail}`);

@@ -1807,6 +1807,23 @@
     text-align:center;font-size:12px;color:var(--ink-soft);
     font-family:'IBM Plex Mono';margin-bottom:12px;
   }
+  /* 리로 자료 없음 — 점수 칸이 – 인 이유. 이름 옆에 작게 */
+  .pts-noriro{
+    margin-left:6px;padding:1px 6px;border-radius:6px;vertical-align:2px;
+    border:1px solid var(--rule);background:var(--paper-soft);color:var(--ink-soft);
+    font-size:11px;font-weight:700;white-space:nowrap;
+  }
+  /* 편성표·리로스쿨이 어긋난 학생 (관리자만). display 를 두지 않는다 — hidden 을 덮는다 */
+  .pts-view-orphans{
+    margin:0 0 12px;padding:8px 12px;border:1px dashed var(--rule);border-radius:8px;
+    font-size:12.5px;color:var(--ink-soft);
+  }
+  .pts-view-orphans summary{cursor:pointer;font-weight:700;color:var(--ink);padding:2px 0;}
+  .pts-view-orphans summary small{font-weight:400;color:var(--ink-soft);margin-left:4px;}
+  .pts-view-orphans ul{margin:4px 0 6px;padding-left:18px;max-height:220px;overflow:auto;}
+  .pts-view-orphans li{padding:1px 0;}
+  .pts-orphan-seat{font-family:'IBM Plex Mono';}
+  .pts-orphan-note{margin-top:4px;font-size:11.5px;}
   .pts-view-recent{
     display:block;margin:0 auto 12px;padding:4px 10px;
     border:1px solid var(--rule);border-radius:8px;background:var(--paper-soft);
@@ -5555,6 +5572,8 @@
               <div class="pts-view-updated" id="ptsViewUpdated">불러오는 중...</div>
               <button class="pts-view-recent" id="ptsViewRecentBtn" onclick="openPtsRecentModal()"
                       style="display:none;">🗓 우리 반 최근 항목 보기</button>
+              <!-- 편성표와 리로스쿨이 어긋난 학생 (관리자만) -->
+              <div class="pts-view-orphans" id="ptsViewOrphans" hidden></div>
 
               <!-- 검색 -->
               <div class="pts-view-search">
@@ -6470,7 +6489,7 @@ const TEACHERS = [];
 const ADMIN_EMAIL = 'pkh910518@yeungnam.hs.kr';
 // 화면에 찍히는 버전. 사용 현황에 '이 사람이 지금 쓰는 버전'으로도 남는다 —
 // 누가 옛 화면을 계속 쓰는지 보려면 그게 있어야 한다.
-const APP_VER = 'ver8.59';
+const APP_VER = 'ver8.60';
 const VIEW_AS_EMAIL = new URLSearchParams(location.search).get('viewAs') || null;
 // 관리자 '실제 권한으로 보기' — admin.html이 워커에서 그 교사 명의의 커스텀 토큰을 받아
 // 이 페이지에 넘긴다. 실제로 그 계정으로 로그인되므로 Firestore 규칙도 그 사람 기준으로
@@ -14655,7 +14674,10 @@ function spotLoadData(){
     // 그 자리에 있던 남의 점수가 붙거나 아무것도 안 나온다.
     const ptsRows = [];
     [p1, p2, p3].forEach(snap => { if (snap?.exists()) ptsRows.push(...(snap.data().students || [])); });
-    ptsOnRoster(ptsRows, ptsRosterSet(allStudents)).forEach(p => spotPts.set(spotKey(p), p));
+    // 리로 자료가 없는 학생(전입 직후)은 넣지 않는다 — 0점이 아니라 '상벌점 데이터 없음'이 맞다.
+    ptsRosterView(ptsRows, ptsRosterSet(allStudents)).list
+      .filter(p => !p.noRiro)
+      .forEach(p => spotPts.set(spotKey(p), p));
     spotLoaded = true;
   })();
   return spotLoading;
@@ -15236,7 +15258,7 @@ async function s360ShowDetail(s, targetEl){
   let ptsHtml = '<div style="font-size:15px;color:var(--ink-soft);">상벌점 데이터 없음</div>';
   if (p) {
     const records = (p.records || []).slice().reverse()
-      .map(r => `<div style="color:var(--ink-soft);padding:3px 0;">· ${r.date} ${escapeHtml(r.detail)}</div>`).join('');
+      .map(r => `<div style="color:var(--ink-soft);padding:3px 0;">· ${escapeHtml(r.date)} ${escapeHtml(r.detail)}</div>`).join('');
     ptsHtml = `
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
         <span class="spot-badge ${Number(p.total)<0?'neg':'pos'}">합계 ${p.total}</span>
@@ -18934,7 +18956,8 @@ window.toggleCommonCustom   = toggleCommonCustom;
 // ══════════════════════════════════════════
 // 상벌점 조회 기능
 // ══════════════════════════════════════════
-let ptsViewData    = [];   // 전체 학생 데이터
+let ptsViewData    = [];   // 전체 학생 데이터 — 편성표 기준(ptsRosterView)
+let ptsViewOrphans = [];   // 편성표에 없어 뺀 리로스쿨 줄 — 관리자 확인용
 let ptsViewGrade   = 'all';
 let ptsViewRoom    = null;
 let ptsViewLoaded  = false;
@@ -18990,12 +19013,15 @@ async function _loadPtsViewData() {
         }
       }
     }
-    // 전출·자퇴한 학생을 여기서 한 번 걸러 낸다. 통계·반별 목록·검색·선도관심이
-    // 모두 ptsViewData 를 쓰므로, 한 군데씩 거르면 어디선가 빠뜨리게 된다.
-    // 명렬을 못 읽었으면 안 거른다(전원이 사라지느니 낫다).
-    ptsViewData = ptsOnRoster(rows, ptsRosterSet(allStudents));
+    // 명단을 여기서 한 번 편성표에 맞춘다 — 전출·자퇴는 빼고, 전입생은 넣고, 반을 옮긴
+    // 학생은 새 반으로. 통계·반별 목록·검색·선도관심이 모두 ptsViewData 를 쓰므로,
+    // 한 군데씩 맞추면 어디선가 빠뜨리게 된다. 명렬을 못 읽었으면 리로 명단 그대로 둔다.
+    const view = ptsRosterView(rows, ptsRosterSet(allStudents));
+    ptsViewData = view.list;
+    ptsViewOrphans = view.orphans;
     ptsViewLoaded = true;
     renderPtsGroups();
+    renderPtsOrphans();
     // 담임(관리자는 고른 반)이면 '우리 반 최근 항목'을 언제든 열 수 있게
     const recentBtn = document.getElementById('ptsViewRecentBtn');
     if (recentBtn) {
@@ -19144,8 +19170,9 @@ function ptsRosterSet(list) {
 // 같은 이름이 둘 이상 비어 있으면 누구인지 모른다. 남의 점수를 붙이거나 있는 학생을
 // 지우느니 리로 자리 그대로 둔다.
 //
-// 자리를 명렬 것으로 바꿔 돌려주므로 반별 목록·통계·담임 배지·종합검색이 모두 명렬과
-// 같은 반·번호로 센다. 명렬이 없으면 같은 줄이 두 번 들어온 것만 줄인다.
+// 자리를 명렬 것으로 바꿔 돌려주므로 선도관심·배지가 명렬과 같은 반·번호로 센다.
+// 명렬이 없으면 같은 줄이 두 번 들어온 것만 줄인다.
+// 리로 줄만 돌려준다 — 화면 명단은 ptsRosterView(편성표 기준)를 쓴다.
 function ptsOnRoster(students, roster) {
   const rows = students || [];
   if (!roster || !roster.list) {
@@ -19156,24 +19183,32 @@ function ptsOnRoster(students, roster) {
     }
     return [...seen.values()];
   }
+  return ptsPair(rows, roster.list).map((p, i) => {
+    if (!p || p.dup) return null;   // 짝이 없으면 뺀다 — 전출·자퇴, 짝이 이미 있는 동명이인, 두 번 담긴 줄
+    if (p.amb) return rows[i];      // 누구인지 모름 — 그대로
+    return ptsSeated(rows[i], p.r);
+  }).filter(Boolean);
+}
+
+// 리로 줄마다 짝이 되는 명렬 학생을 찾는다(위 1)~3) 순서). i 번째가 rows[i] 의 결과다.
+//   { r }    명렬의 r 에 붙는다
+//   { amb }  같은 이름이 둘 이상 비어 있어 누구인지 모른다 — amb 는 그 후보들
+//   { dup }  같은 자리·이름의 줄이 이미 붙었다 — 두 번 담긴 줄
+//   null     붙을 데가 없다 — 전출·자퇴, 짝이 이미 있는 동명이인
+function ptsPair(rows, list) {
   const bySeat = new Map(), byName = new Map();
-  for (const r of roster.list) {
+  for (const r of list) {
     bySeat.set(ptsSeatKey(r) + '|' + ptsRosterKey(r), r);
     const n = ptsRosterKey(r);
     if (!byName.has(n)) byName.set(n, []);
     byName.get(n).push(r);
   }
   const taken = new Set();
-  const out = rows.map(() => undefined);     // undefined 아직 · null 뺌 · 객체 남김
-  const num = (v, d) => { const n = parseInt(v); return isNaN(n) ? d : n; };   // 명렬 칸이 비면 리로 값
-  const place = (i, r) => {
-    taken.add(r);
-    const s = rows[i];
-    out[i] = { ...s, grade: num(r.grade, s.grade), room: num(r.room, s.room), num: num(r.num, s.num) };
-  };
+  const out = rows.map(() => undefined);     // undefined = 아직 못 정함
+  const place = (i, r) => { taken.add(r); out[i] = { r }; };
   rows.forEach((s, i) => {                                       // 1)
     const r = bySeat.get(ptsSeatKey(s) + '|' + ptsRosterKey(s));
-    if (r) { if (taken.has(r)) out[i] = null; else place(i, r); }
+    if (r) { if (taken.has(r)) out[i] = { dup: true }; else place(i, r); }
   });
   for (const sameRoom of [true, false]) rows.forEach((s, i) => {  // 2)
     if (out[i] !== undefined) return;
@@ -19182,10 +19217,50 @@ function ptsOnRoster(students, roster) {
       && (isNaN(g) || parseInt(r.grade) === g)
       && (!sameRoom || parseInt(r.room) === rm));
     if (cands.length === 1) place(i, cands[0]);
-    else if (cands.length > 1) out[i] = s;                       // 누구인지 모름 — 그대로
+    else if (cands.length > 1) out[i] = { amb: cands };
   });
-  // 3) 짝이 없으면 뺀다 — 전출·자퇴, 짝이 이미 있는 동명이인
-  return out.filter(Boolean);
+  return out.map(p => p || null);                                // 3)
+}
+
+// 리로 줄 s 를 명렬 r 의 학년·반·번호로 옮긴다. 명렬 칸이 비면 리로 값을 둔다.
+function ptsSeated(s, r) {
+  const num = (v, d) => { const n = parseInt(v); return isNaN(n) ? d : n; };
+  return { ...s, grade: num(r.grade, s.grade), room: num(r.room, s.room), num: num(r.num, s.num) };
+}
+
+// 상벌점 화면의 명단 — 편성표(명렬)가 기준이다. 명렬 한 사람에 한 줄, 명렬의 순서·자리·이름 그대로.
+//
+// 2026-11-16 신고: "상벌점의 명렬만 다른 데와 다르다 — 전출입이 리로스쿨에는 바로 처리가 안 된다."
+// ptsOnRoster 로 전출생은 빼고 반을 옮긴 학생은 새 반으로 옮겼지만, 명단은 여전히 리로 줄에서
+// 출발했다. 그래서 리로스쿨에 아직 안 올라간 전입생은 상벌점 화면에만 없었고, 그 반은 명렬보다
+// 적게 셌다. 이제는 명렬에서 출발한다.
+//   · 리로 줄이 붙은 학생 — 그 점수·이력 (자리·이름은 명렬 것)
+//   · 리로에 아직 없는 학생 — 0점 줄에 noRiro. 화면에 '리로 자료 없음' 으로 보인다.
+//     누구 것인지 모르는 리로 줄(같은 학년 동명이인)이 있으면 그 후보들에 ambRiro 도 붙인다.
+//     예전에는 그 줄을 리로 자리에 남겨서, 그 자리의 다른 학생(종합검색은 자리로 찾는다)에게
+//     남의 점수가 붙을 수 있었다.
+//   · 붙지 못한 리로 줄(전출·자퇴, 누구인지 모름)은 orphans — 관리자 확인용으로 따로 돌려준다.
+// 명렬을 못 읽었으면 예전처럼 리로 줄을 그대로 쓴다(겹친 줄만 줄여서). 전원이 사라지느니 낫다.
+function ptsRosterView(students, roster) {
+  const rows = students || [];
+  if (!roster || !roster.list) return { list: ptsOnRoster(rows, null), orphans: [] };
+  const got = new Map(), amb = new Set(), orphans = [];
+  ptsPair(rows, roster.list).forEach((p, i) => {
+    if (!p) orphans.push({ ...rows[i], why: 'gone' });
+    else if (p.r) got.set(p.r, rows[i]);
+    else if (p.amb) { orphans.push({ ...rows[i], why: 'amb' }); p.amb.forEach(r => amb.add(r)); }
+  });
+  const list = [];
+  for (const r of roster.list) {
+    const s = got.get(r);
+    if (s) { list.push({ ...ptsSeated(s, r), name: r.name || s.name }); continue; }
+    const g = parseInt(r.grade), rm = parseInt(r.room), n = parseInt(r.num);
+    if (isNaN(g) || isNaN(rm)) continue;     // 반을 모르는 명렬 줄은 어느 반 카드에도 못 넣는다
+    list.push({ grade: g, room: rm, num: isNaN(n) ? r.num : n, name: r.name,
+                total: 0, merit: 0, demerit: 0, deducted: 0, records: [],
+                noRiro: true, ...(amb.has(r) ? { ambRiro: true } : {}) });
+  }
+  return { list, orphans };
 }
 
 function ptsWarnStudents(students, room, grade, threshold, roster) {
@@ -19303,9 +19378,10 @@ function checkHomeroomNewPoints(homeroom) {
   _ptsUnsub = onSnapshot(doc(fbDb, 'riro_points', `grade${grade}`), snap => {
     if (!snap.exists()) return;
     const raw = snap.data().students || [];
-    // 명렬이 있어야 전출·자퇴한 학생을 빼고, 반을 옮긴 학생을 새 반으로 셀 수 있다
+    // 명렬이 있어야 전출·자퇴한 학생을 빼고, 반을 옮긴 학생을 새 반으로 셀 수 있다.
+    // 이 문서는 한 학년뿐이라 그 학년 명렬과만 맞댄다(조회 화면과 같은 명단이 나온다).
     ensurePtsRoster().then(() => {
-      const students = ptsOnRoster(raw, ptsRosterSet(allStudents));
+      const students = ptsRosterView(raw, ptsRosterSet(allStudents.filter(s => String(parseInt(s.grade)) === grade))).list;
       renderHomeroomPtsBadge(hr, room, students);
     });
   }, () => {});
@@ -19410,6 +19486,31 @@ function renderPtsGroups() {
   }).join('');
 }
 
+// 관리자에게만 — 편성표와 리로스쿨이 어긋난 학생. 전출입이 리로스쿨에 늦게 반영되는 동안 생긴다.
+// 같은 학생이 두 목록에 다 뜨면 두 곳의 이름 표기가 다른 것이다(그러면 그 학생 점수가 '리로 자료
+// 없음' 으로 가려지므로 알아챌 자리가 있어야 한다).
+function renderPtsOrphans() {
+  const box = document.getElementById('ptsViewOrphans');
+  if (!box) return;
+  const isAdmin = !isViewAs() && fbAuth.currentUser?.email === ADMIN_EMAIL;
+  const missing = (ptsViewData || []).filter(s => s.noRiro);
+  const orphans = ptsViewOrphans || [];
+  if (!isAdmin || (!missing.length && !orphans.length)) { box.hidden = true; box.innerHTML = ''; return; }
+  const seat = s => `${s.grade}-${s.room}-${String(s.num ?? '').padStart(2, '0')}`;
+  const li = (s, tail) => `<li><span class="pts-orphan-seat">${escapeHtml(seat(s))}</span> ${escapeHtml(s.name || '')}`
+                        + (tail ? ` <span class="pts-orphan-why">· ${escapeHtml(tail)}</span>` : '') + '</li>';
+  const parts = [];
+  if (missing.length) parts.push(`<details><summary>리로스쿨에 아직 없는 학생 ${missing.length}명 <small>편성표에만 있음</small></summary>
+    <ul>${missing.map(s => li(s, s.ambRiro ? '같은 학년에 같은 이름이 여럿' : '')).join('')}</ul></details>`);
+  if (orphans.length) parts.push(`<details><summary>편성표에 없어 뺀 리로스쿨 학생 ${orphans.length}명 <small>명단·통계에 안 셈</small></summary>
+    <ul>${orphans.map(s => li(s, (s.why === 'amb' ? '같은 이름이 여럿이라 누구 것인지 모름' : '편성표에 없음')
+                                + ` · 합계 ${Number(s.total || 0)}`)).join('')}</ul></details>`);
+  box.innerHTML = parts.join('')
+    + '<div class="pts-orphan-note">관리자에게만 보입니다. 전출입은 리로스쿨에 늦게 반영되어 한동안 여기 남습니다. 같은 학생이 두 목록에 다 있으면 편성표와 리로스쿨의 이름 표기가 다른 것입니다.</div>';
+  box.hidden = false;
+}
+window.renderPtsOrphans = renderPtsOrphans;
+
 let ptsSortKey  = null;
 let ptsSortDesc = true;
 let ptsCurrentStudents = [];
@@ -19492,13 +19593,21 @@ function renderPtsStudentList(students) {
   list.innerHTML = students.map((s, i) => {
     const totalCls = s.total > 0 ? 'plus' : s.total < 0 ? 'minus' : '';
     const gradeRoom = ptsViewRoom ? '' : `<span style="font-size:11px;color:var(--ink-soft);font-family:'IBM Plex Mono';">${s.grade}-${s.room}</span>`;
-    return `<div class="pts-student-item" onclick="showPtsDetail(${i}, '${encodeURIComponent(JSON.stringify(s))}')">
-      <span class="pts-snum">${String(s.num).padStart(2,'0')}</span>
-      <span class="pts-sname">${escapeHtml(s.name)} ${gradeRoom}</span>
-      <span class="pts-stotal ${totalCls}">${s.total > 0 ? '+':''}${s.total}</span>
-      <span class="pts-smerit">+${s.merit}</span>
-      <span class="pts-sdemerit">${s.demerit}</span>
-      <span class="pts-sdeducted">${s.deducted ? '+' + Math.abs(s.deducted) : 0}</span>
+    // 편성표에는 있는데 리로스쿨 자료에 아직 없는 학생(전입·반 이동 직후). 0점처럼 보이면
+    // 정말 0점인 줄 안다 — 점수 칸은 비우고 표시를 단다.
+    const tag = s.ambRiro ? '<span class="pts-noriro" title="같은 학년에 같은 이름이 여럿이라 리로스쿨 자료가 누구 것인지 가리지 못했습니다">리로 확인 필요</span>'
+              : s.noRiro  ? '<span class="pts-noriro" title="리로스쿨 상벌점 자료에 아직 없습니다 — 전입·반 이동이 반영되기 전">리로 자료 없음</span>' : '';
+    const v = x => s.noRiro ? '–' : x;
+    // encodeURIComponent 는 작은따옴표를 그대로 둔다 — 사유에 ' 가 있으면 onclick 의 '…' 이 끊겨
+    // 눌러도 안 열렸다. %27 로 바꿔 넣는다(decodeURIComponent 가 되돌린다).
+    const enc = encodeURIComponent(JSON.stringify(s)).replace(/'/g, '%27');
+    return `<div class="pts-student-item" onclick="showPtsDetail(${i}, '${enc}')">
+      <span class="pts-snum">${escapeHtml(String(s.num).padStart(2,'0'))}</span>
+      <span class="pts-sname">${escapeHtml(s.name)} ${gradeRoom}${tag}</span>
+      <span class="pts-stotal ${totalCls}">${v((s.total > 0 ? '+' : '') + s.total)}</span>
+      <span class="pts-smerit">${v('+' + s.merit)}</span>
+      <span class="pts-sdemerit">${v(s.demerit)}</span>
+      <span class="pts-sdeducted">${v(s.deducted ? '+' + Math.abs(s.deducted) : 0)}</span>
     </div>`;
   }).join('');
 }
@@ -19512,20 +19621,26 @@ function showPtsDetail(idx, encoded) {
   document.getElementById('ptsDetailName').textContent = s.name;
   document.getElementById('ptsDetailInfo').textContent = `${s.grade}학년 ${s.room}반 ${String(s.num).padStart(2,'0')}번`;
   const totalEl = document.getElementById('ptsDetailTotal');
-  totalEl.textContent = (s.total > 0 ? '+' : '') + s.total;
+  const v = x => s.noRiro ? '–' : x;    // 리로 자료가 없으면 0점이 아니라 '모름'
+  totalEl.textContent = v((s.total > 0 ? '+' : '') + s.total);
   totalEl.className = 'pts-detail-score-val ' + (s.total > 0 ? 'plus' : s.total < 0 ? 'minus' : '');
-  document.getElementById('ptsDetailMerit').textContent = '+' + (s.merit || 0);
-  document.getElementById('ptsDetailDemerit').textContent = s.demerit || 0;
-  document.getElementById('ptsDetailDeducted').textContent = s.deducted ? '+' + Math.abs(s.deducted) : 0;
+  document.getElementById('ptsDetailMerit').textContent = v('+' + (s.merit || 0));
+  document.getElementById('ptsDetailDemerit').textContent = v(s.demerit || 0);
+  document.getElementById('ptsDetailDeducted').textContent = v(s.deducted ? '+' + Math.abs(s.deducted) : 0);
 
   const recordsEl = document.getElementById('ptsDetailRecords');
-  if (!s.records || s.records.length === 0) {
+  if (s.noRiro) {
+    recordsEl.innerHTML = `<div class="pts-detail-empty">${s.ambRiro
+      ? '리로스쿨에 같은 이름의 자료가 있지만, 같은 학년에 같은 이름이 여럿이라 누구 것인지 가리지 못해 붙이지 않았습니다. 점수는 리로스쿨에서 확인해 주세요.'
+      : '편성표에는 있지만 리로스쿨 상벌점 자료에는 아직 없는 학생입니다. 전입·반 이동이 리로스쿨에 반영되면 그다음 가져올 때 채워집니다.'}</div>`;
+  } else if (!s.records || s.records.length === 0) {
     recordsEl.innerHTML = '<div class="pts-detail-empty">상세 내역이 없습니다.</div>';
   } else {
+    // 리로스쿨에서 긁어 온 글이다 — 글자로만 넣는다
     recordsEl.innerHTML = s.records.map(r => `
       <div class="pts-detail-record-item">
-        <span class="pts-detail-record-date">${r.date}</span>
-        <span class="pts-detail-record-text">${r.detail}</span>
+        <span class="pts-detail-record-date">${escapeHtml(r.date)}</span>
+        <span class="pts-detail-record-text">${escapeHtml(r.detail)}</span>
       </div>
     `).join('');
   }

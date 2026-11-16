@@ -90,6 +90,7 @@ await pg.addScriptTag({ content: `
   function isOutsideClick(e, el) { return e.target === el; }
   let _zoomFor = 0;        // 원본 s360ClosePhotoZoom 이 올린다
 
+  ${grab('escapeHtml')}
   ${LET_FOR[0]}
   ${grab('ptsShowPhoto')}
   ${grab('showPtsDetail')}
@@ -260,6 +261,38 @@ console.log('\n■ 뒤로가기 — 사진을 밑의 창들보다 먼저 닫는�
     const bi = POP.indexOf(below);
     check(`${below.replace(/'/g, '')} 보다 먼저 본다`, bi > 0 && zi < bi, { 사진: zi, 밑: bi });
   }
+}
+
+console.log('\n■ 리로스쿨 자료가 없는 학생 — 0점이 아니라 "아직 없음" (2026-11-16 편성표 기준 명단)');
+{
+  const view = () => pg.evaluate(() => ({
+    total: document.getElementById('ptsDetailTotal').textContent,
+    merit: document.getElementById('ptsDetailMerit').textContent,
+    demerit: document.getElementById('ptsDetailDemerit').textContent,
+    deducted: document.getElementById('ptsDetailDeducted').textContent,
+    rec: document.getElementById('ptsDetailRecords').textContent.trim(),
+    info: document.getElementById('ptsDetailInfo').textContent }));
+  await open({ name: '카전입', grade: 3, room: 3, num: 25, noRiro: true });
+  let v = await view();
+  check('전입생 — 점수 칸이 모두 –', [v.total, v.merit, v.demerit, v.deducted].every(x => x === '–'), v);
+  check('전입생 — 리로스쿨에 아직 없다고 알려 준다', /리로스쿨 상벌점 자료에는 아직 없는 학생/.test(v.rec), v.rec);
+  check('편성표 자리로 보인다', v.info === '3학년 3반 25번', v.info);
+  await open({ name: '하둘', grade: 3, room: 3, num: 1, noRiro: true, ambRiro: true });
+  v = await view();
+  check('같은 이름이 여럿 — 누구 것인지 몰라 안 붙였다고 알려 준다', /누구 것인지 가리지 못해/.test(v.rec), v.rec);
+  await open({ name: '김가람', grade: 3, room: 3, num: 2, total: -3, demerit: -3 });
+  v = await view();
+  check('리로 자료가 있는 학생은 그대로 (0 도 숫자로)', v.total === '-3' && v.merit === '+0' && v.deducted === '0', v);
+
+  // 리로스쿨에서 긁어 온 글이 화면에서 실행되면 안 된다
+  await open({ name: '김가람', grade: 3, room: 3, num: 2, total: -3,
+               records: [{ date: '<b>11/10</b>', detail: '<img src=x onerror="window.__boom=1">지각 -3' }] });
+  await settle();
+  const x = await pg.evaluate(() => ({ boom: !!window.__boom,
+    tags: document.querySelectorAll('#ptsDetailRecords img, #ptsDetailRecords b').length,
+    text: document.getElementById('ptsDetailRecords').textContent.replace(/\s+/g, ' ').trim() }));
+  check('사유·날짜의 태그는 글자로만 보인다', !x.boom && x.tags === 0 && /<img src=x/.test(x.text) && /<b>11\/10<\/b>/.test(x.text), x);
+  await pg.evaluate(() => closePtsDetailBtn());
 }
 
 console.log(errs.length ? '\n❌ 런타임 오류:\n' + errs.slice(0, 4).join('\n') : '\n✅ 런타임 오류 없음');
